@@ -90,5 +90,22 @@ internal sealed class OperatorVoucherRenewalConfiguration : IEntityTypeConfigura
         builder.HasIndex(e => e.VoucherId);
         builder.HasIndex(e => e.CustomerUserId);
         builder.HasIndex(e => e.CreatedAtUtc);
+        // ReplacementVoucherId is indexed by the FK convention above.
+
+        // customer_user_id and acting_user_id stay unconstrained on purpose. They are written
+        // from the acting account's claim, and a renewal must never be refused because of an
+        // id the audit row carries - the same reasoning as error_logs and provider_event_outbox.
+        // The cost is a dangling id; the benefit is that the settlement record can always be
+        // written. See the review's F-14 for the trade-off this leaves on the table.
+
+        builder.ToTable(t =>
+        {
+            // Exactly these two values, per the entity's own documentation.
+            t.HasCheckConstraint("ck_operator_renewal_branch", "branch IN ('extend', 'replace')");
+            t.HasCheckConstraint("ck_operator_renewal_expiration_moves_forward",
+                "new_expiration > old_expiration");
+            // 0 legitimately means "free compensation", so >= 0 and not > 0.
+            t.HasCheckConstraint("ck_operator_renewal_surcharge_non_negative", "surcharge_uah >= 0");
+        });
     }
 }

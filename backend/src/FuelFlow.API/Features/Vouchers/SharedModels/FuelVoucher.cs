@@ -31,7 +31,6 @@ public class FuelVoucher
 
     public string VoucherNumber { get; set; } = null!;
     public string QrPayload { get; set; } = null!;
-    public string? ExternalId { get; set; }
     public DateTime CreatedAtUtc { get; set; }
 
     /// <summary>

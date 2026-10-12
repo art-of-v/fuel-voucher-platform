@@ -28,7 +28,6 @@ internal sealed class AppSettingConfiguration : IEntityTypeConfiguration<AppSett
 
         builder.Property(e => e.UpdatedByUserId)
             .HasColumnName("updated_by_user_id");
-
         builder.Property(e => e.UpdatedByUserName)
             .HasColumnName("updated_by_user_name")
             .HasMaxLength(200);

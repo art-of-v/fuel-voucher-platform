@@ -9,21 +9,117 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace FuelFlow.API.Features.Auth.Migrations
+namespace FuelFlow.API.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260919070939_AddRoleNameAtIssueToRefreshToken")]
-    partial class AddRoleNameAtIssueToRefreshToken
+    [Migration("20261012062205_DatabaseIntegrity")]
+    partial class DatabaseIntegrity
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.11")
+                .HasAnnotation("ProductVersion", "10.0.12")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+
+            modelBuilder.Entity("FuelFlow.Features.Acquiring.MonobankStatementEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("AcquirerCreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("acquirer_created_at_utc");
+
+                    b.Property<DateTime?>("AcquirerModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("acquirer_modified_at_utc");
+
+                    b.Property<long?>("AmountKopecks")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount_kopecks");
+
+                    b.Property<string>("ApprovalCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("approval_code");
+
+                    b.Property<int?>("Ccy")
+                        .HasColumnType("integer")
+                        .HasColumnName("ccy");
+
+                    b.Property<string>("ExtRef")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("ext_ref");
+
+                    b.Property<DateTime>("FirstSeenAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_seen_at_utc");
+
+                    b.Property<string>("InvoiceId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("invoice_id");
+
+                    b.Property<DateTime>("LastSeenAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_seen_at_utc");
+
+                    b.Property<string>("MaskedCard")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("masked_card");
+
+                    b.Property<string>("Merchant")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("merchant");
+
+                    b.Property<string>("RawPayload")
+                        .HasColumnType("text")
+                        .HasColumnName("raw_payload");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("reference");
+
+                    b.Property<string>("Rrn")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("rrn");
+
+                    b.Property<string>("StatementId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("statement_id");
+
+                    b.Property<string>("Status")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InvoiceId");
+
+                    b.HasIndex("Reference");
+
+                    b.HasIndex("Merchant", "AcquirerCreatedAtUtc");
+
+                    b.HasIndex("Merchant", "StatementId")
+                        .IsUnique();
+
+                    b.ToTable("monobank_statement_entries", (string)null);
+                });
 
             modelBuilder.Entity("FuelFlow.Features.Auth.SharedModels.Device", b =>
                 {
@@ -83,7 +179,10 @@ namespace FuelFlow.API.Features.Auth.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("devices", (string)null);
+                    b.ToTable("devices", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_device_status", "status IN ('Active', 'Revoked')");
+                        });
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Auth.SharedModels.RefreshToken", b =>
@@ -251,7 +350,10 @@ namespace FuelFlow.API.Features.Auth.Migrations
 
                     b.HasIndex("WorkerUserId", "Status");
 
-                    b.ToTable("company_invitations", (string)null);
+                    b.ToTable("company_invitations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_company_invitation_status", "status IN ('Pending', 'Accepted', 'Declined', 'Cancelled')");
+                        });
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Company.SharedModels.CompanyMember", b =>
@@ -260,6 +362,14 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at_utc");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
 
                     b.Property<DateTime>("JoinedAtUtc")
                         .HasColumnType("timestamp with time zone")
@@ -278,7 +388,9 @@ namespace FuelFlow.API.Features.Auth.Migrations
                     b.HasIndex("LegalEntityId");
 
                     b.HasIndex("WorkerUserId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_company_members_worker_user_id")
+                        .HasFilter("is_deleted = false");
 
                     b.ToTable("company_members", (string)null);
                 });
@@ -379,8 +491,7 @@ namespace FuelFlow.API.Features.Auth.Migrations
                     b.HasIndex("Edrpou")
                         .IsUnique();
 
-                    b.HasIndex("UserId")
-                        .IsUnique();
+                    b.HasIndex("UserId");
 
                     b.ToTable("legal_entities", (string)null);
                 });
@@ -454,11 +565,66 @@ namespace FuelFlow.API.Features.Auth.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId", "CreatedAtUtc")
+                        .IsDescending(false, true);
 
                     b.HasIndex("UserId", "IsRead");
 
                     b.ToTable("notifications", (string)null);
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Notifications.SharedModels.UserPushToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("DeviceId")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("device_id");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<DateTime>("LastSeenAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_seen_at_utc");
+
+                    b.Property<string>("Platform")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("platform");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("token");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Token")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("push_tokens", (string)null);
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Orders.SharedModels.Fulfillment", b =>
@@ -478,13 +644,26 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("order_id");
 
+                    b.Property<string>("ReleaseReason")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("release_reason");
+
+                    b.Property<DateTime?>("ReleasedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("released_at_utc");
+
                     b.Property<Guid>("VoucherId")
                         .HasColumnType("uuid")
                         .HasColumnName("voucher_id");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("OrderId");
+                    b.HasIndex("OrderId")
+                        .HasFilter("released_at_utc IS NULL");
+
+                    b.HasIndex("ReleasedAtUtc")
+                        .HasFilter("released_at_utc IS NOT NULL");
 
                     b.HasIndex("VoucherId");
 
@@ -517,11 +696,21 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("is_deleted");
 
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Purchase")
+                        .HasColumnName("kind");
+
                     b.Property<DateTime?>("LastWebhookModifiedDateUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_webhook_modified_date_utc");
 
                     b.Property<DateTime?>("LastWebhookProcessedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_webhook_processed_at_utc");
 
                     b.Property<Guid?>("LegalEntityId")
                         .HasColumnType("uuid")
@@ -531,6 +720,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("monobank_invoice_id");
+
+                    b.Property<string>("MonobankMerchant")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("monobank_merchant");
 
                     b.Property<string>("MonobankPaymentUrl")
                         .HasMaxLength(500)
@@ -546,9 +740,13 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("partially_fulfilled_since_utc");
 
-                    b.Property<int>("Price")
-                        .HasColumnType("integer")
+                    b.Property<decimal>("Price")
+                        .HasColumnType("numeric(12,2)")
                         .HasColumnName("price");
+
+                    b.Property<Guid?>("SourceOrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_order_id");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -574,16 +772,21 @@ namespace FuelFlow.API.Features.Auth.Migrations
 
                     b.HasIndex("LegalEntityId");
 
-                    b.HasIndex("Status");
-
-                    b.HasIndex("UserId");
+                    b.HasIndex("SourceOrderId");
 
                     b.HasIndex("UserId", "CreatedAtUtc")
                         .IsDescending(false, true);
 
                     b.HasIndex("UserId", "Status");
 
-                    b.ToTable("orders", (string)null);
+                    b.ToTable("orders", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_order_kind", "kind IN ('Purchase', 'Renewal', 'ReceivedFromCompany')");
+
+                            t.HasCheckConstraint("ck_order_price_non_negative", "price >= 0");
+
+                            t.HasCheckConstraint("ck_order_status", "status IN ('PendingPayment', 'Paid', 'PendingFulfillment', 'PartiallyFulfilled',\n           'Fulfilled', 'PartiallyRefunded', 'Refunded', 'Cancelled')");
+                        });
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Orders.SharedModels.OrderLineItem", b =>
@@ -599,8 +802,8 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("fuel_type_id");
 
-                    b.Property<int>("LineTotal")
-                        .HasColumnType("integer")
+                    b.Property<decimal>("LineTotal")
+                        .HasColumnType("numeric(12,2)")
                         .HasColumnName("line_total");
 
                     b.Property<decimal>("Liters")
@@ -610,6 +813,10 @@ namespace FuelFlow.API.Features.Auth.Migrations
                     b.Property<Guid>("OrderId")
                         .HasColumnType("uuid")
                         .HasColumnName("order_id");
+
+                    b.Property<decimal?>("OriginalLineTotal")
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("original_line_total");
 
                     b.Property<string>("Provider")
                         .IsRequired()
@@ -623,8 +830,13 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         .HasDefaultValue(1)
                         .HasColumnName("quantity");
 
-                    b.Property<int>("UnitPrice")
-                        .HasColumnType("integer")
+                    b.Property<string>("TermCode")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("term_code");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("numeric(12,2)")
                         .HasColumnName("unit_price");
 
                     b.HasKey("Id");
@@ -635,7 +847,16 @@ namespace FuelFlow.API.Features.Auth.Migrations
 
                     b.HasIndex("Provider");
 
-                    b.ToTable("order_line_items", (string)null);
+                    b.ToTable("order_line_items", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_order_line_non_negative_prices", "unit_price >= 0 AND line_total >= 0");
+
+                            t.HasCheckConstraint("ck_order_line_original_non_negative", "original_line_total IS NULL OR original_line_total >= 0");
+
+                            t.HasCheckConstraint("ck_order_line_positive_liters", "liters > 0");
+
+                            t.HasCheckConstraint("ck_order_line_positive_quantity", "quantity > 0");
+                        });
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Orders.SharedModels.OutboxEvent", b =>
@@ -678,7 +899,10 @@ namespace FuelFlow.API.Features.Auth.Migrations
 
                     b.HasIndex("Processed");
 
-                    b.ToTable("outbox_events", (string)null);
+                    b.ToTable("outbox_events", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_outbox_event_type", "event_type IN ('OrderCreated', 'OrderFulfilled', 'OrderCancelled',\n               'PaymentCompleted', 'VoucherExpired', 'VoucherUsed', 'VoucherActivated')");
+                        });
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Orders.SharedModels.Refund", b =>
@@ -688,8 +912,8 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<int>("Amount")
-                        .HasColumnType("integer")
+                    b.Property<long>("Amount")
+                        .HasColumnType("bigint")
                         .HasColumnName("amount");
 
                     b.Property<DateTime>("CreatedAtUtc")
@@ -712,8 +936,8 @@ namespace FuelFlow.API.Features.Auth.Migrations
 
                     b.Property<string>("ExtRef")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
                         .HasColumnName("ext_ref");
 
                     b.Property<string>("InvoiceId")
@@ -751,10 +975,21 @@ namespace FuelFlow.API.Features.Auth.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("InvoiceId");
+
                     b.HasIndex("OrderId")
                         .IsUnique();
 
-                    b.ToTable("refunds", (string)null);
+                    b.HasIndex("UserId");
+
+                    b.ToTable("refunds", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_refund_amount_positive", "amount > 0");
+
+                            t.HasCheckConstraint("ck_refund_status", "status IN ('Processing', 'Completed', 'Failed')");
+                        });
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Settings.SharedModels.AppSetting", b =>
@@ -837,6 +1072,82 @@ namespace FuelFlow.API.Features.Auth.Migrations
                     b.ToTable("support_messages", (string)null);
                 });
 
+            modelBuilder.Entity("FuelFlow.Features.Vouchers.Exchange.VoucherExchange", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ActingUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("acting_user_id");
+
+                    b.Property<string>("ActingUserName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("acting_user_name");
+
+                    b.Property<decimal?>("CostPerLiterApplied")
+                        .HasColumnType("numeric(10,4)")
+                        .HasColumnName("cost_per_liter_applied");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("ExchangeBatchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("exchange_batch_id");
+
+                    b.Property<string>("FuelTypeId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("fuel_type_id");
+
+                    b.Property<Guid?>("NewVoucherId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("new_voucher_id");
+
+                    b.Property<Guid>("OldVoucherId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("old_voucher_id");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("provider");
+
+                    b.Property<Guid>("SupplierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("supplier_id");
+
+                    b.Property<decimal>("SurchargeUah")
+                        .HasColumnType("numeric(10,2)")
+                        .HasColumnName("surcharge_uah");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExchangeBatchId");
+
+                    b.HasIndex("NewVoucherId");
+
+                    b.HasIndex("OldVoucherId")
+                        .IsUnique();
+
+                    b.HasIndex("SupplierId");
+
+                    b.ToTable("voucher_exchanges", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_voucher_exchange_cost_non_negative", "cost_per_liter_applied IS NULL OR cost_per_liter_applied >= 0");
+
+                            t.HasCheckConstraint("ck_voucher_exchange_not_self", "old_voucher_id IS DISTINCT FROM new_voucher_id");
+
+                            t.HasCheckConstraint("ck_voucher_exchange_surcharge_non_negative", "surcharge_uah >= 0");
+                        });
+                });
+
             modelBuilder.Entity("FuelFlow.Features.Vouchers.FuelVoucher", b =>
                 {
                     b.Property<Guid>("Id")
@@ -848,18 +1159,17 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("assigned_to_user_id");
 
+                    b.Property<decimal?>("CostPerLiter")
+                        .HasColumnType("numeric(10,4)")
+                        .HasColumnName("cost_per_liter");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
 
-                    b.Property<DateOnly>("ExpirationDate")
+                    b.Property<DateOnly>("CustomerExpirationDate")
                         .HasColumnType("date")
-                        .HasColumnName("expiration_date");
-
-                    b.Property<string>("ExternalId")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("external_id");
+                        .HasColumnName("customer_expiration_date");
 
                     b.Property<string>("FuelSubtype")
                         .HasMaxLength(50)
@@ -873,7 +1183,8 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         .HasColumnName("fuel_type_id");
 
                     b.Property<string>("ImageUrl")
-                        .HasColumnType("text")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
                         .HasColumnName("image_url");
 
                     b.Property<Guid?>("ImportJobId")
@@ -886,6 +1197,16 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("is_deleted");
 
+                    b.Property<bool>("IsTestData")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_test_data");
+
+                    b.Property<DateTime?>("IssuedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("issued_at_utc");
+
                     b.Property<Guid?>("LegalEntityId")
                         .HasColumnType("uuid")
                         .HasColumnName("legal_entity_id");
@@ -894,11 +1215,19 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         .HasColumnType("numeric(10,2)")
                         .HasColumnName("liters");
 
+                    b.Property<Guid?>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
                     b.Property<string>("Provider")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("provider");
+
+                    b.Property<DateOnly>("ProviderExpirationDate")
+                        .HasColumnType("date")
+                        .HasColumnName("provider_expiration_date");
 
                     b.Property<Guid?>("QrParametersId")
                         .HasColumnType("uuid")
@@ -906,22 +1235,31 @@ namespace FuelFlow.API.Features.Auth.Migrations
 
                     b.Property<string>("QrPayload")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("varchar(2000)")
                         .HasColumnName("qr_payload");
 
                     b.Property<string>("RedemptionRules")
-                        .HasColumnType("text")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
                         .HasColumnName("redemption_rules");
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
                         .HasColumnName("status");
+
+                    b.Property<Guid?>("SupplierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("supplier_id");
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at_utc");
+
+                    b.Property<DateTime?>("UsedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("used_at_utc");
 
                     b.Property<double?>("VerificationMismatchPercent")
                         .HasColumnType("double precision")
@@ -947,28 +1285,20 @@ namespace FuelFlow.API.Features.Auth.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AssignedToUserId");
-
-                    b.HasIndex("ExpirationDate");
-
-                    b.HasIndex("ExternalId")
-                        .IsUnique()
-                        .HasFilter("external_id IS NOT NULL");
-
-                    b.HasIndex("FuelTypeId");
+                    b.HasIndex("CustomerExpirationDate");
 
                     b.HasIndex("ImportJobId");
 
-                    b.HasIndex("LegalEntityId");
+                    b.HasIndex("OrderId");
 
-                    b.HasIndex("Provider");
+                    b.HasIndex("ProviderExpirationDate");
 
                     b.HasIndex("QrParametersId");
 
                     b.HasIndex("QrPayload")
                         .IsUnique();
 
-                    b.HasIndex("Status");
+                    b.HasIndex("SupplierId");
 
                     b.HasIndex("VoucherNumber")
                         .IsUnique();
@@ -977,11 +1307,24 @@ namespace FuelFlow.API.Features.Auth.Migrations
 
                     b.HasIndex("AssignedToUserId", "Status");
 
-                    b.HasIndex("LegalEntityId", "WorkerUserId", "Status");
+                    b.HasIndex("FuelTypeId", "Status", "IsDeleted");
+
+                    b.HasIndex("Status", "IsTestData", "IsDeleted");
+
+                    b.HasIndex("LegalEntityId", "WorkerUserId", "Status", "IsDeleted");
 
                     b.HasIndex("Provider", "FuelTypeId", "Liters", "Status");
 
-                    b.ToTable("fuel_vouchers", (string)null);
+                    b.ToTable("fuel_vouchers", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_voucher_cost_non_negative", "cost_per_liter IS NULL OR cost_per_liter >= 0");
+
+                            t.HasCheckConstraint("ck_voucher_held_has_order", "status NOT IN ('Assigned', 'Used', 'Blocked') OR order_id IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_voucher_liters_positive", "liters > 0");
+
+                            t.HasCheckConstraint("ck_voucher_status", "status IN ('Imported', 'VerifiedWithWarnings', 'VerificationFailed', 'Available',\n           'Assigned', 'Used', 'Expired', 'Blocked', 'Deactivated')");
+                        });
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Vouchers.QrParameters", b =>
@@ -1020,6 +1363,150 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         .IsUnique();
 
                     b.ToTable("qr_parameters", (string)null);
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Vouchers.Renewal.Operator.OperatorVoucherRenewal", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ActingUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("acting_user_id");
+
+                    b.Property<string>("ActingUserName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("acting_user_name");
+
+                    b.Property<string>("Branch")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("branch");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("CustomerUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customer_user_id");
+
+                    b.Property<DateOnly?>("InvoiceDate")
+                        .HasColumnType("date")
+                        .HasColumnName("invoice_date");
+
+                    b.Property<string>("InvoiceNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("invoice_number");
+
+                    b.Property<DateOnly>("NewExpiration")
+                        .HasColumnType("date")
+                        .HasColumnName("new_expiration");
+
+                    b.Property<DateOnly>("OldExpiration")
+                        .HasColumnType("date")
+                        .HasColumnName("old_expiration");
+
+                    b.Property<Guid?>("ReplacementVoucherId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("replacement_voucher_id");
+
+                    b.Property<decimal>("SurchargeUah")
+                        .HasColumnType("numeric(10,2)")
+                        .HasColumnName("surcharge_uah");
+
+                    b.Property<string>("TermCode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("term_code");
+
+                    b.Property<Guid>("VoucherId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("voucher_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAtUtc");
+
+                    b.HasIndex("CustomerUserId");
+
+                    b.HasIndex("ReplacementVoucherId");
+
+                    b.HasIndex("VoucherId");
+
+                    b.ToTable("operator_voucher_renewals", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_operator_renewal_branch", "branch IN ('extend', 'replace')");
+
+                            t.HasCheckConstraint("ck_operator_renewal_expiration_moves_forward", "new_expiration > old_expiration");
+
+                            t.HasCheckConstraint("ck_operator_renewal_surcharge_non_negative", "surcharge_uah >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Vouchers.Renewal.VoucherRenewalItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal?>("AmountPaid")
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("amount_paid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<DateTime?>("FulfilledAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fulfilled_at_utc");
+
+                    b.Property<Guid?>("FulfilledVoucherId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("fulfilled_voucher_id");
+
+                    b.Property<DateOnly?>("NewCustomerExpiration")
+                        .HasColumnType("date")
+                        .HasColumnName("new_customer_expiration");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<DateOnly?>("PreviousCustomerExpiration")
+                        .HasColumnType("date")
+                        .HasColumnName("previous_customer_expiration");
+
+                    b.Property<Guid>("SourceVoucherId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_voucher_id");
+
+                    b.Property<string>("TermCode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("term_code");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FulfilledVoucherId");
+
+                    b.HasIndex("OrderId");
+
+                    b.HasIndex("SourceVoucherId");
+
+                    b.ToTable("voucher_renewal_items", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_voucher_renewal_amount_non_negative", "amount_paid IS NULL OR amount_paid >= 0");
+                        });
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Vouchers.VoucherImport", b =>
@@ -1094,7 +1581,8 @@ namespace FuelFlow.API.Features.Auth.Migrations
 
                     b.Property<string>("ErrorMessage")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
                         .HasColumnName("error_message");
 
                     b.Property<Guid>("ImportId")
@@ -1106,7 +1594,8 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         .HasColumnName("page_number");
 
                     b.Property<string>("RawText")
-                        .HasColumnType("text")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
                         .HasColumnName("raw_text");
 
                     b.Property<string>("VoucherNumber")
@@ -1129,16 +1618,19 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         .HasColumnName("id");
 
                     b.Property<string>("ExceptionMessage")
-                        .HasColumnType("text")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
                         .HasColumnName("exception_message");
 
                     b.Property<string>("ExceptionType")
-                        .HasColumnType("text")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
                         .HasColumnName("exception_type");
 
                     b.Property<string>("Level")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
                         .HasColumnName("level");
 
                     b.Property<DateTime>("LoggedAtUtc")
@@ -1147,27 +1639,50 @@ namespace FuelFlow.API.Features.Auth.Migrations
 
                     b.Property<string>("Message")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
                         .HasColumnName("message");
 
                     b.Property<string>("RequestMethod")
-                        .HasColumnType("text")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
                         .HasColumnName("request_method");
 
                     b.Property<string>("RequestPath")
-                        .HasColumnType("text")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
                         .HasColumnName("request_path");
 
+                    b.Property<DateTime?>("ResolvedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("resolved_at_utc");
+
+                    b.Property<Guid?>("ResolvedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("resolved_by_user_id");
+
+                    b.Property<string>("ResolvedByUserName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("resolved_by_user_name");
+
                     b.Property<string>("Source")
-                        .HasColumnType("text")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
                         .HasColumnName("source");
 
                     b.Property<string>("StackTrace")
                         .HasColumnType("text")
                         .HasColumnName("stack_trace");
 
+                    b.Property<string>("TraceId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("trace_id");
+
                     b.Property<string>("UserName")
-                        .HasColumnType("text")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
                         .HasColumnName("user_name");
 
                     b.HasKey("Id");
@@ -1177,6 +1692,10 @@ namespace FuelFlow.API.Features.Auth.Migrations
                     b.HasIndex("LoggedAtUtc");
 
                     b.HasIndex("Source");
+
+                    b.HasIndex("TraceId");
+
+                    b.HasIndex("ResolvedAtUtc", "LoggedAtUtc");
 
                     b.ToTable("error_logs", (string)null);
                 });
@@ -1190,6 +1709,10 @@ namespace FuelFlow.API.Features.Auth.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
+
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at_utc");
 
                     b.Property<decimal?>("FinalPricePerLiter")
                         .HasColumnType("numeric(10,4)")
@@ -1205,6 +1728,10 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         .HasColumnType("text")
                         .HasColumnName("fuel_type_id");
 
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
                     b.Property<decimal>("Liters")
                         .HasColumnType("numeric(10,2)")
                         .HasColumnName("liters");
@@ -1217,12 +1744,16 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         .HasColumnType("numeric(10,4)")
                         .HasColumnName("margin_uah_per_liter");
 
-                    b.Property<int>("OriginalPrice")
-                        .HasColumnType("integer")
+                    b.Property<decimal?>("MinDiscountPerLiter")
+                        .HasColumnType("numeric(10,4)")
+                        .HasColumnName("min_discount_per_liter");
+
+                    b.Property<decimal>("OriginalPrice")
+                        .HasColumnType("numeric(12,2)")
                         .HasColumnName("original_price");
 
-                    b.Property<int>("Price")
-                        .HasColumnType("integer")
+                    b.Property<decimal>("Price")
+                        .HasColumnType("numeric(12,2)")
                         .HasColumnName("price");
 
                     b.Property<DateTime?>("PriceUpdatedAt")
@@ -1232,6 +1763,10 @@ namespace FuelFlow.API.Features.Auth.Migrations
                     b.Property<Guid?>("PriceUpdatedByUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("price_updated_by_user_id");
+
+                    b.Property<decimal?>("PumpPricePerLiter")
+                        .HasColumnType("numeric(10,4)")
+                        .HasColumnName("pump_price_per_liter");
 
                     b.Property<string>("StationId")
                         .IsRequired()
@@ -1264,10 +1799,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             FinalPricePerLiter = 52m,
                             FuelName = "ДП ЄВРО",
                             FuelTypeId = "okko-dp",
+                            IsDeleted = false,
                             Liters = 10m,
                             MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 500,
-                            Price = 520,
+                            OriginalPrice = 520m,
+                            Price = 520m,
                             StationId = "okko",
                             SupplierPricePerLiter = 50.0m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1279,10 +1815,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             FinalPricePerLiter = 52m,
                             FuelName = "ДП ЄВРО",
                             FuelTypeId = "okko-dp",
+                            IsDeleted = false,
                             Liters = 20m,
                             MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 1000,
-                            Price = 1040,
+                            OriginalPrice = 1040m,
+                            Price = 1040m,
                             StationId = "okko",
                             SupplierPricePerLiter = 50.0m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1294,10 +1831,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             FinalPricePerLiter = 52m,
                             FuelName = "ДП ЄВРО",
                             FuelTypeId = "okko-dp",
+                            IsDeleted = false,
                             Liters = 50m,
                             MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 2500,
-                            Price = 2600,
+                            OriginalPrice = 2600m,
+                            Price = 2600m,
                             StationId = "okko",
                             SupplierPricePerLiter = 50.0m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1309,10 +1847,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             FinalPricePerLiter = 51m,
                             FuelName = "A-95",
                             FuelTypeId = "okko-95",
+                            IsDeleted = false,
                             Liters = 10m,
                             MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 490,
-                            Price = 510,
+                            OriginalPrice = 510m,
+                            Price = 510m,
                             StationId = "okko",
                             SupplierPricePerLiter = 49.0m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1324,10 +1863,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             FinalPricePerLiter = 51m,
                             FuelName = "A-95",
                             FuelTypeId = "okko-95",
+                            IsDeleted = false,
                             Liters = 20m,
                             MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 980,
-                            Price = 1020,
+                            OriginalPrice = 1020m,
+                            Price = 1020m,
                             StationId = "okko",
                             SupplierPricePerLiter = 49.0m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1339,10 +1879,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             FinalPricePerLiter = 51m,
                             FuelName = "A-95",
                             FuelTypeId = "okko-95",
+                            IsDeleted = false,
                             Liters = 50m,
                             MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 2450,
-                            Price = 2550,
+                            OriginalPrice = 2550m,
+                            Price = 2550m,
                             StationId = "okko",
                             SupplierPricePerLiter = 49.0m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1354,10 +1895,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             FinalPricePerLiter = 56m,
                             FuelName = "Pulls 95",
                             FuelTypeId = "okko-p95",
+                            IsDeleted = false,
                             Liters = 10m,
                             MarginUahPerLiter = 3.0m,
-                            OriginalPrice = 530,
-                            Price = 560,
+                            OriginalPrice = 560m,
+                            Price = 560m,
                             StationId = "okko",
                             SupplierPricePerLiter = 53.0m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1369,10 +1911,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             FinalPricePerLiter = 56m,
                             FuelName = "Pulls 95",
                             FuelTypeId = "okko-p95",
+                            IsDeleted = false,
                             Liters = 20m,
                             MarginUahPerLiter = 3.0m,
-                            OriginalPrice = 1060,
-                            Price = 1120,
+                            OriginalPrice = 1120m,
+                            Price = 1120m,
                             StationId = "okko",
                             SupplierPricePerLiter = 53.0m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1384,10 +1927,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             FinalPricePerLiter = 56m,
                             FuelName = "Pulls 95",
                             FuelTypeId = "okko-p95",
+                            IsDeleted = false,
                             Liters = 50m,
                             MarginUahPerLiter = 3.0m,
-                            OriginalPrice = 2650,
-                            Price = 2800,
+                            OriginalPrice = 2800m,
+                            Price = 2800m,
                             StationId = "okko",
                             SupplierPricePerLiter = 53.0m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1399,10 +1943,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             FinalPricePerLiter = 55m,
                             FuelName = "ДП PULLS",
                             FuelTypeId = "okko-pulls-dp",
+                            IsDeleted = false,
                             Liters = 10m,
                             MarginUahPerLiter = 2.5m,
-                            OriginalPrice = 525,
-                            Price = 550,
+                            OriginalPrice = 550m,
+                            Price = 550m,
                             StationId = "okko",
                             SupplierPricePerLiter = 52.5m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1414,10 +1959,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             FinalPricePerLiter = 55m,
                             FuelName = "ДП PULLS",
                             FuelTypeId = "okko-pulls-dp",
+                            IsDeleted = false,
                             Liters = 20m,
                             MarginUahPerLiter = 2.5m,
-                            OriginalPrice = 1050,
-                            Price = 1100,
+                            OriginalPrice = 1100m,
+                            Price = 1100m,
                             StationId = "okko",
                             SupplierPricePerLiter = 52.5m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1429,10 +1975,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             FinalPricePerLiter = 55m,
                             FuelName = "ДП PULLS",
                             FuelTypeId = "okko-pulls-dp",
+                            IsDeleted = false,
                             Liters = 50m,
                             MarginUahPerLiter = 2.5m,
-                            OriginalPrice = 2625,
-                            Price = 2750,
+                            OriginalPrice = 2750m,
+                            Price = 2750m,
                             StationId = "okko",
                             SupplierPricePerLiter = 52.5m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1444,10 +1991,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             FinalPricePerLiter = 27m,
                             FuelName = "ГАЗ",
                             FuelTypeId = "okko-gas",
+                            IsDeleted = false,
                             Liters = 10m,
                             MarginUahPerLiter = 1.5m,
-                            OriginalPrice = 255,
-                            Price = 270,
+                            OriginalPrice = 270m,
+                            Price = 270m,
                             StationId = "okko",
                             SupplierPricePerLiter = 25.5m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1459,10 +2007,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             FinalPricePerLiter = 27m,
                             FuelName = "ГАЗ",
                             FuelTypeId = "okko-gas",
+                            IsDeleted = false,
                             Liters = 20m,
                             MarginUahPerLiter = 1.5m,
-                            OriginalPrice = 510,
-                            Price = 540,
+                            OriginalPrice = 540m,
+                            Price = 540m,
                             StationId = "okko",
                             SupplierPricePerLiter = 25.5m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1474,10 +2023,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             FinalPricePerLiter = 27m,
                             FuelName = "ГАЗ",
                             FuelTypeId = "okko-gas",
+                            IsDeleted = false,
                             Liters = 50m,
                             MarginUahPerLiter = 1.5m,
-                            OriginalPrice = 1275,
-                            Price = 1350,
+                            OriginalPrice = 1350m,
+                            Price = 1350m,
                             StationId = "okko",
                             SupplierPricePerLiter = 25.5m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1489,10 +2039,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             FinalPricePerLiter = 53m,
                             FuelName = "ДП Mustang",
                             FuelTypeId = "wog-dp",
+                            IsDeleted = false,
                             Liters = 10m,
                             MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 510,
-                            Price = 530,
+                            OriginalPrice = 530m,
+                            Price = 530m,
                             StationId = "wog",
                             SupplierPricePerLiter = 51.0m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1504,10 +2055,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             FinalPricePerLiter = 53m,
                             FuelName = "ДП Mustang",
                             FuelTypeId = "wog-dp",
+                            IsDeleted = false,
                             Liters = 20m,
                             MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 1020,
-                            Price = 1060,
+                            OriginalPrice = 1060m,
+                            Price = 1060m,
                             StationId = "wog",
                             SupplierPricePerLiter = 51.0m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1519,10 +2071,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             FinalPricePerLiter = 53m,
                             FuelName = "ДП Mustang",
                             FuelTypeId = "wog-dp",
+                            IsDeleted = false,
                             Liters = 50m,
                             MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 2550,
-                            Price = 2650,
+                            OriginalPrice = 2650m,
+                            Price = 2650m,
                             StationId = "wog",
                             SupplierPricePerLiter = 51.0m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1534,10 +2087,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             FinalPricePerLiter = 52m,
                             FuelName = "A-95 Mustang",
                             FuelTypeId = "wog-95",
+                            IsDeleted = false,
                             Liters = 10m,
                             MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 500,
-                            Price = 520,
+                            OriginalPrice = 520m,
+                            Price = 520m,
                             StationId = "wog",
                             SupplierPricePerLiter = 50.0m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1549,10 +2103,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             FinalPricePerLiter = 52m,
                             FuelName = "A-95 Mustang",
                             FuelTypeId = "wog-95",
+                            IsDeleted = false,
                             Liters = 20m,
                             MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 1000,
-                            Price = 1040,
+                            OriginalPrice = 1040m,
+                            Price = 1040m,
                             StationId = "wog",
                             SupplierPricePerLiter = 50.0m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1564,10 +2119,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             FinalPricePerLiter = 52m,
                             FuelName = "A-95 Mustang",
                             FuelTypeId = "wog-95",
+                            IsDeleted = false,
                             Liters = 50m,
                             MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 2500,
-                            Price = 2600,
+                            OriginalPrice = 2600m,
+                            Price = 2600m,
                             StationId = "wog",
                             SupplierPricePerLiter = 50.0m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1579,10 +2135,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             FinalPricePerLiter = 53m,
                             FuelName = "A 95 EURO",
                             FuelTypeId = "wog-95-euro",
+                            IsDeleted = false,
                             Liters = 10m,
                             MarginUahPerLiter = 2.5m,
-                            OriginalPrice = 505,
-                            Price = 530,
+                            OriginalPrice = 530m,
+                            Price = 530m,
                             StationId = "wog",
                             SupplierPricePerLiter = 50.5m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1594,10 +2151,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             FinalPricePerLiter = 53m,
                             FuelName = "A 95 EURO",
                             FuelTypeId = "wog-95-euro",
+                            IsDeleted = false,
                             Liters = 20m,
                             MarginUahPerLiter = 2.5m,
-                            OriginalPrice = 1010,
-                            Price = 1060,
+                            OriginalPrice = 1060m,
+                            Price = 1060m,
                             StationId = "wog",
                             SupplierPricePerLiter = 50.5m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1609,10 +2167,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             FinalPricePerLiter = 53m,
                             FuelName = "A 95 EURO",
                             FuelTypeId = "wog-95-euro",
+                            IsDeleted = false,
                             Liters = 50m,
                             MarginUahPerLiter = 2.5m,
-                            OriginalPrice = 2525,
-                            Price = 2650,
+                            OriginalPrice = 2650m,
+                            Price = 2650m,
                             StationId = "wog",
                             SupplierPricePerLiter = 50.5m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1624,10 +2183,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             FinalPricePerLiter = 61m,
                             FuelName = "Mustang 100",
                             FuelTypeId = "wog-100",
+                            IsDeleted = false,
                             Liters = 10m,
                             MarginUahPerLiter = 3.0m,
-                            OriginalPrice = 580,
-                            Price = 610,
+                            OriginalPrice = 610m,
+                            Price = 610m,
                             StationId = "wog",
                             SupplierPricePerLiter = 58.0m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1639,10 +2199,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             FinalPricePerLiter = 61m,
                             FuelName = "Mustang 100",
                             FuelTypeId = "wog-100",
+                            IsDeleted = false,
                             Liters = 20m,
                             MarginUahPerLiter = 3.0m,
-                            OriginalPrice = 1160,
-                            Price = 1220,
+                            OriginalPrice = 1220m,
+                            Price = 1220m,
                             StationId = "wog",
                             SupplierPricePerLiter = 58.0m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1654,10 +2215,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             FinalPricePerLiter = 61m,
                             FuelName = "Mustang 100",
                             FuelTypeId = "wog-100",
+                            IsDeleted = false,
                             Liters = 50m,
                             MarginUahPerLiter = 3.0m,
-                            OriginalPrice = 2900,
-                            Price = 3050,
+                            OriginalPrice = 3050m,
+                            Price = 3050m,
                             StationId = "wog",
                             SupplierPricePerLiter = 58.0m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1669,10 +2231,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             FinalPricePerLiter = 27m,
                             FuelName = "ГАЗ",
                             FuelTypeId = "wog-gas",
+                            IsDeleted = false,
                             Liters = 10m,
                             MarginUahPerLiter = 1.5m,
-                            OriginalPrice = 255,
-                            Price = 270,
+                            OriginalPrice = 270m,
+                            Price = 270m,
                             StationId = "wog",
                             SupplierPricePerLiter = 25.5m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1684,10 +2247,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             FinalPricePerLiter = 27m,
                             FuelName = "ГАЗ",
                             FuelTypeId = "wog-gas",
+                            IsDeleted = false,
                             Liters = 20m,
                             MarginUahPerLiter = 1.5m,
-                            OriginalPrice = 510,
-                            Price = 540,
+                            OriginalPrice = 540m,
+                            Price = 540m,
                             StationId = "wog",
                             SupplierPricePerLiter = 25.5m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1699,10 +2263,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             FinalPricePerLiter = 27m,
                             FuelName = "ГАЗ",
                             FuelTypeId = "wog-gas",
+                            IsDeleted = false,
                             Liters = 50m,
                             MarginUahPerLiter = 1.5m,
-                            OriginalPrice = 1275,
-                            Price = 1350,
+                            OriginalPrice = 1350m,
+                            Price = 1350m,
                             StationId = "wog",
                             SupplierPricePerLiter = 25.5m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1714,10 +2279,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             FinalPricePerLiter = 52m,
                             FuelName = "ДП ЄВРО",
                             FuelTypeId = "okko-dp",
+                            IsDeleted = false,
                             Liters = 2m,
                             MarginUahPerLiter = 2m,
-                            OriginalPrice = 100,
-                            Price = 104,
+                            OriginalPrice = 104m,
+                            Price = 104m,
                             StationId = "okko",
                             SupplierPricePerLiter = 50m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1729,10 +2295,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             FinalPricePerLiter = 52m,
                             FuelName = "ДП ЄВРО",
                             FuelTypeId = "okko-dp",
+                            IsDeleted = false,
                             Liters = 3m,
                             MarginUahPerLiter = 2m,
-                            OriginalPrice = 150,
-                            Price = 156,
+                            OriginalPrice = 156m,
+                            Price = 156m,
                             StationId = "okko",
                             SupplierPricePerLiter = 50m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1745,17 +2312,31 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         .HasColumnType("text")
                         .HasColumnName("id");
 
-                    b.Property<int>("BasePrice")
-                        .HasColumnType("integer")
+                    b.Property<bool>("AllowBelowCost")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("allow_below_cost");
+
+                    b.Property<decimal>("BasePrice")
+                        .HasColumnType("numeric(12,2)")
                         .HasColumnName("base_price");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
 
-                    b.Property<int>("DiscountPrice")
-                        .HasColumnType("integer")
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at_utc");
+
+                    b.Property<decimal>("DiscountPrice")
+                        .HasColumnType("numeric(12,2)")
                         .HasColumnName("discount_price");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -1785,9 +2366,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         new
                         {
                             Id = "okko-dp",
-                            BasePrice = 55,
+                            AllowBelowCost = false,
+                            BasePrice = 55m,
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DiscountPrice = 52,
+                            DiscountPrice = 52m,
+                            IsDeleted = false,
                             Name = "ДП ЄВРО",
                             StationId = "okko",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1795,9 +2378,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         new
                         {
                             Id = "okko-95",
-                            BasePrice = 54,
+                            AllowBelowCost = false,
+                            BasePrice = 54m,
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DiscountPrice = 51,
+                            DiscountPrice = 51m,
+                            IsDeleted = false,
                             Name = "A-95",
                             StationId = "okko",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1805,9 +2390,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         new
                         {
                             Id = "okko-p95",
-                            BasePrice = 60,
+                            AllowBelowCost = false,
+                            BasePrice = 60m,
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DiscountPrice = 56,
+                            DiscountPrice = 56m,
+                            IsDeleted = false,
                             Name = "Pulls 95",
                             StationId = "okko",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1815,9 +2402,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         new
                         {
                             Id = "okko-pulls-dp",
-                            BasePrice = 58,
+                            AllowBelowCost = false,
+                            BasePrice = 58m,
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DiscountPrice = 55,
+                            DiscountPrice = 55m,
+                            IsDeleted = false,
                             Name = "ДП PULLS",
                             StationId = "okko",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1825,9 +2414,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         new
                         {
                             Id = "okko-gas",
-                            BasePrice = 29,
+                            AllowBelowCost = false,
+                            BasePrice = 29m,
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DiscountPrice = 27,
+                            DiscountPrice = 27m,
+                            IsDeleted = false,
                             Name = "ГАЗ",
                             StationId = "okko",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1835,9 +2426,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         new
                         {
                             Id = "wog-dp",
-                            BasePrice = 56,
+                            AllowBelowCost = false,
+                            BasePrice = 56m,
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DiscountPrice = 53,
+                            DiscountPrice = 53m,
+                            IsDeleted = false,
                             Name = "ДП Mustang",
                             StationId = "wog",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1845,9 +2438,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         new
                         {
                             Id = "wog-95",
-                            BasePrice = 55,
+                            AllowBelowCost = false,
+                            BasePrice = 55m,
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DiscountPrice = 52,
+                            DiscountPrice = 52m,
+                            IsDeleted = false,
                             Name = "A-95 Mustang",
                             StationId = "wog",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1855,9 +2450,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         new
                         {
                             Id = "wog-95-euro",
-                            BasePrice = 56,
+                            AllowBelowCost = false,
+                            BasePrice = 56m,
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DiscountPrice = 53,
+                            DiscountPrice = 53m,
+                            IsDeleted = false,
                             Name = "A 95 EURO",
                             StationId = "wog",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1865,9 +2462,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         new
                         {
                             Id = "wog-100",
-                            BasePrice = 65,
+                            AllowBelowCost = false,
+                            BasePrice = 65m,
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DiscountPrice = 61,
+                            DiscountPrice = 61m,
+                            IsDeleted = false,
                             Name = "Mustang 100",
                             StationId = "wog",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1875,9 +2474,11 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         new
                         {
                             Id = "wog-gas",
-                            BasePrice = 29,
+                            AllowBelowCost = false,
+                            BasePrice = 29m,
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DiscountPrice = 27,
+                            DiscountPrice = 27m,
+                            IsDeleted = false,
                             Name = "ГАЗ",
                             StationId = "wog",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
@@ -1893,12 +2494,14 @@ namespace FuelFlow.API.Features.Auth.Migrations
 
                     b.Property<string>("AggregateId")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
                         .HasColumnName("aggregate_id");
 
                     b.Property<string>("AggregateType")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
                         .HasColumnName("aggregate_type");
 
                     b.Property<DateTime>("ChangedAtUtc")
@@ -1910,12 +2513,14 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         .HasColumnName("changed_by_user_id");
 
                     b.Property<string>("ChangedByUserName")
-                        .HasColumnType("text")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
                         .HasColumnName("changed_by_user_name");
 
                     b.Property<string>("EventType")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
                         .HasColumnName("event_type");
 
                     b.Property<string>("NewValue")
@@ -1929,12 +2534,14 @@ namespace FuelFlow.API.Features.Auth.Migrations
 
                     b.Property<string>("ProviderId")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
                         .HasColumnName("provider_id");
 
                     b.Property<string>("Summary")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
                         .HasColumnName("summary");
 
                     b.HasKey("Id");
@@ -1943,7 +2550,58 @@ namespace FuelFlow.API.Features.Auth.Migrations
 
                     b.HasIndex("ChangedAtUtc");
 
+                    b.HasIndex("EventType", "ChangedAtUtc")
+                        .IsDescending(false, true);
+
                     b.ToTable("provider_event_outbox", (string)null);
+                });
+
+            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.PurchaseBatch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid?>("EnteredByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("entered_by_user_id");
+
+                    b.Property<string>("FuelTypeId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("fuel_type_id");
+
+                    b.Property<Guid>("ImportJobId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("import_job_id");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("provider");
+
+                    b.Property<Guid>("SupplierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("supplier_id");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SupplierId");
+
+                    b.HasIndex("ImportJobId", "FuelTypeId")
+                        .IsUnique();
+
+                    b.ToTable("purchase_batches", (string)null);
                 });
 
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.Role", b =>
@@ -1958,10 +2616,12 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         .HasColumnName("created_at_utc");
 
                     b.Property<bool>("IsDefault")
-                        .HasColumnType("boolean");
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_default");
 
                     b.Property<int>("Level")
-                        .HasColumnType("integer");
+                        .HasColumnType("integer")
+                        .HasColumnName("level");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -1997,6 +2657,14 @@ namespace FuelFlow.API.Features.Auth.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
+
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at_utc");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
 
                     b.Property<double?>("Lat")
                         .HasColumnType("double precision")
@@ -2048,6 +2716,7 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             Id = "okko",
                             Color = "#22c55e",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
                             Lat = 50.485100000000003,
                             Lng = 30.473400000000002,
                             LogoText = "OKKO",
@@ -2060,6 +2729,7 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             Id = "wog",
                             Color = "#10b981",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
                             Lat = 50.450099999999999,
                             Lng = 30.523399999999999,
                             LogoText = "WOG",
@@ -2072,6 +2742,7 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             Id = "upg",
                             Color = "#06b6d4",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
                             Lat = 50.400100000000002,
                             Lng = 30.613399999999999,
                             LogoText = "UPG",
@@ -2084,6 +2755,7 @@ namespace FuelFlow.API.Features.Auth.Migrations
                             Id = "klo",
                             Color = "#eab308",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
                             Lat = 50.4101,
                             Lng = 30.403400000000001,
                             LogoText = "KLO",
@@ -2110,6 +2782,14 @@ namespace FuelFlow.API.Features.Auth.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
+
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at_utc");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
 
                     b.Property<double?>("Lat")
                         .HasColumnType("double precision")
@@ -2146,60 +2826,76 @@ namespace FuelFlow.API.Features.Auth.Migrations
                     b.HasIndex("StationId");
 
                     b.ToTable("station_nodes", (string)null);
+                });
 
-                    b.HasData(
-                        new
-                        {
-                            Id = "okko-kyiv-main",
-                            Address = "42 Чоколівський бульвар",
-                            City = "Київ",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Lat = 50.430999999999997,
-                            Lng = 30.451499999999999,
-                            Name = "OKKO Київ",
-                            StationId = "okko",
-                            StationType = "Тип АЗС ОККО-міська",
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "wog-kyiv-main",
-                            Address = "15-Б проспект Соборності",
-                            City = "Київ",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Lat = 50.4482,
-                            Lng = 30.617000000000001,
-                            Name = "WOG Київ",
-                            StationId = "wog",
-                            StationType = "Тип АЗС WOG-міська",
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "upg-kyiv-main",
-                            Address = "Проспект Перемоги, 98",
-                            City = "Київ",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Lat = 50.456600000000002,
-                            Lng = 30.395,
-                            Name = "UPG Київ",
-                            StationId = "upg",
-                            StationType = "Тип АЗС UPG-міська",
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "klo-kyiv-main",
-                            Address = "Броварський проспект, 11",
-                            City = "Київ",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Lat = 50.457799999999999,
-                            Lng = 30.598600000000001,
-                            Name = "KLO Київ",
-                            StationId = "klo",
-                            StationType = "Тип АЗС KLO-міська",
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        });
+            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.Supplier", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("address");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("EdrIpn")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("edr_ipn");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("email");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("LegalForm")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("legal_form");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("notes");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("phone");
+
+                    b.Property<string>("Rnkrr")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("rnkrr");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsActive");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("suppliers", (string)null);
                 });
 
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.User", b =>
@@ -2251,6 +2947,12 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("is_deleted");
 
+                    b.Property<bool>("IsQaAccount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_qa_account");
+
                     b.Property<DateTime?>("LastLoginAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_login_at_utc");
@@ -2259,6 +2961,20 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("last_name");
+
+                    b.Property<string>("PendingEmail")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("pending_email");
+
+                    b.Property<DateTime?>("PendingEmailExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("pending_email_expires_at_utc");
+
+                    b.Property<string>("PendingEmailTokenHash")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("pending_email_token_hash");
 
                     b.Property<string>("PhoneNumber")
                         .IsRequired()
@@ -2303,7 +3019,7 @@ namespace FuelFlow.API.Features.Auth.Migrations
 
                     b.HasIndex("ReferralCode")
                         .IsUnique()
-                        .HasFilter("referral_code IS NOT NULL");
+                        .HasFilter("referral_code IS NOT NULL AND is_deleted = false");
 
                     b.HasIndex("RoleId");
 
@@ -2383,19 +3099,19 @@ namespace FuelFlow.API.Features.Auth.Migrations
                     b.HasOne("FuelFlow.Features.Contracts.SharedModels.LegalEntity", "Entity")
                         .WithMany()
                         .HasForeignKey("LegalEntityId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("FuelFlow.SharedKernel.Domain.Station", "Station")
                         .WithMany()
                         .HasForeignKey("StationId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("FuelFlow.SharedKernel.Domain.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Entity");
@@ -2421,13 +3137,13 @@ namespace FuelFlow.API.Features.Auth.Migrations
                     b.HasOne("FuelFlow.Features.Contracts.SharedModels.Contract", "Contract")
                         .WithMany()
                         .HasForeignKey("ContractId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("FuelFlow.SharedKernel.Domain.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Contract");
@@ -2446,19 +3162,33 @@ namespace FuelFlow.API.Features.Auth.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("FuelFlow.Features.Notifications.SharedModels.UserPushToken", b =>
+                {
+                    b.HasOne("FuelFlow.SharedKernel.Domain.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("FuelFlow.Features.Orders.SharedModels.Fulfillment", b =>
                 {
-                    b.HasOne("FuelFlow.Features.Orders.SharedModels.Order", null)
+                    b.HasOne("FuelFlow.Features.Orders.SharedModels.Order", "Order")
                         .WithMany("Fulfillments")
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("FK_fulfillments_orders_order_id");
 
                     b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", "Voucher")
                         .WithMany()
                         .HasForeignKey("VoucherId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Order");
 
                     b.Navigation("Voucher");
                 });
@@ -2469,6 +3199,17 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         .WithMany()
                         .HasForeignKey("LegalEntityId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("FuelFlow.Features.Orders.SharedModels.Order", null)
+                        .WithMany()
+                        .HasForeignKey("SourceOrderId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("FuelFlow.SharedKernel.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Orders.SharedModels.OrderLineItem", b =>
@@ -2484,13 +3225,50 @@ namespace FuelFlow.API.Features.Auth.Migrations
 
             modelBuilder.Entity("FuelFlow.Features.Orders.SharedModels.Refund", b =>
                 {
+                    b.HasOne("FuelFlow.SharedKernel.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("FuelFlow.Features.Orders.SharedModels.Order", "Order")
                         .WithMany()
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("FuelFlow.SharedKernel.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("Order");
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Vouchers.Exchange.VoucherExchange", b =>
+                {
+                    b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", "NewVoucher")
+                        .WithMany()
+                        .HasForeignKey("NewVoucherId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", "OldVoucher")
+                        .WithMany()
+                        .HasForeignKey("OldVoucherId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FuelFlow.SharedKernel.Domain.Supplier", "Supplier")
+                        .WithMany()
+                        .HasForeignKey("SupplierId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("NewVoucher");
+
+                    b.Navigation("OldVoucher");
+
+                    b.Navigation("Supplier");
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Vouchers.FuelVoucher", b =>
@@ -2503,7 +3281,7 @@ namespace FuelFlow.API.Features.Auth.Migrations
                     b.HasOne("FuelFlow.SharedKernel.Domain.FuelTypeEntity", "FuelType")
                         .WithMany()
                         .HasForeignKey("FuelTypeId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("FuelFlow.Features.Vouchers.VoucherImport", "ImportJob")
@@ -2516,10 +3294,20 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         .HasForeignKey("LegalEntityId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("FuelFlow.Features.Orders.SharedModels.Order", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("FuelFlow.Features.Vouchers.QrParameters", "QrParameters")
                         .WithMany()
                         .HasForeignKey("QrParametersId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("FuelFlow.SharedKernel.Domain.Supplier", "Supplier")
+                        .WithMany()
+                        .HasForeignKey("SupplierId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("FuelFlow.SharedKernel.Domain.User", "WorkerUser")
                         .WithMany()
@@ -2536,7 +3324,53 @@ namespace FuelFlow.API.Features.Auth.Migrations
 
                     b.Navigation("QrParameters");
 
+                    b.Navigation("Supplier");
+
                     b.Navigation("WorkerUser");
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Vouchers.Renewal.Operator.OperatorVoucherRenewal", b =>
+                {
+                    b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", "ReplacementVoucher")
+                        .WithMany()
+                        .HasForeignKey("ReplacementVoucherId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", "Voucher")
+                        .WithMany()
+                        .HasForeignKey("VoucherId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ReplacementVoucher");
+
+                    b.Navigation("Voucher");
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Vouchers.Renewal.VoucherRenewalItem", b =>
+                {
+                    b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", "FulfilledVoucher")
+                        .WithMany()
+                        .HasForeignKey("FulfilledVoucherId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("FuelFlow.Features.Orders.SharedModels.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", "SourceVoucher")
+                        .WithMany()
+                        .HasForeignKey("SourceVoucherId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("FulfilledVoucher");
+
+                    b.Navigation("Order");
+
+                    b.Navigation("SourceVoucher");
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Vouchers.VoucherImportError", b =>
@@ -2548,12 +3382,29 @@ namespace FuelFlow.API.Features.Auth.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.PurchaseBatch", b =>
+                {
+                    b.HasOne("FuelFlow.Features.Vouchers.VoucherImport", null)
+                        .WithMany()
+                        .HasForeignKey("ImportJobId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FuelFlow.SharedKernel.Domain.Supplier", "Supplier")
+                        .WithMany()
+                        .HasForeignKey("SupplierId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Supplier");
+                });
+
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.StationNode", b =>
                 {
                     b.HasOne("FuelFlow.SharedKernel.Domain.Station", null)
                         .WithMany()
                         .HasForeignKey("StationId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

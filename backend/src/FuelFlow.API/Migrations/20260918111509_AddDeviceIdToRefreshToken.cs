@@ -1,8 +1,8 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace FuelFlow.API.Features.Auth.Migrations
+namespace FuelFlow.API.Migrations
 {
     /// <inheritdoc />
     public partial class AddDeviceIdToRefreshToken : Migration

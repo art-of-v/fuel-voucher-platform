@@ -65,5 +65,17 @@ internal sealed class OrderLineItemConfiguration : IEntityTypeConfiguration<Orde
         builder.HasIndex(e => e.OrderId);
         builder.HasIndex(e => e.FuelTypeId);
         builder.HasIndex(e => e.Provider);
+
+        builder.ToTable(t =>
+        {
+            // line_total is unit_price * quantity, computed in the handler. Nothing enforced that
+            // the inputs were even sane - a zero-litre line or a negative price was accepted.
+            t.HasCheckConstraint("ck_order_line_positive_quantity", "quantity > 0");
+            t.HasCheckConstraint("ck_order_line_positive_liters", "liters > 0");
+            t.HasCheckConstraint("ck_order_line_non_negative_prices",
+                "unit_price >= 0 AND line_total >= 0");
+            t.HasCheckConstraint("ck_order_line_original_non_negative",
+                "original_line_total IS NULL OR original_line_total >= 0");
+        });
     }
 }

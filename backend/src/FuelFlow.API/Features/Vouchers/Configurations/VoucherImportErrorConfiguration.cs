@@ -29,12 +29,14 @@ internal sealed class VoucherImportErrorConfiguration : IEntityTypeConfiguration
 
         builder.Property(e => e.ErrorMessage)
             .HasColumnName("error_message")
-            .HasColumnType("text")
+            .HasMaxLength(2000)
             .IsRequired();
 
+        // Bounded, and written through PrepareRawTextForStorage so the embedded QR payload - a
+        // bearer instrument - never lands here verbatim.
         builder.Property(e => e.RawText)
             .HasColumnName("raw_text")
-            .HasColumnType("text");
+            .HasMaxLength(4000);
 
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")

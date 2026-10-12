@@ -80,6 +80,14 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(e => e.PartiallyFulfilledSinceUtc)
             .HasColumnName("partially_fulfilled_since_utc");
 
+        // These two arrived in PascalCase because the mapping was forgotten - the only
+        // snake_case violations left on this table. Named explicitly, like every other column.
+        builder.Property(e => e.LastWebhookProcessedAtUtc)
+            .HasColumnName("last_webhook_processed_at_utc");
+
+        builder.Property(e => e.LastWebhookModifiedDateUtc)
+            .HasColumnName("last_webhook_modified_date_utc");
+
         builder.Property(e => e.IsDeleted)
             .HasColumnName("is_deleted")
             .HasDefaultValue(false)
@@ -99,9 +107,12 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
             .HasForeignKey(e => e.SourceOrderId)
             .OnDelete(DeleteBehavior.SetNull);
 
-        builder.HasIndex(e => e.UserId);
+        // LegalEntityId and SourceOrderId are FK columns and need their own index: without one, any
+        // delete or update on the parent scans this table. CreatedAtUtc stays standalone because
+        // (UserId, CreatedAtUtc) has UserId leading, so it does not serve a date range across
+        // users. Bare UserId is a leftmost prefix of both composites and is dropped; bare Status
+        // is 8 values and is dropped with it.
         builder.HasIndex(e => e.LegalEntityId);
-        builder.HasIndex(e => e.Status);
         builder.HasIndex(e => e.CreatedAtUtc);
         builder.HasIndex(e => e.SourceOrderId);
         builder.HasIndex(e => e.IdempotencyKey)
@@ -110,5 +121,24 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.HasIndex(e => new { e.UserId, e.Status });
         builder.HasIndex(e => new { e.UserId, e.CreatedAtUtc })
             .IsDescending(false, true);
+
+        // IX_orders_user_id is a strict leftmost prefix of both composites above and is dropped.
+
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_order_price_non_negative", "price >= 0");
+
+            // The value sets the C# enums define. Storing a closed enum as text is the right call -
+            // it survives adding a member, unlike an int - but only once the database knows the
+            // set. Without these, any 30-character string is a valid status and a typo round-trips
+            // into nowhere: reading it back yields a value no enum member matches.
+            t.HasCheckConstraint("ck_order_status", """
+                status IN ('PendingPayment', 'Paid', 'PendingFulfillment', 'PartiallyFulfilled',
+                           'Fulfilled', 'PartiallyRefunded', 'Refunded', 'Cancelled')
+                """);
+
+            t.HasCheckConstraint("ck_order_kind",
+                "kind IN ('Purchase', 'Renewal', 'ReceivedFromCompany')");
+        });
     }
 }

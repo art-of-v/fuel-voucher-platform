@@ -65,5 +65,10 @@ internal sealed class DeviceConfiguration : IEntityTypeConfiguration<Device>
             .IsUnique();
 
         builder.HasIndex(e => e.UserId);
+
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_device_status", "status IN ('Active', 'Revoked')");
+        });
     }
 }

@@ -197,4 +197,88 @@ public class AdminRoleDemotionIntegrationTests : WebApplicationFactory<Program>,
             "/api/auth/refresh", new RefreshTokenCommand(rawRefreshToken));
         refreshResponse.StatusCode.Should().Be(HttpStatusCode.OK);
     }
+
+    /// <summary>
+    /// The demotion decision reads <c>roles.level</c> from the database, so a role the application
+    /// code has never heard of still ranks where its row says. Previously the ranking came from a
+    /// hardcoded C# switch that returned 0 (User level) for any name it did not contain, which
+    /// made a role inserted through psql silently un-rankable.
+    /// </summary>
+    [Fact]
+    public async Task Demotion_Is_Decided_By_The_Levels_In_The_Database_Not_By_A_Hardcoded_Switch()
+    {
+        var userId = Guid.NewGuid();
+        var customRoleId = Guid.NewGuid();
+        var customRoleName = "SupportLead";
+        // Unique per run: the container database is shared across tests in this class and a fixed
+        // number collides with the row a previous run left behind.
+        var phoneNumber = "+1555" + Random.Shared.Next(1000000, 9999999);
+
+        using (var scope = Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var now = DateTime.UtcNow;
+
+            // Between Admin (50) and ProductOwner (100). No C# constant ever mentions this role.
+            context.Roles.Add(new Role
+            {
+                Id = customRoleId,
+                Name = customRoleName,
+                Level = 75,
+                IsDefault = false,
+                CreatedAtUtc = now,
+            });
+
+            var user = new User
+            {
+                Id = userId,
+                PhoneNumber = phoneNumber,
+                RoleId = customRoleId,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now,
+                IsActive = true,
+                TokenVersion = 1,
+            };
+            context.Users.Add(user);
+
+            // A live session, so the demotion has something to revoke.
+            context.RefreshTokens.Add(new RefreshToken
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                FamilyId = Guid.NewGuid(),
+                DeviceId = "custom-role-device",
+                RoleNameAtIssue = customRoleName,
+                Token = SecretsHasher.Hash("raw-" + Guid.NewGuid().ToString("N")),
+                ExpiresAtUtc = now.AddDays(14),
+                IsRevoked = false,
+                CreatedAtUtc = now,
+            });
+
+            await context.SaveChangesAsync();
+        }
+
+        using (var scope = Services.CreateScope())
+        {
+            var handler = scope.ServiceProvider.GetRequiredService<SetUserRoleCommandHandler>();
+            var result = await handler.HandleAsync(
+                new SetUserRoleCommand(userId, "User", Guid.NewGuid(), "Acting PO", "ProductOwner"),
+                CancellationToken.None);
+            result.Success.Should().BeTrue();
+        }
+
+        using (var scope = Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var updated = await context.Users.Include(u => u.Role).FirstAsync(u => u.Id == userId);
+            updated.Role!.Name.Should().Be("User");
+
+            // 75 -> 0 is a demotion, so the session must have been revoked. A hardcoded switch
+            // would not have recognised the role and would have read it as level 0, seen "0 < 0"
+            // and called it neither, leaving the session alive with the privileges just stripped.
+            var tokens = await context.RefreshTokens.Where(t => t.UserId == userId).ToListAsync();
+            tokens.Should().OnlyContain(t => t.IsRevoked,
+                "the level came from roles.level, so 75 -> 0 was correctly read as a demotion");
+        }
+    }
 }

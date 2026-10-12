@@ -32,20 +32,23 @@ internal sealed class ContractConfiguration : IEntityTypeConfiguration<Contract>
             .HasColumnName("created_at_utc")
             .IsRequired();
 
+        // A signed contract is not owned by the account that signed it, nor by the company or the
+        // brand it names. Cascade here used to walk users -> legal_entities -> contracts ->
+        // user_contracts and end at a digital signature; Restrict stops it at the first hop.
         builder.HasOne(e => e.User)
             .WithMany()
             .HasForeignKey(e => e.UserId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(e => e.Entity)
             .WithMany()
             .HasForeignKey(e => e.LegalEntityId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(e => e.Station)
             .WithMany()
             .HasForeignKey(e => e.StationId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(e => e.UserId);
         builder.HasIndex(e => e.LegalEntityId);

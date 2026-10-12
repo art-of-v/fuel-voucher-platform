@@ -19,6 +19,14 @@ internal sealed class PurchaseBatchConfiguration : IEntityTypeConfiguration<Purc
             .HasColumnName("import_job_id")
             .IsRequired();
 
+        builder.HasOne<VoucherImport>()
+            .WithMany()
+            .HasForeignKey(e => e.ImportJobId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Fuel identity is a free-text natural key everywhere in the catalog (fuel_types.id is
+        // text), so this column stays text - matching the PK it points at is what makes the FK
+        // expressible at all. A varchar(100)/text mismatch would have made it impossible.
         builder.Property(e => e.FuelTypeId)
             .HasColumnName("fuel_type_id")
             .HasColumnType("text")
@@ -40,7 +48,6 @@ internal sealed class PurchaseBatchConfiguration : IEntityTypeConfiguration<Purc
 
         builder.Property(e => e.EnteredByUserId)
             .HasColumnName("entered_by_user_id");
-
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
             .HasColumnType("timestamp with time zone")
@@ -55,7 +62,8 @@ internal sealed class PurchaseBatchConfiguration : IEntityTypeConfiguration<Purc
         builder.HasIndex(e => new { e.ImportJobId, e.FuelTypeId })
             .IsUnique();
 
-        // Supplier reconciliation lists a supplier's batches.
+        // Supplier reconciliation lists a supplier's batches. EnteredByUserId is indexed by the
+        // FK convention above.
         builder.HasIndex(e => e.SupplierId);
     }
 }
