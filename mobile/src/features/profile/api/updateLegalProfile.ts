@@ -1,5 +1,6 @@
 import { apiFetch } from '../../../core/api/apiClient';
 import type { Company } from '../../../core/types/api';
+import { LegalEntityApiError } from '../../company/api/legalEntityApi';
 
 // GET /api/legal-entity/profile returns the profile object directly (not
 // wrapped) and 404 when the user has no legal entity yet. Returns null in that
@@ -25,6 +26,16 @@ export async function updateLegalProfile(data: Partial<Company>): Promise<Compan
     method: 'POST',
     body: JSON.stringify(data),
   });
-  if (!response.ok) throw new Error('Failed to update legal profile');
+  if (!response.ok) {
+    // The status used to be thrown away, which cost two things: the caller could not tell a
+    // duplicate EDRPOU (409) from a rejected format (400), so every failure became the same
+    // "Error" toast, and `err.status ?? 500` read the missing status as a server fault and
+    // shipped the user's typo to Sentry as an incident. Same error type as the scoped
+    // PUT /api/legal-entity/{id} path so one mapper handles both.
+    const body = await response.json().catch(() => ({}) as any);
+    const message =
+      body.error?.message || body.error || body.message || 'Failed to update legal profile';
+    throw new LegalEntityApiError(response.status, message);
+  }
   return response.json();
 }
