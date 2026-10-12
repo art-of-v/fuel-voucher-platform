@@ -157,10 +157,6 @@ public sealed class ConfirmVoucherExchangeCommandHandler
         var oldById = olds.ToDictionary(o => o.Id);
         var newLitersById = news.ToDictionary(n => n.Id, n => n.Liters);
 
-        // Stamp the new vouchers' own cost with ExecuteUpdate rather than tracked entities: production runs
-        // NoTracking, and BulkAction re-loads these same rows and calls UpdateRange, so tracking them here
-        // would attach the same key twice. Grouped by the computed value so a 500-voucher PDF is a handful
-        // of statements instead of one per voucher.
         // An exchange is a 1:1 handover of paper: the operator carries N vouchers to the supplier and comes
         // back with N. A PDF holding more than that is a normal purchase that happens to include the
         // replacements — it must be imported on its own, not half-swallowed by an exchange, because the
@@ -194,6 +190,25 @@ public sealed class ConfirmVoucherExchangeCommandHandler
 
         // Every new voucher is now covered: equal counts and no unpaired old means none is left over, so
         // the invoice cost is never consulted and can no longer underprice stock.
+        await using var tx = _context.Database.IsRelational()
+            ? await _context.Database.BeginTransactionAsync(ct)
+            : null;
+
+        // Stamp the new vouchers' own cost here, INSIDE the transaction, and not one block earlier.
+        //
+        // #277: this ran before BeginTransactionAsync, so anything that failed after it — the expire,
+        // the blended reprice, the activation — rolled the exchange back while the stamp survived. What
+        // was left behind is the worst of both: a voucher priced by an exchange that never happened,
+        // with no exchange row to say so. Grouped by the computed value so a 500-voucher PDF is a
+        // handful of statements instead of one per voucher.
+        //
+        // It stays a raw statement rather than a tracked write: the rows are Imported, the tracker is
+        // untouched by this point, and BulkAction reloads them tracked two dozen lines below to
+        // activate. Making it tracked would mean either double-tracking the same keys or reworking
+        // that call, which is a larger change than the transaction boundary this bug is about.
+        //
+        // Note this is NOT the reprice the comment below warns about: that is
+        // BlendedCostRecalculator.RepriceAsync, which still runs after the olds are flushed.
         foreach (var group in newCostById.GroupBy(kv => kv.Value))
         {
             var ids = group.Select(kv => kv.Key).ToList();
@@ -205,12 +220,6 @@ public sealed class ConfirmVoucherExchangeCommandHandler
                     .SetProperty(v => v.SupplierId, supplierId)
                     .SetProperty(v => v.UpdatedAtUtc, now), ct);
         }
-
-        // InMemory doesn't support transactions; the reuse handlers share this scoped context, so one
-        // outer transaction makes their internal SaveChanges flush (not commit) and we commit once.
-        await using var tx = _context.Database.IsRelational()
-            ? await _context.Database.BeginTransactionAsync(ct)
-            : null;
 
         // Expire the olds BEFORE repricing. The blended pool only counts Imported/VerifiedWithWarnings/
         // Available, so with the olds already Expired (and flushed by the save below) the reprice lands on
