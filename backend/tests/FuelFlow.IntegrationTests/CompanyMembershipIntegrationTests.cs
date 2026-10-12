@@ -423,6 +423,58 @@ public sealed class CompanyMembershipIntegrationTests : IClassFixture<TestDataba
         }
     }
 
+    /// <summary>
+    /// The worker's "you were given fuel" notification rides on an outbox row written inside the gift
+    /// transaction (#150 W3). <c>ck_outbox_event_type</c> is a DB CHECK listing every legal type, so
+    /// adding the enum member is only half the change: without the constraint being extended the very
+    /// first gift in production fails the whole transaction and the owner is handed a 500. This asserts
+    /// the row survives, which is what a missing migration could never do.
+    /// </summary>
+    [Fact]
+    public async Task Gift_QueuesTheWorkerNotification_ThatTheOutboxConstraintAccepts()
+    {
+        var ownerId = Guid.NewGuid();
+        var workerId = Guid.NewGuid();
+        var legalEntityId = Guid.NewGuid();
+        var memberId = Guid.NewGuid();
+        var voucherId = Guid.NewGuid();
+
+        await using (var seed = CreateContext())
+        {
+            await ResetAsync(seed);
+            seed.Users.AddRange(NewUser(ownerId), NewUser(workerId));
+            seed.LegalEntities.Add(NewLegalEntity(legalEntityId, ownerId));
+            seed.CompanyMembers.Add(NewMember(memberId, legalEntityId, workerId));
+            var orderId = SeedPurchaseOrder(seed, ownerId);
+            seed.FuelVouchers.Add(
+                NewVoucher(voucherId, VoucherStatus.Assigned, legalEntityId, ownerId, workerUserId: null, orderId));
+            await seed.SaveChangesAsync();
+        }
+
+        await using (var giftCtx = CreateContext())
+        {
+            var gift = new GiftVouchersCommandHandler(giftCtx, new FuelFlowMetrics());
+            var result = await gift.HandleAsync(new GiftVouchersCommand(ownerId, workerId, new[] { voucherId }));
+
+            result.Status.Should().Be("Success");
+        }
+
+        await using (var verify = CreateContext())
+        {
+            var queued = await verify.OutboxEvents
+                .AsNoTracking()
+                .Where(e => e.EventType == OutboxEventType.VoucherIssued)
+                .ToListAsync();
+
+            queued.Should().ContainSingle();
+
+            var payload = queued[0].Payload;
+            payload.Should().Contain(workerId.ToString());
+            payload.Should().Contain(legalEntityId.ToString());
+            queued[0].Processed.Should().BeFalse();
+        }
+    }
+
     [Fact]
     public async Task Recall_PutsTheVoucherBackUnderThePurchase_NotTheIssuance()
     {
