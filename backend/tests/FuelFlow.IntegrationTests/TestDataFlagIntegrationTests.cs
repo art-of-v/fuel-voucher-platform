@@ -101,7 +101,6 @@ public sealed class TestDataFlagIntegrationTests : IClassFixture<TestDatabaseFix
         => new(
             new DbContextOptionsBuilder<ApplicationDbContext>()
                 .UseNpgsql(_fixture.DbContainer.GetConnectionString())
-                .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
                 .Options
         );
 }
