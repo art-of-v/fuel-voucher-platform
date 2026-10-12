@@ -53,5 +53,12 @@ internal sealed class ContractConfiguration : IEntityTypeConfiguration<Contract>
         builder.HasIndex(e => e.UserId);
         builder.HasIndex(e => e.LegalEntityId);
         builder.HasIndex(e => e.StationId);
+
+        // station_id is a natural key on the catalog ("okko"), bounded by CHECK rather than a type
+        // change - see StationConfiguration.
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_contracts_station_id_length", "length(station_id) <= 100");
+        });
     }
 }

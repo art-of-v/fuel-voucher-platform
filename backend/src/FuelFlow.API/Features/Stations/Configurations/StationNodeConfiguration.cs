@@ -74,5 +74,12 @@ internal sealed class StationNodeConfiguration : IEntityTypeConfiguration<Statio
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(e => e.StationId);
+
+        // Natural key, bounded by CHECK rather than a type change - see StationConfiguration.
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_station_nodes_id_length", "length(id) <= 100");
+            t.HasCheckConstraint("ck_station_nodes_station_id_length", "length(station_id) <= 100");
+        });
     }
 }

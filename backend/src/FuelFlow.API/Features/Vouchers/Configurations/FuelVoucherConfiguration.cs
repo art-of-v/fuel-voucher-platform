@@ -238,5 +238,13 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
         // (fuel_type_id), (assigned_to_user_id) and (legal_entity_id) can serve nothing the
         // wider index cannot serve better. Also dropped: a unique index on external_id, a column
         // nothing in the codebase ever writes, so it guarded 100% NULLs forever.
+
+        // The FK side of the same natural-key trade: fuel_type_id points at fuel_types.id ("okko-95"),
+        // which is deliberately a readable string rather than a UUID. Bounded by CHECK so the
+        // reference cannot drift into something arbitrary - see StationConfiguration.
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_fuel_vouchers_fuel_type_id_length", "length(fuel_type_id) <= 100");
+        });
     }
 }

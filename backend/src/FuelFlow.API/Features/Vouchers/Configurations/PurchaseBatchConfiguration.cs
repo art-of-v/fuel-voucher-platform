@@ -65,5 +65,11 @@ internal sealed class PurchaseBatchConfiguration : IEntityTypeConfiguration<Purc
         // Supplier reconciliation lists a supplier's batches. EnteredByUserId is indexed by the
         // FK convention above.
         builder.HasIndex(e => e.SupplierId);
+
+        // fuel_type_id is a catalog natural key, bounded by CHECK - see StationConfiguration.
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_purchase_batches_fuel_type_id_length", "length(fuel_type_id) <= 100");
+        });
     }
 }

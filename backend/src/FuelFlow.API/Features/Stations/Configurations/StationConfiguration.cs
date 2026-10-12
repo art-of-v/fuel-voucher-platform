@@ -81,6 +81,18 @@ internal sealed class StationConfiguration : IEntityTypeConfiguration<Station>
         builder.HasIndex(e => e.Name);
         builder.HasIndex(e => e.StationType);
 
+        // The catalog keys are natural strings ("okko", "wog"), not UUIDs - readable in a row
+        // and meaningful to the operator. That is a deliberate choice, and this constraint is the
+        // only thing bounding them: `id` stays `text` because converting a primary key's type means
+        // dropping and recreating every foreign key that points at it, across seven tables, and
+        // the gain would be cosmetic. A CHECK gets the guarantee that actually matters - a slug
+        // cannot silently become a paragraph - for the cost of one line and zero refactoring.
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_stations_id_length", "length(id) <= 100");
+            t.HasCheckConstraint("ck_stations_name_length", "length(name) <= 200");
+        });
+
         builder.HasMany<StationNode>()
             .WithOne()
             .HasForeignKey(e => e.StationId)

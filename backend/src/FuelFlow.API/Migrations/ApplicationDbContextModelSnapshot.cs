@@ -426,7 +426,10 @@ namespace FuelFlow.API.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("contracts", (string)null);
+                    b.ToTable("contracts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_contracts_station_id_length", "length(station_id) <= 100");
+                        });
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Contracts.SharedModels.LegalEntity", b =>
@@ -1160,6 +1163,8 @@ namespace FuelFlow.API.Migrations
                             t.HasCheckConstraint("ck_voucher_exchange_not_self", "old_voucher_id IS DISTINCT FROM new_voucher_id");
 
                             t.HasCheckConstraint("ck_voucher_exchange_surcharge_non_negative", "surcharge_uah >= 0");
+
+                            t.HasCheckConstraint("ck_voucher_exchanges_fuel_type_id_length", "length(fuel_type_id) <= 100");
                         });
                 });
 
@@ -1332,6 +1337,8 @@ namespace FuelFlow.API.Migrations
 
                     b.ToTable("fuel_vouchers", null, t =>
                         {
+                            t.HasCheckConstraint("ck_fuel_vouchers_fuel_type_id_length", "length(fuel_type_id) <= 100");
+
                             t.HasCheckConstraint("ck_voucher_cost_non_negative", "cost_per_liter IS NULL OR cost_per_liter >= 0");
 
                             t.HasCheckConstraint("ck_voucher_held_has_order", "status NOT IN ('Assigned', 'Used', 'Blocked') OR order_id IS NOT NULL");
@@ -1819,7 +1826,14 @@ namespace FuelFlow.API.Migrations
 
                     b.HasIndex("StationId", "FuelTypeId");
 
-                    b.ToTable("fuel_packages", (string)null);
+                    b.ToTable("fuel_packages", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_fuel_packages_fuel_type_id_length", "length(fuel_type_id) <= 100");
+
+                            t.HasCheckConstraint("ck_fuel_packages_id_length", "length(id) <= 100");
+
+                            t.HasCheckConstraint("ck_fuel_packages_station_id_length", "length(station_id) <= 100");
+                        });
 
                     b.HasData(
                         new
@@ -2390,7 +2404,14 @@ namespace FuelFlow.API.Migrations
 
                     b.HasIndex("StationId", "Name");
 
-                    b.ToTable("fuel_types", (string)null);
+                    b.ToTable("fuel_types", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_fuel_types_id_length", "length(id) <= 100");
+
+                            t.HasCheckConstraint("ck_fuel_types_name_length", "length(name) <= 200");
+
+                            t.HasCheckConstraint("ck_fuel_types_station_id_length", "length(station_id) <= 100");
+                        });
 
                     b.HasData(
                         new
@@ -2631,7 +2652,10 @@ namespace FuelFlow.API.Migrations
                     b.HasIndex("ImportJobId", "FuelTypeId")
                         .IsUnique();
 
-                    b.ToTable("purchase_batches", (string)null);
+                    b.ToTable("purchase_batches", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_purchase_batches_fuel_type_id_length", "length(fuel_type_id) <= 100");
+                        });
                 });
 
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.Role", b =>
@@ -2744,7 +2768,12 @@ namespace FuelFlow.API.Migrations
 
                     b.HasIndex("StationType");
 
-                    b.ToTable("stations", (string)null);
+                    b.ToTable("stations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_stations_id_length", "length(id) <= 100");
+
+                            t.HasCheckConstraint("ck_stations_name_length", "length(name) <= 200");
+                        });
 
                     b.HasData(
                         new
@@ -2866,7 +2895,12 @@ namespace FuelFlow.API.Migrations
 
                     b.HasIndex("StationId");
 
-                    b.ToTable("station_nodes", (string)null);
+                    b.ToTable("station_nodes", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_station_nodes_id_length", "length(id) <= 100");
+
+                            t.HasCheckConstraint("ck_station_nodes_station_id_length", "length(station_id) <= 100");
+                        });
                 });
 
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.Supplier", b =>
