@@ -2,6 +2,7 @@ using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,19 +10,37 @@ namespace FuelFlow.API.BackgroundJobs;
 
 public class RefundStatusSyncService
 {
-    private readonly ApplicationDbContext _context;
-    private readonly IMonobankClientFactory _monobankClientFactory;
-    private readonly ILogger<RefundStatusSyncService> _logger;
+private readonly ApplicationDbContext _context;
+       private readonly IMonobankClientFactory _monobankClientFactory;
+       private readonly ILogger<RefundStatusSyncService> _logger;
+       private readonly NotificationDispatcher _notifications;
 
-    public RefundStatusSyncService(
-        ApplicationDbContext context,
-        IMonobankClientFactory monobankClientFactory,
-        ILogger<RefundStatusSyncService> logger)
-    {
-        _context = context;
-        _monobankClientFactory = monobankClientFactory;
-        _logger = logger;
-    }
+       public RefundStatusSyncService(
+           ApplicationDbContext context,
+           IMonobankClientFactory monobankClientFactory,
+           ILogger<RefundStatusSyncService> logger)
+           : this(context, monobankClientFactory, logger, NotificationDispatcher.Disabled)
+       {
+       }
+
+       /// <summary>
+       /// The three-argument constructor is kept and delegates here rather than the notifications
+       /// being an optional fourth parameter: several tests proxy this class with
+       /// <c>Mock.Of&lt;RefundStatusSyncService&gt;(null, null, null)</c>, and an optional parameter
+       /// leaves Moq unable to pick a constructor for that call. An overload it can match exactly
+       /// keeps them working.
+       /// </summary>
+       public RefundStatusSyncService(
+           ApplicationDbContext context,
+           IMonobankClientFactory monobankClientFactory,
+           ILogger<RefundStatusSyncService> logger,
+           NotificationDispatcher notifications)
+       {
+           _context = context;
+           _monobankClientFactory = monobankClientFactory;
+           _logger = logger;
+           _notifications = notifications;
+       }
 
     public virtual async Task SyncPendingRefundsAsync(CancellationToken cancellationToken = default)
     {
@@ -130,13 +149,53 @@ public class RefundStatusSyncService
         List<MonobankCancelListItem>? cancelList,
         CancellationToken cancellationToken)
     {
-        var matchingEntry = cancelList?
+        var entries = cancelList?.ToList() ?? [];
+
+        var matchingEntry = entries
             .OrderByDescending(e => e.ModifiedDate)
             .FirstOrDefault(e => e.ExtRef == refund.ExtRef);
 
-        matchingEntry ??= cancelList?
-            .OrderByDescending(e => e.ModifiedDate)
-            .FirstOrDefault();
+        if (matchingEntry == null)
+        {
+            // #261. There used to be an unconditional fallback here: take the newest entry in the
+            // cancel list, whatever it referred to. With two partial refunds on one invoice that
+            // credits the wrong refund - its entry says "success", this refund is marked Completed,
+            // and ApplyConfirmedRefundToOrderAsync moves the order to PartiallyRefunded on the
+            // strength of a confirmation that belonged to somebody else. Silent, and it is money.
+            //
+            // So a fallback now has to be *provably* unambiguous: exactly one entry in the list and
+            // no other refund on this invoice waiting. One entry cannot be somebody else's if there
+            // is nothing else it could have been; "any entry" could.
+            var siblings = await _context.Refunds
+                .AsNoTracking()
+                .CountAsync(
+                    r => r.InvoiceId == refund.InvoiceId
+                         && r.Status == RefundStatus.Processing
+                         && r.Id != refund.Id,
+                    cancellationToken);
+
+            if (entries.Count == 1 && siblings == 0)
+            {
+                matchingEntry = entries[0];
+                _logger.LogInformation(
+                    "Refund {RefundId} has no extRef match; attributing the single cancel-list entry for invoice {InvoiceId}",
+                    refund.Id, refund.InvoiceId);
+            }
+            else
+            {
+                // Left Processing on purpose. The retry path costs nothing and a second look may well
+                // match once the bank has caught up; guessing cannot be undone after it has moved an
+                // order into a refunded state.
+                _logger.LogWarning(
+                    "No cancel-list entry matches refund {RefundId} (order {OrderId}, invoice {InvoiceId}): {Entries} entries, {Siblings} other pending refund(s). Left Processing rather than crediting one that may belong to another.",
+                    refund.Id, refund.OrderId, refund.InvoiceId, entries.Count, siblings);
+
+                await _notifications.RefundSyncUnmatchedAsync(
+                    refund.Id, refund.OrderId, refund.InvoiceId, entries.Count, siblings, cancellationToken);
+
+                return;
+            }
+        }
 
         if (matchingEntry == null)
         {

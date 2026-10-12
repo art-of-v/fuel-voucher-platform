@@ -77,6 +77,14 @@ public sealed class TelegramOptions
         /// </summary>
         public bool NotifyOnImportErrors { get; set; } = false;
 
+    /// <summary>
+    /// Tell the operator when Monobank reported a refund confirmation that cannot be attributed to
+    /// any refund we sent - the cancel list carried no matching <c>extRef</c>, and there was more
+    /// than one thing it could plausibly have been. The refund stays Processing and keeps retrying;
+    /// guessing which refund it belonged to is how a confirmation gets credited twice (#261).
+    /// </summary>
+    public bool NotifyOnUnmatchedRefundSync { get; set; } = false;
+
         /// <summary>
         /// Sends a message for any unhandled exception that reaches the global handler.
         /// Noisy by nature - a single broken endpoint hit by a client retry loop can
