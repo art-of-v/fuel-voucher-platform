@@ -47,7 +47,8 @@ internal sealed class OutboxEventConfiguration : IEntityTypeConfiguration<Outbox
         {
             t.HasCheckConstraint("ck_outbox_event_type", """
                 event_type IN ('OrderCreated', 'OrderFulfilled', 'OrderCancelled',
-                               'PaymentCompleted', 'VoucherExpired', 'VoucherUsed', 'VoucherActivated')
+                               'PaymentCompleted', 'VoucherExpired', 'VoucherUsed', 'VoucherActivated',
+                               'VoucherIssued')
                 """);
         });
     }

@@ -916,7 +916,7 @@ namespace FuelFlow.API.Migrations
 
                     b.ToTable("outbox_events", null, t =>
                         {
-                            t.HasCheckConstraint("ck_outbox_event_type", "event_type IN ('OrderCreated', 'OrderFulfilled', 'OrderCancelled',\n               'PaymentCompleted', 'VoucherExpired', 'VoucherUsed', 'VoucherActivated')");
+                            t.HasCheckConstraint("ck_outbox_event_type", "event_type IN ('OrderCreated', 'OrderFulfilled', 'OrderCancelled',\n               'PaymentCompleted', 'VoucherExpired', 'VoucherUsed', 'VoucherActivated',\n               'VoucherIssued')");
                         });
                 });
 

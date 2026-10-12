@@ -58,28 +58,28 @@ export function useNotificationTapRouting(): void {
       // (my-codes expands it); anything else — or a malformed payload — falls back
       // to the in-app notifications list. See NotificationService.TrySendPushAsync
       // for the payload contract.
-const data = response?.notification?.request?.content?.data as
-          { type?: unknown; orderId?: unknown; legalEntityId?: unknown } | undefined;
-        if (data?.type === 'order_fulfilled' && typeof data.orderId === 'string' && data.orderId) {
-          router.push({ pathname: '/my-codes', params: { orderId: data.orderId } });
-          return;
-        }
+      const data = response?.notification?.request?.content?.data as
+        { type?: unknown; orderId?: unknown; legalEntityId?: unknown } | undefined;
+      if (data?.type === 'order_fulfilled' && typeof data.orderId === 'string' && data.orderId) {
+        router.push({ pathname: '/my-codes', params: { orderId: data.orderId } });
+        return;
+      }
 
-        // "Fuel was issued to you" (#150 W3). The company is the point: a worker may work for
-        // several companies (W1), so landing in whichever context the app happened to have open
-        // would show them somebody else's fuel, or an empty wallet. Switch first, then navigate —
-        // the wallet reads the context on render.
-        if (
-          data?.type === 'voucher_issued' &&
-          typeof data.legalEntityId === 'string' &&
-          data.legalEntityId
-        ) {
-          useStore.getState().setCurrentContext(data.legalEntityId);
-          router.push('/my-codes');
-          return;
-        }
+      // "Fuel was issued to you" (#150 W3). The company is the point: a worker may work for
+      // several companies (W1), so landing in whichever context the app happened to have open
+      // would show them somebody else's fuel, or an empty wallet. Switch first, then navigate —
+      // the wallet reads the context on render.
+      if (
+        data?.type === 'voucher_issued' &&
+        typeof data.legalEntityId === 'string' &&
+        data.legalEntityId
+      ) {
+        useStore.getState().setCurrentContext(data.legalEntityId);
+        router.push('/my-codes');
+        return;
+      }
 
-        router.push('/notifications');
+      router.push('/notifications');
     };
 
     // Cold start: replay the tap that launched the app (fires at most once).
