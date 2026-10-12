@@ -70,16 +70,12 @@ export function resolveBrand(provider: string | null | undefined): BrandId | nul
 /** Which account context the wallet is being viewed in. */
 export type WalletSection = 'personal' | 'company' | 'worker';
 
-/** The five collections the emptiness rule reads. */
+/** The collections the emptiness rule reads. */
 export interface WalletCounts {
   pendingOrders: number;
   fulfilledOrders: number;
   renewalOrders: number;
   unassignedVouchers: number;
-  /** Unassigned company stock. */
-  poolVouchers: number;
-  /** Number of workers holding company stock — a company with only assigned stock is not empty. */
-  workersWithStock: number;
   /** Vouchers issued to the current user, in a worker context. */
   issuedToMe: number;
   /** Company handover receipts in a worker context — one per gift action. */
@@ -94,9 +90,10 @@ export interface WalletCounts {
  * - **worker** — only fuel issued to them, whether that is still a flat voucher list or a
  *   handover receipt. Orders, stock and other workers belong to the employer, so counting
  *   those would show a worker a populated wallet that is not theirs.
- * - **company** — its stock and its in-flight orders. Fulfilled vouchers are
- *   assigned to orders, so they live in the pool; the worker's own order history
- *   is not the company's business.
+ * - **company** — the company's own receipts and in-flight purchases. Its stock is NOT counted:
+ *   the hub owns who holds what and what is left (#161 H4), so the wallet deliberately shows the
+ *   same fuel in only one place. Counting the pool here would keep an empty-looking wallet alive
+ *   after its receipts are gone, and hide the hub behind an empty state.
  * - **personal** — orders in any state, plus unassigned vouchers.
  */
 export function isWalletEmpty(section: WalletSection, counts: WalletCounts): boolean {
@@ -105,9 +102,7 @@ export function isWalletEmpty(section: WalletSection, counts: WalletCounts): boo
       return counts.issuedToMe === 0 && counts.issuanceReceipts === 0;
 
     case 'company':
-      return (
-        counts.pendingOrders === 0 && counts.poolVouchers === 0 && counts.workersWithStock === 0
-      );
+      return counts.pendingOrders === 0 && counts.fulfilledOrders === 0;
 
     case 'personal':
       return (

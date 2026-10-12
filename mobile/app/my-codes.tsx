@@ -39,12 +39,8 @@ import {
   collectWorkerListVouchers,
   narrowIssuanceOrders,
 } from '../src/features/vouchers/lib/workerList';
-import { VoucherListControlsBar } from '../src/features/vouchers/components/VoucherListControlsBar';
-import {
-  CompanyStockHeader,
-  WorkerFuelHeader,
-  WorkerUsageSection,
-} from '../src/features/company/components';
+import { VoucherListControlsBar } from '../src/features/vouchers/components';
+import { WorkerFuelHeader, WorkerUsageSection } from '../src/features/company/components';
 import { useWorkerUsage } from '../src/features/company/hooks/useWorkerUsage';
 
 import { useI18n } from '../src/core/i18n';
@@ -179,7 +175,6 @@ export default function MyCodesScreen() {
     isCompanyContext,
     isWorkerContext,
     currentCompany,
-    companyStock,
     pendingOrders,
     fulfilledOrders,
     issuanceOrders,
@@ -407,8 +402,6 @@ export default function MyCodesScreen() {
     );
   }
 
-  const distributedCount = companyStock.workers.reduce((sum, w) => sum + w.vouchers.length, 0);
-
   // Worker context (multi-company epic #103 S5): the fuel this company issued to
   // me — issued / used / remaining counters, then the handover receipts. The
   // counters cover every voucher the worker holds, whether it sits inside a
@@ -422,11 +415,9 @@ export default function MyCodesScreen() {
   // another way, and cannot honestly be filed under one.
   const looseIssued = looseIssuanceVouchers;
 
-  // Emptiness is context-dependent: a company context shows its stock (pool +
-  // per-worker) plus any in-flight purchases; a worker context shows the fuel
-  // issued to them; personal shows orders + available vouchers. Company fulfilled
-  // vouchers are assigned to orders, so they live in the pool — not in
-  // `unassignedVouchers` — hence the dedicated company check.
+  // Emptiness is context-dependent: a company context shows its receipts and any
+  // in-flight purchases (#161 H4 — the hub owns the stock, so it is not counted here);
+  // a worker context shows the fuel issued to them; personal shows orders + available vouchers.
   const walletSection: WalletSection = isWorkerContext
     ? 'worker'
     : isCompanyContext
@@ -438,8 +429,6 @@ export default function MyCodesScreen() {
     renewalOrders: 0,
     issuanceReceipts: issuanceOrders.length,
     unassignedVouchers: 0,
-    poolVouchers: companyStock.pool.length,
-    workersWithStock: companyStock.workers.length,
     issuedToMe: workerIssued.length,
   });
 
@@ -555,12 +544,6 @@ export default function MyCodesScreen() {
                 />
                 <WorkerUsageSection report={workerUsage.report} isLoading={workerUsage.isLoading} />
               </>
-            ) : isCompanyContext ? (
-              <CompanyStockHeader
-                companyStock={companyStock}
-                currentCompany={currentCompany}
-                distributedCount={distributedCount}
-              />
             ) : (
               <WalletSummaryBar
                 orders={orders}
@@ -698,13 +681,14 @@ export default function MyCodesScreen() {
               </View>
             )}
 
-            {/* FULFILLED ORDERS (personal) - the wallet is orders containing vouchers.
+            {/* RECEIPTS (personal + owner context). The wallet is orders containing vouchers.
                             Each card is a purchase the customer made, with its live vouchers
-                            inside it (one if they bought one, many if they bought many). A
-                            renewal is not its own card: it is an event in a voucher's History,
+                            inside it (one if they bought one, many if they bought many).
+                            A renewal is not its own card: it is an event in a voucher's History,
                             and a replacement is re-parented onto the original order server-side.
-                            Company/worker contexts use the stock views below. */}
-            {!isCompanyContext && fulfilledOrders.length > 0 && (
+                            An owner sees the company's receipts too, and nothing else (#161 H4):
+                            the hub owns who holds what, so this list and the hub cannot disagree. */}
+            {!isWorkerContext && fulfilledOrders.length > 0 && (
               <View style={{ gap: tokens.spacing.md }}>
                 <View style={styles.sectionHeader}>
                   <CheckCircle size={14} color={tokens.colors.primary} />
@@ -731,8 +715,9 @@ export default function MyCodesScreen() {
                     onToggle={toggleOrderExpand}
                     onVoucherPress={openVoucher}
 
-                    // The customer's own paid orders: the only ones with money behind them and
-                    // therefore the only ones a receipt can exist for.
+                    // Orders money was actually paid for — the customer's own, or the company's
+                    // when an owner is looking at their company context. An issuance receipt carries
+                    // no money and so has no invoice behind it.
                     onReceipt={handleGetReceipt}
                     brandColor={brandColorFor(order.provider, tokens)}
                   />

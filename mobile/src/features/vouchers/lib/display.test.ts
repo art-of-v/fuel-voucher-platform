@@ -130,8 +130,6 @@ describe('isWalletEmpty', () => {
     fulfilledOrders: 0,
     renewalOrders: 0,
     unassignedVouchers: 0,
-    poolVouchers: 0,
-    workersWithStock: 0,
     issuedToMe: 0,
     issuanceReceipts: 0,
   };
@@ -142,8 +140,8 @@ describe('isWalletEmpty', () => {
     ['personal', { renewalOrders: 1 }],
     ['personal', { unassignedVouchers: 1 }],
     ['company', { pendingOrders: 1 }],
-    ['company', { poolVouchers: 1 }],
-    ['company', { workersWithStock: 1 }],
+    // An owner's company wallet is receipts (#161 H4), so a receipt is what makes it populated.
+    ['company', { fulfilledOrders: 1 }],
     ['worker', { issuedToMe: 1 }],
     // A worker whose only fuel is inside handover receipts has a populated wallet:
     // the vouchers moved into receipts, they did not disappear.
@@ -161,28 +159,20 @@ describe('isWalletEmpty', () => {
     },
   );
 
-  it("does not show a worker the employer's orders and stock", () => {
+  it("does not show a worker the employer's orders and receipts", () => {
     // The point of the worker branch: fuel issued to someone else must not make
     // *this* worker's wallet look populated.
     expect(
       isWalletEmpty('worker', {
         ...zero,
         pendingOrders: 3,
-        poolVouchers: 10,
-        workersWithStock: 2,
+        fulfilledOrders: 3,
       }),
     ).toBe(true);
   });
 
-  it('does not treat a company with only assigned stock as empty', () => {
-    // Fulfilled vouchers are assigned to orders, so they live against a worker
-    // rather than in the pool. A company holding only assigned stock still has
-    // stock.
-    expect(isWalletEmpty('company', { ...zero, workersWithStock: 1 })).toBe(false);
-  });
-
   it("does not count another section's vouchers against a personal wallet", () => {
-    expect(isWalletEmpty('personal', { ...zero, poolVouchers: 5, issuedToMe: 5 })).toBe(true);
+    expect(isWalletEmpty('personal', { ...zero, issuedToMe: 5, issuanceReceipts: 5 })).toBe(true);
   });
 });
 
