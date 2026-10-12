@@ -62,6 +62,19 @@ public class DataRetentionService
     /// </summary>
     public const int QrParametersRetentionDays = 365;
 
+    /// <summary>
+    /// A season, matching the import and QR windows. <c>support_messages</c> is a contact form:
+    /// email, user agent, IP and the message itself, with no FK to a user and no reader anywhere in
+    /// the product - nothing queries the table except this job. It is pure PII with no audit value,
+    /// so a year is more than long enough to answer "did this person contact us, and when" and short
+    /// enough that the data-minimisation obligation has a floor.
+    /// <para>
+    /// This was deliberately uncovered until the product owner set a window on it; the previous
+    /// comment said "no stated window", which is a question, not a decision.
+    /// </para>
+    /// </summary>
+    public const int SupportMessageRetentionDays = 365;
+
     // Deliberately NOT covered, and the reason matters more than the list:
     //
     //   voucher_exchanges          - the settlement record. "Who do we settle with, for what, at
@@ -76,7 +89,6 @@ public class DataRetentionService
     //                                 rewrite a stored amount (acquiring-statement-118.md), so a
     //                                 prune here would be a silent edit of the ledger.
     //   fuel_vouchers (soft-deleted)- paid-for paper. There is no window during which this is ok.
-    //   support_messages           - a user's own words to support, no stated window.
 
     private readonly ApplicationDbContext _context;
     private readonly RuntimeSettingsService _settings;
@@ -109,6 +121,7 @@ public class DataRetentionService
         var deviceCutoff = now.AddDays(-DeviceRetentionDays);
         var voucherImportCutoff = now.AddDays(-VoucherImportRetentionDays);
         var qrParametersCutoff = now.AddDays(-QrParametersRetentionDays);
+        var supportMessageCutoff = now.AddDays(-SupportMessageRetentionDays);
 
         // Devices are purged by TWO predicates rather than the one
         // `Status == Revoked || LastSeenAt < cutoff` they read as, and the reason is the planner,
@@ -197,6 +210,13 @@ public class DataRetentionService
                     q.CreatedAtUtc < qrParametersCutoff &&
                     !_context.FuelVouchers.IgnoreQueryFilters()
                         .Any(v => v.QrParametersId == q.Id)),
+                dryRun, cancellationToken)),
+
+            // Contact-form submissions past the window. Ordered last so it is the newest policy in the
+            // list, and nothing cascades into it - it references no user, so no other table depends on
+            // the row surviving.
+            ("support_messages", await PurgeAsync(
+                _context.SupportMessages.Where(m => m.CreatedAtUtc < supportMessageCutoff),
                 dryRun, cancellationToken)),
         };
 
