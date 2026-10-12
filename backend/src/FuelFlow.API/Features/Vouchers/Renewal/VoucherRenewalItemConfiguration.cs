@@ -59,7 +59,9 @@ internal sealed class VoucherRenewalItemConfiguration : IEntityTypeConfiguration
         builder.HasOne(e => e.Order)
             .WithMany()
             .HasForeignKey(e => e.OrderId)
-            .OnDelete(DeleteBehavior.Cascade);
+            // Restrict, for the same reason as refunds->orders: this row is what the customer paid
+            // and how the term moved. Deleting the order must not erase the payment record.
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(e => e.SourceVoucher)
             .WithMany()

@@ -60,6 +60,14 @@ public class DeletedUnpaidOrderCleanupService
         // DELETE RESTRICT, so an order that still owns a voucher cannot be removed at all. One such
         // row would abort the whole batch (and be re-selected every night, so the job would never
         // drain again). An order that delivered fuel is never really abandoned - leave it.
+        //
+        // The refunds and renewal-items guards exist for exactly the same reason, and were added
+        // alongside making those two FKs RESTRICT. A refunded order is not an abandoned checkout:
+        // money went out, and "we paid this back, for this, under this order" is answerable only
+        // from the refund row. The status predicate already excludes them today - a refund flips the
+        // order to PartiallyRefunded/Refunded, never Cancelled - so these clauses are not load-bearing
+        // today. They are there so that if that ever stops being true, the job skips the order
+        // instead of the database refusing the delete and wedging the whole cleanup.
         var abandoned = await _context.Orders
             .IgnoreQueryFilters()
             .AsTracking()
@@ -68,6 +76,8 @@ public class DeletedUnpaidOrderCleanupService
                      && o.Status == OrderStatus.Cancelled
                      && o.UpdatedAtUtc < cutoff)
             .Where(o => !_context.FuelVouchers.IgnoreQueryFilters().Any(v => v.OrderId == o.Id))
+            .Where(o => !_context.Refunds.IgnoreQueryFilters().Any(r => r.OrderId == o.Id))
+            .Where(o => !_context.VoucherRenewalItems.IgnoreQueryFilters().Any(i => i.OrderId == o.Id))
             .OrderBy(o => o.UpdatedAtUtc)
             .Take(BatchSize)
             .ToListAsync(cancellationToken);

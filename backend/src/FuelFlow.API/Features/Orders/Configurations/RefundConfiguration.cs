@@ -91,7 +91,16 @@ internal sealed class RefundConfiguration : IEntityTypeConfiguration<Refund>
         builder.HasOne(e => e.Order)
             .WithMany()
             .HasForeignKey(e => e.OrderId)
-            .OnDelete(DeleteBehavior.Cascade);
+            // Restrict, not Cascade. A refund is a money record: "we paid this back, and here is
+            // what for" is answerable only from the row. Under Cascade, deleting the order would
+            // take the refund with it and nothing anywhere would say so - the money trail would
+            // simply stop existing.
+            //
+            // The only path that deletes an order row is DeletedUnpaidOrderCleanupService, and its
+            // predicate now excludes refunds too, so this constraint never fires in normal
+            // operation - which is the point: it turns "the application currently gets this right"
+            // into "the database refuses if it ever stops getting this right".
+            .OnDelete(DeleteBehavior.Restrict);
 
         // user_id copies orders.user_id and created_by_user_id records who approved the refund.
         // Restrict rather than SetNull or nothing: an audit row has to keep naming a real actor,

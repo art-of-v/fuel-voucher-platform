@@ -4,6 +4,7 @@ using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Contracts.SharedModels;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -96,6 +97,110 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
         await using var verify = CreateContext();
         (await verify.FuelVouchers.IgnoreQueryFilters().CountAsync(v => v.VoucherNumber == "cascade-guard"))
             .Should().Be(1, "the voucher is the customer's paid-for paper and must survive");
+    }
+
+    /// <summary>
+    /// A refund is a money record. Under CASCADE, deleting the order took the refund with it and
+    /// nothing said so - "we paid this back, for this, under this order" would simply stop being
+    /// answerable.
+    /// <para>
+    /// Today the application's status predicate already prevents this (a refund flips the order to
+    /// Refunded, never Cancelled), so the constraint is not load-bearing yet. That is exactly why it
+    /// is worth having: it turns "the application currently gets this right" into "the database
+    /// refuses if it ever stops getting this right".
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task Deleting_A_Refunded_Order_Is_Refused()
+    {
+        var user = NewUser("+38000000001");
+        var order = new Order
+        {
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            Price = 100m,
+            Status = OrderStatus.Refunded,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+
+        await using (var seed = CreateContext())
+        {
+            seed.Users.Add(user);
+            seed.Orders.Add(order);
+            seed.Refunds.Add(new Refund
+            {
+                Id = Guid.NewGuid(),
+                OrderId = order.Id,
+                UserId = user.Id,
+                Amount = 100L,
+                InvoiceId = "INV-DBINT-1",
+                ExtRef = "R1",
+                Status = RefundStatus.Completed,
+                IsAutomatic = false,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow
+            });
+            await seed.SaveChangesAsync();
+        }
+
+        await using var context = CreateContext();
+        var act = () => context.Database.ExecuteSqlRawAsync("""DELETE FROM orders WHERE id = {0}""", order.Id);
+
+        await act.Should().ThrowAsync<PostgresException>();
+
+        await using var verify = CreateContext();
+        (await verify.Refunds.CountAsync(r => r.OrderId == order.Id))
+            .Should().Be(1, "the refund is the only record that money went out, and it must survive");
+    }
+
+    /// <summary>
+    /// The same guarantee for the self-serve renewal: <c>voucher_renewal_items</c> records what the
+    /// customer paid and how the term moved, so deleting the order must not erase the payment.
+    /// </summary>
+    [Fact]
+    public async Task Deleting_A_renewal_Order_With_Renewal_Items_Is_Refused()
+    {
+        var user = NewUser("+38000000002");
+        var order = new Order
+        {
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            Price = 500m,
+            Kind = OrderKind.Renewal,
+            Status = OrderStatus.Fulfilled,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+
+        await using (var seed = CreateContext())
+        {
+            // source_voucher_id is a RESTRICT FK to a real voucher, so the renewal item needs one.
+            var source = NewVoucher("renewal-source", "renewal-source-qr");
+            seed.FuelVouchers.Add(source);
+            seed.Users.Add(user);
+            seed.Orders.Add(order);
+            seed.VoucherRenewalItems.Add(new VoucherRenewalItem
+            {
+                Id = Guid.NewGuid(),
+                OrderId = order.Id,
+                SourceVoucherId = source.Id,
+                AmountPaid = 500m,
+                PreviousCustomerExpiration = new DateOnly(2026, 12, 1),
+                NewCustomerExpiration = new DateOnly(2027, 1, 1),
+                CreatedAtUtc = DateTime.UtcNow
+            });
+            await seed.SaveChangesAsync();
+        }
+
+        await using var context = CreateContext();
+        var act = () => context.Database.ExecuteSqlRawAsync("""DELETE FROM orders WHERE id = {0}""", order.Id);
+
+        await act.Should().ThrowAsync<PostgresException>();
+
+        await using var verify = CreateContext();
+        (await verify.VoucherRenewalItems.CountAsync(i => i.OrderId == order.Id))
+            .Should().Be(1, "the renewal item is what the customer paid for, and it must survive");
     }
 
     /// <summary>
