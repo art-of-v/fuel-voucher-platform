@@ -60,16 +60,37 @@ public sealed class CompanyAcceptInvitationCommandHandlerTests : IDisposable
         result.Status.Should().Be("InvalidStatus");
     }
 
-    [Fact]
-    public async Task Accept_ReturnsAlreadyMember_WhenWorkerAlreadyInACompany()
-    {
-        var inv = AddInvitation();
-        _context.CompanyMembers.Add(CompanyTestFactory.NewMember(Guid.NewGuid(), Guid.NewGuid(), WorkerId));
-        await _context.SaveChangesAsync();
+[Fact]
+       public async Task Accept_ReturnsAlreadyMember_WhenWorkerAlreadyInThisCompany()
+       {
+           var inv = AddInvitation();
+           // Same company as the invitation. This used to seed a *different* legal entity, which
+           // only passed because the guard was global - #150 W1.
+           _context.CompanyMembers.Add(CompanyTestFactory.NewMember(Guid.NewGuid(), LegalEntityId, WorkerId));
+           await _context.SaveChangesAsync();
 
-        var result = await _handler.HandleAsync(new AcceptInvitationCommand(inv.Id, WorkerId));
-        result.Status.Should().Be("AlreadyMember");
-    }
+           var result = await _handler.HandleAsync(new AcceptInvitationCommand(inv.Id, WorkerId));
+           result.Status.Should().Be("AlreadyMember");
+       }
+
+       /// <summary>
+       /// The point of W1: working for N companies. A membership elsewhere must not block this
+       /// invitation - under the old global check it refused every second company.
+       /// </summary>
+       [Fact]
+       public async Task Accept_Succeeds_WhenWorkerAlreadyWorksForAnotherCompany()
+       {
+           var inv = AddInvitation();
+           _context.CompanyMembers.Add(CompanyTestFactory.NewMember(Guid.NewGuid(), Guid.NewGuid(), WorkerId));
+           await _context.SaveChangesAsync();
+
+           var result = await _handler.HandleAsync(new AcceptInvitationCommand(inv.Id, WorkerId));
+
+           result.Status.Should().Be("Success");
+           var member = await _context.CompanyMembers.FindAsync(result.MemberId!.Value);
+           member!.LegalEntityId.Should().Be(LegalEntityId);
+           member.WorkerUserId.Should().Be(WorkerId);
+       }
 
     [Fact]
     public async Task Accept_CreatesMemberAndMarksAccepted_OnSuccess()
