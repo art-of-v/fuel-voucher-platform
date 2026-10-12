@@ -212,10 +212,25 @@ public sealed class RefundOrderCommandHandler
             var merchant = order.MonobankMerchant ?? MonobankMerchant.Live;
             var monobankClient = _monobankClientFactory.ForMerchant(merchant);
 
+            // The RETURN receipt: the goods going back. Monobank documents `items` on invoice/cancel
+            // as required when fiscalisation (ПРРО) is active, and it is sent always so that
+            // activating the link is not the day refunds start failing. Built from the same
+            // breakdown that produced the amount, so the receipt and the money cannot disagree.
+            var unfulfilledLines = ComputeUnfulfilledLines(order);
+            var fuelNames = await MonobankBasketBuilder.FuelNamesAsync(
+                _context, unfulfilledLines.Select(l => l.FuelTypeId), cancellationToken);
+
+            var returnItems = MonobankBasketBuilder.Build(unfulfilledLines.Select(l => (
+                l.Provider, l.FuelTypeId,
+                fuelNames.GetValueOrDefault(l.FuelTypeId),
+                l.Liters, l.UnfulfilledUnits, l.UnitPrice,
+                l.UnfulfilledUnits * l.UnitPrice)));
+
             var response = await monobankClient.CancelInvoiceAsync(
                 order.MonobankInvoiceId,
                 amount,
                 extRef,
+                returnItems,
                 cancellationToken);
 
             // Do NOT update order status here - wait for Monobank confirmation via RefundStatusSyncService
@@ -331,12 +346,24 @@ public sealed class RefundOrderCommandHandler
     /// </remarks>
     private static bool WasPaid(Order order) => order.MonobankStatus == MonobankStatus.Success;
 
-    internal static long ComputeRefundAmountKopecks(Order order)
+    /// <summary>One fuel line of an order, and how many of its units the customer never received.</summary>
+    internal readonly record struct UnfulfilledLine(
+        string Provider,
+        string FuelTypeId,
+        decimal Liters,
+        int UnfulfilledUnits,
+        decimal UnitPrice);
+
+    /// <summary>
+    /// What is going back, per fuel line. The single source for both the money and the receipt
+    /// lines, so the return receipt cannot describe a different refund from the one we charge for.
+    /// </summary>
+    internal static List<UnfulfilledLine> ComputeUnfulfilledLines(Order order)
     {
         // A company handover never captured money (Price is 0), so there is nothing to give back.
         // The write path is already blocked upstream — such an order carries no Monobank invoice —
         // so this only keeps a displayed amount from implying otherwise.
-        if (order.Kind == OrderKind.ReceivedFromCompany) return 0;
+        if (order.Kind == OrderKind.ReceivedFromCompany) return [];
 
         // Nothing to return unless the provider says it took the money.
         //
@@ -350,7 +377,7 @@ public sealed class RefundOrderCommandHandler
         // be Cancelled and still be owed a refund: the invoice stays payable for its whole
         // validity window, so a customer can pay one long after a failure cancelled it. Gating on
         // OrderStatus would have removed the only remedy for exactly that case.
-        if (!WasPaid(order)) return 0;
+        if (!WasPaid(order)) return [];
 
         var grouped = order.LineItems
             .GroupBy(li => (li.Provider, li.FuelTypeId, li.Liters))
@@ -364,7 +391,7 @@ public sealed class RefundOrderCommandHandler
             })
             .ToList();
 
-        var unfulfilledValue = 0m;
+        var unfulfilled = new List<UnfulfilledLine>();
 
         foreach (var group in grouped)
         {
@@ -389,9 +416,18 @@ public sealed class RefundOrderCommandHandler
             var unfulfilledUnits = group.OrderedUnits - fulfilledUnits;
             if (unfulfilledUnits > 0)
             {
-                unfulfilledValue += unfulfilledUnits * group.UnitPrice;
+                unfulfilled.Add(new UnfulfilledLine(
+                    group.Provider, group.FuelTypeId, group.Liters, unfulfilledUnits, group.UnitPrice));
             }
         }
+
+        return unfulfilled;
+    }
+
+    internal static long ComputeRefundAmountKopecks(Order order)
+    {
+        var unfulfilledValue = ComputeUnfulfilledLines(order)
+            .Sum(l => l.UnfulfilledUnits * l.UnitPrice);
 
         return Money.ToKopecksLong(unfulfilledValue);
     }

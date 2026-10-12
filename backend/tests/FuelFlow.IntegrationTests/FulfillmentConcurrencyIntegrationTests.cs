@@ -105,7 +105,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
 
         var barrier = new DualBarrier();
         var monobankMock = new Mock<IMonobankClient>();
-        monobankMock.Setup(m => m.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        monobankMock.Setup(m => m.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<MonobankBasketItem>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new MonobankCancelResponse { Status = "processing" });
 
         using (var serviceA = CreateService(barrier, monobankMock.Object))
@@ -569,7 +569,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
         }
 
         var monobankMock = new Mock<IMonobankClient>();
-        monobankMock.Setup(m => m.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+        monobankMock.Setup(m => m.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<MonobankBasketItem>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new MonobankCancelResponse { Status = "processing" });
 
         using (var service = CreateService(new DualBarrier(), monobankMock.Object))

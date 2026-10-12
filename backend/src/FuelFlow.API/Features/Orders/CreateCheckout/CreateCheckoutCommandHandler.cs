@@ -97,7 +97,7 @@ public sealed class CreateCheckoutCommandHandler
         }
 
         // Slice-3 hard block (safety net at checkout, mirroring the operator write path): refuse a
-        // sale whose recomputed price/л sits below blended cost unless this supplier+fuel is opted in.
+        // sale whose recomputed price/╨╗ sits below blended cost unless this supplier+fuel is opted in.
         if (!fuelTypeEntity.AllowBelowCost
             && package.SupplierPricePerLiter is { } cost
             && package.MarginUahPerLiter is { } profit
@@ -196,11 +196,23 @@ public sealed class CreateCheckoutCommandHandler
         {
             var monobankClient = _monobankClientFactory.ForMerchant(merchant);
 
+            // The receipt's goods lines. Always sent: Monobank registers the fiscal receipt for us
+            // and can only print what we declare, and the ╨ƒ╨á╨á╨₧ link is switched on in the bank's web
+            // cabinet without warning us. Declaring always means activating it is not a launch-day
+            // event.
+            var fuelNames = await MonobankBasketBuilder.FuelNamesAsync(
+                _context, order.LineItems.Select(li => li.FuelTypeId), cancellationToken);
+
             var invoiceRequest = new MonobankInvoiceRequest
             {
                 // Monobank is the one place amounts must be kopecks.
                 Amount = Money.ToKopecksLong(order.Price),
                 MerchantPaymentInfo = $"FuelFlow Order {order.Id}",
+                Destination = "╨ƒ╨░╨╗╨╕╨▓╨╛",
+                Items = MonobankBasketBuilder.Build(order.LineItems.Select(li => (
+                    li.Provider, li.FuelTypeId,
+                    fuelNames.GetValueOrDefault(li.FuelTypeId),
+                    li.Liters, li.Quantity, li.UnitPrice, li.LineTotal))),
                 RedirectUrl = _monobankOptions.RedirectUrl,
                 WebhookUrl = _monobankOptions.WebhookUrl
             };

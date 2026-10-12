@@ -60,7 +60,7 @@ public class MonobankStatementImportServiceTests
 
             public Task<MonobankInvoiceResponse> CreateInvoiceAsync(MonobankInvoiceRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<MonobankInvoiceStatus> GetInvoiceStatusAsync(string invoiceId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task<MonobankCancelResponse> CancelInvoiceAsync(string invoiceId, long amountKopecks, string extRef, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<MonobankCancelResponse> CancelInvoiceAsync(string invoiceId, long amountKopecks, string extRef, IReadOnlyList<MonobankBasketItem>? items = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         }
     }
 
@@ -252,7 +252,7 @@ public class MonobankStatementImportServiceTests
 
             public Task<MonobankInvoiceResponse> CreateInvoiceAsync(MonobankInvoiceRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<MonobankInvoiceStatus> GetInvoiceStatusAsync(string invoiceId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-            public Task<MonobankCancelResponse> CancelInvoiceAsync(string invoiceId, long amountKopecks, string extRef, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<MonobankCancelResponse> CancelInvoiceAsync(string invoiceId, long amountKopecks, string extRef, IReadOnlyList<MonobankBasketItem>? items = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         }
     }
 }

@@ -6,7 +6,7 @@ public interface IMonobankClient
 {
     Task<MonobankInvoiceResponse> CreateInvoiceAsync(MonobankInvoiceRequest request, CancellationToken cancellationToken = default);
     Task<MonobankInvoiceStatus> GetInvoiceStatusAsync(string invoiceId, CancellationToken cancellationToken = default);
-    Task<MonobankCancelResponse> CancelInvoiceAsync(string invoiceId, long amountKopecks, string extRef, CancellationToken cancellationToken = default);
+    Task<MonobankCancelResponse> CancelInvoiceAsync(string invoiceId, long amountKopecks, string extRef, IReadOnlyList<MonobankBasketItem>? items = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// The acquirer's own record of what moved, for a period.
