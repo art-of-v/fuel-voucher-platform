@@ -92,7 +92,7 @@ internal static class PipelineSetup
             var section = config.GetSection(AppVersionOptions.SectionName);
             return Results.Ok(new
             {
-                minimumVersion = section["MinimumVersion"] ?? "1.0.0",
+                minimumVersion = section["MinimumVersion"] ?? AppVersionOptions.DefaultMinimumVersion,
                 iosStoreUrl = section["IosStoreUrl"] ?? "",
                 androidStoreUrl = section["AndroidStoreUrl"] ?? ""
             });
