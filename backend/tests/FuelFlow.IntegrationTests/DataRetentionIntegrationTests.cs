@@ -5,6 +5,7 @@ using FuelFlow.Features.Notifications.SharedModels;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Settings.SharedModels;
+using FuelFlow.Features.Support.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -48,6 +49,8 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
         (await verify.Notifications.CountAsync()).Should().Be(2);
         (await verify.ErrorLogs.CountAsync()).Should().Be(1);
         (await verify.PushTokens.CountAsync()).Should().Be(1);
+        (await verify.SupportMessages.CountAsync()).Should().Be(1);
+        (await verify.SupportMessages.AllAsync(m => m.Message != "eligible")).Should().BeTrue();
 
         // Counts alone prove the right *number* went; the discriminator asserts prove the right
         // *rows* went — the "eligible" (dead + aged) row in each table, never the recent/live ones.
@@ -175,6 +178,7 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
         (await verify.PushTokens.CountAsync()).Should().Be(2);
         (await verify.ProviderEventOutbox.CountAsync()).Should().Be(2);
         (await verify.Devices.CountAsync()).Should().Be(3);
+        (await verify.SupportMessages.CountAsync()).Should().Be(2);
     }
 
     private static void Enable(ApplicationDbContext seed) => seed.AppSettings.Add(new AppSetting
@@ -220,6 +224,11 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
 
         seed.PushTokens.Add(NewPushToken("eligible", lastSeenAtUtc: now.AddDays(-100)));
         seed.PushTokens.Add(NewPushToken("recent", lastSeenAtUtc: now.AddDays(-10)));
+
+        // Contact-form submissions. The Message carries the "eligible"/"recent" discriminator, since
+        // a SupportMessage has no natural key beyond its own id.
+        seed.SupportMessages.Add(NewSupportMessage("eligible", now.AddDays(-400)));
+        seed.SupportMessages.Add(NewSupportMessage("recent", now.AddDays(-10)));
 
         // The admin change audit trail, aged only: a change two seasons old is pruned, last season's
         // is kept, and there is no "live" variant because a row here is not work waiting to happen -
@@ -308,6 +317,14 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
         LoggedAtUtc = loggedAtUtc
     };
 
+    private static SupportMessage NewSupportMessage(string message, DateTime createdAtUtc) => new()
+    {
+        Id = Guid.NewGuid(),
+        Email = $"c-{message}@example.test",
+        Message = message,
+        CreatedAtUtc = createdAtUtc
+    };
+
     private static UserPushToken NewPushToken(string token, DateTime lastSeenAtUtc) => new()
     {
         Id = Guid.NewGuid(),
@@ -334,7 +351,7 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
         using var context = CreateContext();
         await context.Database.MigrateAsync();
         await context.Database.ExecuteSqlRawAsync(
-            """TRUNCATE TABLE "verification_codes", "refresh_tokens", "outbox_events", "error_logs", "notifications", "push_tokens", "provider_event_outbox", "devices", "app_settings", "users" RESTART IDENTITY CASCADE""");
+            """TRUNCATE TABLE "verification_codes", "refresh_tokens", "outbox_events", "error_logs", "notifications", "push_tokens", "provider_event_outbox", "devices", "support_messages", "app_settings", "users" RESTART IDENTITY CASCADE""");
         seed(context);
         await context.SaveChangesAsync();
     }
