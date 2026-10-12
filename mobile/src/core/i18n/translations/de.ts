@@ -76,7 +76,8 @@ export const de: Record<string, string> = {
   'context.error.duplicateEdrpou': 'Ein Unternehmen mit dieser EDRPOU ist bereits registriert',
   'context.error.badRequest': 'Überprüfen Sie Ihre Eingaben',
   'context.error.generic': 'Unternehmen konnte nicht erstellt werden. Bitte erneut versuchen.',
-  'context.error.editFailed': 'Unternehmen konnte nicht gespeichert werden. Bitte erneut versuchen.',
+  'context.error.editFailed':
+    'Unternehmen konnte nicht gespeichert werden. Bitte erneut versuchen.',
   // Serverseitige Formatprüfung, clientseitig gespiegelt (#128, #265). Wird sowohl beim Anlegen als
   // auch beim Bearbeiten im Profil verwendet, deshalb nicht unter einem Screen-Namespace verschachtelt.
   'company.edrpouInvalidFormat': 'EDRPOU muss aus genau 8 Ziffern bestehen',
