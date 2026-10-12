@@ -1,6 +1,6 @@
 import React from 'react';
 import { Alert } from 'react-native';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import PaymentScreen from './pay';
 
@@ -162,7 +162,9 @@ describe('Payment screen', () => {
     // payment. The loader covers that and must not resize the frame when it goes away.
     expect(screen.getByTestId('payment-loading')).toBeTruthy();
 
-    (webViewProps?.onLoadEnd as () => void)();
+    act(() => {
+      (webViewProps?.onLoadEnd as () => void)();
+    });
 
     expect(screen.queryByTestId('payment-loading')).toBeNull();
   });
@@ -171,11 +173,15 @@ describe('Payment screen', () => {
     mockParams = { url: 'https://pay.monobank.ua/frame/inv-1' };
 
     render(<PaymentScreen />);
-    (webViewProps?.onLoadEnd as () => void)();
+    act(() => {
+      (webViewProps?.onLoadEnd as () => void)();
+    });
     expect(screen.queryByTestId('payment-loading')).toBeNull();
 
     // 3DS replaces the document inside the frame, which blanks it exactly like the first load.
-    (webViewProps?.onLoadStart as () => void)();
+    act(() => {
+      (webViewProps?.onLoadStart as () => void)();
+    });
     expect(screen.getByTestId('payment-loading')).toBeTruthy();
   });
 
@@ -208,7 +214,10 @@ describe('Payment screen', () => {
     mockParams = { url: 'https://pay.monobank.ua/frame/inv-1' };
 
     render(<PaymentScreen />);
-    (webViewProps?.onHttpError as () => void)();
+    // act: onHttpError swaps the whole subtree for the error state, which is a state update.
+    act(() => {
+      (webViewProps?.onHttpError as () => void)();
+    });
 
     // The frame is gone; the customer needs the title, the reason and a way forward.
     expect(screen.getByTestId('payment-failed')).toBeTruthy();
