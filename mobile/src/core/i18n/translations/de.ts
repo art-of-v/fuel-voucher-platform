@@ -193,16 +193,9 @@ export const de: Record<string, string> = {
   'codes.failedToLoad': 'Fehler beim Laden',
   'codes.retry': 'ERNEUT VERSUCHEN',
 
-  // Company-context stock view (multi-company epic #103, S2)
-  'codes.stock.pool': 'VERFÜGBARER POOL',
-  'codes.stock.poolEmpty': 'Keine verfügbaren Gutscheine im Pool',
-  'codes.stock.withWorkers': 'BEI MITARBEITERN',
-  'codes.stock.unknownWorker': 'Mitarbeiter',
-  'codes.stock.poolShort': 'POOL',
-  'codes.stock.distributedShort': 'VERTEILT',
-  'codes.stock.workersShort': 'MITARBEITER',
-  'codes.stock.companyEmpty': 'KEIN BESTAND',
-  'codes.stock.companyEmptySub': 'Kaufen Sie Kraftstoff für das Unternehmen, um den Pool zu füllen',
+  // Company context — the wallet keeps receipts only; the hub owns the stock (#161 H4).
+  'codes.stock.companyEmpty': 'NOCH KEINE KÄUFE',
+  'codes.stock.companyEmptySub': 'Für das Unternehmen gekaufter Kraftstoff erscheint hier als Beleg',
 
   // Worker context — the fuel a company issued to me (multi-company epic #103, S5)
   'codes.stock.issuedToYou': 'AN SIE AUSGEGEBEN',

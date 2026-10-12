@@ -189,16 +189,9 @@ export const es: Record<string, string> = {
   'codes.failedToLoad': 'Error al cargar',
   'codes.retry': 'REINTENTAR',
 
-  // Company-context stock view (multi-company epic #103, S2)
-  'codes.stock.pool': 'FONDO DISPONIBLE',
-  'codes.stock.poolEmpty': 'No hay vales disponibles en el fondo',
-  'codes.stock.withWorkers': 'CON EMPLEADOS',
-  'codes.stock.unknownWorker': 'Empleado',
-  'codes.stock.poolShort': 'FONDO',
-  'codes.stock.distributedShort': 'REPARTIDO',
-  'codes.stock.workersShort': 'EMPLEADOS',
-  'codes.stock.companyEmpty': 'SIN EXISTENCIAS',
-  'codes.stock.companyEmptySub': 'Compra combustible para la empresa para llenar el fondo',
+  // Company context — the wallet keeps receipts only; the hub owns the stock (#161 H4).
+  'codes.stock.companyEmpty': 'AÚN NO HAY COMPRAS',
+  'codes.stock.companyEmptySub': 'El combustible que se compre para la empresa aparecerá aquí como recibo',
 
   // Worker context — the fuel a company issued to me (multi-company epic #103, S5)
   'codes.stock.issuedToYou': 'ENTREGADO A VOS',
