@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiRequest, ApiError } from "@/lib/api-client";
 import { useI18n } from "@/lib/i18n";
+import { isValidEdrIpn, isValidRnkrr } from "@/lib/supplier-requisites";
 import { toast } from "sonner";
 
 interface Supplier {
@@ -120,6 +121,13 @@ export default function SuppliersTab() {
 
     const set = (key: keyof SupplierForm) => (v: string) => setForm((f) => ({ ...f, [key]: v }));
 
+    // Checked live, from the first keystroke, and gating the button: the alternative is what this
+    // screen did for its whole life - validate nothing here, let the server 400, and show the raw
+    // English error string in a toast. `CustomerRenewalTab` sets a field's validity the same way.
+    const edrIpnError = isValidEdrIpn(form.edrIpn) ? null : t("suppliers.error.edrIpn");
+    const rnkrrError = isValidRnkrr(form.rnkrr) ? null : t("suppliers.error.rnkrr");
+    const requisitesValid = edrIpnError === null && rnkrrError === null;
+
     return (
         <div className="space-y-4">
             <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -165,11 +173,17 @@ export default function SuppliersTab() {
                         </label>
                         <label className="text-sm">
                             {t("suppliers.edrIpn")}
-                            <Input value={form.edrIpn} onChange={(e) => set("edrIpn")(e.target.value)} />
+                            <Input value={form.edrIpn} onChange={(e) => set("edrIpn")(e.target.value)}
+                                aria-invalid={edrIpnError !== null}
+                                className={edrIpnError ? "border-destructive" : ""} />
+                            {edrIpnError && <span className="text-xs text-destructive">{edrIpnError}</span>}
                         </label>
                         <label className="text-sm">
                             {t("suppliers.rnkrr")}
-                            <Input value={form.rnkrr} onChange={(e) => set("rnkrr")(e.target.value)} />
+                            <Input value={form.rnkrr} onChange={(e) => set("rnkrr")(e.target.value)}
+                                aria-invalid={rnkrrError !== null}
+                                className={rnkrrError ? "border-destructive" : ""} />
+                            {rnkrrError && <span className="text-xs text-destructive">{rnkrrError}</span>}
                         </label>
                         <label className="text-sm md:col-span-2">
                             {t("suppliers.address")}
@@ -180,7 +194,7 @@ export default function SuppliersTab() {
                             <Input value={form.notes} onChange={(e) => set("notes")(e.target.value)} />
                         </label>
                     </div>
-                    <Button disabled={!form.name.trim() || save.isPending} onClick={() => save.mutate()}>
+                    <Button disabled={!form.name.trim() || !requisitesValid || save.isPending} onClick={() => save.mutate()}>
                         {save.isPending ? t("common.saving") : t("common.save")}
                     </Button>
                 </div>
