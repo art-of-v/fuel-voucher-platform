@@ -240,7 +240,6 @@ new decimal?[] { 90.00m }, surchargePerPair: 10m, reset: false);
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(_fixture.DbContainer.GetConnectionString())
-            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
             .Options);
 
     /// <summary>
