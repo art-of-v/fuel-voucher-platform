@@ -23,6 +23,7 @@ import { STAFF_ROLES, assignableRoles } from "@/lib/roles";
 import { formatMoney } from "@/lib/money";
 import ProvidersTab from "@/components/ProvidersTab";
 import { BatchCostTimeline } from "@/components/BatchCostTimeline";
+import { StatementReconciliationPanel } from "@/components/StatementReconciliationPanel";
 import StationNodesTab from "@/components/StationNodesTab";
 import VoucherExchangeTab from "@/components/VoucherExchangeTab";
 import SuppliersTab from "@/components/SuppliersTab";
@@ -1200,6 +1201,7 @@ voucherNumber: string;
                     <th className="text-left p-4">{t('common.status')}</th>
                     <th className="text-left p-4">{t('common.date')}</th>
                     <th className="text-left p-4">{t('table.vouchers')}</th>
+                    <th className="text-left p-4">{t('purchases.acquirer')}</th>
                     <th className="text-left p-4">{t('common.actions')}</th>
                   </tr>
                 </thead>
@@ -1237,6 +1239,31 @@ voucherNumber: string;
                       </td>
                       <td className="p-4">{purchase.voucherCount} / {purchase.quantity}</td>
                       <td className="p-4">
+                        {/* The acquirer's own record of the payment, next to our receipt.
+                            monobankInvoiceId and monobankStatus were on the type from the start and
+                            rendered nowhere, so the invoice was in the wire and in nobody's eye. */}
+                        {purchase.monobankInvoiceId ? (
+                          <div className="space-y-1">
+                            <div className="font-mono text-xs break-all" title={purchase.monobankInvoiceId}>
+                              {purchase.monobankInvoiceId}
+                            </div>
+                            {purchase.monobankStatus && (
+                              <span className={`inline-block px-1.5 py-0.5 rounded text-xs ${
+                                purchase.monobankStatus === 'Success' ? 'bg-success/20 text-success' : 'bg-muted text-muted-foreground'}`}>
+                                {t('monobank.status.' + purchase.monobankStatus.toLowerCase())}
+                              </span>
+                            )}
+                            {purchase.refundMonobankStatus && (
+                              <span className="block text-xs text-muted-foreground">
+                                {t('purchases.refundStatus.' + purchase.refundMonobankStatus)}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="p-4">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -1269,8 +1296,8 @@ voucherNumber: string;
                   ))}
                   {purchases.length === 0 && (
                     <tr>
-                      <td colSpan={10} className="p-8 text-center text-muted-foreground">
-                        No purchases found
+<td colSpan={11} className="p-8 text-center text-muted-foreground">
+                      No purchases found
                       </td>
                     </tr>
                   )}
@@ -2585,6 +2612,12 @@ voucherNumber: string;
             )}
           </div>
         )}
+
+        {/* The acquirer statement act belongs with the reports: it is the one document in this
+            system that compares us against an independent source, and it has existed as an API
+            since #118 landed with no way to reach it. Sits above the generated report so it does
+            not depend on that form having been filled in. */}
+        {activeTab === 'reports' && <StatementReconciliationPanel />}
 
         {/* Contracts Tab */}
         {activeTab === 'contracts' && (
