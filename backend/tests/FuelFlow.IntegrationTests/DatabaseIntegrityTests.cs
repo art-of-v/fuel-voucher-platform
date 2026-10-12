@@ -84,6 +84,52 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
             $"{table}.{column} holds a signature/payload/trace with no real upper bound - bounding it would destroy the audit trail");
     }
 
+    /// <summary>
+    /// The catalog keys are natural strings, deliberately not UUIDs, and stay <c>text</c> rather than
+    /// <c>varchar</c> so that converting a primary key's type never forces a foreign-key refactor.
+    /// The trade is only acceptable if something actually bounds them, which is what these prove.
+    /// Raw SQL: going through EF would only prove EF sent a short string.
+    /// </summary>
+    [Fact]
+    public async Task An_Overlong_Catalog_Key_Is_Refused()
+    {
+        await using var context = CreateContext();
+
+        var act = () => context.Database.ExecuteSqlRawAsync(
+            """
+            INSERT INTO stations (id, name, color, logo_text, sort_order, created_at_utc, updated_at_utc, is_deleted)
+            VALUES ({0}, 'Too Long', '#00ff80', 'TL', 999, NOW(), NOW(), false)
+            """, new string('y', 150));
+
+        var ex = await act.Should().ThrowAsync<PostgresException>();
+        ex.Which.MessageText.Should().Contain("ck_stations_id_length",
+            "the catalog key limit, not some unrelated constraint, is what must stop this");
+    }
+
+    [Theory]
+    [InlineData("stations", "ck_stations_id_length")]
+    [InlineData("fuel_types", "ck_fuel_types_id_length")]
+    [InlineData("station_nodes", "ck_station_nodes_id_length")]
+    [InlineData("fuel_packages", "ck_fuel_packages_id_length")]
+    [InlineData("fuel_vouchers", "ck_fuel_vouchers_fuel_type_id_length")]
+    [InlineData("purchase_batches", "ck_purchase_batches_fuel_type_id_length")]
+    [InlineData("voucher_exchanges", "ck_voucher_exchanges_fuel_type_id_length")]
+    public async Task Every_Catalog_Key_Has_Its_Length_Constraint(string table, string constraint)
+    {
+        await using var context = CreateContext();
+
+        var sql = """
+            SELECT count(*) FROM pg_constraint
+            WHERE contype='c' AND conname={0}
+            """;
+        var found = await context.Database
+            .SqlQueryRaw<int>(sql, constraint)
+            .ToListAsync();
+
+        found.Should().ContainSingle().Which.Should().Be(1,
+            $"{table}.* must stay bounded - a natural key with no limit is how a slug becomes a paragraph");
+    }
+
     private ApplicationDbContext CreateContext()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()

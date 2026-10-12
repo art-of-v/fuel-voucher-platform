@@ -62,5 +62,15 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
         builder.HasIndex(e => e.Name);
         builder.HasIndex(e => e.StationId);
         builder.HasIndex(e => new { e.StationId, e.Name });
+
+        // Natural key ("okko-95"), deliberately not a UUID. Bounded by CHECK rather than by a type
+        // change - see StationConfiguration for why converting a natural key is not worth the
+        // refactor, and what the CHECK buys instead.
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_fuel_types_id_length", "length(id) <= 100");
+            t.HasCheckConstraint("ck_fuel_types_name_length", "length(name) <= 200");
+            t.HasCheckConstraint("ck_fuel_types_station_id_length", "length(station_id) <= 100");
+        });
     }
 }
