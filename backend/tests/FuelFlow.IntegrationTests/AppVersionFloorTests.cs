@@ -10,21 +10,38 @@ namespace FuelFlow.IntegrationTests;
 /// <para>
 /// <c>AppVersion:MinimumVersion</c> is not a nag. <c>mobile/app/_layout.tsx</c> reads
 /// <c>/api/app-version</c> on launch and, when the running build is below the floor, returns a
-/// full-screen update wall instead of the app. So the value has to satisfy two opposing
+/// full-screen update wall instead of the app. The value therefore has to satisfy two opposing
 /// requirements at once: high enough that a stale build cannot call an endpoint the cleanup work
 /// deleted, and never higher than the version actually shipping in the stores - because a user sent
 /// to a store that does not yet serve the demanded version finds the build they already had, and is
-/// stuck in a loop they cannot leave.
+/// stuck behind a wall nothing can clear.
 /// </para>
 ///
 /// <para>
-/// Both halves are checked here against the real files: the mobile <c>app.json</c> that becomes the
-/// store build, and the backend configuration that names the floor. Raising one without the other
-/// fails this test rather than production.
+/// The second requirement is the one that has to be checked mechanically, and it is checked here.
+/// On 2026-10-12 the floor was <c>1.1.0</c> while the stores still served <c>1.0.1</c>: the API
+/// auto-deploys on merge, so production served the wall to every user, pointing them at a store
+/// build that did not exist. It was undone, not designed around - so the check below is now the
+/// thing standing between a bumped <c>app.json</c> and a locked-out app.
+/// </para>
+///
+/// <para>
+/// The opposite requirement - that the floor is <em>above</em> the published build - cannot be
+/// checked from this repository, because the repository does not know what the stores serve. That
+/// direction is a deliberate decision per release (see <see cref="PublishedInStores"/>), not an
+/// invariant, so there is no test for it here.
 /// </para>
 /// </summary>
 public class AppVersionFloorTests
 {
+    /// <summary>
+    /// The marketing version the stores actually serve right now. Bumping <c>mobile/app.json</c> does
+    /// not change this - only a submitted build does - and forgetting that is what put a
+    /// non-existent version behind the wall on 2026-10-12. Update it in the same PR that ships the
+    /// build, never the one that prepares it.
+    /// </summary>
+    private const string PublishedInStores = "1.0.1";
+
     private static string RepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
@@ -119,17 +136,34 @@ public class AppVersionFloorTests
     }
 
     /// <summary>
-    /// The direction that leaves stale clients running. If app.json is already ahead of the floor,
-    /// the floor is not doing the job it was raised for.
+    /// The same direction, against the version that is genuinely live in the stores. This is the
+    /// check that was missing when the floor went to 1.1.0: <c>app.json</c> agreed with it, so the
+    /// check above passed while every real user was locked out.
     /// </summary>
     [Fact]
-    public void Floor_IsRaisedAboveTheLastPublishedBuild()
+    public void Floor_DoesNotExcludeTheVersionLiveInTheStores()
     {
-        var shipped = ShippedVersion();
         var floor = ConfiguredFloor();
 
-        Compare(floor, "1.0.1").Should().BeGreaterThan(0,
-            "1.0.1 is the build in the stores; a floor at or below it lets those builds keep " +
-            "calling routes that the endpoint cleanup deleted");
+        Compare(PublishedInStores, floor).Should().BeGreaterThanOrEqualTo(0,
+            $"AppVersion:MinimumVersion demands {floor} but the stores serve {PublishedInStores}: " +
+            "every user on the installed build would hit the forced-update wall and be sent to a " +
+            "store that cannot give them that version");
+    }
+
+    /// <summary>
+    /// Keeps the published constant honest. It is a hand-maintained claim about the App Store, so
+    /// the cheapest thing to do when it goes stale is bump <c>app.json</c> and never touch it - and
+    /// then the check above quietly guards nothing. A store build that is newer than what we recorded
+    /// means the recording is what is out of date, not the app.
+    /// </summary>
+    [Fact]
+    public void PublishedVersion_IsNotAheadOfAppJson()
+    {
+        var shipped = ShippedVersion();
+
+        Compare(PublishedInStores, shipped).Should().BeLessThanOrEqualTo(0,
+            $"the stores are recorded as serving {PublishedInStores} but app.json already ships " +
+            $"{shipped}: record the version in the stores only once a build carrying it is submitted");
     }
 }

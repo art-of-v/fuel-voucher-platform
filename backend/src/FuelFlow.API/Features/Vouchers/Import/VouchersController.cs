@@ -146,12 +146,13 @@ public sealed class VouchersController : ControllerBase
     ///
     /// <para>
     /// Kept although no current client calls it, and that is deliberate. The app is published in
-    /// the App Store, AppVersion:MinimumVersion is 1.0.0 while the shipped version is 1.0.1, and
-    /// Expo Updates only reach a user the next time they launch - so a build from before the
-    /// renderer moved to voucher.imageUrl can still be asking for this. It is the one endpoint
-    /// whose absence takes a customer from "my fuel voucher" to "I cannot refuel": if a stale
-    /// bundle calls it and gets a 404, the QR simply is not there at the pump. That asymmetry is
-    /// why "no client in the repo calls it" was not enough reason to delete it here.
+    /// the App Store and AppVersion:MinimumVersion sits at the version the stores serve (1.0.1),
+    /// so the build in users' hands is exactly the one allowed through - and Expo Updates only
+    /// reach a user the next time they launch, so a build from before the renderer moved to
+    /// voucher.imageUrl can still be asking for this. It is the one endpoint whose absence takes a
+    /// customer from "my fuel voucher" to "I cannot refuel": if a stale bundle calls it and gets a
+    /// 404, the QR simply is not there at the pump. That asymmetry is why "no client in the repo
+    /// calls it" was not enough reason to delete it here.
     /// </para>
     /// </summary>
     [HttpGet("{id:guid}/qr")]
