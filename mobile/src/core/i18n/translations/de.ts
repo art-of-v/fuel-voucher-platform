@@ -195,7 +195,8 @@ export const de: Record<string, string> = {
 
   // Company context — the wallet keeps receipts only; the hub owns the stock (#161 H4).
   'codes.stock.companyEmpty': 'NOCH KEINE KÄUFE',
-  'codes.stock.companyEmptySub': 'Für das Unternehmen gekaufter Kraftstoff erscheint hier als Beleg',
+  'codes.stock.companyEmptySub':
+    'Für das Unternehmen gekaufter Kraftstoff erscheint hier als Beleg',
 
   // Worker context — the fuel a company issued to me (multi-company epic #103, S5)
   'codes.stock.issuedToYou': 'AN SIE AUSGEGEBEN',
