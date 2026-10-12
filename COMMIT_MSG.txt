@@ -1,0 +1,41 @@
+refactor(api): drop four read endpoints that duplicate a route the clients already use
+
+An audit of which endpoints the admin and mobile clients actually call turned up
+four that nothing reaches, and all four are duplicates rather than unique
+capabilities. Removing them loses no behaviour.
+
+GET /api/purchases/my was a literal copy of GET /api/sync/orders. Both actions
+constructed the same GetUserPurchasesCommand from the same claim and returned
+the same List<PurchaseDto> through the same handler. The mobile app only ever
+called /api/sync/orders.
+
+GET /api/sync was a wrapper that added nothing. GetSyncCommandHandler calls
+GetUserPurchasesCommandHandler and returns GetSyncResponse(orders, orders.Count,
+orders.Sum(o => o.Vouchers?.Count ?? 0)) - the two totals are derivable from the
+orders array the caller already receives. Its test file went with it; nothing
+else referenced the command, handler or response.
+
+GET /api/packages/station/{stationId} and GET /api/station-nodes/station/{stationId}
+are the per-station filters of two public catalogue routes. No client called
+them: the mobile app loads each collection unfiltered and filters client-side.
+Dropping them also removes two anonymous routes from the public surface, which
+is the direction AnonymousEndpointSurfaceTests wants.
+
+The handlers removed alongside the routes are genuinely orphaned - each was
+reached only from the action deleted here. GetUserPurchasesCommandHandler stays,
+because /api/sync/orders and the dev-only /api/purchases/simulate both still use
+it.
+
+Coverage is preserved rather than deleted: GetMyPurchases_ShouldReturnUserOrders
+asserted that a created purchase appears in the customer's order list, which is
+still true, so it now calls /api/sync/orders. The two station-filter unit tests
+went with their handlers. README and the Postman collection no longer advertise
+routes that answer 404.
+
+Deliberately left in place, and filed as planning issues instead: the analytics
+and reconciliation endpoints no operator can reach, the AdminFuelVoucherController
+duplicate, the referral feature's missing UI, and logout-everywhere. Those are
+missing UI or missing product decisions, not dead code, and deleting a working
+endpoint does not build the screen. In particular DELETE /api/admin/orders/{id}
+stays: it is a data-integrity guard that refuses to remove an order whose fuel is
+already delivered, and "nobody calls it" is not a reason to delete a guard.

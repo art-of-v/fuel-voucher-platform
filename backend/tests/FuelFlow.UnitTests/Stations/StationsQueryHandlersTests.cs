@@ -8,9 +8,7 @@ using FuelFlow.Features.Stations.GetAdminStationById;
 using FuelFlow.Features.Stations.GetAdminStations;
 using FuelFlow.Features.Stations.GetPackageSuggestions;
 using FuelFlow.Features.Stations.GetPublicPackages;
-using FuelFlow.Features.Stations.GetPublicPackagesByStation;
 using FuelFlow.Features.Stations.GetPublicStationNodes;
-using FuelFlow.Features.Stations.GetPublicStationNodesByStation;
 using FuelFlow.Features.Stations.GetPublicStations;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
@@ -125,23 +123,6 @@ public sealed class StationsQueryHandlersTests : IDisposable
     }
 
     [Fact]
-    public async Task GetPublicStationNodesByStation_ShouldFilterByStationId()
-    {
-        _context.StationNodes.AddRange(
-            CreateStationNode("node-1", "station-a", "Node A1"),
-            CreateStationNode("node-2", "station-a", "Node A2"),
-            CreateStationNode("node-3", "station-b", "Node B"));
-        await _context.SaveChangesAsync();
-
-        var handler = new GetPublicStationNodesByStationQueryHandler(_context);
-
-        var result = await handler.HandleAsync(new GetPublicStationNodesByStationQuery("station-a"));
-
-        result.Should().HaveCount(2);
-        result.Should().OnlyContain(n => n.StationId == "station-a");
-    }
-
-    [Fact]
     public async Task GetPublicPackages_ShouldReturnAllPackages()
     {
         _context.FuelPackages.AddRange(
@@ -154,23 +135,6 @@ public sealed class StationsQueryHandlersTests : IDisposable
         var result = await handler.HandleAsync(new GetPublicPackagesQuery());
 
         result.Should().HaveCount(2);
-    }
-
-    [Fact]
-    public async Task GetPublicPackagesByStation_ShouldFilterByStationId()
-    {
-        _context.FuelPackages.AddRange(
-            CreatePackage("pkg-1", "station-a", "ft-a", "A-95", 10m),
-            CreatePackage("pkg-2", "station-a", "ft-a", "A-95", 20m),
-            CreatePackage("pkg-3", "station-b", "ft-b", "Diesel", 20m));
-        await _context.SaveChangesAsync();
-
-        var handler = new GetPublicPackagesByStationQueryHandler(_context);
-
-        var result = await handler.HandleAsync(new GetPublicPackagesByStationQuery("station-a"));
-
-        result.Should().HaveCount(2);
-        result.Should().OnlyContain(p => p.StationId == "station-a");
     }
 
     [Fact]

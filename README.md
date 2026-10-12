@@ -311,10 +311,9 @@ role required; — = public. This lists the primary endpoints; admin sub-resourc
 |---|---|---|---|
 | `POST` | `/api/purchases` | ✅ (device-signed) | Create a single purchase + Monobank invoice |
 | `POST` | `/api/purchases/bulk` | ✅ (device-signed) | Create a multi-item purchase |
-| `GET` | `/api/purchases/my` | ✅ | Current user's purchases (with vouchers) |
 | `POST` | `/api/purchases/simulate` | Admin | Simulate a Monobank callback (dev/testing) |
 | `POST` | `/api/monobank/webhook` | — (signed) | Monobank payment callback — signature-verified, fail-closed 401 |
-| `GET` | `/api/sync` · `/api/sync/orders` | ✅ | Combined sync (orders + totals) / user's orders |
+| `GET` | `/api/sync/orders` | ✅ | Current user's orders with embedded voucher details |
 
 ### Vouchers
 
@@ -349,7 +348,7 @@ role required; — = public. This lists the primary endpoints; admin sub-resourc
 |---|---|---|
 | `GET` | `/api/stations` · `/api/station-nodes` | Stations and physical locations |
 | `GET` | `/api/stations/fuel-types` | Fuel types with base/discount pricing (public catalog) |
-| `GET` | `/api/packages` · `/api/packages/station/{id}` | Fuel packages (all / by station) |
+| `GET` | `/api/packages` | Fuel packages (public catalog; clients filter by station client-side) |
 | `GET` | `/api/report` | Per-user report (authenticated) |
 
 ### Admin
