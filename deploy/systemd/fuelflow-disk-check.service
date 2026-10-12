@@ -9,7 +9,7 @@
 # itself an alert, not a reason to stop looking.
 [Unit]
 Description=FuelFlow disk pressure check
-Documentation=file:/root/FuelFlow/docs/DEPLOYMENT.md
+Documentation=https://github.com/art-of-v/fuel-voucher-platform-planning/blob/main/docs/DEPLOYMENT.md
 # No Requires=docker.service: the check must still work when Docker is down, which is exactly
 # when the box is in trouble and Postgres may already be restarting.
 After=docker.service

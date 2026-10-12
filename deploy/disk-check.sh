@@ -33,6 +33,7 @@
 #   2 = the check itself is broken (cannot measure, or misconfigured) - also worth a human
 #
 # Every 15 min: installed as fuelflow-disk-check.timer by install-disk-check-schedule.sh
+# See docs/DEPLOYMENT.md (private docs repo), "Disk hygiene".
 # One-off run:  cd /root/FuelFlow/deploy && ./disk-check.sh
 # ------------------------------------------------------------------------------
 set -uo pipefail
