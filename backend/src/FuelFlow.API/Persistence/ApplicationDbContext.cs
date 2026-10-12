@@ -20,8 +20,18 @@ namespace FuelFlow.Persistence;
 
 public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
 {
-    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
+    /// <summary>
+    /// Optional so the ~100 `new ApplicationDbContext(options)` call sites in the test suites keep
+    /// compiling; DI resolves it in the app, and a test that does not care about concurrency logging
+    /// gets a null logger rather than having to pass one.
+    /// </summary>
+    private readonly ILogger<ApplicationDbContext>? _logger;
+
+    public ApplicationDbContext(
+        DbContextOptions<ApplicationDbContext> options,
+        ILogger<ApplicationDbContext>? logger = null) : base(options)
     {
+        _logger = logger;
     }
 
     public DbSet<FuelVoucher> FuelVouchers => Set<FuelVoucher>();
@@ -73,7 +83,54 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        return base.SaveChangesAsync(cancellationToken);
+        return SaveChangesGuardedAsync(cancellationToken);
+    }
+
+    // The synchronous SaveChanges() is deliberately NOT wrapped. Every write in this app is async
+    // (there is not one bare SaveChanges() call in src), and guarding it would mean blocking on
+    // SaveChangesAsync with GetAwaiter().GetResult() - a deadlock waiting for a context that has no
+    // SynchronizationContext today and no guarantee of one tomorrow, in exchange for logging that
+    // nothing would emit.
+
+    private async Task<int> SaveChangesGuardedAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await base.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            // #246 detector. Logged here rather than in the HTTP exception handler because every
+            // write in the app goes through this method - including background jobs, which never
+            // touch the HTTP pipeline and would otherwise fail with no record of what collided.
+            //
+            // Warning, not Error: a concurrency token is only on a handful of tables and this fires
+            // whenever a row changed underneath a writer, which is the whole point of the token -
+            // most such collisions are benign and the caller simply retries. The entity type and key
+            // are what a follow-up needs to know which handlers genuinely race in production; two
+            // attempts to find that by reading the code both came back wrong.
+            //
+            // Rethrown, never swallowed: the caller has to learn its write did not land, or the lost
+            // update this is here to expose is simply recreated.
+            if (_logger is not null)
+            {
+                foreach (var entry in ex.Entries)
+                {
+                    var key = entry.Metadata.FindPrimaryKey()?.Properties
+                        .Select(p => p.Name)
+                        .FirstOrDefault();
+
+                    _logger.LogWarning(
+                        ex,
+                        "Concurrency conflict on {Entity} ({KeyProperty}={Key}) - the row changed since it was read, so this write was not applied",
+                        entry.Metadata.ClrType.Name,
+                        key ?? "id",
+                        key is null ? null : entry.Property(key)?.CurrentValue);
+                }
+            }
+
+            throw;
+        }
     }
 }
 

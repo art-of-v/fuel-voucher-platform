@@ -1,3 +1,4 @@
+using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -10,6 +11,10 @@ internal sealed class OperatorVoucherRenewalConfiguration : IEntityTypeConfigura
         builder.ToTable("operator_voucher_renewals");
 
         builder.HasKey(e => e.Id);
+
+        // #246 detector: xmin token. No DDL - xmin is a system column. Raw SQL must never write
+        // this table, or the token starts failing saves that did not actually race.
+        builder.UseXminAsConcurrencyToken();
 
         builder.Property(e => e.Id)
             .HasColumnName("id");

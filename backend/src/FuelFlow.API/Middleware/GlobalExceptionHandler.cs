@@ -1,6 +1,7 @@
 using FuelFlow.SharedKernel.Observability;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Middleware;
 
@@ -41,6 +42,14 @@ internal sealed class GlobalExceptionHandler : IExceptionHandler
             InvalidOperationException => (StatusCodes.Status400BadRequest, "The request could not be processed"),
 
             KeyNotFoundException => (StatusCodes.Status404NotFound, "Not found"),
+
+            // #246 detector. A concurrency token means this write did not land because the row
+            // changed underneath it. 409 is the honest answer and the caller can legitimately retry.
+            // It is deliberately NOT a 500: that would fire the operator alert below on every
+            // collision, and the token exists to be hit - a collision is the token working, not a
+            // fault. The specific entity was already logged with its key in ApplicationDbContext.
+            DbUpdateConcurrencyException => (StatusCodes.Status409Conflict, "The record changed while you were editing it - please try again"),
+
             _ => (StatusCodes.Status500InternalServerError, "An unexpected error occurred")
         };
 
