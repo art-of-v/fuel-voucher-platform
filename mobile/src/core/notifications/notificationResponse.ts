@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
+import { useStore } from '../state/appStore';
 
 /**
  * The RECEIVE/TAP half of push. Registration (minting a token + upserting it to
@@ -10,6 +11,10 @@ import * as Notifications from 'expo-notifications';
  * Destination: an "order fulfilled" push carries `type: "order_fulfilled"` and an
  * `orderId` in `data` (see the backend NotificationService), so a tap deep-links to
  * that order in the wallet — `/my-codes?orderId=…`, which expands that order's card.
+ * A "fuel was issued to you" push (#150 W3) carries `type: "voucher_issued"` and a
+ * `legalEntityId`, and switches the app into that company's worker context before
+ * opening the wallet — a worker belongs to several companies now, so the context has
+ * to come from the push rather than from whatever was open.
  * Any other push, or a malformed payload, falls back to the in-app notifications
  * list `/notifications` (the list from #28a / PR #653). The branch lives in
  * `openTarget`, which reads the tapped response's `notification.request.content.data`.
@@ -53,13 +58,28 @@ export function useNotificationTapRouting(): void {
       // (my-codes expands it); anything else — or a malformed payload — falls back
       // to the in-app notifications list. See NotificationService.TrySendPushAsync
       // for the payload contract.
-      const data = response?.notification?.request?.content?.data as
-        { type?: unknown; orderId?: unknown } | undefined;
-      if (data?.type === 'order_fulfilled' && typeof data.orderId === 'string' && data.orderId) {
-        router.push({ pathname: '/my-codes', params: { orderId: data.orderId } });
-        return;
-      }
-      router.push('/notifications');
+const data = response?.notification?.request?.content?.data as
+          { type?: unknown; orderId?: unknown; legalEntityId?: unknown } | undefined;
+        if (data?.type === 'order_fulfilled' && typeof data.orderId === 'string' && data.orderId) {
+          router.push({ pathname: '/my-codes', params: { orderId: data.orderId } });
+          return;
+        }
+
+        // "Fuel was issued to you" (#150 W3). The company is the point: a worker may work for
+        // several companies (W1), so landing in whichever context the app happened to have open
+        // would show them somebody else's fuel, or an empty wallet. Switch first, then navigate —
+        // the wallet reads the context on render.
+        if (
+          data?.type === 'voucher_issued' &&
+          typeof data.legalEntityId === 'string' &&
+          data.legalEntityId
+        ) {
+          useStore.getState().setCurrentContext(data.legalEntityId);
+          router.push('/my-codes');
+          return;
+        }
+
+        router.push('/notifications');
     };
 
     // Cold start: replay the tap that launched the app (fires at most once).

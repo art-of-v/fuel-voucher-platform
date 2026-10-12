@@ -1,6 +1,7 @@
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import * as Notifications from 'expo-notifications';
 import { useNotificationTapRouting } from './notificationResponse';
+import { useStore } from '../state/appStore';
 
 // The native module cannot load under Jest, so mock the SDK surface we call.
 // Mirrors the mocking style of push.test.ts.
@@ -101,6 +102,48 @@ describe('useNotificationTapRouting', () => {
       }),
     );
     expect(mockPush).toHaveBeenCalledTimes(1);
+  });
+
+  // #150 W3. A worker belongs to several companies now, so a push that only opened the wallet
+  // would show whichever context the app happened to have open. The company in the payload has to
+  // become the active context BEFORE navigating.
+  it('switches into the issuing company before opening the wallet on a voucher-issued push', async () => {
+    let captured: ((response: unknown) => void) | undefined;
+    addResponseListener.mockImplementation((listener: (r: unknown) => void) => {
+      captured = listener;
+      return { remove: jest.fn() };
+    });
+
+    useStore.setState({ currentLegalEntityId: 'some-other-company' });
+    renderHook(() => useNotificationTapRouting());
+    await waitFor(() => expect(getLastResponse).toHaveBeenCalled());
+
+    act(() => {
+      captured?.(fakeResponse({ type: 'voucher_issued', legalEntityId: 'company-abc' }));
+    });
+
+    expect(useStore.getState().currentLegalEntityId).toBe('company-abc');
+    expect(mockPush).toHaveBeenCalledWith('/my-codes');
+  });
+
+  it('leaves the context alone when a voucher-issued push has no company', async () => {
+    let captured: ((response: unknown) => void) | undefined;
+    addResponseListener.mockImplementation((listener: (r: unknown) => void) => {
+      captured = listener;
+      return { remove: jest.fn() };
+    });
+
+    useStore.setState({ currentLegalEntityId: 'keep-me' });
+    renderHook(() => useNotificationTapRouting());
+    await waitFor(() => expect(getLastResponse).toHaveBeenCalled());
+
+    act(() => {
+      captured?.(fakeResponse({ type: 'voucher_issued' }));
+    });
+
+    // A malformed payload must not wipe the worker's context - it falls back to the list.
+    expect(useStore.getState().currentLegalEntityId).toBe('keep-me');
+    expect(mockPush).toHaveBeenCalledWith('/notifications');
   });
 
   it('falls back to the list when an order-fulfilled push carries no orderId', async () => {

@@ -182,10 +182,18 @@ try
             service => service.ProcessPendingOrdersAsync(CancellationToken.None),
             "*/1 * * * *");
 
-        recurringJobManager.AddOrUpdate<NotificationService>(
-            "process-notifications",
-            service => service.ProcessOrderFulfilledEventsAsync(CancellationToken.None),
-            "*/1 * * * *");
+recurringJobManager.AddOrUpdate<NotificationService>(
+      "process-notifications",
+      service => service.ProcessOrderFulfilledEventsAsync(CancellationToken.None),
+      "*/1 * * * *");
+
+      // #150 W3. A separate job rather than a second call inside the one above: AddOrUpdate takes
+      // an expression tree, which cannot hold an async lambda, and one job per event type is what
+      // the rest of this schedule does. Same service, same cadence.
+      recurringJobManager.AddOrUpdate<NotificationService>(
+      "process-worker-notifications",
+      service => service.ProcessVoucherIssuedEventsAsync(CancellationToken.None),
+      "*/1 * * * *");
 
         recurringJobManager.AddOrUpdate<RefundStatusSyncService>(
             "sync-refund-status",

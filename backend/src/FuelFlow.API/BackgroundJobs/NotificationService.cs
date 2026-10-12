@@ -60,6 +60,121 @@ public sealed class NotificationService
         }
     }
 
+    /// <summary>
+    /// #150 W3 - tells a worker that fuel was issued to them.
+    /// <para>
+    /// Separate from the order-fulfilled path on purpose. A worker has no order of their own: the
+    /// order belongs to the employer, and the worker never sees it. Reusing the customer's copy would
+    /// name an order they cannot open, and reusing the customer's push <c>type</c> would deep-link
+    /// them into a screen that is not theirs.
+    /// </para>
+    /// </summary>
+    public async Task ProcessVoucherIssuedEventsAsync(CancellationToken cancellationToken = default)
+    {
+        var events = await _context.OutboxEvents
+            .Where(e => !e.Processed && e.EventType == OutboxEventType.VoucherIssued)
+            .OrderBy(e => e.CreatedAtUtc)
+            .Take(50)
+            .ToListAsync(cancellationToken);
+
+        if (!events.Any())
+        {
+            _logger.LogDebug("No pending VOUCHER_ISSUED events to process");
+            return;
+        }
+
+        _logger.LogInformation("Processing {Count} VOUCHER_ISSUED events", events.Count);
+
+        foreach (var outboxEvent in events)
+        {
+            try
+            {
+                await ProcessVoucherIssuedEventAsync(outboxEvent, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to process VOUCHER_ISSUED event {EventId}", outboxEvent.Id);
+            }
+        }
+    }
+
+    private async Task ProcessVoucherIssuedEventAsync(OutboxEvent outboxEvent, CancellationToken cancellationToken)
+    {
+        var payload = System.Text.Json.JsonSerializer.Deserialize<VoucherIssuedPayload>(
+            outboxEvent.Payload, PayloadJsonOptions);
+
+        if (payload?.WorkerUserId == null || !Guid.TryParse(payload.WorkerUserId, out var workerId))
+        {
+            _logger.LogWarning("Invalid VOUCHER_ISSUED payload for event {EventId}", outboxEvent.Id);
+            outboxEvent.Processed = true;
+            outboxEvent.ProcessedAtUtc = DateTime.UtcNow;
+            _context.OutboxEvents.Update(outboxEvent);
+            await _context.SaveChangesAsync(cancellationToken);
+            return;
+        }
+
+        var notification = new Notification
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = workerId,
+            // Worker-context copy: speaks about the company that issued the fuel, never about an
+            // order, because there is no order on the worker's side to refer to.
+            Title = "Вам видано паливо",
+            Message = payload.CompanyName is { Length: > 0 } company
+                ? $"{company} видав вам {DescribeVoucherCount(payload.VoucherCount)}. Це паливо для роботи — його не потрібно купувати."
+                : $"Вам видано {DescribeVoucherCount(payload.VoucherCount)}.",
+            IsRead = false,
+            CreatedAtUtc = DateTime.UtcNow
+        };
+
+        _context.Notifications.Add(notification);
+
+        outboxEvent.Processed = true;
+        outboxEvent.ProcessedAtUtc = DateTime.UtcNow;
+        _context.OutboxEvents.Update(outboxEvent);
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "Created voucher-issued notification for worker {WorkerId} ({Count} voucher(s))",
+            workerId, payload.VoucherCount);
+
+        // After the save, for the same reason as the order-fulfilled path: a push failure can then
+        // neither duplicate the notification nor cause the event to be reprocessed.
+        await TrySendPushAsync(
+            workerId,
+            notification.Title,
+            notification.Message,
+            new Dictionary<string, object>
+            {
+                ["type"] = "voucher_issued",
+                // The company is what makes this deep-link correct: a worker in several companies
+                // (W1) has to land in the context of the one that issued the fuel, not in whichever
+                // context their app happened to have open.
+                ["legalEntityId"] = payload.LegalEntityId ?? string.Empty,
+                ["voucherCount"] = payload.VoucherCount,
+            },
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Ukrainian plural: 1 талон, 2-4 талони, 5+ талонів. The teens are the trap - 11 is
+    /// "талонів" even though it ends in 1, and 12-14 are "талонів" even though they end in 2-4.
+    /// </summary>
+    private static string DescribeVoucherCount(int count)
+    {
+        var mod10 = count % 10;
+        var mod100 = count % 100;
+
+        if (mod10 == 1 && mod100 != 11)
+            return $"{count} талон";
+
+        if (mod10 is >= 2 and <= 4 && mod100 is < 12 or > 14)
+            return $"{count} талони";
+
+        return $"{count} талонів";
+    }
+
     private async Task ProcessEventAsync(OutboxEvent outboxEvent, CancellationToken cancellationToken)
     {
         var payload = System.Text.Json.JsonSerializer.Deserialize<OrderFulfilledPayload>(
@@ -108,7 +223,16 @@ public sealed class NotificationService
         // The in-app notification is now persisted and the event is marked processed, so a push
         // failure can neither duplicate the notification nor cause reprocessing. Fire the push as
         // a best-effort follow-up.
-        await TrySendPushAsync(userId, notification.Title, notification.Message, payload.OrderId, cancellationToken);
+        await TrySendPushAsync(
+            userId,
+            notification.Title,
+            notification.Message,
+            new Dictionary<string, object>
+            {
+                ["type"] = "order_fulfilled",
+                ["orderId"] = payload.OrderId.ToString(),
+            },
+            cancellationToken);
     }
 
     /// <summary>
@@ -123,7 +247,12 @@ public sealed class NotificationService
     /// <c>mobile/src/core/notifications/notificationResponse.ts</c>.
     /// </para>
     /// </summary>
-    private async Task TrySendPushAsync(Guid userId, string title, string body, Guid orderId, CancellationToken cancellationToken)
+    private async Task TrySendPushAsync(
+        Guid userId,
+        string title,
+        string body,
+        IReadOnlyDictionary<string, object> data,
+        CancellationToken cancellationToken)
     {
         try
         {
@@ -139,11 +268,7 @@ public sealed class NotificationService
                     t.Token,
                     title,
                     body,
-                    new Dictionary<string, object>
-                    {
-                        ["type"] = "order_fulfilled",
-                        ["orderId"] = orderId.ToString(),
-                    }))
+                    data))
                 .ToList();
 
             var results = await _pushSender.SendAsync(messages, cancellationToken);
