@@ -29,8 +29,8 @@ describe('legalEntityErrorKey', () => {
       'context.error.editFailed',
     );
     // The override only replaces the fallback — a 409 still names the duplicate.
-    expect(legalEntityErrorKey(new LegalEntityApiError(409, 'dup'), 'context.error.editFailed')).toBe(
-      'context.error.duplicateEdrpou',
-    );
+    expect(
+      legalEntityErrorKey(new LegalEntityApiError(409, 'dup'), 'context.error.editFailed'),
+    ).toBe('context.error.duplicateEdrpou');
   });
 });

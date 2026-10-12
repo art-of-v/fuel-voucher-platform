@@ -145,7 +145,10 @@ export function useProfile(callbacks?: {
       if ((err?.status ?? 500) >= 500) {
         reportError(err);
       }
-      showToast({ kind: 'danger', message: t(legalEntityErrorKey(err, 'context.error.editFailed')) });
+      showToast({
+        kind: 'danger',
+        message: t(legalEntityErrorKey(err, 'context.error.editFailed')),
+      });
     },
   });
 
