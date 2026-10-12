@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createLegalEntity,
   getMyLegalEntities,
-  LegalEntityApiError,
   type CreateLegalEntityInput,
 } from '../api/legalEntityApi';
 import { useAuth } from '../../auth/hooks/useAuth';
@@ -10,14 +9,13 @@ import { useStore } from '../../../core/state/appStore';
 
 export const LEGAL_ENTITIES_KEY = ['legal-entities', 'mine'] as const;
 
-/** Maps a create failure to an i18n key — 409 is a duplicate EDRPOU. */
-export function legalEntityErrorKey(error: unknown): string {
-  if (error instanceof LegalEntityApiError) {
-    if (error.status === 409) return 'context.error.duplicateEdrpou';
-    if (error.status === 400) return 'context.error.badRequest';
-  }
-  return 'context.error.generic';
-}
+/**
+ * Maps a create failure to an i18n key — 409 is a duplicate EDRPOU.
+ *
+ * Re-exported from lib/legalEntityError so existing importers keep working; the implementation
+ * lives there so it can be tested without the hook's dependencies.
+ */
+export { legalEntityErrorKey } from '../lib/legalEntityError';
 
 /**
  * Data layer for the "Мої контексти" screen (multi-company epic #103, S1): the

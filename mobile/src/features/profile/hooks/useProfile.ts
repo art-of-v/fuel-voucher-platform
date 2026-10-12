@@ -6,6 +6,7 @@ import { logout as apiLogout } from '../../../core/api/logout';
 import { getLegalProfile, updateLegalProfile } from '../api/updateLegalProfile';
 import { getMyLegalEntities, updateLegalEntity } from '../../company/api/legalEntityApi';
 import { useAccountContext } from '../../company/hooks/useAccountContext';
+import { legalEntityErrorKey } from '../../company/lib/legalEntityError';
 import { updateUserProfile } from '../api/updateProfile';
 import { getMyInvitations } from '../../company/api/companyApi';
 import { useAuth } from '../../auth/hooks/useAuth';
@@ -133,11 +134,18 @@ export function useProfile(callbacks?: {
       showToast({ kind: 'success', message: t('common.saved') });
     },
     onError: (err: any) => {
-      // Unexpected failure — forward the raw cause to Sentry, show localized copy only.
+      // A company edit that fails because the EDRPOU is taken (409) or malformed (400) is
+      // the user's keystroke, not an incident: report it to Sentry only above 500, and show
+      // what actually went wrong instead of one "Error" toast for every outcome.
+      //
+      // The mapper and its four translated strings already existed but nothing called them
+      // — legalEntityErrorKey had no callers at all — so this is the first time a person
+      // actually sees 'A company with this EDRPOU is already registered'. The old fallback
+      // said "could not create the company", which would be false here, hence the key.
       if ((err?.status ?? 500) >= 500) {
         reportError(err);
       }
-      showToast({ kind: 'danger', message: t('common.error') });
+      showToast({ kind: 'danger', message: t(legalEntityErrorKey(err, 'context.error.editFailed')) });
     },
   });
 
