@@ -22,7 +22,6 @@ function mapVoucher(v: any): Voucher {
     // No backend field today; leave it unset so the UI renders the
     // locale-correct litre suffix (`10 л` in uk) instead of a hardcoded 'L'.
     unit: v.unit,
-    qrCodeUrl: v.qrCodeUrl,
     qrCodeData: v.qrCodeData ?? v.qrPayload,
     externalId: v.externalId ?? v.voucherNumber,
     imageUrl: v.imageUrl ?? v.image_url ?? null,

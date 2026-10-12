@@ -1,6 +1,5 @@
 using FluentAssertions;
 using FuelFlow.Features.Vouchers;
-using FuelFlow.Features.Vouchers.GetInventory;
 using FuelFlow.Features.Vouchers.GetUserVouchers;
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.MarkVoucherAsUsed;
@@ -181,43 +180,6 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         response.Vouchers[0].WorkerUserId.Should().Be(UserId);
         response.Vouchers[0].WorkerFirstName.Should().Be("Ivan");
         response.Vouchers[0].WorkerLastName.Should().Be("Petrenko");
-    }
-
-    [Fact]
-    public async Task GetInventory_ShouldGroupByProviderFuelTypeLiters()
-    {
-        var vouchers = new[]
-        {
-            CreateVoucher("OKKO", "okko-95", 50, VoucherStatus.Available),
-            CreateVoucher("OKKO", "okko-95", 50, VoucherStatus.Assigned),
-            CreateVoucher("OKKO", "okko-95", 50, VoucherStatus.Used),
-            CreateVoucher("OKKO", "okko-dp", 50, VoucherStatus.Available),
-            CreateVoucher("WOG", "wog-95", 50, VoucherStatus.Available)
-        };
-
-        _context.FuelVouchers.AddRange(vouchers);
-        await _context.SaveChangesAsync();
-
-        var handler = new GetInventoryCommandHandler(_context);
-        var command = new GetInventoryCommand();
-
-        var response = await handler.HandleAsync(command);
-
-        response.Inventory.Should().HaveCount(3);
-
-        var okkoA95 = response.Inventory.First(i => i.Provider == "OKKO" && i.FuelTypeId == "okko-95");
-        okkoA95.Available.Should().Be(1);
-        okkoA95.Assigned.Should().Be(1);
-        okkoA95.Used.Should().Be(1);
-        okkoA95.Total.Should().Be(3);
-
-        var okkoDiesel = response.Inventory.First(i => i.Provider == "OKKO" && i.FuelTypeId == "okko-dp");
-        okkoDiesel.Available.Should().Be(1);
-        okkoDiesel.Total.Should().Be(1);
-
-        var wogA95 = response.Inventory.First(i => i.Provider == "WOG" && i.FuelTypeId == "wog-95");
-        wogA95.Available.Should().Be(1);
-        wogA95.Total.Should().Be(1);
     }
 
     // MarkVoucherAsUsed_ShouldTransitionFromAssignedToUsed moved to

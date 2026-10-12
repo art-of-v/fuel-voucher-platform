@@ -2,9 +2,7 @@ using FuelFlow.Features.Vouchers.BulkActionVouchers;
 using FuelFlow.Features.Vouchers.DeleteVoucher;
 using FuelFlow.Features.Vouchers.GetAdminVoucherById;
 using FuelFlow.Features.Vouchers.GetAdminVouchers;
-using FuelFlow.Features.Vouchers.GetVoucherVerification;
 using FuelFlow.Features.Vouchers.UnarchiveVoucher;
-using FuelFlow.Features.Vouchers.UnblockVoucher;
 using FuelFlow.Features.Vouchers.UpdateVoucher;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -18,30 +16,24 @@ public sealed class AdminVoucherController : ControllerBase
 {
     private readonly GetAdminVouchersQueryHandler _getAllHandler;
     private readonly GetAdminVoucherByIdQueryHandler _getByIdHandler;
-    private readonly GetVoucherVerificationQueryHandler _getVerificationHandler;
     private readonly UpdateVoucherCommandHandler _updateHandler;
     private readonly DeleteVoucherCommandHandler _deleteHandler;
     private readonly BulkActionVouchersCommandHandler _bulkActionHandler;
-    private readonly UnblockVoucherCommandHandler _unblockHandler;
     private readonly UnarchiveVoucherCommandHandler _unarchiveHandler;
 
     public AdminVoucherController(
         GetAdminVouchersQueryHandler getAllHandler,
         GetAdminVoucherByIdQueryHandler getByIdHandler,
-        GetVoucherVerificationQueryHandler getVerificationHandler,
         UpdateVoucherCommandHandler updateHandler,
         DeleteVoucherCommandHandler deleteHandler,
         BulkActionVouchersCommandHandler bulkActionHandler,
-        UnblockVoucherCommandHandler unblockHandler,
         UnarchiveVoucherCommandHandler unarchiveHandler)
     {
         _getAllHandler = getAllHandler;
         _getByIdHandler = getByIdHandler;
-        _getVerificationHandler = getVerificationHandler;
         _updateHandler = updateHandler;
         _deleteHandler = deleteHandler;
         _bulkActionHandler = bulkActionHandler;
-        _unblockHandler = unblockHandler;
         _unarchiveHandler = unarchiveHandler;
     }
 
@@ -108,20 +100,6 @@ public sealed class AdminVoucherController : ControllerBase
         return Ok(new { success = result.Success, count = result.Count });
     }
 
-    [HttpPost("{id:guid}/unblock")]
-    public async Task<IActionResult> Unblock(Guid id, CancellationToken cancellationToken)
-    {
-        var result = await _unblockHandler.HandleAsync(
-            new UnblockVoucherCommand(id, GetUserId(), GetUserName()),
-            cancellationToken);
-
-        if (result is null) return NotFound();
-        if (!result.Success && !string.IsNullOrWhiteSpace(result.Error))
-            return BadRequest(new { error = result.Error });
-
-        return Ok(new { success = true });
-    }
-
     /// <summary>
     /// The undo for the soft delete. Deliberately a separate endpoint from the customer-facing
     /// <c>PATCH /api/vouchers/{id}/restore</c>, which undoes a *redemption* and keeps the
@@ -140,18 +118,6 @@ public sealed class AdminVoucherController : ControllerBase
             return BadRequest(new { error = result.Error });
 
         return Ok(new { success = true });
-    }
-
-    [HttpGet("{id:guid}/verification")]
-    [ProducesResponseType(typeof(GetVoucherVerificationResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetVoucherVerification(Guid id, CancellationToken cancellationToken)
-    {
-        var result = await _getVerificationHandler.HandleAsync(new GetVoucherVerificationQuery(id), cancellationToken);
-        if (result == null)
-            return NotFound();
-
-        return Ok(result);
     }
 
     private Guid GetUserId()

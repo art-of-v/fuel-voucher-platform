@@ -2,11 +2,8 @@ using FluentAssertions;
 using FuelFlow.Features.Stations;
 using FuelFlow.Features.Stations.GetAdminFuelTypeById;
 using FuelFlow.Features.Stations.GetAdminFuelTypes;
-using FuelFlow.Features.Stations.GetAdminPackages;
-using FuelFlow.Features.Stations.GetAdminPackagesByStation;
 using FuelFlow.Features.Stations.GetAdminStationById;
 using FuelFlow.Features.Stations.GetAdminStations;
-using FuelFlow.Features.Stations.GetPackageSuggestions;
 using FuelFlow.Features.Stations.GetPublicPackages;
 using FuelFlow.Features.Stations.GetPublicStationNodes;
 using FuelFlow.Features.Stations.GetPublicStations;
@@ -259,39 +256,6 @@ public sealed class StationsQueryHandlersTests : IDisposable
     }
 
     [Fact]
-    public async Task GetAdminPackages_ShouldOrderByStationIdThenFuelNameThenLiters()
-    {
-        _context.FuelPackages.AddRange(
-            CreatePackage("pkg-1", "station-b", "ft-b", "B Fuel", 50m),
-            CreatePackage("pkg-2", "station-a", "ft-a", "A Fuel", 20m),
-            CreatePackage("pkg-3", "station-a", "ft-a", "A Fuel", 10m));
-        await _context.SaveChangesAsync();
-
-        var handler = new GetAdminPackagesQueryHandler(_context);
-
-        var result = await handler.HandleAsync(new GetAdminPackagesQuery());
-
-        result.Select(p => p.Id).Should().Equal("pkg-3", "pkg-2", "pkg-1");
-    }
-
-    [Fact]
-    public async Task GetAdminPackagesByStation_ShouldFilterByStationId()
-    {
-        _context.FuelPackages.AddRange(
-            CreatePackage("pkg-1", "station-a", "ft-a", "A-95", 10m),
-            CreatePackage("pkg-2", "station-a", "ft-a", "A-95", 20m),
-            CreatePackage("pkg-3", "station-b", "ft-b", "Diesel", 20m));
-        await _context.SaveChangesAsync();
-
-        var handler = new GetAdminPackagesByStationQueryHandler(_context);
-
-        var result = await handler.HandleAsync(new GetAdminPackagesByStationQuery("station-a"));
-
-        result.Should().HaveCount(2);
-        result.Should().OnlyContain(p => p.StationId == "station-a");
-    }
-
-    [Fact]
     public async Task GetAdminStationById_ShouldReturnFound()
     {
         _context.Stations.Add(CreateStation("station-a", "Alpha Station"));
@@ -313,90 +277,6 @@ public sealed class StationsQueryHandlersTests : IDisposable
         var result = await handler.HandleAsync(new GetAdminStationByIdQuery("missing"));
 
         result.Should().BeNull();
-    }
-
-    [Fact]
-    public async Task GetPackageSuggestions_ShouldReturnSuggestionForVoucherCombo()
-    {
-        _context.Stations.Add(CreateStation("okko", "OKKO"));
-        _context.FuelTypes.Add(CreateFuelType("okko-95", "A-95", "okko"));
-        _context.FuelVouchers.Add(CreateVoucher("OKKO", "okko-95", 50m));
-        await _context.SaveChangesAsync();
-
-        var handler = new GetPackageSuggestionsQueryHandler(_context);
-
-        var result = await handler.HandleAsync(new GetPackageSuggestionsQuery());
-
-        var suggestion = result.Single();
-        suggestion.SuggestedId.Should().Be("okko-a-95-50");
-        suggestion.StationId.Should().Be("okko");
-        suggestion.StationName.Should().Be("OKKO");
-        suggestion.FuelTypeId.Should().Be("okko-95");
-        suggestion.FuelName.Should().Be("A-95");
-        suggestion.Liters.Should().Be(50m);
-    }
-
-    [Fact]
-    public async Task GetPackageSuggestions_ShouldMatchProviderCaseAndWhitespace()
-    {
-        _context.Stations.Add(CreateStation("okko", "OKKO"));
-        _context.FuelTypes.Add(CreateFuelType("okko-95", "A-95", "okko"));
-        _context.FuelVouchers.Add(CreateVoucher("  okko ", "okko-95", 50m));
-        await _context.SaveChangesAsync();
-
-        var handler = new GetPackageSuggestionsQueryHandler(_context);
-
-        var result = await handler.HandleAsync(new GetPackageSuggestionsQuery());
-
-        result.Should().ContainSingle();
-    }
-
-    [Fact]
-    public async Task GetPackageSuggestions_ShouldSkipWhenPackageAlreadyExists()
-    {
-        _context.Stations.Add(CreateStation("okko", "OKKO"));
-        _context.FuelTypes.Add(CreateFuelType("okko-95", "A-95", "okko"));
-        _context.FuelPackages.Add(CreatePackage("pkg-1", "okko", "okko-95", "A-95", 50m));
-        _context.FuelVouchers.Add(CreateVoucher("OKKO", "okko-95", 50m));
-        await _context.SaveChangesAsync();
-
-        var handler = new GetPackageSuggestionsQueryHandler(_context);
-
-        var result = await handler.HandleAsync(new GetPackageSuggestionsQuery());
-
-        result.Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task GetPackageSuggestions_ShouldSkipWhenProviderDoesNotMatchStation()
-    {
-        _context.Stations.Add(CreateStation("okko", "OKKO"));
-        _context.FuelTypes.Add(CreateFuelType("okko-95", "A-95", "okko"));
-        _context.FuelVouchers.Add(CreateVoucher("WOG", "okko-95", 50m));
-        await _context.SaveChangesAsync();
-
-        var handler = new GetPackageSuggestionsQueryHandler(_context);
-
-        var result = await handler.HandleAsync(new GetPackageSuggestionsQuery());
-
-        result.Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task GetPackageSuggestions_ShouldGroupDuplicateVoucherCombos()
-    {
-        _context.Stations.Add(CreateStation("okko", "OKKO"));
-        _context.FuelTypes.Add(CreateFuelType("okko-95", "A-95", "okko"));
-        _context.FuelVouchers.AddRange(
-            CreateVoucher("OKKO", "okko-95", 50m),
-            CreateVoucher("OKKO", "okko-95", 50m));
-        await _context.SaveChangesAsync();
-
-        var handler = new GetPackageSuggestionsQueryHandler(_context);
-
-        var result = await handler.HandleAsync(new GetPackageSuggestionsQuery());
-
-        result.Should().ContainSingle();
     }
 
     private static Station CreateStation(string id, string name)

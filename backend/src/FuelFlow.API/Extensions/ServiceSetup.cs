@@ -3,7 +3,6 @@ using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.BackgroundJobs;
 using FuelFlow.Features.Pricing.ScrapeOkkoPrices;
-using FuelFlow.Features.Admin.GetDashboard;
 using FuelFlow.Features.Admin.GetReconciliation;
 using FuelFlow.Features.Auth.AdminLogin;
 using FuelFlow.Features.Auth.AdminUser.GetAdminUsers;
@@ -28,15 +27,10 @@ using FuelFlow.Features.Support.CreateSupportMessage;
 using FuelFlow.Features.Orders.CreateCheckout;
 using FuelFlow.Features.Orders.DeleteMyOrder;
 using FuelFlow.Features.Orders.DeleteOrder;
-using FuelFlow.Features.Orders.GetAdminOrderById;
-using FuelFlow.Features.Orders.GetAdminOrders;
 using FuelFlow.Features.Orders.GetAdminPurchases;
 using FuelFlow.Features.Orders.GetUserPurchases;
 using FuelFlow.Features.Orders.SimulatePayment;
 using FuelFlow.Features.Orders.UpdateMonobankInfo;
-using FuelFlow.Features.Orders.UpdateOrderStatus;
-using FuelFlow.Features.Referral.CreateReferralCode;
-using FuelFlow.Features.Referral.RedeemReferralCode;
 using FuelFlow.Features.Stations.CreateFuelType;
 using FuelFlow.Features.Stations.CreatePackage;
 using FuelFlow.Features.Stations.CreateStation;
@@ -45,8 +39,6 @@ using FuelFlow.Features.Stations.DeletePackage;
 using FuelFlow.Features.Stations.DeleteStation;
 using FuelFlow.Features.Stations.GetAdminFuelTypeById;
 using FuelFlow.Features.Stations.GetAdminFuelTypes;
-using FuelFlow.Features.Stations.GetAdminPackages;
-using FuelFlow.Features.Stations.GetAdminPackagesByStation;
 using FuelFlow.Features.Stations.CreateStationNode;
 using FuelFlow.Features.Stations.DeleteStationNode;
 using FuelFlow.Features.Stations.GetAdminStationById;
@@ -59,7 +51,6 @@ using FuelFlow.Features.Providers.GetProviderById;
 using FuelFlow.Features.Providers.GetProviderHistory;
 using FuelFlow.Features.Providers.GetProviders;
 using FuelFlow.Features.Stations.GetAdminStations;
-using FuelFlow.Features.Stations.GetPackageSuggestions;
 using FuelFlow.Features.Stations.GetPublicFuelTypes;
 using FuelFlow.Features.Stations.GetPublicPackages;
 using FuelFlow.Features.Stations.GetPublicStationNodes;
@@ -76,9 +67,7 @@ using FuelFlow.Features.Vouchers.Exchange;
 using FuelFlow.Features.Vouchers.GetAdminVoucherById;
 using FuelFlow.Features.Vouchers.GetAdminVouchers;
 using FuelFlow.Features.Vouchers.GetImportBatches;
-using FuelFlow.Features.Vouchers.GetInventory;
 using FuelFlow.Features.Vouchers.GetUserVouchers;
-using FuelFlow.Features.Vouchers.GetVoucherVerification;
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.MarkVoucherAsUsed;
 using FuelFlow.Features.Vouchers.PurchaseBatchCost;
@@ -176,8 +165,6 @@ internal static class ServiceSetup
         services.AddTransient<IQrDecoder, QrDecoder>();
         services.AddTransient<IVoucherDetector, VoucherDetector>();
         services.AddTransient<IQrGenerator, QrGeneratorV2>();
-        services.AddScoped<GetVouchersQueryHandler>();
-        services.AddScoped<GetVoucherVerificationQueryHandler>();
         services.AddScoped<GetImportBatchesQueryHandler>();
         services.AddScoped<GetImportBatchByIdQueryHandler>();
         services.AddScoped<GetImportBatchVouchersQueryHandler>();
@@ -187,7 +174,6 @@ internal static class ServiceSetup
         services.AddScoped<SetBatchCostCommandHandler>();
         services.AddScoped<FuelFlow.Features.Vouchers.ParseInvoice.ParseInvoiceCommandHandler>();
         services.AddScoped<GetUserVouchersCommandHandler>();
-        services.AddScoped<GetInventoryCommandHandler>();
         services.AddScoped<MarkVoucherAsUsedCommandHandler>();
         services.AddScoped<RestoreVoucherCommandHandler>();
         services.AddScoped<GetAdminVouchersQueryHandler>();
@@ -224,10 +210,7 @@ services.AddScoped<TermQuoteQueryHandler>();
         services.AddScoped<FuelFlow.Features.Orders.GetSavingsReport.GetSavingsReportQueryHandler>();
         services.AddScoped<SimulatePaymentCommandHandler>();
         services.AddScoped<UpdateMonobankInfoCommandHandler>();
-        services.AddScoped<GetAdminOrdersQueryHandler>();
-        services.AddScoped<GetAdminOrderByIdQueryHandler>();
         services.AddScoped<GetAdminPurchasesQueryHandler>();
-        services.AddScoped<UpdateOrderStatusCommandHandler>();
         services.AddScoped<DeleteOrderCommandHandler>();
         services.AddScoped<DeleteMyOrderCommandHandler>();
         services.AddScoped<RefundOrderCommandHandler>();
@@ -349,8 +332,6 @@ services.AddScoped<TermQuoteQueryHandler>();
 
     private static void AddReferralServices(IServiceCollection services)
     {
-        services.AddScoped<CreateReferralCodeCommandHandler>();
-        services.AddScoped<RedeemReferralCodeCommandHandler>();
     }
 
     private static void AddProviderServices(IServiceCollection services)
@@ -379,9 +360,6 @@ services.AddScoped<TermQuoteQueryHandler>();
         services.AddScoped<CreateFuelTypeCommandHandler>();
         services.AddScoped<UpdateFuelTypeCommandHandler>();
         services.AddScoped<DeleteFuelTypeCommandHandler>();
-        services.AddScoped<GetAdminPackagesQueryHandler>();
-        services.AddScoped<GetAdminPackagesByStationQueryHandler>();
-        services.AddScoped<GetPackageSuggestionsQueryHandler>();
         services.AddScoped<CreatePackageCommandHandler>();
         services.AddScoped<UpdatePackageCommandHandler>();
         services.AddScoped<DeletePackageCommandHandler>();
@@ -399,7 +377,6 @@ services.AddScoped<TermQuoteQueryHandler>();
 
     private static void AddAdminServices(IServiceCollection services)
     {
-        services.AddScoped<GetDashboardQueryHandler>();
         services.AddScoped<GetAdminUsersQueryHandler>();
         services.AddScoped<GetReconciliationQueryHandler>();
     }
