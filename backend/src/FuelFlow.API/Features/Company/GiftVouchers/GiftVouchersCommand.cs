@@ -1,3 +1,4 @@
+using FuelFlow.API.BackgroundJobs.Models;
 using FuelFlow.API.Features.Orders.SharedServices;
 using FuelFlow.Features.Company.SharedModels;
 using FuelFlow.Features.Orders.SharedModels;
@@ -50,6 +51,14 @@ public sealed class GiftVouchersCommandHandler
         {
             return new GiftVouchersResult("WorkerNotMember", ErrorMessage: "Worker is not a member of this company.");
         }
+
+        // Named so the notification can say which company issued the fuel. A worker may belong to
+        // several (W1), so "you were given fuel" without a company would be genuinely ambiguous.
+        var companyName = await _context.LegalEntities
+            .AsNoTracking()
+            .Where(e => e.Id == legalEntityId)
+            .Select(e => e.Name)
+            .FirstOrDefaultAsync(cancellationToken);
 
         var voucherIdSet = command.VoucherIds.Distinct().ToList();
 
@@ -156,6 +165,25 @@ public sealed class GiftVouchersCommandHandler
                 FulfilledAtUtc = now
             });
         }
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        // #150 W3 - tell the worker. Written into the outbox inside the same transaction as the
+        // gift, so a committed issue always has its notification queued and a rolled-back one never
+        // leaves a "you were given fuel" message pointing at fuel that was not actually handed over.
+        _context.OutboxEvents.Add(new OutboxEvent
+        {
+            EventType = OutboxEventType.VoucherIssued,
+            Payload = System.Text.Json.JsonSerializer.Serialize(new VoucherIssuedPayload
+            {
+                WorkerUserId = command.WorkerUserId.ToString(),
+                CompanyName = companyName,
+                VoucherCount = vouchers.Count,
+                LegalEntityId = legalEntityId.ToString(),
+            }),
+            Processed = false,
+            CreatedAtUtc = now,
+        });
 
         await _context.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
