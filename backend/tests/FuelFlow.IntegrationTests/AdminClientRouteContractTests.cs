@@ -37,15 +37,26 @@ public class AdminClientRouteContractTests : IClassFixture<TestDatabaseFixture>
     }
 
     /// <summary>
-    /// A path literal as the SPA writes it: <c>apiRequest("GET", path)</c>, <c>apiBlob(method,
-    /// path, ...)</c>, or a <c>queryKey</c> - the last because the global default queryFn fetches
-    /// <c>queryKey[0]</c> verbatim (admin/src/App.tsx), so a query key is a request. A wrong key is
-    /// as broken as a wrong URL: one 404s, the other never invalidates.
+    /// A path literal as a client writes it. Three shapes, because the two clients wrap their
+    /// transport differently:
+    /// <list type="bullet">
+    /// <item><c>apiRequest("GET", path)</c> and <c>apiBlob(method, path, ...)</c> in the admin SPA,
+    /// where the method precedes the path.</item>
+    /// <item><c>queryKey: [path, ...]</c> in the admin SPA, which is a request because the global
+    /// default queryFn fetches <c>queryKey[0]</c> verbatim (admin/src/lib/query-defaults.ts).</item>
+    /// <item><c>apiFetch(path)</c> and <c>apiRequest("POST", path)</c> in the mobile app, where
+    /// the path comes first and may be wrapped in <c>withEntity(...)</c>.</item>
+    /// </list>
+    /// A bare <c>const NAME = '/api/...'</c> is captured too: the mobile app names its paths in
+    /// constants (USER_QUERY_KEY) and passes those into apiFetch, so scanning call sites alone
+    /// would silently skip them.
     /// </summary>
     private static readonly Regex ClientCall = new(
         """
         \bapi(?:Request|Blob)\b[\s\S]{0,400}?\(\s*["'](?:GET|POST|PUT|PATCH|DELETE)["']\s*,\s*[`"'](?<path>/[^`"']*)
+        |\bapiFetch\s*\(\s*(?:withEntity\s*\(\s*)?[`"'](?<path>/[^`'"]*)
         |queryKey:\s*\[\s*[`"'](?<path>/[^`'"]*)
+        |\bconst\s+[A-Za-z0-9_]+\s*(?::[^=\n]+)?=\s*[`"'](?<path>/api/[^`"']*)
         """,
         RegexOptions.Compiled | RegexOptions.IgnorePatternWhitespace);
 
@@ -55,7 +66,7 @@ public class AdminClientRouteContractTests : IClassFixture<TestDatabaseFixture>
     private static readonly Regex RouteParameter = new(@"\{[^}]*\}", RegexOptions.Compiled);
 
     [Fact]
-    public void EveryAdminPath_MatchesARealRoute()
+    public void EveryClientPath_MatchesARealRoute()
     {
         var routes = RouteTemplates();
 
@@ -66,8 +77,14 @@ public class AdminClientRouteContractTests : IClassFixture<TestDatabaseFixture>
 
         var clientPaths = ClientPaths().ToList();
         clientPaths.Should().NotBeEmpty(
-            "the extraction should still see the SPA's API calls; a regex that stops matching " +
+            "the extraction should still see the clients' API calls; a regex that stops matching " +
             "would turn this test into a no-op that passes forever");
+
+        // The mobile app is the surface where money moves, so it must be seen here too - not
+        // only the admin panel, where both mismatches found so far happened to live.
+        clientPaths.Select(p => p.File).Should().Contain(
+            f => f.StartsWith("mobile", StringComparison.Ordinal),
+            "the mobile app is part of the client surface this contract covers");
 
         var unresolved = clientPaths
             .Where(p => !routes.Any(r => Matches(r, p.Path)))
@@ -76,8 +93,8 @@ public class AdminClientRouteContractTests : IClassFixture<TestDatabaseFixture>
             .ToArray();
 
         unresolved.Should().BeEmpty(
-            "every /api path the admin SPA requests or keys its cache on must match a route " +
-            "template; a mismatched path is a silent 404, or a cache key that never invalidates");
+            "every /api path a client requests or keys its cache on must match a route template; " +
+            "a mismatched path is a silent 404, or a cache key that never invalidates");
     }
 
     /// <summary>
@@ -98,7 +115,7 @@ public class AdminClientRouteContractTests : IClassFixture<TestDatabaseFixture>
 
         allowed.Should().NotBeEmpty("the edge allow-lists should still declare their /api paths");
 
-        var blocked = ClientPaths()
+        var blocked = AdminPaths()
             .Select(p => p.Path)
             .Distinct(StringComparer.Ordinal)
             .Where(p => !allowed.Any(a => Permits(a, p)))
@@ -127,33 +144,58 @@ public class AdminClientRouteContractTests : IClassFixture<TestDatabaseFixture>
             .ToList();
     }
 
+    private static readonly string[] ClientSourceDirectories =
+        ["admin/src", "mobile/src", "mobile/app"];
+
+    /// <summary>
+    /// Every path either shipped client names, with the file and line it was written on.
+    /// </summary>
     private static IEnumerable<(string Path, string File, int Line)> ClientPaths()
     {
         var root = RepositoryRoot();
-        var adminSrc = Path.Combine(root, "admin", "src");
 
-        foreach (var file in Directory.EnumerateFiles(adminSrc, "*.*", SearchOption.AllDirectories))
+        foreach (var relative in ClientSourceDirectories)
         {
-            // Test files assert against invented paths ("/api/admin/whatever"); they are not
-            // requests the shipped bundle makes.
-            if (file.Contains(".test.", StringComparison.Ordinal) || file.Contains(".spec.", StringComparison.Ordinal))
-                continue;
-
-            var lines = File.ReadAllLines(file);
-            for (var i = 0; i < lines.Length; i++)
+            foreach (var file in EnumerateClientFiles(Path.Combine(root, relative.Replace('/', Path.DirectorySeparatorChar))))
             {
-                foreach (Match match in ClientCall.Matches(lines[i]))
+                var lines = File.ReadAllLines(file);
+                for (var i = 0; i < lines.Length; i++)
                 {
-                    var path = NormalizeClientPath(match.Groups["path"].Value);
+                    foreach (Match match in ClientCall.Matches(lines[i]))
+                    {
+                        var path = NormalizeClientPath(match.Groups["path"].Value);
 
-                    if (!path.StartsWith("/api/", StringComparison.Ordinal))
-                        continue;
+                        if (!path.StartsWith("/api/", StringComparison.Ordinal))
+                            continue;
 
-                    yield return (path, Path.GetRelativePath(root, file), i + 1);
+                        yield return (path, Path.GetRelativePath(root, file), i + 1);
+                    }
                 }
             }
         }
     }
+
+    private static IEnumerable<string> EnumerateClientFiles(string root)
+    {
+        if (!Directory.Exists(root))
+            return [];
+
+        return Directory
+            .EnumerateFiles(root, "*.*", SearchOption.AllDirectories)
+            // Test files assert against invented paths ("/api/admin/whatever"); they are not
+            // requests the shipped bundle makes.
+            .Where(f => !f.Contains(".test.", StringComparison.Ordinal)
+                        && !f.Contains(".spec.", StringComparison.Ordinal))
+            // Only source the client actually ships: skip the type declaration files, which
+            // mirror backend DTOs and carry field names rather than routes.
+            .Where(f => f.EndsWith(".ts", StringComparison.Ordinal)
+                        || f.EndsWith(".tsx", StringComparison.Ordinal));
+    }
+
+    /// <summary>Admin-only: the edge allow-lists describe the admin origin's surface, not mobile's.</summary>
+    private static IEnumerable<(string Path, string File, int Line)> AdminPaths() =>
+        ClientPaths().Where(p => p.File.StartsWith("admin" + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+                                 || p.File.StartsWith("admin/", StringComparison.Ordinal));
 
     /// <summary>
     /// Reduces a client-side path literal to bare segments. A complete <c>${expr}</c> collapses to a
