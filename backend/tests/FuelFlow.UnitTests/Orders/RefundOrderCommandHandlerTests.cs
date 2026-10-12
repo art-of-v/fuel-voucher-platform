@@ -573,4 +573,43 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         result.ErrorMessage.Should().Contain("no Monobank invoice");
         (await _context.Refunds.CountAsync()).Should().Be(0);
     }
+
+    [Fact]
+    public async Task HandleAsync_ShouldNotCountReleasedFulfillmentsAsDelivered()
+    {
+        // Two units ordered, one delivered, and the second delivery was released by the
+        // reconciliation job because stock ran out. Half the value is still owed to the customer.
+        //
+        // The handler loads the order with IgnoreQueryFilters() so it can see soft-deleted orders,
+        // and that also switches off Fulfillment's global `ReleasedAtUtc == null` filter. Counting
+        // released rows as delivered made fulfilledUnits (2) meet OrderedUnits (2), the unfulfilled
+        // value collapse to zero, and the customer was told "no unfulfilled value remains" while
+        // half their money stayed with us. The admin dialog showed it as "0.00 грн".
+        var order = BuildOrder();
+        order.Fulfillments.Add(new Fulfillment
+        {
+            Id = 1,
+            OrderId = order.Id,
+            VoucherId = Guid.NewGuid(),
+            FulfilledAtUtc = DateTime.UtcNow,
+            Voucher = BuildVoucher("okko", "okko-95", 50)
+        });
+        order.Fulfillments.Add(new Fulfillment
+        {
+            Id = 2,
+            OrderId = order.Id,
+            VoucherId = Guid.NewGuid(),
+            FulfilledAtUtc = DateTime.UtcNow.AddMinutes(-5),
+            ReleasedAtUtc = DateTime.UtcNow,
+            ReleaseReason = "stock exhausted",
+            Voucher = BuildVoucher("okko", "okko-95", 50)
+        });
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        var result = await _handler.HandleAsync(new RefundOrderCommand { OrderId = order.Id });
+
+        result.Status.Should().Be("Processing", "one of two delivered units is still owed back");
+        result.AmountKopecks.Should().Be(250000, "a released delivery is not a delivery");
+    }
 }

@@ -370,8 +370,20 @@ public sealed class RefundOrderCommandHandler
 
         foreach (var group in grouped)
         {
+            // ReleasedAtUtc has to be excluded here by hand, because the query above calls
+            // IgnoreQueryFilters() - which is why it sees soft-deleted orders - and that also
+            // switches off Fulfillment's global `ReleasedAtUtc == null` filter. That filter exists
+            // for exactly this reason (see FulfillmentConfiguration): a delivery the reconciliation
+            // job released is not a delivery the customer received.
+            //
+            // Without it, every order the reconciliation job has touched counts its released
+            // fulfillments as delivered, fulfilledUnits ends up >= OrderedUnits, and the refundable
+            // value collapses to zero - so a customer who paid for two units and received one is
+            // told "no unfulfilled value remains" and nothing is returned. Found on the S9 refund
+            // test: the admin showed "0.00 грн" against an order with half its value undelivered.
             var fulfilledUnits = order.Fulfillments
-                .Count(f => f.Voucher is not null
+                .Count(f => f.ReleasedAtUtc is null
+                    && f.Voucher is not null
                     && string.Equals(f.Voucher!.Provider, group.Provider, StringComparison.OrdinalIgnoreCase)
                     && f.Voucher.FuelTypeId == group.FuelTypeId
                     && f.Voucher.Liters == group.Liters);
