@@ -68,22 +68,40 @@ public sealed class GetStatementReconciliationQueryHandler
         var rows = StatementMatcher.Match(entries, orders, refunds);
         var summary = StatementMatcher.Summarise(rows);
 
-        // Orders whose invoice is in the period but which the acquirer did not report at all.
-        // The other direction of the disagreement: we believe we took this money, they say nothing
-        // about it. Surfaced rather than left as a silent absence.
+        // Orders we believe took money in this period whose invoice the acquirer never mentioned.
+        // The other direction of the disagreement: we believe we were paid, they say nothing.
+        //
+        // Deliberately NOT the `orders` list above. That list is narrowed to the invoices the
+        // statement does mention - so the matcher never walks the whole order table - which means
+        // subtracting the reported ids from it can only ever produce an empty set. The candidate
+        // set has to be our own orders *for the period*, and that is what gives the table any
+        // chance of showing a row.
+        // A List, not a HashSet: EF Core expands a captured collection into a parameterised IN,
+        // and it does that for a List. A HashSet is not a translatable shape, and the failure is
+        // an exception at query time rather than a wrong answer.
         var reportedInvoiceIds = entries
             .Select(e => e.InvoiceId)
             .Where(id => !string.IsNullOrEmpty(id))
-            .ToHashSet(StringComparer.Ordinal);
+            .Distinct()
+            .ToList();
 
-        var missing = orders
-            .Where(o => o.MonobankInvoiceId != null && !reportedInvoiceIds.Contains(o.MonobankInvoiceId))
+        var missing = (await _context.Orders
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(o => o.MonobankInvoiceId != null
+                        && o.CreatedAtUtc >= fromUtc
+                        && o.CreatedAtUtc < toUtc
+                        && (o.MonobankMerchant == null || o.MonobankMerchant == merchant))
+            .Where(o => !reportedInvoiceIds.Contains(o.MonobankInvoiceId))
             .Select(o => new MissingFromStatementRow(
                 o.Id,
                 o.MonobankInvoiceId!,
                 o.Price,
                 o.Status,
                 o.CreatedAtUtc))
+            .ToListAsync(cancellationToken))
+            // Sorted after materialising: an OrderBy on the projected record is not a shape EF
+            // can translate, and the set is a single period's worth of orders.
             .OrderBy(r => r.OrderId)
             .ToList();
 
