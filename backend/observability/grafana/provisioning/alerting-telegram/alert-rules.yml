@@ -197,6 +197,47 @@ groups:
     folder: FuelFlow
     interval: 1m
     rules:
+      # The #246 concurrency detector. ApplicationDbContext logs every DbUpdateConcurrencyException
+      # at Warning with the entity type and key, precisely so the next step can read which handlers
+      # genuinely race instead of guessing from the source. LogErrorBurst below filters
+      # level=~"error|fatal", so without this rule that evidence reaches nobody: the detector fires,
+      # writes a line, and no alert and no human ever sees it. Same shape as the retention job that
+      # nobody had ever switched on - an instrument nobody watches is not evidence.
+      #
+      # Fires on the FIRST hit rather than on a rate, because a single collision is the whole point:
+      # it names the entity and key that raced, which is what #246 needs to choose the next handler
+      # to convert. A rate threshold here would hide exactly the rare, informative case.
+      - uid: fuelflow-concurrency-conflict
+        title: ConcurrencyConflict
+        condition: C
+        for: 0m
+        noDataState: NoData
+        execErrState: OK
+        annotations:
+          summary: "{{ $labels.service }} hit a concurrency conflict ({{ $values.B }})"
+          description: "A tracked write was refused because the row changed since it was read. The 409 is correct behaviour - the caller retries - but the entity type and key in the log line are the evidence #246 needs. Search Grafana > FuelFlow Logs for \"Concurrency conflict on\" to read them."
+        labels:
+          severity: warning
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: fuelflow-loki
+            model:
+              refId: A
+              expr: sum(count_over_time({level="warning"} |= "Concurrency conflict on" [5m]))
+              queryType: range
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, reducer: last, expression: A }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+
       # Catches errors that never reach the HTTP metrics or the app's own Telegram
       # dispatcher - e.g. controllers that catch an exception, log it and return a
       # response themselves. Serilog promotes `level` to a Loki label, so this is a
