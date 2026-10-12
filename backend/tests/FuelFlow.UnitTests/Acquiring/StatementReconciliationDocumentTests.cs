@@ -1,0 +1,163 @@
+using System.Globalization;
+using System.Text;
+using FluentAssertions;
+using FuelFlow.Features.Acquiring;
+using FuelFlow.Features.Acquiring.Reconciliation;
+using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.SharedKernel.Options;
+using Xunit;
+
+namespace FuelFlow.UnitTests.Acquiring;
+
+public class StatementReconciliationDocumentTests
+{
+    private static StatementReconciliationResponse Act()
+    {
+        var rows = new List<StatementMatchRow>
+        {
+            new("ST1", StatementMatchStatus.Matched, "INV1", "FuelFlow Order x", 97857, 978.57m,
+                Guid.NewGuid(), 978.57m, "ord-1", OrderStatus.Fulfilled,
+                new DateTime(2026, 10, 5, 9, 0, 0, DateTimeKind.Utc), null),
+            new("ST2", StatementMatchStatus.AmountMismatch, "INV2", "FuelFlow Bundle", 97900, 979.00m,
+                Guid.NewGuid(), 978.57m, "ord-2", OrderStatus.Fulfilled,
+                new DateTime(2026, 10, 6, 9, 0, 0, DateTimeKind.Utc),
+                "Acquirer reports 979.00, the order was priced 978.57"),
+            new("ST3", StatementMatchStatus.Unmatched, "INV3", null, 25000, 250.00m,
+                null, null, null, null,
+                new DateTime(2026, 10, 7, 9, 0, 0, DateTimeKind.Utc),
+                "No order or refund of ours carries this invoice")
+        };
+
+        return new StatementReconciliationResponse(
+            MonobankMerchant.Live,
+            new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 11, 1, 0, 0, 0, DateTimeKind.Utc),
+            3,
+            StatementMatcher.Summarise(rows),
+            rows,
+            [new MissingFromStatementRow(Guid.NewGuid(), "INV9", 100m, OrderStatus.PendingFulfillment, DateTime.UtcNow)]);
+    }
+
+    [Fact]
+    public void The_Csv_Carries_One_Line_Per_Row_Plus_A_Summary()
+    {
+        var csv = StatementReconciliationCsv.Render(Act());
+
+        csv.Should().Contain("Matched,1");
+        csv.Should().Contain("Amount mismatches,1");
+        csv.Should().Contain("Unmatched,1");
+        csv.Should().Contain("ST1");
+        csv.Should().Contain("ST2");
+        csv.Should().Contain("ST3");
+        csv.Should().Contain("INV9");
+    }
+
+    // The act is read in a spreadsheet, and Excel on Windows decides a CSV's encoding from the BOM
+    // alone - without it the customer's Cyrillic names arrive as mojibake in the one tool this is
+    // actually opened with.
+    [Fact]
+    public void The_Csv_Bytes_Start_With_A_Utf8_Bom()
+    {
+        var bytes = StatementReconciliationCsv.RenderBytes(Act());
+
+        bytes.Take(3).Should().Equal(0xEF, 0xBB, 0xBF);
+    }
+
+    // A note containing a comma must not split into two rows; RFC 4180 doubling is what every
+    // reader that matters understands.
+    [Fact]
+    public void The_Csv_Quotes_Every_Field_So_A_Comma_Cannot_Split_A_Row()
+    {
+        var csv = StatementReconciliationCsv.Render(Act());
+
+        csv.Should().Contain("\"Acquirer reports 979.00, the order was priced 978.57\"");
+    }
+
+    [Fact]
+    public void The_Csv_Writes_Decimal_Points_Whatever_The_Machine_Locale()
+    {
+        var original = CultureInfo.CurrentCulture;
+        try
+        {
+            // A comma-decimal locale is how "979,00" reaches an accountant in the one document
+            // whose figures must read identically everywhere.
+            CultureInfo.CurrentCulture = new CultureInfo("de-DE");
+
+            var csv = StatementReconciliationCsv.Render(Act());
+
+            csv.Should().Contain("978.57");
+            csv.Should().NotContain("978,57");
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = original;
+        }
+    }
+
+    [Fact]
+    public void The_Pdf_Is_A_Pdf()
+    {
+        var pdf = StatementReconciliationPdf.Build(Act());
+
+        pdf.Should().NotBeEmpty();
+        Encoding.ASCII.GetString(pdf, 0, 5).Should().Be("%PDF-");
+    }
+
+    [Fact]
+    public void The_Pdf_Renders_An_Act_With_A_Mismatch_And_Unmatched_Rows()
+    {
+        // The colours and the Cyrillic labels are the point of the document; if either silently
+        // fails to render, the act still "works" and nobody finds out until an accountant does.
+        var pdf = StatementReconciliationPdf.Build(Act());
+
+        pdf.Should().NotBeEmpty();
+        Encoding.ASCII.GetString(pdf, 0, 5).Should().Be("%PDF-");
+    }
+
+    [Fact]
+    public void An_Empty_Period_Still_Renders_Both_Formats()
+    {
+        var empty = Act() with
+        {
+            Rows = Array.Empty<StatementMatchRow>(),
+            MissingFromStatement = Array.Empty<MissingFromStatementRow>(),
+            StatementRowCount = 0,
+            Summary = StatementMatcher.Summarise(Array.Empty<StatementMatchRow>())
+        };
+
+        StatementReconciliationCsv.Render(empty).Should().Contain("Rows in statement,0");
+        Encoding.ASCII.GetString(StatementReconciliationPdf.Build(empty), 0, 5).Should().Be("%PDF-");
+    }
+
+    [Theory]
+    // The end is always the start of the next month, so consecutive months tile rather than
+    // overlap - including across the year boundary, which is where a naive "+1 month" test case
+    // silently produces month 13.
+    [InlineData(2026, 10, 2026, 11)]
+    [InlineData(2026, 12, 2027, 1)]
+    [InlineData(2027, 1, 2027, 2)]
+    public void The_Default_Period_Is_The_Calendar_Month(int year, int month, int toYear, int toMonth)
+    {
+        var (from, to) = GetStatementReconciliationQueryHandler.ResolvePeriod(
+            new StatementReconciliationQuery { Year = year, Month = month });
+
+        from.Should().Be(new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Utc));
+        to.Should().Be(new DateTime(toYear, toMonth, 1, 0, 0, 0, DateTimeKind.Utc));
+    }
+
+    [Fact]
+    public void Explicit_Bounds_Win_Over_The_Calendar_Month()
+    {
+        var (from, to) = GetStatementReconciliationQueryHandler.ResolvePeriod(
+            new StatementReconciliationQuery
+            {
+                Year = 2026,
+                Month = 10,
+                FromUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                ToUtc = new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc)
+            });
+
+        from.Month.Should().Be(1);
+        to.Month.Should().Be(2);
+    }
+}

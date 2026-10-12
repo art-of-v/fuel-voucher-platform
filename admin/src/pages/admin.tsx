@@ -351,7 +351,9 @@ voucherNumber: string;
     lastName: string | null;
     birthdate: string | null;
     profileImageUrl: string | null;
-    referralCode: string | null;
+    // referralCode is deliberately absent: the only endpoints that wrote it are gone, so the
+    // column rendered "N/A" for every user. referredBy stays - the column predates the feature
+    // and is populated by other paths.
     referredBy: string | null;
     bonusBalance: number;
     isDeleted: boolean;
@@ -1022,7 +1024,6 @@ voucherNumber: string;
                     <th className="text-left p-4">{t('table.email')}</th>
                     <th className="text-left p-4">{t('table.birthdate')}</th>
                     <th className="text-left p-4">{t('table.bonusBalance')}</th>
-                    <th className="text-left p-4">{t('table.referralCode')}</th>
                     <th className="text-left p-4">{t('table.referredBy')}</th>
                     <th className="text-left p-4">{t('table.role')}</th>
                     <th className="text-left p-4">{t('table.status')}</th>
@@ -1041,7 +1042,6 @@ voucherNumber: string;
                       <td className="p-4">{user.email || <span className="text-muted-foreground italic">N/A</span>}</td>
                       <td className="p-4">{user.birthdate ? formatDate(user.birthdate) : <span className="text-muted-foreground italic">N/A</span>}</td>
                       <td className="p-4 text-primary font-bold">{user.bonusBalance || 0} UAH</td>
-                      <td className="p-4 font-mono text-foreground/80">{user.referralCode || <span className="text-muted-foreground italic">N/A</span>}</td>
                       <td className="p-4 font-mono text-xs text-muted-foreground">{user.referredBy || '-'}</td>
                       <td className="p-4 font-mono text-xs text-muted-foreground">
                         {(() => {
