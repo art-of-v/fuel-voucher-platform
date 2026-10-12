@@ -1,4 +1,4 @@
-using FuelFlow.JobsWorker.Observability;
+using FuelFlow.SharedKernel.Observability;
 using FuelFlow.JobsWorker.Services;
 // Aliased rather than imported: the API defines its own NotificationService, so a plain
 // using would make that name ambiguous here.
@@ -125,6 +125,8 @@ try
     });
 
     // Measures every job centrally, so jobs added later are instrumented automatically.
+    // The type itself lives in the shared kernel because the API runs Hangfire in-process in
+    // production and must attach the filter too - see MetricsJobFilter.
     builder.Services.AddSingleton<MetricsJobFilter>();
 
     var host = builder.Build();
@@ -151,7 +153,7 @@ try
         Log.Information("Database migrations applied successfully");
     }
 
-    GlobalJobFilters.Filters.Add(host.Services.GetRequiredService<MetricsJobFilter>());
+    host.RegisterHangfireMetricsJobFilter();
 
     // Observable gauge: polled by the exporter on scrape rather than pushed, so the
     // query must stay cheap and must never throw or it would break the whole scrape.

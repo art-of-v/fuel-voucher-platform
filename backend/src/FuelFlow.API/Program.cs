@@ -113,6 +113,11 @@ try
         options.WorkerCount = 1;
         options.Queues = new[] { "default" };
     });
+
+    // Resolved by HangfireMetricsSetup.RegisterHangfireMetricsJobFilter below. Must be
+    // registered before the container is built, and must exist in the API because production
+    // runs Hangfire in-process here rather than in the JobsWorker.
+    builder.Services.AddSingleton<MetricsJobFilter>();
     var redisConnection = builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379";
     var redisConfig = RedisConnectionParser.Parse(redisConnection);
     var redisSanitized = redisConfig.Contains('@')
@@ -268,6 +273,13 @@ try
     // therefore be registered here, or fuelflow_vouchers_pool_available_vouchers is
     // never emitted and the VoucherPoolLow alert + business dashboards go silent.
     app.RegisterFuelFlowBusinessGauges();
+
+    // Same trap, one layer over: Hangfire runs in-process here and there is no JobsWorker in
+    // production, so without this the MetricsJobFilter is never attached in the only host that
+    // runs jobs - fuelflow_jobs_succeeded / fuelflow_jobs_failed are never emitted, and the
+    // HangfireJobFailures alert watches an empty series, which reads as "healthy" forever.
+    // The filter is resolved from DI, so it must be registered above, before the build.
+    app.RegisterHangfireMetricsJobFilter();
 
     app.Run();
 }
