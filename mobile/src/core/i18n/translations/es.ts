@@ -74,6 +74,11 @@ export const es: Record<string, string> = {
   'context.error.duplicateEdrpou': 'Ya existe una empresa registrada con este EDRPOU',
   'context.error.badRequest': 'Revise los datos introducidos',
   'context.error.generic': 'No se pudo crear la empresa. Inténtelo de nuevo.',
+  // Espejo en cliente de la validación de formato del servidor (#128, #265). La usan tanto la
+  // hoja de creación como la de edición en el perfil, por eso no viven bajo un solo namespace.
+  // "NIF" y no "VAT": es el término que ya usa la etiqueta de este campo en español.
+  'company.edrpouInvalidFormat': 'El EDRPOU debe tener exactamente 8 dígitos',
+  'company.vatInvalidFormat': 'El NIF debe tener exactamente 12 dígitos',
 
   'nav.stations': 'ESTACIONES',
   'nav.basket': 'CESTA',

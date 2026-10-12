@@ -75,6 +75,10 @@ export const en: Record<string, string> = {
   'context.error.duplicateEdrpou': 'A company with this EDRPOU is already registered',
   'context.error.badRequest': 'Check the details you entered',
   'context.error.generic': 'Could not create the company. Please try again.',
+  // Client-side mirror of the server's format gate (#128, #265). Used by the create sheet and by
+  // the edit sheet in the profile, which is why they are not nested under one screen's namespace.
+  'company.edrpouInvalidFormat': 'EDRPOU must be exactly 8 digits',
+  'company.vatInvalidFormat': 'VAT must be exactly 12 digits',
 
   'nav.stations': 'STATIONS',
   'nav.basket': 'BASKET',
