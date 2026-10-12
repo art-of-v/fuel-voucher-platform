@@ -13,16 +13,44 @@ public sealed class RestoreVoucherCommandHandler
         _context = context;
     }
 
+    /// <summary>
+    /// Undoes a customer's own redemption: <c>Used</c> back to <c>Assigned</c>. The mirror image of
+    /// <see cref="MarkVoucherAsUsed.MarkVoucherAsUsedCommandHandler"/> under
+    /// <c>FuelFlow.Features.Vouchers</c>, and deliberately built the
+    /// same way rather than patched - the previous version had neither an ownership check nor an
+    /// atomic transition, and only the endpoint's <c>Staff</c> policy was keeping it from acting on
+    /// other people's vouchers.
+    /// <para>
+    /// This is <b>not</b> an un-delete. The global <c>!IsDeleted</c> query filter stays in force here,
+    /// so an archived voucher is invisible and returns <c>NotFound</c> on purpose: un-archiving is an
+    /// operator action and lives behind the admin endpoint, not something a customer can undo by id.
+    /// </para>
+    /// </summary>
     public async Task<RestoreVoucherResponse> HandleAsync(
         RestoreVoucherCommand command,
         CancellationToken cancellationToken = default)
     {
         var voucher = await _context.FuelVouchers
-            .FirstOrDefaultAsync(v => v.Id == command.VoucherId, cancellationToken);
+            .AsNoTracking()
+            .Where(v => v.Id == command.VoucherId)
+            .Select(v => new { v.Status, v.WorkerUserId, v.AssignedToUserId })
+            .FirstOrDefaultAsync(cancellationToken);
 
         if (voucher == null)
         {
-            return new RestoreVoucherResponse(false, "Voucher not found");
+            return new RestoreVoucherResponse(false, "Voucher not found", "NotFound");
+        }
+
+        if (voucher.WorkerUserId.HasValue)
+        {
+            if (voucher.WorkerUserId != command.UserId)
+            {
+                return new RestoreVoucherResponse(false, "Only the assigned worker can restore this voucher", "Forbidden");
+            }
+        }
+        else if (voucher.AssignedToUserId != command.UserId)
+        {
+            return new RestoreVoucherResponse(false, "Voucher is not assigned to this user", "Forbidden");
         }
 
         if (voucher.Status == VoucherStatus.Assigned)
@@ -32,19 +60,40 @@ public sealed class RestoreVoucherCommandHandler
 
         if (voucher.Status != VoucherStatus.Used)
         {
-            return new RestoreVoucherResponse(false, $"Voucher cannot be restored (current status: {voucher.Status})");
+            return new RestoreVoucherResponse(false, $"Voucher cannot be restored (current status: {voucher.Status})", "InvalidState");
         }
 
-        if (voucher.AssignedToUserId == null)
+        // The status check above is advisory only: between it and the write, another request could
+        // restore the same voucher. Repeating the predicate in the UPDATE's WHERE clause makes the
+        // transition atomic, so exactly one of two concurrent restores wins.
+        var affected = await _context.FuelVouchers
+            .Where(v => v.Id == command.VoucherId && v.Status == VoucherStatus.Used)
+            .ExecuteUpdateAsync(
+                s => s
+                    .SetProperty(v => v.Status, VoucherStatus.Assigned)
+                    // Cleared in the same statement that undoes the redemption. UsedAtUtc answers
+                    // "when was this redeemed", and leaving it set hands the voucher a redemption
+                    // that no longer happened - which a worker usage report would then count.
+                    .SetProperty(v => v.UsedAtUtc, (DateTime?)null)
+                    .SetProperty(v => v.UpdatedAtUtc, DateTime.UtcNow),
+                cancellationToken);
+
+        if (affected == 0)
         {
-            return new RestoreVoucherResponse(false, "Voucher has no assigned user");
+            // Lost the race. Re-read so the caller is told the real outcome rather than a stale one.
+            var current = await _context.FuelVouchers
+                .AsNoTracking()
+                .Where(v => v.Id == command.VoucherId)
+                .Select(v => (VoucherStatus?)v.Status)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            return current switch
+            {
+                VoucherStatus.Assigned => new RestoreVoucherResponse(true, "Voucher is already in Assigned status"),
+                null => new RestoreVoucherResponse(false, "Voucher not found", "NotFound"),
+                _ => new RestoreVoucherResponse(false, $"Voucher cannot be restored (current status: {current})", "InvalidState")
+            };
         }
-
-        voucher.Status = VoucherStatus.Assigned;
-        voucher.UpdatedAtUtc = DateTime.UtcNow;
-        _context.FuelVouchers.Update(voucher);
-
-        await _context.SaveChangesAsync(cancellationToken);
 
         return new RestoreVoucherResponse(true, "Voucher restored to Assigned status");
     }

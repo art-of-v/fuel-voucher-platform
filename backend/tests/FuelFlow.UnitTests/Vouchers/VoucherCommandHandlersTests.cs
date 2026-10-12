@@ -329,8 +329,13 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         unchangedVoucher!.Status.Should().Be(VoucherStatus.Assigned);
     }
 
+    /// <summary>
+    /// Moved to <c>RestoreVoucherIntegrationTests</c>, which could no longer execute it once the
+    /// write became an <c>ExecuteUpdateAsync</c> - the EF Core in-memory provider does not
+    /// translate <c>ExecuteUpdate</c>.
+    /// </summary>
     [Fact]
-    public async Task RestoreVoucher_ShouldTransitionFromUsedToAssigned()
+    public async Task RestoreVoucher_ShouldFail_WhenVoucherIsNotOwnedByTheCaller()
     {
         var voucherId = Guid.NewGuid();
 
@@ -345,7 +350,9 @@ public sealed class VoucherCommandHandlersTests : IDisposable
             VoucherNumber = "OKKO-1",
             QrPayload = "payload-1",
             Status = VoucherStatus.Used,
-            AssignedToUserId = UserId,
+            // Somebody else's redeemed voucher. Before the ownership check existed, only the
+            // endpoint's Staff policy kept this from un-redeeming another customer's voucher.
+            AssignedToUserId = OtherUserId,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };
@@ -354,15 +361,13 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         await _context.SaveChangesAsync();
 
         var handler = new RestoreVoucherCommandHandler(_context);
-        var command = new RestoreVoucherCommand(voucherId);
+        var command = new RestoreVoucherCommand(voucherId, UserId);
 
         var response = await handler.HandleAsync(command);
 
-        response.Success.Should().BeTrue();
-        response.Message.Should().Be("Voucher restored to Assigned status");
-
-        var updatedVoucher = await _context.FuelVouchers.FindAsync(voucherId);
-        updatedVoucher!.Status.Should().Be(VoucherStatus.Assigned);
+        response.Success.Should().BeFalse();
+        response.ErrorCode.Should().Be("Forbidden");
+        response.Message.Should().Contain("not assigned to this user");
     }
 
     [Fact]
@@ -390,7 +395,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         await _context.SaveChangesAsync();
 
         var handler = new RestoreVoucherCommandHandler(_context);
-        var command = new RestoreVoucherCommand(voucherId);
+        var command = new RestoreVoucherCommand(voucherId, UserId);
 
         var response = await handler.HandleAsync(command);
 
@@ -414,7 +419,10 @@ public sealed class VoucherCommandHandlersTests : IDisposable
             VoucherNumber = "OKKO-1",
             QrPayload = "payload-1",
             Status = VoucherStatus.Available,
-            AssignedToUserId = null,
+            // Owned by the caller, so the ownership check passes and it is the *status* that
+            // rejects this - which is what the test is about. An unowned voucher would be turned
+            // away earlier with "not assigned to this user", proving nothing about the status gate.
+            AssignedToUserId = UserId,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };
@@ -423,7 +431,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         await _context.SaveChangesAsync();
 
         var handler = new RestoreVoucherCommandHandler(_context);
-        var command = new RestoreVoucherCommand(voucherId);
+        var command = new RestoreVoucherCommand(voucherId, UserId);
 
         var response = await handler.HandleAsync(command);
 
