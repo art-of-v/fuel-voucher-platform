@@ -13,7 +13,7 @@
 # is what fires the OnFailure alert below.
 [Unit]
 Description=FuelFlow nightly encrypted database backup
-Documentation=file:/root/FuelFlow/docs/DEPLOYMENT.md
+Documentation=https://github.com/art-of-v/fuel-voucher-platform-planning/blob/main/docs/DEPLOYMENT.md
 # Needs the Docker daemon: backup.sh runs `docker exec fuelflow-postgres pg_dump`.
 Requires=docker.service
 After=docker.service

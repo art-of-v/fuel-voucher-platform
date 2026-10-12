@@ -11,7 +11,7 @@ using Xunit;
 namespace FuelFlow.IntegrationTests;
 
 /// <summary>
-/// Covers WP-4 (money-integrity review; conclusions now in <c>docs/SECURITY.md</c>,
+/// Covers WP-4 (money-integrity review; conclusions now in <c>docs/SECURITY.md (private docs repo)</c>,
 /// "Fraud analysis findings"): <see cref="MarkVoucherAsUsedCommandHandler"/> used to
 /// read the voucher, check its status, and then write — so two concurrent redemptions could both
 /// observe <see cref="VoucherStatus.Assigned"/> and both write <see cref="VoucherStatus.Used"/>.

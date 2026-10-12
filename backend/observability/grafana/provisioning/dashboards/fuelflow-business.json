@@ -1,7 +1,7 @@
 {
   "uid": "fuelflow-business",
   "title": "FuelFlow / Business",
-  "description": "Voucher pool, order flow, fulfillment, Monobank payments and Hangfire jobs. Metric names include the unit segment injected by the Prometheus exporter (see docs/OBSERVABILITY.md).",
+  "description": "Voucher pool, order flow, fulfillment, Monobank payments and Hangfire jobs. Metric names include the unit segment injected by the Prometheus exporter (see docs/OBSERVABILITY.md (private docs repo)).",
   "tags": ["fuelflow", "business"],
   "timezone": "browser",
   "schemaVersion": 39,

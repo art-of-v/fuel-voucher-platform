@@ -4,7 +4,7 @@
 # faithful move of an existing schedule into version control — not a behaviour change.
 [Unit]
 Description=Nightly FuelFlow database backup (03:20)
-Documentation=file:/root/FuelFlow/docs/DEPLOYMENT.md
+Documentation=https://github.com/art-of-v/fuel-voucher-platform-planning/blob/main/docs/DEPLOYMENT.md
 
 [Timer]
 # Local time, matching the old crontab `20 3 * * *`. The server's timezone is whatever

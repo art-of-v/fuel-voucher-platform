@@ -3,7 +3,7 @@
 # two nightly jobs never contend for IO.
 [Unit]
 Description=Nightly FuelFlow Docker GC (04:20)
-Documentation=file:/root/FuelFlow/docs/DEPLOYMENT.md
+Documentation=https://github.com/art-of-v/fuel-voucher-platform-planning/blob/main/docs/DEPLOYMENT.md
 
 [Timer]
 OnCalendar=*-*-* 04:20:00

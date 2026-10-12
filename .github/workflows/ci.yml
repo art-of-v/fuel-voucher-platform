@@ -257,7 +257,7 @@ jobs:
       #
       # Not fixed here: a *sustained* limit would need either authentication (a DOCKERHUB_TOKEN
       # secret, which raises this from the anonymous quota to an account quota) or a mirror. Both
-      # are one-line changes if this step starts failing regularly - see docs/TESTING.md.
+      # are one-line changes if this step starts failing regularly - see docs/TESTING.md (private docs repo).
       - name: Pull the Testcontainers Postgres image
         run: |
           set -euo pipefail
@@ -548,7 +548,7 @@ jobs:
   # still proves what prod is about to run.
   #
   # Requires the box to be set up for staging (deploy/.env.staging present, the
-  # `fuelflow_shared` network created — see docs/DEPLOYMENT.md "Staging (same box)"). Until
+  # `fuelflow_shared` network created — see docs/DEPLOYMENT.md (private docs repo) "Staging (same box)"). Until
   # that's done this job fails, which by design also holds prod back.
   deploy-staging:
     name: Deploy to staging

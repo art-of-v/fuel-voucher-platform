@@ -14,7 +14,7 @@ import * as Sentry from '@sentry/react-native';
  *
  * A mobile DSN is a write-only ingest key that ships inside the app binary — it is public
  * by nature, not an account secret — but it is left blank by default so tracking stays off
- * until someone opts in. See docs/DEPLOYMENT.md.
+ * until someone opts in. See docs/DEPLOYMENT.md (private docs repo).
  *
  * VERIFIABILITY: @sentry/react-native links a NATIVE module. This JS wiring builds and is
  * unit-tested, but whether crash reporting actually reaches Sentry can only be confirmed in

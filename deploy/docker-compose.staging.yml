@@ -10,9 +10,9 @@
 # `main` - the last build that succeeded for that component - when it did not, so
 # one component's broken build cannot block the others. IMAGE_TAG still sets all
 # three at once and keeps the documented manual-rollback path working; the
-# per-component variables win where both are set. See docs/DEPLOYMENT.md.
+# per-component variables win where both are set. See docs/DEPLOYMENT.md (private docs repo).
 #
-# Runbook: docs/DEPLOYMENT.md "Staging (same box)".
+# Runbook: docs/DEPLOYMENT.md (private docs repo) "Staging (same box)".
 #
 # Manual use:
 #   cd ~/FuelFlow/deploy

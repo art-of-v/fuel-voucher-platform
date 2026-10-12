@@ -1,7 +1,7 @@
 {
   "uid": "fuelflow-logs",
   "title": "FuelFlow / Logs",
-  "description": "Log volume and search across the API and JobsWorker. Logs reach Loki two ways: the in-app Serilog sink (host-run processes) and Alloy's Docker scrape (containers). Only service/environment/level are stream labels - everything else is a structured field, so filter with | json rather than adding labels (see docs/OBSERVABILITY.md).",
+  "description": "Log volume and search across the API and JobsWorker. Logs reach Loki two ways: the in-app Serilog sink (host-run processes) and Alloy's Docker scrape (containers). Only service/environment/level are stream labels - everything else is a structured field, so filter with | json rather than adding labels (see docs/OBSERVABILITY.md (private docs repo)).",
   "tags": ["fuelflow", "logs"],
   "timezone": "browser",
   "schemaVersion": 39,

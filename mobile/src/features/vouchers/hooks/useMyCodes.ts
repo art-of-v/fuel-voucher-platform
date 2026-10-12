@@ -166,7 +166,7 @@ export function useMyCodes() {
   );
   const scopedOrders = useMemo(() => filterOrdersByContext(orders, context), [orders, context]);
 
-  // The wallet is orders containing vouchers (see docs/DESIGN.md "wallet shape").
+  // The wallet is orders containing vouchers (see docs/DESIGN.md (private docs repo) "wallet shape").
   // Renewal orders are NOT shown as their own cards: an extend/replace is an event in a
   // voucher's History, and the live voucher it produced is filed under the customer's
   // ORIGINAL purchase order via `originOrderId` (resolved on the server across replace swaps).

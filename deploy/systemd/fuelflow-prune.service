@@ -7,7 +7,7 @@
 # threshold after pruning (disk filling from something prune can't reclaim).
 [Unit]
 Description=FuelFlow nightly Docker image/build-cache GC
-Documentation=file:/root/FuelFlow/docs/DEPLOYMENT.md
+Documentation=https://github.com/art-of-v/fuel-voucher-platform-planning/blob/main/docs/DEPLOYMENT.md
 # Needs the Docker daemon: prune-docker.sh runs `docker image prune`.
 Requires=docker.service
 After=docker.service

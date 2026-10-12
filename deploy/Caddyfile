@@ -208,7 +208,7 @@ palne.shop, www.palne.shop {
 # passes a lone `$` through unchanged, so a partially escaped hash still collapses
 # into a valid one and still works. The hazard is a value that is not a hash at
 # all - caddy then reads it as base64-encoded plaintext and refuses to start.
-# See deploy/ROTATION.md and deploy/preflight.sh.
+# See docs/ROTATION.md (private docs repo) and deploy/preflight.sh.
 # ============================================================================
 
 # --- Staging admin dashboard ---
