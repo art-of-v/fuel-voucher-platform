@@ -166,6 +166,10 @@ export default function CheckoutScreen() {
             orderId: response.orderIds[0] ?? '',
             pageUrl: response.pageUrl,
             appUrl: response.appUrl,
+            // The payment screen shows this above the acquirer's own frame, so the amount is
+            // visible even if that frame never renders. The cart is the authority here: it is the
+            // figure the customer was just shown on the confirm button.
+            amount: discountedTotal,
           }),
         );
 

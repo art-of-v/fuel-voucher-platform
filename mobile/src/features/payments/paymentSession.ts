@@ -19,6 +19,16 @@ export interface PaymentSession {
    * error: every consumer must treat it as optional.
    */
   appUrl?: string | null;
+  /**
+   * What the cart is being paid for, in UAH.
+   *
+   * Passed rather than fetched: the payment screen's job is to hand the customer to the acquirer
+   * without stalling, and a request there is one that can hang on the single screen where the
+   * network is most likely to be the problem. It is also what the screen shows when the
+   * acquirer's own page fails to render and the customer has to switch to the mono app - the moment
+   * knowing the amount matters most.
+   */
+  amount?: number;
 }
 
 /** Route params for `/pay`. URLs travel as strings through the query. */
@@ -26,6 +36,7 @@ export interface PaymentRouteParams {
   url: string;
   appUrl?: string;
   orderId?: string;
+  amount?: number;
 }
 
 /**
@@ -38,6 +49,7 @@ export function paymentHref(session: PaymentSession): string {
     url: session.pageUrl,
     ...(session.orderId ? { orderId: session.orderId } : {}),
     ...(session.appUrl ? { appUrl: session.appUrl } : {}),
+    ...(session.amount !== undefined ? { amount: String(session.amount) } : {}),
   });
   return `/pay?${params.toString()}`;
 }

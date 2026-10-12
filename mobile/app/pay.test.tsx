@@ -152,4 +152,66 @@ describe('Payment screen', () => {
     // The direct checkout path carries a real Monobank-app deep link and must use it.
     await waitFor(() => expect(mockOpenURL).toHaveBeenCalledWith('https://mbnk.app/or/deep'));
   });
+
+  it('covers the frame with a loading state until the acquirer page paints', () => {
+    mockParams = { url: 'https://pay.monobank.ua/frame/inv-1' };
+
+    render(<PaymentScreen />);
+
+    // Monobank's page is light and this app is dark: an unpainted WebView is a white flash into a
+    // payment. The loader covers that and must not resize the frame when it goes away.
+    expect(screen.getByTestId('payment-loading')).toBeTruthy();
+
+    (webViewProps?.onLoadEnd as () => void)();
+
+    expect(screen.queryByTestId('payment-loading')).toBeNull();
+  });
+
+  it('brings the loading state back for an in-frame navigation like 3DS', () => {
+    mockParams = { url: 'https://pay.monobank.ua/frame/inv-1' };
+
+    render(<PaymentScreen />);
+    (webViewProps?.onLoadEnd as () => void)();
+    expect(screen.queryByTestId('payment-loading')).toBeNull();
+
+    // 3DS replaces the document inside the frame, which blanks it exactly like the first load.
+    (webViewProps?.onLoadStart as () => void)();
+    expect(screen.getByTestId('payment-loading')).toBeTruthy();
+  });
+
+  it('shows what is being paid, in our own words, above a page we do not control', () => {
+    mockParams = { url: 'https://pay.monobank.ua/frame/inv-1', amount: '1249.5' };
+
+    render(<PaymentScreen />);
+
+    expect(screen.getByTestId('payment-amount')).toBeTruthy();
+  });
+
+  it('omits the amount row rather than showing a broken one when checkout did not pass it', () => {
+    // Re-opening an unpaid order from the wallet carries no amount: the row must disappear, not hang.
+    mockParams = { url: 'https://pay.monobank.ua/frame/inv-resumed' };
+
+    render(<PaymentScreen />);
+
+    expect(screen.queryByTestId('payment-amount')).toBeNull();
+  });
+
+  it('ignores an amount that is not a number instead of printing NaN', () => {
+    mockParams = { url: 'https://pay.monobank.ua/frame/inv-1', amount: 'not-a-number' };
+
+    render(<PaymentScreen />);
+
+    expect(screen.queryByTestId('payment-amount')).toBeNull();
+  });
+
+  it('offers a real recovery on failure instead of a muted sentence', () => {
+    mockParams = { url: 'https://pay.monobank.ua/frame/inv-1' };
+
+    render(<PaymentScreen />);
+    (webViewProps?.onHttpError as () => void)();
+
+    // The frame is gone; the customer needs the title, the reason and a way forward.
+    expect(screen.getByTestId('payment-failed')).toBeTruthy();
+    expect(screen.queryByTestId('payment-webview')).toBeNull();
+  });
 });

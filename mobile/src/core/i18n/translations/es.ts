@@ -158,6 +158,8 @@ export const es: Record<string, string> = {
   'codes.orderNotPayable': 'Este pedido ya no se puede pagar.',
   'payment.title': 'Pago',
   'payment.subtitle': 'Confirma tu pago',
+  'payment.loading': 'Cargando la página de pago…',
+  'payment.payingFor': 'Pagando',
   'payment.close': 'Cerrar',
   'payment.openMonobank': 'Pagar con mono',
   'payment.missingUrl':
