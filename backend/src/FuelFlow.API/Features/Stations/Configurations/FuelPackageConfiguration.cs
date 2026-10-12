@@ -28,7 +28,7 @@ internal sealed class FuelPackageConfiguration : IEntityTypeConfiguration<FuelPa
 
         builder.Property(e => e.FuelName)
             .HasColumnName("fuel_name")
-            .HasColumnType("text")
+            .HasMaxLength(200)
             .IsRequired();
 
         builder.Property(e => e.Liters)

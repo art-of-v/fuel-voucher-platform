@@ -33,6 +33,57 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
         _fixture = fixture;
     }
 
+    /// <summary>
+    /// Catalog display columns were unbounded <c>text</c>. A length limit is only worth having if the
+    /// database actually enforces it, so this writes through raw SQL and expects the write to fail -
+    /// going through EF would only prove EF sent a short string.
+    /// </summary>
+    [Fact]
+    public async Task An_Overlong_Station_Type_Is_Refused_By_The_Column()
+    {
+        await using var context = CreateContext();
+
+        var act = () => context.Database.ExecuteSqlRawAsync(
+            """
+            INSERT INTO stations (id, name, color, logo_text, station_type, sort_order, created_at_utc, updated_at_utc, is_deleted)
+            VALUES ('bounds-probe', 'Probe', '#00ff80', 'PRB', {0}, 999, NOW(), NOW(), false)
+            """, new string('x', 300));
+
+        var ex = await act.Should().ThrowAsync<PostgresException>();
+        ex.Which.MessageText.Should().Contain("character varying(64)",
+            "the column limit, not some unrelated constraint, is what must stop this");
+    }
+
+    /// <summary>
+    /// The counterpart, and the reason this was not simply "make every text column varchar": a
+    /// digital signature, a raw acquirer payload and a stack trace have no meaningful upper bound,
+    /// and truncating any of them destroys the only value the column holds. These must stay
+    /// <c>text</c>; a future sweep that "tidies up the remaining text columns" would quietly break
+    /// the audit trail, so the exception is pinned here rather than left to memory.
+    /// </summary>
+    [Theory]
+    [InlineData("user_contracts", "signature_data")]
+    [InlineData("monobank_statement_entries", "raw_payload")]
+    [InlineData("error_logs", "stack_trace")]
+    [InlineData("devices", "public_key")]
+    public async Task Genuinely_Unbounded_Columns_Stay_Text(string table, string column)
+    {
+        await using var context = CreateContext();
+
+        var sql = """
+            SELECT data_type FROM information_schema.columns
+            WHERE table_schema='public' AND table_name={0} AND column_name={1}
+            """;
+        var act = () => context.Database
+            .SqlQueryRaw<string>(sql, table, column)
+            .ToListAsync();
+
+        var rows = await act();
+        rows.Should().ContainSingle();
+        rows[0].Should().Be("text",
+            $"{table}.{column} holds a signature/payload/trace with no real upper bound - bounding it would destroy the audit trail");
+    }
+
     private ApplicationDbContext CreateContext()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()

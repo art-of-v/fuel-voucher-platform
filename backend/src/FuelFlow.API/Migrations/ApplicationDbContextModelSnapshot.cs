@@ -1557,7 +1557,8 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<string>("FileName")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
                         .HasColumnName("file_name");
 
                     b.Property<int>("ImportedCount")
@@ -1574,7 +1575,8 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
                         .HasColumnName("status");
 
                     b.Property<int>("VerificationFailedCount")
@@ -1747,7 +1749,8 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<string>("FuelName")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
                         .HasColumnName("fuel_name");
 
                     b.Property<string>("FuelTypeId")
@@ -2671,13 +2674,15 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("id");
 
                     b.Property<string>("Address")
-                        .HasColumnType("text")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
                         .HasColumnName("address");
 
                     b.Property<string>("Color")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("text")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
                         .HasDefaultValue("#00ff80")
                         .HasColumnName("color");
 
@@ -2703,16 +2708,19 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<string>("LogoText")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
                         .HasColumnName("logo_text");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
                     b.Property<string>("Phone")
-                        .HasColumnType("text")
+                        .HasMaxLength(45)
+                        .HasColumnType("character varying(45)")
                         .HasColumnName("phone");
 
                     b.Property<int>("SortOrder")
@@ -2722,7 +2730,8 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("sort_order");
 
                     b.Property<string>("StationType")
-                        .HasColumnType("text")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
                         .HasColumnName("station_type");
 
                     b.Property<DateTime>("UpdatedAtUtc")
@@ -2799,11 +2808,13 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("id");
 
                     b.Property<string>("Address")
-                        .HasColumnType("text")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
                         .HasColumnName("address");
 
                     b.Property<string>("City")
-                        .HasColumnType("text")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
                         .HasColumnName("city");
 
                     b.Property<DateTime>("CreatedAtUtc")
@@ -2828,11 +2839,13 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
                     b.Property<string>("Phone")
-                        .HasColumnType("text")
+                        .HasMaxLength(45)
+                        .HasColumnType("character varying(45)")
                         .HasColumnName("phone");
 
                     b.Property<string>("StationId")
@@ -2841,7 +2854,8 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("station_id");
 
                     b.Property<string>("StationType")
-                        .HasColumnType("text")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
                         .HasColumnName("station_type");
 
                     b.Property<DateTime>("UpdatedAtUtc")

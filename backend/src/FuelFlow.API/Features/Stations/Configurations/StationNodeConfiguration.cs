@@ -23,24 +23,24 @@ internal sealed class StationNodeConfiguration : IEntityTypeConfiguration<Statio
 
         builder.Property(e => e.Name)
             .HasColumnName("name")
-            .HasColumnType("text")
+            .HasMaxLength(200)
             .IsRequired();
 
         builder.Property(e => e.Address)
             .HasColumnName("address")
-            .HasColumnType("text");
+            .HasMaxLength(500);
 
         builder.Property(e => e.Phone)
             .HasColumnName("phone")
-            .HasColumnType("text");
+            .HasMaxLength(45);
 
         builder.Property(e => e.City)
             .HasColumnName("city")
-            .HasColumnType("text");
+            .HasMaxLength(128);
 
         builder.Property(e => e.StationType)
             .HasColumnName("station_type")
-            .HasColumnType("text");
+            .HasMaxLength(64);
 
         builder.Property(e => e.Lat)
             .HasColumnName("lat")
