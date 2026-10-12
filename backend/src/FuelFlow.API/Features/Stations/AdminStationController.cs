@@ -38,8 +38,12 @@ public sealed class AdminStationController : ControllerBase
     public async Task<IActionResult> GetAll([FromQuery] int page = 1, [FromQuery] int pageSize = 50, CancellationToken ct = default) =>
         Ok(await _getAll.HandleAsync(new GetAdminStationsQuery(page, pageSize), ct));
 
-    // Disabled 2026-10-12 (planning #289, delete by 2026-11-12): no caller in any client, script, deploy config, doc or test.
-    // [HttpGet("{id}")]
+    // Routes restored 2026-10-12. Commenting out the attribute does not disable the action: under
+    // [ApiController] a method with no HTTP attribute binds to the controller prefix, so these three
+    // claimed `api/admin/stations` alongside GetAll and the router answered 500
+    // (AmbiguousMatchException) instead of 404. `GET /api/admin/stations` has a live caller -
+    // StationNodesTab.tsx:101, the brand list behind the "Точки АЗК" screen.
+    [HttpGet("{id}")]
     public async Task<IActionResult> GetById([FromRoute] string id, CancellationToken ct)
     {
         var result = await _getById.HandleAsync(new GetAdminStationByIdQuery(id), ct);
@@ -57,16 +61,14 @@ public sealed class AdminStationController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = result.Station!.Id }, result.Station);
     }
 
-    // Disabled 2026-10-12 (planning #289, delete by 2026-11-12): no caller in any client, script, deploy config, doc or test.
-    // [HttpPut("{id}")]
+    [HttpPut("{id}")]
     public async Task<IActionResult> Update([FromRoute] string id, [FromBody] Station request, CancellationToken ct)
     {
         var success = await _update.HandleAsync(new UpdateStationCommand(id, request), ct);
         return success ? Ok(new { success = true }) : NotFound();
     }
 
-    // Disabled 2026-10-12 (planning #289, delete by 2026-11-12): no caller in any client, script, deploy config, doc or test.
-    // [HttpDelete("{id}")]
+    [HttpDelete("{id}")]
     public async Task<IActionResult> Delete([FromRoute] string id, CancellationToken ct)
     {
         var success = await _delete.HandleAsync(new DeleteStationCommand(id), ct);

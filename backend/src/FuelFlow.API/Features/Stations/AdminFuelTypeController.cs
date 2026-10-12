@@ -38,8 +38,12 @@ public sealed class AdminFuelTypeController : ControllerBase
     public async Task<IActionResult> GetAll(CancellationToken ct) =>
         Ok(await _getAll.HandleAsync(new GetAdminFuelTypesQuery(), ct));
 
-    // Disabled 2026-10-12 (planning #289, delete by 2026-11-12): no caller in any client, script, deploy config, doc or test.
-    // [HttpGet("{id}")]
+    // Routes restored 2026-10-12. These were disabled by commenting out the attributes, which
+    // disables nothing: under [ApiController] a method with no HTTP attribute binds to the
+    // controller prefix, so four actions claimed `api/admin/fuel-types` and the router answered
+    // 500 (AmbiguousMatchException) instead of 404. `GET /api/admin/fuel-types` has a live caller -
+    // admin.tsx:380, the fuel-type list the voucher importer reads - so it was never dead.
+    [HttpGet("{id}")]
     [Authorize(Policy = "Staff")]
     public async Task<IActionResult> GetById([FromRoute] string id, CancellationToken ct)
     {
@@ -59,8 +63,7 @@ public sealed class AdminFuelTypeController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = result.FuelType!.Id }, result.FuelType);
     }
 
-    // Disabled 2026-10-12 (planning #289, delete by 2026-11-12): no caller in any client, script, deploy config, doc or test.
-    // [HttpPut("{id}")]
+    [HttpPut("{id}")]
     [Authorize(Policy = "Staff")]
     public async Task<IActionResult> Update([FromRoute] string id, [FromBody] FuelTypeEntity request, CancellationToken ct)
     {
@@ -72,8 +75,7 @@ public sealed class AdminFuelTypeController : ControllerBase
         return success ? Ok(new { success = true }) : NotFound();
     }
 
-    // Disabled 2026-10-12 (planning #289, delete by 2026-11-12): no caller in any client, script, deploy config, doc or test.
-    // [HttpDelete("{id}")]
+    [HttpDelete("{id}")]
     [Authorize(Policy = "Staff")]
     public async Task<IActionResult> Delete([FromRoute] string id, CancellationToken ct)
     {
