@@ -42,15 +42,12 @@ public sealed class AdminPackageController : ControllerBase
     public async Task<IActionResult> GetAll(CancellationToken ct) =>
         Ok(await _getAll.HandleAsync(new GetAdminPackagesQuery(), ct));
 
-    // Disabled 2026-10-12 (planning #289, delete by 2026-11-12): no caller in any client, script, deploy config, doc or test.
-    // [HttpGet("station/{stationId}")]
-    public async Task<IActionResult> GetByStation([FromRoute] string stationId, CancellationToken ct) =>
-        Ok(await _getByStation.HandleAsync(new GetAdminPackagesByStationQuery(stationId), ct));
-
-    // Disabled 2026-10-12 (planning #289, delete by 2026-11-12): no caller in any client, script, deploy config, doc or test.
-    // [HttpGet("suggestions")]
-    public async Task<IActionResult> GetSuggestions(CancellationToken ct) =>
-        Ok(await _getSuggestions.HandleAsync(new GetPackageSuggestionsQuery(), ct));
+    // Removed 2026-10-12 (planning #289): no caller in any client, script, deploy config, doc or
+    // test. They were previously "disabled" by commenting out the [HttpGet] attribute, which does
+    // not disable an action - under [ApiController] a method with no HTTP attribute binds to the
+    // controller prefix, so four actions here plus GetAll all claimed `api/admin/packages` and the
+    // router answered 500 (AmbiguousMatchException) instead of 404. Deleting the method is the way
+    // to remove an endpoint; commenting the attribute out is not.
 
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] FuelPackage request, CancellationToken ct)
@@ -61,21 +58,5 @@ public sealed class AdminPackageController : ControllerBase
         if (result.Conflict)
             return Conflict(result.Error);
         return CreatedAtAction(nameof(GetAll), new { id = result.Package!.Id }, result.Package);
-    }
-
-    // Disabled 2026-10-12 (planning #289, delete by 2026-11-12): no caller in any client, script, deploy config, doc or test.
-    // [HttpPut("{id}")]
-    public async Task<IActionResult> Update([FromRoute] string id, [FromBody] FuelPackage request, CancellationToken ct)
-    {
-        var success = await _update.HandleAsync(new UpdatePackageCommand(id, request), ct);
-        return success ? Ok(new { success = true }) : NotFound();
-    }
-
-    // Disabled 2026-10-12 (planning #289, delete by 2026-11-12): no caller in any client, script, deploy config, doc or test.
-    // [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete([FromRoute] string id, CancellationToken ct)
-    {
-        var success = await _delete.HandleAsync(new DeletePackageCommand(id), ct);
-        return success ? Ok(new { success = true }) : NotFound();
     }
 }

@@ -27,8 +27,12 @@ public sealed class StatementReconciliationController : ControllerBase
 
     /// <summary>The act as JSON: the summary, every row with its verdict, and the orders the
     /// acquirer never mentioned.</summary>
-    // Disabled 2026-10-12 (planning #289, delete by 2026-11-12): no caller in any client, script, deploy config, doc or test.
-    // [HttpGet]
+    // Route restored 2026-10-12. Commenting out [HttpGet] does not disable an action: under
+    // [ApiController] a method with no HTTP attribute binds to the controller prefix, so all three
+    // actions here claimed `api/admin/reconciliation/statement` and the router answered 500
+    // (AmbiguousMatchException) instead of 404 - taking the whole act offline in production.
+    // It has a caller now anyway: the admin's statement panel, which was unreachable without this.
+    [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> Get(
         [FromQuery] MonobankMerchant? merchant,
@@ -58,8 +62,7 @@ public sealed class StatementReconciliationController : ControllerBase
     /// because <c>[Produces]</c> applies content negotiation to every return and an empty 404 has no
     /// CSV formatter to negotiate with - which turns "no such period" into a 406.
     /// </remarks>
-    // Disabled 2026-10-12 (planning #289, delete by 2026-11-12): no caller in any client, script, deploy config, doc or test.
-    // [HttpGet("csv")]
+    [HttpGet("csv")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK, "text/csv")]
     public async Task<IActionResult> GetCsv(
         [FromQuery] MonobankMerchant? merchant,
@@ -77,8 +80,7 @@ public sealed class StatementReconciliationController : ControllerBase
     }
 
     /// <summary>The act as PDF - the form it gets signed off in.</summary>
-    // Disabled 2026-10-12 (planning #289, delete by 2026-11-12): no caller in any client, script, deploy config, doc or test.
-    // [HttpGet("pdf")]
+    [HttpGet("pdf")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK, "application/pdf")]
     public async Task<IActionResult> GetPdf(
         [FromQuery] MonobankMerchant? merchant,
