@@ -27,7 +27,8 @@ public sealed class StatementReconciliationController : ControllerBase
 
     /// <summary>The act as JSON: the summary, every row with its verdict, and the orders the
     /// acquirer never mentioned.</summary>
-    [HttpGet]
+    // Disabled 2026-10-12 (planning #289, delete by 2026-11-12): no caller in any client, script, deploy config, doc or test.
+    // [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> Get(
         [FromQuery] MonobankMerchant? merchant,
@@ -57,7 +58,8 @@ public sealed class StatementReconciliationController : ControllerBase
     /// because <c>[Produces]</c> applies content negotiation to every return and an empty 404 has no
     /// CSV formatter to negotiate with - which turns "no such period" into a 406.
     /// </remarks>
-    [HttpGet("csv")]
+    // Disabled 2026-10-12 (planning #289, delete by 2026-11-12): no caller in any client, script, deploy config, doc or test.
+    // [HttpGet("csv")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK, "text/csv")]
     public async Task<IActionResult> GetCsv(
         [FromQuery] MonobankMerchant? merchant,
@@ -75,7 +77,8 @@ public sealed class StatementReconciliationController : ControllerBase
     }
 
     /// <summary>The act as PDF - the form it gets signed off in.</summary>
-    [HttpGet("pdf")]
+    // Disabled 2026-10-12 (planning #289, delete by 2026-11-12): no caller in any client, script, deploy config, doc or test.
+    // [HttpGet("pdf")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK, "application/pdf")]
     public async Task<IActionResult> GetPdf(
         [FromQuery] MonobankMerchant? merchant,

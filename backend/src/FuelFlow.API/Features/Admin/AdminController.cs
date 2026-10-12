@@ -50,7 +50,8 @@ public sealed class AdminController : ControllerBase
     /// view that can prove a loss; the reconciliation above estimates margin from the live catalogue
     /// and cannot.
     /// </summary>
-    [HttpGet("realized-margin")]
+    // Disabled 2026-10-12 (planning #289, delete by 2026-11-12): no caller in any client, script, deploy config, doc or test.
+    // [HttpGet("realized-margin")]
     [ProducesResponseType(typeof(RealizedMarginReport), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetRealizedMargin(
         [FromQuery] DateTime? fromDate = null,
