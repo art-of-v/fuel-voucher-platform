@@ -75,7 +75,7 @@ public sealed class LegalEntityController : ControllerBase
         {
             entity = new LegalEntity
             {
-                Id = Guid.NewGuid(),
+                Id = Guid.CreateVersion7(),
                 UserId = userId.Value,
                 CreatedAtUtc = DateTime.UtcNow
             };
@@ -167,7 +167,7 @@ public sealed class LegalEntityController : ControllerBase
 
         var entity = new LegalEntity
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
             UserId = userId.Value,
             Name = request.Name,
             Edrpou = request.Edrpou,
@@ -305,7 +305,7 @@ public sealed class LegalEntityController : ControllerBase
 
         var userContract = new UserContract
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
             UserId = userId.Value,
             ContractId = request.ContractId,
             SignatureData = request.SignatureData,

@@ -141,9 +141,11 @@ public sealed class VerifyChallengeCommandHandler
 
         var refreshTokenEntity = new RefreshToken
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
             UserId = user.Id,
-            FamilyId = Guid.NewGuid(),
+            // Guid.NewGuid(), not CreateVersion7() - see VerifyCodeCommand: this is part of the
+        // refresh-token rotation family, where an id should not carry a creation timestamp.
+        FamilyId = Guid.NewGuid(),
             DeviceId = command.DeviceId,
             RoleNameAtIssue = user.Role?.Name, // Pin the session to the role it was born with (§16)
             // Store the HASH, exactly like the standard refresh flow does — /api/auth/refresh

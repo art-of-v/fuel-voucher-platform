@@ -202,7 +202,7 @@ public sealed class ProvidersController : ControllerBase
 
         var fuel = new FuelTypeEntity
         {
-            Id = Guid.NewGuid().ToString(),
+            Id = Guid.CreateVersion7().ToString(),
             StationId = id,
             Name = request.Name,
             // base_price / discount_price are UAH per liter, decimal to the kopeck (spec §12, #90):
@@ -239,7 +239,7 @@ public sealed class ProvidersController : ControllerBase
         {
             _context.FuelPackages.Add(new FuelPackage
             {
-                Id = Guid.NewGuid().ToString(),
+                Id = Guid.CreateVersion7().ToString(),
                 StationId = id,
                 FuelTypeId = fuel.Id,
                 FuelName = fuel.Name,
@@ -305,7 +305,7 @@ public sealed class ProvidersController : ControllerBase
             {
                 var pkg = new FuelPackage
                 {
-                    Id = Guid.NewGuid().ToString(),
+                    Id = Guid.CreateVersion7().ToString(),
                     StationId = fuel.StationId,
                     FuelTypeId = fuel.Id,
                     FuelName = fuel.Name,
@@ -522,7 +522,7 @@ public sealed class ProvidersController : ControllerBase
 
                 _context.FuelPackages.Add(new FuelPackage
                 {
-                    Id = Guid.NewGuid().ToString(),
+                    Id = Guid.CreateVersion7().ToString(),
                     StationId = id,
                     FuelTypeId = fuel.Id,
                     FuelName = fuel.Name,

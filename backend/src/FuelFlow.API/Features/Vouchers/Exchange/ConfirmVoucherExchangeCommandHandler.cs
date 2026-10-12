@@ -247,7 +247,7 @@ public sealed class ConfirmVoucherExchangeCommandHandler
         // One row per OLD voucher, each carrying ITS OWN surcharge share and cost. The old vouchers of one
         // exchange routinely cost different amounts per liter, so a batch-wide copy would misreport every
         // row but one during supplier reconciliation.
-        var batchId = Guid.NewGuid();
+        var batchId = Guid.CreateVersion7();
         foreach (var (oldId, newId) in pairing.Pairs)
         {
             var old = oldById[oldId];
@@ -258,7 +258,7 @@ public sealed class ConfirmVoucherExchangeCommandHandler
 
             _context.VoucherExchanges.Add(new VoucherExchange
             {
-                Id = Guid.NewGuid(),
+                Id = Guid.CreateVersion7(),
                 ExchangeBatchId = batchId,
                 OldVoucherId = oldId,
                 NewVoucherId = newId,

@@ -101,7 +101,7 @@ public sealed class SuppliersController : ControllerBase
         var now = DateTime.UtcNow;
         var supplier = new Supplier
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
             Name = name,
             LegalForm = request.LegalForm?.Trim(),
             Phone = request.Phone?.Trim(),

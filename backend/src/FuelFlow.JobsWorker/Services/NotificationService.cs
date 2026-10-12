@@ -80,7 +80,7 @@ public sealed class NotificationService
 
         var notification = new Notification
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
             UserId = userId,
             Title = "Замовлення виконано",
             Message = $"Ваше замовлення #{payload.OrderId} виконано. Ваучери призначені та готові до використання.",

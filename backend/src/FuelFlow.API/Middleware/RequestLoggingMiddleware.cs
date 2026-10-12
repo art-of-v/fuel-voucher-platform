@@ -25,7 +25,7 @@ internal sealed class RequestLoggingMiddleware
     {
         var request = context.Request;
         var sw = Stopwatch.StartNew();
-        var requestId = Guid.NewGuid().ToString("N")[..8];
+        var requestId = Guid.CreateVersion7().ToString("N")[..8];
 
         _logger.LogInformation(
             "--> {RequestId} {Method} {Scheme}://{Host}{Path} from {RemoteIp} origin={Origin} ctype={ContentType} len={ContentLength} ua={UserAgent}",

@@ -158,7 +158,7 @@ public sealed class RefundOrderCommandHandler
         {
             refund = new Refund
             {
-                Id = Guid.NewGuid(),
+                Id = Guid.CreateVersion7(),
                 OrderId = order.Id,
                 UserId = order.UserId,
                 Amount = amount,

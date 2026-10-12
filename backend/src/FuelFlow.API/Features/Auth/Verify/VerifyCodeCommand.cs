@@ -176,7 +176,7 @@ public sealed class VerifyCodeCommandHandler
 
             user = new User
             {
-                Id = Guid.NewGuid(),
+                Id = Guid.CreateVersion7(),
                 PhoneNumber = phoneNumber,
                 // Self-registration is the mobile-app path: stamp the built-in "User"
                 // role. Admins are created/maintained by promoting an account to "Admin".
@@ -210,9 +210,12 @@ public sealed class VerifyCodeCommandHandler
 
         var refreshToken = new RefreshToken
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
             UserId = user.Id,
-            FamilyId = Guid.NewGuid(),
+            // Deliberately Guid.NewGuid(), not CreateVersion7(): this sits inside the refresh-token
+        // rotation machinery, and v7 embeds a creation timestamp. Never v4-for-no-reason either -
+        // family_id is an indexed grouping key matched only server-side, never a credential.
+        FamilyId = Guid.NewGuid(),
             DeviceId = null, // Device will be linked during challenge verification
             RoleNameAtIssue = user.Role?.Name, // Pin the session to the role it was born with (§16)
             Token = SecretsHasher.Hash(refreshTokenValue),

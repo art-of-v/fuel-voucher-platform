@@ -23,7 +23,7 @@ public sealed class ProviderEventService
     {
         _context.Set<ProviderEventOutbox>().Add(new ProviderEventOutbox
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
             AggregateType = aggregateType,
             AggregateId = aggregateId,
             EventType = eventType,

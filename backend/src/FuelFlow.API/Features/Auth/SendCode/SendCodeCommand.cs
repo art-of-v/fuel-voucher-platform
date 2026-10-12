@@ -77,7 +77,7 @@ public sealed class SendCodeCommandHandler
         {
             _context.VerificationCodes.Add(new VerificationCode
             {
-                Id = Guid.NewGuid(),
+                Id = Guid.CreateVersion7(),
                 PhoneNumber = phoneNumber,
                 Code = _qaTestAccess.CodeHash!, // already a SHA-256 hash of the configured QA code
                 ExpiresAtUtc = DateTime.UtcNow.AddMinutes(5),
@@ -96,7 +96,7 @@ public sealed class SendCodeCommandHandler
         var code = ResolveCode();
         var verificationCode = new VerificationCode
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
             PhoneNumber = phoneNumber,
             Code = SecretsHasher.Hash(code),
             ExpiresAtUtc = DateTime.UtcNow.AddMinutes(5), // spec §2: verification codes valid for 5 minutes

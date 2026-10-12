@@ -315,7 +315,7 @@ public sealed class RenewalCheckoutCommandHandler
         var now = DateTime.UtcNow;
         var order = new Order
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
             UserId = userId,
             // Left null on purpose: a replacement inherits the SOURCE voucher's legal entity at
             // fulfilment time, so the order need not (and cannot, for a mixed batch) carry one.
@@ -338,7 +338,7 @@ public sealed class RenewalCheckoutCommandHandler
             // unchanged when a renewal order ends up only partially fulfilled.
             order.LineItems.Add(new OrderLineItem
             {
-                Id = Guid.NewGuid(),
+                Id = Guid.CreateVersion7(),
                 OrderId = order.Id,
                 Provider = line.Source.Provider,
                 FuelTypeId = line.Source.FuelTypeId,
@@ -357,7 +357,7 @@ public sealed class RenewalCheckoutCommandHandler
         {
             _context.VoucherRenewalItems.Add(new VoucherRenewalItem
             {
-                Id = Guid.NewGuid(),
+                Id = Guid.CreateVersion7(),
                 OrderId = order.Id,
                 SourceVoucherId = line.Source.Id,
                 TermCode = line.Term.Code(),

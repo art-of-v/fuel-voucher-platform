@@ -141,7 +141,7 @@ public class MonobankStatementImportService
                 continue;
             }
 
-            entry.Id = Guid.NewGuid();
+            entry.Id = Guid.CreateVersion7();
             entry.FirstSeenAtUtc = now;
             _context.MonobankStatementEntries.Add(entry);
             existing[item.StatementId] = entry;

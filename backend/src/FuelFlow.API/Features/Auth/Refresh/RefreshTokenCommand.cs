@@ -180,7 +180,7 @@ public sealed class RefreshTokenCommandHandler
 
         var newRefreshToken = new RefreshToken
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
             UserId = identityToken.UserId,
             FamilyId = identityToken.FamilyId,
             DeviceId = identityToken.DeviceId, // Preserve device linkage on rotation

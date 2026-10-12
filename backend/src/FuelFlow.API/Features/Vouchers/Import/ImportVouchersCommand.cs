@@ -152,7 +152,7 @@ public sealed class ImportVouchersCommandHandler
 
         var import = new VoucherImport
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
             FileName = request.FileName,
             PageCount = 0,
             StartedAtUtc = DateTime.UtcNow,
@@ -202,7 +202,7 @@ public sealed class ImportVouchersCommandHandler
 
                         _context.VoucherImportErrors.Add(new VoucherImportError
                         {
-                            Id = Guid.NewGuid(),
+                            Id = Guid.CreateVersion7(),
                             ImportId = import.Id,
                             PageNumber = page.PageNumber,
                             ErrorMessage = errMsg,
@@ -231,7 +231,7 @@ public sealed class ImportVouchersCommandHandler
 
                         _context.VoucherImportErrors.Add(new VoucherImportError
                         {
-                            Id = Guid.NewGuid(),
+                            Id = Guid.CreateVersion7(),
                             ImportId = import.Id,
                             PageNumber = page.PageNumber,
                             ErrorMessage = errMsg,
@@ -273,7 +273,7 @@ public sealed class ImportVouchersCommandHandler
 
                             _context.VoucherImportErrors.Add(new VoucherImportError
                             {
-                                Id = Guid.NewGuid(),
+                                Id = Guid.CreateVersion7(),
                                 ImportId = import.Id,
                                 PageNumber = page.PageNumber,
                                 VoucherNumber = string.IsNullOrEmpty(parsed.VoucherNumber) ? null : parsed.VoucherNumber,
@@ -305,7 +305,7 @@ public sealed class ImportVouchersCommandHandler
 
                             _context.VoucherImportErrors.Add(new VoucherImportError
                             {
-                                Id = Guid.NewGuid(),
+                                Id = Guid.CreateVersion7(),
                                 ImportId = import.Id,
                                 PageNumber = page.PageNumber,
                                 VoucherNumber = string.IsNullOrEmpty(parsed.VoucherNumber) ? null : parsed.VoucherNumber,
@@ -329,7 +329,7 @@ public sealed class ImportVouchersCommandHandler
 
                             _context.VoucherImportErrors.Add(new VoucherImportError
                             {
-                                Id = Guid.NewGuid(),
+                                Id = Guid.CreateVersion7(),
                                 ImportId = import.Id,
                                 PageNumber = page.PageNumber,
                                 VoucherNumber = parsed.VoucherNumber,
@@ -378,7 +378,7 @@ public sealed class ImportVouchersCommandHandler
                             {
                                 qrParams = new QrParameters
                                 {
-                                    Id = Guid.NewGuid(),
+                                    Id = Guid.CreateVersion7(),
                                     EccLevel = normalizedEcc,
                                     Version = parsed.QrVersion,
                                     MaskPattern = parsed.QrMaskPattern,
@@ -397,7 +397,7 @@ public sealed class ImportVouchersCommandHandler
 
                         var voucher = new FuelVoucher
                         {
-                            Id = Guid.NewGuid(),
+                            Id = Guid.CreateVersion7(),
                             Provider = parsed.Provider,
                             FuelTypeId = parsed.FuelTypeId!,
                             Liters = parsed.Liters,

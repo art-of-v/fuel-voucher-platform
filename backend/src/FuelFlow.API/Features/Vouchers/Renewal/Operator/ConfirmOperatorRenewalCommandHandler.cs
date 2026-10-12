@@ -220,7 +220,7 @@ public sealed class ConfirmOperatorRenewalCommandHandler
         // than a fuel purchase.
         var renewalOrder = new Order
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
             UserId = customerUserId,
             LegalEntityId = customerLegalEntityId,
             Price = command.SurchargeUah,
@@ -233,7 +233,7 @@ public sealed class ConfirmOperatorRenewalCommandHandler
             {
                 new()
                 {
-                    Id = Guid.NewGuid(),
+                    Id = Guid.CreateVersion7(),
                     Provider = voucher.Provider,
                     FuelTypeId = voucher.FuelTypeId,
                     Liters = voucher.Liters,
@@ -262,7 +262,7 @@ public sealed class ConfirmOperatorRenewalCommandHandler
 
         _context.OperatorVoucherRenewals.Add(new OperatorVoucherRenewal
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
             VoucherId = voucher.Id,
             ReplacementVoucherId = replacementVoucherId,
             CustomerUserId = customerUserId,

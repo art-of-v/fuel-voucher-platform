@@ -82,7 +82,7 @@ public sealed class SendInvitationCommandHandler
 
         var invitation = new CompanyInvitation
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
             LegalEntityId = legalEntityId,
             OwnerUserId = command.OwnerUserId,
             WorkerPhoneNumber = normalizedPhone,

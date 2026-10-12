@@ -29,7 +29,7 @@ public sealed class RegisterPushTokenCommandHandler
         {
             _context.PushTokens.Add(new UserPushToken
             {
-                Id = Guid.NewGuid(),
+                Id = Guid.CreateVersion7(),
                 UserId = command.UserId,
                 Token = command.Token,
                 Platform = command.Platform,
