@@ -18,7 +18,7 @@ namespace FuelFlow.Features.Orders.DeleteOrder;
         DeleteOrderCommand command,
         CancellationToken cancellationToken = default)
     {
-        // AsTracking is required, not decoration: the context defaults to NoTracking, so setting
+        // AsTracking is required, not decoration: the context default is TrackAll, so setting
         // IsDeleted on an untracked entity persists NOTHING and this handler would report success
         // while the order stayed exactly where it was. The architecture guard
         // (NoTrackingMutationGuardTests) enforces it - it caught the first attempt at this change.

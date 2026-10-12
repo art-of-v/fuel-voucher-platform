@@ -21,9 +21,9 @@ public sealed class DeleteMyOrderCommandHandler
         // (the entity's query filter hides soft-deleted rows). Only an unpaid checkout may
         // go this way — anything past PendingPayment has money or vouchers attached and
         // belongs to the admin/refund flows.
-        // Global query default is NoTracking (DatabaseSetup). This is a soft delete — we
-        // mutate IsDeleted below — so the entity must be tracked or SaveChanges silently
-        // persists nothing and the order reappears on the next refresh.
+        // The default is TrackAll (DatabaseSetup), so this already tracks. Kept explicit because this
+        // is a soft delete — we mutate IsDeleted below — and SaveChanges has to see it or the
+        // order reappears on the next refresh.
         var order = await _context.Orders
             .AsTracking()
             .FirstOrDefaultAsync(

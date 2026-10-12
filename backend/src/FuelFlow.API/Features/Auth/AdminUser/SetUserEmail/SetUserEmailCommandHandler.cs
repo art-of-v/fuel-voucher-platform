@@ -29,7 +29,7 @@ public sealed class SetUserEmailCommandHandler
 
     public async Task<SetUserEmailResult> HandleAsync(SetUserEmailCommand command, CancellationToken cancellationToken)
     {
-        // Global query default is NoTracking (DatabaseSetup); this entity is mutated below, so it
+        // The default is TrackAll (DatabaseSetup), so this already tracks; kept explicit because
         // must be tracked or SaveChanges silently persists nothing.
         var target = await _context.Users
             .AsTracking()

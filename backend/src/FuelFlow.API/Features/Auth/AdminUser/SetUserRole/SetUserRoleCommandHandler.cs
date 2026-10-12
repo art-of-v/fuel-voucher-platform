@@ -31,7 +31,7 @@ public sealed class SetUserRoleCommandHandler
         SetUserRoleCommand command,
         CancellationToken cancellationToken)
     {
-        // Global query default is NoTracking (DatabaseSetup). This entity is mutated below,
+        // The default is TrackAll (DatabaseSetup), so this already tracks. Kept explicit because
         // so it must be tracked or SaveChanges would silently persist nothing.
         var target = await _context.Users
             .AsTracking()

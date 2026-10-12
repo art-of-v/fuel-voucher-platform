@@ -18,10 +18,10 @@ using Xunit;
 namespace FuelFlow.IntegrationTests;
 
 /// <summary>
-/// Real-Postgres coverage for the admin/user mutation handlers that mutate a loaded entity under
-/// the global NoTracking default (DatabaseSetup). InMemory cannot model the identity-map / tracking
-/// nuance those handlers depend on — the same class of gap that hid the demotion-revocation bug —
-/// so these run against a Testcontainers Postgres and resolve each handler from DI, exactly as a
+/// Real-Postgres coverage for the admin/user mutation handlers that load an entity and mutate it
+/// in place (the default is TrackAll — DatabaseSetup). InMemory cannot model the identity-map /
+/// tracking nuance those handlers depend on - the same class of gap that hid the demotion-revocation
+/// bug - so these run against a Testcontainers Postgres and resolve each handler from DI, exactly as a
 /// real request does. All three handlers share ONE container via the <see cref="TestDatabaseFixture"/>
 /// class fixture, so the coverage stays cheap.
 /// </summary>

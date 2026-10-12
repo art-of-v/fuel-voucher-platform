@@ -58,7 +58,7 @@ public sealed class RefundOrderCommandHandler
             };
         }
 
-        // AsTracking: the app-wide query default is NoTracking, but the retry and
+        // AsTracking is redundant but harmless: the default is TrackAll (DatabaseSetup). Kept
         // amount-correction branches below mutate this entity and rely on SaveChanges.
         var existing = await _context.Refunds
             .AsTracking()

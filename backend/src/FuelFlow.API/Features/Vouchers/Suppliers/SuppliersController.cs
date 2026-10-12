@@ -153,7 +153,7 @@ public sealed class SuppliersController : ControllerBase
         if (request.IsActive.HasValue) supplier.IsActive = request.IsActive.Value;
         supplier.UpdatedAtUtc = DateTime.UtcNow;
 
-        // AsTracking is load-bearing, not decoration. The context's default is NoTracking, so without it
+        // AsTracking is load-bearing, not decoration. The context's default is TrackAll, so without it
         // these property changes reach no change tracker, SaveChanges writes nothing for the row, and the
         // response below - built from this same instance - still shows the new values. The outbox row added
         // in RecordAsync always persists, which is what made the audit trail claim success while the table
