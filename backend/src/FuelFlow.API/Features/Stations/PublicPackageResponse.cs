@@ -2,10 +2,11 @@ namespace FuelFlow.Features.Stations;
 
 /// <summary>
 /// Explicit allow-list projection of <see cref="FuelFlow.SharedKernel.Domain.FuelPackage"/> for the
-/// anonymous <c>GET /api/packages</c> and <c>GET /api/packages/station/{stationId}</c> endpoints
-/// (planning #52).
+/// anonymous <c>GET /api/packages</c> endpoint (planning #52). The per-station variant that
+/// served the same projection was removed as client-less; the rule below applies to whatever
+/// reads this type.
 ///
-/// Those endpoints previously returned the raw <c>FuelPackage</c> entity, which serialized the
+/// That endpoint previously returned the raw <c>FuelPackage</c> entity, which serialized the
 /// operator's commercially-sensitive pricing to unauthenticated callers: <c>SupplierPricePerLiter</c>
 /// (acquisition cost), <c>MarginUahPerLiter</c> and <c>MarginPercent</c> (markup). The fields below
 /// are exactly the store-front values a shopper needs — the sale price is fine to show — and

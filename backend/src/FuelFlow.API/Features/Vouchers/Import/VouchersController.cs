@@ -11,17 +11,23 @@ namespace FuelFlow.Features.Vouchers.Import;
 public sealed class VouchersController : ControllerBase
 {
     private readonly ImportVouchersCommandHandler _importHandler;
+    private readonly GetVouchersQueryHandler _getHandler;
+    private readonly IQrGenerator _qrGenerator;
     private readonly ProviderEventService _eventService;
     private readonly ImportConcurrencyGuard _importGuard;
     private readonly ILogger<VouchersController> _logger;
 
     public VouchersController(
         ImportVouchersCommandHandler importHandler,
+        GetVouchersQueryHandler getHandler,
+        IQrGenerator qrGenerator,
         ProviderEventService eventService,
         ImportConcurrencyGuard importGuard,
         ILogger<VouchersController> logger)
     {
         _importHandler = importHandler;
+        _getHandler = getHandler;
+        _qrGenerator = qrGenerator;
         _eventService = eventService;
         _importGuard = importGuard;
         _logger = logger;
@@ -124,4 +130,66 @@ public sealed class VouchersController : ControllerBase
             && header[2] == (byte)'D'
             && header[3] == (byte)'F';
     }
+    /// <summary>
+    /// Renders a voucher's QR as a PNG, for the holder or an Admin.
+    ///
+    /// <para>
+    /// Kept although no current client calls it, and that is deliberate. The app is published in
+    /// the App Store, AppVersion:MinimumVersion is 1.0.0 while the shipped version is 1.0.1, and
+    /// Expo Updates only reach a user the next time they launch - so a build from before the
+    /// renderer moved to voucher.imageUrl can still be asking for this. It is the one endpoint
+    /// whose absence takes a customer from "my fuel voucher" to "I cannot refuel": if a stale
+    /// bundle calls it and gets a 404, the QR simply is not there at the pump. That asymmetry is
+    /// why "no client in the repo calls it" was not enough reason to delete it here.
+    /// </para>
+    /// </summary>
+    [HttpGet("{id:guid}/qr")]
+    [Authorize]
+    [Produces("image/png")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetVoucherQr(Guid id, [FromQuery] int width = 300, [FromQuery] int height = 300, CancellationToken cancellationToken = default)
+    {
+        var voucher = await _getHandler.GetVoucherByIdAsync(id, cancellationToken);
+        if (voucher == null)
+            return NotFound();
+
+        // Authorization must agree with MarkVoucherAsUsedCommandHandler, because both endpoints
+        // hand out control of the same bearer instrument: the QR payload IS what a station scans.
+        //
+        // The previous check tested AssignedToUserId only. GiftVouchersCommand transfers a company
+        // voucher by setting WorkerUserId and LEAVING AssignedToUserId on the owner, so that check
+        // was wrong in both directions at once: the worker the voucher now belongs to got 403 on
+        // their own QR, and the owner who gifted it away could still pull the redeemable QR and
+        // spend it at the pump - while mark-used refused to let that same owner mark it Used, so
+        // the worker's app went on showing Assigned for a voucher that was already burned.
+        if (!User.IsInRole("Admin"))
+        {
+            if (!Guid.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var userId))
+                return Forbid();
+
+            var holder = voucher.WorkerUserId ?? voucher.AssignedToUserId;
+            if (holder != userId)
+                return Forbid();
+        }
+
+        // Clamp: unbounded width/height let any authenticated caller ask for a
+        // gigapixel PNG and OOM the container (no per-container memory limit).
+        width = Math.Clamp(width, MinQrSize, MaxQrSize);
+        height = Math.Clamp(height, MinQrSize, MaxQrSize);
+
+        var base64 = _qrGenerator.GenerateQrCode(
+            voucher.QrPayload, width, height,
+            voucher.QrParameters?.EccLevel,
+            voucher.QrParameters?.Version,
+            voucher.QrParameters?.EncodingMode,
+            voucher.QrParameters?.MaskPattern);
+        var bytes = Convert.FromBase64String(base64);
+        return File(bytes, "image/png");
+    }
+
+    private const int MinQrSize = 32;
+    private const int MaxQrSize = 2000;
 }
