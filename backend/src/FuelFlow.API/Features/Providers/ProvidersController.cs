@@ -254,6 +254,7 @@ public sealed class ProvidersController : ControllerBase
                 FinalPricePerLiter = finalPerLiter,
                 PumpPricePerLiter = request.PumpPricePerLiter,
                 MinDiscountPerLiter = request.MinDiscountPerLiter,
+                IsTestData = request.IsTestData,
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow
             });
@@ -318,6 +319,7 @@ public sealed class ProvidersController : ControllerBase
                     FinalPricePerLiter = finalPerLiter,
                     PumpPricePerLiter = request.PumpPricePerLiter,
                     MinDiscountPerLiter = request.MinDiscountPerLiter,
+                    IsTestData = request.IsTestData,
                     CreatedAtUtc = DateTime.UtcNow,
                     UpdatedAtUtc = DateTime.UtcNow
                 };
@@ -356,6 +358,9 @@ public sealed class ProvidersController : ControllerBase
             pkg.FinalPricePerLiter = finalPerLiter;
             pkg.Price = Math.Round(finalPerLiter * pkg.Liters, 2, MidpointRounding.AwayFromZero);
             pkg.OriginalPrice = FuelPricing.OriginalPackagePrice(request.PumpPricePerLiter, pkg.Liters, Math.Round(finalPerLiter * pkg.Liters, 2, MidpointRounding.AwayFromZero));
+            // Written on every edit, not only when it changes, so clearing the flag on a fuel
+            // actually puts its packages back on sale instead of silently leaving them hidden.
+            pkg.IsTestData = request.IsTestData;
             pkg.UpdatedAtUtc = DateTime.UtcNow;
         }
 

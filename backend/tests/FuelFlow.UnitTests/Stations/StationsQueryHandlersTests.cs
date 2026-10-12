@@ -156,6 +156,66 @@ public sealed class StationsQueryHandlersTests : IDisposable
         result.Should().HaveCount(2);
     }
 
+    /// <summary>
+    /// Production served a QA fuel type as a live package - "QA-CHECK-95", 5 L, 1 UAH - through this
+    /// anonymous endpoint. The rows are gone; this is what stops the next one being purchasable.
+    /// </summary>
+    [Fact]
+    public async Task GetPublicPackages_ShouldNotServeAFlaggedTestPackage()
+    {
+        _context.FuelPackages.AddRange(
+            CreatePackage("pkg-real", "station-a", "ft-a", "A-95", 10m),
+            CreatePackage("pkg-qa", "station-a", "ft-qa", "QA-CHECK-95", 5m, isTestData: true));
+        await _context.SaveChangesAsync();
+
+        var handler = new GetPublicPackagesQueryHandler(_context);
+
+        var result = await handler.HandleAsync(new GetPublicPackagesQuery());
+
+        result.Should().ContainSingle("a rehearsal package reaching the store front is purchasable");
+        result[0].Id.Should().Be("pkg-real");
+    }
+
+    /// <summary>
+    /// The second anonymous route. A filter on GetPublicPackages alone would have left the
+    /// rehearsal package buyable through /api/packages/station/{id}.
+    /// </summary>
+    [Fact]
+    public async Task GetPublicPackagesByStation_ShouldNotServeAFlaggedTestPackage()
+    {
+        _context.FuelPackages.AddRange(
+            CreatePackage("pkg-real", "station-a", "ft-a", "A-95", 10m),
+            CreatePackage("pkg-qa", "station-a", "ft-qa", "QA-CHECK-95", 5m, isTestData: true));
+        await _context.SaveChangesAsync();
+
+        var handler = new GetPublicPackagesByStationQueryHandler(_context);
+
+        var result = await handler.HandleAsync(new GetPublicPackagesByStationQuery("station-a"));
+
+        result.Should().ContainSingle();
+        result[0].Id.Should().Be("pkg-real");
+    }
+
+    /// <summary>
+    /// The filter is deliberately not a global query filter, so the row an admin has to fix stays
+    /// visible to them. If this ever fails, someone widened it into the model and the admin screen
+    /// went blind to the very row it exists to manage.
+    /// </summary>
+    [Fact]
+    public async Task AdminPackages_ShouldStillListAFlaggedTestPackage()
+    {
+        _context.FuelPackages.AddRange(
+            CreatePackage("pkg-real", "station-a", "ft-a", "A-95", 10m),
+            CreatePackage("pkg-qa", "station-a", "ft-qa", "QA-CHECK-95", 5m, isTestData: true));
+        await _context.SaveChangesAsync();
+
+        var handler = new GetAdminPackagesQueryHandler(_context);
+
+        var result = await handler.HandleAsync(new GetAdminPackagesQuery());
+
+        result.Should().HaveCount(2, "the admin has to be able to see and clear the flag");
+    }
+
     [Fact]
     public async Task GetPublicPackagesByStation_ShouldFilterByStationId()
     {
@@ -467,7 +527,7 @@ public sealed class StationsQueryHandlersTests : IDisposable
         };
     }
 
-    private static FuelPackage CreatePackage(string id, string stationId, string fuelTypeId, string fuelName, decimal liters)
+    private static FuelPackage CreatePackage(string id, string stationId, string fuelTypeId, string fuelName, decimal liters, bool isTestData = false)
     {
         return new FuelPackage
         {
@@ -477,7 +537,8 @@ public sealed class StationsQueryHandlersTests : IDisposable
             FuelName = fuelName,
             Liters = liters,
             Price = 500,
-            OriginalPrice = 480
+            OriginalPrice = 480,
+            IsTestData = isTestData
         };
     }
 

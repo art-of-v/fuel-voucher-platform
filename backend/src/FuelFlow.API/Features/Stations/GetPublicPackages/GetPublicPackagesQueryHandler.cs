@@ -19,6 +19,12 @@ public sealed class GetPublicPackagesQueryHandler
     {
         var rows = await _context.FuelPackages
             .AsNoTracking()
+            // Rehearsal packages are real rows and stay visible to the admin screens, but this
+            // endpoint is anonymous and is what the app and the marketing site read. A test package
+            // reaching it is purchasable - which is exactly how "QA-CHECK-95", 5 L at 1 UAH, ended
+            // up on sale in production. Filtered here rather than by a global query filter so the
+            // admin can still see and fix the row.
+            .Where(x => !x.IsTestData)
             .OrderBy(x => x.StationId)
             .ThenBy(x => x.FuelName)
             .ThenBy(x => x.Liters)

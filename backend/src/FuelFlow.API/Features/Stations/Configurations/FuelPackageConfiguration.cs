@@ -91,6 +91,13 @@ internal sealed class FuelPackageConfiguration : IEntityTypeConfiguration<FuelPa
         builder.Property(e => e.IsDeleted).HasColumnName("is_deleted").IsRequired();
         builder.Property(e => e.DeletedAtUtc).HasColumnName("deleted_at_utc");
 
+        // NOT folded into the query filter below on purpose - see FuelPackage.IsTestData. A global
+        // filter would hide rehearsal rows from the admin screens that have to manage them.
+        builder.Property(e => e.IsTestData).HasColumnName("is_test_data").IsRequired();
+
+        // The storefront query filters on it, so it carries the filter columns in front.
+        builder.HasIndex(e => new { e.IsDeleted, e.IsTestData });
+
         // A package is the thing an order line points at; archiving keeps that line readable.
         builder.HasQueryFilter(e => !e.IsDeleted);
 
