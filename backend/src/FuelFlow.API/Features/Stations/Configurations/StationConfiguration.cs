@@ -18,31 +18,34 @@ internal sealed class StationConfiguration : IEntityTypeConfiguration<Station>
 
         builder.Property(e => e.Name)
             .HasColumnName("name")
-            .HasColumnType("text")
+            .HasMaxLength(200)
             .IsRequired();
 
+        // A hex colour, e.g. the seeded "#00ff80". 16 leaves room for rgba()/8-digit hex without
+        // accepting a paragraph into a colour.
         builder.Property(e => e.Color)
             .HasColumnName("color")
-            .HasColumnType("text")
+            .HasMaxLength(16)
             .HasDefaultValue("#00ff80")
             .IsRequired();
 
+        // A brand wordmark, not artwork: the seeded rows carry "OKKO", "WOG", "UPG".
         builder.Property(e => e.LogoText)
             .HasColumnName("logo_text")
-            .HasColumnType("text")
+            .HasMaxLength(64)
             .IsRequired();
 
         builder.Property(e => e.Address)
             .HasColumnName("address")
-            .HasColumnType("text");
+            .HasMaxLength(500);
 
         builder.Property(e => e.Phone)
             .HasColumnName("phone")
-            .HasColumnType("text");
+            .HasMaxLength(45);
 
         builder.Property(e => e.StationType)
             .HasColumnName("station_type")
-            .HasColumnType("text");
+            .HasMaxLength(64);
 
         builder.Property(e => e.Lat)
             .HasColumnName("lat")

@@ -17,6 +17,7 @@ internal sealed class VoucherImportConfiguration : IEntityTypeConfiguration<Vouc
 
         builder.Property(e => e.FileName)
             .HasColumnName("file_name")
+            .HasMaxLength(500)
             .IsRequired();
 
         builder.Property(e => e.PageCount)
@@ -32,6 +33,7 @@ internal sealed class VoucherImportConfiguration : IEntityTypeConfiguration<Vouc
 
         builder.Property(e => e.Status)
             .HasColumnName("status")
+            .HasMaxLength(32)
             .IsRequired();
 
         builder.Property(e => e.ImportedCount)
