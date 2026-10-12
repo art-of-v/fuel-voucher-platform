@@ -1,6 +1,13 @@
 import { legalEntityErrorKey } from './legalEntityError';
 import { LegalEntityApiError } from '../api/legalEntityApi';
 
+// legalEntityApi imports apiFetch, which drags in securityService and react-native-device-info,
+// whose NativeEventEmitter invariant fails under jest. Only apiFetch is needed, and nothing here
+// calls it.
+jest.mock('../../../core/api/apiClient', () => ({
+  apiFetch: jest.fn(),
+}));
+
 /**
  * The create-company sheet has always mapped 409 and 400 to real copy. The profile screen's
  * company edit did not, and showed one "Error" toast for every outcome instead — so these
