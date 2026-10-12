@@ -98,7 +98,8 @@ public sealed class GetAdminVouchersQueryHandler
             WorkerLastName = v.WorkerUser?.LastName,
             CreatedAtUtc = v.CreatedAtUtc,
             ImageUrl = v.ImageUrl,
-            IsTestData = v.IsTestData
+            IsTestData = v.IsTestData,
+            IsDeleted = v.IsDeleted
         }).ToList();
 
         var globalTotal = await _context.FuelVouchers.IgnoreQueryFilters().CountAsync(cancellationToken);

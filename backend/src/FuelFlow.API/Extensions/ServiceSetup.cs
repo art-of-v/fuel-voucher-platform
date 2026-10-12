@@ -90,6 +90,7 @@ using FuelFlow.Features.Vouchers.PurchaseBatchCost;
 using FuelFlow.Features.Vouchers.Renewal.Checkout;
 using FuelFlow.Features.Vouchers.Renewal.Quote;
 using FuelFlow.Features.Vouchers.RestoreVoucher;
+using FuelFlow.Features.Vouchers.UnarchiveVoucher;
 using FuelFlow.Features.Vouchers.UpdateVoucher;
 using FuelFlow.Features.Settings;
 using FuelFlow.Middleware;
@@ -199,6 +200,8 @@ internal static class ServiceSetup
         services.AddScoped<UpdateVoucherCommandHandler>();
         services.AddScoped<DeleteVoucherCommandHandler>();
         services.AddScoped<BulkActionVouchersCommandHandler>();
+        // The undo for the soft delete: without it a mistaken delete_all has no way back (#217).
+        services.AddScoped<UnarchiveVoucherCommandHandler>();
         services.AddScoped<GetFuelVouchersQueryHandler>();
         services.AddScoped<GetQrCodesQueryHandler>();
 
