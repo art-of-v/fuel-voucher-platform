@@ -4,6 +4,7 @@ using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Providers;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.BulkActionVouchers;
+using FuelFlow.Features.Vouchers.DeleteVoucher;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
@@ -127,7 +128,104 @@ public sealed class BulkVoucherSoftDeleteIntegrationTests : IClassFixture<TestDa
             .Should().ContainSingle();
     }
 
-    private BulkActionVouchersCommandHandler Handler(ApplicationDbContext context)
+    // The rule a paid voucher is never deleted, stated explicitly rather than left standing on a
+// RESTRICT foreign key that #217 removed by going soft.
+//
+// Before, a voucher's safety came from an accident: the hard delete threw for anything with
+// history. Soft delete fixed the real problem - the row survives - but took the accident with it,
+// so both delete paths went on archiving paid vouchers silently.
+
+[Theory]
+[InlineData(VoucherStatus.Assigned)]
+[InlineData(VoucherStatus.Used)]
+[InlineData(VoucherStatus.Expired)]
+[InlineData(VoucherStatus.Blocked)]
+[InlineData(VoucherStatus.Deactivated)]
+public async Task Bulk_Delete_Refuses_A_Voucher_That_Is_Not_Just_Stock(VoucherStatus status)
+{
+    await SeedAsync();
+    var context = CreateContext();
+    var voucher = await context.FuelVouchers.IgnoreQueryFilters().FirstAsync();
+    voucher.Status = status;
+
+    // ck_voucher_held_has_order requires an order for Assigned/Used/Blocked, so a realistic row in
+    // one of those states always carries one. Expired and Deactivated need no order, which leaves
+    // them covering the guard's status signal with nothing else to lean on.
+    if (status is VoucherStatus.Assigned or VoucherStatus.Used or VoucherStatus.Blocked)
+    {
+        voucher.OrderId = AddOrder(context);
+    }
+
+    await context.SaveChangesAsync();
+
+    var acting = CreateContext();
+    var result = await Handler(acting).HandleAsync(
+        new BulkActionVouchersCommand("delete", [voucher.Id], null));
+
+    result.Success.Should().BeFalse();
+    result.Error.Should().NotBeNullOrWhiteSpace("the admin has to be told why, not just refused");
+    (await acting.FuelVouchers.IgnoreQueryFilters().Where(v => v.IsDeleted).ToListAsync()).Should().BeEmpty();
+}
+
+[Fact]
+public async Task Bulk_Delete_Refuses_A_Voucher_That_Carries_An_Order()
+{
+    // Status alone is not the signal - a replace releases ownership but keeps order_id on purpose,
+    // so a voucher can be Available and still be history.
+    await SeedAsync();
+    var context = CreateContext();
+    var voucher = await context.FuelVouchers.IgnoreQueryFilters().FirstAsync();
+
+    voucher.OrderId = AddOrder(context);
+    voucher.Status = VoucherStatus.Available; // still stock-looking, but it belongs to an order
+    await context.SaveChangesAsync();
+
+    var acting = CreateContext();
+    var result = await Handler(acting).HandleAsync(
+        new BulkActionVouchersCommand("delete", [voucher.Id], null));
+
+    result.Success.Should().BeFalse("order_id is the signal, whatever the status says");
+}
+
+[Fact]
+public async Task Bulk_Delete_Refuses_The_Whole_Batch_And_Changes_Nothing()
+{
+    // The dangerous shape: an admin selects 50 stock vouchers, 3 of which are paid. Archiving the
+    // other 47 would still report the right count while quietly burying 3 paid vouchers, so the
+    // whole batch is refused.
+    await SeedAsync();
+    var context = CreateContext();
+    var all = await context.FuelVouchers.IgnoreQueryFilters().ToListAsync();
+    all[0].Status = VoucherStatus.Used;
+    all[0].OrderId = AddOrder(context);
+    await context.SaveChangesAsync();
+
+    var acting = CreateContext();
+    var result = await Handler(acting).HandleAsync(
+        new BulkActionVouchersCommand("delete", all.Select(v => v.Id).ToList(), null));
+
+    result.Success.Should().BeFalse();
+    result.Error.Should().Contain("1 of"); // names how many are the problem
+    (await acting.FuelVouchers.IgnoreQueryFilters().Where(v => v.IsDeleted).ToListAsync()).Should().BeEmpty(
+        "a partial delete would hide which vouchers were actually refused");
+}
+
+[Fact]
+public async Task Bulk_Delete_Of_Pure_Stock_Still_Works()
+{
+    await SeedAsync();
+    var context = CreateContext();
+    var all = await context.FuelVouchers.IgnoreQueryFilters().ToListAsync();
+
+    var acting = CreateContext();
+    var result = await Handler(acting).HandleAsync(
+        new BulkActionVouchersCommand("delete", all.Select(v => v.Id).ToList(), null));
+
+    result.Success.Should().BeTrue("stock that never left stock is still archivable");
+    (await acting.FuelVouchers.IgnoreQueryFilters().Where(v => v.IsDeleted).ToListAsync()).Should().HaveCount(all.Count);
+}
+
+private BulkActionVouchersCommandHandler Handler(ApplicationDbContext context)
         => new(
             context,
             new Mock<IBackgroundJobClient>().Object,
@@ -137,6 +235,105 @@ public sealed class BulkVoucherSoftDeleteIntegrationTests : IClassFixture<TestDa
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(_fixture.DbContainer.GetConnectionString())
             .Options);
+
+[Fact]
+public async Task Delete_All_Archives_Stock_And_Names_What_It_Kept()
+{
+    // delete_all reaches every voucher in the system, and the admin confirms it with the global
+    // total - so unfiltered it archived the paid ones too and called it success. That is #284 on
+    // the most dangerous path of the three.
+    await SeedAsync();
+    var context = CreateContext();
+    var all = await context.FuelVouchers.IgnoreQueryFilters().ToListAsync();
+    all[0].Status = VoucherStatus.Used;
+    all[0].OrderId = AddOrder(context);
+    await context.SaveChangesAsync();
+
+    var acting = CreateContext();
+    var result = await Handler(acting).HandleAsync(new BulkActionVouchersCommand("delete_all", null, null));
+
+    // Reported as a failure on purpose: the stock went, but the list did not empty, and an admin
+    // has to be told which is which rather than left to infer it.
+    result.Success.Should().BeFalse();
+    result.Error.Should().Contain("kept 1");
+
+    var stillThere = await acting.FuelVouchers.IgnoreQueryFilters().Where(v => !v.IsDeleted).ToListAsync();
+    stillThere.Should().ContainSingle("the paid voucher is the record of what the customer bought");
+    stillThere[0].Id.Should().Be(all[0].Id);
+
+    // And the stock did get archived - otherwise the feature is just broken.
+    (await acting.FuelVouchers.IgnoreQueryFilters().CountAsync(v => v.IsDeleted)).Should().Be(1);
+}
+
+[Fact]
+public async Task Single_Delete_Refuses_A_Paid_Voucher()
+{
+    // The other half of the rule: the admin endpoint that deletes one voucher, which is not the
+    // bulk handler and does not share its code.
+    await SeedAsync();
+    var context = CreateContext();
+    var voucher = await context.FuelVouchers.IgnoreQueryFilters().FirstAsync();
+    voucher.Status = VoucherStatus.Used;
+    voucher.OrderId = AddOrder(context);
+    await context.SaveChangesAsync();
+
+    var acting = CreateContext();
+    var result = await new DeleteVoucherCommandHandler(acting, new ProviderEventService(acting)).HandleAsync(
+        new DeleteVoucherCommand(voucher.Id, Guid.NewGuid(), "admin"));
+
+    result.Should().NotBeNull();
+    result!.Success.Should().BeFalse();
+    result.Error.Should().NotBeNullOrWhiteSpace();
+    (await acting.FuelVouchers.IgnoreQueryFilters().Where(v => v.IsDeleted).ToListAsync()).Should().BeEmpty();
+}
+
+[Fact]
+public async Task Single_Delete_Of_Stock_Still_Archives_It()
+{
+    await SeedAsync();
+    var context = CreateContext();
+    var voucher = await context.FuelVouchers.IgnoreQueryFilters().FirstAsync();
+
+    var acting = CreateContext();
+    var result = await new DeleteVoucherCommandHandler(acting, new ProviderEventService(acting)).HandleAsync(
+        new DeleteVoucherCommand(voucher.Id, Guid.NewGuid(), "admin"));
+
+    result.Should().NotBeNull();
+    result!.Success.Should().BeTrue();
+    (await acting.FuelVouchers.IgnoreQueryFilters().Where(v => v.IsDeleted).ToListAsync())
+        .Should().ContainSingle();
+}
+
+private static int _phoneCounter;
+
+// Attaches a user and a fulfilled order and returns the order id. Deliberately does not save: the
+// caller saves once, so a voucher whose status is being set in the same breath lands atomically.
+// A save in here would flush a half-built voucher and trip ck_voucher_held_has_order.
+private Guid AddOrder(ApplicationDbContext context)
+    {
+        // An order needs a user, and the phone number is unique, so each call takes the next one
+        // rather than repeating a literal that would collide with the row an earlier test left.
+        var userId = Guid.NewGuid();
+        context.Users.Add(new User
+        {
+            Id = userId,
+            PhoneNumber = "+380" + (20000000 + Interlocked.Increment(ref _phoneCounter)),
+            CreatedAtUtc = DateTime.UtcNow
+        });
+
+        var orderId = Guid.NewGuid();
+        context.Orders.Add(new Order
+        {
+            Id = orderId,
+            UserId = userId,
+            Price = 100m,
+            Status = OrderStatus.Fulfilled,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+
+        return orderId;
+    }
 
 private async Task SeedAsync()
     {

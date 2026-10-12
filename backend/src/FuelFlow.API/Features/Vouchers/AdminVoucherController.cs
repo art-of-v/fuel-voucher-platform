@@ -85,6 +85,7 @@ public sealed class AdminVoucherController : ControllerBase
         var result = await _deleteHandler.HandleAsync(
             new DeleteVoucherCommand(id, GetUserId(), GetUserName()), cancellationToken);
         if (result is null) return NotFound();
+        if (!result.Success) return BadRequest(new { error = result.Error });
         return Ok(new { success = true });
     }
 
