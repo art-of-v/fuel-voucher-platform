@@ -354,7 +354,7 @@ role required; — = public. This lists the primary endpoints; admin sub-resourc
 ### Admin
 
 Admin CRUD/reporting lives under `/api/admin/*` (all `Admin`-role): `stations`, `fuel-types`,
-`packages`, `providers`, `vouchers`, `fuel-vouchers`, `voucher-imports`, `qr-codes`, `orders`
+`packages`, `providers`, `vouchers`, `voucher-imports`, `orders`
 (incl. `POST /api/admin/orders/{id}/refund`), `users`, `settings`, `report`, `audit`, `errors`,
 `legal-entity/contracts`, and `dashboard` (aggregated counts). See
 `docs/RECONCILIATION.md` in the private docs repo for the reconciliation-specific endpoints.
