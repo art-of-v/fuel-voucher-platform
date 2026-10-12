@@ -174,6 +174,8 @@ namespace FuelFlow.API.Migrations
                     b.HasIndex("DeviceId")
                         .IsUnique();
 
+                    b.HasIndex("LastSeenAt");
+
                     b.HasIndex("UserId");
 
                     b.ToTable("devices", null, t =>
@@ -562,6 +564,8 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("IsRead", "CreatedAtUtc");
+
                     b.HasIndex("UserId", "CreatedAtUtc")
                         .IsDescending(false, true);
 
@@ -615,6 +619,8 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("user_id");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("LastSeenAtUtc");
 
                     b.HasIndex("Token")
                         .IsUnique();
