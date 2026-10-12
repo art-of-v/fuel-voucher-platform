@@ -10,7 +10,9 @@ export const languages: { code: Language; name: string; flag: string }[] = [
   { code: "es", name: "Español", flag: "🇪🇸" },
 ];
 
-const translations: Record<Language, Record<string, string>> = {
+// Exported so a test can compare the blocks against each other: they are edited by hand and
+// nothing else in the build notices when they drift. See i18n-parity.test.ts.
+export const translations: Record<Language, Record<string, string>> = {
   en: {
     // App
     "app.title": "FUEL FLOW",
@@ -652,6 +654,8 @@ const translations: Record<Language, Record<string, string>> = {
     "suppliers.saved": "Supplier saved",
     "suppliers.error.nameTaken":
       "A supplier with this name already exists - the operator picks suppliers by name, so two rows would be ambiguous.",
+    "suppliers.error.edrIpn": "EDR / IPN must be 8-10 digits.",
+    "suppliers.error.rnkrr": "RNKR must be 5 digits.",
     "suppliers.empty":
       "No suppliers yet. Add the first one - the brand on a voucher does not say who issued it.",
     "import.uploading": "Uploading...",
@@ -1510,6 +1514,8 @@ const translations: Record<Language, Record<string, string>> = {
     "suppliers.saved": "Постачальника збережено",
     "suppliers.error.nameTaken":
       "Постачальник із такою назвою вже існує — оператор обирає постачальника за назвою, тож два рядки були б неоднозначними.",
+    "suppliers.error.edrIpn": "ЄДРОПУ/ІПН має складатися з 8-10 цифр.",
+    "suppliers.error.rnkrr": "РНОКР має складатися з 5 цифр.",
     "suppliers.empty":
       "Постачальників ще немає. Додайте першого — бренд на талоні не каже, хто його видав.",
     "import.processing": "Обробка...",
@@ -2296,6 +2302,10 @@ const translations: Record<Language, Record<string, string>> = {
     "suppliers.deactivated": "Lieferant deaktiviert",
     "suppliers.reactivated": "Lieferant reaktiviert",
     "suppliers.saved": "Lieferant gespeichert",
+    "suppliers.error.nameTaken":
+      "Ein Lieferant mit diesem Namen existiert bereits - der Lieferant wird nach Name ausgewählt, zwei Zeilen wären daher mehrdeutig.",
+    "suppliers.error.edrIpn": "EDR/Steuernummer muss aus 8-10 Ziffern bestehen.",
+    "suppliers.error.rnkrr": "RNKR muss aus 5 Ziffern bestehen.",
     "suppliers.empty":
       "Noch keine Lieferanten. Legen Sie den ersten an - die Marke auf einem Gutschein sagt nicht, wer ihn ausgestellt hat.",
     "import.uploading": "Hochladen...",
@@ -3063,6 +3073,10 @@ const translations: Record<Language, Record<string, string>> = {
     "suppliers.deactivated": "Proveedor desactivado",
     "suppliers.reactivated": "Proveedor reactivado",
     "suppliers.saved": "Proveedor guardado",
+    "suppliers.error.nameTaken":
+      "Ya existe un proveedor con ese nombre - el proveedor se elige por nombre, por lo que dos filas serían ambiguas.",
+    "suppliers.error.edrIpn": "El EDR/ITN debe tener entre 8 y 10 dígitos.",
+    "suppliers.error.rnkrr": "El RNKR debe tener 5 dígitos.",
     "suppliers.empty":
       "Aún no hay proveedores. Añade el primero - la marca del cupón no dice quién lo emitió.",
     "import.uploading": "Subiendo...",
