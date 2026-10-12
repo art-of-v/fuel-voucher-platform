@@ -78,6 +78,7 @@ export const uk: Record<string, string> = {
   // Дублює серверну перевірку формату (#128, #265). Використовується і при створенні компанії,
   // і в редакторі компанії в профілі — тому не вкладено в namespace одного екрана.
   'company.edrpouInvalidFormat': 'ЄДРПОУ має містити рівно 8 цифр',
+  'company.edrpouChecksumInvalid': 'Контрольна цифра ЄДРПОУ не збігається з першими сімома',
   'company.vatInvalidFormat': 'ІПН ПДВ має містити рівно 12 цифр',
 
   'nav.stations': 'СТАНЦІЇ',

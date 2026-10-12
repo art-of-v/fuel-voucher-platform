@@ -46,7 +46,7 @@ public sealed class LegalEntityMultiCompanyIntegrationTests : IClassFixture<Test
         var second = await client.PostAsJsonAsync("/api/legal-entity", new
         {
             Name = "Beta LLC",
-            Edrpou = "10000002"
+            Edrpou = "10000024"
         });
         second.StatusCode.Should().Be(HttpStatusCode.OK);
         var secondId = (await second.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
@@ -59,7 +59,7 @@ public sealed class LegalEntityMultiCompanyIntegrationTests : IClassFixture<Test
         var userId = await UserIdAsync(context, phone);
         var entities = await context.LegalEntities.Where(e => e.UserId == userId).ToListAsync();
         entities.Should().HaveCount(2);
-        entities.Select(e => e.Edrpou).Should().BeEquivalentTo(new[] { "10000001", "10000002" });
+        entities.Select(e => e.Edrpou).Should().BeEquivalentTo(new[] { "10000001", "10000024" });
     }
 
     [Fact]
@@ -69,8 +69,8 @@ public sealed class LegalEntityMultiCompanyIntegrationTests : IClassFixture<Test
         const string phone = "+380000000012";
         var client = await AuthenticatedClientAsync(phone);
 
-        await client.PostAsJsonAsync("/api/legal-entity", new { Name = "ACME LLC", Edrpou = "10000011" });
-        await client.PostAsJsonAsync("/api/legal-entity", new { Name = "Beta LLC", Edrpou = "10000012" });
+        await client.PostAsJsonAsync("/api/legal-entity", new { Name = "ACME LLC", Edrpou = "10000113" });
+        await client.PostAsJsonAsync("/api/legal-entity", new { Name = "Beta LLC", Edrpou = "10000127" });
 
         var response = await client.GetAsync("/api/legal-entity/mine");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -100,12 +100,12 @@ public sealed class LegalEntityMultiCompanyIntegrationTests : IClassFixture<Test
         await ResetAsync();
 
         var owner = await AuthenticatedClientAsync("+380000000014");
-        var claim = await owner.PostAsJsonAsync("/api/legal-entity", new { Name = "ACME LLC", Edrpou = "10000021" });
+        var claim = await owner.PostAsJsonAsync("/api/legal-entity", new { Name = "ACME LLC", Edrpou = "10000107" });
         claim.StatusCode.Should().Be(HttpStatusCode.OK);
 
         // A different account claiming the same EDRPOU must get a clean 409, not a 500.
         var other = await AuthenticatedClientAsync("+380000000015");
-        var conflict = await other.PostAsJsonAsync("/api/legal-entity", new { Name = "Beta LLC", Edrpou = "10000021" });
+        var conflict = await other.PostAsJsonAsync("/api/legal-entity", new { Name = "Beta LLC", Edrpou = "10000107" });
         conflict.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
@@ -115,7 +115,7 @@ public sealed class LegalEntityMultiCompanyIntegrationTests : IClassFixture<Test
         await ResetAsync();
         var client = await AuthenticatedClientAsync("+380000000016");
 
-        var response = await client.PostAsJsonAsync("/api/legal-entity", new { Name = "", Edrpou = "10000031" });
+        var response = await client.PostAsJsonAsync("/api/legal-entity", new { Name = "", Edrpou = "10000030" });
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
@@ -126,16 +126,16 @@ public sealed class LegalEntityMultiCompanyIntegrationTests : IClassFixture<Test
         const string phone = "+380000000017";
         var client = await AuthenticatedClientAsync(phone);
 
-        var first = await client.PostAsJsonAsync("/api/legal-entity", new { Name = "ACME LLC", Edrpou = "10000041" });
+        var first = await client.PostAsJsonAsync("/api/legal-entity", new { Name = "ACME LLC", Edrpou = "10000047" });
         var firstId = (await first.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
-        var second = await client.PostAsJsonAsync("/api/legal-entity", new { Name = "Beta LLC", Edrpou = "10000042" });
+        var second = await client.PostAsJsonAsync("/api/legal-entity", new { Name = "Beta LLC", Edrpou = "10000053" });
         var secondId = (await second.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
 
         // Edit the SECOND company — the legacy POST /profile could only ever touch the first.
         var update = await client.PutAsJsonAsync($"/api/legal-entity/{secondId}", new
         {
             Name = "Beta Renamed LLC",
-            Edrpou = "10000042",
+            Edrpou = "10000053",
             Address = "1 Main St"
         });
         update.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -155,14 +155,14 @@ public sealed class LegalEntityMultiCompanyIntegrationTests : IClassFixture<Test
         await ResetAsync();
 
         var owner = await AuthenticatedClientAsync("+380000000018");
-        var created = await owner.PostAsJsonAsync("/api/legal-entity", new { Name = "ACME LLC", Edrpou = "10000051" });
+        var created = await owner.PostAsJsonAsync("/api/legal-entity", new { Name = "ACME LLC", Edrpou = "10000076" });
         var entityId = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
 
         var intruder = await AuthenticatedClientAsync("+380000000019");
         var response = await intruder.PutAsJsonAsync($"/api/legal-entity/{entityId}", new
         {
             Name = "Hijacked LLC",
-            Edrpou = "10000051"
+            Edrpou = "10000076"
         });
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
@@ -173,7 +173,7 @@ public sealed class LegalEntityMultiCompanyIntegrationTests : IClassFixture<Test
         await ResetAsync();
 
         var other = await AuthenticatedClientAsync("+380000000020");
-        await other.PostAsJsonAsync("/api/legal-entity", new { Name = "Taken LLC", Edrpou = "10000061" });
+        await other.PostAsJsonAsync("/api/legal-entity", new { Name = "Taken LLC", Edrpou = "10000082" });
 
         var owner = await AuthenticatedClientAsync("+380000000021");
         var created = await owner.PostAsJsonAsync("/api/legal-entity", new { Name = "ACME LLC", Edrpou = "10000062" });
@@ -183,7 +183,7 @@ public sealed class LegalEntityMultiCompanyIntegrationTests : IClassFixture<Test
         var response = await owner.PutAsJsonAsync($"/api/legal-entity/{entityId}", new
         {
             Name = "ACME LLC",
-            Edrpou = "10000061"
+            Edrpou = "10000082"
         });
         response.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }

@@ -187,6 +187,31 @@ public sealed class LegalEntityProfileIntegrationTests : IClassFixture<TestDatab
     }
 
     [Fact]
+    public async Task UpsertProfile_Returns400_WhenEdrpouControlDigitIsWrong()
+    {
+        // #266: eight correct-looking digits whose last two are transposed. The format gate waved this
+        // through - it is exactly eight digits - and edrpou is globally unique, so letting it land
+        // would make the typo permanent and block the real company from ever being registered.
+        await ResetAsync();
+        var client = await AuthenticatedClientAsync("+380000000030");
+
+        var response = await client.PostAsJsonAsync("/api/legal-entity/profile", new
+        {
+            Name = "QA company name",
+            Edrpou = "38528174"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Contain("control digit");
+
+        using var scope = _fixture.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        (await context.LegalEntities.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
     public async Task Update_Returns400_WhenEdrpouIsNotEightDigits()
     {
         // Editing an existing entity must not become a way around the gate.
