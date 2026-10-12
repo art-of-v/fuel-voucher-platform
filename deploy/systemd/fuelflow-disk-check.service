@@ -1,0 +1,34 @@
+# Samples disk usage on / every 15 minutes (fuelflow-disk-check.timer) and fails the unit when it
+# has something to report, which is what fires the OnFailure Telegram alert. Mirrors
+# fuelflow-prune.service, which alerts on the same disk once a night - this one exists because
+# "still full after GC" is a statement about the past, and 22 hours of silence is how the disk gets
+# to 100% unnoticed. See deploy/disk-check.sh.
+#
+# Type=oneshot: the unit is "active" only while the check runs. The timer triggers it every
+# 15 minutes regardless of the previous outcome - a check that could not measure the disk is
+# itself an alert, not a reason to stop looking.
+[Unit]
+Description=FuelFlow disk pressure check
+Documentation=file:/root/FuelFlow/docs/DEPLOYMENT.md
+# No Requires=docker.service: the check must still work when Docker is down, which is exactly
+# when the box is in trouble and Postgres may already be restarting.
+After=docker.service
+# On failure, start the alert unit. %n is this unit's name, passed as the instance so the alert
+# message can name what failed.
+OnFailure=fuelflow-disk-check-alert@%n.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/FuelFlow/deploy
+ExecStart=/root/FuelFlow/deploy/disk-check.sh
+# A single df and one optional psql: microseconds of IO against a disk that is the thing being
+# measured. Still ordered below the app, so a check can never be why a request is slow.
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+# Short on purpose: if `df` or the psql call wedges, the next tick is 15 minutes away and there is
+# no point holding a unit open.
+TimeoutStartSec=60
+SyslogIdentifier=fuelflow-disk-check
+
+# No [Install] section: started by the timer, never enabled on its own.
