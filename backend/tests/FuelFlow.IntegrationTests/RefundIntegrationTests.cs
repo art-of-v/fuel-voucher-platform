@@ -116,7 +116,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
         // Regression (#63): the refund copies the order's IdempotencyKey into refunds.ext_ref.
         // A bulk checkout builds a 111-char key (userId + time bucket + cart digest + a fresh
         // GUID), which fits orders.idempotency_key (varchar 150) but overflowed the old
-        // ext_ref (varchar 100) — the INSERT threw Postgres 22001 "value too long for type
+        // ext_ref (varchar 100) ΓÇö the INSERT threw Postgres 22001 "value too long for type
         // character varying(100)", surfacing as an unhandled 500 on every bulk-order refund.
         // ext_ref is now varchar(150), matching its source column.
         var userId = Guid.NewGuid();
@@ -199,7 +199,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
 
         // Monobank cancel fired exactly once - the second request short-circuited.
         monobankMock.Verify(
-            m => m.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            m => m.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<MonobankBasketItem>>(), It.IsAny<CancellationToken>()),
             Times.Once());
 
         using (var verify = CreateContext())
@@ -257,7 +257,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
 
         // The retry issued a fresh Monobank cancel.
         monobankMock.Verify(
-            m => m.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            m => m.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<MonobankBasketItem>>(), It.IsAny<CancellationToken>()),
             Times.Once());
 
         using (var verify = CreateContext())
@@ -599,8 +599,8 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
     {
         var captured = new AmountBox();
         var mock = new Mock<IMonobankClient>();
-        mock.Setup(m => m.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .Callback<string, long, string, CancellationToken>((_, amount, _, _) => captured.Value = amount)
+        mock.Setup(m => m.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<MonobankBasketItem>>(), It.IsAny<CancellationToken>()))
+            .Callback<string, long, string, IReadOnlyList<MonobankBasketItem>, CancellationToken>((_, amount, _, _, _) => captured.Value = amount)
             .ReturnsAsync(new MonobankCancelResponse { Status = "processing" });
         cancelledAmount = captured;
         return mock;

@@ -33,7 +33,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
 
         _monobankClientMock = new Mock<IMonobankClient>();
         _monobankClientMock
-            .Setup(x => x.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<MonobankBasketItem>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new MonobankCancelResponse { Status = "processing" });
 
         _monobankClientFactory = new StubMonobankClientFactory(_monobankClientMock.Object);
@@ -56,7 +56,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
     /// <remarks>
     /// It used to leave <c>MonobankStatus</c> unset and still be treated as refundable, which
     /// only worked because the amount was derived from line items alone. That made the fixture
-    /// quietly assert the thing this PR removes — that an order with an invoice is refundable
+    /// quietly assert the thing this PR removes ΓÇö that an order with an invoice is refundable
     /// whether or not anyone paid. Override <paramref name="monobankStatus"/> for the unpaid cases.
     /// </remarks>
     private static Order BuildOrder(
@@ -122,7 +122,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         result.AmountKopecks.Should().Be(250000);
 
         _monobankClientMock.Verify(
-            x => x.CancelInvoiceAsync("INV123", 250000, "idem-key-1", It.IsAny<CancellationToken>()),
+            x => x.CancelInvoiceAsync("INV123", 250000, "idem-key-1", It.IsAny<IReadOnlyList<MonobankBasketItem>>(), It.IsAny<CancellationToken>()),
             Times.Once);
 
         var refund = await _context.Refunds.SingleAsync(r => r.OrderId == order.Id);
@@ -201,7 +201,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         await _context.SaveChangesAsync();
 
         // One of two units is already delivered, so only 250000 kopecks are
-        // refundable — the caller-supplied 999999 must be capped down.
+        // refundable ΓÇö the caller-supplied 999999 must be capped down.
         var result = await _handler.HandleAsync(new RefundOrderCommand
         {
             OrderId = order.Id,
@@ -212,7 +212,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         result.AmountKopecks.Should().Be(250000);
 
         _monobankClientMock.Verify(
-            x => x.CancelInvoiceAsync("INV123", 250000, "idem-key-1", It.IsAny<CancellationToken>()),
+            x => x.CancelInvoiceAsync("INV123", 250000, "idem-key-1", It.IsAny<IReadOnlyList<MonobankBasketItem>>(), It.IsAny<CancellationToken>()),
             Times.Once);
 
         var refund = await _context.Refunds.SingleAsync(r => r.OrderId == order.Id);
@@ -245,7 +245,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         result.AmountKopecks.Should().Be(100000);
 
         _monobankClientMock.Verify(
-            x => x.CancelInvoiceAsync("INV123", 100000, "idem-key-1", It.IsAny<CancellationToken>()),
+            x => x.CancelInvoiceAsync("INV123", 100000, "idem-key-1", It.IsAny<IReadOnlyList<MonobankBasketItem>>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -290,7 +290,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         result.Status.Should().Be("Processing");
         result.AmountKopecks.Should().Be(500000);
         _monobankClientMock.Verify(
-            x => x.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            x => x.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<MonobankBasketItem>>(), It.IsAny<CancellationToken>()),
             Times.Never);
 
         var refund = await _context.Refunds.SingleAsync(r => r.OrderId == order.Id);
@@ -335,7 +335,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
 
         result.Status.Should().Be("Completed");
         _monobankClientMock.Verify(
-            x => x.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            x => x.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<MonobankBasketItem>>(), It.IsAny<CancellationToken>()),
             Times.Never);
 
         var updatedOrder = await _context.Orders.FindAsync(order.Id);
@@ -363,7 +363,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         result.AmountKopecks.Should().Be(250000);
 
         _monobankClientMock.Verify(
-            x => x.CancelInvoiceAsync("INV123", 250000, "idem-key-1", It.IsAny<CancellationToken>()),
+            x => x.CancelInvoiceAsync("INV123", 250000, "idem-key-1", It.IsAny<IReadOnlyList<MonobankBasketItem>>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -394,7 +394,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
 
         result.Status.Should().Be("NothingToRefund");
         _monobankClientMock.Verify(
-            x => x.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            x => x.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<MonobankBasketItem>>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -410,7 +410,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
 
         result.Status.Should().Be("NotPayable");
         _monobankClientMock.Verify(
-            x => x.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            x => x.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<MonobankBasketItem>>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -430,7 +430,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         await _context.SaveChangesAsync();
 
         _monobankClientMock
-            .Setup(x => x.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<MonobankBasketItem>>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new HttpRequestException("Monobank API returned 502"));
 
         var result = await _handler.HandleAsync(new RefundOrderCommand { OrderId = order.Id });
@@ -469,7 +469,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
 
         result.Status.Should().Be("Processing");
         _monobankClientMock.Verify(
-            x => x.CancelInvoiceAsync("INV123", 500000, "idem-key-1", It.IsAny<CancellationToken>()),
+            x => x.CancelInvoiceAsync("INV123", 500000, "idem-key-1", It.IsAny<IReadOnlyList<MonobankBasketItem>>(), It.IsAny<CancellationToken>()),
             Times.Once);
 
         var refunds = await _context.Refunds.Where(r => r.OrderId == order.Id).ToListAsync();
@@ -526,7 +526,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
 
         // Never reached out to Monobank for money that was never collected.
         _monobankClientMock.Verify(
-            x => x.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            x => x.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<MonobankBasketItem>>(), It.IsAny<CancellationToken>()),
             Times.Never);
         (await _context.Refunds.CountAsync()).Should().Be(0);
     }
@@ -548,7 +548,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
 
         result.Status.Should().Be("Processing");
         _monobankClientMock.Verify(
-            x => x.CancelInvoiceAsync("INV123", 500000, "idem-key-1", It.IsAny<CancellationToken>()),
+            x => x.CancelInvoiceAsync("INV123", 500000, "idem-key-1", It.IsAny<IReadOnlyList<MonobankBasketItem>>(), It.IsAny<CancellationToken>()),
             Times.Once);
 
         // Cancelled is NOT itself a reason to refuse. Only the provider's word about payment
@@ -584,7 +584,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         // and that also switches off Fulfillment's global `ReleasedAtUtc == null` filter. Counting
         // released rows as delivered made fulfilledUnits (2) meet OrderedUnits (2), the unfulfilled
         // value collapse to zero, and the customer was told "no unfulfilled value remains" while
-        // half their money stayed with us. The admin dialog showed it as "0.00 грн".
+        // half their money stayed with us. The admin dialog showed it as "0.00 ╨│╤Ç╨╜".
         var order = BuildOrder();
         order.Fulfillments.Add(new Fulfillment
         {

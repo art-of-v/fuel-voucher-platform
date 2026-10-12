@@ -34,7 +34,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
 
         var monobankClientMock = new Mock<IMonobankClient>();
         monobankClientMock
-            .Setup(x => x.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<MonobankBasketItem>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new MonobankCancelResponse { Status = "processing" });
         var refundHandler = new RefundOrderCommandHandler(
             _context,

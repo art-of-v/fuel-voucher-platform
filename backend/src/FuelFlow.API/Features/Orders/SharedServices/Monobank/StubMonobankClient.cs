@@ -88,6 +88,7 @@ public sealed class MockMonobankClient : IMonobankClient
         string invoiceId,
         long amountKopecks,
         string extRef,
+        IReadOnlyList<MonobankBasketItem>? items = null,
         CancellationToken cancellationToken = default)
     {
         _logger.LogWarning(

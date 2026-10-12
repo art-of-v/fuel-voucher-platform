@@ -51,15 +51,28 @@ public sealed class MonobankClient : IMonobankClient
 
         try
         {
+            // merchantPaymInfo is built as a dictionary rather than an anonymous object because
+            // basketOrder must be ABSENT when there is nothing to declare, not sent as an empty
+            // array - Monobank treats the two differently once fiscalisation is linked.
+            var merchantPaymInfo = new Dictionary<string, object?>
+            {
+                ["reference"] = request.MerchantPaymentInfo,
+                // What the payment is for, as it appears on the receipt. Previously the same string
+                // as `reference` ("FuelFlow Order 7258a522-..."), which printed an internal UUID as
+                // the purchase description.
+                ["destination"] = request.Destination ?? "╨ƒ╨░╨╗╨╕╨▓╨╛",
+            };
+
+            if (request.Items is { Count: > 0 })
+            {
+                merchantPaymInfo["basketOrder"] = request.Items;
+            }
+
             var payload = new
             {
                 amount = request.Amount,
                 ccy = 980,
-                merchantPaymInfo = new
-                {
-                    reference = request.MerchantPaymentInfo,
-                    destination = request.MerchantPaymentInfo
-                },
+                merchantPaymInfo,
                 redirectUrl = request.RedirectUrl ?? _options.RedirectUrl,
                 webHookUrl = request.WebhookUrl ?? _options.WebhookUrl,
                 validity = 3600,
@@ -169,19 +182,38 @@ public sealed class MonobankClient : IMonobankClient
         string invoiceId,
         long amountKopecks,
         string extRef,
+        IReadOnlyList<MonobankBasketItem>? items = null,
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation(
-            "Cancelling Monobank invoice {InvoiceId} for {Amount} kopecks (extRef {ExtRef})",
+            "Cancelling Monobank invoice {InvoiceId} for {Amount} kopecks (extRef {ExtRef}, {ItemCount} receipt line(s))",
             invoiceId,
             amountKopecks,
-            extRef);
+            extRef,
+            items?.Count ?? 0);
 
         try
         {
+            // `items` is the RETURN receipt: which goods are going back. Monobank documents it as
+            // required when fiscalisation is active, and it is sent always for the same reason the
+            // create path always sends basketOrder - the link can be switched on without telling us.
+            // Omitted rather than sent empty, so behaviour is identical to before until a caller has
+            // something to declare.
+            var body = new Dictionary<string, object?>
+            {
+                ["invoiceId"] = invoiceId,
+                ["extRef"] = extRef,
+                ["amount"] = amountKopecks,
+            };
+
+            if (items is { Count: > 0 })
+            {
+                body["items"] = items;
+            }
+
             var response = await _httpClient.PostAsJsonAsync(
                 "/api/merchant/invoice/cancel",
-                new { invoiceId, extRef, amount = amountKopecks },
+                body,
                 cancellationToken);
 
             if (!response.IsSuccessStatusCode)

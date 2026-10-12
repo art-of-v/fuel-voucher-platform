@@ -42,7 +42,7 @@ public sealed class ApiFulfillmentServicePartialBackfillTests : IDisposable
 
         var monobankClientMock = new Mock<IMonobankClient>();
         monobankClientMock
-            .Setup(x => x.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<MonobankBasketItem>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new MonobankCancelResponse { Status = "processing" });
 
         _service = new TestableFulfillmentService(
