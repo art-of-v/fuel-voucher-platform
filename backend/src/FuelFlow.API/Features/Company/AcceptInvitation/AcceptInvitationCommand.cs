@@ -43,7 +43,7 @@ public sealed class AcceptInvitationCommandHandler
 
         var member = new CompanyMember
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
             LegalEntityId = invitation.LegalEntityId,
             WorkerUserId = command.WorkerUserId,
             JoinedAtUtc = DateTime.UtcNow

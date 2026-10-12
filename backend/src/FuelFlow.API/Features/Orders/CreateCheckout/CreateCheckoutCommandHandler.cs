@@ -153,7 +153,7 @@ public sealed class CreateCheckoutCommandHandler
 
         var order = new Order
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
             UserId = command.UserId!.Value,
             LegalEntityId = command.LegalEntityId,
             Price = lineTotal,
@@ -165,7 +165,7 @@ public sealed class CreateCheckoutCommandHandler
 
         order.LineItems.Add(new OrderLineItem
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
             OrderId = order.Id,
             Provider = command.StationId!,
             FuelTypeId = command.FuelTypeId,

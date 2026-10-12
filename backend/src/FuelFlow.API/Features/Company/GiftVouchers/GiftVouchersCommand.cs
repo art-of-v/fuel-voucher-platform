@@ -98,7 +98,7 @@ public sealed class GiftVouchersCommandHandler
         // for revenue.
         var companyCostByFuel = await LoadCompanyCostAsync(sharedPurchaseOrderId, cancellationToken);
 
-        var issuanceOrderId = Guid.NewGuid();
+        var issuanceOrderId = Guid.CreateVersion7();
 
         var issuanceOrder = new Order
         {
@@ -121,7 +121,7 @@ public sealed class GiftVouchersCommandHandler
 
                 return new OrderLineItem
                 {
-                    Id = Guid.NewGuid(),
+                    Id = Guid.CreateVersion7(),
                     OrderId = issuanceOrderId,
                     Provider = voucher.Provider,
                     FuelTypeId = voucher.FuelTypeId,

@@ -131,7 +131,7 @@ public sealed class SetBatchCostCommandHandler
             {
                 batch = new SharedKernel.Domain.PurchaseBatch
                 {
-                    Id = Guid.NewGuid(),
+                    Id = Guid.CreateVersion7(),
                     ImportJobId = command.ImportJobId,
                     FuelTypeId = command.FuelTypeId,
                     Provider = provider,

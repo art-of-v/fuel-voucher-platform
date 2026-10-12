@@ -129,7 +129,7 @@ public sealed class RegisterDeviceCommandHandler
 
         var device = new Device
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
             UserId = command.UserId,
             DeviceId = command.DeviceId,
             PublicKey = command.PublicKey,

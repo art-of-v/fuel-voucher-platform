@@ -54,7 +54,7 @@ public sealed class CreateSupportMessageCommandHandler
     {
         var message = new SupportMessage
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
             Email = command.Email.Trim(),
             Message = command.Message.Trim(),
             UserAgent = Truncate(userAgent, 300),

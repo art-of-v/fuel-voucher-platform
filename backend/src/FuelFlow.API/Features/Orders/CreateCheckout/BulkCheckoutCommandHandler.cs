@@ -266,7 +266,7 @@ private readonly IMonobankMerchantResolver _merchantResolver;
 
         var order = new Order
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
             UserId = command.UserId!.Value,
             LegalEntityId = command.LegalEntityId,
             Price = totalPrice,
@@ -283,7 +283,7 @@ private readonly IMonobankMerchantResolver _merchantResolver;
         {
             order.LineItems.Add(new OrderLineItem
             {
-                Id = Guid.NewGuid(),
+                Id = Guid.CreateVersion7(),
                 OrderId = order.Id,
                 Provider = item.StationId!,
                 FuelTypeId = item.FuelTypeId,
