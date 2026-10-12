@@ -120,6 +120,7 @@ const PUBLIC_ENDPOINTS = [
   '/api/stations',
   '/api/stations/fuel-types',
   '/api/packages',
+  '/api/logs',
 ];
 
 // Must stay in sync with the backend's DeviceAuth:RequireSignatureForEndpoints
