@@ -154,8 +154,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "customerRenewal.expiry": "Expiry",
     "customerRenewal.error.belowCost":
       "Surcharge is below the replacement voucher's cost. Import stock at the correct cost, or enable the below-cost opt-in for this fuel if the sale is deliberate.",
-      "customerRenewal.error.belowCostBy":
-        "Surcharge is below the replacement voucher's cost by {0} UAH. Import stock at the correct cost, or enable the below-cost opt-in for this fuel if the sale is deliberate.",
+    "customerRenewal.error.belowCostBy":
+      "Surcharge is below the replacement voucher's cost by {0} UAH. Import stock at the correct cost, or enable the below-cost opt-in for this fuel if the sale is deliberate.",
     "customerRenewal.error.noStock":
       "No replacement voucher in stock for this provider, fuel and volume. Import stock first.",
     "customerRenewal.error.notRenewable":
@@ -229,7 +229,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "settings.deletedUnpaidOrderCleanupTitle": "Deleted unpaid order cleanup",
     "settings.deletedUnpaidOrderCleanupWhat":
       "Permanently deletes abandoned checkouts — orders a customer removed that were never paid and have since been cancelled — once they are older than the retention window. Frees database space and declutters the purchases view. Deletion cannot be undone.",
-    "settings.enableDeletedUnpaidOrderCleanup": "Enable deletion of deleted unpaid orders",
+    "settings.enableDeletedUnpaidOrderCleanup":
+      "Enable deletion of deleted unpaid orders",
     "settings.enableDeletedUnpaidOrderCleanupHint":
       "When enabled, a nightly job permanently deletes abandoned, cancelled orders older than the retention period.",
     "settings.retentionPeriod": "Retention period (days)",
@@ -423,10 +424,10 @@ export const translations: Record<Language, Record<string, string>> = {
       "Pump/board price (UAH/L) — the ceiling. Leave empty until you record it; while empty the price is cost + margin.",
     "price.belowCost": "below cost",
     "price.belowCostHint": "Final price is below cost per liter.",
-      "price.spread": "packages disagree",
-      "price.spreadHint":
-        "This fuel's packages do not all carry the same cost or customer price. Saving this row rewrites every package to what is shown here.",
-      "price.spreadCost": "cost across packages: {0} – {1}",
+    "price.spread": "packages disagree",
+    "price.spreadHint":
+      "This fuel's packages do not all carry the same cost or customer price. Saving this row rewrites every package to what is shown here.",
+    "price.spreadCost": "cost across packages: {0} – {1}",
     "price.allowBelowCost": "Allow below cost",
     "price.allowBelowCostHint":
       "Standing manager opt-in: permit selling this fuel below cost (deliberate loss-leader). Without it, below-cost pricing and sales are blocked.",
@@ -868,6 +869,16 @@ export const translations: Record<Language, Record<string, string>> = {
     "auditlog.event.AdminLoggedIn": "Admin Logged In",
     "auditlog.event.AdminLoginFailed": "Admin Login Failed",
     "auditlog.event.UserDeleted": "User Deleted",
+
+    // Parity fill (#281): de and es were missing these entirely, so the whole screen fell
+    // back to English. Grouped by prefix rather than inline with the original keys to keep the
+    // drift visible and reviewable as one block.
+    "customerRenewal.error.belowCostBy":
+      "Surcharge is below the replacement voucher's cost by {0} UAH. Import stock at the correct cost, or enable the below-cost opt-in for this fuel if the sale is deliberate.",
+    "price.spread": "packages disagree",
+    "price.spreadHint":
+      "This fuel's packages do not all carry the same cost or customer price. Saving this row rewrites every package to what is shown here.",
+    "price.spreadCost": "cost across packages: {0} – {1}",
   },
 
   uk: {
@@ -969,7 +980,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "voucherExchange.historyNext": "Наступна сторінка",
     "voucherExchange.historyPage": "Сторінка {0} з {1}",
     "voucherExchange.historyEmpty": "Обмінів ще не записано.",
-    "voucherExchange.historyLoadFailed": "Не вдалося завантажити історію обмінів.",
+    "voucherExchange.historyLoadFailed":
+      "Не вдалося завантажити історію обмінів.",
     "nav.customerRenewal": "Продовження оператором",
     "customerRenewal.searchPlaceholder":
       "Пошук за номером талона або власником…",
@@ -1086,10 +1098,12 @@ export const translations: Record<Language, Record<string, string>> = {
       "Тестовий доступ QA ВИМКНЕНО. Номер і код QA не надають доступу.",
     "settings.qaLastChanged": "Останню зміну зроблено",
     "settings.qaSaved": "Тестовий доступ QA оновлено",
-    "settings.deletedUnpaidOrderCleanupTitle": "Видалення неоплачених замовлень",
+    "settings.deletedUnpaidOrderCleanupTitle":
+      "Видалення неоплачених замовлень",
     "settings.deletedUnpaidOrderCleanupWhat":
       "Остаточно видаляє покинуті оформлення — замовлення, які клієнт прибрав, так і не оплатив і які відтоді скасовано, — коли вони стають старшими за період зберігання. Звільняє місце в базі даних і розвантажує розділ покупок. Видалення не можна скасувати.",
-    "settings.enableDeletedUnpaidOrderCleanup": "Увімкнути видалення неоплачених замовлень",
+    "settings.enableDeletedUnpaidOrderCleanup":
+      "Увімкнути видалення неоплачених замовлень",
     "settings.enableDeletedUnpaidOrderCleanupHint":
       "Після увімкнення нічне завдання остаточно видаляє покинуті скасовані замовлення, старші за період зберігання.",
     "settings.retentionPeriod": "Період зберігання (днів)",
@@ -1484,8 +1498,10 @@ export const translations: Record<Language, Record<string, string>> = {
     "import.dragDrop": "Перетягніть сюди зображення талонів, PDF або ZIP",
     "import.clickSelect": "Натисніть, щоб вибрати",
     "import.supplier": "Постачальник, у якого куплено цей PDF",
-    "import.supplierRequired": "Оберіть постачальника перед імпортом — саме з ним ми будемо розраховуватись за ці талони.",
-    "import.noSuppliers": "Постачальників ще немає. Спершу додайте: бренд на талоні не каже, хто його видав.",
+    "import.supplierRequired":
+      "Оберіть постачальника перед імпортом — саме з ним ми будемо розраховуватись за ці талони.",
+    "import.noSuppliers":
+      "Постачальників ще немає. Спершу додайте: бренд на талоні не каже, хто його видав.",
     "import.uploading": "Завантаження...",
     "nav.suppliers": "Постачальники",
     "suppliers.title": "Постачальники",
@@ -1827,7 +1843,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "voucherExchange.historyNext": "Nächste Seite",
     "voucherExchange.historyPage": "Seite {0} von {1}",
     "voucherExchange.historyEmpty": "Noch keine Tauschvorgänge erfasst.",
-    "voucherExchange.historyLoadFailed": "Der Tauschverlauf konnte nicht geladen werden.",
+    "voucherExchange.historyLoadFailed":
+      "Der Tauschverlauf konnte nicht geladen werden.",
     "nav.customerRenewal": "Verlängerung durch Operator",
     "customerRenewal.searchPlaceholder":
       "Suche nach Gutscheinnummer oder Inhaber…",
@@ -1872,8 +1889,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "customerRenewal.expiry": "Ablauf",
     "customerRenewal.error.belowCost":
       "Die Gebühr liegt unter den Kosten des Ersatzgutscheins. Importieren Sie Bestand mit den richtigen Kosten oder aktivieren Sie die Ausnahme für unter Kosten für diesen Kraftstoff, wenn der Verkauf beabsichtigt ist.",
-      "customerRenewal.error.belowCostBy":
-        "Die Gebühr liegt um {0} UAH unter den Kosten des Ersatzgutscheins. Importieren Sie Bestand mit den richtigen Kosten oder aktivieren Sie die Ausnahme für unter Kosten für diesen Kraftstoff, wenn der Verkauf beabsichtigt ist.",
+    "customerRenewal.error.belowCostBy":
+      "Die Gebühr liegt um {0} UAH unter den Kosten des Ersatzgutscheins. Importieren Sie Bestand mit den richtigen Kosten oder aktivieren Sie die Ausnahme für unter Kosten für diesen Kraftstoff, wenn der Verkauf beabsichtigt ist.",
     "customerRenewal.error.noStock":
       "Kein Ersatzgutschein für diesen Anbieter, Kraftstoff und dieses Volumen auf Lager. Importieren Sie zuerst Bestand.",
     "customerRenewal.error.notRenewable":
@@ -1945,10 +1962,12 @@ export const translations: Record<Language, Record<string, string>> = {
       "QA-Testzugang ist AUS. Die QA-Telefonnummer und der Code gewähren keinen Zugang.",
     "settings.qaLastChanged": "Zuletzt geändert",
     "settings.qaSaved": "QA-Testzugang aktualisiert",
-    "settings.deletedUnpaidOrderCleanupTitle": "Bereinigung gelöschter unbezahlter Bestellungen",
+    "settings.deletedUnpaidOrderCleanupTitle":
+      "Bereinigung gelöschter unbezahlter Bestellungen",
     "settings.deletedUnpaidOrderCleanupWhat":
       "Löscht abgebrochene Bestellvorgänge endgültig — Bestellungen, die eine Kundin oder ein Kunde entfernt hat, die nie bezahlt und seither storniert wurden —, sobald sie älter als die Aufbewahrungsfrist sind. Gibt Datenbankspeicher frei und entlastet die Käufeansicht. Das Löschen kann nicht rückgängig gemacht werden.",
-    "settings.enableDeletedUnpaidOrderCleanup": "Löschung gelöschter unbezahlter Bestellungen aktivieren",
+    "settings.enableDeletedUnpaidOrderCleanup":
+      "Löschung gelöschter unbezahlter Bestellungen aktivieren",
     "settings.enableDeletedUnpaidOrderCleanupHint":
       "Wenn aktiviert, löscht ein nächtlicher Job abgebrochene, stornierte Bestellungen, die älter als die Aufbewahrungsfrist sind, endgültig.",
     "settings.retentionPeriod": "Aufbewahrungsfrist (Tage)",
@@ -2072,10 +2091,10 @@ export const translations: Record<Language, Record<string, string>> = {
       "Zapfsäulen-/Anzeigepreis (UAH/L) — die Obergrenze. Leer lassen, bis er erfasst wird; solange leer ist der Preis Einkaufspreis + Marge.",
     "price.belowCost": "unter EK",
     "price.belowCostHint": "Endpreis liegt unter dem Einkaufspreis pro Liter.",
-      "price.spread": "Pakete weichen ab",
-      "price.spreadHint":
-        "Die Pakete dieses Kraftstoffs haben nicht alle dieselben Kosten oder Verkaufspreise. Das Speichern dieser Zeile schreibt alle Pakete auf die hier angezeigten Werte um.",
-      "price.spreadCost": "Kosten über Pakete: {0} – {1}",
+    "price.spread": "Pakete weichen ab",
+    "price.spreadHint":
+      "Die Pakete dieses Kraftstoffs haben nicht alle dieselben Kosten oder Verkaufspreise. Das Speichern dieser Zeile schreibt alle Pakete auf die hier angezeigten Werte um.",
+    "price.spreadCost": "Kosten über Pakete: {0} – {1}",
     "price.allowBelowCost": "Unter EK erlauben",
     "price.allowBelowCostHint":
       "Dauerhafte Freigabe des Managers: Verkauf dieses Kraftstoffs unter Einkaufspreis erlauben (bewusster Verlustbringer). Ohne sie werden Preise und Verkäufe unter EK blockiert.",
@@ -2304,7 +2323,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "suppliers.saved": "Lieferant gespeichert",
     "suppliers.error.nameTaken":
       "Ein Lieferant mit diesem Namen existiert bereits - der Lieferant wird nach Name ausgewählt, zwei Zeilen wären daher mehrdeutig.",
-    "suppliers.error.edrIpn": "EDR/Steuernummer muss aus 8-10 Ziffern bestehen.",
+    "suppliers.error.edrIpn":
+      "EDR/Steuernummer muss aus 8-10 Ziffern bestehen.",
     "suppliers.error.rnkrr": "RNKR muss aus 5 Ziffern bestehen.",
     "suppliers.empty":
       "Noch keine Lieferanten. Legen Sie den ersten an - die Marke auf einem Gutschein sagt nicht, wer ihn ausgestellt hat.",
@@ -2499,6 +2519,100 @@ export const translations: Record<Language, Record<string, string>> = {
     "auditlog.event.AdminLoggedIn": "Admin angemeldet",
     "auditlog.event.AdminLoginFailed": "Admin-Anmeldung fehlgeschlagen",
     "auditlog.event.UserDeleted": "Benutzer gelöscht",
+
+    // Parity fill (#281): de and es were missing these entirely, so the whole screen fell
+    // back to English. Grouped by prefix rather than inline with the original keys to keep the
+    // drift visible and reviewable as one block.
+    "imports.back": "Zurück zu den Importen",
+    "imports.activateAll": "Alle aktivieren",
+    "imports.deactivateAll": "Alle deaktivieren",
+    "imports.number": "Nummer",
+    "imports.verification": "Prüfung",
+    "imports.noVouchers": "Keine Gutscheine in diesem Import",
+    "imports.batchCostsTitle": "Chargenkosten",
+    "imports.batchCostsHint":
+      "Geben Sie vor der Aktivierung die Kosten pro Liter für jeden Kraftstoff an – die Aktivierung bleibt gesperrt, solange keine Kosten hinterlegt sind, und die Preise werden aus den Mischkosten (gleitender Durchschnitt) neu berechnet.",
+    "imports.costPerLiter": "Kosten, ₴/L",
+    "imports.blendedCost": "Mischkosten, ₴/L",
+    "imports.saveCost": "Speichern",
+    "imports.costTimeline": "Kostenverlauf",
+    "imports.costTimelineEmpty": "Kein Canje hat diese Charge berührt.",
+    "imports.timelineDate": "Datum",
+    "imports.timelineFuel": "Kraftstoff",
+    "imports.timelineOut": "Ausgewechselt",
+    "imports.timelineSurcharge": "Aufpreis",
+    "imports.timelineCostMove": "Kosten /L",
+    "imports.costSaved": "Kosten gespeichert – Preise aktualisiert",
+    "imports.costSaveFailed": "Kosten konnten nicht gespeichert werden",
+    "imports.parseInvoice": "Rechnung hochladen (.xlsx)",
+    "imports.invoiceParsing": "Rechnung wird gelesen.",
+    "imports.invoiceParsed":
+      "Rechnung gelesen – {0} Kraftstoff(e) vorbefüllt; prüfen und speichern",
+    "imports.invoiceNoMatch":
+      "Rechnung gelesen, aber keine Zeile passte zu einem Kraftstoff in diesem Import",
+    "imports.invoiceUnmatchedLines": "{0} Rechnungszeile(n) ohne Zuordnung",
+    "imports.invoiceUncoveredFuels": "nicht auf der Rechnung: {0}",
+    "imports.invoiceWarnings": "{0} Warnung(en)",
+    "imports.invoiceRowErrors": "{0} unlesbare Zeile(n)",
+    "imports.invoiceParseFailed": "Rechnung konnte nicht gelesen werden",
+    "imports.batchStock": "{0} Gutscheine · {1} L",
+    "imports.pnlTitle": "Chargen-GuV",
+    "imports.pnlHint":
+      "Gewinn je Charge – nur intern, nie für Kunden sichtbar. Realisiert = Marge aus bereits verkauften Gutscheinen; unrealisiert = Marge, die im verbleibenden Bestand zum aktuellen Preis steckt.",
+    "imports.pnlFuel": "Kraftstoff",
+    "imports.pnlSold": "Verkauft",
+    "imports.pnlRemaining": "Verbleibend",
+    "imports.pnlCostL": "Kosten, ₴/L",
+    "imports.pnlAvgSaleL": "Ø Verkauf, ₴/L",
+    "imports.pnlRealizedRevenue": "Umsatz",
+    "imports.pnlRealizedMargin": "Realisierte Marge",
+    "imports.pnlExpiredLoss": "Verfallverlust",
+    "imports.pnlNetResult": "Nettoergebnis",
+    "imports.pnlUnrealizedMargin": "Unrealisierte Marge",
+    "imports.pnlTotal": "Gesamt",
+    "imports.pnlUncosted": "noch keine Kosten",
+    "imports.file": "Datei",
+    "imports.pages": "Seiten",
+    "imports.vouchers": "Gutscheine",
+    "imports.imported": "Importiert",
+    "imports.duplicates": "Duplikate",
+    "imports.errors": "Fehler",
+    "imports.warnings": "Warnungen",
+    "imports.created": "Erstellt",
+    "imports.none": "Noch keine Importe",
+    "status.deactivated": "Deaktiviert",
+    "contracts.availableTitle": "Verfügbare Verträge",
+    "contracts.name": "Name",
+    "contracts.version": "Version",
+    "contracts.createdAt": "Erstellt",
+    "contracts.noneAvailable": "Keine weiteren Verträge gefunden",
+    "contracts.signedTitle": "Unterzeichnete Verträge",
+    "contracts.user": "Benutzer",
+    "contracts.company": "Unternehmen",
+    "contracts.contract": "Vertrag",
+    "contracts.signedAt": "Unterzeichnet am",
+    "contracts.signature": "Unterschrift",
+    "contracts.view": "Ansehen",
+    "contracts.noneSigned": "Noch keine unterzeichneten Verträge",
+    "import.start": "Import starten",
+    "import.close": "Schließen",
+    "import.model": "Modell",
+    "import.errorOccurred": "Beim Import ist ein Fehler aufgetreten.",
+    "import.duplicates": "Duplikate",
+    "import.noVouchers": "Es wurden noch keine Gutscheine importiert.",
+    "import.scanTitle": "Gutschein scannen",
+    "reconciliation.summary": "Zusammenfassung",
+    "reconciliation.revenue": "Umsatz",
+    "reconciliation.fulfilled": "Erfüllt",
+    "reconciliation.pending": "Ausstehend",
+    "reconciliation.unprocessed": "Nicht verarbeitete Ereignisse",
+    "reconciliation.importErrors": "Importfehler (7 T.)",
+    "reconciliation.pendingOrders": "Offene Bestellungen",
+    "reconciliation.voucherInventory": "Gutscheinbestand",
+    "reconciliation.monthlyRevenue": "Monatsumsatz",
+    "reconciliation.recentImports": "Letzte Importe",
+    "reconciliation.noPending": "Keine offenen Bestellungen",
+    "reconciliation.noImports": "Keine aktuellen Importe",
   },
 
   es: {
@@ -2600,7 +2714,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "voucherExchange.historyNext": "Página siguiente",
     "voucherExchange.historyPage": "Página {0} de {1}",
     "voucherExchange.historyEmpty": "Todavía no hay canjes registrados.",
-    "voucherExchange.historyLoadFailed": "No se pudo cargar el historial de canjes.",
+    "voucherExchange.historyLoadFailed":
+      "No se pudo cargar el historial de canjes.",
     "nav.customerRenewal": "Renovación por operador",
     "customerRenewal.searchPlaceholder": "Buscar por número de vale o titular…",
     "customerRenewal.allProviders": "Todos los proveedores",
@@ -2644,8 +2759,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "customerRenewal.expiry": "Vencimiento",
     "customerRenewal.error.belowCost":
       "El recargo es menor que el coste del vale de reposición. Importe existencias con el coste correcto o active la opción de venta bajo coste para este combustible si la venta es deliberada.",
-      "customerRenewal.error.belowCostBy":
-        "El recargo es {0} UAH menor que el coste del vale de reposición. Importe existencias con el coste correcto o active la opción de venta bajo coste para este combustible si la venta es deliberada.",
+    "customerRenewal.error.belowCostBy":
+      "El recargo es {0} UAH menor que el coste del vale de reposición. Importe existencias con el coste correcto o active la opción de venta bajo coste para este combustible si la venta es deliberada.",
     "customerRenewal.error.noStock":
       "No hay vale de reposición en existencias para este proveedor, combustible y volumen. Importe existencias primero.",
     "customerRenewal.error.notRenewable":
@@ -2716,10 +2831,12 @@ export const translations: Record<Language, Record<string, string>> = {
       "El acceso de prueba QA está DESACTIVADO. El teléfono y el código QA no otorgan acceso.",
     "settings.qaLastChanged": "Último cambio",
     "settings.qaSaved": "Acceso de prueba QA actualizado",
-    "settings.deletedUnpaidOrderCleanupTitle": "Limpieza de pedidos no pagados eliminados",
+    "settings.deletedUnpaidOrderCleanupTitle":
+      "Limpieza de pedidos no pagados eliminados",
     "settings.deletedUnpaidOrderCleanupWhat":
       "Elimina permanentemente los pagos abandonados — pedidos que un cliente quitó, que nunca se pagaron y que desde entonces se han cancelado — cuando superan el periodo de retención. Libera espacio en la base de datos y despeja la vista de compras. La eliminación no se puede deshacer.",
-    "settings.enableDeletedUnpaidOrderCleanup": "Activar la limpieza de pedidos no pagados eliminados",
+    "settings.enableDeletedUnpaidOrderCleanup":
+      "Activar la limpieza de pedidos no pagados eliminados",
     "settings.enableDeletedUnpaidOrderCleanupHint":
       "Cuando está activada, una tarea nocturna elimina permanentemente los pedidos abandonados y cancelados que superan el periodo de retención.",
     "settings.retentionPeriod": "Periodo de retención (días)",
@@ -2843,10 +2960,10 @@ export const translations: Record<Language, Record<string, string>> = {
     "price.belowCost": "bajo costo",
     "price.belowCostHint":
       "El precio final está por debajo del costo por litro.",
-      "price.spread": "paquetes difieren",
-      "price.spreadHint":
-        "Los paquetes de este combustible no tienen todos el mismo costo ni el mismo precio de venta. Guardar esta fila reescribe todos los paquetes con los valores mostrados aquí.",
-      "price.spreadCost": "costo entre paquetes: {0} – {1}",
+    "price.spread": "paquetes difieren",
+    "price.spreadHint":
+      "Los paquetes de este combustible no tienen todos el mismo costo ni el mismo precio de venta. Guardar esta fila reescribe todos los paquetes con los valores mostrados aquí.",
+    "price.spreadCost": "costo entre paquetes: {0} – {1}",
     "price.allowBelowCost": "Permitir bajo costo",
     "price.allowBelowCostHint":
       "Autorización permanente del gerente: permitir vender este combustible por debajo del costo (pérdida deliberada como gancho). Sin ella, se bloquean los precios y ventas por debajo del costo.",
@@ -3270,6 +3387,103 @@ export const translations: Record<Language, Record<string, string>> = {
     "auditlog.event.AdminLoginFailed":
       "Error de inicio de sesión del administrador",
     "auditlog.event.UserDeleted": "Usuario eliminado",
+
+    // Parity fill (#281): de and es were missing these entirely, so the whole screen fell
+    // back to English. Grouped by prefix rather than inline with the original keys to keep the
+    // drift visible and reviewable as one block.
+    "imports.back": "Volver a las importaciones",
+    "imports.activateAll": "Activar todos",
+    "imports.deactivateAll": "Desactivar todos",
+    "imports.number": "Número",
+    "imports.verification": "Verificación",
+    "imports.noVouchers": "No hay vales en esta importación",
+    "imports.batchCostsTitle": "Coste por lote",
+    "imports.batchCostsHint":
+      "Introduzca el coste por litro de cada combustible antes de activar: la activación queda bloqueada mientras no haya coste, y los precios se recalculan a partir del coste medio (media móvil).",
+    "imports.costPerLiter": "Coste, ₴/L",
+    "imports.blendedCost": "Coste medio, ₴/L",
+    "imports.saveCost": "Guardar",
+    "imports.costTimeline": "Historial de costes",
+    "imports.costTimelineEmpty": "Ningún canje ha afectado a este lote.",
+    "imports.timelineDate": "Fecha",
+    "imports.timelineFuel": "Combustible",
+    "imports.timelineOut": "Canjeados",
+    "imports.timelineSurcharge": "Recargo",
+    "imports.timelineCostMove": "Coste /L",
+    "imports.costSaved": "Coste guardado: precios actualizados",
+    "imports.costSaveFailed": "No se pudo guardar el coste",
+    "imports.parseInvoice": "Subir factura (.xlsx)",
+    "imports.invoiceParsing": "Leyendo la factura.",
+    "imports.invoiceParsed":
+      "Factura leída: {0} combustible(s) prellenados; revísela y guárdela",
+    "imports.invoiceNoMatch":
+      "Factura leída, pero ninguna línea coincidió con un combustible de esta importación",
+    "imports.invoiceUnmatchedLines": "{0} línea(s) de factura sin coincidir",
+    "imports.invoiceUncoveredFuels": "no están en la factura: {0}",
+    "imports.invoiceWarnings": "{0} aviso(s)",
+    "imports.invoiceRowErrors": "{0} fila(s) ilegible(s)",
+    "imports.invoiceParseFailed": "No se pudo leer la factura",
+    "imports.batchStock": "{0} vales · {1} L",
+    "imports.pnlTitle": "P&L por lote",
+    "imports.pnlHint":
+      "Beneficio por lote: solo interno, nunca se muestra al cliente. Realizado = margen ya generado por los vales vendidos; no realizado = margen que sigue en las existencias restantes al precio actual.",
+    "imports.pnlFuel": "Combustible",
+    "imports.pnlSold": "Vendidos",
+    "imports.pnlRemaining": "Restantes",
+    "imports.pnlCostL": "Coste, ₴/L",
+    "imports.pnlAvgSaleL": "Venta media, ₴/L",
+    "imports.pnlRealizedRevenue": "Ingresos",
+    "imports.pnlRealizedMargin": "Margen realizado",
+    "imports.pnlExpiredLoss": "Pérdida por caducidad",
+    "imports.pnlNetResult": "Resultado neto",
+    "imports.pnlUnrealizedMargin": "Margen no realizado",
+    "imports.pnlTotal": "Total",
+    "imports.pnlUncosted": "sin coste aún",
+    "imports.file": "Archivo",
+    "imports.pages": "Páginas",
+    "imports.vouchers": "Vales",
+    "imports.imported": "Importados",
+    "imports.duplicates": "Duplicados",
+    "imports.errors": "Errores",
+    "imports.warnings": "Avisos",
+    "imports.created": "Creados",
+    "imports.none": "Todavía no hay importaciones",
+    "status.deactivated": "Desactivado",
+    "contracts.availableTitle": "Contratos disponibles",
+    "contracts.name": "Nombre",
+    "contracts.version": "Versión",
+    "contracts.createdAt": "Creado",
+    "contracts.noneAvailable": "No se encontraron más contratos",
+    "contracts.signedTitle": "Contratos firmados",
+    "contracts.user": "Usuario",
+    "contracts.company": "Empresa",
+    "contracts.contract": "Contrato",
+    "contracts.signedAt": "Fecha de firma",
+    "contracts.signature": "Firma",
+    "contracts.view": "Ver",
+    "contracts.noneSigned": "Todavía no hay contratos firmados",
+    "import.start": "Iniciar importación",
+    "import.close": "Cerrar",
+    "import.model": "Modelo",
+    "import.errorOccurred": "Se produjo un error durante la importación.",
+    "import.duplicates": "Duplicados",
+    "import.noVouchers": "Todavía no se han importado vales.",
+    "import.scanTitle": "Escanear vale",
+    "reconciliation.summary": "Resumen",
+    "reconciliation.revenue": "Ingresos",
+    "reconciliation.fulfilled": "Completados",
+    "reconciliation.pending": "Pendientes",
+    "reconciliation.unprocessed": "Eventos sin procesar",
+    "reconciliation.importErrors": "Errores de importación (7 d)",
+    "reconciliation.pendingOrders": "Pedidos pendientes",
+    "reconciliation.voucherInventory": "Existencias de vales",
+    "reconciliation.monthlyRevenue": "Ingresos mensuales",
+    "reconciliation.recentImports": "Importaciones recientes",
+    "reconciliation.noPending": "No hay pedidos pendientes",
+    "reconciliation.noImports": "No hay importaciones recientes",
+    "order.status.pendingPayment": "Pago pendiente",
+    "order.status.paid": "Pagado",
+    "order.status.pendingFulfillment": "Entrega pendiente",
   },
 };
 
