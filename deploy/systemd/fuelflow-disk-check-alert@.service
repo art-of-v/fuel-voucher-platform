@@ -1,0 +1,17 @@
+# Fired by `OnFailure=` on fuelflow-disk-check.service whenever the check has something to report
+# (warning, critical, recovery, or its own inability to measure the disk). Mirrors
+# fuelflow-prune-alert@.service.
+#
+# Templated (`@`): the failing unit's name is the instance (%i), so the notifier can say WHICH
+# unit failed. Started as fuelflow-disk-check-alert@fuelflow-disk-check.service.
+[Unit]
+Description=Alert that %i failed
+# No OnFailure here: the alert must not itself trigger alert handling (no loop).
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/FuelFlow/deploy
+# %i is the failed unit name. The notifier reads deploy/.env for the Telegram creds and the
+# journal for the message disk-check.sh already wrote.
+ExecStart=/root/FuelFlow/deploy/notify-disk-check.sh %i
+SyslogIdentifier=fuelflow-disk-check-alert

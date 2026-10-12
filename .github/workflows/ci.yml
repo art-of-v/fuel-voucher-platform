@@ -49,6 +49,7 @@ jobs:
       admin: ${{ steps.filter.outputs.admin }}
       mobile: ${{ steps.filter.outputs.mobile }}
       website: ${{ steps.filter.outputs.website }}
+      deploy: ${{ steps.filter.outputs.deploy }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -71,22 +72,23 @@ jobs:
             changed="$(git diff --name-only "$base" "${{ github.sha }}")" || { echo "diff failed — running all suites."; allchanged=1; changed=""; }
           fi
           echo "Changed files:"; echo "$changed"
-          backend=false; admin=false; mobile=false; website=false; other=false
+          backend=false; admin=false; mobile=false; website=false; deploy=false; other=false
           while IFS= read -r f; do
             if [ -z "$f" ]; then continue; fi
             case "$f" in
-              backend/*) backend=true ;;
-              admin/*)   admin=true ;;
-              mobile/*)  mobile=true ;;
-              website/*) website=true ;;
-              *)         other=true ;;
+            backend/*) backend=true ;;
+            admin/*)   admin=true ;;
+            mobile/*)  mobile=true ;;
+            website/*) website=true ;;
+            deploy/*)  deploy=true; other=true ;;
+            *)         other=true ;;
             esac
           done <<< "$changed"
           # A change to shared/root/CI/deploy files, or an unreadable diff, exercises everything.
           if [ "$allchanged" = "1" ] || [ "$other" = "true" ]; then
             backend=true; admin=true; mobile=true; website=true
           fi
-          for kv in "backend=$backend" "admin=$admin" "mobile=$mobile" "website=$website"; do
+          for kv in "backend=$backend" "admin=$admin" "mobile=$mobile" "website=$website" "deploy=$deploy"; do
             echo "$kv" >> "$GITHUB_OUTPUT"; echo "$kv"
           done
 
@@ -407,10 +409,33 @@ jobs:
   # any genuinely FAILED or was CANCELLED. It stays on a hosted runner (not the self-hosted box)
   # so the sole required gate never blocks on runner availability; it is ~1 billed minute.
   # Point branch protection at this context ("CI required"), not the individual matrix jobs.
+  # deploy/ scripts decide what runs on the box: the disk-pressure check and the systemd units that
+  # schedule it, the image-tag resolver, the backup/GC jobs. None of them is covered by the four
+  # component suites, and their own .test.sh harnesses run only inside the deploy jobs - which means
+  # a PR could merge a broken script and the first thing that noticed would be a deploy that failed
+  # before staging. One short job, gated on deploy/ changing, so the failure shows up on the PR.
+  #
+  # Cost: a fully skipped job bills 0 (#3), and deploy/ changes are rare, so this is close to free.
+  deploy-scripts:
+    name: Deploy scripts (bash)
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.deploy == 'true' || github.event_name == 'push'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Drives every branch of disk-check.sh with a stubbed df and a throwaway state file: the
+      # healthy silence, each escalation, the dedup that keeps a stuck disk from paging 96 times a
+      # day, and the two ways the check can fail to measure at all. None of it is observable on a
+      # box that is not already in trouble.
+      - name: Test the disk pressure check
+        run: bash deploy/disk-check.test.sh
+
   ci-required:
     name: CI required
     if: always()
-    needs: [changes, backend, backend-integration, admin, mobile, website]
+    needs: [changes, backend, backend-integration, admin, mobile, website, deploy-scripts]
     runs-on: ubuntu-latest
     steps:
       - name: Verify no required job failed

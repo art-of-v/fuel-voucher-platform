@@ -1,0 +1,24 @@
+# Samples disk usage every 15 minutes, so a disk crossing the warning line is noticed while there
+# is still room to act on it rather than at the moment Postgres dies.
+#
+# Why 15 and not 60: the whole reason this exists is that the nightly prune samples once at 04:20.
+# On 2026-09-27 the gap between "disk has room" and "disk is unusable" was short enough that an
+# hourly sample would still have been too coarse to be the difference. 15 minutes also keeps the
+# notification budget sane - the check only speaks when the level changes, so a disk sitting at 91%
+# costs one message, not 96.
+[Unit]
+Description=Quarter-hourly FuelFlow disk pressure check
+Documentation=file:/root/FuelFlow/docs/DEPLOYMENT.md
+
+[Timer]
+# Every 15 minutes past the hour, staggered off :00 so the check never lands on the same minute as
+# the :20 backup/GC or any deploy tick.
+OnCalendar=*-*-* *:05,20,35,50:00
+# If the box was off (a reboot mid-deploy), run on the next tick rather than skipping.
+Persistent=true
+# A few minutes of jitter, so 5 machines (staging and prod share this box) never sample in lockstep.
+RandomizedDelaySec=60
+Unit=fuelflow-disk-check.service
+
+[Install]
+WantedBy=timers.target
