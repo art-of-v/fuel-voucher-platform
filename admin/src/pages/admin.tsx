@@ -600,7 +600,7 @@ voucherNumber: string;
   });
 
   const { data: signedContractsList = [] } = useQuery<UserContractType[]>({
-    queryKey: ["/api/admin/legal-entity/signed-contracts"],
+    queryKey: ["/api/admin/legal-entity/contracts/signed-contracts"],
     enabled: !!user && activeTab === 'contracts'
   });
 

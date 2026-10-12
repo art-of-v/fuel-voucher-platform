@@ -135,7 +135,7 @@ export default function CheckoutScreen() {
     try {
       setIsProcessing(true);
 
-      // Checked: createMonobankInvoice below will trigger SecurityService.signPayload
+      // Checked: createBulkMonobankInvoice below will trigger SecurityService.signPayload
       // inside apiFetch, which handles the single, cryptographically secure Face ID prompt.
       // We no longer need this manual LocalAuthentication block which caused a double prompt.
 
