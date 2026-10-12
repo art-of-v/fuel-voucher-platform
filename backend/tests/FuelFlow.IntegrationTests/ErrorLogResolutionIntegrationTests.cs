@@ -227,6 +227,5 @@ public sealed class ErrorLogResolutionIntegrationTests : IClassFixture<TestDatab
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(_fixture.DbContainer.GetConnectionString())
-            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
             .Options);
 }

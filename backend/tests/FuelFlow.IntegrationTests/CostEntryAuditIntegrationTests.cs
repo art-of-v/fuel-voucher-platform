@@ -34,7 +34,6 @@ public sealed class CostEntryAuditIntegrationTests : IClassFixture<TestDatabaseF
             .UseNpgsql(_fixture.DbContainer.GetConnectionString())
             // Matches production: the API DbContext is read-only for queries and the handler
             // re-attaches explicitly. Running tracking here would hide a missing Update call.
-            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
             .Options);
 
     private static SetBatchCostCommandHandler Handler(ApplicationDbContext ctx)
