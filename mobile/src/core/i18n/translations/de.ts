@@ -79,7 +79,8 @@ export const de: Record<string, string> = {
   // Serverseitige Formatprüfung, clientseitig gespiegelt (#128, #265). Wird sowohl beim Anlegen als
   // auch beim Bearbeiten im Profil verwendet, deshalb nicht unter einem Screen-Namespace verschachtelt.
   'company.edrpouInvalidFormat': 'EDRPOU muss aus genau 8 Ziffern bestehen',
-  'company.edrpouChecksumInvalid': 'Die Prüfziffer der EDRPOU passt nicht zu den ersten sieben Ziffern',
+  'company.edrpouChecksumInvalid':
+    'Die Prüfziffer der EDRPOU passt nicht zu den ersten sieben Ziffern',
   'company.vatInvalidFormat': 'USt-IdNr. muss aus genau 12 Ziffern bestehen',
 
   'nav.stations': 'STATIONEN',

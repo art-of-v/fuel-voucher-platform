@@ -78,7 +78,8 @@ export const es: Record<string, string> = {
   // hoja de creación como la de edición en el perfil, por eso no viven bajo un solo namespace.
   // "NIF" y no "VAT": es el término que ya usa la etiqueta de este campo en español.
   'company.edrpouInvalidFormat': 'El EDRPOU debe tener exactamente 8 dígitos',
-  'company.edrpouChecksumInvalid': 'El dígito de control del EDRPOU no coincide con los primeros siete',
+  'company.edrpouChecksumInvalid':
+    'El dígito de control del EDRPOU no coincide con los primeros siete',
   'company.vatInvalidFormat': 'El NIF debe tener exactamente 12 dígitos',
 
   'nav.stations': 'ESTACIONES',

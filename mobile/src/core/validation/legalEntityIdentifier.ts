@@ -146,9 +146,7 @@ export function isValidVat(value: string | null | undefined): boolean {
 export function edrpouErrorKey(value: string | null | undefined): string | null {
   if (!isAllDigits(value, EDRPOU_LENGTH)) return EDRPOU_FORMAT_ERROR_KEY;
 
-  return hasValidEdrpouControlDigit((value as string).trim())
-    ? null
-    : EDRPOU_CHECKSUM_ERROR_KEY;
+  return hasValidEdrpouControlDigit((value as string).trim()) ? null : EDRPOU_CHECKSUM_ERROR_KEY;
 }
 
 /** Translation key describing why the VAT is unacceptable, or `null` when it is fine. */
