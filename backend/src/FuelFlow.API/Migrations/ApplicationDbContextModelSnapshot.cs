@@ -3260,7 +3260,7 @@ namespace FuelFlow.API.Migrations
                     b.HasOne("FuelFlow.Features.Orders.SharedModels.Order", "Order")
                         .WithMany()
                         .HasForeignKey("OrderId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("FuelFlow.SharedKernel.Domain.User", null)
@@ -3384,7 +3384,7 @@ namespace FuelFlow.API.Migrations
                     b.HasOne("FuelFlow.Features.Orders.SharedModels.Order", "Order")
                         .WithMany()
                         .HasForeignKey("OrderId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", "SourceVoucher")
