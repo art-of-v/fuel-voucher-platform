@@ -160,10 +160,10 @@ jest.mock('../src/features/vouchers/components/OrderCard', () => {
 jest.mock('../src/features/vouchers/components', () => ({
   VoucherCard: () => null,
   WalletSummaryBar: () => null,
+  VoucherListControlsBar: () => null,
 }));
 
 jest.mock('../src/features/company/components', () => ({
-  CompanyStockHeader: () => null,
   WorkerFuelHeader: () => null,
   WorkerUsageSection: () => null,
 }));
@@ -199,7 +199,6 @@ const baseData = {
   isCompanyContext: false,
   isWorkerContext: false,
   currentCompany: null,
-  companyStock: { pool: [], poolLiters: 0, workers: [] },
   pendingOrders: [],
   fulfilledOrders: [],
   issuanceOrders: [],
@@ -531,5 +530,32 @@ describe('receipt download (#119)', () => {
       expect.any(String),
       expect.stringContaining('Order not found'),
     );
+  });
+
+  // #161 H4: the owner's wallet in a company context is receipts and history, and nothing else.
+  // The hub owns who holds what and what is left, so the two screens cannot both list the fuel.
+  describe('the owner company context', () => {
+    const company = { id: 'le1', name: 'ACME LLC' };
+    const receipt = order('co-buy', 'FULFILLED', { legalEntityId: 'le1' });
+
+    it('shows the company its receipts', () => {
+      renderScreen({ isCompanyContext: true, currentCompany: company, fulfilledOrders: [receipt] });
+
+      expect(screen.getByTestId('receipt-co-buy')).toBeTruthy();
+    });
+
+    it('keeps the link to the hub, which is where the stock lives', () => {
+      renderScreen({ isCompanyContext: true, currentCompany: company, fulfilledOrders: [receipt] });
+
+      expect(screen.getByText('company.managementTitle')).toBeTruthy();
+    });
+
+    it('is not empty just because its receipts are gone', () => {
+      // A company whose fuel has all been used up has nothing left to show in the wallet, and
+      // saying so is honest - the hub is one tap away for the operational view.
+      renderScreen({ isCompanyContext: true, currentCompany: company, fulfilledOrders: [] });
+
+      expect(screen.queryByTestId('receipt-co-buy')).toBeNull();
+    });
   });
 });

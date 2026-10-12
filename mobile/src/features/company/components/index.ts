@@ -1,4 +1,3 @@
-export { CompanyStockHeader } from './CompanyStockHeader';
 export { WorkerFuelHeader } from './WorkerFuelHeader';
 export { WorkerUsageSection } from './WorkerUsageSection';
 export { CompanyStatsRow } from './CompanyStatsRow';
