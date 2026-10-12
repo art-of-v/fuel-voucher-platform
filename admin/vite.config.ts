@@ -23,10 +23,6 @@ export default defineConfig({
         target: process.env.VITE_API_URL || "http://localhost:5000",
         changeOrigin: true,
       },
-      "/uploads": {
-        target: process.env.VITE_API_URL || "http://localhost:5000",
-        changeOrigin: true,
-      },
     },
   },
   preview: {
@@ -34,10 +30,6 @@ export default defineConfig({
     port: 5000,
     proxy: {
       "/api": {
-        target: process.env.VITE_API_URL || "http://localhost:5000",
-        changeOrigin: true,
-      },
-      "/uploads": {
         target: process.env.VITE_API_URL || "http://localhost:5000",
         changeOrigin: true,
       },

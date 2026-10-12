@@ -143,7 +143,7 @@ export default function VoucherExchangeTab() {
     queryClient.invalidateQueries({ queryKey: ["/api/admin/voucher-exchange/attention"] });
     queryClient.invalidateQueries({ queryKey: ["/api/admin/voucher-exchange/attention/count"] });
     queryClient.invalidateQueries({ queryKey: ["/api/admin/vouchers"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/admin/imports"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/voucher-imports"] });
     // The exchange just recorded is now in the history; without this the operator confirms an
     // exchange, opens History, and does not see it.
     queryClient.invalidateQueries({ queryKey: ["/api/admin/voucher-exchange/batches"] });
