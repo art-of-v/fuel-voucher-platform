@@ -62,14 +62,11 @@ using FuelFlow.Features.Stations.GetAdminStations;
 using FuelFlow.Features.Stations.GetPackageSuggestions;
 using FuelFlow.Features.Stations.GetPublicFuelTypes;
 using FuelFlow.Features.Stations.GetPublicPackages;
-using FuelFlow.Features.Stations.GetPublicPackagesByStation;
 using FuelFlow.Features.Stations.GetPublicStationNodes;
-using FuelFlow.Features.Stations.GetPublicStationNodesByStation;
 using FuelFlow.Features.Stations.GetPublicStations;
 using FuelFlow.Features.Stations.UpdateFuelType;
 using FuelFlow.Features.Stations.UpdatePackage;
 using FuelFlow.Features.Stations.UpdateStation;
-using FuelFlow.Features.Sync.GetSync;
 using FuelFlow.Features.Updates;
 using FuelFlow.Features.Users.ChangeEmail;
 using FuelFlow.Features.Users.UpdateUser;
@@ -319,7 +316,6 @@ services.AddScoped<TermQuoteQueryHandler>();
         }
 
         services.AddScoped<ProcessMonobankWebhookCommandHandler>();
-        services.AddScoped<GetSyncCommandHandler>();
     }
 
     /// <summary>
@@ -396,9 +392,7 @@ services.AddScoped<TermQuoteQueryHandler>();
         services.AddScoped<GetPublicStationsQueryHandler>();
         services.AddScoped<GetPublicFuelTypesQueryHandler>();
         services.AddScoped<GetPublicStationNodesQueryHandler>();
-        services.AddScoped<GetPublicStationNodesByStationQueryHandler>();
         services.AddScoped<GetPublicPackagesQueryHandler>();
-        services.AddScoped<GetPublicPackagesByStationQueryHandler>();
     }
 
     private static void AddContractServices(IServiceCollection services)

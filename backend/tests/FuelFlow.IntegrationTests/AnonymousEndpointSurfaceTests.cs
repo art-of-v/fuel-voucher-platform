@@ -98,11 +98,9 @@ public class AnonymousEndpointSurfaceTests : IClassFixture<TestDatabaseFixture>
         // project explicit DTOs rather than returning entities, so a column added to a table
         // cannot become public reference data by accident (FF-31).
         "GET /api/packages",
-        "GET /api/packages/station/{stationid}",
         "GET /api/stations",
         "GET /api/stations/fuel-types",
         "GET /api/station-nodes",
-        "GET /api/station-nodes/station/{stationid}",
 
         // Public contact form behind the /support page on palne.shop: a visitor with no account
         // must be able to reach support. Anonymous by design and spam-hardened at the endpoint
