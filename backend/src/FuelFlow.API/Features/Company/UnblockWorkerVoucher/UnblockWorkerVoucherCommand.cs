@@ -41,7 +41,12 @@ public sealed class UnblockWorkerVoucherCommandHandler
             return new UnblockWorkerVoucherResult("OwnerCompanyNotFound", "Owner does not have a legal entity profile.");
         }
 
+        // Read-only guard, so AsNoTracking (#246). The thaw itself is a compare-and-swap
+        // ExecuteUpdateAsync further down, which bumps xmin behind EF's back; a tracked instance of
+        // that same voucher would sit in the change tracker holding the pre-statement xmin, and the
+        // first thing that later modified it would fail on a conflict that never happened.
         var voucher = await _context.FuelVouchers
+            .AsNoTracking()
             .FirstOrDefaultAsync(x => x.Id == command.VoucherId, cancellationToken);
 
         if (voucher is null)

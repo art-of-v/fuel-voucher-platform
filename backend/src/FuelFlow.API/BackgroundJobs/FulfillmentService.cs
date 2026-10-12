@@ -118,6 +118,19 @@ public class FulfillmentService
                 var currentOrder = order;
                 IDbContextTransaction? transaction = null;
 
+                // #246: this runs on the same scoped context as AssignVouchersToOrderAsync, which
+                // claims vouchers with raw compare-and-swap UPDATEs. Those rows are then loaded here
+                // TRACKED and saved below — and the tracker still holds the instances the assignment
+                // path loaded before its statements bumped them. With a concurrency token on
+                // fuel_vouchers that is not a race, it is a guaranteed conflict on a legitimate save.
+                //
+                // So the tracker is emptied before the read, exactly as the assignment path does on
+                // entry: everything loaded after this point carries the values the database has now,
+                // and the only conflicts left are real ones. Without the Clear() an AsNoTracking()
+                // here would be worse, not better — the rows read fresh would collide with the stale
+                // instances already tracked, and `Update()` would throw on the duplicate key.
+                _context.ChangeTracker.Clear();
+
                 try
                 {
                     if (_context.Database.IsRelational())
@@ -130,8 +143,16 @@ public class FulfillmentService
                             $"SELECT pg_advisory_xact_lock(hashtext('fulfillment-order'), hashtext({currentOrder.Id.ToString()}))",
                             cancellationToken);
 
+                        // Loaded TRACKED, and that is load-bearing in a way that is easy to undo by accident.
+                        //
+                        // `orders` carries the xmin concurrency token (#246), and EF materializes a
+                        // store-generated token ONLY on a tracked load — on an AsNoTracking read the
+                        // property comes back as 0. This order is reset and saved further down, so with
+                        // AsNoTracking the UPDATE carried `WHERE id = @id AND xmin = 0`, matched nothing,
+                        // and threw a concurrency exception on EVERY mismatch repair. Not a race: a
+                        // guarantee of failure. The tracker was emptied above, so nothing else is
+                        // holding this key and the tracked read is safe.
                         var freshOrder = await _context.Orders
-                            .AsNoTracking()
                             .Include(o => o.LineItems)
                             .FirstOrDefaultAsync(o => o.Id == currentOrder.Id, cancellationToken);
 
@@ -266,8 +287,10 @@ public class FulfillmentService
                             ? DateTime.UtcNow
                             : null;
                         currentOrder.UpdatedAtUtc = DateTime.UtcNow;
-                        _context.Orders.Update(currentOrder);
-
+                        // No Update() call. The entity is tracked and its properties are mutated in
+                        // place, so change detection handles it - and Update() would mark the whole
+                        // graph Modified, rewriting every line item of the order to change four fields
+                        // on the order itself.
                         await _context.SaveChangesAsync(cancellationToken);
 
                         _logger.LogInformation(
@@ -553,8 +576,12 @@ public class FulfillmentService
 
             var usedVoucherIds = existingFulfillments.Select(f => f.VoucherId).ToList();
 
+            // Read-only: this feeds a count, and the rows are raw-UPDATEd by the claim below.
+            // AsNoTracking so an instance loaded before a claim never carries a stale xmin into a
+            // later SaveChanges (#246).
             var existingFulfillmentVouchers = usedVoucherIds.Count != 0
                 ? await _context.FuelVouchers
+                    .AsNoTracking()
                     .Where(v => usedVoucherIds.Contains(v.Id))
                     .ToListAsync(cancellationToken)
                 : [];
@@ -758,7 +785,12 @@ public class FulfillmentService
         // A QA account draws only from test stock and a real account only from real stock, so a seeded
         // test voucher never reaches a paying customer and a QA run never burns real inventory.
         // Re-asserted atomically at the claim (TryAssignVoucherAsync).
+        // AsNoTracking (#246): this is a decision, not a write. The chosen row is claimed by a raw
+        // compare-and-swap UPDATE moments later, and tracking it here would put an instance with the
+        // pre-claim xmin into the change tracker — where any later save of that row would fail on a
+        // conflict that never happened.
         return await _context.FuelVouchers
+            .AsNoTracking()
             .Where(v => v.Status == VoucherStatus.Available
                      && v.Provider.ToLower() == lineItem.Provider.ToLower()
                      && v.FuelTypeId == lineItem.FuelTypeId
@@ -1287,7 +1319,10 @@ public class FulfillmentService
         // stock is preserved for the tiers that actually need it — a shorter voucher that still covers the
         // promise is strictly better than a longer one. A QA account draws only from test stock and a real
         // account only from real stock, re-asserted atomically at the claim (TryAssignReplacementVoucherAsync).
+        // AsNoTracking for the same reason as FindMatchingVoucherAsync (#246): a decision whose row is
+        // claimed by a raw UPDATE two lines later, never a write in its own right.
         return await _context.FuelVouchers
+            .AsNoTracking()
             .Where(v => v.Status == VoucherStatus.Available
                      && v.Provider.ToLower() == source.Provider.ToLower()
                      && v.FuelTypeId == source.FuelTypeId
