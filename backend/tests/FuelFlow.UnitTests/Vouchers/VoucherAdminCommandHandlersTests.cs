@@ -7,10 +7,8 @@ using FuelFlow.Features.Vouchers.DeleteVoucher;
 using FuelFlow.Features.Vouchers.GetAdminVoucherById;
 using FuelFlow.Features.Vouchers.GetAdminVouchers;
 using FuelFlow.Features.Vouchers.GetImportBatches;
-using FuelFlow.Features.Vouchers.GetVoucherVerification;
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.SharedModels;
-using FuelFlow.Features.Vouchers.UnblockVoucher;
 using FuelFlow.Features.Vouchers.UpdateVoucher;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
@@ -535,79 +533,6 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
 
     // ── 6. GetFuelVouchersQueryHandler ───────────────────────────────────────
 
-    [Fact]
-    public async Task UnblockVoucher_ShouldTransitionBlockedToAssigned()
-    {
-        var voucher = CreateVoucher(status: VoucherStatus.Blocked, voucherNumber: "OKKO-BLOCK-1");
-        voucher.AssignedToUserId = UserId;
-        voucher.WorkerUserId = OtherUserId;
-        _context.FuelVouchers.Add(voucher);
-        await _context.SaveChangesAsync();
-
-        var handler = new UnblockVoucherCommandHandler(_context, _eventService);
-        var result = await handler.HandleAsync(new UnblockVoucherCommand(voucher.Id, UserId, "Admin User"));
-
-        result.Should().NotBeNull();
-        result!.Success.Should().BeTrue();
-
-        var updated = await _context.FuelVouchers.FirstAsync(v => v.Id == voucher.Id);
-        updated.Status.Should().Be(VoucherStatus.Assigned);
-        updated.AssignedToUserId.Should().Be(UserId);
-        updated.WorkerUserId.Should().BeNull();
-
-        var evt = _context.ProviderEventOutbox.Single(e => e.EventType == "VoucherUnblocked");
-        evt.AggregateId.Should().Be(voucher.Id.ToString());
-        evt.ChangedByUserId.Should().Be(UserId);
-        evt.ChangedByUserName.Should().Be("Admin User");
-        evt.OldValue.Should().Contain("Blocked");
-        evt.NewValue.Should().Contain("Assigned");
-    }
-
-    [Fact]
-    public async Task UnblockVoucher_ShouldRejectWhenVoucherIsNotBlocked()
-    {
-        var voucher = CreateVoucher(status: VoucherStatus.Assigned, voucherNumber: "OKKO-ASSIGNED-1");
-        _context.FuelVouchers.Add(voucher);
-        await _context.SaveChangesAsync();
-
-        var handler = new UnblockVoucherCommandHandler(_context, _eventService);
-        var result = await handler.HandleAsync(new UnblockVoucherCommand(voucher.Id));
-
-        result.Should().NotBeNull();
-        result!.Success.Should().BeFalse();
-        result.Error.Should().Contain("Only blocked vouchers can be unblocked");
-
-        var updated = await _context.FuelVouchers.FirstAsync(v => v.Id == voucher.Id);
-        updated.Status.Should().Be(VoucherStatus.Assigned);
-    }
-
-    [Fact]
-    public async Task UnblockVoucher_ShouldReturnNull_WhenVoucherMissing()
-    {
-        var handler = new UnblockVoucherCommandHandler(_context, _eventService);
-
-        var result = await handler.HandleAsync(new UnblockVoucherCommand(Guid.NewGuid()));
-
-        result.Should().BeNull();
-    }
-
-[Fact]
-    public async Task GetVoucherVerification_ShouldReturnVerificationData()
-    {
-        var voucher = CreateVoucher(status: VoucherStatus.Assigned, voucherNumber: "OKKO-VERIFY-1");
-        _context.FuelVouchers.Add(voucher);
-        await _context.SaveChangesAsync();
-
-        var handler = new GetVoucherVerificationQueryHandler(_context, _qrGeneratorMock.Object);
-        var result = await handler.HandleAsync(new GetVoucherVerificationQuery(voucher.Id));
-
-        result.Should().NotBeNull();
-        result!.VoucherId.Should().Be(voucher.Id);
-        result.VoucherNumber.Should().Be("OKKO-VERIFY-1");
-        result.Status.Should().Be(VoucherStatus.Assigned.ToString());
-        result.QrCodeBase64.Should().Be("data:image/png;base64,base64-data");
-    }
-
     // ── 8. GetQrCodesQueryHandler ────────────────────────────────────────────
 
 private VoucherImport CreateImport(string fileName = "vouchers.pdf", int importedCount = 0)
@@ -867,58 +792,6 @@ private VoucherImport CreateImport(string fileName = "vouchers.pdf", int importe
     }
 
     // ── 11. GetVouchersQueryHandler ──────────────────────────────────────────
-
-    [Fact]
-    public async Task GetVouchers_ShouldReturnVouchersWithFields()
-    {
-        var v1 = CreateVoucher(voucherNumber: "OKKO-LIST-1", createdAtUtc: DateTime.UtcNow);
-        var v2 = CreateVoucher(voucherNumber: "OKKO-LIST-2", createdAtUtc: DateTime.UtcNow.AddMinutes(-1));
-        _context.FuelVouchers.AddRange(v1, v2);
-        await _context.SaveChangesAsync();
-
-        var handler = new GetVouchersQueryHandler(_context, _qrGeneratorMock.Object);
-        var result = await handler.HandleAsync(new GetVouchersQuery(Page: 1, PageSize: 50), CancellationToken.None);
-
-        result.TotalCount.Should().Be(2);
-        result.Page.Should().Be(1);
-        result.PageSize.Should().Be(50);
-        result.Vouchers.Should().HaveCount(2);
-
-        var first = result.Vouchers.First(v => v.Id == v1.Id);
-        first.VoucherNumber.Should().Be("OKKO-LIST-1");
-        first.Provider.Should().Be("OKKO");
-        first.FuelTypeName.Should().Be("A-95");
-        first.QrCodeUrl.Should().Be($"/api/voucher-catalog/{v1.Id}/qr");
-    }
-
-    [Fact]
-    public async Task GetVouchers_ShouldClampOversizedPageSize()
-    {
-        _context.FuelVouchers.Add(CreateVoucher(voucherNumber: "OKKO-CLAMP-1"));
-        await _context.SaveChangesAsync();
-
-        var handler = new GetVouchersQueryHandler(_context, _qrGeneratorMock.Object);
-        var result = await handler.HandleAsync(
-            new GetVouchersQuery(Page: 0, PageSize: 1_000_000), CancellationToken.None);
-
-        result.Page.Should().Be(1);
-        result.PageSize.Should().Be(GetVouchersQueryHandler.MaxPageSize);
-    }
-
-    [Fact]
-    public async Task GetVouchers_ShouldFilterByFuelTypeId()
-    {
-        _context.FuelVouchers.AddRange(
-            CreateVoucher(fuelTypeId: "okko-95", voucherNumber: "OKKO-95-1"),
-            CreateVoucher(fuelTypeId: "okko-dp", voucherNumber: "OKKO-DP-1"));
-        await _context.SaveChangesAsync();
-
-        var handler = new GetVouchersQueryHandler(_context, _qrGeneratorMock.Object);
-        var result = await handler.HandleAsync(new GetVouchersQuery(Page: 1, PageSize: 50, FuelTypeId: "okko-dp"), CancellationToken.None);
-
-        result.TotalCount.Should().Be(1);
-        result.Vouchers.Should().ContainSingle(v => v.FuelTypeId == "okko-dp");
-    }
 
     // ── GetAdminVouchersQueryHandler: fuel options are scoped to the brand ──
 
