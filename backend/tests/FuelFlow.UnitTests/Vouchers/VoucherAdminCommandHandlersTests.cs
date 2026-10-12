@@ -6,7 +6,6 @@ using FuelFlow.Features.Vouchers.BulkActionVouchers;
 using FuelFlow.Features.Vouchers.DeleteVoucher;
 using FuelFlow.Features.Vouchers.GetAdminVoucherById;
 using FuelFlow.Features.Vouchers.GetAdminVouchers;
-using FuelFlow.Features.Vouchers.GetFuelVouchers;
 using FuelFlow.Features.Vouchers.GetImportBatches;
 using FuelFlow.Features.Vouchers.GetQrCodes;
 using FuelFlow.Features.Vouchers.GetVoucherVerification;
@@ -535,7 +534,7 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
         result.Statuses.Should().Contain("Blocked");
     }
 
-    // ── 6. GetFuelVouchersQueryHandler ───────────────────────────────────────
+    // ── 6. UnblockVoucherCommandHandler ─────────────────────────────────────
 
     [Fact]
     public async Task UnblockVoucher_ShouldTransitionBlockedToAssigned()
@@ -591,34 +590,6 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
         var result = await handler.HandleAsync(new UnblockVoucherCommand(Guid.NewGuid()));
 
         result.Should().BeNull();
-    }
-
-    [Fact]
-    public async Task GetFuelVouchers_ShouldReturnItemsAndTotal()
-    {
-        _context.FuelVouchers.AddRange(CreateVoucher(), CreateVoucher());
-        await _context.SaveChangesAsync();
-
-        var handler = new GetFuelVouchersQueryHandler(_context);
-        var result = await handler.HandleAsync(new GetFuelVouchersQuery(null, null, 1, 50));
-
-        result.Total.Should().Be(2);
-        result.Items.Should().HaveCount(2);
-    }
-
-    [Fact]
-    public async Task GetFuelVouchers_ShouldFilterByVoucherNumberSearch()
-    {
-        var target = CreateVoucher(voucherNumber: "OKKO-TARGET-1");
-        var other = CreateVoucher(voucherNumber: "OKKO-OTHER-1");
-        _context.FuelVouchers.AddRange(target, other);
-        await _context.SaveChangesAsync();
-
-        var handler = new GetFuelVouchersQueryHandler(_context);
-        var result = await handler.HandleAsync(new GetFuelVouchersQuery("OKKO-TARGET", null, 1, 50));
-
-        result.Total.Should().Be(1);
-        result.Items.Should().ContainSingle(v => v.Id == target.Id);
     }
 
     // ── 7. GetVoucherVerificationQueryHandler ────────────────────────────────
