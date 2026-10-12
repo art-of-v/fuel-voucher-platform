@@ -159,6 +159,7 @@ jest.mock('lucide-react-native', () => {
     Plus: icon('Plus'),
     X: icon('X'),
     AlertTriangle: icon('AlertTriangle'),
+    AlertCircle: icon('AlertCircle'),
     Briefcase: icon('Briefcase'),
   };
 });
@@ -174,7 +175,7 @@ eact-test-renderer keeps a Modal's children mounted whatever isible says, so
 const sheetIsOpen = (): boolean => (screen.UNSAFE_getByType(Modal) as any).props.visible;
 
 function company(id: string, name: string) {
-  return { id, name, edrpou: '1234567890', isActive: true, role: 'owner' };
+  return { id, name, edrpou: '12345678', isActive: true, role: 'owner' };
 }
 
 function membership(legalEntityId: string, name: string, isOwner = false) {
@@ -334,7 +335,7 @@ describe('Contexts — companies the user only works for', () => {
 
 describe('Contexts — creating a company', () => {
   /** Fills the two required fields; both are needed for the submit to enable. */
-  function fillRequired(name = 'Nova', edrpou = '1234567890') {
+  function fillRequired(name = 'Nova', edrpou = '12345678') {
     fireEvent.changeText(screen.getByTestId('field-context.create.name'), name);
     fireEvent.changeText(screen.getByTestId('field-context.create.edrpou'), edrpou);
   }
@@ -351,7 +352,7 @@ describe('Contexts — creating a company', () => {
     render(<ContextsScreen />);
     fireEvent.press(screen.getByText('context.addCompany'));
 
-    fillRequired('', '1234567890');
+    fillRequired('', '12345678');
     fireEvent.press(screen.getByText('context.create.submit'));
 
     // A company with no name would be created and then unusable everywhere else.
@@ -379,12 +380,60 @@ describe('Contexts — creating a company', () => {
     expect(mockCreateCompany).not.toHaveBeenCalled();
   });
 
+  it('refuses to submit an EDRPOU that is not eight digits', () => {
+    // The server rejects this with a 400 (#128), and `legal_entities.edrpou` is globally unique, so
+    // a typo here is permanent until somebody finds the row. The client says so instead.
+    render(<ContextsScreen />);
+    fireEvent.press(screen.getByText('context.addCompany'));
+
+    fillRequired('Nova', '1234567890456565');
+    fireEvent.press(screen.getByText('context.create.submit'));
+
+    expect(mockCreateCompany).not.toHaveBeenCalled();
+  });
+
+  it('refuses to submit a VAT that is not twelve digits', () => {
+    // A VAT is optional, so an empty one is fine. One that was typed and is wrong is not the same
+    // thing: someone believed they were giving us a VAT.
+    render(<ContextsScreen />);
+    fireEvent.press(screen.getByText('context.addCompany'));
+
+    fillRequired('Nova', '12345678');
+    fireEvent.changeText(screen.getByTestId('field-context.create.vatNumber'), '999999999');
+    fireEvent.press(screen.getByText('context.create.submit'));
+
+    expect(mockCreateCompany).not.toHaveBeenCalled();
+  });
+
+  it('explains the EDRPOU on the field once it has been left, not before', () => {
+    render(<ContextsScreen />);
+    fireEvent.press(screen.getByText('context.addCompany'));
+
+    fireEvent.changeText(screen.getByTestId('field-context.create.edrpou'), '1234');
+    // Mid-typing is not an error: the eighth digit has not been typed yet.
+    expect(screen.queryByText('company.edrpouInvalidFormat')).toBeNull();
+
+    fireEvent(screen.getByTestId('field-context.create.edrpou'), 'blur');
+    expect(screen.getByText('company.edrpouInvalidFormat')).toBeTruthy();
+  });
+
+  it('explains the VAT on the field once it has been left', () => {
+    render(<ContextsScreen />);
+    fireEvent.press(screen.getByText('context.addCompany'));
+
+    fireEvent.changeText(screen.getByTestId('field-context.create.vatNumber'), '123');
+    expect(screen.queryByText('company.vatInvalidFormat')).toBeNull();
+
+    fireEvent(screen.getByTestId('field-context.create.vatNumber'), 'blur');
+    expect(screen.getByText('company.vatInvalidFormat')).toBeTruthy();
+  });
+
   it('sends trimmed values with the optional fields omitted', async () => {
     render(<ContextsScreen />);
     fireEvent.press(screen.getByText('context.addCompany'));
 
     fireEvent.changeText(screen.getByTestId('field-context.create.name'), '  Nova  ');
-    fireEvent.changeText(screen.getByTestId('field-context.create.edrpou'), ' 1234567890 ');
+    fireEvent.changeText(screen.getByTestId('field-context.create.edrpou'), ' 12345678 ');
     fireEvent.press(screen.getByText('context.create.submit'));
 
     await waitFor(() => expect(mockCreateCompany).toHaveBeenCalled());
@@ -392,7 +441,7 @@ describe('Contexts — creating a company', () => {
     // string as a supplied-but-blank value.
     expect(mockCreateCompany).toHaveBeenCalledWith({
       name: 'Nova',
-      edrpou: '1234567890',
+      edrpou: '12345678',
       vatNumber: undefined,
       directorName: undefined,
       address: undefined,
@@ -403,14 +452,14 @@ describe('Contexts — creating a company', () => {
     render(<ContextsScreen />);
     fireEvent.press(screen.getByText('context.addCompany'));
 
-    fillRequired('Nova', '1234567890');
-    fireEvent.changeText(screen.getByTestId('field-context.create.vatNumber'), '9999999999');
+    fillRequired('Nova', '12345678');
+    fireEvent.changeText(screen.getByTestId('field-context.create.vatNumber'), '123456789012');
     fireEvent.changeText(screen.getByTestId('field-context.create.address'), 'Kyiv');
     fireEvent.press(screen.getByText('context.create.submit'));
 
     await waitFor(() => expect(mockCreateCompany).toHaveBeenCalled());
     expect(mockCreateCompany).toHaveBeenCalledWith(
-      expect.objectContaining({ vatNumber: '9999999999', address: 'Kyiv' }),
+      expect.objectContaining({ vatNumber: '123456789012', address: 'Kyiv' }),
     );
   });
 
@@ -463,7 +512,7 @@ describe('Contexts — creating a company', () => {
     render(<ContextsScreen />);
     fireEvent.press(screen.getByText('context.addCompany'));
 
-    fillRequired('Nova', '1234567890');
+    fillRequired('Nova', '12345678');
     fireEvent.changeText(screen.getByTestId('field-context.create.address'), 'Kyiv');
     fireEvent.press(screen.getByText('context.create.submit'));
     await waitFor(() => expect(sheetIsOpen()).toBe(false));

@@ -10,7 +10,16 @@ import {
   Modal,
 } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
-import { User, Building2, Check, Plus, X, AlertTriangle, Briefcase } from 'lucide-react-native';
+import {
+  User,
+  Building2,
+  Check,
+  Plus,
+  X,
+  AlertTriangle,
+  AlertCircle,
+  Briefcase,
+} from 'lucide-react-native';
 import { GridPageLayout, ScreenHeader, LoadingState, useContentInsets } from '../src/core/ui';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useI18n } from '../src/core/i18n';
@@ -23,6 +32,12 @@ import {
 import { useMemberships } from '../src/features/company/hooks/useMemberships';
 import { useToastStore } from '../src/core/feedback/toastStore';
 import { Haptics } from '../src/core/utils/haptics';
+import {
+  edrpouErrorKey,
+  isValidEdrpou,
+  isValidVat,
+  vatErrorKey,
+} from '../src/core/validation/legalEntityIdentifier';
 
 type CompanyForm = {
   name: string;
@@ -55,10 +70,15 @@ export default function ContextsScreen() {
 
   const [createVisible, setCreateVisible] = useState(false);
   const [form, setForm] = useState<CompanyForm>(EMPTY_FORM);
+  // A field that has been left at least once. The format errors appear from the first blur onwards:
+  // showing "must be 8 digits" while the eighth digit is still being typed is noise, and it is the
+  // same pattern TextField's `error` prop already drives on every other form in the app.
+  const [touched, setTouched] = useState<{ edrpou?: boolean; vatNumber?: boolean }>({});
 
   const { companies, isLoading, hasError, refetch, createCompany, isCreating } = useLegalEntities({
     onCreated: () => {
       setForm(EMPTY_FORM);
+      setTouched({});
       setCreateVisible(false);
       showToast({ kind: 'success', message: t('common.saved') });
     },
@@ -78,7 +98,14 @@ export default function ContextsScreen() {
     router.back();
   };
 
-  const canSubmit = form.name.trim().length > 0 && form.edrpou.trim().length > 0;
+  // The server validates the same rule on every write path (#128) and would answer a 16-digit typo
+  // with a 400. Gating here turns that into a message on the field while the person is still looking
+  // at the number they typed - the EDRPOU is globally unique, so a bad one is permanent until found.
+  const canSubmit =
+    form.name.trim().length > 0 && isValidEdrpou(form.edrpou) && isValidVat(form.vatNumber);
+
+  const edrpouError = touched.edrpou ? edrpouErrorKey(form.edrpou) : null;
+  const vatError = touched.vatNumber ? vatErrorKey(form.vatNumber) : null;
 
   const submitCreate = async () => {
     if (!canSubmit || isCreating) return;
@@ -284,6 +311,8 @@ export default function ContextsScreen() {
                 label={t('context.create.edrpou')}
                 value={form.edrpou}
                 onChangeText={(v) => setForm((f) => ({ ...f, edrpou: v }))}
+                onBlur={() => setTouched((s) => ({ ...s, edrpou: true }))}
+                error={edrpouError ? t(edrpouError) : undefined}
                 keyboardType="number-pad"
                 tokens={tokens}
               />
@@ -291,6 +320,8 @@ export default function ContextsScreen() {
                 label={t('context.create.vatNumber')}
                 value={form.vatNumber}
                 onChangeText={(v) => setForm((f) => ({ ...f, vatNumber: v }))}
+                onBlur={() => setTouched((s) => ({ ...s, vatNumber: true }))}
+                error={vatError ? t(vatError) : undefined}
                 keyboardType="number-pad"
                 tokens={tokens}
               />
@@ -445,6 +476,12 @@ function useContextsStyles() {
           letterSpacing: 1.5,
           textTransform: 'uppercase',
         },
+        // Sentence case on purpose, unlike the label above: this is prose someone has to read, and
+        // uppercase tracked-out text is the label treatment.
+        fieldError: {
+          fontFamily: 'Inter-Medium',
+          fontSize: tokens.type.caption.fontSize,
+        },
         input: {
           borderRadius: tokens.radius.md,
           paddingHorizontal: tokens.spacing.fine14,
@@ -545,12 +582,17 @@ function Field({
   label,
   value,
   onChangeText,
+  onBlur,
+  error,
   keyboardType,
   tokens,
 }: {
   label: string;
   value: string;
   onChangeText: (v: string) => void;
+  onBlur?: () => void;
+  /** Already-localized message. Its presence IS the error state, as in core/ui TextField. */
+  error?: string;
   keyboardType?: 'default' | 'number-pad';
   tokens: ReturnType<typeof useDesignTokens>;
 }) {
@@ -562,18 +604,31 @@ function Field({
         testID={`field-${label}`}
         value={value}
         onChangeText={onChangeText}
+        onBlur={onBlur}
         keyboardType={keyboardType ?? 'default'}
         autoCapitalize="none"
+        // Nothing about an invalid field is invisible to a screen reader: the message below is
+        // announced with the field, and the flag says the value will be rejected rather than that
+        // the input is disabled.
+        aria-invalid={!!error}
         placeholderTextColor={tokens.colors.text.dim}
         style={[
           styles.input,
           {
             backgroundColor: tokens.colors.background,
             color: tokens.colors.text.primary,
-            borderColor: tokens.colors.borderLight,
+            borderColor: error ? tokens.colors.status.danger.base : tokens.colors.borderLight,
           },
         ]}
       />
+      {error ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens.spacing.xs }}>
+          <AlertCircle size={13} color={tokens.colors.status.danger.base} />
+          <Text style={[styles.fieldError, { color: tokens.colors.status.danger.base }]}>
+            {error}
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }

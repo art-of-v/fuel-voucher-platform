@@ -1,9 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View } from 'react-native';
 
 import { BottomSheet, Button, TextField } from '../../../core/ui';
 import { useDesignTokens } from '../../../core/hooks/useTheme';
 import { useI18n } from '../../../core/i18n';
+import {
+  edrpouErrorKey,
+  isValidEdrpou,
+  isValidVat,
+  vatErrorKey,
+} from '../../../core/validation/legalEntityIdentifier';
 
 export interface CompanyForm {
   name: string;
@@ -42,6 +48,30 @@ export function EditCompanySheet({
   const tokens = useDesignTokens();
   const { t } = useI18n();
 
+  // Same rule the server enforces on the scoped PUT (#128), mirrored so the reason appears on the
+  // field (#265). A first-ever run shows no error: an empty EDRPOU is not "malformed", it is
+  // "not filled in yet", and saying otherwise before a keystroke is noise.
+  const [edrpouTouched, setEdrpouTouched] = useState(false);
+  const [vatTouched, setVatTouched] = useState(false);
+  const [wasVisible, setWasVisible] = useState(visible);
+
+  // A sheet that has been closed and reopened starts from the field's own state, not from what the
+  // person typed last time - otherwise a form they corrected and abandoned reopens still red.
+  // Adjusted during render rather than in an effect: this is React's own answer to "sync state with
+  // a prop that changed", and `set-state-in-effect` is a lint error here for good reason - an effect
+  // would first paint the stale state.
+  if (visible !== wasVisible) {
+    setWasVisible(visible);
+    if (!visible) {
+      setEdrpouTouched(false);
+      setVatTouched(false);
+    }
+  }
+
+  const edrpouError = edrpouTouched ? edrpouErrorKey(form.edrpou) : null;
+  const vatError = vatTouched ? vatErrorKey(form.vatNumber) : null;
+  const identifiersValid = isValidEdrpou(form.edrpou) && isValidVat(form.vatNumber);
+
   return (
     <BottomSheet
       visible={visible}
@@ -54,6 +84,10 @@ export function EditCompanySheet({
           size="lg"
           fullWidth
           loading={isSaving}
+          // The server validates this on every write, so a save with a malformed EDRPOU cannot
+          // succeed whatever the client does - it just fails with a message this screen used to
+          // swallow. Disabled instead, with the reason on the field.
+          disabled={!identifiersValid}
           onPress={onSave}
         />
       }
@@ -71,6 +105,8 @@ export function EditCompanySheet({
               label={t('profile.edrpou')}
               value={form.edrpou}
               onChangeText={(text) => onChange({ ...form, edrpou: text })}
+              onBlur={() => setEdrpouTouched(true)}
+              error={edrpouError ? t(edrpouError) : undefined}
               keyboardType="numeric"
             />
           </View>
@@ -79,6 +115,8 @@ export function EditCompanySheet({
               label={t('profile.vatNumber')}
               value={form.vatNumber}
               onChangeText={(text) => onChange({ ...form, vatNumber: text })}
+              onBlur={() => setVatTouched(true)}
+              error={vatError ? t(vatError) : undefined}
               keyboardType="numeric"
             />
           </View>
