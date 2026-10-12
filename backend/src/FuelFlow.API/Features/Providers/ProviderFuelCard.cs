@@ -81,6 +81,11 @@ var litres = weighted.Sum(p => p.Liters);
             DiscountPerLiter = Math.Max(0, fuel.BasePrice - fuel.DiscountPrice),
             AllowBelowCost = fuel.AllowBelowCost,
             PackageLiters = packages.Select(p => (int)p.Liters).OrderBy(l => l).ToList(),
+            // Read back off the packages rather than a column on the fuel type, because the flag
+            // lives on the package - that is the row the storefront filters. Any=true when the fuel
+            // has packages and they are all flagged; a mixed fuel shows flagged, since the operator
+            // needs to look at it either way.
+            IsTestData = packages.Count > 0 && packages.All(p => p.IsTestData),
             PriceSpread = BuildSpread(supplierCosts, finals)
         };
     }

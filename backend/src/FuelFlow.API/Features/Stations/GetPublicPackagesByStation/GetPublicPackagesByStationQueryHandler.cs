@@ -19,7 +19,10 @@ public sealed class GetPublicPackagesByStationQueryHandler
     {
         var rows = await _context.FuelPackages
             .AsNoTracking()
-            .Where(x => x.StationId == query.StationId)
+            // Same rule as GetPublicPackagesQueryHandler, and for the same reason: this is the
+            // second anonymous storefront route, so a filter on one of the two would leave the
+            // rehearsal package purchasable through the other.
+            .Where(x => x.StationId == query.StationId && !x.IsTestData)
             .OrderBy(x => x.FuelName)
             .ThenBy(x => x.Liters)
             .Select(x => new
