@@ -30,15 +30,17 @@ internal sealed class UserContractConfiguration : IEntityTypeConfiguration<UserC
             .HasColumnName("signed_at_utc")
             .IsRequired();
 
+        // A signature outlives the account that gave it. Cascade here meant that deleting a user
+        // erased every contract they had signed - which is exactly the history #217 keeps.
         builder.HasOne(e => e.User)
             .WithMany()
             .HasForeignKey(e => e.UserId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(e => e.Contract)
             .WithMany()
             .HasForeignKey(e => e.ContractId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(e => e.UserId);
         builder.HasIndex(e => e.ContractId);

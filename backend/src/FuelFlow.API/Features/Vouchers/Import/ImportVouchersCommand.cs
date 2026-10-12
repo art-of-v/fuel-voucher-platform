@@ -92,6 +92,36 @@ public sealed class ImportVouchersCommandHandler
         return $"<{payload.Length} chars, sha256:{Convert.ToHexString(digest)[..10].ToLowerInvariant()}>";
     }
 
+    /// <summary>
+    /// Prepares a rejected voucher's raw region text for storage.
+    /// <para>
+    /// The region text is the parsed block a voucher was rejected from, and it embeds the QR
+    /// payload - the same bearer instrument <see cref="DescribeQrPayload"/> exists to keep out of
+    /// stores. Writing it verbatim copied redeemable material into
+    /// <c>voucher_import_errors</c>, which the admin UI surfaces to a wider audience than the
+    /// voucher table and which no retention job prunes.
+    /// </para>
+    /// <para>
+    /// The text is kept, bounded, because its whole purpose is letting an operator see why a row
+    /// failed to parse. Only the payload is replaced, by its own fingerprint, so the operator can
+    /// still tell two failing rows apart and confirm a re-import produced the same payload.
+    /// </para>
+    /// </summary>
+    internal static string PrepareRawTextForStorage(string? rawText, string? qrPayload)
+    {
+        var text = rawText ?? string.Empty;
+
+        if (!string.IsNullOrEmpty(qrPayload) && text.Contains(qrPayload, StringComparison.Ordinal))
+            text = text.Replace(qrPayload, DescribeQrPayload(qrPayload), StringComparison.Ordinal);
+
+        return text.Length <= MaxStoredRawTextLength
+            ? text
+            : text[..MaxStoredRawTextLength];
+    }
+
+    /// <summary>Bound on a column that is text; a failed parse must not be able to write a page.</summary>
+    private const int MaxStoredRawTextLength = 4000;
+
     public async Task<ImportVouchersResponse> HandleAsync(ImportVouchersCommand request, CancellationToken cancellationToken)
     {        _logger.LogInformation("Import Started for file: {FileName}", request.FileName);
         var stopwatch = Stopwatch.StartNew();
@@ -248,7 +278,7 @@ public sealed class ImportVouchersCommandHandler
                                 PageNumber = page.PageNumber,
                                 VoucherNumber = string.IsNullOrEmpty(parsed.VoucherNumber) ? null : parsed.VoucherNumber,
                                 ErrorMessage = errMsg,
-                                RawText = parsed.RawText,
+                                RawText = PrepareRawTextForStorage(parsed.RawText, parsed.QrPayload),
                                 CreatedAtUtc = DateTime.UtcNow
                             });
                             import.FailedCount++;
@@ -280,7 +310,7 @@ public sealed class ImportVouchersCommandHandler
                                 PageNumber = page.PageNumber,
                                 VoucherNumber = string.IsNullOrEmpty(parsed.VoucherNumber) ? null : parsed.VoucherNumber,
                                 ErrorMessage = errMsg,
-                                RawText = parsed.RawText,
+                                RawText = PrepareRawTextForStorage(parsed.RawText, parsed.QrPayload),
                                 CreatedAtUtc = DateTime.UtcNow
                             });
                             import.FailedCount++;
@@ -304,7 +334,7 @@ public sealed class ImportVouchersCommandHandler
                                 PageNumber = page.PageNumber,
                                 VoucherNumber = parsed.VoucherNumber,
                                 ErrorMessage = errMsg,
-                                RawText = parsed.RawText,
+                                RawText = PrepareRawTextForStorage(parsed.RawText, parsed.QrPayload),
                                 CreatedAtUtc = DateTime.UtcNow
                             });
                             import.FailedCount++;
@@ -330,7 +360,12 @@ public sealed class ImportVouchersCommandHandler
 
                         if (!qrParamsCache.TryGetValue(cacheKey, out var qrParams))
                         {
-                            var normalizedEcc = string.IsNullOrEmpty(eccKey) ? null : eccKey;
+                            // Match what is persisted, not a null. ecc_level is NOT NULL, so `p.EccLevel == null`
+                            // compiled to `ecc_level IS NULL`, could never match, and every import
+                            // containing one unreadable QR appended another ('', NULL, NULL, NULL)
+                            // row to qr_parameters. The unique index could not catch it either:
+                            // Postgres treats NULLs as distinct in a btree.
+                            var normalizedEcc = eccKey;
                             qrParams = await _context.QrParameters
                                 .FirstOrDefaultAsync(
                                     p => p.EccLevel == normalizedEcc &&
@@ -344,7 +379,7 @@ public sealed class ImportVouchersCommandHandler
                                 qrParams = new QrParameters
                                 {
                                     Id = Guid.NewGuid(),
-                                    EccLevel = normalizedEcc ?? string.Empty,
+                                    EccLevel = normalizedEcc,
                                     Version = parsed.QrVersion,
                                     MaskPattern = parsed.QrMaskPattern,
                                     EncodingMode = parsed.QrEncodingMode,

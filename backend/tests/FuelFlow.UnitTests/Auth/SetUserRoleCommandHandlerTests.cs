@@ -164,11 +164,17 @@ public sealed class SetUserRoleCommandHandlerTests
 
     private static async Task SeedRolesAsync(ApplicationDbContext context)
     {
+        // Level is SECURITY-CRITICAL: the handler ranks old vs new role from the DB column
+        // to decide whether a demotion happened. Seeding it as 0 would make every theory
+        // below vacuously "not a demotion", so these must mirror what production actually
+        // ships - migration 20260917192136_AddRoleLevelAndSeedProductOwnerManager writes
+        // ProductOwner 100 / Admin 50 / Manager 10 / User 0.
+        // AdminRoleDemotionIntegrationTests proves the same rule against real seeded rows.
         context.Roles.AddRange(
-            new Role { Id = SeedRoles.ProductOwnerId, Name = SeedRoles.ProductOwnerName, CreatedAtUtc = DateTime.UtcNow },
-            new Role { Id = SeedRoles.AdminRoleId, Name = SeedRoles.AdminName, CreatedAtUtc = DateTime.UtcNow },
-            new Role { Id = SeedRoles.ManagerRoleId, Name = SeedRoles.ManagerName, CreatedAtUtc = DateTime.UtcNow },
-            new Role { Id = SeedRoles.UserRoleId, Name = SeedRoles.UserName, CreatedAtUtc = DateTime.UtcNow });
+            new Role { Id = SeedRoles.ProductOwnerId, Name = SeedRoles.ProductOwnerName, Level = 100, CreatedAtUtc = DateTime.UtcNow },
+            new Role { Id = SeedRoles.AdminRoleId, Name = SeedRoles.AdminName, Level = 50, CreatedAtUtc = DateTime.UtcNow },
+            new Role { Id = SeedRoles.ManagerRoleId, Name = SeedRoles.ManagerName, Level = 10, CreatedAtUtc = DateTime.UtcNow },
+            new Role { Id = SeedRoles.UserRoleId, Name = SeedRoles.UserName, Level = 0, CreatedAtUtc = DateTime.UtcNow });
         await context.SaveChangesAsync();
     }
 

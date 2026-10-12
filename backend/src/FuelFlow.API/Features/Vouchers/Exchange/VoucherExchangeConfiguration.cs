@@ -91,11 +91,28 @@ internal sealed class VoucherExchangeConfiguration : IEntityTypeConfiguration<Vo
             .WithMany()
             .HasForeignKey(e => e.NewVoucherId)
             .OnDelete(DeleteBehavior.Restrict);
-
+        // acting_user_id stays a bare uuid - an exchange is a settlement record and must always be
+        // writable; it cannot be refused because an actor row is missing.
         builder.HasIndex(e => e.ExchangeBatchId);
-        builder.HasIndex(e => e.OldVoucherId);
         builder.HasIndex(e => e.NewVoucherId);
         // Supplier reconciliation reads one supplier's exchanged vouchers.
         builder.HasIndex(e => e.SupplierId);
+        // ActingUserId is indexed by the FK convention above.
+
+        // A voucher retired into an exchange can never be retired again, so old_voucher_id is
+        // unique - this is the database half of the idempotency the handler already checks, and
+        // it replaces the plain index that stood here for it.
+        builder.HasIndex(e => e.OldVoucherId)
+            .IsUnique();
+
+        builder.ToTable(t =>
+        {
+            // 0 legitimately means "free compensation", so >= 0 and not > 0.
+            t.HasCheckConstraint("ck_voucher_exchange_surcharge_non_negative", "surcharge_uah >= 0");
+            t.HasCheckConstraint("ck_voucher_exchange_cost_non_negative",
+                "cost_per_liter_applied IS NULL OR cost_per_liter_applied >= 0");
+            t.HasCheckConstraint("ck_voucher_exchange_not_self",
+                "old_voucher_id IS DISTINCT FROM new_voucher_id");
+        });
     }
 }

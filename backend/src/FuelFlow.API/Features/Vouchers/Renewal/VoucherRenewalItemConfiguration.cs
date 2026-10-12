@@ -44,7 +44,7 @@ internal sealed class VoucherRenewalItemConfiguration : IEntityTypeConfiguration
 
         builder.Property(e => e.AmountPaid)
             .HasColumnName("amount_paid")
-            .HasColumnType("numeric(18,2)");
+            .HasColumnType("numeric(12,2)");
 
         builder.Property(e => e.PreviousCustomerExpiration)
             .HasColumnName("previous_customer_expiration");
@@ -75,6 +75,16 @@ internal sealed class VoucherRenewalItemConfiguration : IEntityTypeConfiguration
 
         builder.HasIndex(e => e.OrderId);
         builder.HasIndex(e => e.SourceVoucherId);
+
+        // FulfilledVoucherId gets its index from the FK convention below - declaring one here as
+        // well would emit a second index under the same generated name.
+        builder.ToTable(t =>
+        {
+            // Mirrors order_line_items.line_total, which is numeric(12,2). numeric(18,2) was
+            // three orders of magnitude wider than the money it is compared against.
+            t.HasCheckConstraint("ck_voucher_renewal_amount_non_negative",
+                "amount_paid IS NULL OR amount_paid >= 0");
+        });
     }
 }
 

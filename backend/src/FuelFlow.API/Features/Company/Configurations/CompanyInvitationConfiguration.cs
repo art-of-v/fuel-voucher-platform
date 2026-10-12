@@ -65,5 +65,11 @@ internal sealed class CompanyInvitationConfiguration : IEntityTypeConfiguration<
             .WithMany()
             .HasForeignKey(e => e.WorkerUserId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_company_invitation_status",
+                "status IN ('Pending', 'Accepted', 'Declined', 'Cancelled')");
+        });
     }
 }

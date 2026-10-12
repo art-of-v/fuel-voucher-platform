@@ -49,6 +49,35 @@ public class DataRetentionService
     /// </summary>
     public const int DeviceRetentionDays = 90;
 
+    /// <summary>
+    /// Import batches and their error rows are a supplier-delivery record, kept a full season so a
+    /// cost dispute can still be traced to the PDF it came from. Never shorter: a supplier invoice
+    /// arrives on its own schedule, not ours.
+    /// </summary>
+    public const int VoucherImportRetentionDays = 365;
+
+    /// <summary>
+    /// A QR encoding configuration older than a season will never be derived again — a re-import
+    /// re-reads the parameters off the paper rather than reusing this row.
+    /// </summary>
+    public const int QrParametersRetentionDays = 365;
+
+    // Deliberately NOT covered, and the reason matters more than the list:
+    //
+    //   voucher_exchanges          - the settlement record. "Who do we settle with, for what, at
+    //                                 what cost" is answerable only from these rows, and
+    //                                 VOUCHER_LIFECYCLE.md calls the system itself the record
+    //                                 (suppliers issue no invoices, there is no paper to check
+    //                                 against). Pruning them destroys the audit trail.
+    //   voucher_renewal_items      - what the customer paid and how the term moved. CASCADE from
+    //                                 orders is the only thing that may remove one.
+    //   operator_voucher_renewals  - the same settlement fact for the operator path.
+    //   monobank_statement_entries - the acquirer's immutable evidence. Re-import must never
+    //                                 rewrite a stored amount (acquiring-statement-118.md), so a
+    //                                 prune here would be a silent edit of the ledger.
+    //   fuel_vouchers (soft-deleted)- paid-for paper. There is no window during which this is ok.
+    //   support_messages           - a user's own words to support, no stated window.
+
     private readonly ApplicationDbContext _context;
     private readonly RuntimeSettingsService _settings;
     private readonly ILogger<DataRetentionService> _logger;
@@ -78,6 +107,8 @@ public class DataRetentionService
         var pushTokenCutoff = now.AddDays(-PushTokenRetentionDays);
         var providerEventCutoff = now.AddDays(-ProviderEventRetentionDays);
         var deviceCutoff = now.AddDays(-DeviceRetentionDays);
+        var voucherImportCutoff = now.AddDays(-VoucherImportRetentionDays);
+        var qrParametersCutoff = now.AddDays(-QrParametersRetentionDays);
 
         // __RESULTS__
         var results = new (string Table, int Count)[]
@@ -135,6 +166,24 @@ public class DataRetentionService
                 _context.Devices.Where(d =>
                     (d.Status == DeviceStatus.Revoked || d.LastSeenAt < deviceCutoff)),
                 dryRun, cancellationToken)),
+
+            // A finished import and its error rows, aged by completion. An in-flight import
+            // (CompletedAtUtc null) is never matched however old it started. Ordered last so the
+            // import errors cascade to their batch in the same run.
+            ("voucher_imports", await PurgeAsync(
+                _context.VoucherImports.Where(i =>
+                    i.CompletedAtUtc != null && i.CompletedAtUtc < voucherImportCutoff),
+                dryRun, cancellationToken)),
+
+            // A QR config nothing points at any more. The reference check is what makes this safe:
+            // a row still referenced by a fuel_vouchers row is a live voucher's provenance and is
+            // never matched, however old it is.
+            ("qr_parameters", await PurgeAsync(
+                _context.QrParameters.Where(q =>
+                    q.CreatedAtUtc < qrParametersCutoff &&
+                    !_context.FuelVouchers.IgnoreQueryFilters()
+                        .Any(v => v.QrParametersId == q.Id)),
+                dryRun, cancellationToken)),
         };
 
         // __TAIL__
@@ -158,8 +207,9 @@ public class DataRetentionService
 
     /// <summary>
     /// Dry-run: returns the count of matching rows, deleting nothing. Live: deletes them in bounded
-    /// batches (load + <c>RemoveRange</c>) and returns the number removed. The context defaults to
-    /// NoTracking, so the batch query opts into tracking to let <c>RemoveRange</c> stage the delete.
+    /// batches (load + <c>RemoveRange</c>) and returns the number removed. The batch query opts into
+    /// tracking explicitly - the context tracks by default (see DatabaseSetup.cs on why that
+    /// default is load-bearing), and saying it here keeps the delete honest if that ever flips.
     /// </summary>
     private async Task<int> PurgeAsync<T>(
         IQueryable<T> filtered,

@@ -308,10 +308,8 @@ public sealed class RefundOrderCommandHandler
     }
 
     /// <summary>Total ordered value in kopecks (all line items, regardless of fulfillment).</summary>
-    internal static int ComputeTotalValueKopecks(Order order) =>
-        (int)Math.Round(
-            Money.ToKopecks(order.LineItems.Sum(li => li.UnitPrice * li.Quantity)),
-            MidpointRounding.AwayFromZero);
+    internal static long ComputeTotalValueKopecks(Order order) =>
+        Money.ToKopecksLong(order.LineItems.Sum(li => li.UnitPrice * li.Quantity));
 
     /// <summary>Value of delivered vouchers in kopecks (total ordered value minus unfulfilled value).</summary>
     /// <remarks>
@@ -320,7 +318,7 @@ public sealed class RefundOrderCommandHandler
     /// abandoned checkout as fulfilled revenue in both GetReport and GetReconciliation. Nothing
     /// was delivered, so the answer is zero.
     /// </remarks>
-    internal static int ComputeFulfilledValueKopecks(Order order) =>
+    internal static long ComputeFulfilledValueKopecks(Order order) =>
         !WasPaid(order) ? 0 : ComputeTotalValueKopecks(order) - ComputeRefundAmountKopecks(order);
 
     /// <summary>
@@ -333,7 +331,7 @@ public sealed class RefundOrderCommandHandler
     /// </remarks>
     private static bool WasPaid(Order order) => order.MonobankStatus == MonobankStatus.Success;
 
-    internal static int ComputeRefundAmountKopecks(Order order)
+    internal static long ComputeRefundAmountKopecks(Order order)
     {
         // A company handover never captured money (Price is 0), so there is nothing to give back.
         // The write path is already blocked upstream — such an order carries no Monobank invoice —
@@ -395,6 +393,6 @@ public sealed class RefundOrderCommandHandler
             }
         }
 
-        return (int)Math.Round(Money.ToKopecks(unfulfilledValue), MidpointRounding.AwayFromZero);
+        return Money.ToKopecksLong(unfulfilledValue);
     }
 }

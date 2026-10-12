@@ -30,7 +30,13 @@ internal sealed class RefundConfiguration : IEntityTypeConfiguration<Refund>
 
         builder.Property(e => e.Amount)
             .HasColumnName("amount")
+            .HasColumnType("bigint")
             .IsRequired();
+
+        // The reconciliation endpoint filters on invoice_id, and it had no index - a sequential
+        // scan of the whole refunds table inside the query an operator runs when money is already
+        // wrong. user_id and created_by_user_id are indexed by the FK conventions below.
+        builder.HasIndex(e => e.InvoiceId);
 
         builder.Property(e => e.InvoiceId)
             .HasColumnName("invoice_id")
@@ -86,5 +92,27 @@ internal sealed class RefundConfiguration : IEntityTypeConfiguration<Refund>
             .WithMany()
             .HasForeignKey(e => e.OrderId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // user_id copies orders.user_id and created_by_user_id records who approved the refund.
+        // Restrict rather than SetNull or nothing: an audit row has to keep naming a real actor,
+        // so a user referenced by a refund cannot be hard-deleted.
+        builder.HasOne<FuelFlow.SharedKernel.Domain.User>()
+            .WithMany()
+            .HasForeignKey(e => e.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<FuelFlow.SharedKernel.Domain.User>()
+            .WithMany()
+            .HasForeignKey(e => e.CreatedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_refund_amount_positive", "amount > 0");
+            // The value set RefundStatus defines. Storing a closed enum as text survives adding a
+            // member; it is only safe once the database knows the set.
+            t.HasCheckConstraint("ck_refund_status",
+                "status IN ('Processing', 'Completed', 'Failed')");
+        });
     }
 }

@@ -122,6 +122,6 @@ public sealed class UpdateOrderRequest
 
 public sealed class RefundOrderRequest
 {
-    public int? AmountKopecks { get; set; }
+    public long? AmountKopecks { get; set; }
     public string? Reason { get; set; }
 }

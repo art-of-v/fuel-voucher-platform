@@ -71,4 +71,64 @@ public sealed class MigrationDiscoveryTests
                 .ContainSingle($"migration {id} must carry [DbContext] to be discovered");
         }
     }
+
+    /// <summary>
+    /// Closes the class of bug above instead of pinning its two known instances. EF discovers
+    /// migrations by assembly attribute, not by folder, so a migration can sit anywhere in the
+    /// project and be invisible — and two did, in <c>Features/Auth/Migrations/</c>, which is why
+    /// that folder now holds nothing.
+    /// </summary>
+    [Fact]
+    public void Migrations_Live_In_One_Folder()
+    {
+        var projectRoot = FindProjectRoot();
+        var migrationFiles = Directory
+            .EnumerateFiles(projectRoot, "*.cs", SearchOption.AllDirectories)
+            .Where(f => f.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}"))
+            .Where(f => !f.EndsWith("ModelSnapshot.cs", StringComparison.Ordinal))
+            .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}"))
+            .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
+            .ToList();
+
+        migrationFiles.Should().NotBeEmpty();
+
+        // The migration and its Designer must be siblings: a migration whose Designer sits in a
+        // different folder compiles and is still invisible, because the attributes ride on the
+        // generated partial.
+        var canonical = Path.Combine(projectRoot, "src", "FuelFlow.API", "Migrations");
+        migrationFiles
+            .Where(f => !Path.GetDirectoryName(f)!.Equals(canonical, StringComparison.OrdinalIgnoreCase))
+            .Should().BeEmpty("migrations belong in src/FuelFlow.API/Migrations so the folder list is honest");
+
+        foreach (var file in migrationFiles.Where(f => !f.EndsWith(".Designer.cs", StringComparison.Ordinal)))
+        {
+            // The [Migration] id is the file name without its extension, extension included in the
+            // match - not just the timestamp prefix.
+            var id = Path.GetFileNameWithoutExtension(file);
+            var designer = Path.ChangeExtension(file, ".Designer.cs");
+
+            // Either the generated partial exists, or the hand-written class carries the two
+            // attributes discovery depends on. A migration with neither is invisible.
+            var designerExists = File.Exists(designer);
+            var carriesAttributes = typeof(ApplicationDbContext).Assembly
+                .GetTypes()
+                .Any(t => t.GetCustomAttributes(typeof(MigrationAttribute), false)
+                    .Any(a => ((MigrationAttribute)a).Id == id));
+
+            (designerExists || carriesAttributes).Should().BeTrue(
+                $"migration {id} has no .Designer.cs and no [Migration] attribute, so EF cannot see it");
+        }
+    }
+
+    private static string FindProjectRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !File.Exists(Path.Combine(dir.FullName, "FuelFlow.slnx")))
+        {
+            dir = dir.Parent;
+        }
+
+        dir.Should().NotBeNull("could not locate the backend project root from " + AppContext.BaseDirectory);
+        return dir!.FullName;
+    }
 }

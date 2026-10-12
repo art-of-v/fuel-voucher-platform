@@ -68,6 +68,12 @@ public sealed class SetUserRoleCommandHandler
         }
 
         var oldRoleName = target.Role?.Name;
+
+        // Captured before target.Role is reassigned below, because it has to be the level the user
+        // is stepping DOWN from. Read from the database rather than from a hardcoded name switch,
+        // so roles.level is the one place the hierarchy lives - a role inserted through psql ranks
+        // where its row says, not where a C# switch happens to know about it.
+        var oldRoleLevel = target.Role?.Level ?? 0;
         // Tracked so the target.Role assignment below reuses the identity-mapped instance:
         // if the same role is re-applied, an untracked copy would collide with the tracked
         // Role already loaded via Include (same key, two instances).
@@ -85,7 +91,7 @@ public sealed class SetUserRoleCommandHandler
         // stepping down within Staff (Admin → Manager). A PROMOTION deliberately does NOT revoke:
         // the existing session stays at its old authorization until the user starts a new one
         // (the RoleNameAtIssue snapshot keeps refresh from silently upgrading it).
-        var isDemotion = SeedRoles.LevelFor(command.RoleName) < SeedRoles.LevelFor(oldRoleName);
+        var isDemotion = targetRole.Level < oldRoleLevel;
 
         // Atomic: the role flip and the session revocation must commit together or not at all.
         // Previously the role change was saved in its own SaveChanges BEFORE revoking; when the

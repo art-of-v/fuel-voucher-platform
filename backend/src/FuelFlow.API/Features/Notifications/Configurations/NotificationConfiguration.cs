@@ -46,7 +46,11 @@ internal sealed class NotificationConfiguration : IEntityTypeConfiguration<Notif
             .HasForeignKey(e => e.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasIndex(e => e.UserId);
+        // The real read is `WHERE user_id = @id ORDER BY created_at_utc DESC`, which neither index
+        // could serve: (user_id) does not order, and (user_id, is_read) leads with the wrong
+        // column. This one replaces the bare user_id index, which is its leftmost prefix.
+        builder.HasIndex(e => new { e.UserId, e.CreatedAtUtc })
+            .IsDescending(false, true);
         builder.HasIndex(e => new { e.UserId, e.IsRead });
     }
 }

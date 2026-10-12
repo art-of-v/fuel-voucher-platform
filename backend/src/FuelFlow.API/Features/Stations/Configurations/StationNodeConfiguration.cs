@@ -65,6 +65,14 @@ internal sealed class StationNodeConfiguration : IEntityTypeConfiguration<Statio
 
         builder.HasQueryFilter(e => !e.IsDeleted);
 
+        // Restrict: deleting a brand must never delete every physical location that belonged to
+        // it. The catalog is archived via IsDeleted instead; this is the seatbelt for a DELETE
+        // that arrives from anywhere else - including a hand-written psql session.
+        builder.HasOne<Station>()
+            .WithMany()
+            .HasForeignKey(e => e.StationId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasIndex(e => e.StationId);
     }
 }

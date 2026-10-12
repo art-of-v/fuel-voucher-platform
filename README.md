@@ -215,17 +215,19 @@ firing and the admin unblock return that fuel to the **purchase** it arrived und
 
 ## Money & currency
 
-**Convention: the domain model stores money in whole-UAH integers; kopecks exist only at the
-Monobank boundary.**
+**Convention: the domain model stores money in decimal UAH to the kopeck; kopeck integers exist
+only at the Monobank boundary.**
 
-| Unit | Where |
-|---|---|
-| UAH (int) | `orders.price`, `order_line_items.unit_price` / `line_total`, `fuel_packages.price` / `original_price`, `fuel_types.base_price` / `discount_price` (per liter) |
-| kopecks (int) | `refunds.amount`; every Monobank API call (`invoice/create`, `invoice/cancel`, webhooks) and any DTO field explicitly named `...Kopecks` |
+| Unit | Type | Where |
+|---|---|---|
+| UAH | `numeric(12,2)` | `orders.price`, `order_line_items.unit_price` / `line_total`, `fuel_packages.price` / `original_price`, `fuel_types.base_price` / `discount_price`, `voucher_renewal_items.amount_paid` |
+| UAH per litre | `numeric(10,4)` | `fuel_vouchers.cost_per_liter`, `fuel_packages.*_per_liter`, `voucher_exchanges.cost_per_liter_applied` |
+| UAH surcharge | `numeric(10,2)` | `voucher_exchanges.surcharge_uah`, `operator_voucher_renewals.surcharge_uah` |
+| kopecks | `bigint` | `refunds.amount`, `monobank_statement_entries.amount_kopecks`; every Monobank API call (`invoice/create`, `invoice/cancel`, webhooks) and any DTO field explicitly named `...Kopecks` |
 
-Monobank's merchant API mandates kopeck integers, and business prices are whole UAH, so
-keeping the domain in UAH avoids floating-point money math without paying kopeck-conversion
-cost everywhere.
+Monobank's merchant API mandates kopeck integers, so every conversion goes through
+`SharedKernel.Money` at that boundary and nowhere else. Per-litre rates keep 4 dp because
+blended cost is a weighted average and rounding it to 2 dp drifts the cost of goods.
 
 Rules:
 
@@ -248,24 +250,38 @@ The primary tables:
 | Table | Purpose |
 |---|---|
 | `users` | Accounts (UUID, unique phone, email, role); `is_active`, `token_version`, `is_deleted` drive session revocation & soft-delete |
-| `phone_verifications` | OTP records |
+| `roles` | Role definitions with a level (`User`, `Manager`, `Admin`, `ProductOwner`) |
+| `verification_codes` | OTP records (stored hashed) |
 | `devices` | Registered device public keys for challenge/signature auth |
 | `refresh_tokens` | Rotating refresh tokens (`family_id` for reuse detection) |
+| `push_tokens` | Per-device push registration |
 | `stations` / `station_nodes` | Fuel brands and individual physical locations (lat/lng) |
 | `fuel_types` | Fuel-type definitions per station with base/discount pricing (per liter, UAH) |
 | `fuel_packages` | Saleable packages (station + fuel type + liters + price, UAH); carry supplier/margin/final pricing |
-| `fuel_vouchers` | Voucher inventory; `qr_image` rendered from `qr_parameters`; carries `legal_entity_id` + `worker_user_id`; `order_id` names the order that delivered it and is **required** for a held voucher (`Assigned`/`Used`/`Blocked`, DB CHECK `ck_voucher_held_has_order`), null while it is stock |
+| `suppliers` | Third parties fuel is bought from (deactivated, never hard-deleted) |
+| `purchase_batches` | One row per (import × fuel): the batch's supplier and who entered it |
+| `fuel_vouchers` | Voucher inventory; QR rendered from `qr_parameters`; carries `legal_entity_id` + `worker_user_id`; `order_id` names the order that delivered it and is **required** for a held voucher (`Assigned`/`Used`/`Blocked`, DB CHECK `ck_voucher_held_has_order`), null while it is stock |
 | `qr_parameters` | QR encoding config (version, ECC level, mask, encoding mode) |
 | `orders` / `order_line_items` | Purchase orders and their line items (UAH); `kind` = `Purchase` \| `Renewal` \| `ReceivedFromCompany` (a company→worker handover, priced 0, with `source_order_id` naming the purchase the fuel came from) |
 | `fulfillments` | Junction linking orders to the vouchers that satisfy them |
-| `refunds` | Refund records (amount in **kopecks**; one per order) |
+| `refunds` | Refund records (amount in **kopecks**, `bigint`; one per order) |
+| `monobank_statement_entries` | Acquirer statement rows as imported — immutable evidence, never rewritten by a re-import |
 | `voucher_imports` / `voucher_import_errors` | Batch PDF import jobs + per-voucher failures |
+| `voucher_renewal_items` | What each renewal line cost and how the term moved |
+| `operator_voucher_renewals` | Operator-initiated renewals (extend vs replace, surcharge, invoice) |
+| `voucher_exchanges` | Per-voucher settlement record for an operator↔provider stock exchange |
 | `legal_entities` | Company profiles (owner = the user who created one) |
 | `company_invitations` / `company_members` | Owner↔worker invitations and membership |
+| `contracts` / `user_contracts` | Client contracts and the signatures on them |
 | `outbox_events` | Transactional event log dispatched by background jobs |
+| `provider_event_outbox` | Immutable admin/domain change audit trail (before/after values, 365d) |
 | `notifications` | In-app user notifications |
-| `audit_log` / `error_logs` | Admin/domain audit trail and persisted error records |
-| `contracts` / `referrals` | Client contracts (digital signatures) and referral records |
+| `error_logs` | Persisted application errors (90d) |
+| `support_messages` | Public support form submissions |
+| `app_settings` | Runtime feature toggles an admin can flip without a deploy |
+
+Referral codes are two columns on `users` (`referral_code`, `referred_by`), not a table of
+their own. The admin Audit tab reads `provider_event_outbox`; there is no `audit_log` table.
 
 ---
 

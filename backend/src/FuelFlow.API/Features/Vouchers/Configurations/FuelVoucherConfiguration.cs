@@ -43,9 +43,13 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
             .HasMaxLength(100)
             .IsRequired();
 
+        // Bounded on purpose. The QR payload is a bearer instrument - whoever holds it can have
+        // the voucher redeemed at the pump - and it is the widest value on the table. A payload
+        // that does not fit in 2000 characters will not scan anyway, and the cap keeps the
+        // unique index below TOAST so the entry is a predictable size.
         builder.Property(e => e.QrPayload)
             .HasColumnName("qr_payload")
-            .HasColumnType("text")
+            .HasColumnType("varchar(2000)")
             .IsRequired();
 
         builder.Property(e => e.CreatedAtUtc)
@@ -55,24 +59,21 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
         builder.Property(e => e.Status)
             .HasColumnName("status")
             .HasConversion<string>()
-            .HasMaxLength(20)
+            .HasMaxLength(32)
             .IsRequired();
 
         builder.Property(e => e.FuelSubtype)
             .HasColumnName("fuel_subtype")
             .HasMaxLength(50);
 
+        // Read-only and never written, but projected by live endpoints, so it stays - bounded.
         builder.Property(e => e.RedemptionRules)
             .HasColumnName("redemption_rules")
-            .HasColumnType("text");
+            .HasMaxLength(1000);
 
         builder.Property(e => e.ImageUrl)
             .HasColumnName("image_url")
-            .HasColumnType("text");
-
-        builder.Property(e => e.ExternalId)
-            .HasColumnName("external_id")
-            .HasMaxLength(200);
+            .HasMaxLength(500);
 
         builder.Property(e => e.AssignedToUserId)
             .HasColumnName("assigned_to_user_id");
@@ -117,6 +118,17 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
             .HasForeignKey(e => e.ImportJobId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        // Restrict, not Cascade. A voucher is paper the customer already paid for, and this
+        // constraint was the sharpest edge in the schema: deleting a fuel type walked straight
+        // into fuel_vouchers and destroyed every voucher sold against it. #217 fixed the code
+        // path (the handlers archive now), which left the constraint armed with nothing
+        // pointing at it. The catalog is archived via IsDeleted; this is the seatbelt for a
+        // DELETE arriving from anywhere else, including a hand-written psql session.
+        builder.HasOne(e => e.FuelType)
+            .WithMany()
+            .HasForeignKey(e => e.FuelTypeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // Restrict, not SetNull: deleting an order must never silently strip the only trace of
         // where a voucher in someone's hands came from. That matters as soon as the "a held
         // voucher always has an order" CHECK lands, and it is the safe choice before it does.
@@ -149,9 +161,45 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
 
         builder.HasQueryFilter(e => !e.IsDeleted);
 
+        // These live in the model, not in a hand-written migration, so EF owns them: it will
+        // never drop one by accident, and a regenerated `migrations script` can reproduce the
+        // schema from the model. The held-voucher rule used to exist only as raw SQL, invisible
+        // to EF and coupled to the VoucherStatus member names by literal string.
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_voucher_held_has_order",
+                "status NOT IN ('Assigned', 'Used', 'Blocked') OR order_id IS NOT NULL");
+            t.HasCheckConstraint("ck_voucher_liters_positive", "liters > 0");
+            t.HasCheckConstraint("ck_voucher_cost_non_negative", "cost_per_liter IS NULL OR cost_per_liter >= 0");
+
+            // The value set VoucherStatus defines. varchar(20) was exactly the length of
+            // VerifiedWithWarnings, so the column had zero headroom and the next member added to
+            // the enum would have failed at write time rather than at compile time; 32 gives room.
+            t.HasCheckConstraint("ck_voucher_status", """
+                status IN ('Imported', 'VerifiedWithWarnings', 'VerificationFailed', 'Available',
+                           'Assigned', 'Used', 'Expired', 'Blocked', 'Deactivated')
+                """);
+
+            // Deliberately NOT constrained: customer_expiration_date <= provider_expiration_date.
+            // It looks obviously true and is not - ConfirmOperatorRenewalCommandHandler stamps the
+            // customer's promise from the *renewal term*, not from the paper's own date ("the extra
+            // real life is a reserve"), so a deliberate business rule produces customer > provider.
+            // A constraint here would refuse a renewal the business has already decided to allow.
+            // VOUCHER_RENEWAL.md:371-374 records that as an open commercial decision, so it stays
+            // a decision rather than becoming an exception nobody can add.
+        });
+
         builder.Property(e => e.UpdatedAtUtc)
             .HasColumnName("updated_at_utc")
             .IsRequired();
+
+        // These two arrived in PascalCase because the mapping was forgotten - the only
+        // snake_case violations left on this table. Named explicitly, like every other column.
+        builder.Property(e => e.IssuedAtUtc)
+            .HasColumnName("issued_at_utc");
+
+        builder.Property(e => e.UsedAtUtc)
+            .HasColumnName("used_at_utc");
 
         builder.Property(e => e.VerificationMismatchPercent)
             .HasColumnName("verification_mismatch_percent")
@@ -166,29 +214,29 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
         builder.HasIndex(e => e.VoucherNumber)
             .IsUnique();
 
+        // Security control, not just an index: DB-global dedup on the QR payload means the same
+        // paper cannot be imported twice under two numbers. Worth the storage.
         builder.HasIndex(e => e.QrPayload)
             .IsUnique();
 
-        builder.HasIndex(e => e.Status);
         builder.HasIndex(e => e.ProviderExpirationDate);
         builder.HasIndex(e => e.CustomerExpirationDate);
-        builder.HasIndex(e => e.Provider);
-        builder.HasIndex(e => e.FuelTypeId);
-        builder.HasIndex(e => e.AssignedToUserId);
-        builder.HasIndex(e => e.LegalEntityId);
         builder.HasIndex(e => e.WorkerUserId);
         builder.HasIndex(e => e.OrderId);
-        // Cleanup and "is this stock real?" queries filter on it, so it is indexed alongside status.
-        builder.HasIndex(e => new { e.Status, e.IsTestData });
-        builder.HasIndex(e => new { e.Provider, e.FuelTypeId, e.Liters, e.Status });
         builder.HasIndex(e => e.ImportJobId);
         builder.HasIndex(e => e.SupplierId);
+
+        // Cleanup and "is this stock real?" queries filter on it, so it is indexed alongside status.
+        builder.HasIndex(e => new { e.Status, e.IsTestData, e.IsDeleted });
+        builder.HasIndex(e => new { e.Provider, e.FuelTypeId, e.Liters, e.Status });
         // The blended-cost recompute reads this pool filtered by fuel and status.
-        builder.HasIndex(e => new { e.FuelTypeId, e.Status });
+        builder.HasIndex(e => new { e.FuelTypeId, e.Status, e.IsDeleted });
         builder.HasIndex(e => new { e.AssignedToUserId, e.Status });
-        builder.HasIndex(e => new { e.LegalEntityId, e.WorkerUserId, e.Status });
-        builder.HasIndex(e => e.ExternalId)
-            .IsUnique()
-            .HasFilter("external_id IS NOT NULL");
+        builder.HasIndex(e => new { e.LegalEntityId, e.WorkerUserId, e.Status, e.IsDeleted });
+
+        // Dropped as strict left-prefix duplicates of the composites above: a bare (status),
+        // (fuel_type_id), (assigned_to_user_id) and (legal_entity_id) can serve nothing the
+        // wider index cannot serve better. Also dropped: a unique index on external_id, a column
+        // nothing in the codebase ever writes, so it guarded 100% NULLs forever.
     }
 }

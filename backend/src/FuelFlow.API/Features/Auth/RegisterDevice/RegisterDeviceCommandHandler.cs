@@ -69,7 +69,17 @@ public sealed class RegisterDeviceCommandHandler
                 // Reclaim without nonce is allowed ONLY for an explicitly soft-deleted
                 // owner. A missing owner row (orphan device data) or any other gap is
                 // treated as a live binding and refused - fail closed.
+                //
+                // IgnoreQueryFilters is mandatory here: User carries a global !IsDeleted
+                // filter, and this is the one query whose whole purpose is to TELL a
+                // soft-deleted owner apart from a live one. Under the filter the row is
+                // invisible, currentOwner comes back null, and every reclaim-after-delete
+                // silently degrades into the fail-closed branch - permanently locking the
+                // physical device of the account that deleted itself. AsNoTracking: we only
+                // read IsDeleted, never mutate the owner.
                 var currentOwner = await _context.Users
+                    .IgnoreQueryFilters()
+                    .AsNoTracking()
                     .FirstOrDefaultAsync(u => u.Id == existingDevice.UserId, cancellationToken);
                 var previousOwnerGone = currentOwner is { IsDeleted: true };
 

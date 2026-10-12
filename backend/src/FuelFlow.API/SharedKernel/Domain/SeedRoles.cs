@@ -4,9 +4,10 @@ namespace FuelFlow.SharedKernel.Domain;
 /// Canonical role identifiers and helpers.
 /// </summary>
 /// <remarks>
-/// The numeric <c>Level</c> encodes the hierarchy enforced by
-/// AuthorizationHelpers.CanManage:
-///   ProductOwner (100) > Admin (50) > Manager (10) > User (0).
+/// The numeric ranking — ProductOwner (100) &gt; Admin (50) &gt; Manager (10) &gt; User (0) —
+/// lives in the <c>roles.level</c> column and is read from the database, not from a switch here.
+/// This class holds only the names the application needs before a database round trip: the
+/// authorization policies, and the singleton ProductOwner guard.
 /// </remarks>
 internal static class SeedRoles
 {
@@ -41,15 +42,4 @@ internal static class SeedRoles
 
     public static bool IsStaff(string? roleName) =>
         roleName is not null && Array.IndexOf(StaffRoleNames, roleName) >= 0;
-
-    /// <summary>
-    /// Numeric hierarchy level for a role name. Unknown roles resolve to 0 (User level).
-    /// </summary>
-    public static int LevelFor(string? roleName) => roleName switch
-    {
-        ProductOwnerName => 100,
-        AdminName => 50,
-        ManagerName => 10,
-        _ => 0,
-    };
 }

@@ -40,5 +40,15 @@ internal sealed class OutboxEventConfiguration : IEntityTypeConfiguration<Outbox
 
         builder.HasIndex(e => e.Processed);
         builder.HasIndex(e => e.CreatedAtUtc);
+
+        // The value set OutboxEventType defines. A dispatcher switching on a typo'd value would
+        // silently never fire, which is the worst shape a queue failure can take.
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_outbox_event_type", """
+                event_type IN ('OrderCreated', 'OrderFulfilled', 'OrderCancelled',
+                               'PaymentCompleted', 'VoucherExpired', 'VoucherUsed', 'VoucherActivated')
+                """);
+        });
     }
 }

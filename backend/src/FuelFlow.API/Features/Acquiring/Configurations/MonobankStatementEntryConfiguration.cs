@@ -15,10 +15,14 @@ internal sealed class MonobankStatementEntryConfiguration : IEntityTypeConfigura
         builder.Property(e => e.Id)
             .HasColumnName("id");
 
+        // String, not int, to match orders.monobank_merchant - the same enum stored two ways is a
+        // conversion waiting to be forgotten, and an int enum silently changes meaning if someone
+        // reorders the C# declaration, with no migration to catch it.
         builder.Property(e => e.Merchant)
             .HasColumnName("merchant")
             .IsRequired()
-            .HasConversion<int>();
+            .HasConversion<string>()
+            .HasMaxLength(20);
 
         builder.Property(e => e.StatementId)
             .HasColumnName("statement_id")
