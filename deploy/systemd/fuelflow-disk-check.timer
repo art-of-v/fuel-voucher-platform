@@ -8,7 +8,7 @@
 # costs one message, not 96.
 [Unit]
 Description=Quarter-hourly FuelFlow disk pressure check
-Documentation=file:/root/FuelFlow/docs/DEPLOYMENT.md
+Documentation=https://github.com/art-of-v/fuel-voucher-platform-planning/blob/main/docs/DEPLOYMENT.md
 
 [Timer]
 # Every 15 minutes past the hour, staggered off :00 so the check never lands on the same minute as

@@ -31,7 +31,7 @@ ${CONTEXT:-<no journal output - fuelflow-disk-check.service failed without loggi
 
 Background: on 2026-09-27 / reached 100% and Postgres crash-looped, taking the API down. The
 nightly GC reclaims images and build cache only; database growth, container logs and Loki data are
-not its to reclaim. See docs/DEPLOYMENT.md ('Disk pressure alert').
+not its to reclaim. See docs/DEPLOYMENT.md (private docs repo), "Disk hygiene".
 
 Full detail:
     journalctl -u ${FAILED_UNIT} -n 50 --no-pager"
