@@ -21,7 +21,10 @@ const VALID_FORM = {
   email: '',
 };
 
-function renderSheet(overrides: Partial<typeof VALID_FORM> = {}, props: Record<string, unknown> = {}) {
+function renderSheet(
+  overrides: Partial<typeof VALID_FORM> = {},
+  props: Record<string, unknown> = {},
+) {
   return render(
     <EditCompanySheet
       visible
