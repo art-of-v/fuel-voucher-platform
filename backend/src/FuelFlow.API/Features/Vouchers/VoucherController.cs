@@ -121,21 +121,39 @@ public sealed class VoucherController : ControllerBase
     }
 
     [HttpPatch("{id}/restore")]
-    [Authorize(Policy = "Staff")]
+    [Authorize]
     [ProducesResponseType(typeof(RestoreVoucherResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RestoreVoucher([FromRoute] Guid id, CancellationToken cancellationToken)
     {
+        // Was [Authorize(Policy = "Staff")], but the only caller is the mobile client's "undo my
+        // redemption" toggle (useMyCodes.ts) - a customer action that could only ever return 403.
+        // Ownership is enforced in the handler instead, exactly as for mark-used.
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                     ?? User.FindFirst("sub")?.Value;
+
+        if (string.IsNullOrEmpty(userId))
+        {
+            _logger.LogWarning("User ID not found in claims");
+            return Unauthorized("User ID not found");
+        }
+
         try
         {
-            var command = new RestoreVoucherCommand(id);
+            var command = new RestoreVoucherCommand(id, Guid.Parse(userId));
             var response = await _restoreHandler.HandleAsync(command, cancellationToken);
 
             if (!response.Success)
             {
-                return BadRequest(response.Message);
+                return response.ErrorCode switch
+                {
+                    "NotFound" => NotFound(response.Message),
+                    "Forbidden" => Forbid(),
+                    _ => BadRequest(response.Message)
+                };
             }
 
             return Ok(response);

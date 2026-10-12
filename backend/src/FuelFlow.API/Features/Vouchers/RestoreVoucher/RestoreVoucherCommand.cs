@@ -1,3 +1,3 @@
 namespace FuelFlow.Features.Vouchers.RestoreVoucher;
 
-public sealed record RestoreVoucherCommand(Guid VoucherId);
+public sealed record RestoreVoucherCommand(Guid VoucherId, Guid UserId);
