@@ -1,4 +1,5 @@
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Options;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -12,6 +13,11 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.ToTable("orders");
 
         builder.HasKey(e => e.Id);
+
+        // #246: xmin token. No DDL — xmin is a system column. One raw statement writes this table
+        // (FulfillmentService.TryMarkOrderFulfilledAsync) and it is a compare-and-swap; the tracked
+        // writes around it read their row fresh, so a conflict here is a race that really happened.
+        builder.UseXminAsConcurrencyToken();
 
         builder.Property(e => e.Id)
             .HasColumnName("id");

@@ -768,6 +768,12 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("user_id");
 
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CreatedAtUtc");
@@ -1302,6 +1308,12 @@ namespace FuelFlow.API.Migrations
                     b.Property<Guid?>("WorkerUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("worker_user_id");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
 
                     b.HasKey("Id");
 

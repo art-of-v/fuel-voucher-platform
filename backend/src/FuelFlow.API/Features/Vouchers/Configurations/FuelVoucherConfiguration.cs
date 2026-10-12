@@ -1,4 +1,5 @@
 using FuelFlow.Features.Vouchers;
+using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -11,6 +12,13 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
         builder.ToTable("fuel_vouchers");
 
         builder.HasKey(e => e.Id);
+
+        // #246: xmin token. No DDL — xmin is a system column. Raw SQL must never write this table
+        // in the same request as a tracked save of the same row, or the token starts failing saves
+        // that did not actually race. Every raw write here is a compare-and-swap, and FulfillmentService
+        // now clears the tracker before reading rows its own statements just claimed, which is what
+        // makes that rule hold rather than merely be intended.
+        builder.UseXminAsConcurrencyToken();
 
         builder.Property(e => e.Id)
             .HasColumnName("id");

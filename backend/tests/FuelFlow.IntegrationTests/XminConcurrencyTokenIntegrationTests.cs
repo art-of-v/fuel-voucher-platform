@@ -102,13 +102,24 @@ public sealed class XminConcurrencyTokenIntegrationTests : IClassFixture<TestDat
     }
 
     /// <summary>
-    /// Pins the table set. <c>fuel_vouchers</c> and <c>orders</c> are written with raw SQL as well as
-    /// through the tracker; a raw UPDATE bumps <c>xmin</c> behind EF's back and the tracked save then
-    /// fails a predicate that never actually raced. Adding the token to those two turns a working
-    /// handler into a 409, which is why they are deliberately not in this list.
+    /// Pins the table set. <c>fuel_vouchers</c> and <c>orders</c> were excluded from the first half of
+    /// #246 because they are written with raw SQL as well as through the tracker: a raw UPDATE bumps
+    /// <c>xmin</c> behind EF's back, and a tracked save of the same row then fails a predicate that
+    /// never actually raced. That mixing has been removed — <c>FulfillmentService</c> clears the
+    /// tracker before the mismatch-repair pass reads rows its own statements just claimed, and its
+    /// decision queries are <c>AsNoTracking</c> — so the two are in this list now.
     /// </summary>
+    /// <remarks>
+    /// This is a model-metadata assertion: it can only say which tables carry the token, never whether
+    /// a handler mixes a raw write with a tracked save of the same row. The two rules the token turns
+    /// into requirements - "the tracker is emptied before reading rows your own statements claimed" and
+    /// "a row you save was read TRACKED, or EF gives you xmin = 0" - are behavioural and live in
+    /// <see cref="FulfillmentMismatchRepairTests"/> and
+    /// <see cref="ConcurrencyTokenTrackingRuleIntegrationTests"/>. A test that cannot see a handler is
+    /// exactly why the exclusion outlived the mixing it described.
+    /// </remarks>
     [Fact]
-    public async Task The_Token_Is_On_The_Four_Tracker_Only_Tables_And_Not_On_The_Raw_Sql_Ones()
+    public async Task The_Token_Is_On_Every_Table_That_Owns_Money_Or_Stock()
     {
         await using var context = CreateContext();
 
@@ -119,15 +130,8 @@ public sealed class XminConcurrencyTokenIntegrationTests : IClassFixture<TestDat
             .ToList();
 
         tokenised.Should().BeEquivalentTo(
-            ["operator_voucher_renewals", "refunds", "voucher_exchanges", "voucher_renewal_items"]);
-
-        foreach (var rawSqlTable in new[] { "fuel_vouchers", "orders" })
-        {
-            var entity = context.Model.GetEntityTypes().FirstOrDefault(t => t.GetTableName() == rawSqlTable);
-            entity.Should().NotBeNull($"{rawSqlTable} is mapped");
-            var property = entity!.FindProperty(PostgresConcurrencyTokenProbe.PropertyName);
-            property.Should().BeNull($"{rawSqlTable} is written with raw SQL, so xmin there would fail saves that did not race");
-        }
+            ["fuel_vouchers", "operator_voucher_renewals", "orders", "refunds", "voucher_exchanges", "voucher_renewal_items"],
+            "the two hot tables are included now that nothing mixes a raw write with a tracked save of the same row");
     }
 
     private async Task<Refund> SeedRefundAsync(Guid orderId, int amount)
