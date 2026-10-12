@@ -82,15 +82,15 @@ backend/src/
 │   └── Features/
 │       ├── Auth/                  # OTP login, JWT refresh, device registration, admin users
 │       ├── Orders/                # Checkout (single + bulk), Monobank invoices, fulfillment, outbox
-│       ├── Vouchers/              # Import (PDF/QR), user vouchers, redemption
+│       ├── Vouchers/              # Import (PDF/QR), catalog, inventory, user vouchers, verification
 │       ├── Company/               # Company owner/worker: invitations, membership, gift/recall
 │       ├── Providers/ & Stations/ # Fuel packages, per-liter pricing (supplier/margin/final)
 │       ├── Contracts/             # Legal entities, client contracts & digital signatures
 │       ├── Monobank/              # Signed payment webhook
 │       ├── Report/                # Per-user profit/spending reports
-│       ├── Admin/                 # Reconciliation, admin voucher/user/order ops
+│       ├── Admin/                 # Dashboard, reconciliation, admin voucher/user/order ops
 │       ├── Audit/ & ErrorLogs/    # audit_log + error_logs tables and admin UIs
-│       ├── Notifications/ Sync/ Settings/
+│       ├── Notifications/ Referral/ Sync/ Settings/
 │       └── ...
 └── FuelFlow.JobsWorker/           # Standalone Hangfire worker (jobs also run in-process in the API)
 ```
@@ -280,8 +280,8 @@ The primary tables:
 | `support_messages` | Public support form submissions |
 | `app_settings` | Runtime feature toggles an admin can flip without a deploy |
 
-The `users` table still carries two referral columns (`referral_code`, `referred_by`) left by a
-feature that never reached a client; the endpoints that wrote them are gone. The admin Audit tab reads `provider_event_outbox`; there is no `audit_log` table.
+Referral codes are two columns on `users` (`referral_code`, `referred_by`), not a table of
+their own. The admin Audit tab reads `provider_event_outbox`; there is no `audit_log` table.
 
 ---
 
@@ -311,9 +311,10 @@ role required; — = public. This lists the primary endpoints; admin sub-resourc
 |---|---|---|---|
 | `POST` | `/api/purchases` | ✅ (device-signed) | Create a single purchase + Monobank invoice |
 | `POST` | `/api/purchases/bulk` | ✅ (device-signed) | Create a multi-item purchase |
+| `GET` | `/api/purchases/my` | ✅ | Current user's purchases (with vouchers) |
 | `POST` | `/api/purchases/simulate` | Admin | Simulate a Monobank callback (dev/testing) |
 | `POST` | `/api/monobank/webhook` | — (signed) | Monobank payment callback — signature-verified, fail-closed 401 |
-| `GET` | `/api/sync/orders` | ✅ | Current user's orders with embedded voucher details |
+| `GET` | `/api/sync` · `/api/sync/orders` | ✅ | Combined sync (orders + totals) / user's orders |
 
 ### Vouchers
 
@@ -322,7 +323,10 @@ role required; — = public. This lists the primary endpoints; admin sub-resourc
 | `GET` | `/api/vouchers/my` | ✅ | User's vouchers (plain array; includes `source`, `legalEntityId`, `workerUserId`) |
 | `PATCH` | `/api/vouchers/{id}/mark-used` | ✅ | Mark a voucher used (worker-guarded for gifted vouchers) |
 | `PATCH` | `/api/vouchers/{id}/restore` | Admin | Restore a used voucher |
+| `GET` | `/api/vouchers/inventory` | Admin | Aggregated inventory by provider/fuel/liters |
 | `POST` | `/api/voucher-catalog/import` | Admin | Upload a PDF catalog (multipart, field `file`) |
+| `GET` | `/api/voucher-catalog` | Admin | Voucher catalog list |
+| `GET` | `/api/voucher-catalog/{id}/qr` | ✅ | Render a voucher's QR (holder or Admin) |
 
 ### Company (owner/worker)
 
@@ -345,15 +349,15 @@ role required; — = public. This lists the primary endpoints; admin sub-resourc
 |---|---|---|
 | `GET` | `/api/stations` · `/api/station-nodes` | Stations and physical locations |
 | `GET` | `/api/stations/fuel-types` | Fuel types with base/discount pricing (public catalog) |
-| `GET` | `/api/packages` | Fuel packages (public catalog; clients filter by station client-side) |
+| `GET` | `/api/packages` · `/api/packages/station/{id}` | Fuel packages (all / by station) |
 | `GET` | `/api/report` | Per-user report (authenticated) |
 
 ### Admin
 
 Admin CRUD/reporting lives under `/api/admin/*` (all `Admin`-role): `stations`, `fuel-types`,
-`packages`, `providers`, `vouchers`, `voucher-imports`, `orders`
+`packages`, `providers`, `vouchers`, `fuel-vouchers`, `voucher-imports`, `qr-codes`, `orders`
 (incl. `POST /api/admin/orders/{id}/refund`), `users`, `settings`, `report`, `audit`, `errors`,
-`legal-entity/contracts`. See
+`legal-entity/contracts`, and `dashboard` (aggregated counts). See
 `docs/RECONCILIATION.md` in the private docs repo for the reconciliation-specific endpoints.
 
 ### Monitoring

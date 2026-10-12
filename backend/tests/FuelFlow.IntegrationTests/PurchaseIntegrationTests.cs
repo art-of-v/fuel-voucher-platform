@@ -199,10 +199,8 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
         var createResponse = await _client.PostAsJsonAsync("/api/purchases", createRequest);
         createResponse.EnsureSuccessStatusCode();
 
-        // Act - /api/sync/orders is the one remaining route for "my orders". It serves the same
-        // GetUserPurchasesCommandHandler that /api/purchases/my used to, so this asserts the
-        // behaviour, not the retired route.
-        var response = await _client.GetAsync("/api/sync/orders");
+        // Act
+        var response = await _client.GetAsync("/api/purchases/my");
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
