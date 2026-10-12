@@ -24,7 +24,7 @@
 #
 # It does NOT truncate the logs of RUNNING containers — Docker's json-file logs are
 # capped by /etc/docker/daemon.json (log-opts max-size/max-file), applied separately.
-# See docs/DEPLOYMENT.md ("Disk hygiene").
+# See docs/DEPLOYMENT.md (private docs repo) ("Disk hygiene").
 #
 # One-off run:  cd /root/FuelFlow/deploy && ./prune-docker.sh
 # Nightly:      installed as fuelflow-prune.timer by install-prune-schedule.sh

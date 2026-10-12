@@ -26,7 +26,7 @@
  *   OTA bucket, the private key at keys/private-key.pem, and these env vars:
  *     OTA_RCLONE_REMOTE    e.g. r2ota:fuelflow-ota    (rclone remote:bucket to upload into)
  *     OTA_PUBLIC_BASE_URL  e.g. https://ota.palne.shop (public CDN base the manifest URLs use)
- *   Runbook: docs/DEPLOYMENT.md ("Over-the-air updates (OTA)").
+ *   Runbook: docs/DEPLOYMENT.md (private docs repo) ("Over-the-air updates (OTA)").
  *
  * NOTE: run once and curl-verify the printed endpoint before flipping app.json
  *   expo.updates.enabled=true + url in a NEW native build — an installed build only starts
@@ -97,7 +97,7 @@ const appConfig = JSON.parse(readFileSync(join(mobileRoot, 'app.json'), 'utf8'))
 // exact same hash, so we recompute it with the very tool the build uses — never a hand-rolled hash.
 // If publish-time and build-time fingerprints differ (e.g. publishing from a different checkout than
 // the build came from), the app requests a runtime version nobody published and the API answers 204,
-// a SILENT no-update. See docs/DEPLOYMENT.md ("Runtime version — a native fingerprint").
+// a SILENT no-update. See docs/DEPLOYMENT.md (private docs repo) ("Runtime version — a native fingerprint").
 const usesFingerprint =
   typeof appConfig.runtimeVersion === 'object' && appConfig.runtimeVersion?.policy === 'fingerprint';
 const resolveRuntimeVersion = () => {

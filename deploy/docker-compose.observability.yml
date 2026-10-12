@@ -28,7 +28,7 @@
 # proper service/environment/level labels. There is deliberately no Alloy
 # container here: its Docker-socket mount is root-equivalent on the host, and
 # with the sink enabled it would only duplicate every log line. See the "Logs
-# and monitoring" section in docs/DEPLOYMENT.md.
+# and monitoring" section in docs/DEPLOYMENT.md (private docs repo).
 #
 # Memory limits (the server has ~2.5 GB headroom over the app stack):
 #   prometheus 512M | loki 384M | grafana 256M | gateway 32M — worst case

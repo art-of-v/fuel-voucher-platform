@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef } from 'react';
  *
  * Why this exists rather than TanStack Query's `refetchOnWindowFocus` (#164): that option listens
  * to `window.focus` / `visibilitychange`, neither of which React Native has, so it never fires —
- * the repo documents this in `useAppStateActive` and `docs/MOBILE-ARCHITECTURE.md`. Tabs here are
+ * the repo documents this in `useAppStateActive` and `docs/MOBILE-ARCHITECTURE.md` (private docs repo). Tabs here are
  * real routes on a stack, so revisiting one re-focuses an already-mounted screen instead of
  * remounting it, and a mount-keyed effect never runs again. Focus is the only signal that says
  * "the user is looking at this again, and something may have changed".

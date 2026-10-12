@@ -1,5 +1,5 @@
 // Company owner / worker DTOs.
-// See docs/COMPANY_WORKERS.md.
+// See docs/COMPANY_WORKERS.md (private docs repo).
 
 // Invitation as seen by the owner (sent invitations list).
 export interface CompanyInvitationDto {

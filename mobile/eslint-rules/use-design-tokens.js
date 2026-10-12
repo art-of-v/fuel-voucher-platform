@@ -2,7 +2,7 @@
  * Forbids hard-coded style values in screens, where a design token already owns
  * the number.
  *
- * The app has a real design system — `DESIGN.md` plus the token scales in
+ * The app has a real design system — `docs/DESIGN.md` (private docs repo) plus the token scales in
  * `src/core/design/` — and screens were ignoring it. At the time this rule was
  * added, `app/` carried roughly 600 hard-coded spacing, radius, font-size and
  * z-index numbers against 41 uses of `tokens.*`. Nothing went wrong visually;

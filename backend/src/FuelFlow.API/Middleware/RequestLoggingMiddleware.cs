@@ -61,7 +61,7 @@ internal sealed class RequestLoggingMiddleware
         {
             // Log the stable user id (GUID), never the phone number or first name.
             // Those are PII and this line ships to Loki + on-box logs (see
-            // docs/OBSERVABILITY.md). The id is correlatable but not personal, and
+            // docs/OBSERVABILITY.md (private docs repo)). The id is correlatable but not personal, and
             // matches the ClaimTypes.NameIdentifier ?? "sub" convention used by the
             // controllers to read the current user.
             user = context.User.Identity?.IsAuthenticated == true

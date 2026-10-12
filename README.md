@@ -65,7 +65,7 @@ Three applications share one backend:
 - Money-affecting values (checkout price, webhook amount, order status) are computed and enforced server-side; the client only ever *proposes*.
 - Background jobs run **in-process** via Hangfire (PostgreSQL storage) by default; the same jobs can also run in the standalone `FuelFlow.JobsWorker` for horizontal scaling.
 - Domain events use an **outbox**: events are written in the same transaction as the state change, then dispatched to consumers (fulfillment, notifications) by a recurring job.
-- JWT bearer tokens carry identity; admin endpoints require the `Admin` role claim; a per-request middleware re-checks the session against the DB so revocation is immediate (see [docs/SECURITY.md](docs/SECURITY.md)).
+- JWT bearer tokens carry identity; admin endpoints require the `Admin` role claim; a per-request middleware re-checks the session against the DB so revocation is immediate (see `docs/SECURITY.md` in the private docs repo).
 
 ### Backend layout
 
@@ -199,7 +199,7 @@ Admins use the **same** login flow; the `Admin` role is granted by setting the u
   ledger is `received = delivered value + refunded + outstanding`.
 - Partial orders can be refunded (manual `POST /api/admin/orders/{id}/refund` or the optional
   auto-refund job) for the undelivered value via Monobank invoice cancellation; a `sync-refund-status`
-  job reconciles refund state. See [docs/RECONCILIATION.md](docs/RECONCILIATION.md).
+  job reconciles refund state. See `docs/RECONCILIATION.md` in the private docs repo.
 - **Profit** is earned margin on liters actually delivered (`FuelPackage.MarginUahPerLiter × liters × delivered qty`).
 
 ### 5. Company workers
@@ -209,7 +209,7 @@ company (`legalEntityId` on checkout), invite registered users as **workers**, g
 company vouchers, and fire workers (which blocks their gifted vouchers). Gifting records a
 `ReceivedFromCompany` order that owns the fuel it hands over, so the worker sees a receipt; recall,
 firing and the admin unblock return that fuel to the **purchase** it arrived under. See
-[docs/COMPANY_WORKERS.md](docs/COMPANY_WORKERS.md).
+`docs/COMPANY_WORKERS.md` in the private docs repo.
 
 ---
 
@@ -358,7 +358,7 @@ Admin CRUD/reporting lives under `/api/admin/*` (all `Admin`-role): `stations`, 
 `packages`, `providers`, `vouchers`, `fuel-vouchers`, `voucher-imports`, `qr-codes`, `orders`
 (incl. `POST /api/admin/orders/{id}/refund`), `users`, `settings`, `report`, `audit`, `errors`,
 `legal-entity/contracts`, and `dashboard` (aggregated counts). See
-[docs/RECONCILIATION.md](docs/RECONCILIATION.md) for the reconciliation-specific endpoints.
+`docs/RECONCILIATION.md` in the private docs repo for the reconciliation-specific endpoints.
 
 ### Monitoring
 
@@ -426,8 +426,8 @@ npm start -- --ios --private-key-path ./keys/private-key.pem   # or --android
 >
 > `./keys/private-key.pem` is the same key `npm run publish:ota` signs real updates with. It is
 > gitignored and lives only on the publish machine; generate it once with
-> `npx expo-updates codesigning:generate` (see `docs/DEPLOYMENT.md` → "Over-the-air updates
-> (OTA)"). Only pass it if that file exists — a checkout without the key cannot run a dev server.
+> `npx expo-updates codesigning:generate` (see `docs/DEPLOYMENT.md` in the private docs repo →
+> "Over-the-air updates (OTA)"). Only pass it if that file exists — a checkout without the key cannot run a dev server.
 
 > **No `.env`?** Not a problem, and nothing gets hardcoded: `resolveApiBaseUrl()` in
 > `mobile/src/core/api/apiClient.ts` reads `EXPO_PUBLIC_API_URL`, then `expo.extra.apiUrl` from
@@ -467,7 +467,7 @@ Backend (`appsettings.json` / environment overrides — use `__` for nested keys
 Mobile (`mobile/.env`): `EXPO_PUBLIC_API_URL=...` · Admin (build arg in `admin/Dockerfile` / dev env): `VITE_API_URL=...`
 
 Production values for all of the above live in `deploy/.env` on the server (see
-[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)).
+`docs/DEPLOYMENT.md` in the private docs repo).
 
 ---
 
@@ -478,7 +478,7 @@ Production values for all of the above live in `deploy/.env` on the server (see
   Deploys are **automatic**: every green merge to `main` is built into images in CI (pushed
   to GHCR), rolled out to a same-box staging stack and smoke-tested, then deployed to prod,
   which **pulls** those exact SHA-pinned images (self-hosted runner). Full runbook:
-  [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+  `docs/DEPLOYMENT.md` in the private docs repo.
 - **Mobile** — Expo / EAS (development builds + TestFlight); web export available.
 
 Set sensitive values (`Database__ConnectionString`, `Jwt__Secret`, `Monobank__Token`,
@@ -488,17 +488,28 @@ Set sensitive values (`Database__ConnectionString`, `Jwt__Secret`, `Monobank__To
 
 ## Documentation index
 
-| Doc | Contents |
+The operational documentation is **not in this repository**. It lives in the private
+[`fuel-voucher-platform-planning`](https://github.com/art-of-v/fuel-voucher-platform-planning)
+repo under `docs/` — it describes the live host, the DNS zone, the alerting stack and the
+operational procedures, and this repository is public. References like `docs/DEPLOYMENT.md`
+in code comments and scripts throughout this repo point at that private repo.
+
+| Doc (private repo) | Contents |
 |---|---|
-| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Deploy & ops runbook: Hetzner stack, CI auto-deploy, `deploy/.env` variables, backups, troubleshooting |
-| [docs/DNS.md](docs/DNS.md) | Authoritative DNS for `palne.shop` — the live zone, and what was verified about the Cloudflare cutover vs what was not |
-| [docs/SECURITY.md](docs/SECURITY.md) | Auth & device-binding model (plain-language + the real implemented controls) + fraud-analysis findings |
-| [docs/DESIGN.md](docs/DESIGN.md) | Mobile design system (tokens, components, rules) + app structure & core flows |
-| [docs/MOBILE-ARCHITECTURE.md](docs/MOBILE-ARCHITECTURE.md) | How the mobile code is organised: where new code goes, layer rules, data flow, non-obvious constraints, known debt |
-| [docs/MOBILE-MAINTAINABILITY.md](docs/MOBILE-MAINTAINABILITY.md) | Maintainability audit of the mobile app + the plan to address it (living tracker) |
-| [docs/RECONCILIATION.md](docs/RECONCILIATION.md) | Admin & customer reconciliation, refunds, SQL queries |
-| [docs/COMPANY_WORKERS.md](docs/COMPANY_WORKERS.md) | Company owner/worker feature (data model + `/api/company` API) |
-| [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md) | Prometheus/Grafana/Loki observability stack + Telegram alerting + Sentry error tracking |
+| `docs/DEPLOYMENT.md` | Deploy & ops runbook: Hetzner stack, CI auto-deploy, `deploy/.env` variables, backups, troubleshooting |
+| `docs/ROTATION.md` | Rotating a secret on the box — the procedure, and the traps that cost two outages |
+| `docs/DNS.md` | Authoritative DNS for `palne.shop` — the live zone, and what was verified about the Cloudflare cutover vs what was not |
+| `docs/SECURITY.md` | Auth & device-binding model (plain-language + the real implemented controls) + fraud-analysis findings |
+| `docs/DESIGN.md` | Mobile design system (tokens, components, rules) + app structure & core flows |
+| `docs/MOBILE-ARCHITECTURE.md` | How the mobile code is organised: where new code goes, layer rules, data flow, non-obvious constraints, known debt |
+| `docs/MOBILE-MAINTAINABILITY.md` | Maintainability audit of the mobile app + the plan to address it (living tracker) |
+| `docs/RECONCILIATION.md` | Admin & customer reconciliation, refunds, SQL queries |
+| `docs/COMPANY_WORKERS.md` | Company owner/worker feature (data model + `/api/company` API) |
+| `docs/OBSERVABILITY.md` | Prometheus/Grafana/Loki observability stack + Telegram alerting + Sentry error tracking |
+| `docs/TESTING.md` | How the test suite is wired, and what each layer actually proves |
+| `docs/WORKFLOW.md` | Branching, PR and merge conventions |
+
+They were removed from this repository on 2026-10-12; the git history still contains them.
 
 ---
 
@@ -510,5 +521,5 @@ Set sensitive values (`Database__ConnectionString`, `Jwt__Secret`, `Monobank__To
 | **Synchronous PDF import** | Import runs inside the request; very large PDFs can approach the client timeout. Bounded by an import-concurrency guard. |
 | **Self-reported redemption** | `mark-used` is honor-system — there is no POS/pump integration proving fuel was dispensed. |
 
-See [docs/SECURITY.md](docs/SECURITY.md) for the fraud-analysis findings and the
+See `docs/SECURITY.md` in the private docs repo for the fraud-analysis findings and the
 open/closed work packages.

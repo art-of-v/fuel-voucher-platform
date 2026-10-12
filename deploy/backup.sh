@@ -141,7 +141,7 @@ echo "[$(date -Is)] OK: $(du -h "$OUT" | cut -f1) encrypted to ${BACKUP_AGE_RECI
 # up is not a backup. Set BACKUP_REMOTE in .env to an rclone remote. The remote is
 # Cloudflare R2 (S3-compatible), configured once with `rclone config`, e.g.
 #     BACKUP_REMOTE=r2:fuelflow-backups
-# See docs/DEPLOYMENT.md "Off-site backups (Cloudflare R2)" for the one-time setup.
+# See docs/DEPLOYMENT.md (private docs repo) "Off-site backups (Cloudflare R2)" for the one-time setup.
 if [[ -n "${BACKUP_REMOTE:-}" ]]; then
   if command -v rclone >/dev/null 2>&1; then
     echo "[$(date -Is)] Copying to ${BACKUP_REMOTE} ..."

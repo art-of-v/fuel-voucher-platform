@@ -61,7 +61,7 @@ export interface Voucher {
   externalId?: string;
   imageUrl?: string | null;
   expirationDate?: string;
-  // Company / worker fields (see docs/COMPANY_WORKERS.md)
+  // Company / worker fields (see docs/COMPANY_WORKERS.md (private docs repo))
   source?: 'own' | 'gifted' | string;
   legalEntityId?: string | null;
   workerUserId?: string | null;

@@ -1,7 +1,7 @@
 # FuelFlow — production stack for a single Hetzner server (CX22, 4 GB / 2 vCPU).
 # Deploys happen automatically via CI (".github/workflows/ci.yml" → "Deploy to
 # Hetzner"); this compose file is what CI builds and runs. Runbook:
-# docs/DEPLOYMENT.md.
+# docs/DEPLOYMENT.md (private docs repo).
 #
 # Manual use (rollback / server restart):
 #   cd ~/FuelFlow/deploy
@@ -18,7 +18,7 @@
 #
 # --- Memory limits -------------------------------------------------------------------
 # Every service has a mem_limit. Sized for the Hetzner CX22 (4 GB RAM / 2 vCPU —
-# originally deployed on a 2 GB server, docs/DEPLOYMENT.md) with 2 GB of swap as
+# originally deployed on a 2 GB server, docs/DEPLOYMENT.md (private docs repo)) with 2 GB of swap as
 # the safety net:
 #
 #   dotnet-backend  896M   | postgres 512M | redis 192M | caddy 96M | admin 64M | website 32M

@@ -1,6 +1,6 @@
 import { classifyVoucher, type Voucher } from './api';
 
-// classifyVoucher decides what a user may do with a voucher (see COMPANY_WORKERS.md
+// classifyVoucher decides what a user may do with a voucher (see docs/COMPANY_WORKERS.md (private docs repo)
 // §5). It is a security-relevant guard: the my-codes screen hides the "mark used"
 // action based on its result, and useMyCodes re-checks it before redeeming (a
 // 'blocked' or 'gifted_to_worker' voucher must never be redeemable by the viewer).
