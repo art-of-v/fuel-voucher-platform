@@ -73,14 +73,6 @@
   transition: color var(--motion-slow) var(--easing);
 }
 
-.priceLocked .price {
-  color: var(--accent);
-}
-
-.priceLocked .lockState {
-  color: var(--accent);
-}
-
 .row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

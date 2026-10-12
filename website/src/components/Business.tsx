@@ -19,7 +19,10 @@ const features = [
   },
   {
     title: 'Акт звірки без розбіжностей',
-    body: 'Отримано = видано + повернено. Повний пакет документів з ПДВ для бухгалтерії — без Excel і ручних звірок.',
+    // "Повний пакет документів з ПДВ" was here. The reconciliation act is real
+    // (it is generated from Monobank statements); a VAT claim is a tax promise
+    // the site cannot make on its own, so it is gone rather than softened.
+    body: 'Отримано = видано + повернено. Акт звірки формується автоматично — без Excel і ручних звірок.',
   },
 ];
 

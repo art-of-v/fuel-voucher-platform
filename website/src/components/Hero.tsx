@@ -67,7 +67,7 @@ export default function Hero() {
             </div>
             <div className={styles.specRow}>
               <span className={styles.specLabel}>Пакет</span>
-              <span className={styles.specValue}>50 л</span>
+              <span className={styles.specValue}>2–50 л</span>
             </div>
             <div className={styles.specRow}>
               <span className={styles.specLabel}>Оплата</span>

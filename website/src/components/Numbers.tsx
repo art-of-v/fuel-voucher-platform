@@ -1,16 +1,50 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import Counter from './Counter';
 import SectionIndex from './SectionIndex';
 import styles from './Numbers.module.css';
+import { fetchCatalogue } from '../lib/catalogue';
 
-const prices = [97.6, 99.9, 98.4, 100.3, 99.2];
-
+/**
+ * The three figures here used to be hardcoded: a rotating fake price
+ * (97.60 -> 99.20 UAH/l), "50 litres in the wallet" and "3 months, the
+ * standard term". None of it held up against the system:
+ *
+ * - the price was invented, and the animation made it look measured;
+ * - litres do not accumulate in a wallet - a package is one voucher, redeemed
+ *   by one fill, so a "50 litres in the wallet" balance describes a mechanic
+ *   that does not exist;
+ * - there is no three-month term. A voucher's term is the expiry printed on it
+ *   by the network and parsed at import.
+ *
+ * So the numbers are now read from the same catalogue the prices section uses,
+ * and the two figures that are not prices state the real model instead.
+ */
 export default function Numbers() {
-  const [locked, setLocked] = useState(false);
-  const [tick, setTick] = useState(0);
+  const [stats, setStats] = useState<{ fromPerLiter: number; networks: number } | null>(
+    null
+  );
   const ref = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    let alive = true;
+    fetchCatalogue()
+      .then((rows) => {
+        if (!alive) return;
+        const perLiter = rows.map((r) => r.finalPricePerLiter);
+        if (!perLiter.length) return;
+        setStats({
+          fromPerLiter: Math.min(...perLiter),
+          networks: new Set(rows.map((r) => r.stationId)).size,
+        });
+      })
+      .catch(() => {
+        /* the prices section carries the error state; nothing to say here */
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     const root = ref.current;
@@ -34,38 +68,6 @@ export default function Numbers() {
     return () => observer.disconnect();
   }, []);
 
-  useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      setLocked(true);
-      return;
-    }
-    const root = ref.current;
-    if (!root) return;
-    let interval: ReturnType<typeof setInterval> | undefined;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && !locked) {
-          interval = setInterval(() => setTick((t) => t + 1), 900);
-          timer = setTimeout(() => {
-            clearInterval(interval);
-            setLocked(true);
-          }, 4500);
-        }
-      },
-      { threshold: 0.5 }
-    );
-    io.observe(root);
-    return () => {
-      io.disconnect();
-      clearInterval(interval);
-      clearTimeout(timer);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const price = locked ? prices[prices.length - 1] : prices[tick % prices.length];
-
   return (
     <section className={`lf-section ${styles.section}`} id="numbers" ref={ref}>
       <div className="lf-grid-bg" aria-hidden="true" />
@@ -85,30 +87,41 @@ export default function Numbers() {
         </header>
 
         <div className={`${styles.stage} ${styles.reveal}`}>
-          <div className={`${styles.priceBlock} ${locked ? styles.priceLocked : ''}`}>
+          <div className={styles.priceBlock}>
             <span className={styles.price}>
-              ₴{price.toFixed(2)}
+              {stats ? (
+                <>
+                  від {stats.fromPerLiter.toFixed(2).replace('.', ',')}
+                </>
+              ) : (
+                '—'
+              )}
               <span className={styles.priceUnit}>/ л</span>
             </span>
             <span className={styles.lockState}>
-              {locked ? '✓ Зафіксовано' : 'Ціна на колонці рухається…'}
+              ✓ Ціна фіксується в момент оплати
             </span>
           </div>
 
           <div className={styles.row}>
             <div className={styles.stat}>
-              <Counter to={50} className={styles.statValue} />
-              <span className={styles.statLabel}>літрів у гаманці</span>
-            </div>
-            <div className={styles.stat}>
-              <Counter to={2920} prefix="₴" className={styles.statValue} />
-              <span className={styles.statLabel}>сплачено одного разу</span>
-            </div>
-            <div className={styles.stat}>
-              <Counter to={3} suffix=" міс" className={styles.statValue} />
+              <span className={styles.statValue}>2–50</span>
               <span className={styles.statLabel}>
-                стандартний термін · або індивідуально, з можливістю
-                продовження
+                літрів в одному пакеті — від 2 до 50, набір залежить від мережі
+              </span>
+            </div>
+            <div className={styles.stat}>
+              <span className={styles.statValue}>
+                {stats ? String(stats.networks).padStart(2, '0') : '—'}
+              </span>
+              <span className={styles.statLabel}>
+                мережі-партнери: OKKO, WOG, KLO, UPG
+              </span>
+            </div>
+            <div className={styles.stat}>
+              <span className={styles.statValue}>1 = 1</span>
+              <span className={styles.statLabel}>
+                пакет — це один ваучер на одну заправку
               </span>
             </div>
           </div>
