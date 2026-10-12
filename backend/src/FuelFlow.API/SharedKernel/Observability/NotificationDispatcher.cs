@@ -240,6 +240,44 @@ public sealed class NotificationDispatcher
     /// Throttled per exception type + endpoint, because a single broken endpoint under
     /// a client retry loop would otherwise flood the chat and hide everything else.
     /// </summary>
+    /// <summary>
+    /// Raised when Monobank's cancel list holds a refund confirmation that matches no refund we
+    /// sent, and there was more than one thing it could have been. #261: the old code took the
+    /// newest entry regardless, so a confirmation belonging to a different refund could complete
+    /// the wrong one and move the order to PartiallyRefunded.
+    /// <para>
+    /// Warning, not Critical: the refund simply stays Processing and retries, and no money has
+    /// moved. It is worth a human because the retry will not fix it — only knowing which refund the
+    /// bank meant will.
+    /// </para>
+    /// </summary>
+    public Task RefundSyncUnmatchedAsync(
+        Guid refundId,
+        Guid orderId,
+        string invoiceId,
+        int entryCount,
+        int siblingRefunds,
+        CancellationToken ct = default)
+        => SendAsync(
+            _config.NotifyOnUnmatchedRefundSync,
+            AlertSeverity.Warning,
+            "Підтвердження повернення не зіставилося",
+            $"Monobank повернув підтвердження для рахунку {invoiceId}, але жоден із наших refund не має такого extRef. "
+            + $"Записів у cancel list: {entryCount}, інших refund на цьому рахунку, що очікують: {siblingRefunds}. "
+            + "Повернення лишається Processing і повторить спробу — потрібно звірити, який саме refund мав на увазі банк.",
+            new Dictionary<string, string>
+            {
+                ["Refund"] = refundId.ToString(),
+                ["Замовлення"] = orderId.ToString(),
+                ["Рахунок"] = invoiceId
+            },
+            // Per invoice: one alert explains the whole list, and repeated syncs of the same stuck
+            // refund must not send a message each time. Hourly, like the unfulfillable alert - a
+            // stuck refund is a thing to look at today, not something to page about every cycle.
+            throttleKey: $"refundsync|{invoiceId}",
+            ct,
+            throttleMinutes: 60);
+
     public Task UnhandledExceptionAsync(Exception exception, string endpoint, CancellationToken ct = default)
         => SendAsync(
             _config.NotifyOnUnhandledException,
