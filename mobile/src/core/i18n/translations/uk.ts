@@ -156,6 +156,8 @@ export const uk: Record<string, string> = {
   'codes.orderNotPayable': 'Це замовлення вже не можна оплатити.',
   'payment.title': 'Оплата',
   'payment.subtitle': 'Підтвердіть оплату',
+  'payment.loading': 'Завантажуємо сторінку оплати…',
+  'payment.payingFor': 'Оплата за',
   'payment.close': 'Закрити',
   'payment.openMonobank': 'Сплатити через mono',
   'payment.missingUrl':

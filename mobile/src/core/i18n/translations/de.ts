@@ -161,6 +161,8 @@ export const de: Record<string, string> = {
   'codes.orderNotPayable': 'Diese Bestellung kann nicht mehr bezahlt werden.',
   'payment.title': 'Zahlung',
   'payment.subtitle': 'Bestätigen Sie Ihre Zahlung',
+  'payment.loading': 'Zahlungsseite wird geladen…',
+  'payment.payingFor': 'Zahlung für',
   'payment.close': 'Schließen',
   'payment.openMonobank': 'Mit mono bezahlen',
   'payment.missingUrl':
