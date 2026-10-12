@@ -75,10 +75,8 @@ using FuelFlow.Features.Vouchers.DeleteVoucher;
 using FuelFlow.Features.Vouchers.Exchange;
 using FuelFlow.Features.Vouchers.GetAdminVoucherById;
 using FuelFlow.Features.Vouchers.GetAdminVouchers;
-using FuelFlow.Features.Vouchers.GetFuelVouchers;
 using FuelFlow.Features.Vouchers.GetImportBatches;
 using FuelFlow.Features.Vouchers.GetInventory;
-using FuelFlow.Features.Vouchers.GetQrCodes;
 using FuelFlow.Features.Vouchers.GetUserVouchers;
 using FuelFlow.Features.Vouchers.GetVoucherVerification;
 using FuelFlow.Features.Vouchers.Import;
@@ -199,8 +197,6 @@ internal static class ServiceSetup
         services.AddScoped<BulkActionVouchersCommandHandler>();
         // The undo for the soft delete: without it a mistaken delete_all has no way back (#217).
         services.AddScoped<UnarchiveVoucherCommandHandler>();
-        services.AddScoped<GetFuelVouchersQueryHandler>();
-        services.AddScoped<GetQrCodesQueryHandler>();
 
         // Operator→provider voucher exchange / renewal (#104).
         services.AddScoped<GetVoucherExchangeAttentionQueryHandler>();

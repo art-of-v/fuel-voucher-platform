@@ -6,9 +6,7 @@ using FuelFlow.Features.Vouchers.BulkActionVouchers;
 using FuelFlow.Features.Vouchers.DeleteVoucher;
 using FuelFlow.Features.Vouchers.GetAdminVoucherById;
 using FuelFlow.Features.Vouchers.GetAdminVouchers;
-using FuelFlow.Features.Vouchers.GetFuelVouchers;
 using FuelFlow.Features.Vouchers.GetImportBatches;
-using FuelFlow.Features.Vouchers.GetQrCodes;
 using FuelFlow.Features.Vouchers.GetVoucherVerification;
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.SharedModels;
@@ -593,37 +591,7 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
         result.Should().BeNull();
     }
 
-    [Fact]
-    public async Task GetFuelVouchers_ShouldReturnItemsAndTotal()
-    {
-        _context.FuelVouchers.AddRange(CreateVoucher(), CreateVoucher());
-        await _context.SaveChangesAsync();
-
-        var handler = new GetFuelVouchersQueryHandler(_context);
-        var result = await handler.HandleAsync(new GetFuelVouchersQuery(null, null, 1, 50));
-
-        result.Total.Should().Be(2);
-        result.Items.Should().HaveCount(2);
-    }
-
-    [Fact]
-    public async Task GetFuelVouchers_ShouldFilterByVoucherNumberSearch()
-    {
-        var target = CreateVoucher(voucherNumber: "OKKO-TARGET-1");
-        var other = CreateVoucher(voucherNumber: "OKKO-OTHER-1");
-        _context.FuelVouchers.AddRange(target, other);
-        await _context.SaveChangesAsync();
-
-        var handler = new GetFuelVouchersQueryHandler(_context);
-        var result = await handler.HandleAsync(new GetFuelVouchersQuery("OKKO-TARGET", null, 1, 50));
-
-        result.Total.Should().Be(1);
-        result.Items.Should().ContainSingle(v => v.Id == target.Id);
-    }
-
-    // ── 7. GetVoucherVerificationQueryHandler ────────────────────────────────
-
-    [Fact]
+[Fact]
     public async Task GetVoucherVerification_ShouldReturnVerificationData()
     {
         var voucher = CreateVoucher(status: VoucherStatus.Assigned, voucherNumber: "OKKO-VERIFY-1");
@@ -642,31 +610,7 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
 
     // ── 8. GetQrCodesQueryHandler ────────────────────────────────────────────
 
-    [Fact]
-    public async Task GetQrCodes_ShouldReturnSequentialIdsAndCorrectStatus()
-    {
-        _context.FuelVouchers.AddRange(
-            CreateVoucher(status: VoucherStatus.Available, createdAtUtc: DateTime.UtcNow),
-            CreateVoucher(status: VoucherStatus.Assigned, createdAtUtc: DateTime.UtcNow.AddMinutes(-1)),
-            CreateVoucher(status: VoucherStatus.Used, createdAtUtc: DateTime.UtcNow.AddMinutes(-2)));
-        await _context.SaveChangesAsync();
-
-        var handler = new GetQrCodesQueryHandler(_context);
-        var result = await handler.HandleAsync(new GetQrCodesQuery());
-
-        result.Should().HaveCount(3);
-        result.Select(d => d.Id).Should().Equal(1, 2, 3);
-
-        result[0].Status.Should().Be("available");
-        result[0].StationId.Should().Be("okko");
-        result[0].FuelType.Should().Be("A-95");
-        result[1].Status.Should().Be("sold");
-        result[2].Status.Should().Be("sold");
-    }
-
-    // ── 9. Import batches ────────────────────────────────────────────────────
-
-    private VoucherImport CreateImport(string fileName = "vouchers.pdf", int importedCount = 0)
+private VoucherImport CreateImport(string fileName = "vouchers.pdf", int importedCount = 0)
     {
         var import = new VoucherImport
         {
