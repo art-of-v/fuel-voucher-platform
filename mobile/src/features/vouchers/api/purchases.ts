@@ -108,6 +108,48 @@ function parseSuccessBody(response: Response, bodyText: string) {
   }
 }
 
+export async function createMonobankInvoice(
+  data: PurchaseData,
+  legalEntityId?: string | null,
+): Promise<{ purchaseId: number; invoiceId: string; pageUrl: string; appUrl?: string }> {
+  const response = await apiFetch('/api/purchases', {
+    method: 'POST',
+    body: JSON.stringify({
+      provider: 'MONOBANK',
+      packageId: data.packageId,
+      fuelTypeId: data.fuelType,
+      liters: data.liters,
+      quantity: data.quantity,
+      price: data.price,
+      stationId: data.stationId,
+      stationName: data.stationName,
+      ...(legalEntityId ? { legalEntityId } : {}),
+    }),
+  });
+  const bodyText = await response.text();
+  if (!response.ok) {
+    const accountInactiveError = handleAccountInactiveError(response, bodyText);
+    if (accountInactiveError) throw accountInactiveError;
+    throw buildPurchaseError(response, bodyText);
+  }
+  const result = parseSuccessBody(response, bodyText);
+  return {
+    purchaseId: result.orderId,
+    invoiceId: result.monobankInvoiceId ?? '',
+    pageUrl: result.paymentUrl ?? '',
+    // Only present when the backend asked Monobank for `withAppUrl`. It is NOT persisted on the
+    // order, so an order re-opened from the wallet has none - callers must tolerate undefined.
+    appUrl: result.appUrl ?? undefined,
+  };
+}
+
+export async function createBulkMonobankInvoice(
+  items: PurchaseData[],
+  legalEntityId?: string | null,
+): Promise<{ orderIds: string[]; invoiceId: string; pageUrl: string; appUrl?: string }> {
+  const response = await apiFetch('/api/purchases/bulk', {
+    method: 'POST',
+
 export async function createBulkMonobankInvoice(
   items: PurchaseData[],
   legalEntityId?: string | null,

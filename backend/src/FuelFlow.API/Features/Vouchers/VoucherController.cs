@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using FuelFlow.Features.Vouchers.GetInventory;
 using FuelFlow.Features.Vouchers.GetUserVouchers;
 using FuelFlow.Features.Vouchers.MarkVoucherAsUsed;
 using FuelFlow.Features.Vouchers.RestoreVoucher;
@@ -12,17 +13,20 @@ namespace FuelFlow.Features.Vouchers;
 public sealed class VoucherController : ControllerBase
 {
     private readonly GetUserVouchersCommandHandler _getUserVouchersHandler;
+    private readonly GetInventoryCommandHandler _getInventoryHandler;
     private readonly MarkVoucherAsUsedCommandHandler _markAsUsedHandler;
     private readonly RestoreVoucherCommandHandler _restoreHandler;
     private readonly ILogger<VoucherController> _logger;
 
     public VoucherController(
         GetUserVouchersCommandHandler getUserVouchersHandler,
+        GetInventoryCommandHandler getInventoryHandler,
         MarkVoucherAsUsedCommandHandler markAsUsedHandler,
         RestoreVoucherCommandHandler restoreHandler,
         ILogger<VoucherController> logger)
     {
         _getUserVouchersHandler = getUserVouchersHandler;
+        _getInventoryHandler = getInventoryHandler;
         _markAsUsedHandler = markAsUsedHandler;
         _restoreHandler = restoreHandler;
         _logger = logger;
@@ -53,6 +57,25 @@ public sealed class VoucherController : ControllerBase
         {
             _logger.LogError(ex, "Error getting vouchers for user {UserId}", userId);
             return StatusCode(500, "An error occurred while retrieving vouchers");
+        }
+    }
+    [HttpGet("inventory")]
+    [Authorize(Policy = "Staff")]
+    [ProducesResponseType(typeof(GetInventoryResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetInventory(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var command = new GetInventoryCommand();
+            var response = await _getInventoryHandler.HandleAsync(command, cancellationToken);
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting voucher inventory");
+            return StatusCode(500, "An error occurred while retrieving inventory");
         }
     }
     [HttpPatch("{id}/mark-used")]

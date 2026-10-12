@@ -130,6 +130,17 @@ public sealed class VouchersController : ControllerBase
             && header[2] == (byte)'D'
             && header[3] == (byte)'F';
     }
+    [HttpGet]
+    [Authorize(Policy = "Staff")]
+    [ProducesResponseType(typeof(GetVouchersResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetVouchers([FromQuery] int page = 1, [FromQuery] int pageSize = 50, CancellationToken cancellationToken = default)
+    {
+        var query = new GetVouchersQuery(page, pageSize);
+        var result = await _getHandler.HandleAsync(query, cancellationToken);
+        return Ok(result);
+    }
     /// <summary>
     /// Renders a voucher's QR as a PNG, for the holder or an Admin.
     ///

@@ -253,6 +253,32 @@ public sealed class LegalEntityController : ControllerBase
 
         return Ok(MapToDto(entity));
     }
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetContracts(CancellationToken cancellationToken)
+    {
+        var userId = GetUserId();
+        if (userId == null) return Unauthorized();
+
+        var contracts = await _dbContext.Contracts
+            .AsNoTracking()
+            .Include(c => c.Entity)
+            .Include(c => c.Station)
+            .Where(c => c.UserId == userId.Value)
+            .OrderByDescending(c => c.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+
+        var result = contracts.Select(c => new
+        {
+            id = c.Id,
+            legalEntityId = c.LegalEntityId,
+            legalEntityName = c.Entity?.Name,
+            stationId = c.StationId,
+            stationName = c.Station?.Name,
+            createdAt = c.CreatedAtUtc
+        });
+
+        return Ok(result);
+    }
 
     [HttpPost("sign")]
     [ProducesResponseType(StatusCodes.Status200OK)]

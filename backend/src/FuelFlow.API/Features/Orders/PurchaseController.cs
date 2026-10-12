@@ -337,6 +337,33 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
         }
     }
 
+    [HttpGet("my")]
+    [ProducesResponseType(typeof(List<PurchaseDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetMyPurchases(CancellationToken cancellationToken)
+    {
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                     ?? User.FindFirst("sub")?.Value
+                     ?? User.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")?.Value;
+
+        if (string.IsNullOrEmpty(userId))
+        {
+            _logger.LogWarning("User ID not found in claims");
+            return Unauthorized("User ID not found");
+        }
+
+        try
+        {
+            var command = new GetUserPurchasesCommand(Guid.Parse(userId));
+            var purchases = await _getUserPurchasesHandler.HandleAsync(command, cancellationToken);
+            return Ok(purchases);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving purchases for user {UserId}", userId);
+            return StatusCode(500, "An error occurred while retrieving purchases");
+        }
+    }
     /// <summary>
     /// The signed-in customer's own savings summary: paid amount, litres bought, saving vs the pump
     /// (frozen at purchase), remaining unredeemed balance and a per-month breakdown. Optionally
