@@ -1,4 +1,5 @@
 using FluentAssertions;
+using FuelFlow.Features.Admin.GetDashboard;
 using FuelFlow.Features.Admin.GetReconciliation;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers;
@@ -116,6 +117,78 @@ public sealed class AdminQueryHandlersTests : IDisposable
         CreatedAtUtc = DateTime.UtcNow,
         UpdatedAtUtc = DateTime.UtcNow
     };
+
+    [Fact]
+    public async Task GetDashboard_ShouldReturnCounts()
+    {
+        _context.Users.AddRange(
+            new User { Id = UserId, PhoneNumber = "+380991111111", CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new User { Id = OtherUserId, PhoneNumber = "+380992222222", CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
+        _context.SaveChanges();
+
+        _context.FuelVouchers.AddRange(
+            CreateVoucher("OKKO", "okko-95", VoucherStatus.Available),
+            CreateVoucher("OKKO", "okko-95", VoucherStatus.Imported),
+            CreateVoucher("OKKO", "okko-95", VoucherStatus.Assigned),
+            CreateVoucher("OKKO", "okko-95", VoucherStatus.Used),
+            CreateVoucher("OKKO", "okko-95", VoucherStatus.VerificationFailed),
+            CreateVoucher("OKKO", "okko-95", VoucherStatus.VerifiedWithWarnings),
+            CreateVoucher("OKKO", "okko-95", VoucherStatus.Expired));
+        _context.SaveChanges();
+
+        var fulfilledOrder = CreateOrder(Guid.NewGuid(), UserId, OrderStatus.Fulfilled, MonobankStatus.Success, DateTime.UtcNow.AddDays(-3));
+        AddLineItem(fulfilledOrder, "okko", "okko-95", 50m, 1, 1000);
+
+        var partialOrder = CreateOrder(Guid.NewGuid(), UserId, OrderStatus.PartiallyFulfilled, MonobankStatus.Success, DateTime.UtcNow.AddDays(-2));
+        AddLineItem(partialOrder, "wog", "wog-dp", 20m, 2, 1000);
+
+        var pendingOrder = CreateOrder(Guid.NewGuid(), UserId, OrderStatus.PendingFulfillment, MonobankStatus.Pending, DateTime.UtcNow.AddDays(-1));
+
+        _context.Orders.AddRange(fulfilledOrder, partialOrder, pendingOrder);
+        _context.SaveChanges();
+
+        var handler = new GetDashboardQueryHandler(_context);
+        var query = new GetDashboardQuery();
+
+        var response = await handler.HandleAsync(query);
+
+        response.Users.Total.Should().Be(2);
+
+        response.Vouchers.Total.Should().Be(7);
+        response.Vouchers.Available.Should().Be(2);
+        response.Vouchers.Assigned.Should().Be(1);
+        response.Vouchers.Used.Should().Be(1);
+        response.Vouchers.VerificationFailed.Should().Be(1);
+        response.Vouchers.VerifiedWithWarnings.Should().Be(1);
+        response.Vouchers.ByProvider.Should().ContainSingle(v => v.Provider == "OKKO" && v.Count == 7);
+
+        response.Orders.Total.Should().Be(3);
+        response.Orders.Pending.Should().Be(2);
+        response.Orders.Fulfilled.Should().Be(1);
+        response.Orders.RevenueUah.Should().Be(180);
+    }
+
+    [Fact]
+    public async Task GetDashboard_ShouldReturnEmptyStats_WhenNoData()
+    {
+        var handler = new GetDashboardQueryHandler(_context);
+        var query = new GetDashboardQuery();
+
+        var response = await handler.HandleAsync(query);
+
+        response.Users.Total.Should().Be(0);
+        response.Vouchers.Total.Should().Be(0);
+        response.Vouchers.Available.Should().Be(0);
+        response.Vouchers.Assigned.Should().Be(0);
+        response.Vouchers.Used.Should().Be(0);
+        response.Vouchers.VerificationFailed.Should().Be(0);
+        response.Vouchers.VerifiedWithWarnings.Should().Be(0);
+        response.Vouchers.ByProvider.Should().BeEmpty();
+        response.Orders.Total.Should().Be(0);
+        response.Orders.Pending.Should().Be(0);
+        response.Orders.Fulfilled.Should().Be(0);
+        response.Orders.RevenueUah.Should().Be(0);
+    }
 
     [Fact]
     public async Task GetReconciliation_ShouldReturnMatchingSummary_WhenSeeded()

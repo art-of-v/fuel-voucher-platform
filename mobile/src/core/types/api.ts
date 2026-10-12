@@ -56,6 +56,7 @@ export interface Voucher {
   amount: number;
   status: string;
   unit?: string;
+  qrCodeUrl?: string;
   qrCodeData?: string;
   externalId?: string;
   imageUrl?: string | null;

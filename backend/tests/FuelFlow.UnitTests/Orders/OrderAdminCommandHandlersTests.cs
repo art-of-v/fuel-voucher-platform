@@ -5,8 +5,11 @@ using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.Features.Orders.CreateCheckout;
 using FuelFlow.Features.Orders.DeleteOrder;
+using FuelFlow.Features.Orders.GetAdminOrderById;
+using FuelFlow.Features.Orders.GetAdminOrders;
 using FuelFlow.Features.Orders.GetAdminPurchases;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Features.Orders.UpdateOrderStatus;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
@@ -25,6 +28,9 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
     private readonly Mock<IMonobankClient> _monobankClientMock;
     private readonly BulkCheckoutCommandHandler _bulkCheckoutHandler;
     private readonly DeleteOrderCommandHandler _deleteOrderHandler;
+    private readonly UpdateOrderStatusCommandHandler _updateOrderStatusHandler;
+    private readonly GetAdminOrdersQueryHandler _getAdminOrdersHandler;
+    private readonly GetAdminOrderByIdQueryHandler _getAdminOrderByIdHandler;
     private readonly GetAdminPurchasesQueryHandler _getAdminPurchasesHandler;
 
     public OrderAdminCommandHandlersTests()
@@ -63,6 +69,9 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
             NotificationDispatcher.Disabled);
 
         _deleteOrderHandler = new DeleteOrderCommandHandler(_context);
+        _updateOrderStatusHandler = new UpdateOrderStatusCommandHandler(_context);
+        _getAdminOrdersHandler = new GetAdminOrdersQueryHandler(_context);
+        _getAdminOrderByIdHandler = new GetAdminOrderByIdQueryHandler(_context);
         _getAdminPurchasesHandler = new GetAdminPurchasesQueryHandler(_context);
     }
 
@@ -189,6 +198,43 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
     }
 
     [Fact]
+    public async Task UpdateOrderStatus_ShouldUpdateStatus_WhenStatusValid()
+    {
+        var order = BuildOrder(Guid.NewGuid(), OrderStatus.PendingPayment);
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        var result = await _updateOrderStatusHandler.HandleAsync(new UpdateOrderStatusCommand(order.Id, "Fulfilled"));
+
+        result.Should().BeTrue();
+        var updated = await _context.Orders.FindAsync(order.Id);
+        updated!.Status.Should().Be(OrderStatus.Fulfilled);
+        updated.UpdatedAtUtc.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(2));
+    }
+
+    [Fact]
+    public async Task UpdateOrderStatus_ShouldLeaveStatusUnchanged_WhenStatusInvalid()
+    {
+        var order = BuildOrder(Guid.NewGuid(), OrderStatus.PendingPayment);
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        var result = await _updateOrderStatusHandler.HandleAsync(new UpdateOrderStatusCommand(order.Id, "NotARealStatus"));
+
+        result.Should().BeTrue();
+        var updated = await _context.Orders.FindAsync(order.Id);
+        updated!.Status.Should().Be(OrderStatus.PendingPayment);
+    }
+
+    [Fact]
+    public async Task UpdateOrderStatus_ShouldReturnFalse_WhenOrderMissing()
+    {
+        var result = await _updateOrderStatusHandler.HandleAsync(new UpdateOrderStatusCommand(Guid.NewGuid(), "Fulfilled"));
+
+        result.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task BulkCheckout_ShouldCreateSingleOrder_WithAllLineItems_AndSharedInvoice()
     {
         var user = await _context.Users.FirstAsync();
@@ -243,6 +289,49 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
             .WithMessage("*Invalid fuel type*");
 
         _context.Orders.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetAdminOrders_ShouldReturnOrders_IncludingSoftDeleted()
+    {
+        var active = BuildOrder(Guid.NewGuid(), OrderStatus.Fulfilled);
+        active.FulfilledAtUtc = DateTime.UtcNow;
+        var softDeleted = BuildOrder(Guid.NewGuid(), OrderStatus.Cancelled);
+        softDeleted.IsDeleted = true;
+
+        _context.Orders.AddRange(active, softDeleted);
+        await _context.SaveChangesAsync();
+
+        var result = await _getAdminOrdersHandler.HandleAsync(new GetAdminOrdersQuery());
+
+        result.Should().HaveCount(2);
+        result.Should().Contain(dto => dto.Id == active.Id && dto.Status == OrderStatus.Fulfilled.ToString());
+        result.Should().Contain(dto => dto.Id == softDeleted.Id && dto.Status == OrderStatus.Cancelled.ToString());
+        result.Should().Contain(dto => dto.Id == active.Id && dto.LineItems.Count == 1);
+    }
+
+    [Fact]
+    public async Task GetAdminOrderById_ShouldReturnOrder_WhenFound()
+    {
+        var order = BuildOrder(Guid.NewGuid(), OrderStatus.Paid);
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        var result = await _getAdminOrderByIdHandler.HandleAsync(new GetAdminOrderByIdQuery(order.Id));
+
+        result.Should().NotBeNull();
+        result!.Id.Should().Be(order.Id);
+        result.UserId.Should().Be(order.UserId);
+        result.Status.Should().Be(OrderStatus.Paid.ToString());
+        result.LineItems.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task GetAdminOrderById_ShouldReturnNull_WhenMissing()
+    {
+        var result = await _getAdminOrderByIdHandler.HandleAsync(new GetAdminOrderByIdQuery(Guid.NewGuid()));
+
+        result.Should().BeNull();
     }
 
     [Fact]
