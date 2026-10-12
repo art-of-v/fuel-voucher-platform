@@ -58,13 +58,17 @@ public sealed class SendInvitationCommandHandler
             return new SendInvitationResult("CannotInviteSelf", ErrorMessage: "Owner cannot invite themselves.");
         }
 
+        // Scoped to THIS company, not to the worker globally - #150 W1. A person may work for N
+        // companies, so "already in a company" was never the question; "already in this one" is.
+        // The old check also refused to invite anyone who worked anywhere, which is the exact
+        // restriction W1 removes.
         var alreadyMember = await _context.CompanyMembers
             .AsNoTracking()
-            .AnyAsync(x => x.WorkerUserId == worker.Id, cancellationToken);
+            .AnyAsync(x => x.LegalEntityId == legalEntityId && x.WorkerUserId == worker.Id, cancellationToken);
 
         if (alreadyMember)
         {
-            return new SendInvitationResult("WorkerAlreadyMember", ErrorMessage: "Worker is already in a company.");
+            return new SendInvitationResult("WorkerAlreadyMember", ErrorMessage: "Worker is already a member of this company.");
         }
 
         var alreadyPending = await _context.CompanyInvitations

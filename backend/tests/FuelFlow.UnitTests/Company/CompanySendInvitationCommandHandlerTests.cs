@@ -88,9 +88,26 @@ public sealed class CompanySendInvitationCommandHandlerTests : IDisposable
         _context.CompanyMembers.Add(CompanyTestFactory.NewMember(Guid.NewGuid(), LegalEntityId, WorkerId));
         await _context.SaveChangesAsync();
 
-        var result = await Handler().HandleAsync(new SendInvitationCommand(OwnerId, WorkerPhone));
-        result.Status.Should().Be("WorkerAlreadyMember");
-    }
+           var result = await Handler().HandleAsync(new SendInvitationCommand(OwnerId, WorkerPhone));
+           result.Status.Should().Be("WorkerAlreadyMember");
+       }
+
+       /// <summary>
+       /// The point of W1: a worker who already works for another company can be invited here. Under
+       /// the old global check this was refused, which is the restriction #150 W1 removes.
+       /// </summary>
+       [Fact]
+       public async Task Send_Invites_A_Worker_Who_Already_Works_For_Another_Company()
+       {
+           await SeedOwnerAndWorkerAsync();
+           _context.CompanyMembers.Add(CompanyTestFactory.NewMember(Guid.NewGuid(), Guid.NewGuid(), WorkerId));
+           await _context.SaveChangesAsync();
+
+           var result = await Handler().HandleAsync(new SendInvitationCommand(OwnerId, WorkerPhone));
+
+           result.Status.Should().NotBe("WorkerAlreadyMember");
+           result.Status.Should().Be("Success");
+       }
 
     [Fact]
     public async Task Send_ReturnsAlreadyPending_WhenPendingInvitationExists()

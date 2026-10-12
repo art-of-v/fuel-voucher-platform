@@ -32,13 +32,16 @@ public sealed class AcceptInvitationCommandHandler
             return new AcceptInvitationResult("InvalidStatus", ErrorMessage: "Only pending invitations can be accepted.");
         }
 
+        // Scoped to THIS company - #150 W1. The invitation names its company, so "already a member"
+        // has to mean of this one. Global, it refused every second company a worker was invited to,
+        // which is precisely the constraint W1 removes.
         var alreadyMember = await _context.CompanyMembers
             .AsNoTracking()
-            .AnyAsync(x => x.WorkerUserId == command.WorkerUserId, cancellationToken);
+            .AnyAsync(x => x.LegalEntityId == invitation.LegalEntityId && x.WorkerUserId == command.WorkerUserId, cancellationToken);
 
         if (alreadyMember)
         {
-            return new AcceptInvitationResult("AlreadyMember", ErrorMessage: "Worker is already a member of another company.");
+            return new AcceptInvitationResult("AlreadyMember", ErrorMessage: "Worker is already a member of this company.");
         }
 
         var member = new CompanyMember

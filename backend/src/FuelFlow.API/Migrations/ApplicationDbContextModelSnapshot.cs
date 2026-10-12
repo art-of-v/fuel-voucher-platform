@@ -387,8 +387,11 @@ namespace FuelFlow.API.Migrations
                     b.HasIndex("LegalEntityId");
 
                     b.HasIndex("WorkerUserId")
+                        .HasDatabaseName("ix_company_members_worker_user_id");
+
+                    b.HasIndex("LegalEntityId", "WorkerUserId")
                         .IsUnique()
-                        .HasDatabaseName("ix_company_members_worker_user_id")
+                        .HasDatabaseName("ix_company_members_legal_entity_worker")
                         .HasFilter("is_deleted = false");
 
                     b.ToTable("company_members", (string)null);

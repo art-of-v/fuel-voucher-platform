@@ -36,12 +36,21 @@ internal sealed class CompanyMemberConfiguration : IEntityTypeConfiguration<Comp
 
         builder.HasIndex(e => e.LegalEntityId);
 
-        // One live membership per worker. A fired worker leaves a soft-deleted row behind, and the
-        // unique index would then refuse to let the same person be re-invited - so the index covers
-        // only the rows that still count. Same shape as User.referral_code / phone_number.
-        builder.HasIndex(e => e.WorkerUserId)
+        // One live membership per (company, worker) - #150 W1. A person may work for N companies, so
+        // the uniqueness that matters is "not twice in the SAME company", not "not twice anywhere":
+        // the old global unique index on worker_user_id made a second company impossible, which is
+        // the opposite of the decision. The filter still covers only live rows, because a fired
+        // worker leaves a soft-deleted row behind and must still be re-invitable to that company.
+        builder.HasIndex(e => new { e.LegalEntityId, e.WorkerUserId })
             .IsUnique()
             .HasFilter("is_deleted = false")
+            .HasDatabaseName("ix_company_members_legal_entity_worker");
+
+        // Deliberately NOT unique, and kept because the composite index above cannot serve it:
+        // that one leads with legal_entity_id, while "which companies does this person work for"
+        // (GetMyMemberships, the worker context in the switcher) filters on worker_user_id alone.
+        // Without this it is a sequential scan of the whole membership table.
+        builder.HasIndex(e => e.WorkerUserId)
             .HasDatabaseName("ix_company_members_worker_user_id");
 
         builder.HasQueryFilter(e => !e.IsDeleted);
