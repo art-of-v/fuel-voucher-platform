@@ -74,6 +74,21 @@
     <PackageReference Include="AspNetCore.HealthChecks.NpgSql" Version="9.0.0" />
     <PackageReference Include="AspNetCore.HealthChecks.Redis" Version="9.0.0" />
 
+    <!-- Transitive today, pinned here because it is not safe to leave alone. Resolves in through
+         Microsoft.IdentityModel.* 8.19.2 at 10.0.0, which two advisories published 2026-10-13 cover:
+         CVE-2026-84008 (High, CVSS 7.5) - SignedCms.CheckSignature reparses attacker-controlled
+         X.509 in quadratic time; CVE-2026-70162 (Moderate, 5.9, Windows) - EnvelopedCms.Decode
+         does the same on CMS attributes. Both are fixed in 10.0.13.
+
+         Nothing in this codebase calls either API, so neither path is reachable today - the X.509
+         we do handle is Monobank's webhook key, and nothing decodes CMS. That is a reason not to
+         lose sleep, not a reason to stay on a version with a published DoS in it: the next person to
+         add a certificate path should not inherit this.
+
+         Unlike the ImageSharp advisories the CI gate accepts, this is a patch bump inside the same
+         major, so there is nothing to weigh against - just move. -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
+
     <!-- Customer documents (per-order receipt, #119). QuestPDF ships no fonts of its own, so PT Sans
          is embedded below - see SharedKernel/Pdf/PdfFonts.cs for why the document must not depend on
          the host's fonts. -->
