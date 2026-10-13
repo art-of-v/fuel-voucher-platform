@@ -96,16 +96,22 @@ export const de: Record<string, string> = {
   'nav.feedback': 'Feedback',
   'feedback.subtitle': 'Sagen Sie uns, was nicht funktioniert oder fehlt',
   'feedback.whatTitle': 'So funktioniert es',
-  'feedback.whatBody': 'Tippen Sie auf "Schreiben Sie uns" — ein privater Telegram-Chat mit unserem Bot öffnet sich. Beschreiben Sie das Problem: was Sie getan haben, was Sie erwartet haben, was passiert ist.',
-  'feedback.privateBody': 'Dies ist ein privater Chat — andere Kunden sehen ihn nicht. Nur das Entwicklungsteam liest Ihre Nachrichten.',
-  'feedback.triageBody': 'Begrüßungen, Witze und leere Testnachrichten werden nicht weitergeleitet; nur wirklich informative Nachrichten erreichen das Team.',
+  'feedback.whatBody':
+    'Tippen Sie auf "Schreiben Sie uns" — ein privater Telegram-Chat mit unserem Bot öffnet sich. Beschreiben Sie das Problem: was Sie getan haben, was Sie erwartet haben, was passiert ist.',
+  'feedback.privateBody':
+    'Dies ist ein privater Chat — andere Kunden sehen ihn nicht. Nur das Entwicklungsteam liest Ihre Nachrichten.',
+  'feedback.triageBody':
+    'Begrüßungen, Witze und leere Testnachrichten werden nicht weitergeleitet; nur wirklich informative Nachrichten erreichen das Team.',
   'feedback.writeToUs': 'Schreiben Sie uns',
   'feedback.openWebForm': 'Stattdessen per E-Mail',
-  'feedback.tips': 'Je konkreter, desto schneller. Bildschirmname, Zeitpunkt, was Sie angetippt haben.',
+  'feedback.tips':
+    'Je konkreter, desto schneller. Bildschirmname, Zeitpunkt, was Sie angetippt haben.',
   'feedback.noTelegramTitle': 'Telegram wurde nicht geöffnet',
-  'feedback.noTelegramBody': 'Telegram scheint nicht installiert zu sein. Schreiben Sie uns stattdessen per E-Mail — es erreicht uns genauso.',
+  'feedback.noTelegramBody':
+    'Telegram scheint nicht installiert zu sein. Schreiben Sie uns stattdessen per E-Mail — es erreicht uns genauso.',
   'feedback.unavailableTitle': 'Der Feedback-Kanal ist abgeschaltet',
-  'feedback.unavailableBody': 'Er ist derzeit abgeschaltet. Schreiben Sie uns stattdessen per E-Mail — es erreicht uns genauso.',
+  'feedback.unavailableBody':
+    'Er ist derzeit abgeschaltet. Schreiben Sie uns stattdessen per E-Mail — es erreicht uns genauso.',
   'feedback.loadFailed': 'Der Feedback-Kanal konnte nicht geladen werden. Erneut versuchen.',
 
   'stations.title': 'NETZWERK',

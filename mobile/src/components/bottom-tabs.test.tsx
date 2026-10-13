@@ -381,7 +381,13 @@ describe('BottomTabs — rendering', () => {
     mockFeedbackAvailable = false;
     render(<BottomTabs />);
 
-    for (const name of ['nav.stations', 'map.title', 'nav.basket', 'nav.codes', 'nav.profile'] as TabName[]) {
+    for (const name of [
+      'nav.stations',
+      'map.title',
+      'nav.basket',
+      'nav.codes',
+      'nav.profile',
+    ] as TabName[]) {
       expect(flat(tab(name)).flex).toBe(1);
       expect(flat(tab(name)).minWidth).toBe(tokens.touchTarget.min);
     }
