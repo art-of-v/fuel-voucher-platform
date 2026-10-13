@@ -1,3 +1,7 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { fetchCatalogue, pickReferencePackage } from '../lib/catalogue';
 import styles from './PhoneMock.module.css';
 
 const modules = [
@@ -12,7 +16,38 @@ const modules = [
   [1, 1, 1, 0, 1, 0, 1, 0, 1],
 ];
 
+const MOCK_LITERS = 20;
+
 export default function PhoneMock({ className }: { className?: string }) {
+  // Same live catalogue the prices section reads, so the multiplication cannot
+  // contradict the table above it the way the hardcoded "₴2 920 · А-95" did.
+  const [reference, setReference] = useState<{
+    perLiter: number;
+    fuelName: string;
+    stationId: string;
+  } | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    fetchCatalogue()
+      .then((rows) => {
+        const found = pickReferencePackage(rows);
+        if (alive && found) {
+          setReference({
+            perLiter: found.finalPricePerLiter,
+            fuelName: found.fuelName,
+            stationId: found.stationId.toUpperCase(),
+          });
+        }
+      })
+      .catch(() => {
+        /* decorative mock; the real numbers live in Numbers and Prices */
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   return (
     <div className={`${styles.phone} ${className ?? ''}`} aria-hidden="true">
       <div className={styles.notch} />
@@ -25,19 +60,28 @@ export default function PhoneMock({ className }: { className?: string }) {
         </div>
 
         <div className={styles.balance}>
-          {/* "Паливо в гаманці / 50 літрів / ₴2 920" implied litres accumulate in
-              a wallet. They do not: a package is one voucher redeemed by one
-              fill, and Fulfillment records no litres of its own. So the mock
-              shows what the app actually holds - one voucher - and carries no
-              price, which would go stale against the live table above it. */}
+          {/* A package is one voucher redeemed by one fill - litres do not
+              accumulate in a wallet. So this shows one voucher, and the money
+              line is the multiplication back to a price: litres × the live
+              reference rate. */}
           <div className={styles.balanceLabel}>Твій ваучер</div>
           <div className={styles.balanceValue}>
-            <span className={styles.liters}>20</span>
+            <span className={styles.liters}>{MOCK_LITERS}</span>
             <span className={styles.unit}>літрів</span>
           </div>
           <div className={styles.balanceFoot}>
-            <span className={styles.money}>А-95</span>
-            <span className={styles.chip}>OKKO</span>
+            <span className={styles.money}>
+              {reference
+                ? `${reference.perLiter.toFixed(2).replace('.', ',')} × ${MOCK_LITERS} = ${Math.round(
+                    reference.perLiter * MOCK_LITERS
+                  )
+                    .toLocaleString('uk-UA')
+                    .replace(/\u00a0/g, ' ')} ₴`
+                : '—'}
+            </span>
+            <span className={styles.chip}>
+              {reference ? `${reference.stationId}` : 'OKKO'}
+            </span>
           </div>
         </div>
 

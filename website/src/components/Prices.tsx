@@ -106,7 +106,9 @@ export default function Prices() {
                   </div>
 
                   <div className={styles.heroPrice}>
-                    <span className={styles.heroLabel}>Від</span>
+                    <span className={styles.heroLabel}>
+                      Від · {offer.cheapestFuel}
+                    </span>
                     <div className={styles.heroValue}>
                       {offer.fromPerLiter.toFixed(2).replace('.', ',')}
                     </div>
