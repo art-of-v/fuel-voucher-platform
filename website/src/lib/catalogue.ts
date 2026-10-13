@@ -35,6 +35,8 @@ export interface NetworkOffer {
   name: string;
   /** Cheapest package per litre in this network - the headline number. */
   fromPerLiter: number;
+  /** Which fuel that number belongs to, so "від 44,90" cannot read as petrol. */
+  cheapestFuel: string;
   /** Volumes this network actually stocks, ascending. */
   volumes: number[];
   fuels: { fuelName: string; perLiter: number; saving: number | null }[];
@@ -121,6 +123,7 @@ export function groupByNetwork(packages: PublicPackage[]): NetworkOffer[] {
         stationId,
         name: NETWORK_NAMES[stationId.toLowerCase()] ?? stationId.toUpperCase(),
         fromPerLiter: fuels[0]?.perLiter ?? 0,
+        cheapestFuel: fuels[0]?.fuelName ?? '',
         volumes: [...new Set(rows.map((r) => r.liters))].sort((a, b) => a - b),
         fuels,
       };
@@ -134,4 +137,58 @@ export function formatMoney(value: number): string {
 
 export function formatLiters(liters: number[]): string {
   return liters.join(' · ');
+}
+
+/**
+ * The one package the site's headline price is allowed to quote.
+ *
+ * Taking the cheapest row in the catalogue put KLO's LPG on the front page as
+ * "від 44,90/л". That number is true and it is the least representative thing we
+ * sell: LPG is a small-volume product at one network, and leading with it tells
+ * a visitor that this is what fuel costs here.
+ *
+ * The reference is diesel at OKKO - the network the app lists first, and the
+ * grade with the largest volumes. Falls back through the fuels we actually
+ * carry rather than inventing a number if the catalogue ever changes shape.
+ */
+export function pickReferencePackage(
+  packages: PublicPackage[]
+): PublicPackage | null {
+  if (packages.length === 0) return null;
+
+  const isDiesel = (name: string) => /дп|diesel|дізел/i.test(name);
+  const isPetrol = (name: string) => /95/.test(name);
+  const cheapestOf = (rows: PublicPackage[]) =>
+    rows.reduce((best, p) =>
+      p.finalPricePerLiter < best.finalPricePerLiter ? p : best
+    );
+
+  const okko = packages.filter((p) => p.stationId.toLowerCase() === 'okko');
+  const anchor = okko.length > 0 ? okko : packages;
+
+  // Cheapest within the grade, not the first one that matches. The catalogue is
+  // ordered by fuel name, so "first diesel" is OKKO's premium PULLS grade at
+  // 102.90 - and a headline price has to be the grade people recognise, not the
+  // expensive one that happens to sort earlier.
+  const diesel = anchor.filter((p) => isDiesel(p.fuelName));
+  if (diesel.length > 0) return cheapestOf(diesel);
+
+  const petrol = anchor.filter((p) => isPetrol(p.fuelName));
+  if (petrol.length > 0) return cheapestOf(petrol);
+
+  return cheapestOf(anchor);
+}
+
+/**
+ * Which fuel a network card's "від X" refers to. Without it, a card whose
+ * cheapest row is gas reads as if petrol at that network costs 44.90.
+ */
+export function cheapestFuelName(
+  packages: PublicPackage[]
+): { fuelName: string; perLiter: number } | null {
+  if (packages.length === 0) return null;
+  const cheapest = packages.reduce((best, p) =>
+    p.finalPricePerLiter < best.finalPricePerLiter ? p : best
+  );
+  return { fuelName: cheapest.fuelName, perLiter: cheapest.finalPricePerLiter };
 }

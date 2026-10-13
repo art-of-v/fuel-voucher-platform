@@ -3,27 +3,33 @@
 import { useEffect, useRef, useState } from 'react';
 import SectionIndex from './SectionIndex';
 import styles from './Numbers.module.css';
-import { fetchCatalogue } from '../lib/catalogue';
+import { fetchCatalogue, pickReferencePackage } from '../lib/catalogue';
+
+/** The bucket the multiplication is shown on - the standard full fill. */
+const BUCKET_LITERS = 50;
 
 /**
- * The three figures here used to be hardcoded: a rotating fake price
- * (97.60 -> 99.20 UAH/l), "50 litres in the wallet" and "3 months, the
- * standard term". None of it held up against the system:
+ * The figures here used to be hardcoded: a rotating fake price, "50 litres in
+ * the wallet", "2 920 UAH paid once" and "3 months, the standard term". None of
+ * it held up against the system, and three of the four were invented numbers.
  *
- * - the price was invented, and the animation made it look measured;
- * - litres do not accumulate in a wallet - a package is one voucher, redeemed
- *   by one fill, so a "50 litres in the wallet" balance describes a mechanic
- *   that does not exist;
- * - there is no three-month term. A voucher's term is the expiry printed on it
- *   by the network and parsed at import.
+ * The price is real and read from the catalogue, but it is not the cheapest row
+ * we sell - that is KLO's LPG at 44.90, which put a gas number on the front page
+ * as the headline. The headline quotes diesel at OKKO instead: the network the app
+ * lists first, and the grade with the largest volumes.
  *
- * So the numbers are now read from the same catalogue the prices section uses,
- * and the two figures that are not prices state the real model instead.
+ * The multiplication is the original design's "50 litres = one payment", restored
+ * with the live reference price. Nothing accumulates in a wallet - a package is
+ * one voucher, redeemed by one fill - so this is arithmetic on a price, not a
+ * balance the user is shown they hold.
  */
 export default function Numbers() {
-  const [stats, setStats] = useState<{ fromPerLiter: number; networks: number } | null>(
-    null
-  );
+  const [stats, setStats] = useState<{
+    perLiter: number;
+    fuelName: string;
+    stationId: string;
+    networks: number;
+  } | null>(null);
   const ref = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -31,10 +37,12 @@ export default function Numbers() {
     fetchCatalogue()
       .then((rows) => {
         if (!alive) return;
-        const perLiter = rows.map((r) => r.finalPricePerLiter);
-        if (!perLiter.length) return;
+        const reference = pickReferencePackage(rows);
+        if (!reference) return;
         setStats({
-          fromPerLiter: Math.min(...perLiter),
+          perLiter: reference.finalPricePerLiter,
+          fuelName: reference.fuelName,
+          stationId: reference.stationId,
           networks: new Set(rows.map((r) => r.stationId)).size,
         });
       })
@@ -89,25 +97,39 @@ export default function Numbers() {
         <div className={`${styles.stage} ${styles.reveal}`}>
           <div className={styles.priceBlock}>
             <span className={styles.price}>
-              {stats ? (
-                <>
-                  від {stats.fromPerLiter.toFixed(2).replace('.', ',')}
-                </>
-              ) : (
-                '—'
-              )}
+              {stats ? stats.perLiter.toFixed(2).replace('.', ',') : '—'}
               <span className={styles.priceUnit}>/ л</span>
             </span>
             <span className={styles.lockState}>
               ✓ Ціна фіксується в момент оплати
             </span>
+            <span className={styles.referenceNote}>
+              {stats ? `орієнтир: ${stats.fuelName} · ${stats.stationId.toUpperCase()}` : ' '}
+            </span>
           </div>
 
           <div className={styles.row}>
             <div className={styles.stat}>
-              <span className={styles.statValue}>2–50</span>
+              <span className={styles.statValue}>
+                {stats ? BUCKET_LITERS : '—'}
+              </span>
               <span className={styles.statLabel}>
-                літрів в одному пакеті — від 2 до 50, набір залежить від мережі
+                літрів — повний бак у стандартному пакеті
+              </span>
+            </div>
+            <div className={styles.stat}>
+              <span className={styles.statValue}>
+                {stats
+                  ? (stats.perLiter * BUCKET_LITERS)
+                      .toFixed(0)
+                      .replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+                  : '—'}
+              </span>
+              <span className={styles.statLabel}>
+                {stats
+                  ? `${stats.perLiter.toFixed(2).replace('.', ',')} × ${BUCKET_LITERS} л — сплачено один раз, і все`
+                  : 'літрів × ціна — сплачено один раз'}
+                , і далі не змінюється
               </span>
             </div>
             <div className={styles.stat}>
@@ -118,13 +140,12 @@ export default function Numbers() {
                 мережі-партнери: OKKO, WOG, KLO, UPG
               </span>
             </div>
-            <div className={styles.stat}>
-              <span className={styles.statValue}>1 = 1</span>
-              <span className={styles.statLabel}>
-                пакет — це один ваучер на одну заправку
-              </span>
-            </div>
           </div>
+
+          <p className={styles.footnote}>
+            Пакет — це один ваучер на одну заправку, а не запас літрів у
+            гаманці: 50 л — це 50 л, які ти заливаєш за один раз.
+          </p>
         </div>
       </div>
     </section>
