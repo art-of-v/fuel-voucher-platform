@@ -19,6 +19,7 @@ import { PackageCard } from '../src/features/stations/components/PackageCard';
 import { BRAND_COLORS } from '../src/core/design/tokens';
 import { useAccountContext } from '../src/features/company/hooks/useAccountContext';
 import { canBuyInContext } from '../src/features/company/lib/context';
+import type { FuelPackage } from '../src/core/types/api';
 
 export default function PackagesScreen() {
   const router = useRouter();
@@ -46,8 +47,12 @@ export default function PackagesScreen() {
 
   const brandColor = BRAND_COLORS[selectedStation.id] || tokens.colors.primary;
 
-  const handleAddToCart = (pkg: any, termCode?: string, termLinePrice?: number) => {
+  const handleAddToCart = (pkg: FuelPackage, termCode?: string, termLinePrice?: number) => {
     if (!canPurchase) return;
+    // The card's button is already disabled for an empty shelf; this is the backstop behind it, so a
+    // stale render or a re-entrant press cannot put an unbuyable line in the basket. The server refuses
+    // it too — three layers, because the failure costs the customer their money, not a tap.
+    if (pkg.isAvailable === false) return;
     const qty = quantities[pkg.id] || 1;
     // The quoted price travels with the line: the basket and payment screen must show what the customer
     // agreed to, not the undiscounted package price.

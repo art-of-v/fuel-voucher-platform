@@ -26,6 +26,10 @@ export const es: Record<string, string> = {
   // actuar, así que solo se le dice lo que le afecta: este combustible no se puede comprar ahora.
   'purchase.error.belowCost':
     'Este combustible no está disponible para compra ahora. Elija otro o inténtelo más tarde.',
+  // El estante quedó vacío al pagar: a diferencia del precio bajo coste, esto se resuelve solo en
+  // cuanto se activa existencias.
+  'purchase.error.outOfStock':
+    'Este combustible no está en el almacén. Quítelo del carrito o inténtelo más tarde.',
   'renew.error.providerTermExhausted': 'Este vale no puede durar tanto - elige un plazo más corto.',
 
   'renew.error.unknownTerm': 'Plazo desconocido.',
@@ -98,6 +102,9 @@ export const es: Record<string, string> = {
   'packages.liters': 'LITROS',
   'packages.save': 'AHORRO',
   'packages.addToCart': 'AÑADIR AL CARRITO',
+  // Aparece en la propia tarjeta y en su botón desactivado, para que el cliente vea que el estante
+  // está vacío en la oferta y no en un pago rechazado.
+  'packages.outOfStock': 'No disponible en almacén',
   'packages.browseOnly':
     'Aquí solo consultas. Para comprar combustible, cambia a tu contexto personal.',
   'packages.addedToCart': 'AÑADIDO AL CARRITO',
@@ -120,6 +127,9 @@ export const es: Record<string, string> = {
   'basket.discount': 'Descuento',
   'basket.totalToPay': 'TOTAL A PAGAR',
   'basket.checkout': 'PROCEDER AL PAGO',
+  // Sustituye al botón de pago mientras una línea no tenga existencias: dice el bloqueo y la salida en
+  // una línea, en vez de dejar un botón activo que falla al pagar.
+  'basket.blockedByStock': 'Quita los artículos sin existencias',
   'basket.cards': 'tarjetas',
 
   'checkout.title': 'PAGO',

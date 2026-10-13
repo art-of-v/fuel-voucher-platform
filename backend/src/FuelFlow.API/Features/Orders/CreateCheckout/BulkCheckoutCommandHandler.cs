@@ -4,6 +4,7 @@ using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.Availability;
 using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Features.Vouchers.Terms;
 using FuelFlow.Features.Orders.SharedModels;
@@ -24,10 +25,11 @@ public sealed class BulkCheckoutCommandHandler
     private readonly ApplicationDbContext _context;
     private readonly IMonobankClientFactory _monobankClientFactory;
 private readonly IMonobankMerchantResolver _merchantResolver;
-    private readonly RuntimeSettingsService _runtimeSettings;
+private readonly RuntimeSettingsService _runtimeSettings;
     private readonly MonobankOptions _monobankOptions;
     private readonly ILogger<BulkCheckoutCommandHandler> _logger;
     private readonly NotificationDispatcher _notifications;
+    private readonly PackageStockAvailability _stock;
 
     public BulkCheckoutCommandHandler(
         ApplicationDbContext context,
@@ -36,15 +38,18 @@ private readonly IMonobankMerchantResolver _merchantResolver;
         IOptions<MonobankOptions> monobankOptions,
         RuntimeSettingsService runtimeSettings,
         ILogger<BulkCheckoutCommandHandler> logger,
-        NotificationDispatcher notifications)
+        NotificationDispatcher notifications,
+        PackageStockAvailability stock)
     {
         _context = context;
         _monobankClientFactory = monobankClientFactory;
         _merchantResolver = merchantResolver;
+        _monobankOptions = monobankOptions.Value;
         _runtimeSettings = runtimeSettings;
         _notifications = notifications;
         _monobankOptions = monobankOptions.Value;
         _logger = logger;
+        _stock = stock;
     }
 
     public async Task<BulkCheckoutResponse> HandleAsync(
@@ -111,6 +116,14 @@ private readonly IMonobankMerchantResolver _merchantResolver;
         // undiscounted full-term behaviour exactly as before.
         var termConfig = await _runtimeSettings.GetVoucherTermConfigAsync(cancellationToken);
 
+        // One stock question for the whole cart, answered before any line is priced. Keyed off the same
+        // (station, fuel, liters) triple the package lookup uses, so a line can never be priced off a
+        // package whose stock is then found missing.
+        var wantedStock = command.Items
+            .Select(i => StockKey.For(i.StationId!, i.FuelTypeId, i.Liters))
+            .ToHashSet();
+        var inStock = await _stock.AvailableKeysAsync(wantedStock, user.IsQaAccount, cancellationToken);
+
         foreach (var item in command.Items)
         {
             var fuelType = fuelTypes.FirstOrDefault(f =>
@@ -128,6 +141,13 @@ private readonly IMonobankMerchantResolver _merchantResolver;
             if (package == null)
                 throw new ArgumentException(
                     $"No pricing found for fuel type {item.FuelTypeId} at station {item.StationId} for {item.Liters}L");
+
+            // Checked before the pricing guards below, and deliberately so: an empty shelf is the more
+            // fundamental answer, and refusing there means the below-cost alert is not fired for a sale
+            // that could never have completed anyway. One blocked line fails the whole bulk order, matching
+            // the below-cost behaviour — a customer who cannot buy one line cannot check out with it.
+            if (!inStock.Contains(StockKey.For(item.StationId!, item.FuelTypeId, item.Liters)))
+                throw new PackageOutOfStockException(item.StationId!, item.FuelTypeId, item.Liters);
 
             var (discountPerLiter, termCode) = ResolveTerm(item, termConfig, command.UserId.Value);
 

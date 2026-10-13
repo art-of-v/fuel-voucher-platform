@@ -108,3 +108,76 @@ describe('PackageCard total divider spacing (#181)', () => {
     expect(divider!.marginTop).toBe(tokens.spacing.md);
   });
 });
+
+/**
+ * A package with an empty shelf stays in the catalog — the customer can still read the price and walk
+ * the app — but nothing about it can be bought. What matters is that this is visible ON the card:
+ * a dead-looking shop is worse than a card that explains itself.
+ */
+describe('PackageCard out-of-stock presentation', () => {
+  const renderCard = (overrides: Partial<FuelPackage> = {}) =>
+    render(
+      <PackageCard
+        pkg={mkPackage(overrides)}
+        index={0}
+        quantity={1}
+        isAdded={false}
+        onAdd={jest.fn()}
+        onQuantityChange={jest.fn()}
+      />,
+    );
+
+  it('states the empty shelf on the card', () => {
+    renderCard({ isAvailable: false });
+
+    expect(screen.getAllByText('packages.outOfStock').length).toBeGreaterThan(0);
+  });
+
+  it('replaces the add-to-cart action with the same reason', () => {
+    renderCard({ isAvailable: false });
+
+    expect(screen.queryByText('packages.addToCart')).toBeNull();
+    // Both the badge and the button say it, so the reason is never more than a glance away.
+    expect(screen.getAllByText('packages.outOfStock').length).toBe(2);
+  });
+
+  it('withdraws the quantity stepper and the term ladder', () => {
+    // Both change a price for something that cannot be bought. Leaving them live makes the card
+    // invite a decision the customer cannot carry through.
+    renderCard({ isAvailable: false });
+
+    expect(screen.queryByText('packages.quantity')).toBeNull();
+    expect(screen.queryByText('term.short.1m')).toBeNull();
+  });
+
+  it('dims the card', () => {
+    renderCard({ isAvailable: false });
+
+    // An empty shelf has to read as unavailable without a tap. The assertion carries its
+    // own reason rather than a bare `toBeDefined()`, so a failure says what was lost.
+    expect(
+      screen
+        .UNSAFE_getAllByType(View)
+        .map((node) => flatten(node.props.style))
+        .filter((style) => typeof style.opacity === 'number' && style.opacity < 1).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it('says nothing when the package is in stock', () => {
+    renderCard({ isAvailable: true });
+
+    expect(screen.queryByText('packages.outOfStock')).toBeNull();
+    expect(screen.getByText('packages.addToCart')).toBeTruthy();
+    expect(screen.getByText('packages.quantity')).toBeTruthy();
+  });
+
+  it('treats an older payload with no flag as buyable', () => {
+    // The field is optional so a cached or older response degrades to "buyable" rather than to a shop
+    // where nothing can be bought. The server still refuses the sale, so this fails loudly rather
+    // than silently — the opposite trade-off (defaulting to unavailable) would be much worse.
+    renderCard({ isAvailable: undefined });
+
+    expect(screen.getByText('packages.addToCart')).toBeTruthy();
+    expect(screen.queryByText('packages.outOfStock')).toBeNull();
+  });
+});

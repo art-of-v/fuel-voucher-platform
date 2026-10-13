@@ -3,6 +3,7 @@ using FuelFlow.API.Features.Orders.CreateCheckout.Models;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Features.Vouchers.Availability;
 using FuelFlow.SharedKernel;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
@@ -22,6 +23,7 @@ public sealed class CreateCheckoutCommandHandler
     private readonly ILogger<CreateCheckoutCommandHandler> _logger;
     private readonly FuelFlowMetrics _metrics;
     private readonly NotificationDispatcher _notifications;
+    private readonly PackageStockAvailability _stock;
 
     public CreateCheckoutCommandHandler(
         ApplicationDbContext context,
@@ -30,7 +32,8 @@ public sealed class CreateCheckoutCommandHandler
         IOptions<MonobankOptions> monobankOptions,
         ILogger<CreateCheckoutCommandHandler> logger,
         FuelFlowMetrics metrics,
-        NotificationDispatcher notifications)
+        NotificationDispatcher notifications,
+        PackageStockAvailability stock)
     {
         _context = context;
         _monobankClientFactory = monobankClientFactory;
@@ -39,6 +42,7 @@ public sealed class CreateCheckoutCommandHandler
         _logger = logger;
         _metrics = metrics;
         _notifications = notifications;
+        _stock = stock;
     }
 
     public async Task<CreateCheckoutResponse> HandleAsync(
@@ -94,6 +98,14 @@ public sealed class CreateCheckoutCommandHandler
         {
             throw new ArgumentException(
                 $"No pricing found for fuel type {command.FuelTypeId} at station {command.StationId} for {command.Liters}L");
+        }
+
+        // Same gate as the bulk path, and for the same reason: never mint an invoice for fuel there is no
+        // stock to deliver. Checked before the below-cost block so an empty shelf does not fire an
+        // operator alert about a sale that was never going to happen.
+        if (!await _stock.IsInStockAsync(user.IsQaAccount, command.StationId, command.FuelTypeId, command.Liters, cancellationToken))
+        {
+            throw new PackageOutOfStockException(command.StationId, command.FuelTypeId, command.Liters);
         }
 
         // Slice-3 hard block (safety net at checkout, mirroring the operator write path): refuse a

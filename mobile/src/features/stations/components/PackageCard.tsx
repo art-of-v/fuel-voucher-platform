@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { View, Text, Pressable, Animated, StyleSheet } from 'react-native';
-import { Minus, Plus, ShoppingCart } from 'lucide-react-native';
+import { Minus, Plus, ShoppingCart, PackageX } from 'lucide-react-native';
 import { useDesignTokens } from '../../../core/hooks/useTheme';
 import { formatMoney } from '../../../core/utils/currency';
 import { Haptics } from '../../../core/utils/haptics';
@@ -115,6 +115,13 @@ export function PackageCard({
   const quote = useTermQuote(pkg.stationId, pkg.fuelTypeId, pkg.liters);
   const linePrice = linePriceForTerm(quote, term, pkg.price);
 
+  // The shop has nothing sellable behind this package. It stays in the list — the customer can still
+  // read the price, walk the app and see what the offer would be — but nothing about it is actionable.
+  // Default to available when the field is absent so a stale cached payload stays buyable: the server
+  // refuses the sale anyway, so the failure mode is a rejected payment rather than a dead-looking shop.
+  const isAvailable = pkg.isAvailable !== false;
+  const purchasable = canPurchase && isAvailable;
+
   const savingsPerUnit = pkg.originalPrice - pkg.price;
   // originalPrice is the pump/list "before" price (planning #73). Only show the struck price and the
   // savings pill when it sits above the sale price, so we never render a fake or negative saving.
@@ -125,12 +132,15 @@ export function PackageCard({
 
   return (
     <Animated.View style={{ opacity: entranceAnim, transform: [{ translateY }] }}>
+      {/* The entrance animation owns the outer opacity; the dim for an empty shelf goes on the card
+          itself, so the two never fight over one animated value. */}
       <Animated.View
         style={[
           styles.card,
           {
             backgroundColor: tokens.colors.card,
             borderColor: tokens.colors.borderLight,
+            opacity: isAvailable ? 1 : 0.55,
             transform: [{ perspective: 1000 }, { scale: scaleAnim }, { rotateX }],
             borderRadius: soft ? tokens.surface.card : undefined,
           },
@@ -141,7 +151,7 @@ export function PackageCard({
           style={[
             styles.accent,
             {
-              backgroundColor: activeBrandColor,
+              backgroundColor: isAvailable ? activeBrandColor : tokens.colors.text.dim,
               width: soft ? tokens.surface.accentWidth : ACCENT_WIDTH,
             },
           ]}
@@ -212,7 +222,30 @@ export function PackageCard({
           )}
         </View>
 
-        {canPurchase && (
+        {/* Stated once, plainly, above the controls it disables — the customer should never have to
+            discover an empty shelf by pressing a button that does nothing. */}
+        {!isAvailable && (
+          <View
+            style={[
+              styles.outOfStockBadge,
+              {
+                backgroundColor: tokens.colors.surfaceSunken,
+                borderColor: tokens.colors.borderLight,
+                borderRadius: soft ? tokens.surface.pill : undefined,
+              },
+            ]}
+          >
+            <PackageX size={14} color={tokens.colors.text.dim} />
+            <Text
+              allowFontScaling={false}
+              style={[styles.outOfStockBadgeText, { color: tokens.colors.text.dim }]}
+            >
+              {t('packages.outOfStock')}
+            </Text>
+          </View>
+        )}
+
+        {purchasable && (
           <View style={styles.stepperSection}>
             <Text
               allowFontScaling={false}
@@ -260,8 +293,11 @@ export function PackageCard({
           </View>
         )}
 
-        {/* Where the term is chosen: directly above the total it changes. */}
-        <TermSelect quote={quote} value={term} onChange={(next) => onTermChange?.(next)} />
+        {/* Where the term is chosen: directly above the total it changes. Hidden with the rest of the
+            purchase controls when there is no stock — a term ladder for fuel nobody can sell is noise. */}
+        {purchasable && (
+          <TermSelect quote={quote} value={term} onChange={(next) => onTermChange?.(next)} />
+        )}
 
         {/* `marginTop` spaces this divider from the term picker above it: `paddingTop` below only
             spaces it from the РАЗОМ text, which left a wrapped second chip row sitting flush against
@@ -304,6 +340,9 @@ export function PackageCard({
           </View>
         </View>
 
+        {/* Rendered for an out-of-stock package too, but disabled: a worker-context card hides the action
+            entirely (buying is not offered there at all), whereas an empty shelf has to explain
+            itself, and a dead grey bar labelled "out of stock" says more than a missing button. */}
         {canPurchase && (
           <Pressable
             onPressIn={handlePressIn}
@@ -311,13 +350,18 @@ export function PackageCard({
             onPress={() =>
               onAdd(term && quote ? { termCode: term, termLinePrice: linePrice } : undefined)
             }
-            disabled={isAdded}
+            disabled={isAdded || !isAvailable}
+            accessibilityState={{ disabled: isAdded || !isAvailable }}
             style={[
               styles.mainBtn,
               {
-                backgroundColor: isAdded ? tokens.colors.card : activeBrandColor,
-                borderColor: isAdded ? activeBrandColor : 'transparent',
-                borderWidth: isAdded ? 1 : 0,
+                backgroundColor: isAdded
+                  ? tokens.colors.card
+                  : isAvailable
+                    ? activeBrandColor
+                    : tokens.colors.disabled,
+                borderColor: isAdded || !isAvailable ? activeBrandColor : 'transparent',
+                borderWidth: isAdded || !isAvailable ? 1 : 0,
                 opacity: isAdded ? 0.7 : 1,
                 borderRadius: soft ? tokens.surface.button : undefined,
               },
@@ -325,18 +369,25 @@ export function PackageCard({
           >
             <ShoppingCart
               size={20}
-              color={isAdded ? activeBrandColor : tokens.colors.text.onPrimary}
+              color={
+                isAdded || !isAvailable ? activeBrandColor : tokens.colors.text.onPrimary
+              }
             />
             <Text
               allowFontScaling={false}
               style={[
                 styles.mainBtnText,
                 {
-                  color: isAdded ? activeBrandColor : tokens.colors.text.onPrimary,
+                  color:
+                    isAdded || !isAvailable ? activeBrandColor : tokens.colors.text.onPrimary,
                 },
               ]}
             >
-              {isAdded ? t('packages.added') : t('packages.addToCart')}
+              {!isAvailable
+                ? t('packages.outOfStock')
+                : isAdded
+                  ? t('packages.added')
+                  : t('packages.addToCart')}
             </Text>
           </Pressable>
         )}
@@ -407,6 +458,22 @@ const styles = StyleSheet.create({
   },
   stepperSection: {
     marginBottom: 24,
+  },
+  outOfStockBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    marginBottom: 24,
+  },
+  outOfStockBadgeText: {
+    fontFamily: 'Inter-Black',
+    fontSize: 10,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
   },
   sectionLabel: {
     fontFamily: 'Inter-Black',

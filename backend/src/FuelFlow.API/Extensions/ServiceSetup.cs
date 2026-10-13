@@ -361,6 +361,10 @@ services.AddScoped<TermQuoteQueryHandler>();
         services.AddScoped<GetPublicFuelTypesQueryHandler>();
         services.AddScoped<GetPublicStationNodesQueryHandler>();
         services.AddScoped<GetPublicPackagesQueryHandler>();
+        // One definition of "in stock", used by the store front (this method) AND by checkout, so the two
+        // can never disagree. Registered explicitly rather than left to the assembly scan: the scan covers
+        // handlers by name convention, and this is a shared query service, not one.
+        services.AddScoped<FuelFlow.Features.Vouchers.Availability.PackageStockAvailability>();
     }
 
     private static void AddContractServices(IServiceCollection services)

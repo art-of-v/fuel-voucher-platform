@@ -80,7 +80,12 @@ jest.mock('../src/features/vouchers/api/purchases', () => ({
   createBulkMonobankInvoice: (...a: unknown[]) => mockCreateInvoice(...a),
   // Keep the real mapping: the screen branches on it, and a stub returning undefined would make the
   // test below pass for the wrong reason.
-  purchaseErrorKey: (code?: string) => (code === 'below_cost' ? 'purchase.error.belowCost' : null),
+  purchaseErrorKey: (code?: string) =>
+    code === 'below_cost'
+      ? 'purchase.error.belowCost'
+      : code === 'package_out_of_stock'
+        ? 'purchase.error.outOfStock'
+        : null,
 }));
 
 jest.mock('../src/features/company/hooks/useAccountContext', () => ({
@@ -284,6 +289,26 @@ describe('Checkout — what gets sent to the payment provider', () => {
     fireEvent.press(screen.getByText(/packages\.payTitle/));
 
     await waitFor(() => expect(global.alert).toHaveBeenCalledWith('purchase.error.belowCost'));
+  });
+
+  // The race the whole availability feature exists for: the shop showed stock, another customer took
+  // the last voucher, and the server refuses with `package_out_of_stock`. That code has its own wording
+  // rather than sharing belowCost's, because the two mean different things to the customer — this one
+  // resolves on its own once stock is activated.
+  it('gives an emptied shelf its own wording rather than the below-cost one', async () => {
+    mockContext = { kind: 'personal' };
+    basket();
+    mockCreateInvoice.mockRejectedValue(
+      Object.assign(new Error('Fuel okko-95 at okko for 10L has no stock available.'), {
+        code: 'package_out_of_stock',
+      }),
+    );
+    render(<CheckoutScreen />);
+
+    fireEvent.press(screen.getByText(/packages\.payTitle/));
+
+    await waitFor(() => expect(global.alert).toHaveBeenCalledWith('purchase.error.outOfStock'));
+    expect(global.alert).not.toHaveBeenCalledWith('purchase.error.belowCost');
   });
 
   it('falls back to the server message for a rejection with no code', async () => {

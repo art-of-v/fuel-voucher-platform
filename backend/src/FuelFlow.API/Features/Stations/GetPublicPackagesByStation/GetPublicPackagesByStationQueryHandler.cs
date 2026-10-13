@@ -1,3 +1,4 @@
+using FuelFlow.Features.Vouchers.Availability;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -7,7 +8,12 @@ namespace FuelFlow.Features.Stations.GetPublicPackagesByStation;
 public sealed class GetPublicPackagesByStationQueryHandler
 {
     private readonly ApplicationDbContext _context;
-    public GetPublicPackagesByStationQueryHandler(ApplicationDbContext context) => _context = context;
+    private readonly PackageStockAvailability _stock;
+    public GetPublicPackagesByStationQueryHandler(ApplicationDbContext context, PackageStockAvailability stock)
+    {
+        _context = context;
+        _stock = stock;
+    }
 
     // Projects PublicPackageResponse (store-front fields only) — never the raw FuelPackage entity,
     // which carries the operator's supplier cost + margin. See PublicPackageResponse (planning #52).
@@ -38,6 +44,9 @@ public sealed class GetPublicPackagesByStationQueryHandler
             })
             .ToListAsync(ct);
 
+        var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
+        var available = await _stock.AvailableKeysAsync(isTestAccount, ct);
+
         return rows
             .Select(x => new PublicPackageResponse(
                 x.Id,
@@ -47,7 +56,8 @@ public sealed class GetPublicPackagesByStationQueryHandler
                 x.Liters,
                 x.Price,
                 FuelPricing.OriginalPackagePrice(x.PumpPricePerLiter, x.Liters, x.Price),
-                x.FinalPricePerLiter))
+                x.FinalPricePerLiter,
+                available.Contains(StockKey.For(x.StationId, x.FuelTypeId, x.Liters))))
             .ToList();
     }
 }

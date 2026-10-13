@@ -11,6 +11,7 @@ import { Haptics } from '../src/core/utils/haptics';
 import { formatMoney, formatPercent } from '../src/core/utils/currency';
 import { CartItemCard } from '../src/features/cart/components/CartItemCard';
 import { useAccountContext } from '../src/features/company/hooks/useAccountContext';
+import { useAllPackages } from '../src/features/stations/hooks/useAllPackages';
 
 export default function BasketScreen() {
   const router = useRouter();
@@ -150,6 +151,37 @@ export default function BasketScreen() {
   const total = getCartTotal();
   const discountedTotal = getDiscountedTotal();
   const discountAmount = total - discountedTotal;
+
+  // The basket can outlive the stock it was filled with: a basket is persisted across app launches,
+  // stock is sold to someone else, an operator deactivates a batch. Re-reading the catalog here is the
+  // only way to know before the customer reaches the payment screen — and the server's 409 is the
+  // backstop, not the plan.
+  //
+  // Matched on (station, fuel, nominal) rather than the package id, because that is the same composite
+  // the backend counts stock by; a re-priced or re-imported package keeps its identity but not its stock.
+  const { data: allPackages } = useAllPackages();
+  const availability = useMemo(() => {
+    const byKey = new Map<string, boolean>();
+    for (const p of allPackages ?? []) {
+      byKey.set(`${p.stationId}|${p.fuelTypeId}|${p.liters}`, p.isAvailable !== false);
+    }
+    return byKey;
+  }, [allPackages]);
+
+  const outOfStockIds = useMemo(
+    () =>
+      cart
+        .filter((item) => {
+          const pkg = item.package;
+          if (!pkg) return false;
+          // Unknown (catalog still loading) must not disable the basket — a slow fetch is not a refusal.
+          const known = availability.get(`${pkg.stationId}|${pkg.fuelTypeId}|${pkg.liters}`);
+          return known === false;
+        })
+        .map((item) => item.id),
+    [cart, availability],
+  );
+  const blockedByStock = outOfStockIds.length > 0;
 
   const handleApplyPromo = () => {
     setPromoError(false);
@@ -312,11 +344,28 @@ export default function BasketScreen() {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             router.push('/checkout');
           }}
-          style={[styles.checkoutButton, { backgroundColor: tokens.colors.primary }]}
+          disabled={blockedByStock}
+          accessibilityState={{ disabled: blockedByStock }}
+          style={[
+            styles.checkoutButton,
+            {
+              backgroundColor: blockedByStock ? tokens.colors.disabled : tokens.colors.primary,
+            },
+          ]}
         >
-          <Zap size={18} color={tokens.colors.text.onPrimary} />
-          <Text style={[styles.checkoutButtonText, { color: tokens.colors.text.onPrimary }]}>
-            {t('basket.checkout')}
+          <Zap
+            size={18}
+            color={blockedByStock ? tokens.colors.text.dim : tokens.colors.text.onPrimary}
+          />
+          <Text
+            style={[
+              styles.checkoutButtonText,
+              {
+                color: blockedByStock ? tokens.colors.text.dim : tokens.colors.text.onPrimary,
+              },
+            ]}
+          >
+            {blockedByStock ? t('basket.blockedByStock') : t('basket.checkout')}
           </Text>
         </Pressable>
       </View>
@@ -355,6 +404,13 @@ export default function BasketScreen() {
           <CartItemCard
             key={item.id}
             item={item}
+            isAvailable={
+              item.package
+                ? availability.get(
+                    `${item.package.stationId}|${item.package.fuelTypeId}|${item.package.liters}`,
+                  )
+                : undefined
+            }
             onUpdateQuantity={updateQuantity}
             onRemove={removeFromCart}
           />

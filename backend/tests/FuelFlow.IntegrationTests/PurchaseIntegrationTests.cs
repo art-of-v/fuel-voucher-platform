@@ -5,6 +5,9 @@ using System.Text.Json;
 using FuelFlow.Features.Orders.CreateCheckout;
 using FuelFlow.Features.Orders.SimulatePayment;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Features.Stations;
+using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.DTOs;
@@ -105,12 +108,45 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
         _accessToken = verifyResult2.GetProperty("accessToken").GetString();
     }
 
+    /// <summary>
+    /// Checkout refuses a package with no activated stock behind it, so every test that expects a sale
+    /// needs real <c>Available</c> vouchers under the line it buys — the same thing an operator does by
+    /// importing a PDF, costing the batch and activating it.
+    /// </summary>
+    private void SeedSellableStock(string stationId, string fuelTypeId, decimal liters, int count = 1)
+    {
+        using var scope = _fixture.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var expiry = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6));
+
+        for (var i = 0; i < count; i++)
+        {
+            context.FuelVouchers.Add(new FuelVoucher
+            {
+                Id = Guid.CreateVersion7(),
+                Provider = stationId.ToUpperInvariant(),
+                FuelTypeId = fuelTypeId,
+                Liters = liters,
+                ProviderExpirationDate = expiry,
+                CustomerExpirationDate = expiry,
+                VoucherNumber = $"STOCK-{stationId}-{fuelTypeId}-{liters}-{Guid.NewGuid().ToString()[..8]}",
+                QrPayload = Guid.NewGuid().ToString(),
+                Status = VoucherStatus.Available,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow
+            });
+        }
+
+        context.SaveChanges();
+    }
+
     [Fact]
     public async Task CreatePurchase_ShouldReturn200_WithValidRequest()
     {
         // Arrange
         await AuthenticateAsync("+380991234701");
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
+        SeedSellableStock("okko", "okko-95", 50m);
 
         var request = new CreateCheckoutCommand
         {
@@ -186,6 +222,8 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
 
         // Create a purchase first
+        SeedSellableStock("wog", "wog-95", 20m, count: 2);
+
         var createRequest = new CreateCheckoutCommand
         {
             Provider = "wog",
@@ -219,6 +257,8 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
 
         // Create order
+        SeedSellableStock("okko", "okko-dp", 50m);
+
         var createRequest = new CreateCheckoutCommand
         {
             Provider = "okko",
@@ -258,6 +298,8 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
 
         // Create order
+        SeedSellableStock("okko", "okko-95", 20m);
+
         var createRequest = new CreateCheckoutCommand
         {
             Provider = "okko",
@@ -296,6 +338,8 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
         await AuthenticateAsync("+380991234706");
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
 
+        SeedSellableStock("okko", "okko-95", 50m);
+
         var request = new CreateCheckoutCommand
         {
             Provider = "okko",
@@ -315,6 +359,70 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
         var result = await response.Content.ReadFromJsonAsync<CreateCheckoutResponse>();
         Assert.NotNull(result);
         Assert.NotEqual(Guid.Empty, result.OrderId);
+    }
+
+    /// <summary>
+    /// The refusal this epic exists for. A package can be in the catalog, fully priced, and still have
+    /// nothing sellable behind it — then the sale must not happen. 409 with a stable code so the app can
+    /// translate it; <c>wog-dp</c> is deliberately a combination no other test in this collection seeds.
+    /// </summary>
+    [Fact]
+    public async Task CreatePurchase_ShouldReturn409_WhenPackageHasNoSellableStock()
+    {
+        // Arrange
+        await AuthenticateAsync("+380991234707");
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
+
+        var request = new CreateCheckoutCommand
+        {
+            Provider = "wog",
+            FuelTypeId = "wog-dp",
+            Liters = 10,
+            Quantity = 1,
+            Price = 500,
+            StationId = "wog"
+        };
+
+        // Act
+        var response = await _client.PostAsJsonAsync("/api/purchases", request);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("package_out_of_stock", body.GetProperty("code").GetString());
+
+        // Money never moved: no order, and therefore no invoice, exists for a refused line.
+        using var scope = _fixture.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        Assert.False(context.Orders.Any(o => o.LineItems.Any(li => li.FuelTypeId == "wog-dp" && o.Status == OrderStatus.PendingPayment)));
+    }
+
+    /// <summary>
+    /// The catalog keeps every package and says which are buyable. The app relies on this to grey a card
+    /// out instead of hiding it, so the flag has to be present on the anonymous route and honest about
+    /// both a stocked and an empty nominal.
+    /// </summary>
+    [Fact]
+    public async Task PublicPackages_ShouldFlagAvailability_WithoutHidingTheCatalog()
+    {
+        // Arrange
+        SeedSellableStock("okko", "okko-95", 10m);
+
+        // Act
+        var response = await _client.GetAsync("/api/packages");
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var packages = await response.Content.ReadFromJsonAsync<List<PublicPackageResponse>>();
+        Assert.NotNull(packages);
+
+        var stocked = packages!.Single(p => p.StationId == "okko" && p.FuelTypeId == "okko-95" && p.Liters == 10m);
+        Assert.True(stocked.IsAvailable, "an activated voucher of exactly this nominal is behind this package");
+
+        var empty = packages.Single(p => p.StationId == "wog" && p.FuelTypeId == "wog-dp" && p.Liters == 10m);
+        Assert.False(empty.IsAvailable);
     }
 }
 

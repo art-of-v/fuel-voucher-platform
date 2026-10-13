@@ -46,6 +46,17 @@ export interface FuelPackage {
   originalPrice: number;
   /** Voucher price per litre (грн/л) from PublicPackageResponse; null on legacy rows. */
   finalPricePerLiter?: number;
+  /**
+   * Whether the shop can sell this exact package right now — true when at least one activated
+   * (Available) voucher of the same brand + fuel + nominal exists for the caller.
+   *
+   * The catalog lists every package either way; this is what turns the buy button off rather than
+   * hiding the card. It is scoped to the caller's own stock pool, so a QA account and a regular
+   * customer can legitimately see different answers for the same package.
+   *
+   * Optional so a cached or older payload degrades to "buyable" — the server still refuses the sale.
+   */
+  isAvailable?: boolean;
 }
 
 export interface Voucher {
