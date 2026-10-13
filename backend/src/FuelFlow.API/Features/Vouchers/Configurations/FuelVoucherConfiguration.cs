@@ -219,13 +219,25 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
         builder.Property(e => e.VerificationTotalModules)
             .HasColumnName("verification_total_modules");
 
+        // Both keys are filtered to live rows, so an archived voucher releases its number and its
+        // QR payload for reuse. Without the filter the two paths disagree: the import's duplicate
+        // check reads through the !IsDeleted query filter, so it calls a number free, and then the
+        // insert hits a DB-global unique index and the whole import dies on an error the operator
+        // cannot interpret. #1067 made soft delete the only delete path, so archived rows - and the
+        // keys they squat on - are permanent.
+        //
+        // The dedup guarantee this buys is the one that matters: the same paper cannot be live
+        // twice under two numbers. Re-importing paper that was archived by mistake is a recovery
+        // path, not an attack surface, and it now works instead of exploding.
         builder.HasIndex(e => e.VoucherNumber)
-            .IsUnique();
+            .IsUnique()
+            .HasFilter("is_deleted = false");
 
-        // Security control, not just an index: DB-global dedup on the QR payload means the same
-        // paper cannot be imported twice under two numbers. Worth the storage.
+        // Security control, not just an index: dedup on the QR payload means the same paper cannot
+        // be imported twice under two numbers. Worth the storage.
         builder.HasIndex(e => e.QrPayload)
-            .IsUnique();
+            .IsUnique()
+            .HasFilter("is_deleted = false");
 
         builder.HasIndex(e => e.ProviderExpirationDate);
         builder.HasIndex(e => e.CustomerExpirationDate);
