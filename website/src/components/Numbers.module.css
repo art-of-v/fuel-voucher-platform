@@ -121,6 +121,15 @@
   .headRight {
     justify-self: start;
   }
+/* The moment the price stops: it turns accent green and stays there. */
+.priceLocked .price {
+  color: var(--accent);
+}
+
+.priceLocked .lockState {
+  color: var(--accent);
+}
+
 .referenceNote {
   display: block;
   font-family: var(--font-sans);
