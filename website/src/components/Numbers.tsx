@@ -69,16 +69,24 @@ export default function Numbers() {
 
   useEffect(() => {
     if (!stats) return;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      setLocked(true);
-      return;
-    }
+    const root = ref.current;
+    if (!root) return;
 
     let interval: ReturnType<typeof setInterval> | undefined;
     let timer: ReturnType<typeof setTimeout> | undefined;
+
+    // Both setState calls live inside the observer callback, never in the effect
+    // body - a synchronous setState there cascades renders, and eslint's
+    // react-hooks/set-state-in-effect fails the build on it.
     const io = new IntersectionObserver(
       ([entry]) => {
         if (!entry.isIntersecting) return;
+
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          setLocked(true);
+          return;
+        }
+
         interval = setInterval(() => setTick((t) => t + 1), 900);
         timer = setTimeout(() => {
           if (interval) clearInterval(interval);
@@ -87,7 +95,7 @@ export default function Numbers() {
       },
       { threshold: 0.5 }
     );
-    io.observe(ref.current!);
+    io.observe(root);
     return () => {
       io.disconnect();
       if (interval) clearInterval(interval);
