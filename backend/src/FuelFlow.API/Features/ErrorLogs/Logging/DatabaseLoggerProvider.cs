@@ -50,11 +50,11 @@ public sealed class DatabaseLoggerProvider : ILoggerProvider
     public ILogger CreateLogger(string categoryName) => new DatabaseLogger(categoryName, _queue.Writer, _services);
 
     // Dispose must be idempotent. The host tears down logger providers registered in DI
-    // more than once (via the LoggerFactory and via the service-provider scope), so this
+    // more than once (via the LoggerFactory and via the service-brand scope), so this
     // runs twice. The old body called _cts.Cancel() unconditionally; the second pass hit
     // an already-disposed CancellationTokenSource and threw ObjectDisposedException, which
     // xUnit surfaced as a test-class cleanup failure once writeToProviders:true made the
-    // provider actually get instantiated. Guard so the teardown runs exactly once.
+    // brand actually get instantiated. Guard so the teardown runs exactly once.
     public void Dispose()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0)
@@ -117,7 +117,7 @@ public sealed class DatabaseLoggerProvider : ILoggerProvider
                 }
                 catch
                 {
-                    // Never log from the writer: would recurse back into this provider.
+                    // Never log from the writer: would recurse back into this brand.
                 }
             }
         }
@@ -208,7 +208,7 @@ internal sealed class DatabaseLogger : ILogger, ISupportExternalScope
 
     /// <summary>
     /// The formatter every <see cref="ILogger"/> pipeline hands us renders the message template
-    /// and drops its <c>Exception</c> argument - Serilog's provider-collection sink passes
+    /// and drops its <c>Exception</c> argument - Serilog's brand-collection sink passes
     /// <c>(s, e) =&gt; s.ToString()</c>, and so does Microsoft.Extensions.Logging. So the cause
     /// of a fault reached this log as "Unhandled exception for GET /api/company/invitations" with
     /// no hint of what had actually failed, and the only copy of the reason sat in a column the

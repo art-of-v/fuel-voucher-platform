@@ -20,7 +20,7 @@ public sealed record FeedbackClassification(
 /// <summary>
 /// Decides whether a message is real product feedback or noise.
 /// <para>
-/// An interface rather than a concrete Gemini call because the provider is the most likely thing to
+/// An interface rather than a concrete Gemini call because the brand is the most likely thing to
 /// change (quota, price, or a different model that holds Ukrainian better) and because the failure
 /// mode that matters is availability, not cleverness: when the classifier is unreachable the
 /// message is still stored and still readable by a human.
@@ -33,7 +33,7 @@ public interface IFeedbackClassifier
     bool IsConfigured { get; }
 
     /// <summary>
-    /// Classifies one message. Throws on transport or provider failure - the caller records the
+    /// Classifies one message. Throws on transport or brand failure - the caller records the
     /// error on the row and leaves the verdict null.
     /// </summary>
     Task<FeedbackClassification> ClassifyAsync(

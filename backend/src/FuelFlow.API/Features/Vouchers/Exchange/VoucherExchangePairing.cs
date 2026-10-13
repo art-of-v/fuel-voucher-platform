@@ -2,9 +2,9 @@ namespace FuelFlow.Features.Vouchers.Exchange;
 
 /// <summary>
 /// Pure, deterministic pairing of retired OLD stock vouchers to freshly-imported NEW ones for an
-/// operator→provider exchange (planning #104). Pairing is flexible: the operator may select a
-/// different number of old vouchers than the provider PDF contains. We pair 1:1 only WITHIN the same
-/// <c>(provider, fuel, liters)</c> bucket, in a stable sorted order; leftover old vouchers expire
+/// operator→brand exchange (planning #104). Pairing is flexible: the operator may select a
+/// different number of old vouchers than the brand PDF contains. We pair 1:1 only WITHIN the same
+/// <c>(brand, fuel, liters)</c> bucket, in a stable sorted order; leftover old vouchers expire
 /// unpaired (null NewVoucherId) and leftover new vouchers simply enter stock with no row.
 ///
 /// Kept free of EF/DB types so it is unit-testable in isolation.
@@ -12,7 +12,7 @@ namespace FuelFlow.Features.Vouchers.Exchange;
 public static class VoucherExchangePairing
 {
     /// <summary>A voucher reduced to the fields pairing needs.</summary>
-    public sealed record Candidate(Guid Id, string Provider, string FuelTypeId, decimal Liters, string VoucherNumber);
+    public sealed record Candidate(Guid Id, string Brand, string FuelTypeId, decimal Liters, string VoucherNumber);
 
     public sealed record Result(
         IReadOnlyList<(Guid OldId, Guid? NewId)> Pairs,
@@ -27,7 +27,7 @@ public static class VoucherExchangePairing
     /// </summary>
     public static Result Pair(IReadOnlyList<Candidate> olds, IReadOnlyList<Candidate> news)
     {
-        // Bucket new vouchers by (provider, fuel, liters); within a bucket, hand them out in a stable
+        // Bucket new vouchers by (brand, fuel, liters); within a bucket, hand them out in a stable
         // order (by voucher number) so the pairing is deterministic.
         var buckets = news
             .GroupBy(Key)
@@ -58,5 +58,5 @@ public static class VoucherExchangePairing
     }
 
     private static (string, string, decimal) Key(Candidate c)
-        => (c.Provider.ToLowerInvariant(), c.FuelTypeId, c.Liters);
+        => (c.Brand.ToLowerInvariant(), c.FuelTypeId, c.Liters);
 }

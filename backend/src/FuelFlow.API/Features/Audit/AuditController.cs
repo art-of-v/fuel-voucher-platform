@@ -18,21 +18,21 @@ public sealed class AuditController : ControllerBase
     [HttpGet("facets")]
     public async Task<IActionResult> GetFacets(CancellationToken ct = default)
     {
-        var eventTypes = await _context.Set<ProviderEventOutbox>()
+        var eventTypes = await _context.Set<AuditEventOutbox>()
             .AsNoTracking()
             .Select(e => e.EventType)
             .Distinct()
             .OrderBy(x => x)
             .ToListAsync(ct);
 
-        var aggregateTypes = await _context.Set<ProviderEventOutbox>()
+        var aggregateTypes = await _context.Set<AuditEventOutbox>()
             .AsNoTracking()
             .Select(e => e.AggregateType)
             .Distinct()
             .OrderBy(x => x)
             .ToListAsync(ct);
 
-        var users = await _context.Set<ProviderEventOutbox>()
+        var users = await _context.Set<AuditEventOutbox>()
             .AsNoTracking()
             .Where(e => e.ChangedByUserName != null)
             .Select(e => e.ChangedByUserName!)
@@ -55,7 +55,7 @@ public sealed class AuditController : ControllerBase
         [FromQuery] DateTime? to = null,
         CancellationToken ct = default)
     {
-        var query = _context.Set<ProviderEventOutbox>().AsNoTracking();
+        var query = _context.Set<AuditEventOutbox>().AsNoTracking();
 
         if (!string.IsNullOrWhiteSpace(eventType))
             query = query.Where(e => e.EventType == eventType);

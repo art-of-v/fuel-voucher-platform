@@ -129,7 +129,7 @@ public class AdminClientRouteContractTests : IClassFixture<TestDatabaseFixture>
 
     private IReadOnlyList<string> RouteTemplates()
     {
-        // The composite EndpointDataSource is assembled by UseEndpoints, so ask the root provider
+        // The composite EndpointDataSource is assembled by UseEndpoints, so ask the root brand
         // for every registered source and flatten. CreateClient() forces the host - and therefore
         // the endpoint graph - to be built before this runs.
         _ = _fixture.CreateClient();

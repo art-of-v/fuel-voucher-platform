@@ -121,7 +121,7 @@ public sealed class RenewalCheckoutCommandHandler
             if (!VoucherRenewalEligibility.TryResolveBranch(
                     source.Status,
                     source.CustomerExpirationDate,
-                    source.ProviderExpirationDate,
+                    source.SupplierExpirationDate,
                     today,
                     config.TriggerThresholdDays,
                     offeredTerms,
@@ -133,7 +133,7 @@ public sealed class RenewalCheckoutCommandHandler
             // supplier term cannot absorb this term has nothing to extend into - it must be replaced, and
             // the customer has to be told before they pay, not after.
             if (branch == VoucherRenewalBranch.Extend &&
-                !VoucherRenewalEligibility.CanExtend(source.CustomerExpirationDate, source.ProviderExpirationDate, term))
+                !VoucherRenewalEligibility.CanExtend(source.CustomerExpirationDate, source.SupplierExpirationDate, term))
                 throw new VoucherRenewalException("provider_term_exhausted",
                     $"The '{item.TermCode}' term is longer than this voucher's remaining supplier validity.");
 
@@ -156,12 +156,12 @@ public sealed class RenewalCheckoutCommandHandler
             var candidate = await _context.FuelVouchers
                 .AsNoTracking()
                 .Where(v => v.Status == VoucherStatus.Available
-                         && v.Provider.ToLower() == line.Source.Provider.ToLower()
+                         && v.Brand.ToLower() == line.Source.Brand.ToLower()
                          && v.FuelTypeId == line.Source.FuelTypeId
                          && v.Liters == line.Source.Liters
-                         && v.ProviderExpirationDate >= promisedExpiration
+                         && v.SupplierExpirationDate >= promisedExpiration
                          && !reservedStock.Contains(v.Id))
-                .OrderBy(v => v.ProviderExpirationDate)
+                .OrderBy(v => v.SupplierExpirationDate)
                 .Select(v => new { v.Id, v.CostPerLiter })
                 .FirstOrDefaultAsync(cancellationToken);
 
@@ -170,7 +170,7 @@ public sealed class RenewalCheckoutCommandHandler
             if (candidate is null)
             {
                 var fuelName = await ResolveFuelNameAsync(line.Source, cancellationToken);
-                await _notifications.VoucherStockLowAsync(line.Source.Provider, fuelName, 0, 1, cancellationToken);
+                await _notifications.VoucherStockLowAsync(line.Source.Brand, fuelName, 0, 1, cancellationToken);
                 throw new VoucherRenewalException("no_stock", $"No replacement voucher is currently in stock for {fuelName}.");
             }
 
@@ -198,7 +198,7 @@ public sealed class RenewalCheckoutCommandHandler
                 var pool = (await _context.FuelVouchers
                         .AsNoTracking()
                         .Where(v => v.Status == VoucherStatus.Available
-                                 && v.Provider.ToLower() == line.Source.Provider.ToLower()
+                                 && v.Brand.ToLower() == line.Source.Brand.ToLower()
                                  && v.FuelTypeId == line.Source.FuelTypeId
                                  && v.Liters == line.Source.Liters
                                  && v.CostPerLiter != null)
@@ -333,14 +333,14 @@ public sealed class RenewalCheckoutCommandHandler
 
         foreach (var line in resolved)
         {
-            // The line item mirrors the source voucher (provider/fuel/nominal) so the shared refund
-            // maths — which groups by Provider/FuelTypeId/Liters and refunds unfulfilled units — works
+            // The line item mirrors the source voucher (brand/fuel/nominal) so the shared refund
+            // maths — which groups by Brand/FuelTypeId/Liters and refunds unfulfilled units — works
             // unchanged when a renewal order ends up only partially fulfilled.
             order.LineItems.Add(new OrderLineItem
             {
                 Id = Guid.CreateVersion7(),
                 OrderId = order.Id,
-                Provider = line.Source.Provider,
+                Brand = line.Source.Brand,
                 FuelTypeId = line.Source.FuelTypeId,
                 Liters = line.Source.Liters,
                 Quantity = 1,
@@ -393,7 +393,7 @@ public sealed class RenewalCheckoutCommandHandler
             .FirstOrDefaultAsync(cancellationToken);
 
         var label = string.IsNullOrEmpty(name) ? source.FuelTypeId : name;
-        return $"{label} ({source.Provider.ToUpperInvariant()}, {source.Liters:0.##} L)";
+        return $"{label} ({source.Brand.ToUpperInvariant()}, {source.Liters:0.##} L)";
     }
 
     private sealed record ResolvedLine(FuelVoucher Source, VoucherRenewalTerm Term, VoucherRenewalBranch Branch, decimal LineAmount);

@@ -15,7 +15,7 @@ public static class MonobankBasketBuilder
 {
     /// <summary>
     /// The fuel name for a set of fuel types, keyed by id. Missing ids are simply absent, and the
-    /// caller falls back to the provider - a receipt with a provider name is better than a receipt
+    /// caller falls back to the brand - a receipt with a brand name is better than a receipt
     /// that declares nothing.
     /// </summary>
     public static async Task<Dictionary<string, string>> FuelNamesAsync(
@@ -47,12 +47,12 @@ public static class MonobankBasketBuilder
     /// <para>
     /// <c>FuelName</c> is nullable on purpose: <see cref="FuelNamesAsync"/> simply omits a fuel type
     /// it could not find, and the declared type says so rather than making every caller lie with a
-    /// placeholder. Such a line falls back to the provider name, which at least tells an inspector
+    /// placeholder. Such a line falls back to the brand name, which at least tells an inspector
     /// who supplied the fuel.
     /// </para>
     /// </summary>
     public static List<MonobankBasketItem> Build(
-        IEnumerable<(string Provider, string FuelTypeId, string? FuelName, decimal Liters, int Quantity, decimal UnitPrice, decimal LineTotal)> lines)
+        IEnumerable<(string Brand, string FuelTypeId, string? FuelName, decimal Liters, int Quantity, decimal UnitPrice, decimal LineTotal)> lines)
     {
         var items = new List<MonobankBasketItem>();
 
@@ -65,7 +65,7 @@ public static class MonobankBasketBuilder
             items.Add(new MonobankBasketItem
             {
                 Name = string.IsNullOrWhiteSpace(fuelName)
-                    ? line.Provider.ToUpperInvariant()
+                    ? line.Brand.ToUpperInvariant()
                     : fuelName,
                 Qty = line.Liters * line.Quantity,
                 Sum = (long)Math.Round(Money.ToKopecks(line.UnitPrice), MidpointRounding.AwayFromZero),

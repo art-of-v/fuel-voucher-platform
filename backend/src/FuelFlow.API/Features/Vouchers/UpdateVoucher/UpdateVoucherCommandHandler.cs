@@ -1,4 +1,4 @@
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -18,11 +18,11 @@ public sealed class UpdateVoucherCommandHandler
     ];
 
     private readonly ApplicationDbContext _context;
-    private readonly ProviderEventService _eventService;
+    private readonly AuditEventService _eventService;
 
     public UpdateVoucherCommandHandler(
         ApplicationDbContext context,
-        ProviderEventService eventService)
+        AuditEventService eventService)
     {
         _context = context;
         _eventService = eventService;
@@ -77,8 +77,8 @@ public sealed class UpdateVoucherCommandHandler
                 JsonSerializer.Serialize(new { status = entity.Status.ToString(), assignedToUserId = entity.AssignedToUserId }),
                 command.ActingAdminUserId.Value,
                 command.ActingAdminName,
-                $"Updated voucher {entity.VoucherNumber} ({entity.Provider})",
-                entity.Provider,
+                $"Updated voucher {entity.VoucherNumber} ({entity.Brand})",
+                entity.Brand,
                 cancellationToken);
         }
 

@@ -37,7 +37,7 @@ public sealed class GetAdminOrderByIdQueryHandler
         {
             Id = item.Id,
             UserId = item.UserId,
-            Provider = firstLi?.Provider ?? "",
+            Brand = firstLi?.Brand ?? "",
             FuelTypeId = firstLi?.FuelTypeId ?? "",
             Liters = totalLiters,
             Quantity = totalQuantity,
@@ -51,7 +51,7 @@ public sealed class GetAdminOrderByIdQueryHandler
             LineItems = lineItemsList.Select(li => new OrderLineItemDto
             {
                 Id = li.Id,
-                Provider = li.Provider,
+                Brand = li.Brand,
                 FuelTypeId = li.FuelTypeId,
                 Liters = li.Liters,
                 Quantity = li.Quantity,
@@ -66,7 +66,7 @@ public sealed class OrderDetailDto
 {
     public Guid Id { get; set; }
     public Guid UserId { get; set; }
-    public string Provider { get; set; } = null!;
+    public string Brand { get; set; } = null!;
     public string FuelTypeId { get; set; } = null!;
     public decimal Liters { get; set; }
     public int Quantity { get; set; }

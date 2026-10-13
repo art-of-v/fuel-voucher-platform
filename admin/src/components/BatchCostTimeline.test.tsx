@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientBrand } from "@tanstack/react-query";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { ReactNode } from "react";
@@ -21,7 +21,7 @@ const RESPONSE: BatchCostTimelineResponse = {
       exchangeBatchId: "xb-1",
       atUtc: "2026-10-07T12:00:00Z",
       fuelTypeId: "okko-dp",
-      provider: "okko",
+      brand: "okko",
       vouchersExchangedOut: 5,
       litersExchangedOut: 250,
       surchargeUah: 300,
@@ -33,7 +33,7 @@ const RESPONSE: BatchCostTimelineResponse = {
     {
       fuelTypeId: "okko-dp",
       fuelTypeName: "Дизель",
-      provider: "okko",
+      brand: "okko",
       voucherCount: 10,
       totalLiters: 500,
       costPerLiter: 45,
@@ -45,7 +45,7 @@ const RESPONSE: BatchCostTimelineResponse = {
 function renderTimeline(props: { importId: string | null; enabled?: boolean } = { importId: "import-1" }) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const wrap = ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    <QueryClientBrand client={client}>{children}</QueryClientBrand>
   );
   return render(<BatchCostTimeline importId={props.importId} enabled={props.enabled ?? true} />, { wrapper: wrap });
 }

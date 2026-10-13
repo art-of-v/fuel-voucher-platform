@@ -4,7 +4,7 @@ public sealed class PurchaseDto
 {
     public Guid Id { get; set; }
     public string ProductType { get; set; } = null!;
-    public string Provider { get; set; } = null!;
+    public string Brand { get; set; } = null!;
     public string FuelType { get; set; } = null!;
     public string FuelName { get; set; } = null!;
     public decimal Liters { get; set; }

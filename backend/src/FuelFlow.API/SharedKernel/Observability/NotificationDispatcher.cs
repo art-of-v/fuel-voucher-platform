@@ -143,7 +143,7 @@ public sealed class NotificationDispatcher
     }
 
     public Task VoucherStockLowAsync(
-        string provider,
+        string brand,
         string fuelType,
         int available,
         int threshold,
@@ -158,16 +158,16 @@ public sealed class NotificationDispatcher
             isZero ? AlertSeverity.Critical : AlertSeverity.Warning,
             isZero ? "Талонів не залишилось" : "Малий залишок талонів",
             isZero
-                ? $"Для {provider} талонів більше немає."
-                : $"Для {provider} залишилось лише {available} талон(ів).",
+                ? $"Для {brand} талонів більше немає."
+                : $"Для {brand} залишилось лише {available} талон(ів).",
             new Dictionary<string, string>
             {
-                ["Мережа"] = provider,
+                ["Мережа"] = brand,
                 ["Пальне"] = fuelType,
                 ["Доступно"] = available.ToString(),
                 ["Порог"] = threshold.ToString()
             },
-            throttleKey: $"stock|{provider}|{fuelType}|{isZero}",
+            throttleKey: $"stock|{brand}|{fuelType}|{isZero}",
             ct,
             throttleMinutes: vouchers.ReminderIntervalMinutes);
     }
@@ -178,7 +178,7 @@ public sealed class NotificationDispatcher
     /// the remedy - pricing it for a paid renewal - only works while it is still alive.
     /// </summary>
     public Task VoucherStockExpiringAsync(
-        string provider,
+        string brand,
         string fuelType,
         int expiring,
         int available,
@@ -191,11 +191,11 @@ public sealed class NotificationDispatcher
             vouchers.NotifyOnExpiringStock,
             AlertSeverity.Warning,
             "Талони добігають терміну",
-            $"Для {provider} {expiring} талон(ів) із {available} доступних втрачають силу менш ніж за {withinDays} дн. "
+            $"Для {brand} {expiring} талон(ів) із {available} доступних втрачають силу менш ніж за {withinDays} дн. "
             + "Їх треба або продати, або залишити на платне продовження.",
             new Dictionary<string, string>
             {
-                ["Мережа"] = provider,
+                ["Мережа"] = brand,
                 ["Пальне"] = fuelType,
                 ["Добігають терміну"] = expiring.ToString(),
                 ["Доступно"] = available.ToString(),
@@ -204,7 +204,7 @@ public sealed class NotificationDispatcher
             // Distinct throttle key from the low-count alert: the same combination can be both
             // comfortably stocked and quietly running out of life, and the two deserve a message
             // each rather than one swallowing the other.
-            throttleKey: $"expiring|{provider}|{fuelType}",
+            throttleKey: $"expiring|{brand}|{fuelType}",
             ct,
             throttleMinutes: vouchers.ReminderIntervalMinutes);
     }
@@ -305,7 +305,7 @@ public sealed class NotificationDispatcher
     /// Throttled per fuel + shape so a burst of cost entries or blocked checkouts sends one message.
     /// </summary>
     public Task BelowCostAsync(
-        string provider,
+        string brand,
         string fuelType,
         decimal costPerLiter,
         decimal finalPerLiter,
@@ -316,11 +316,11 @@ public sealed class NotificationDispatcher
             deliberate ? AlertSeverity.Warning : AlertSeverity.Critical,
             deliberate ? "Увімкнено продаж нижче собівартості" : "Ціна нижче собівартості — продаж заблоковано",
             deliberate
-                ? $"{provider} / {fuelType} продається нижче собівартості за рішенням менеджера; кожен літр — свідома втрата."
-                : $"{provider} / {fuelType} продається нижче собівартості, тому продаж і видача заблоковані, доки ціну не виправлять або менеджер не ввімкне дозвіл.",
+                ? $"{brand} / {fuelType} продається нижче собівартості за рішенням менеджера; кожен літр — свідома втрата."
+                : $"{brand} / {fuelType} продається нижче собівартості, тому продаж і видача заблоковані, доки ціну не виправлять або менеджер не ввімкне дозвіл.",
             new Dictionary<string, string>
             {
-                ["Мережа"] = provider,
+                ["Мережа"] = brand,
                 ["Пальне"] = fuelType,
                 ["Собівартість, грн/л"] = costPerLiter.ToString("0.00"),
                 ["Ціна, грн/л"] = finalPerLiter.ToString("0.00"),
@@ -345,7 +345,7 @@ public sealed class NotificationDispatcher
     public Task FulfillmentMismatchAsync(
         string orderId,
         string orderNumber,
-        string provider,
+        string brand,
         int releasedVouchers,
         int wantedTotal,
         int foundTotal,
@@ -359,15 +359,15 @@ public sealed class NotificationDispatcher
             AlertSeverity.Warning,
             corrected ? "Продовження видачі повернуло талони на склад" : "Розходження у видачі замовлення",
             corrected
-                ? $"Замовлення {orderNumber} ({provider}) мало {wantedTotal} талон(ів), але в базі було {foundTotal}. "
+                ? $"Замовлення {orderNumber} ({brand}) мало {wantedTotal} талон(ів), але в базі було {foundTotal}. "
                     + $"{releasedVouchers} талон(ів) повернуто на склад, запис про видачу збережено як звільнений."
-                : $"Замовлення {orderNumber} ({provider}) мало {wantedTotal} талон(ів), але в базі було {foundTotal}. "
+                : $"Замовлення {orderNumber} ({brand}) мало {wantedTotal} талон(ів), але в базі було {foundTotal}. "
                     + "Замовлення старше за вікно звірки, тому нічого не змінено - розходження треба перевірити вручну.",
             new Dictionary<string, string>
             {
                 ["Замовлення"] = orderNumber,
                 ["ID"] = orderId,
-                ["Мережа"] = provider,
+                ["Мережа"] = brand,
                 ["Очікувалося"] = wantedTotal.ToString(),
                 ["Знайдено"] = foundTotal.ToString(),
                 ["Повернуто"] = releasedVouchers.ToString(),

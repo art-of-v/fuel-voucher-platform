@@ -31,7 +31,7 @@ public sealed class GetImportBatchPnlQueryHandler
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(v => v.ImportJobId == query.ImportId && !v.IsDeleted)
-            .Select(v => new { v.Id, v.FuelTypeId, v.Provider, v.Liters, v.Status, v.CostPerLiter })
+            .Select(v => new { v.Id, v.FuelTypeId, v.Brand, v.Liters, v.Status, v.CostPerLiter })
             .ToListAsync(cancellationToken);
 
         if (vouchers.Count == 0) return [];
@@ -92,7 +92,7 @@ public sealed class GetImportBatchPnlQueryHandler
 
         var result = new List<ImportBatchPnlDto>();
         foreach (var group in vouchers
-            .GroupBy(v => new { v.FuelTypeId, v.Provider })
+            .GroupBy(v => new { v.FuelTypeId, v.Brand })
             .OrderBy(g => g.Key.FuelTypeId))
         {
             var fuelTypeId = group.Key.FuelTypeId;
@@ -173,7 +173,7 @@ public sealed class GetImportBatchPnlQueryHandler
             {
                 FuelTypeId = fuelTypeId,
                 FuelTypeName = names.TryGetValue(fuelTypeId, out var n) ? n : null,
-                Provider = group.Key.Provider,
+                Brand = group.Key.Brand,
                 VouchersIn = all.Count,
                 LitersIn = all.Sum(v => v.Liters),
                 VouchersSold = vouchersSold,

@@ -1,7 +1,7 @@
 using FluentAssertions;
-using FuelFlow.Features.Providers;
-using FuelFlow.Features.Providers.GetProviderById;
-using FuelFlow.Features.Providers.GetProviderHistory;
+using FuelFlow.Features.Brands;
+using FuelFlow.Features.Brands.GetProviderById;
+using FuelFlow.Features.Brands.GetProviderHistory;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -28,7 +28,7 @@ public sealed class GetProviderByIdAndHistoryTests : IDisposable
         _context.Dispose();
     }
 
-    // --- GetProviderByIdQueryHandler ---------------------------------------
+    // --- GetBrandByIdQueryHandler ---------------------------------------
 
     [Fact]
     public async Task GetProviderById_ShouldReturnProvider()
@@ -52,18 +52,18 @@ public sealed class GetProviderByIdAndHistoryTests : IDisposable
             new FuelPackage { Id = "test-fuel-b-50", StationId = "test-okko", FuelTypeId = "test-fuel-b", FuelName = "DP", Liters = 50m, Price = 2600, OriginalPrice = 2500, SupplierPricePerLiter = 50m, MarginUahPerLiter = 2m, FinalPricePerLiter = 52m, CreatedAtUtc = now, UpdatedAtUtc = now });
         await _context.SaveChangesAsync();
 
-        var handler = new GetProviderByIdQueryHandler(_context);
-        var provider = await handler.HandleAsync(new GetProviderByIdQuery("test-okko"), CancellationToken.None);
+        var handler = new GetBrandByIdQueryHandler(_context);
+        var brand = await handler.HandleAsync(new GetBrandByIdQuery("test-okko"), CancellationToken.None);
 
-        provider.Should().NotBeNull();
-        provider!.Id.Should().Be("test-okko");
-        provider.Name.Should().Be("OKKO");
-        provider.LogoText.Should().Be("OKKO");
-        provider.Color.Should().Be("#22c55e");
-        provider.Nominals.Should().Equal(10, 20, 50);
-        provider.Fuels.Should().HaveCount(2);
+        brand.Should().NotBeNull();
+        brand!.Id.Should().Be("test-okko");
+        brand.Name.Should().Be("OKKO");
+        brand.LogoText.Should().Be("OKKO");
+        brand.Color.Should().Be("#22c55e");
+        brand.Nominals.Should().Equal(10, 20, 50);
+        brand.Fuels.Should().HaveCount(2);
 
-        var fuelA = provider.Fuels.Single(f => f.Id == "test-fuel-a");
+        var fuelA = brand.Fuels.Single(f => f.Id == "test-fuel-a");
         fuelA.Name.Should().Be("A-95");
         fuelA.SupplierPricePerLiter.Should().Be(49m);
         fuelA.MarginUahPerLiter.Should().Be(2m);
@@ -74,21 +74,21 @@ public sealed class GetProviderByIdAndHistoryTests : IDisposable
     [Fact]
     public async Task GetProviderById_ShouldReturnNull_WhenStationMissing()
     {
-        var handler = new GetProviderByIdQueryHandler(_context);
-        var result = await handler.HandleAsync(new GetProviderByIdQuery("missing"), CancellationToken.None);
+        var handler = new GetBrandByIdQueryHandler(_context);
+        var result = await handler.HandleAsync(new GetBrandByIdQuery("missing"), CancellationToken.None);
 
         result.Should().BeNull();
     }
 
-    // --- GetProviderHistoryQueryHandler ------------------------------------
+    // --- GetBrandHistoryQueryHandler ------------------------------------
 
-    private ProviderEventOutbox CreateEvent(string providerId, DateTime changedAt, string value) =>
+    private AuditEventOutbox CreateEvent(string providerId, DateTime changedAt, string value) =>
         new()
         {
             Id = Guid.NewGuid(),
             AggregateType = "Fuel",
             AggregateId = "fuel-a",
-            ProviderId = providerId,
+            ScopeId = providerId,
             EventType = "PriceChanged",
             OldValue = null,
             NewValue = value,
@@ -106,11 +106,11 @@ public sealed class GetProviderByIdAndHistoryTests : IDisposable
         var e2 = CreateEvent("test-okko", now.AddMinutes(-1), "v2");
         var e3 = CreateEvent("test-okko", now.AddMinutes(-2), "v3");
         var other = CreateEvent("test-wog", now, "v4");
-        _context.ProviderEventOutbox.AddRange(e1, e2, e3, other);
+        _context.AuditEventOutbox.AddRange(e1, e2, e3, other);
         await _context.SaveChangesAsync();
 
-        var handler = new GetProviderHistoryQueryHandler(_context);
-        var result = await handler.HandleAsync(new GetProviderHistoryQuery("test-okko"), CancellationToken.None);
+        var handler = new GetBrandHistoryQueryHandler(_context);
+        var result = await handler.HandleAsync(new GetBrandHistoryQuery("test-okko"), CancellationToken.None);
 
         result.Should().HaveCount(3);
         result.Select(e => e.Id).Should().Equal(e2.Id, e3.Id, e1.Id);
@@ -136,23 +136,23 @@ public sealed class GetProviderByIdAndHistoryTests : IDisposable
             CreateEvent("test-okko", now.AddMinutes(-2), "v4"),
             CreateEvent("test-okko", now.AddMinutes(-1), "v5")
         };
-        _context.ProviderEventOutbox.AddRange(events);
+        _context.AuditEventOutbox.AddRange(events);
         await _context.SaveChangesAsync();
 
-        var handler = new GetProviderHistoryQueryHandler(_context);
-        var result = await handler.HandleAsync(new GetProviderHistoryQuery("test-okko", 2), CancellationToken.None);
+        var handler = new GetBrandHistoryQueryHandler(_context);
+        var result = await handler.HandleAsync(new GetBrandHistoryQuery("test-okko", 2), CancellationToken.None);
 
         result.Should().HaveCount(2);
         result.Select(e => e.Id).Should().Equal(events[4].Id, events[3].Id);
     }
 
-    // --- ProviderEventService ----------------------------------------------
+    // --- AuditEventService ----------------------------------------------
 
     [Fact]
     public async Task RecordEventAsync_ShouldPersistEvent()
     {
         var changedByUserId = Guid.NewGuid();
-        var service = new ProviderEventService(_context);
+        var service = new AuditEventService(_context);
 
         await service.RecordEventAsync(
             "Fuel",
@@ -166,10 +166,10 @@ public sealed class GetProviderByIdAndHistoryTests : IDisposable
             "test-okko",
             CancellationToken.None);
 
-        var evt = await _context.ProviderEventOutbox.SingleAsync();
+        var evt = await _context.AuditEventOutbox.SingleAsync();
         evt.AggregateType.Should().Be("Fuel");
         evt.AggregateId.Should().Be("fuel-a");
-        evt.ProviderId.Should().Be("test-okko");
+        evt.ScopeId.Should().Be("test-okko");
         evt.EventType.Should().Be("PriceChanged");
         evt.OldValue.Should().Be("49.00");
         evt.NewValue.Should().Be("51.00");

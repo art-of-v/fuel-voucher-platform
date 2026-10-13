@@ -62,7 +62,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
                 new OrderLineItem
                 {
                     Id = Guid.NewGuid(),
-                    Provider = "OKKO",
+                    Brand = "OKKO",
                     FuelTypeId = "okko-95",
                     Liters = 50,
                     Quantity = 2,
@@ -85,7 +85,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
                 new OrderLineItem
                 {
                     Id = Guid.NewGuid(),
-                    Provider = "OKKO",
+                    Brand = "OKKO",
                     FuelTypeId = "okko-dp",
                     Liters = 50,
                     Quantity = 1,
@@ -98,10 +98,10 @@ public sealed class SyncCommandHandlerTests : IDisposable
         var voucher1 = new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-95",
             Liters = 50,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             VoucherNumber = "OKKO-1",
             QrPayload = "payload-1",
@@ -114,10 +114,10 @@ public sealed class SyncCommandHandlerTests : IDisposable
         var voucher2 = new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-95",
             Liters = 50,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             VoucherNumber = "OKKO-2",
             QrPayload = "payload-2",
@@ -130,10 +130,10 @@ public sealed class SyncCommandHandlerTests : IDisposable
         var voucher3 = new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-dp",
             Liters = 50,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(2)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(2)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(2)),
             VoucherNumber = "OKKO-3",
             QrPayload = "payload-3",
@@ -223,7 +223,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
                 new OrderLineItem
                 {
                     Id = Guid.NewGuid(),
-                    Provider = "OKKO",
+                    Brand = "OKKO",
                     FuelTypeId = "okko-95",
                     Liters = 50,
                     Quantity = 1,
@@ -266,7 +266,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
                 new OrderLineItem
                 {
                     Id = Guid.NewGuid(),
-                    Provider = "OKKO",
+                    Brand = "OKKO",
                     FuelTypeId = "okko-95",
                     Liters = 50,
                     Quantity = 1,
@@ -289,7 +289,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
                 new OrderLineItem
                 {
                     Id = Guid.NewGuid(),
-                    Provider = "OKKO",
+                    Brand = "OKKO",
                     FuelTypeId = "okko-dp",
                     Liters = 50,
                     Quantity = 1,
@@ -333,7 +333,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
                 new OrderLineItem
                 {
                     Id = Guid.NewGuid(),
-                    Provider = "OKKO",
+                    Brand = "OKKO",
                     FuelTypeId = "okko-95",
                     Liters = 50,
                     Quantity = 1,
@@ -356,7 +356,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
                 new OrderLineItem
                 {
                     Id = Guid.NewGuid(),
-                    Provider = "OKKO",
+                    Brand = "OKKO",
                     FuelTypeId = "okko-95",
                     Liters = 20,
                     Quantity = 1,

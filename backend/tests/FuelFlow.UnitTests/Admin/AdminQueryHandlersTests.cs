@@ -58,17 +58,17 @@ public sealed class AdminQueryHandlersTests : IDisposable
         };
     }
 
-    private static FuelVoucher CreateVoucher(string provider, string fuelTypeId, VoucherStatus status)
+    private static FuelVoucher CreateVoucher(string brand, string fuelTypeId, VoucherStatus status)
     {
         return new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Provider = provider,
+            Brand = brand,
             FuelTypeId = fuelTypeId,
             Liters = 50,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
-            VoucherNumber = $"{provider}-{Guid.NewGuid().ToString()[..8]}",
+            VoucherNumber = $"{brand}-{Guid.NewGuid().ToString()[..8]}",
             QrPayload = Guid.NewGuid().ToString(),
             Status = status,
             AssignedToUserId = status == VoucherStatus.Assigned || status == VoucherStatus.Used ? UserId : null,
@@ -91,12 +91,12 @@ public sealed class AdminQueryHandlersTests : IDisposable
         };
     }
 
-    private static void AddLineItem(Order order, string provider, string fuelTypeId, decimal liters, int quantity, int unitPrice)
+    private static void AddLineItem(Order order, string brand, string fuelTypeId, decimal liters, int quantity, int unitPrice)
     {
         order.LineItems.Add(new OrderLineItem
         {
             Id = Guid.NewGuid(),
-            Provider = provider,
+            Brand = brand,
             FuelTypeId = fuelTypeId,
             Liters = liters,
             Quantity = quantity,
@@ -160,7 +160,7 @@ public sealed class AdminQueryHandlersTests : IDisposable
         response.Vouchers.Used.Should().Be(1);
         response.Vouchers.VerificationFailed.Should().Be(1);
         response.Vouchers.VerifiedWithWarnings.Should().Be(1);
-        response.Vouchers.ByProvider.Should().ContainSingle(v => v.Provider == "OKKO" && v.Count == 7);
+        response.Vouchers.ByProvider.Should().ContainSingle(v => v.Brand == "OKKO" && v.Count == 7);
 
         response.Orders.Total.Should().Be(3);
         response.Orders.Pending.Should().Be(2);

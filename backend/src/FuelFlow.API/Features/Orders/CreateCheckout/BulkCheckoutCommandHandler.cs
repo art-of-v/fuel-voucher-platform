@@ -305,7 +305,7 @@ private readonly RuntimeSettingsService _runtimeSettings;
             {
                 Id = Guid.CreateVersion7(),
                 OrderId = order.Id,
-                Provider = item.StationId!,
+                Brand = item.StationId!,
                 FuelTypeId = item.FuelTypeId,
                 Liters = item.Liters,
                 Quantity = item.Quantity,

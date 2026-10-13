@@ -8,7 +8,7 @@ public sealed class ImportBatchCostDto
 {
     public string FuelTypeId { get; set; } = null!;
     public string? FuelTypeName { get; set; }
-    public string Provider { get; set; } = null!;
+    public string Brand { get; set; } = null!;
     public int VoucherCount { get; set; }
     public decimal TotalLiters { get; set; }
 
@@ -34,7 +34,7 @@ public sealed class ImportBatchPnlDto
 {
     public string FuelTypeId { get; set; } = null!;
     public string? FuelTypeName { get; set; }
-    public string Provider { get; set; } = null!;
+    public string Brand { get; set; } = null!;
 
     /// <summary>Everything in the batch (all statuses, excluding deleted).</summary>
     public int VouchersIn { get; set; }

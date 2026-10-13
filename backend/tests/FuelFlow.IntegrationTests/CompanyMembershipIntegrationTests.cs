@@ -313,10 +313,10 @@ public sealed class CompanyMembershipIntegrationTests : IClassFixture<TestDataba
         => new()
         {
             Id = id,
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-95",
             Liters = 50m,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             VoucherNumber = $"OKKO-{id:N}"[..20],
             QrPayload = $"payload-{id:N}",
@@ -364,7 +364,7 @@ public sealed class CompanyMembershipIntegrationTests : IClassFixture<TestDataba
             {
                 Id = Guid.NewGuid(),
                 OrderId = purchaseOrderId,
-                Provider = "OKKO",
+                Brand = "OKKO",
                 FuelTypeId = "okko-95",
                 Liters = 50m,
                 Quantity = 2,

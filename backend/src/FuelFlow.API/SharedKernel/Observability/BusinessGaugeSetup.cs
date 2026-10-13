@@ -45,12 +45,12 @@ public static class BusinessGaugeSetup
                     .Where(v => v.AssignedToUserId == null
                         && !v.IsDeleted
                         && v.Status == VoucherStatus.Available)
-                    .GroupBy(v => new { v.Provider, v.FuelTypeId })
-                    .Select(g => new { g.Key.Provider, g.Key.FuelTypeId, Count = g.Count() })
+                    .GroupBy(v => new { v.Brand, v.FuelTypeId })
+                    .Select(g => new { g.Key.Brand, g.Key.FuelTypeId, Count = g.Count() })
                     .ToList()
                     .Select(x => new Measurement<int>(
                         x.Count,
-                        new KeyValuePair<string, object?>("provider", x.Provider),
+                        new KeyValuePair<string, object?>("brand", x.Brand),
                         new KeyValuePair<string, object?>("fuel_type", x.FuelTypeId)))
                     .ToList();
             }

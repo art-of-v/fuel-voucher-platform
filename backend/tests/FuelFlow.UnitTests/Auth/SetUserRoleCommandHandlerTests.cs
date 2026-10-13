@@ -1,7 +1,7 @@
 using FluentAssertions;
 using FuelFlow.Features.Auth.AdminUser.SetUserRole;
 using FuelFlow.Features.Auth.Logout;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
@@ -41,7 +41,7 @@ public sealed class SetUserRoleCommandHandlerTests
         (await context.Devices.FirstAsync(d => d.Id == device.Id)).Status
             .Should().Be(DeviceStatus.Revoked);
 
-        var audit = await context.Set<ProviderEventOutbox>().SingleAsync();
+        var audit = await context.Set<AuditEventOutbox>().SingleAsync();
         audit.EventType.Should().Be("RoleChanged");
         audit.NewValue.Should().Contain("\"sessionsRevoked\":true");
     }
@@ -72,7 +72,7 @@ public sealed class SetUserRoleCommandHandlerTests
         (await context.Devices.FirstAsync(d => d.Id == device.Id)).Status
             .Should().Be(DeviceStatus.Active);
 
-        var audit = await context.Set<ProviderEventOutbox>().SingleAsync();
+        var audit = await context.Set<AuditEventOutbox>().SingleAsync();
         audit.EventType.Should().Be("RoleChanged");
         audit.NewValue.Should().Contain("\"sessionsRevoked\":false");
     }
@@ -99,7 +99,7 @@ public sealed class SetUserRoleCommandHandlerTests
         // Nothing revoked, role unchanged.
         owner.TokenVersion.Should().Be(7);
         t1.IsRevoked.Should().BeFalse();
-        (await context.Set<ProviderEventOutbox>().CountAsync()).Should().Be(0);
+        (await context.Set<AuditEventOutbox>().CountAsync()).Should().Be(0);
     }
 
     [Fact]
@@ -142,7 +142,7 @@ public sealed class SetUserRoleCommandHandlerTests
     }
 
     // The handler now wraps the role change + revoke in a real transaction (atomicity fix). The
-    // InMemory provider has no transactions and throws TransactionIgnoredWarning-as-error unless told
+    // InMemory brand has no transactions and throws TransactionIgnoredWarning-as-error unless told
     // to ignore it; against real Postgres (see AdminRoleDemotionIntegrationTests) the transaction is
     // genuine. Ignoring the warning here makes BeginTransaction a no-op so these logic tests still run.
     private static ApplicationDbContext CreateContext() => new(
@@ -159,7 +159,7 @@ public sealed class SetUserRoleCommandHandlerTests
     private static SetUserRoleCommandHandler CreateHandler(ApplicationDbContext context) => new(
         context,
         NullLogger<SetUserRoleCommandHandler>.Instance,
-        new ProviderEventService(context),
+        new AuditEventService(context),
         new LogoutEverywhereCommandHandler(context, NullLogger<LogoutEverywhereCommandHandler>.Instance));
 
     private static async Task SeedRolesAsync(ApplicationDbContext context)

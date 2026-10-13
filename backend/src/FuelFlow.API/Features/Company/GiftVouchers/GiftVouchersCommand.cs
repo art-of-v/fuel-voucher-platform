@@ -125,14 +125,14 @@ public sealed class GiftVouchersCommandHandler
             UpdatedAtUtc = now,
             LineItems = vouchers.Select(voucher =>
             {
-                var key = (Provider: voucher.Provider.ToLowerInvariant(), voucher.FuelTypeId, voucher.Liters);
+                var key = (Brand: voucher.Brand.ToLowerInvariant(), voucher.FuelTypeId, voucher.Liters);
                 var cost = companyCostByFuel.GetValueOrDefault(key);
 
                 return new OrderLineItem
                 {
                     Id = Guid.CreateVersion7(),
                     OrderId = issuanceOrderId,
-                    Provider = voucher.Provider,
+                    Brand = voucher.Brand,
                     FuelTypeId = voucher.FuelTypeId,
                     Liters = voucher.Liters,
                     Quantity = 1,
@@ -193,8 +193,8 @@ public sealed class GiftVouchersCommandHandler
         return new GiftVouchersResult("Success", vouchers.Count, IssuanceOrderId: issuanceOrder.Id);
     }
 
-    /// <summary>Price per (provider, fuel, litres) line on the company's own purchase, for reference.</summary>
-    private async Task<Dictionary<(string Provider, string FuelTypeId, decimal Liters), decimal>> LoadCompanyCostAsync(
+    /// <summary>Price per (brand, fuel, litres) line on the company's own purchase, for reference.</summary>
+    private async Task<Dictionary<(string Brand, string FuelTypeId, decimal Liters), decimal>> LoadCompanyCostAsync(
         Guid? purchaseOrderId,
         CancellationToken cancellationToken)
     {
@@ -204,11 +204,11 @@ public sealed class GiftVouchersCommandHandler
         var lines = await _context.OrderLineItems
             .AsNoTracking()
             .Where(li => li.OrderId == orderId)
-            .Select(li => new { li.Provider, li.FuelTypeId, li.Liters, li.UnitPrice })
+            .Select(li => new { li.Brand, li.FuelTypeId, li.Liters, li.UnitPrice })
             .ToListAsync(cancellationToken);
 
         return lines
-            .GroupBy(li => (li.Provider.ToLowerInvariant(), li.FuelTypeId, li.Liters))
+            .GroupBy(li => (li.Brand.ToLowerInvariant(), li.FuelTypeId, li.Liters))
             .ToDictionary(g => g.Key, g => g.First().UnitPrice);
     }
 }

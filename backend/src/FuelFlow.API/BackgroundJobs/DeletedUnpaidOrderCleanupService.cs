@@ -53,7 +53,7 @@ public class DeletedUnpaidOrderCleanupService
         var cutoff = DateTime.UtcNow.AddDays(-retentionDays);
 
         // AsTracking + Include so EF itself cascades the delete to the loaded line items (robust
-        // regardless of the provider's DB-level FK behaviour); IgnoreQueryFilters because every
+        // regardless of the brand's DB-level FK behaviour); IgnoreQueryFilters because every
         // candidate is, by definition, soft-deleted and hidden by the global !IsDeleted filter.
         //
         // !FuelVouchers.Any is not an optimisation, it is required: fuel_vouchers.order_id is ON

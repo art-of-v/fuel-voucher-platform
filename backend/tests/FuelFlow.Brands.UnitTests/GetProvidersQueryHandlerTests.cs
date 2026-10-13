@@ -1,17 +1,17 @@
 using FluentAssertions;
-using FuelFlow.Features.Providers.GetProviders;
+using FuelFlow.Features.Brands.GetProviders;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Providers.UnitTests;
 
-public sealed class GetProvidersQueryHandlerTests : IDisposable
+public sealed class GetBrandsQueryHandlerTests : IDisposable
 {
     private readonly ApplicationDbContext _context;
-    private readonly GetProvidersQueryHandler _handler;
+    private readonly GetBrandsQueryHandler _handler;
 
-    public GetProvidersQueryHandlerTests()
+    public GetBrandsQueryHandlerTests()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
@@ -20,7 +20,7 @@ public sealed class GetProvidersQueryHandlerTests : IDisposable
         _context = new ApplicationDbContext(options);
         _context.Database.EnsureCreated();
 
-        _handler = new GetProvidersQueryHandler(_context);
+        _handler = new GetBrandsQueryHandler(_context);
     }
 
     public void Dispose()
@@ -51,14 +51,14 @@ public sealed class GetProvidersQueryHandlerTests : IDisposable
             new FuelPackage { Id = "test-fuel-b-50", StationId = "test-okko", FuelTypeId = "test-fuel-b", FuelName = "ДП", Liters = 50m, Price = 2600, OriginalPrice = 2500, SupplierPricePerLiter = 50m, MarginUahPerLiter = 2m, FinalPricePerLiter = 52m, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
         await _context.SaveChangesAsync();
 
-        var providers = await _handler.HandleAsync(new GetProvidersQuery());
+        var providers = await _handler.HandleAsync(new GetBrandsQuery());
 
-        var provider = providers.Single(p => p.Id == "test-okko");
-        provider.Nominals.Should().Equal(10, 20, 50);
+        var brand = providers.Single(p => p.Id == "test-okko");
+        brand.Nominals.Should().Equal(10, 20, 50);
 
-        provider.Fuels.Should().HaveCount(2);
+        brand.Fuels.Should().HaveCount(2);
 
-        var fuelA = provider.Fuels.Single(f => f.Id == "test-fuel-a");
+        var fuelA = brand.Fuels.Single(f => f.Id == "test-fuel-a");
         fuelA.SupplierPricePerLiter.Should().Be(49m);
         fuelA.MarginUahPerLiter.Should().Be(2m);
         fuelA.FinalPricePerLiter.Should().Be(51m);
@@ -101,7 +101,7 @@ public sealed class GetProvidersQueryHandlerTests : IDisposable
             Package("test-dp-10", 10m, cost: 100.00m, final: 99.90m));
         await _context.SaveChangesAsync();
 
-        var providers = await _handler.HandleAsync(new GetProvidersQuery());
+        var providers = await _handler.HandleAsync(new GetBrandsQuery());
         var fuel = providers.Single(p => p.Id == "test-okko").Fuels.Single();
 
         // (5.00×0.01 + 100×2 + 100×3 + 100×10) / 15.01 L = 99.9367. The QA leftover still moves the
@@ -145,7 +145,7 @@ public sealed class GetProvidersQueryHandlerTests : IDisposable
             Package("test-dp-10", 10m, cost: 110.00m, final: 105.00m));
         await _context.SaveChangesAsync();
 
-        var providers = await _handler.HandleAsync(new GetProvidersQuery());
+        var providers = await _handler.HandleAsync(new GetBrandsQuery());
         var fuel = providers.Single(p => p.Id == "test-okko").Fuels.Single();
 
         fuel.PriceSpread.Should().NotBeNull();
@@ -185,8 +185,8 @@ public sealed class GetProvidersQueryHandlerTests : IDisposable
             Package("test-dp-c", 9m, cost: 100.00m, final: 99.90m, margin: 1.00m, pump: 105m));
         await _context.SaveChangesAsync();
 
-        var first = await _handler.HandleAsync(new GetProvidersQuery());
-        var second = await _handler.HandleAsync(new GetProvidersQuery());
+        var first = await _handler.HandleAsync(new GetBrandsQuery());
+        var second = await _handler.HandleAsync(new GetBrandsQuery());
 
         second.SelectMany(p => p.Fuels).Should().BeEquivalentTo(first.SelectMany(p => p.Fuels));
     }
@@ -225,10 +225,10 @@ public sealed class GetProvidersQueryHandlerTests : IDisposable
         });
         await _context.SaveChangesAsync();
 
-        var providers = await _handler.HandleAsync(new GetProvidersQuery());
+        var providers = await _handler.HandleAsync(new GetBrandsQuery());
 
-        var provider = providers.Single(p => p.Id == "test-klo");
-        provider.Fuels.Should().BeEmpty();
-        provider.Nominals.Should().BeEmpty();
+        var brand = providers.Single(p => p.Id == "test-klo");
+        brand.Fuels.Should().BeEmpty();
+        brand.Nominals.Should().BeEmpty();
     }
 }

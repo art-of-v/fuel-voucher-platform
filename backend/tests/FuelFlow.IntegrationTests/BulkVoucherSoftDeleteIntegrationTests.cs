@@ -1,7 +1,7 @@
 using FluentAssertions;
 using FuelFlow.API.BackgroundJobs;
 using FuelFlow.Features.Orders.SharedModels;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.BulkActionVouchers;
 using FuelFlow.Features.Vouchers.DeleteVoucher;
@@ -32,7 +32,7 @@ namespace FuelFlow.IntegrationTests;
 /// These tests pin the corrected behaviour, including that the FK failure mode is gone.
 /// </para>
 /// <para>
-/// Real PostgreSQL throughout. An in-memory provider supports neither <c>ExecuteUpdate</c> nor the
+/// Real PostgreSQL throughout. An in-memory brand supports neither <c>ExecuteUpdate</c> nor the
 /// foreign keys, so a unit test here could have proved nothing about either.
 /// </para>
 /// </remarks>
@@ -229,7 +229,7 @@ private BulkActionVouchersCommandHandler Handler(ApplicationDbContext context)
         => new(
             context,
             new Mock<IBackgroundJobClient>().Object,
-            new ProviderEventService(context));
+            new AuditEventService(context));
 
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -278,7 +278,7 @@ public async Task Single_Delete_Refuses_A_Paid_Voucher()
     await context.SaveChangesAsync();
 
     var acting = CreateContext();
-    var result = await new DeleteVoucherCommandHandler(acting, new ProviderEventService(acting)).HandleAsync(
+    var result = await new DeleteVoucherCommandHandler(acting, new AuditEventService(acting)).HandleAsync(
         new DeleteVoucherCommand(voucher.Id, Guid.NewGuid(), "admin"));
 
     result.Should().NotBeNull();
@@ -295,7 +295,7 @@ public async Task Single_Delete_Of_Stock_Still_Archives_It()
     var voucher = await context.FuelVouchers.IgnoreQueryFilters().FirstAsync();
 
     var acting = CreateContext();
-    var result = await new DeleteVoucherCommandHandler(acting, new ProviderEventService(acting)).HandleAsync(
+    var result = await new DeleteVoucherCommandHandler(acting, new AuditEventService(acting)).HandleAsync(
         new DeleteVoucherCommand(voucher.Id, Guid.NewGuid(), "admin"));
 
     result.Should().NotBeNull();
@@ -385,7 +385,7 @@ private async Task SeedAsync()
                 ImportJobId = importId,
                 FuelTypeId = fuel.Id,
                 SupplierId = supplier.Id,
-                Provider = "okko",
+                Brand = "okko",
                 VoucherNumber = $"V-{Guid.NewGuid():N}",
                 QrPayload = Guid.NewGuid().ToString(),
                 Liters = 10m,

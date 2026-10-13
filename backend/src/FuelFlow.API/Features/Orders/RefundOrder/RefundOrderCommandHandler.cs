@@ -1,6 +1,6 @@
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.Features.Orders.SharedModels;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel;
 using FuelFlow.SharedKernel.Options;
@@ -13,12 +13,12 @@ public sealed class RefundOrderCommandHandler
 {
     private readonly ApplicationDbContext _context;
     private readonly IMonobankClientFactory _monobankClientFactory;
-    private readonly ProviderEventService _providerEventService;
+    private readonly AuditEventService _providerEventService;
 
     public RefundOrderCommandHandler(
         ApplicationDbContext context,
         IMonobankClientFactory monobankClientFactory,
-        ProviderEventService providerEventService)
+        AuditEventService providerEventService)
     {
         _context = context;
         _monobankClientFactory = monobankClientFactory;
@@ -127,7 +127,7 @@ public sealed class RefundOrderCommandHandler
                 // and the admin UI surfaces this string verbatim, so a vague message here is
                 // what turns a predictable refusal into a support question.
                 ErrorMessage = order.MonobankStatus != MonobankStatus.Success
-                    ? $"Order was not paid (provider status: {order.MonobankStatus?.ToString() ?? "unknown"}); there is nothing to return"
+                    ? $"Order was not paid (brand status: {order.MonobankStatus?.ToString() ?? "unknown"}); there is nothing to return"
                     : "No unfulfilled value remains on this order"
             };
         }
@@ -221,7 +221,7 @@ public sealed class RefundOrderCommandHandler
                 _context, unfulfilledLines.Select(l => l.FuelTypeId), cancellationToken);
 
             var returnItems = MonobankBasketBuilder.Build(unfulfilledLines.Select(l => (
-                l.Provider, l.FuelTypeId,
+                l.Brand, l.FuelTypeId,
                 fuelNames.GetValueOrDefault(l.FuelTypeId),
                 l.Liters, l.UnfulfilledUnits, l.UnitPrice,
                 l.UnfulfilledUnits * l.UnitPrice)));
@@ -252,7 +252,7 @@ public sealed class RefundOrderCommandHandler
                 summary: command.IsAutomatic
                     ? $"Automatic refund of {amount} kopecks for partially fulfilled order"
                     : $"Manual refund of {amount} kopecks requested by admin",
-                providerId: order.LineItems.FirstOrDefault()?.Provider ?? "unknown",
+                providerId: order.LineItems.FirstOrDefault()?.Brand ?? "unknown",
                 ct: cancellationToken);
 
             return new RefundOrderResult
@@ -267,7 +267,7 @@ public sealed class RefundOrderCommandHandler
         catch (Exception ex)
         {
             refund.Status = RefundStatus.Failed;
-            // error_message column is limited to 500 chars; a longer provider exception
+            // error_message column is limited to 500 chars; a longer brand exception
             // (e.g. a full HTML error body) would make this SaveChanges throw and turn a
             // handled refund failure into an unhandled 500.
             refund.ErrorMessage = ex.Message.Length <= 500 ? ex.Message : ex.Message[..500];
@@ -283,7 +283,7 @@ public sealed class RefundOrderCommandHandler
                 changedByUserId: changedByUserId,
                 changedByUserName: changedByUserName,
                 summary: $"Refund of {amount} kopecks for order {order.Id} failed: {ex.Message}",
-                providerId: order.LineItems.FirstOrDefault()?.Provider ?? "unknown",
+                providerId: order.LineItems.FirstOrDefault()?.Brand ?? "unknown",
                 ct: cancellationToken);
 
             return new RefundOrderResult
@@ -337,10 +337,10 @@ public sealed class RefundOrderCommandHandler
         !WasPaid(order) ? 0 : ComputeTotalValueKopecks(order) - ComputeRefundAmountKopecks(order);
 
     /// <summary>
-    /// Whether the provider confirmed this order was paid.
+    /// Whether the brand confirmed this order was paid.
     /// </summary>
     /// <remarks>
-    /// Deliberately keyed on the provider's status rather than the order status: an order can be
+    /// Deliberately keyed on the brand's status rather than the order status: an order can be
     /// Cancelled and still have been paid (the invoice stays payable for its whole validity
     /// window), and that is exactly the case where value must still be accounted for.
     /// </remarks>
@@ -348,7 +348,7 @@ public sealed class RefundOrderCommandHandler
 
     /// <summary>One fuel line of an order, and how many of its units the customer never received.</summary>
     internal readonly record struct UnfulfilledLine(
-        string Provider,
+        string Brand,
         string FuelTypeId,
         decimal Liters,
         int UnfulfilledUnits,
@@ -365,25 +365,25 @@ public sealed class RefundOrderCommandHandler
         // so this only keeps a displayed amount from implying otherwise.
         if (order.Kind == OrderKind.ReceivedFromCompany) return [];
 
-        // Nothing to return unless the provider says it took the money.
+        // Nothing to return unless the brand says it took the money.
         //
         // Without this, every order that exists but was never paid reports its FULL price as
         // refundable: an unpaid checkout, and an order whose invoice creation failed. The admin
         // button is gated purely on this number (admin.tsx:2629), so both render as a live action
-        // and both fail on the provider's terms instead of ours — an operator clicks "refund" on
+        // and both fail on the brand's terms instead of ours — an operator clicks "refund" on
         // an order nobody paid for and gets a Monobank error back.
         //
-        // Keyed on the provider's status rather than the order status on purpose. An order can
+        // Keyed on the brand's status rather than the order status on purpose. An order can
         // be Cancelled and still be owed a refund: the invoice stays payable for its whole
         // validity window, so a customer can pay one long after a failure cancelled it. Gating on
         // OrderStatus would have removed the only remedy for exactly that case.
         if (!WasPaid(order)) return [];
 
         var grouped = order.LineItems
-            .GroupBy(li => (li.Provider, li.FuelTypeId, li.Liters))
+            .GroupBy(li => (li.Brand, li.FuelTypeId, li.Liters))
             .Select(g => new
             {
-                g.Key.Provider,
+                g.Key.Brand,
                 g.Key.FuelTypeId,
                 g.Key.Liters,
                 OrderedUnits = g.Sum(li => li.Quantity),
@@ -409,7 +409,7 @@ public sealed class RefundOrderCommandHandler
             var fulfilledUnits = order.Fulfillments
                 .Count(f => f.ReleasedAtUtc is null
                     && f.Voucher is not null
-                    && string.Equals(f.Voucher!.Provider, group.Provider, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(f.Voucher!.Brand, group.Brand, StringComparison.OrdinalIgnoreCase)
                     && f.Voucher.FuelTypeId == group.FuelTypeId
                     && f.Voucher.Liters == group.Liters);
 
@@ -417,7 +417,7 @@ public sealed class RefundOrderCommandHandler
             if (unfulfilledUnits > 0)
             {
                 unfulfilled.Add(new UnfulfilledLine(
-                    group.Provider, group.FuelTypeId, group.Liters, unfulfilledUnits, group.UnitPrice));
+                    group.Brand, group.FuelTypeId, group.Liters, unfulfilledUnits, group.UnitPrice));
             }
         }
 

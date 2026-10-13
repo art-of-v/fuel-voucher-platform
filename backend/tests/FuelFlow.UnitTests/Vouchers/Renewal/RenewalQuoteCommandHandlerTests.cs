@@ -205,7 +205,7 @@ public sealed class RenewalQuoteCommandHandlerTests : IDisposable
     }
 
     /// <summary>
-    /// Seeds a customer voucher. The provider term defaults to well past the customer term so these
+    /// Seeds a customer voucher. The brand term defaults to well past the customer term so these
     /// tests exercise the date rules; the ceiling itself is covered in
     /// <c>VoucherRenewalEligibilityTests</c> and in the dedicated quote tests below.
     /// </summary>
@@ -216,10 +216,10 @@ public sealed class RenewalQuoteCommandHandlerTests : IDisposable
         var voucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-95",
             Liters = liters,
-            ProviderExpirationDate = providerExpiry ?? expiry.AddYears(1),
+            SupplierExpirationDate = providerExpiry ?? expiry.AddYears(1),
             CustomerExpirationDate = expiry,
             VoucherNumber = $"V-{Guid.NewGuid():N}"[..16],
             QrPayload = $"qr-{Guid.NewGuid():N}",
@@ -238,10 +238,10 @@ public sealed class RenewalQuoteCommandHandlerTests : IDisposable
         _context.FuelVouchers.Add(new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Provider = matching.Provider,
+            Brand = matching.Brand,
             FuelTypeId = matching.FuelTypeId,
             Liters = matching.Liters,
-            ProviderExpirationDate = expiry,
+            SupplierExpirationDate = expiry,
             CustomerExpirationDate = expiry,
             VoucherNumber = $"S-{Guid.NewGuid():N}"[..16],
             QrPayload = $"qr-{Guid.NewGuid():N}",

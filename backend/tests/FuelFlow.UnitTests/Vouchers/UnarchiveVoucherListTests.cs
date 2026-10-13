@@ -15,8 +15,8 @@ namespace FuelFlow.UnitTests.Vouchers;
 /// <para>
 /// The un-archive write itself is covered in <c>UnarchiveVoucherIntegrationTests</c>: it is an
 /// <c>ExecuteUpdateAsync</c> whose WHERE clause carries the <c>IsDeleted</c> predicate, and the EF
-/// Core in-memory provider does not translate <c>ExecuteUpdate</c>. This file covers the read side,
-/// which the in-memory provider is fine for.
+/// Core in-memory brand does not translate <c>ExecuteUpdate</c>. This file covers the read side,
+/// which the in-memory brand is fine for.
 /// </para>
 /// </summary>
 public sealed class UnarchiveVoucherListTests : IDisposable
@@ -34,7 +34,7 @@ public sealed class UnarchiveVoucherListTests : IDisposable
     }
 
     /// <summary>
-    /// The admin list <c>Include</c>s FuelType, so the in-memory provider needs the row to exist -
+    /// The admin list <c>Include</c>s FuelType, so the in-memory brand needs the row to exist -
     /// without it the vouchers silently drop out of the result set.
     /// </summary>
     private void SeedFuelTypes()
@@ -57,10 +57,10 @@ public sealed class UnarchiveVoucherListTests : IDisposable
         _context.FuelVouchers.Add(new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-95",
             Liters = 50m,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             VoucherNumber = $"OKKO-{Guid.NewGuid():N}"[..20],
             QrPayload = Guid.NewGuid().ToString(),

@@ -1,5 +1,5 @@
 using System.Text.Json;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers.BulkActionVouchers;
 using FuelFlow.Features.Vouchers.PurchaseBatchCost;
 using FuelFlow.Features.Vouchers.SharedModels;
@@ -9,11 +9,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Vouchers.Exchange;
 
-/// <summary>The admin-entered cost/liter for one fuel in the new provider batch.</summary>
+/// <summary>The admin-entered cost/liter for one fuel in the new brand batch.</summary>
 public sealed record ExchangeFuelCost(string FuelTypeId, decimal CostPerLiter);
 
 /// <summary>
-/// Records one operator→provider exchange (planning #104): retire the selected OLD stock vouchers,
+/// Records one operator→brand exchange (planning #104): retire the selected OLD stock vouchers,
 /// activate the freshly-imported NEW ones at a cost that bakes in the доплата (so the remaining stock
 /// reprices upward), pair old→new flexibly, and write an audit-grade <c>voucher_exchanges</c> row per
 /// old voucher. No payment, no device signature — <c>Staff</c> policy only.
@@ -54,13 +54,13 @@ public sealed class ConfirmVoucherExchangeCommandHandler
     private readonly ApplicationDbContext _context;
     private readonly BlendedCostRecalculator _recalculator;
     private readonly BulkActionVouchersCommandHandler _bulkAction;
-    private readonly ProviderEventService _eventService;
+    private readonly AuditEventService _eventService;
 
     public ConfirmVoucherExchangeCommandHandler(
         ApplicationDbContext context,
         BlendedCostRecalculator recalculator,
         BulkActionVouchersCommandHandler bulkAction,
-        ProviderEventService eventService)
+        AuditEventService eventService)
     {
         _context = context;
         _recalculator = recalculator;
@@ -130,7 +130,7 @@ public sealed class ConfirmVoucherExchangeCommandHandler
             .Where(v => v.ImportJobId == command.NewImportId
                 && !v.IsDeleted
                 && (v.Status == VoucherStatus.Imported || v.Status == VoucherStatus.VerifiedWithWarnings))
-            .Select(v => new VoucherExchangePairing.Candidate(v.Id, v.Provider, v.FuelTypeId, v.Liters, v.VoucherNumber))
+            .Select(v => new VoucherExchangePairing.Candidate(v.Id, v.Brand, v.FuelTypeId, v.Liters, v.VoucherNumber))
             .ToListAsync(ct);
 
         if (news.Count == 0)
@@ -148,10 +148,10 @@ public sealed class ConfirmVoucherExchangeCommandHandler
         var now = DateTime.UtcNow;
 
 // Pair first: the pairing is what decides which old voucher each new one replaces, and therefore
-        // whose cost carries over to it. Bucketing is by (provider, fuel, liters), so within a pair the two
+        // whose cost carries over to it. Bucketing is by (brand, fuel, liters), so within a pair the two
         // have the same volume and the value transfer is exact.
         var pairing = VoucherExchangePairing.Pair(
-            olds.Select(o => new VoucherExchangePairing.Candidate(o.Id, o.Provider, o.FuelTypeId, o.Liters, o.VoucherNumber)).ToList(),
+            olds.Select(o => new VoucherExchangePairing.Candidate(o.Id, o.Brand, o.FuelTypeId, o.Liters, o.VoucherNumber)).ToList(),
             news);
 
         var oldById = olds.ToDictionary(o => o.Id);
@@ -179,7 +179,7 @@ public sealed class ConfirmVoucherExchangeCommandHandler
             {
                 var old = oldById[oldId];
                 return Fail(
-                    $"No replacement in the PDF matches {old.VoucherNumber} ({old.Provider} {old.FuelTypeId}, " +
+                    $"No replacement in the PDF matches {old.VoucherNumber} ({old.Brand} {old.FuelTypeId}, " +
                     $"{old.Liters:0.##} L). An exchange pairs vouchers of the same fuel and volume 1:1.");
             }
 
@@ -272,7 +272,7 @@ public sealed class ConfirmVoucherExchangeCommandHandler
                 OldVoucherId = oldId,
                 NewVoucherId = newId,
                 FuelTypeId = old.FuelTypeId,
-                Provider = old.Provider,
+                Brand = old.Brand,
                 SurchargeUah = pairSurcharge,
                 CostPerLiterApplied = newId.HasValue
                     ? newCostById.GetValueOrDefault(newId.Value)

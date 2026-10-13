@@ -53,7 +53,7 @@ public sealed class GetReconciliationQueryHandler
         long EarnedMarginKopecks(Order o)
         {
             long sum = 0;
-            foreach (var g in o.LineItems.GroupBy(li => (li.Provider, li.FuelTypeId, li.Liters)))
+            foreach (var g in o.LineItems.GroupBy(li => (li.Brand, li.FuelTypeId, li.Liters)))
             {
                 if (!fpLookup.TryGetValue(g.Key, out var fp) || fp.MarginUahPerLiter is null)
                 {
@@ -61,7 +61,7 @@ public sealed class GetReconciliationQueryHandler
                 }
 
                 var delivered = o.Fulfillments.Count(f => f.Voucher is not null
-                    && string.Equals(f.Voucher.Provider, g.Key.Provider, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(f.Voucher.Brand, g.Key.Brand, StringComparison.OrdinalIgnoreCase)
                     && f.Voucher.FuelTypeId == g.Key.FuelTypeId
                     && f.Voucher.Liters == g.Key.Liters);
 
@@ -84,7 +84,7 @@ public sealed class GetReconciliationQueryHandler
 
         var lowInventoryProviders = await _context.Orders
             .Where(o => o.Status == OrderStatus.PendingFulfillment || o.Status == OrderStatus.PartiallyFulfilled)
-            .SelectMany(o => o.LineItems.Select(li => li.Provider))
+            .SelectMany(o => o.LineItems.Select(li => li.Brand))
             .Distinct()
             .CountAsync(cancellationToken);
 
@@ -127,7 +127,7 @@ public sealed class GetReconciliationQueryHandler
             return new GetReconciliationResponse.ThreeWayMatchItem(
                 o.Id,
                 null,
-                firstLi?.Provider ?? "",
+                firstLi?.Brand ?? "",
                 firstLi?.FuelTypeId ?? "",
                 lineItemsList.Sum(li => li.Liters * li.Quantity),
                 expected,
@@ -153,11 +153,11 @@ public sealed class GetReconciliationQueryHandler
                     "critical", o.CreatedAtUtc));
             else if (o.MatchStatus == "UNFULFILLED")
                 exceptions.Add(new(o.OrderId, "UNFULFILLED",
-                    $"{o.Provider} {o.FuelType} {o.Liters}L×{o.Quantity} — no inventory ({o.DaysSinceCreated}d waiting)",
+                    $"{o.Brand} {o.FuelType} {o.Liters}L×{o.Quantity} — no inventory ({o.DaysSinceCreated}d waiting)",
                     "warning", o.CreatedAtUtc));
             else if (o.MatchStatus == "PARTIAL")
                 exceptions.Add(new(o.OrderId, "PARTIAL",
-                    $"Only {o.VouchersDelivered}/{o.VouchersExpected} vouchers delivered for {o.Provider} {o.FuelType}",
+                    $"Only {o.VouchersDelivered}/{o.VouchersExpected} vouchers delivered for {o.Brand} {o.FuelType}",
                     "warning", o.CreatedAtUtc));
         }
 

@@ -52,7 +52,7 @@ public sealed class GetDashboardQueryHandler
         var profitKopecks = fulfilledOrdersList.Sum(o =>
             o.LineItems.Sum(li =>
             {
-                if (fpLookup.TryGetValue((li.Provider, li.FuelTypeId, li.Liters), out var fp))
+                if (fpLookup.TryGetValue((li.Brand, li.FuelTypeId, li.Liters), out var fp))
                     return (long)((fp.MarginUahPerLiter ?? 0) * (decimal)li.Liters * li.Quantity);
                 return 0L;
             })
@@ -61,7 +61,7 @@ public sealed class GetDashboardQueryHandler
         var revenueUah = profitKopecks;
 
         var byProvider = await _context.FuelVouchers
-            .GroupBy(v => v.Provider)
+            .GroupBy(v => v.Brand)
             .Select(g => new GetDashboardResponse.VouchersByProvider(g.Key, g.Count()))
             .ToListAsync(cancellationToken);
 

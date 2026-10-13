@@ -80,7 +80,7 @@ if (query.From != null)
                 BatchId = g.Key,
                 AtUtc = g.Min(e => e.CreatedAtUtc),
                 SupplierId = g.First().SupplierId,
-                Providers = g.Select(e => e.Provider).Distinct().OrderBy(p => p).ToList(),
+                Providers = g.Select(e => e.Brand).Distinct().OrderBy(p => p).ToList(),
                 FuelTypeIds = g.Select(e => e.FuelTypeId).Distinct().OrderBy(f => f).ToList(),
                 VouchersExchanged = g.Count(),
                 LitersOut = g.Sum(e => _context.FuelVouchers
@@ -193,7 +193,7 @@ public sealed class VoucherExchangeBatchDto
     public int VouchersExchanged { get; set; }
     public decimal LitersOut { get; set; }
 
-    /// <summary>What the provider charged for the whole exchange: the sum of every pair's share.</summary>
+    /// <summary>What the brand charged for the whole exchange: the sum of every pair's share.</summary>
     public decimal SurchargeUah { get; set; }
 
     /// <summary>

@@ -153,10 +153,10 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
     private static FuelVoucher NewVoucher(string number, string qr, string fuelTypeId = "okko-dp") => new()
     {
         Id = Guid.NewGuid(),
-        Provider = "okko",
+        Brand = "okko",
         FuelTypeId = fuelTypeId,
         Liters = 10m,
-        ProviderExpirationDate = new DateOnly(2027, 1, 1),
+        SupplierExpirationDate = new DateOnly(2027, 1, 1),
         CustomerExpirationDate = new DateOnly(2027, 1, 1),
         VoucherNumber = number,
         QrPayload = qr,
@@ -188,7 +188,7 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
             """DELETE FROM fuel_types WHERE id = {0}""", fuelTypeId);
 
         // PostgresException, not DbUpdateException: these three go through ExecuteSqlRaw, which
-        // surfaces the provider exception directly rather than wrapping it the way SaveChanges does.
+        // surfaces the brand exception directly rather than wrapping it the way SaveChanges does.
         await act.Should().ThrowAsync<PostgresException>();
 
         await using var verify = CreateContext();
@@ -400,7 +400,7 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
     }
 
     /// <summary>
-    /// A voucher may not be promised past the provider's own printed term. Zero-litre fuel is
+    /// A voucher may not be promised past the brand's own printed term. Zero-litre fuel is
     /// never a real product either.
     /// </summary>
     [Theory]
@@ -558,7 +558,7 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
 
         var act = () => context.Database.ExecuteSqlRawAsync(
             """
-            INSERT INTO fuel_vouchers (id, provider, fuel_type_id, liters, provider_expiration_date,
+            INSERT INTO fuel_vouchers (id, brand, fuel_type_id, liters, supplier_expiration_date,
                                        customer_expiration_date, voucher_number, qr_payload,
                                        created_at_utc, updated_at_utc, status, is_test_data, is_deleted)
             VALUES ({0}, 'okko', 'okko-dp', 10, '2027-01-01', '2027-01-01', 'bad-status', 'bad-status-qr',
@@ -595,7 +595,7 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
 
         var act = () => context.Database.ExecuteSqlRawAsync(
             """
-            INSERT INTO fuel_vouchers (id, provider, fuel_type_id, liters, provider_expiration_date,
+            INSERT INTO fuel_vouchers (id, brand, fuel_type_id, liters, supplier_expiration_date,
                                        customer_expiration_date, voucher_number, qr_payload,
                                        created_at_utc, updated_at_utc, status, is_test_data, is_deleted)
             VALUES ({0}, 'okko', 'okko-dp', 10, '2027-01-01', '2027-01-01', 'longest-status', 'longest-status-qr',

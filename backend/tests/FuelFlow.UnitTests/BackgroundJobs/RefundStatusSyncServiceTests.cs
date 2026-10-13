@@ -76,12 +76,12 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
     private static FuelVoucher BuildVoucher() => new()
     {
         Id = Guid.NewGuid(),
-        Provider = "okko",
+        Brand = "okko",
         FuelTypeId = "okko-95",
         Liters = 50,
         VoucherNumber = $"V-{Guid.NewGuid():N}",
         QrPayload = "q",
-        ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
+        SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
         CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
         CreatedAtUtc = DateTime.UtcNow,
         UpdatedAtUtc = DateTime.UtcNow

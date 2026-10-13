@@ -4,7 +4,7 @@ using FuelFlow.Features.Auth.SendCode;
 using FuelFlow.Features.Auth.SendCode.Abstractions;
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Auth.Verify;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Persistence;
@@ -105,12 +105,12 @@ public sealed class QaTestAccessTests : IDisposable
 
         return new VerifyCodeCommandHandler(
             _context, tokenServiceMock.Object, IdentityPhone(), jwtOptionsMock.Object,
-            new Mock<ILogger<VerifyCodeCommandHandler>>().Object, new ProviderEventService(_context),
+            new Mock<ILogger<VerifyCodeCommandHandler>>().Object, new AuditEventService(_context),
             qaTestAccess: qa);
     }
 
     private SetQaTestAccessCommandHandler BuildSetQa()
-        => new(_context, new RuntimeSettingsService(_context), new ProviderEventService(_context),
+        => new(_context, new RuntimeSettingsService(_context), new AuditEventService(_context),
             new Mock<ILogger<SetQaTestAccessCommandHandler>>().Object);
 
     private async Task SeedQaUserAsync(bool active = true)
@@ -334,7 +334,7 @@ public sealed class QaTestAccessTests : IDisposable
         result.Enabled.Should().BeTrue();
         (await new RuntimeSettingsService(_context).IsQaTestAccessEnabledAsync()).Should().BeTrue();
 
-        var audit = await _context.Set<ProviderEventOutbox>().SingleAsync(e => e.AggregateType == "QaTestAccess");
+        var audit = await _context.Set<AuditEventOutbox>().SingleAsync(e => e.AggregateType == "QaTestAccess");
         audit.EventType.Should().Be("QaTestAccessEnabled");
         audit.ChangedByUserId.Should().Be(actor);
         audit.NewValue.Should().Contain("true"); // JSON: {"enabled":true,...}
@@ -382,7 +382,7 @@ public sealed class QaTestAccessTests : IDisposable
         (await _context.RefreshTokens.SingleAsync(rt => rt.UserId == qaUser.Id)).IsRevoked.Should().BeTrue();
         (await _context.VerificationCodes.SingleAsync(v => v.PhoneNumber == QaPhone)).IsUsed.Should().BeTrue();
 
-        var audit = await _context.Set<ProviderEventOutbox>().SingleAsync(e => e.EventType == "QaTestAccessDisabled");
+        var audit = await _context.Set<AuditEventOutbox>().SingleAsync(e => e.EventType == "QaTestAccessDisabled");
         audit.OldValue.Should().Contain("true");  // was enabled
         audit.NewValue.Should().Contain("false"); // now disabled
     }
@@ -396,7 +396,7 @@ public sealed class QaTestAccessTests : IDisposable
 
         result.Enabled.Should().BeFalse();
         result.RevokedSessions.Should().Be(0);
-        (await _context.Set<ProviderEventOutbox>().AnyAsync(e => e.AggregateType == "QaTestAccess")).Should().BeFalse();
+        (await _context.Set<AuditEventOutbox>().AnyAsync(e => e.AggregateType == "QaTestAccess")).Should().BeFalse();
     }
 
     [Fact]

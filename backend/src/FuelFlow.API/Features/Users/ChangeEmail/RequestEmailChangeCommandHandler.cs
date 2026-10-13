@@ -1,7 +1,7 @@
 using System.Text.Json;
 using FuelFlow.Features.Auth.EmailChange;
 using FuelFlow.Features.Auth.Verify;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Notifications.Email;
@@ -21,14 +21,14 @@ public sealed class RequestEmailChangeCommandHandler
     private readonly ApplicationDbContext _context;
     private readonly OtpVerificationService _otp;
     private readonly IEmailSender _emailSender;
-    private readonly ProviderEventService _eventService;
+    private readonly AuditEventService _eventService;
     private readonly ILogger<RequestEmailChangeCommandHandler> _logger;
 
     public RequestEmailChangeCommandHandler(
         ApplicationDbContext context,
         OtpVerificationService otp,
         IEmailSender emailSender,
-        ProviderEventService eventService,
+        AuditEventService eventService,
         ILogger<RequestEmailChangeCommandHandler> logger)
     {
         _context = context;

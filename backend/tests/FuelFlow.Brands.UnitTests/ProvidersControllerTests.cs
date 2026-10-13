@@ -1,10 +1,10 @@
 using System.Security.Claims;
 using System.Text.Json;
 using FluentAssertions;
-using FuelFlow.Features.Providers;
-using FuelFlow.Features.Providers.GetProviderById;
-using FuelFlow.Features.Providers.GetProviderHistory;
-using FuelFlow.Features.Providers.GetProviders;
+using FuelFlow.Features.Brands;
+using FuelFlow.Features.Brands.GetProviderById;
+using FuelFlow.Features.Brands.GetProviderHistory;
+using FuelFlow.Features.Brands.GetProviders;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
@@ -18,13 +18,13 @@ using Moq;
 
 namespace FuelFlow.Providers.UnitTests;
 
-public sealed class ProvidersControllerTests : IDisposable
+public sealed class BrandsControllerTests : IDisposable
 {
     private readonly ApplicationDbContext _context;
-    private readonly ProvidersController _controller;
+    private readonly BrandsController _controller;
     private readonly ClaimsPrincipal _user;
 
-    public ProvidersControllerTests()
+    public BrandsControllerTests()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
@@ -46,12 +46,12 @@ public sealed class ProvidersControllerTests : IDisposable
 
     // Builds a controller sharing _context + the admin principal; the dispatcher is swappable so the
     // below-cost tests can assert the loss-leader Telegram alert through a Moq IAlertNotifier.
-    private ProvidersController BuildController(NotificationDispatcher notifications) =>
+    private BrandsController BuildController(NotificationDispatcher notifications) =>
         new(
-            new GetProvidersQueryHandler(_context),
-            new GetProviderByIdQueryHandler(_context),
-            new GetProviderHistoryQueryHandler(_context),
-            new ProviderEventService(_context),
+            new GetBrandsQueryHandler(_context),
+            new GetBrandByIdQueryHandler(_context),
+            new GetBrandHistoryQueryHandler(_context),
+            new AuditEventService(_context),
             _context,
             notifications)
         {
@@ -83,7 +83,7 @@ public sealed class ProvidersControllerTests : IDisposable
             PackageLiters = new List<int> { 10 }
         };
 
-    private static ProviderFuelDto BelowCostUpdate(string id, string name, bool allowBelowCost) =>
+    private static BrandFuelDto BelowCostUpdate(string id, string name, bool allowBelowCost) =>
         new()
         {
             Id = id,
@@ -163,7 +163,7 @@ public sealed class ProvidersControllerTests : IDisposable
             PackageLiters = packageLiters.ToList()
         };
 
-    private static ProviderFuelDto FuelDto(string id, string name, decimal supplier, decimal margin, decimal final) =>
+    private static BrandFuelDto FuelDto(string id, string name, decimal supplier, decimal margin, decimal final) =>
         new()
         {
             Id = id,
@@ -317,7 +317,7 @@ public sealed class ProvidersControllerTests : IDisposable
 
         string Num(decimal d) => d.ToString("F2", System.Globalization.CultureInfo.CurrentCulture);
 
-        var evt = await _context.ProviderEventOutbox.SingleAsync(e => e.AggregateType == "Fuel");
+        var evt = await _context.AuditEventOutbox.SingleAsync(e => e.AggregateType == "Fuel");
         evt.EventType.Should().Be("PriceChanged");
         evt.Summary.Should().Contain($"supplier {Num(49m)} → {Num(100m)}");
         evt.Summary.Should().Contain($"margin {Num(2m)} → {Num(0.5m)}");

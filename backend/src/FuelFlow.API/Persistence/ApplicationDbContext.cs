@@ -68,7 +68,7 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
     public DbSet<LegalEntity> LegalEntities => Set<LegalEntity>();
     public DbSet<CompanyInvitation> CompanyInvitations => Set<CompanyInvitation>();
     public DbSet<CompanyMember> CompanyMembers => Set<CompanyMember>();
-    public DbSet<ProviderEventOutbox> ProviderEventOutbox => Set<ProviderEventOutbox>();
+    public DbSet<AuditEventOutbox> AuditEventOutbox => Set<AuditEventOutbox>();
     public DbSet<SupportMessage> SupportMessages => Set<SupportMessage>();
     public DbSet<ErrorLog> ErrorLogs => Set<ErrorLog>();
     public DbSet<FeedbackMessage> FeedbackMessages => Set<FeedbackMessage>();

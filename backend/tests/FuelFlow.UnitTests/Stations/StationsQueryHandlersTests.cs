@@ -694,7 +694,7 @@ public sealed class StationsQueryHandlersTests : IDisposable
     }
 
     private static FuelVoucher CreateVoucher(
-        string provider,
+        string brand,
         string fuelTypeId,
         decimal liters,
         VoucherStatus status = VoucherStatus.Available,
@@ -705,12 +705,12 @@ public sealed class StationsQueryHandlersTests : IDisposable
         return new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Provider = provider,
+            Brand = brand,
             FuelTypeId = fuelTypeId,
             Liters = liters,
-            ProviderExpirationDate = expiry,
+            SupplierExpirationDate = expiry,
             CustomerExpirationDate = expiry,
-            VoucherNumber = $"{provider}-{Guid.NewGuid().ToString()[..8]}",
+            VoucherNumber = $"{brand}-{Guid.NewGuid().ToString()[..8]}",
             QrPayload = Guid.NewGuid().ToString(),
             Status = status,
             IsTestData = isTestData,

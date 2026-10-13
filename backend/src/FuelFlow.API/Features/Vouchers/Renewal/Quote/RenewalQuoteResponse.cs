@@ -32,7 +32,7 @@ public sealed class RenewalVoucherQuote
     /// <summary><c>extend</c> (still valid) or <c>replace</c> (lapsed); null when not eligible.</summary>
     public string? Branch { get; set; }
 
-    public string Provider { get; set; } = string.Empty;
+    public string Brand { get; set; } = string.Empty;
     public string FuelTypeId { get; set; } = string.Empty;
     public string FuelName { get; set; } = string.Empty;
     public decimal Liters { get; set; }

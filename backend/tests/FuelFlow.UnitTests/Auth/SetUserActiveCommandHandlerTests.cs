@@ -1,6 +1,6 @@
 using FluentAssertions;
 using FuelFlow.Features.Auth.AdminUser.SetUserActive;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -35,7 +35,7 @@ public sealed class SetUserActiveCommandHandlerTests
         result.Forbidden.Should().BeTrue();
         target.IsActive.Should().BeTrue();
         target.TokenVersion.Should().Be(7);
-        (await context.Set<ProviderEventOutbox>().CountAsync()).Should().Be(0);
+        (await context.Set<AuditEventOutbox>().CountAsync()).Should().Be(0);
     }
 
     [Theory]
@@ -62,13 +62,13 @@ public sealed class SetUserActiveCommandHandlerTests
         result.Success.Should().BeTrue();
         target.IsActive.Should().Be(activate);
         target.TokenVersion.Should().Be(7);
-        var audit = await context.Set<ProviderEventOutbox>().SingleAsync();
+        var audit = await context.Set<AuditEventOutbox>().SingleAsync();
         audit.EventType.Should().Be(activate ? "UserActivated" : "UserDeactivated");
         audit.ChangedByUserId.Should().Be(command.ActingUserId);
 
         // Repeating the same request is idempotent, including the audit trail.
         (await handler.HandleAsync(command, CancellationToken.None)).Success.Should().BeTrue();
-        (await context.Set<ProviderEventOutbox>().CountAsync()).Should().Be(1);
+        (await context.Set<AuditEventOutbox>().CountAsync()).Should().Be(1);
     }
 
     [Fact]
@@ -122,7 +122,7 @@ public sealed class SetUserActiveCommandHandlerTests
             .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking).Options);
 
     private static SetUserActiveCommandHandler CreateHandler(ApplicationDbContext context) => new(
-        context, NullLogger<SetUserActiveCommandHandler>.Instance, new ProviderEventService(context));
+        context, NullLogger<SetUserActiveCommandHandler>.Instance, new AuditEventService(context));
 
     private static async Task<User> AddUserAsync(ApplicationDbContext context, string roleName)
     {

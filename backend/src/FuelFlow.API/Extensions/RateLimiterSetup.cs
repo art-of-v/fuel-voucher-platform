@@ -26,7 +26,7 @@ internal static class RateLimiterSetup
     internal const string TelegramFeedbackWebhookPolicy = "telegram-feedback-webhook";
 
     /// <summary>Ceiling applied to every request, per client IP, per minute. Generous enough that
-    /// no legitimate client or provider callback approaches it; low enough that a single host
+    /// no legitimate client or brand callback approaches it; low enough that a single host
     /// cannot sit on the unattributed endpoints (webhook, PDF import, all of admin) all day.</summary>
     internal const int GlobalPerIpPermitLimit = 300;
 

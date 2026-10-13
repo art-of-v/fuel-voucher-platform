@@ -16,7 +16,7 @@ public sealed record GetDashboardResponse(
         int VerifiedWithWarnings,
         IReadOnlyList<VouchersByProvider> ByProvider);
 
-    public sealed record VouchersByProvider(string Provider, int Count);
+    public sealed record VouchersByProvider(string Brand, int Count);
 
     public sealed record OrdersStats(
         int Total,

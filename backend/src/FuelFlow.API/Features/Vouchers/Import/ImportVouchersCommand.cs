@@ -73,7 +73,7 @@ public sealed class ImportVouchersCommandHandler
     /// Renders a QR payload as a non-reversible fingerprint for logs and stored error rows.
     /// <para>
     /// The payload is the bearer instrument: whoever holds it can have the voucher redeemed at
-    /// the pump, and FuelFlow cannot revoke it because redemption happens on the provider's side.
+    /// the pump, and FuelFlow cannot revoke it because redemption happens on the brand's side.
     /// Writing it into <c>voucher_import_errors</c> and into the log stream copies redeemable
     /// material into two stores with a wider audience and a longer retention than the voucher
     /// table itself. Length plus a short digest is enough for an operator to tell two failing
@@ -139,7 +139,7 @@ public sealed class ImportVouchersCommandHandler
         }
         var supplierId = supplier.Id;
 
-        // Per-provider tally for the imported-vouchers metric. Provider is a small,
+        // Per-brand tally for the imported-vouchers metric. Brand is a small,
         // bounded set, unlike the file name, so it is safe as a metric label.
         var importedVouchersByProvider = new Dictionary<string, int>();
 
@@ -286,9 +286,9 @@ public sealed class ImportVouchersCommandHandler
                         }
 
                         // Hard integrity check: the brand printed on the paper and the fuel it sells must
-                        // agree. `provider` is the brand and `fuel_types.station_id` is the same fact, so a
+                        // agree. `brand` is the brand and `fuel_types.station_id` is the same fact, so a
                         // mismatch means one of the two was mis-read — and it would otherwise be stored as
-                        // truth, because `provider` is free text with nothing in the schema to contradict
+                        // truth, because `brand` is free text with nothing in the schema to contradict
                         // it. Such a voucher matches nothing on renewal (the two fields are compared
                         // together) and no fuel-type pricing describes it, so it silently drops out of the
                         // business rather than being visibly wrong.
@@ -296,9 +296,9 @@ public sealed class ImportVouchersCommandHandler
                         // A fuel type with no row at all is left alone: that is an unresolved SKU, already
                         // reported above, and the foreign key is what catches it.
                         if (brandByFuelType.TryGetValue(parsed.FuelTypeId!, out var fuelBrand) &&
-                            !BrandFuelPairing.IsConsistent(parsed.Provider, fuelBrand))
+                            !BrandFuelPairing.IsConsistent(parsed.Brand, fuelBrand))
                         {
-                            var errMsg = $"Brand '{parsed.Provider}' does not sell fuel '{parsed.FuelTypeId}', " +
+                            var errMsg = $"Brand '{parsed.Brand}' does not sell fuel '{parsed.FuelTypeId}', " +
                                          $"which belongs to brand '{fuelBrand}'. The paper says one brand and " +
                                          "the fuel type says another; re-scan or pick the correct fuel type.";
                             _logger.LogWarning("Page {PageNumber}: {ErrorMessage}", page.PageNumber, errMsg);
@@ -398,14 +398,14 @@ public sealed class ImportVouchersCommandHandler
                         var voucher = new FuelVoucher
                         {
                             Id = Guid.CreateVersion7(),
-                            Provider = parsed.Provider,
+                            Brand = parsed.Brand,
                             FuelTypeId = parsed.FuelTypeId!,
                             Liters = parsed.Liters,
                             // The date printed on the supplier's document is the real term. It is
                             // both columns at import: nothing has been sold yet, so the customer is
                             // getting the whole thing. Shortening happens later, at fulfilment, when
                             // a term is actually chosen - never here, and never past this date.
-                            ProviderExpirationDate = parsed.ExpirationDate,
+                            SupplierExpirationDate = parsed.ExpirationDate,
                             CustomerExpirationDate = parsed.ExpirationDate,
                             VoucherNumber = parsed.VoucherNumber,
                             QrPayload = parsed.QrPayload,
@@ -468,8 +468,8 @@ public sealed class ImportVouchersCommandHandler
                         addedPayloads.Add(voucher.QrPayload);
                         import.ImportedCount++;
 
-                        importedVouchersByProvider[voucher.Provider] =
-                            importedVouchersByProvider.GetValueOrDefault(voucher.Provider) + 1;
+                        importedVouchersByProvider[voucher.Brand] =
+                            importedVouchersByProvider.GetValueOrDefault(voucher.Brand) + 1;
 
                         _logger.LogInformation("QR Decode Success: Decoded QR code for Voucher {VoucherNumber}.", parsed.VoucherNumber);
                     }
@@ -506,7 +506,7 @@ public sealed class ImportVouchersCommandHandler
 
         if (import.ImportedCount > 0)
         {
-            // Tagged by provider rather than file name: file names are unbounded and
+            // Tagged by brand rather than file name: file names are unbounded and
             // would create a new Prometheus time series per upload.
             foreach (var group in importedVouchersByProvider)
             {

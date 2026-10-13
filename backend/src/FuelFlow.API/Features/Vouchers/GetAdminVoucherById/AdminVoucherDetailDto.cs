@@ -7,7 +7,7 @@ public sealed class AdminVoucherDetailDto
     public decimal Liters { get; set; }
     public string FuelTypeId { get; set; } = null!;
     public FuelTypeRefDto? FuelType { get; set; }
-    public string Provider { get; set; } = null!;
+    public string Brand { get; set; } = null!;
 
     /// <summary>
     /// The same two facts the list row carries (#227): who we bought this voucher from, and what
@@ -22,9 +22,9 @@ public sealed class AdminVoucherDetailDto
     public decimal? CostPerLiter { get; set; }
 
     /// <summary>Real supplier term, from the printed document. Never moves after import.</summary>
-    public DateOnly ProviderExpirationDate { get; set; }
+    public DateOnly SupplierExpirationDate { get; set; }
 
-    /// <summary>What the customer was sold; differs from the provider term only once we sell short terms.</summary>
+    /// <summary>What the customer was sold; differs from the brand term only once we sell short terms.</summary>
     public DateOnly CustomerExpirationDate { get; set; }
 
     public string VoucherNumber { get; set; } = null!;

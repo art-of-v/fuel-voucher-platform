@@ -179,7 +179,7 @@ public sealed class CreateCheckoutCommandHandler
         {
             Id = Guid.CreateVersion7(),
             OrderId = order.Id,
-            Provider = command.StationId!,
+            Brand = command.StationId!,
             FuelTypeId = command.FuelTypeId,
             Liters = command.Liters,
             Quantity = command.Quantity,
@@ -222,7 +222,7 @@ public sealed class CreateCheckoutCommandHandler
                 MerchantPaymentInfo = $"FuelFlow Order {order.Id}",
                 Destination = "╨ƒ╨░╨╗╨╕╨▓╨╛",
                 Items = MonobankBasketBuilder.Build(order.LineItems.Select(li => (
-                    li.Provider, li.FuelTypeId,
+                    li.Brand, li.FuelTypeId,
                     fuelNames.GetValueOrDefault(li.FuelTypeId),
                     li.Liters, li.Quantity, li.UnitPrice, li.LineTotal))),
                 RedirectUrl = _monobankOptions.RedirectUrl,

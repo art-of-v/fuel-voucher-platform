@@ -1,6 +1,6 @@
 using FuelFlow.SharedKernel.Domain;
 
-namespace FuelFlow.Features.Providers;
+namespace FuelFlow.Features.Brands;
 
 /// <summary>
 /// Builds a fuel's pricing card from its packages. Shared by <c>/providers</c> and
@@ -8,7 +8,7 @@ namespace FuelFlow.Features.Providers;
 /// </summary>
 /// <remarks>
 /// A card has one row per fuel but a fuel has one package per nominal, and the write path
-/// (<c>ProvidersController.UpdateFuel</c>) writes the same six figures to <em>every</em> package of
+/// (<c>BrandsController.UpdateFuel</c>) writes the same six figures to <em>every</em> package of
 /// the fuel. So the card's job is to report one canonical row — and, when the packages disagree, to
 /// say so, because a save from this screen will silently flatten them to whatever is shown.
 ///
@@ -17,7 +17,7 @@ namespace FuelFlow.Features.Providers;
 /// one fuel that meant the card could show a price that exists nowhere the customer can buy — and
 /// the number could change between two identical page loads.
 /// </remarks>
-internal static class ProviderFuelCard
+internal static class BrandFuelCard
 {
     /// <summary>
     /// Cost per litre, weighted by the litres each package actually sells. This is the figure the
@@ -42,7 +42,7 @@ var litres = weighted.Sum(p => p.Liters);
     /// <summary>
     /// The nominal the remaining per-package figures are read from: the smallest one, ties broken by
     /// id. Deterministic, and the nominal an operator reads the card as ("what does a litre of this
-    /// cost") is the smallest one. When packages disagree, <see cref="ProviderFuelDto.PriceSpread"/>
+    /// cost") is the smallest one. When packages disagree, <see cref="BrandFuelDto.PriceSpread"/>
     /// is what makes that visible.
     /// </summary>
     private static FuelPackage? Reference(IReadOnlyList<FuelPackage> packages) =>
@@ -51,7 +51,7 @@ var litres = weighted.Sum(p => p.Liters);
             .ThenBy(p => p.Id, StringComparer.Ordinal)
             .FirstOrDefault();
 
-    public static ProviderFuelDto Build(FuelTypeEntity fuel, IReadOnlyList<FuelPackage> packages)
+    public static BrandFuelDto Build(FuelTypeEntity fuel, IReadOnlyList<FuelPackage> packages)
     {
         var reference = Reference(packages);
 
@@ -64,7 +64,7 @@ var litres = weighted.Sum(p => p.Liters);
             .Select(p => p.FinalPricePerLiter!.Value)
             .ToList();
 
-        return new ProviderFuelDto
+        return new BrandFuelDto
         {
             Id = fuel.Id,
             Name = fuel.Name,
@@ -95,14 +95,14 @@ var litres = weighted.Sum(p => p.Liters);
     /// when they do not, covering the two figures that decide sellability: what we paid, and what
     /// the customer pays.
     /// </summary>
-    private static ProviderFuelPriceSpreadDto? BuildSpread(List<decimal> supplierCosts, List<decimal> finals)
+    private static BrandFuelPriceSpreadDto? BuildSpread(List<decimal> supplierCosts, List<decimal> finals)
     {
         var costsDisagree = supplierCosts.Count > 1 && supplierCosts.Min() != supplierCosts.Max();
         var finalsDisagree = finals.Count > 1 && finals.Min() != finals.Max();
 
         if (!costsDisagree && !finalsDisagree) return null;
 
-        return new ProviderFuelPriceSpreadDto
+        return new BrandFuelPriceSpreadDto
         {
             MinSupplierPricePerLiter = supplierCosts.Count > 0 ? supplierCosts.Min() : 0m,
             MaxSupplierPricePerLiter = supplierCosts.Count > 0 ? supplierCosts.Max() : 0m,

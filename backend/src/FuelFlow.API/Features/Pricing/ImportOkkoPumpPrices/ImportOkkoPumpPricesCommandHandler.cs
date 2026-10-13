@@ -1,5 +1,5 @@
 using System.Text.Json;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
@@ -30,7 +30,7 @@ public sealed record SyncOkkoPumpPricesCommand(
 /// canonical category (<see cref="OkkoFuelClassifier"/>) matches a scraped row, it writes the
 /// sheet's price into <see cref="FuelPackage.PumpPricePerLiter"/> on every package and reprices
 /// <c>FinalPricePerLiter</c>/<c>OriginalPrice</c> plus the fuel-type headline — exactly mirroring
-/// the pump path of <c>ProvidersController.UpdateFuel</c>.
+/// the pump path of <c>BrandsController.UpdateFuel</c>.
 /// <para>
 /// A pump change is NOT a cost event, so the supplier cost (<c>SupplierPricePerLiter</c>) is held
 /// constant — only the ceiling moves. Writing the pump turns on the struck "до" price and the
@@ -54,9 +54,9 @@ public sealed class ImportOkkoPumpPricesCommandHandler
     private const string OkkoStationId = "okko";
 
     private readonly ApplicationDbContext _context;
-    private readonly ProviderEventService _events;
+    private readonly AuditEventService _events;
 
-    public ImportOkkoPumpPricesCommandHandler(ApplicationDbContext context, ProviderEventService events)
+    public ImportOkkoPumpPricesCommandHandler(ApplicationDbContext context, AuditEventService events)
     {
         _context = context;
         _events = events;
@@ -146,7 +146,7 @@ public sealed class ImportOkkoPumpPricesCommandHandler
             // make every sale of this fuel below cost — and checkout then refuses to sell it at all
             // (BelowCostSaleBlockedException), so the fuel becomes unbuyable until a human intervenes.
             // The manual path refuses the same write unless the fuel is opted in via AllowBelowCost
-            // (ProvidersController.UpdateFuel); the automatic path must behave identically, or a
+            // (BrandsController.UpdateFuel); the automatic path must behave identically, or a
             // third party's price move could take a fuel off sale unattended.
             if (!ft.AllowBelowCost && FuelPricing.IsBelowCost(cost, profit, pump, minDiscount))
             {
@@ -217,7 +217,7 @@ public sealed class ImportOkkoPumpPricesCommandHandler
     /// <summary>
     /// Writes one <c>PumpPriceImported</c> audit row per fuel whose pump actually moved, mirroring the
     /// operator path's <c>PriceChanged</c> trail — so a price drop on the public site shows up in the
-    /// provider history with the import, not just with whoever last typed a number.
+    /// brand history with the import, not just with whoever last typed a number.
     /// </summary>
     private async Task RecordEventsAsync(
         IReadOnlyList<OkkoPumpApplied> applied,

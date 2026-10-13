@@ -3,7 +3,7 @@ using System.Text.Json;
 using FluentAssertions;
 using FuelFlow.Features.ErrorLogs;
 using FuelFlow.Features.ErrorLogs.Logging;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.AspNetCore.Mvc;
@@ -90,7 +90,7 @@ public sealed class ErrorLogTraceIntegrationTests : IClassFixture<TestDatabaseFi
         }
 
         await using var context = CreateContext();
-        var controller = new ErrorLogsController(context, new ProviderEventService(context));
+        var controller = new ErrorLogsController(context, new AuditEventService(context));
 
         var incident = await ReadItemsAsync(controller.GetAll(traceId: traceId));
 
@@ -118,8 +118,8 @@ public sealed class ErrorLogTraceIntegrationTests : IClassFixture<TestDatabaseFi
     };
 
     /// <summary>
-    /// Drives the real sink against the container: the provider resolves its
-    /// <see cref="NpgsqlDataSource"/> from the services it is handed, so a bare provider is enough.
+    /// Drives the real sink against the container: the brand resolves its
+    /// <see cref="NpgsqlDataSource"/> from the services it is handed, so a bare brand is enough.
     /// </summary>
     private async Task WriteLogsAsync(Action<ILogger> act)
     {
@@ -127,11 +127,11 @@ public sealed class ErrorLogTraceIntegrationTests : IClassFixture<TestDatabaseFi
 
         await using var dataSource = new NpgsqlDataSourceBuilder(_fixture.ConnectionString).Build();
         var services = new ServiceCollection().AddSingleton(dataSource).BuildServiceProvider();
-        var provider = new DatabaseLoggerProvider(services);
+        var brand = new DatabaseLoggerProvider(services);
 
-        act(provider.CreateLogger("FuelFlow.Middleware.GlobalExceptionHandler"));
+        act(brand.CreateLogger("FuelFlow.Middleware.GlobalExceptionHandler"));
 
-        // Wait for the writer task rather than disposing the provider to flush it: Dispose
+        // Wait for the writer task rather than disposing the brand to flush it: Dispose
         // cancels the channel reader, which discards whatever is still queued.
         for (var attempt = 0; attempt < 50 && await CountRowsAsync() <= before; attempt++)
         {

@@ -1,6 +1,6 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
@@ -22,9 +22,9 @@ namespace FuelFlow.Features.Vouchers.Suppliers;
 public sealed class SuppliersController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
-    private readonly ProviderEventService _events;
+    private readonly AuditEventService _events;
 
-    public SuppliersController(ApplicationDbContext context, ProviderEventService events)
+    public SuppliersController(ApplicationDbContext context, AuditEventService events)
     {
         _context = context;
         _events = events;
@@ -248,7 +248,7 @@ public sealed class SuppliersController : ControllerBase
         var actorName = User.FindFirst("first_name")?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
 
         // old_value/new_value are jsonb, not text: an unserialised string here is a 22P02 at SaveChanges,
-        // and it fails in production only - the in-memory provider does not parse jsonb.
+        // and it fails in production only - the in-memory brand does not parse jsonb.
         var snapshot = JsonSerializer.Serialize(new
         {
             supplier.Id,

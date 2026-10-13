@@ -17,7 +17,7 @@ namespace FuelFlow.IntegrationTests;
 /// <para>
 /// These live in the integration suite rather than the unit suite deliberately: the fix is an
 /// <c>ExecuteUpdateAsync</c> whose WHERE clause carries the status predicate, and the EF Core
-/// in-memory provider neither translates <c>ExecuteUpdate</c> nor models row locking.
+/// in-memory brand neither translates <c>ExecuteUpdate</c> nor models row locking.
 /// </para>
 /// </summary>
 [Collection("Integration Tests")]
@@ -144,10 +144,10 @@ public sealed class RestoreVoucherIntegrationTests : IClassFixture<TestDatabaseF
         seed.FuelVouchers.Add(new FuelVoucher
         {
             Id = voucherId,
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-95",
             Liters = 50m,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             VoucherNumber = $"OKKO-{voucherId:N}"[..20],
             QrPayload = $"payload-{voucherId:N}",

@@ -13,11 +13,11 @@ import { apiRequest } from "@/lib/api-client";
 import { toast } from "sonner";
 import { ExchangeHistory } from "@/components/ExchangeHistory";
 
-// --- API shapes (operator→provider stock exchange, #104) --------------------------------------
+// --- API shapes (operator→brand stock exchange, #104) --------------------------------------
 interface AttentionItem {
   id: string;
   voucherNumber: string;
-  provider: string;
+  brand: string;
   fuelTypeId: string;
   fuelName: string | null;
   liters: number;
@@ -28,7 +28,7 @@ interface AttentionItem {
 interface AttentionResponse {
   data: AttentionItem[];
   thresholdDays: number;
-  providers: string[];
+  brands: string[];
   fuels: string[];
 }
 interface ImportResponse {
@@ -43,7 +43,7 @@ interface ImportResponse {
 interface CostFuel {
   fuelTypeId: string;
   fuelName: string | null;
-  provider: string;
+  brand: string;
   newCount: number;
   newLiters: number;
   oldBlendedCostPerLiter: number | null;
@@ -86,7 +86,7 @@ export default function VoucherExchangeTab() {
 
   // Step 1 — old-stock selection
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [providerFilter, setProviderFilter] = useState("");
+  const [brandFilter, setBrandFilter] = useState("");
   const [fuelFilter, setFuelFilter] = useState("");
   const [numberQuery, setNumberQuery] = useState("");
 
@@ -112,11 +112,11 @@ export default function VoucherExchangeTab() {
   const numberQ = numberQuery.trim().toLowerCase();
   const filtered = items.filter(
     (i) =>
-      (!providerFilter || i.provider === providerFilter) &&
+      (!brandFilter || i.brand === brandFilter) &&
       (!fuelFilter || i.fuelName === fuelFilter) &&
       (!numberQ || i.voucherNumber.toLowerCase().includes(numberQ)),
   );
-  const filtersActive = !!(providerFilter || fuelFilter || numberQ);
+  const filtersActive = !!(brandFilter || fuelFilter || numberQ);
 
   const { data: costContext, isLoading: costLoading } = useQuery<CostContext>({
     queryKey: ["/api/admin/voucher-exchange/cost-context", importId],
@@ -223,7 +223,7 @@ export default function VoucherExchangeTab() {
   const resetAll = () => {
     setStep(1);
     setSelected(new Set());
-    setProviderFilter("");
+    setBrandFilter("");
     setFuelFilter("");
     setNumberQuery("");
     setImportId(null);
@@ -321,11 +321,11 @@ export default function VoucherExchangeTab() {
                   className="h-8 w-56 pl-9"
                 />
               </div>
-              <Select value={providerFilter || "__all__"} onValueChange={(v) => setProviderFilter(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-8 w-44"><SelectValue placeholder={t("voucherExchange.allProviders")} /></SelectTrigger>
+              <Select value={brandFilter || "__all__"} onValueChange={(v) => setBrandFilter(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="h-8 w-44"><SelectValue placeholder={t("voucherExchange.allBrands")} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">{t("voucherExchange.allProviders")}</SelectItem>
-                  {(attention?.providers ?? []).map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                  <SelectItem value="__all__">{t("voucherExchange.allBrands")}</SelectItem>
+                  {(attention?.brands ?? []).map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
                 </SelectContent>
               </Select>
               <Select value={fuelFilter || "__all__"} onValueChange={(v) => setFuelFilter(v === "__all__" ? "" : v)}>
@@ -357,7 +357,7 @@ export default function VoucherExchangeTab() {
                   <tr>
                     <th className="w-10 p-3"></th>
                     <th className="text-left p-3 whitespace-nowrap">{t("voucherExchange.col.voucher")}</th>
-                    <th className="text-left p-3 whitespace-nowrap">{t("voucherExchange.col.provider")}</th>
+                    <th className="text-left p-3 whitespace-nowrap">{t("voucherExchange.col.brand")}</th>
                     <th className="text-left p-3 whitespace-nowrap">{t("voucherExchange.col.fuel")}</th>
                     <th className="text-right p-3 whitespace-nowrap">{t("voucherExchange.col.liters")}</th>
                     <th className="text-right p-3 whitespace-nowrap">{t("voucherExchange.col.expiry")}</th>
@@ -370,7 +370,7 @@ export default function VoucherExchangeTab() {
                         <input type="checkbox" checked={selected.has(i.id)} onChange={() => toggle(i.id)} onClick={(e) => e.stopPropagation()} className="accent-primary" />
                       </td>
                       <td className="p-3 font-mono text-xs">{i.voucherNumber}</td>
-                      <td className="p-3 text-muted-foreground">{i.provider}</td>
+                      <td className="p-3 text-muted-foreground">{i.brand}</td>
                       <td className="p-3 text-muted-foreground">{i.fuelName ?? i.fuelTypeId}</td>
                       <td className="p-3 text-right tabular-nums">{i.liters}</td>
                       <td className="p-3 text-right whitespace-nowrap"><div className="flex items-center justify-end gap-2"><span className="text-xs text-muted-foreground tabular-nums">{i.expirationDate}</span>{badge(i)}</div></td>
@@ -387,7 +387,7 @@ export default function VoucherExchangeTab() {
         </div>
       )}
 
-      {/* STEP 2 — import the new provider PDF */}
+      {/* STEP 2 — import the new brand PDF */}
       {step === 2 && (
         <div className="space-y-3">
           <div className="bg-card border border-border rounded-xl p-4 space-y-3">
@@ -463,7 +463,7 @@ export default function VoucherExchangeTab() {
                   <tbody>
                     {(costContext?.fuels ?? []).map((f) => (
                       <tr key={f.fuelTypeId} className="border-t border-border">
-                        <td className="p-3">{f.fuelName ?? f.fuelTypeId} <span className="text-xs text-muted-foreground">({f.provider})</span></td>
+                        <td className="p-3">{f.fuelName ?? f.fuelTypeId} <span className="text-xs text-muted-foreground">({f.brand})</span></td>
                         <td className="p-3 text-right tabular-nums">{f.newCount}</td>
                         <td className="p-3 text-right tabular-nums">{f.newLiters}</td>
                         <td className="p-3 text-right tabular-nums text-muted-foreground">{f.oldBlendedCostPerLiter != null ? f.oldBlendedCostPerLiter.toFixed(4) : "—"}</td>
@@ -488,7 +488,7 @@ export default function VoucherExchangeTab() {
               </div>
           </div>
 
-          {/* Pre-confirm summary (aggregate — exact 1:1 pairing within provider/fuel/liters is computed on confirm) */}
+          {/* Pre-confirm summary (aggregate — exact 1:1 pairing within brand/fuel/liters is computed on confirm) */}
           <div className="bg-muted border border-border rounded-xl p-4 text-sm flex gap-6 flex-wrap">
             <span>{t("voucherExchange.confirm.oldSelected", String(selected.size))}</span>
             <span>{t("voucherExchange.confirm.newImported", String(importResult?.imported ?? 0))}</span>

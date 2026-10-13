@@ -9,9 +9,9 @@ namespace FuelFlow.Features.Pricing;
 /// <summary>
 /// Bulk-imports OKKO's published pump prices (колонка) into the OKKO catalog.
 /// <para>
-/// Separate from <c>ProvidersController</c> because the write is brand-scoped and machine-fed: the
+/// Separate from <c>BrandsController</c> because the write is brand-scoped and machine-fed: the
 /// body is the CSV emitted by <c>scripts/fetch-okko-prices.mjs</c>, not a typed-out
-/// <c>ProviderFuelDto</c>. Posting with <c>dryRun=true</c> returns the preview without touching the
+/// <c>BrandFuelDto</c>. Posting with <c>dryRun=true</c> returns the preview without touching the
 /// catalog, so the operator can confirm the scraper read the site correctly before committing.
 /// </para>
 /// <para>
@@ -19,7 +19,7 @@ namespace FuelFlow.Features.Pricing;
 /// </para>
 /// </summary>
 [ApiController]
-[Route("api/admin/providers/okko/pump-prices")]
+[Route("api/admin/brands/okko/pump-prices")]
 [Authorize(Policy = "Staff")]
 public sealed class AdminOkkoPumpPriceController : ControllerBase
 {

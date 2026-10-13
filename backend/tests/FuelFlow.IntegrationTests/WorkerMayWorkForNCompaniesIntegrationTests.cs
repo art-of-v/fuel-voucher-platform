@@ -14,7 +14,7 @@ namespace FuelFlow.IntegrationTests;
 /// <c>UNIQUE(legal_entity_id, worker_user_id)</c>.
 /// <para>
 /// These live in the integration suite rather than the unit suite because the thing being changed is
-/// a <b>unique index</b>, and the EF Core in-memory provider enforces no indexes at all. A unit test
+/// a <b>unique index</b>, and the EF Core in-memory brand enforces no indexes at all. A unit test
 /// would happily insert two rows that production Postgres rejects.
 /// </para>
 /// </summary>

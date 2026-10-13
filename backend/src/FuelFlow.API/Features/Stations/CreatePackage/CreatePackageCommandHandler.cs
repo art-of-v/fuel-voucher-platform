@@ -21,7 +21,7 @@ public sealed class CreatePackageCommandHandler
             return new CreatePackageResult { Conflict = true, Error = $"Package with id '{command.Package.Id}' already exists" };
 
         // One supplier price per fuel. Every other write path copies the cost off an existing package
-        // (ProvidersController seeds, prices and station creation), so this endpoint is the only place
+        // (BrandsController seeds, prices and station creation), so this endpoint is the only place
         // where a package can arrive carrying a cost of its own — and that is how a 0.01 L test
         // package at 5.00/L ended up beside 100.00/L packages, after which the fuel card reported it
         // healthy while the below-cost guard refused to sell the real fuel at all.

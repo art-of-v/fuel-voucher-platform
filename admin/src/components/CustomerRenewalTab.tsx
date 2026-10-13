@@ -18,7 +18,7 @@ import DateInput from "@/components/DateInput";
 interface RenewableVoucher {
   id: string;
   voucherNumber: string;
-  provider: string;
+  brand: string;
   fuelTypeId: string;
   fuelName: string | null;
   liters: number;
@@ -86,7 +86,7 @@ export default function CustomerRenewalTab() {
 
   const [queryInput, setQueryInput] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
-  const [providerFilter, setProviderFilter] = useState("");
+  const [brandFilter, setBrandFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
 
   const [selected, setSelected] = useState<RenewableVoucher | null>(null);
@@ -117,11 +117,11 @@ export default function CustomerRenewalTab() {
   const tiers = config?.tiers ?? [];
 
   const { data: vouchers = [], isLoading, isFetching } = useQuery<RenewableVoucher[]>({
-    queryKey: ["/api/admin/voucher-renewal/vouchers", debouncedQuery, providerFilter, statusFilter],
+    queryKey: ["/api/admin/voucher-renewal/vouchers", debouncedQuery, brandFilter, statusFilter],
     queryFn: () => {
       const params = new URLSearchParams();
       if (debouncedQuery) params.set("query", debouncedQuery);
-      if (providerFilter) params.set("provider", providerFilter);
+      if (brandFilter) params.set("brand", brandFilter);
       if (statusFilter) params.set("status", statusFilter);
       const qs = params.toString();
       return apiRequest<unknown, RenewableVoucher[]>(
@@ -129,8 +129,8 @@ export default function CustomerRenewalTab() {
     },
   });
 
-  const providerOptions = useMemo(
-    () => Array.from(new Set(vouchers.map((v) => v.provider))).sort(),
+  const brandOptions = useMemo(
+    () => Array.from(new Set(vouchers.map((v) => v.brand))).sort(),
     [vouchers],
   );
 
@@ -146,7 +146,7 @@ const RENEWAL_ERROR_KEYS: Record<string, string> = {
   not_customer_voucher: "customerRenewal.error.notCustomerVoucher",
   invalid_surcharge: "customerRenewal.error.invalidSurcharge",
   unknown_term: "customerRenewal.error.unknownTerm",
-  provider_term_exhausted: "customerRenewal.error.providerTermExhausted",
+  brand_term_exhausted: "customerRenewal.error.brandTermExhausted",
   not_found: "customerRenewal.error.notFound",
 };
 
@@ -283,11 +283,11 @@ const RENEWAL_ERROR_PARAMS: Record<string, (error: ApiError) => { key: string; p
             className="pl-9"
           />
         </div>
-        <Select value={providerFilter || "__all__"} onValueChange={(v) => setProviderFilter(v === "__all__" ? "" : v)}>
-          <SelectTrigger className="h-9 w-40"><SelectValue placeholder={t("customerRenewal.allProviders")} /></SelectTrigger>
+        <Select value={brandFilter || "__all__"} onValueChange={(v) => setBrandFilter(v === "__all__" ? "" : v)}>
+          <SelectTrigger className="h-9 w-40"><SelectValue placeholder={t("customerRenewal.allBrands")} /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="__all__">{t("customerRenewal.allProviders")}</SelectItem>
-            {providerOptions.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+            <SelectItem value="__all__">{t("customerRenewal.allBrands")}</SelectItem>
+            {brandOptions.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={statusFilter || "__all__"} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>
@@ -335,7 +335,7 @@ const RENEWAL_ERROR_PARAMS: Record<string, (error: ApiError) => { key: string; p
                     >
                       <td className="px-3 py-2 font-mono text-xs">{v.voucherNumber}</td>
                       <td className="px-3 py-2">{v.ownerName ?? "—"}</td>
-                      <td className="px-3 py-2">{v.fuelName ?? v.fuelTypeId} · {v.provider}</td>
+                      <td className="px-3 py-2">{v.fuelName ?? v.fuelTypeId} · {v.brand}</td>
                       <td className="px-3 py-2 text-right">{v.liters}</td>
                       <td className="px-3 py-2 font-mono text-xs">
                         {formatDate(v.expirationDate)}

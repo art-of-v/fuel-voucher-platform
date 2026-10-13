@@ -21,7 +21,7 @@ namespace FuelFlow.IntegrationTests;
 /// Epic #103 S3b real-Postgres coverage for the owner block/unblock toggle on a worker-held voucher
 /// (<see cref="BlockWorkerVoucherCommandHandler"/> / <see cref="UnblockWorkerVoucherCommandHandler"/>).
 /// These live in the integration suite because the state transition is an atomic
-/// <c>ExecuteUpdateAsync</c> whose WHERE repeats the status predicate — the InMemory provider neither
+/// <c>ExecuteUpdateAsync</c> whose WHERE repeats the status predicate — the InMemory brand neither
 /// translates <c>ExecuteUpdate</c> nor models the row locking the block-vs-redeem race depends on.
 /// The pure ownership/scoping/state guards are unit-tested in
 /// <c>FuelFlow.UnitTests.Company.CompanyVoucherBlockingTests</c>.
@@ -256,10 +256,10 @@ public sealed class CompanyVoucherBlockingIntegrationTests : IClassFixture<TestD
         => new()
         {
             Id = id,
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-95",
             Liters = 50m,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             VoucherNumber = $"OKKO-{id:N}"[..20],
             QrPayload = $"payload-{id:N}",

@@ -52,7 +52,7 @@ public sealed class GetSavingsReportQueryHandlerTests : IDisposable
         {
             Id = Guid.NewGuid(),
             OrderId = order.Id,
-            Provider = "okko",
+            Brand = "okko",
             FuelTypeId = "okko-dp",
             Liters = liters,
             Quantity = quantity,
@@ -70,10 +70,10 @@ public sealed class GetSavingsReportQueryHandlerTests : IDisposable
         _context.FuelVouchers.Add(new FuelVoucher
         {
             Id = voucherId,
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-dp",
             Liters = liters,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             VoucherNumber = $"V-{Guid.NewGuid().ToString()[..8]}",
             QrPayload = Guid.NewGuid().ToString(),

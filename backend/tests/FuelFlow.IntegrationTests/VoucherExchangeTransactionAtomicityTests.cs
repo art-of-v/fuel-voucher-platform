@@ -2,7 +2,7 @@ using FluentAssertions;
 using Hangfire;
 using Moq;
 using FuelFlow.Features.Orders.SharedModels;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.BulkActionVouchers;
 using FuelFlow.Features.Vouchers.Exchange;
@@ -82,7 +82,7 @@ public sealed class VoucherExchangeTransactionAtomicityTests : IClassFixture<Tes
 
         using (var ctx = CreateContext(interceptor))
         {
-            var eventService = new ProviderEventService(ctx);
+            var eventService = new AuditEventService(ctx);
             var handler = new ConfirmVoucherExchangeCommandHandler(
                 ctx,
                 new BlendedCostRecalculator(ctx),
@@ -194,10 +194,10 @@ public sealed class VoucherExchangeTransactionAtomicityTests : IClassFixture<Tes
         => new()
         {
             Id = id,
-            Provider = "okko",
+            Brand = "okko",
             FuelTypeId = "okko-95",
             Liters = 50m,
-            ProviderExpirationDate = expiry,
+            SupplierExpirationDate = expiry,
             CustomerExpirationDate = expiry,
             VoucherNumber = $"VX-{id:N}"[..16],
             QrPayload = $"qr-{id:N}",

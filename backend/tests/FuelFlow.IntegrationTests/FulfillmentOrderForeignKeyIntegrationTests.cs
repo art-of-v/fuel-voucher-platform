@@ -18,7 +18,7 @@ namespace FuelFlow.IntegrationTests;
 ///
 /// The constraint is added by migration rather than by the model, because EF scaffolds this
 /// relationship onto a second shadow column instead of the existing <c>order_id</c>. So the behaviour
-/// is pinned against real Postgres here: an InMemory provider enforces no foreign keys at all and
+/// is pinned against real Postgres here: an InMemory brand enforces no foreign keys at all and
 /// would pass regardless.
 /// </summary>
 [Collection("Integration Tests")]
@@ -100,10 +100,10 @@ public sealed class FulfillmentOrderForeignKeyIntegrationTests : IClassFixture<T
         => new()
         {
             Id = id,
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-95",
             Liters = 10m,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(7)),
             VoucherNumber = $"fk-test-{id:N}",
             QrPayload = $"fk-qr-{id:N}",

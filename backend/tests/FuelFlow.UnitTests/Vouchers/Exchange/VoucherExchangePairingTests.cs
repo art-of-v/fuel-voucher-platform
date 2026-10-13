@@ -5,11 +5,11 @@ namespace FuelFlow.UnitTests.Vouchers.Exchange;
 
 public sealed class VoucherExchangePairingTests
 {
-    private static VoucherExchangePairing.Candidate Old(string number, string provider = "okko", string fuel = "okko-a95", decimal liters = 50m)
-        => new(Guid.NewGuid(), provider, fuel, liters, number);
+    private static VoucherExchangePairing.Candidate Old(string number, string brand = "okko", string fuel = "okko-a95", decimal liters = 50m)
+        => new(Guid.NewGuid(), brand, fuel, liters, number);
 
-    private static VoucherExchangePairing.Candidate New(string number, string provider = "okko", string fuel = "okko-a95", decimal liters = 50m)
-        => new(Guid.NewGuid(), provider, fuel, liters, number);
+    private static VoucherExchangePairing.Candidate New(string number, string brand = "okko", string fuel = "okko-a95", decimal liters = 50m)
+        => new(Guid.NewGuid(), brand, fuel, liters, number);
 
     [Fact]
     public void Pair_EqualCountsSameBucket_PairsAllOneToOne()
@@ -74,7 +74,7 @@ public sealed class VoucherExchangePairingTests
     [Fact]
     public void Pair_DifferentBuckets_DoNotCrossPair()
     {
-        // Same provider, different fuel → different bucket; same fuel, different liters → different bucket.
+        // Same brand, different fuel → different bucket; same fuel, different liters → different bucket.
         var oldA95 = Old("O-1", fuel: "okko-a95", liters: 50m);
         var oldDp = Old("O-2", fuel: "okko-dp", liters: 50m);
         var newA95Diff = New("N-1", fuel: "okko-a95", liters: 40m); // different liters
@@ -93,8 +93,8 @@ public sealed class VoucherExchangePairingTests
     [Fact]
     public void Pair_ProviderBucketingIsCaseInsensitive()
     {
-        var old = Old("O-1", provider: "OKKO");
-        var fresh = New("N-1", provider: "okko");
+        var old = Old("O-1", brand: "OKKO");
+        var fresh = New("N-1", brand: "okko");
 
         var result = VoucherExchangePairing.Pair(new[] { old }, new[] { fresh });
 

@@ -4,14 +4,14 @@ namespace FuelFlow.Features.Vouchers.Import;
 /// Whether the brand printed on a voucher agrees with the brand the fuel it claims belongs to.
 /// </summary>
 /// <remarks>
-/// <c>provider</c> and <c>fuel_types.station_id</c> are the same fact written twice — the brand on the
+/// <c>brand</c> and <c>fuel_types.station_id</c> are the same fact written twice — the brand on the
 /// paper and the brand in the catalog — and only one of them is constrained. A voucher whose two copies
 /// disagree is invisible in practice rather than visibly wrong: renewal matching compares both fields
 /// together, so it finds no replacement, and fuel-type pricing is keyed by the catalog brand, so nothing
 /// prices it correctly. It just stops being sellable with no error anywhere.
 /// <para>
 /// The comparison is case-insensitive and whitespace-tolerant because the brand is read off paper in caps
-/// ("OKKO") while the catalog stores it lower ("okko") — every other provider comparison in the codebase
+/// ("OKKO") while the catalog stores it lower ("okko") — every other brand comparison in the codebase
 /// already folds case for that reason.
 /// </para>
 /// </remarks>

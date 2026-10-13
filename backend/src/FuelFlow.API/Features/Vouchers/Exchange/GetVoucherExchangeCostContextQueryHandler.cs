@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 namespace FuelFlow.Features.Vouchers.Exchange;
 
 /// <summary>
-/// Given a freshly-imported voucher batch (the new provider PDF), returns per-fuel context the admin
+/// Given a freshly-imported voucher batch (the new brand PDF), returns per-fuel context the admin
 /// UI needs to pre-fill the cost/liter for the exchange: the current blended cost of the EXISTING
 /// stock for that fuel (the "old" cost — the new import carries no batch cost yet, so it is excluded
 /// from the blend), the total new liters, and any cost already entered for this import. The UI
@@ -34,7 +34,7 @@ public sealed class GetVoucherExchangeCostContextQueryHandler
             .Select(v => new
             {
                 v.FuelTypeId,
-                v.Provider,
+                v.Brand,
                 v.Liters,
                 FuelName = v.FuelType != null ? v.FuelType.Name : null
             })
@@ -59,7 +59,7 @@ public sealed class GetVoucherExchangeCostContextQueryHandler
             {
                 FuelTypeId = group.Key,
                 FuelName = group.Select(g => g.FuelName).FirstOrDefault(n => n != null),
-                Provider = group.Select(g => g.Provider).First(),
+                Brand = group.Select(g => g.Brand).First(),
                 NewCount = group.Count(),
                 NewLiters = group.Sum(g => g.Liters),
                 OldBlendedCostPerLiter = blended,
@@ -87,7 +87,7 @@ public sealed class VoucherExchangeCostContextFuel
 {
     public string FuelTypeId { get; set; } = string.Empty;
     public string? FuelName { get; set; }
-    public string Provider { get; set; } = string.Empty;
+    public string Brand { get; set; } = string.Empty;
     public int NewCount { get; set; }
     public decimal NewLiters { get; set; }
 

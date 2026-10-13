@@ -1,6 +1,6 @@
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.Features.Auth.SharedModels;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
@@ -48,7 +48,7 @@ public sealed class VerifyCodeCommandHandler
     private readonly IPhoneNumberService _phoneNumberService;
     private readonly JwtOptions _jwtOptions;
     private readonly ILogger<VerifyCodeCommandHandler> _logger;
-    private readonly ProviderEventService _eventService;
+    private readonly AuditEventService _eventService;
     private readonly NotificationDispatcher? _notifications;
     private readonly IConnectionMultiplexer? _redis;
     private readonly QaTestAccess.QaTestAccessService? _qaTestAccess;
@@ -60,7 +60,7 @@ public sealed class VerifyCodeCommandHandler
         IPhoneNumberService phoneNumberService,
         IOptions<JwtOptions> jwtOptions,
         ILogger<VerifyCodeCommandHandler> logger,
-        ProviderEventService eventService,
+        AuditEventService eventService,
         IConnectionMultiplexer? redis = null,
         NotificationDispatcher? notifications = null,
         QaTestAccess.QaTestAccessService? qaTestAccess = null,

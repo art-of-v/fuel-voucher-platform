@@ -1,5 +1,5 @@
 using FuelFlow.Features.Auth.SharedModels;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -12,12 +12,12 @@ public sealed class SetUserBannedCommandHandler
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<SetUserBannedCommandHandler> _logger;
-    private readonly ProviderEventService _eventService;
+    private readonly AuditEventService _eventService;
 
     public SetUserBannedCommandHandler(
         ApplicationDbContext context,
         ILogger<SetUserBannedCommandHandler> logger,
-        ProviderEventService eventService)
+        AuditEventService eventService)
     {
         _context = context;
         _logger = logger;

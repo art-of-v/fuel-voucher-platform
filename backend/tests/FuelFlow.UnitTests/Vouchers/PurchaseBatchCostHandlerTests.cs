@@ -1,5 +1,5 @@
 using FluentAssertions;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.PurchaseBatchCost;
 using FuelFlow.Features.Vouchers.SharedModels;
@@ -23,7 +23,7 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
 
     private readonly ApplicationDbContext _context;
     private readonly BlendedCostRecalculator _recalculator;
-    private readonly ProviderEventService _eventService;
+    private readonly AuditEventService _eventService;
     private readonly SetBatchCostCommandHandler _setHandler;
     private readonly GetImportBatchCostsQueryHandler _getHandler;
 
@@ -50,7 +50,7 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         _context.SaveChanges();
 
         _recalculator = new BlendedCostRecalculator(_context);
-        _eventService = new ProviderEventService(_context);
+        _eventService = new AuditEventService(_context);
         _setHandler = new SetBatchCostCommandHandler(_context, _recalculator, _eventService, NotificationDispatcher.Disabled);
         _getHandler = new GetImportBatchCostsQueryHandler(_context, _recalculator);
     }
@@ -82,15 +82,15 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         return id;
     }
 
-    private void SeedVoucher(Guid importId, string fuelTypeId, decimal liters, VoucherStatus status = VoucherStatus.Imported, string provider = "OKKO", decimal? costPerLiter = null, Guid? supplierId = null)
+    private void SeedVoucher(Guid importId, string fuelTypeId, decimal liters, VoucherStatus status = VoucherStatus.Imported, string brand = "OKKO", decimal? costPerLiter = null, Guid? supplierId = null)
     {
         _context.FuelVouchers.Add(new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Provider = provider,
+            Brand = brand,
             FuelTypeId = fuelTypeId,
             Liters = liters,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             VoucherNumber = $"V-{Guid.NewGuid().ToString()[..8]}",
             QrPayload = Guid.NewGuid().ToString(),
@@ -109,10 +109,10 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         _context.FuelVouchers.Add(new FuelVoucher
         {
             Id = id,
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = fuelTypeId,
             Liters = liters,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             VoucherNumber = $"V-{id.ToString()[..8]}",
             QrPayload = Guid.NewGuid().ToString(),
@@ -155,7 +155,7 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         var batch = await _context.PurchaseBatches.SingleAsync();
         batch.ImportJobId.Should().Be(import);
         batch.FuelTypeId.Should().Be("okko-dp");
-        batch.Provider.Should().Be("OKKO");
+        batch.Brand.Should().Be("OKKO");
         batch.SupplierId.Should().Be(SupplierId);   // one PDF = one supplier's delivery
         batch.EnteredByUserId.Should().Be(AdminId);
 
@@ -177,7 +177,7 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         fuel.DiscountPrice.Should().Be(27);   // final/L rounded
         fuel.BasePrice.Should().Be(27);       // pump null ⇒ final + minDiscount(0)
 
-        _context.ProviderEventOutbox.Should().ContainSingle(e => e.EventType == "BatchCostEntered");
+        _context.AuditEventOutbox.Should().ContainSingle(e => e.EventType == "BatchCostEntered");
     }
 
     [Fact]
@@ -405,7 +405,7 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         var row = rows.Should().ContainSingle().Subject;
         row.FuelTypeId.Should().Be("okko-dp");
         row.FuelTypeName.Should().Be("ДП ЄВРО");
-        row.Provider.Should().Be("OKKO");
+        row.Brand.Should().Be("OKKO");
         row.VoucherCount.Should().Be(2);
         row.TotalLiters.Should().Be(150m);
         row.CostPerLiter.Should().Be(25m);

@@ -25,11 +25,11 @@ public sealed class GetImportBatchVouchersQueryHandler
             .Select(v => new ImportBatchVoucherDto
             {
                 Id = v.Id,
-                Provider = v.Provider,
+                Brand = v.Brand,
                 FuelTypeId = v.FuelTypeId,
                 FuelTypeName = v.FuelType != null ? v.FuelType.Name : null,
                 Liters = v.Liters,
-                ProviderExpirationDate = v.ProviderExpirationDate,
+                SupplierExpirationDate = v.SupplierExpirationDate,
                 CustomerExpirationDate = v.CustomerExpirationDate,
                 VoucherNumber = v.VoucherNumber,
                 Status = v.Status.ToString(),

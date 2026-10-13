@@ -195,9 +195,9 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
 
         var voucher = await db.FuelVouchers.FirstOrDefaultAsync(v => v.VoucherNumber == "99999600000020368126");
         voucher.Should().NotBeNull();
-        voucher!.Provider.Should().Be("OKKO");
+        voucher!.Brand.Should().Be("OKKO");
         voucher.Liters.Should().Be(20m);
-        voucher.ProviderExpirationDate.Should().Be(new DateOnly(2025, 6, 17));
+        voucher.SupplierExpirationDate.Should().Be(new DateOnly(2025, 6, 17));
         voucher.QrPayload.Should().Be("9018$2000$;99999600000020368126=4507101299?");
 
         var importRecord = await db.VoucherImports.FindAsync(result.ImportId);
@@ -340,10 +340,10 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
 
         var voucher = await db.FuelVouchers.FirstOrDefaultAsync(v => v.VoucherNumber == voucherNum);
         voucher.Should().NotBeNull();
-        voucher!.Provider.Should().Be("WOG");
+        voucher!.Brand.Should().Be("WOG");
         voucher.FuelTypeId.Should().Be("wog-95-euro");
         voucher.Liters.Should().Be(20m);
-        voucher.ProviderExpirationDate.Should().Be(new DateOnly(2026, 2, 9));
+        voucher.SupplierExpirationDate.Should().Be(new DateOnly(2026, 2, 9));
     }
 
     [Fact]
@@ -392,14 +392,14 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
         (await db.FuelVouchers.AnyAsync(v => v.VoucherNumber == voucherNum)).Should().BeFalse();
     }
 
-    private static byte[] GenerateVoucherPdf(string provider, string fuel, decimal liters, string date, string number)
+    private static byte[] GenerateVoucherPdf(string brand, string fuel, decimal liters, string date, string number)
     {
         var builder = new UglyToad.PdfPig.Writer.PdfDocumentBuilder();
         var page = builder.AddPage(PageSize.A4);
         var font = builder.AddStandard14Font(Standard14Font.Helvetica);
 
         // Position words closely to form a single cluster mimicking a voucher at (50, 100) region
-        page.AddText(provider, 10, new PdfPoint(50, 100), font);
+        page.AddText(brand, 10, new PdfPoint(50, 100), font);
         page.AddText(fuel, 10, new PdfPoint(60, 80), font);
         page.AddText($"{liters} l", 10, new PdfPoint(70, 60), font);
         page.AddText($"Valid until {date}", 10, new PdfPoint(70, 40), font);

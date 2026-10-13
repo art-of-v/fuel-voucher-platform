@@ -3,14 +3,14 @@ using FuelFlow.SharedKernel.Domain;
 namespace FuelFlow.Features.Vouchers.Exchange;
 
 /// <summary>
-/// One row per OLD stock voucher retired in an operator→provider exchange (planning #104). When the
-/// operator renews our own lapsing stock with the provider off-platform (no Monobank, no in-app
+/// One row per OLD stock voucher retired in an operator→brand exchange (planning #104). When the
+/// operator renews our own lapsing stock with the brand off-platform (no Monobank, no in-app
 /// charge), the admin app records the exchange: which old stock voucher was replaced by which new
 /// one, the доплата paid, and the cost/liter applied to the new batch.
 ///
 /// A single confirm action retires N old vouchers and activates M new ones; every old voucher in that
 /// action shares one <see cref="ExchangeBatchId"/>. Pairing is flexible (1:1 within the same
-/// provider/fuel/liters bucket): a paired old voucher stores the new voucher it was replaced by in
+/// brand/fuel/liters bucket): a paired old voucher stores the new voucher it was replaced by in
 /// <see cref="NewVoucherId"/>; an unpaired old voucher simply expires with a null
 /// <see cref="NewVoucherId"/>. Unpaired NEW vouchers just enter stock and get no row here.
 ///
@@ -37,11 +37,11 @@ public sealed class VoucherExchange
     /// <summary>Fuel of the retired voucher (and of its paired replacement — same bucket).</summary>
     public string FuelTypeId { get; set; } = string.Empty;
 
-    /// <summary>Provider of the retired voucher (okko/wog/…), denormalized for audit.</summary>
-    public string Provider { get; set; } = string.Empty;
+    /// <summary>Brand of the retired voucher (okko/wog/…), denormalized for audit.</summary>
+    public string Brand { get; set; } = string.Empty;
 
     /// <summary>
-    /// This row's OWN share of the batch surcharge - the provider charge spread pro-rata over this
+    /// This row's OWN share of the batch surcharge - the brand charge spread pro-rata over this
     /// pair's liters (see ConfirmVoucherExchangeCommandHandler), NOT the batch total repeated.
     ///
     /// Do not read one row and call it the batch charge: a four-voucher exchange would report a

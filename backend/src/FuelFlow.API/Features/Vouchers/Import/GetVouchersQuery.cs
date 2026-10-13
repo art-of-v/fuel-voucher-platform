@@ -12,7 +12,7 @@ public sealed record GetVouchersQuery(int Page = 1, int PageSize = 50, string? F
 /// </summary>
 public sealed record VoucherDto(
     Guid Id,
-    string Provider,
+    string Brand,
     string FuelTypeId,
     string FuelTypeName,
     decimal Liters,
@@ -65,11 +65,11 @@ public sealed class GetVouchersQueryHandler
 
         var dtoList = vouchers.Select(v => new VoucherDto(
             v.Id,
-            v.Provider,
+            v.Brand,
             v.FuelTypeId,
             v.FuelType?.Name ?? v.FuelTypeId,
             v.Liters,
-            v.ProviderExpirationDate,
+            v.SupplierExpirationDate,
             v.VoucherNumber,
             // Must match the route on VouchersController ([Route("api/voucher-catalog")] +
             // [HttpGet("{id:guid}/qr")]). This emitted /api/Vouchers/{id}/qr, which is a

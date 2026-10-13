@@ -2,7 +2,7 @@ using FluentAssertions;
 using FuelFlow.API.BackgroundJobs;
 using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Vouchers;
@@ -40,7 +40,7 @@ public sealed class FulfillmentReconciliationGraceTests : IDisposable
         var refundHandler = new RefundOrderCommandHandler(
             _context,
             new StubMonobankClientFactory(monobankClientMock.Object),
-            new ProviderEventService(_context));
+            new AuditEventService(_context));
 
         _service = new FulfillmentService(
             _context,
@@ -72,7 +72,7 @@ public sealed class FulfillmentReconciliationGraceTests : IDisposable
                 new OrderLineItem
                 {
                     Id = Guid.NewGuid(),
-                    Provider = "OKKO",
+                    Brand = "OKKO",
                     FuelTypeId = "okko-95",
                     Liters = 10m,
                     Quantity = 1,
@@ -89,13 +89,13 @@ public sealed class FulfillmentReconciliationGraceTests : IDisposable
             var voucher = new FuelVoucher
             {
                 Id = Guid.NewGuid(),
-                Provider = "OKKO",
+                Brand = "OKKO",
                 FuelTypeId = "okko-95",
                 Liters = 10m,
                 VoucherNumber = $"V-GRACE-{i}",
                 QrPayload = Guid.NewGuid().ToString(),
                 Status = VoucherStatus.Assigned,
-                ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
+                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
                 CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
                 OrderId = order.Id,
                 AssignedToUserId = userId,

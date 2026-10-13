@@ -8,7 +8,7 @@ namespace FuelFlow.SharedKernel.Domain;
 /// <remarks>
 /// A row exists <b>only once the cost has been entered</b> — the absence of a batch row for an
 /// (ImportJobId, FuelTypeId) pair means "no cost yet", which the activation gate refuses to sell.
-/// <see cref="Provider"/> is the brand, denormalized for reporting; <see cref="SupplierId"/> is the company
+/// <see cref="Brand"/> is the brand, denormalized for reporting; <see cref="SupplierId"/> is the company
 /// the stock was actually bought from.
 /// </remarks>
 public sealed class PurchaseBatch
@@ -18,10 +18,10 @@ public sealed class PurchaseBatch
     public string FuelTypeId { get; set; } = null!;
 
     /// <summary>Supplier station id (e.g. "okko"), denormalized from the batch's vouchers for reporting.</summary>
-    public string Provider { get; set; } = null!;
+    public string Brand { get; set; } = null!;
 
     /// <summary>
-    /// The company this stock was bought from. Unlike <see cref="Provider"/> (the brand) this is the party we
+    /// The company this stock was bought from. Unlike <see cref="Brand"/> (the brand) this is the party we
     /// settle with and hand vouchers back to.
     /// </summary>
     public Guid SupplierId { get; set; }

@@ -1,6 +1,6 @@
-namespace FuelFlow.Features.Providers;
+namespace FuelFlow.Features.Brands;
 
-public sealed record ProviderDto
+public sealed record BrandDto
 {
     public string Id { get; init; } = null!;
     public string Name { get; init; } = null!;
@@ -10,11 +10,11 @@ public sealed record ProviderDto
     /// <summary>Display priority in the mobile app; lower = higher. 999 = end of the list.</summary>
     public int SortOrder { get; init; } = 999;
 
-    public List<ProviderFuelDto> Fuels { get; init; } = [];
+    public List<BrandFuelDto> Fuels { get; init; } = [];
     public List<int> Nominals { get; init; } = [];
 }
 
-public sealed record ProviderFuelDto
+public sealed record BrandFuelDto
 {
     public string Id { get; init; } = null!;
     public string Name { get; init; } = null!;
@@ -64,11 +64,11 @@ public sealed record ProviderFuelDto
     /// flatten real per-nominal data, and the operator should know that before saving rather than
     /// after. Null in the ordinary case, where every package agrees.
     /// </summary>
-    public ProviderFuelPriceSpreadDto? PriceSpread { get; init; }
+    public BrandFuelPriceSpreadDto? PriceSpread { get; init; }
 }
 
 /// <summary>What the packages of one fuel actually disagree about, when they disagree.</summary>
-public sealed record ProviderFuelPriceSpreadDto
+public sealed record BrandFuelPriceSpreadDto
 {
     public decimal MinSupplierPricePerLiter { get; init; }
     public decimal MaxSupplierPricePerLiter { get; init; }
@@ -94,12 +94,12 @@ public sealed record CreateFuelRequest
 
     /// <summary>
     /// Rehearsal flag, propagated to every package created for this fuel. Read back on
-    /// <see cref="ProviderFuelDto.IsTestData"/> so the screen can show what it set.
+    /// <see cref="BrandFuelDto.IsTestData"/> so the screen can show what it set.
     /// </summary>
     public bool IsTestData { get; init; }
 }
 
-public sealed record ProviderEventDto
+public sealed record AuditEventDto
 {
     public Guid Id { get; init; }
     public string AggregateType { get; init; } = null!;

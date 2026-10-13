@@ -45,7 +45,7 @@ public sealed class GetUserVouchersCommandHandler
             var qrImage = GenerateQrImage(v);
             return new VoucherDto(
                 v.Id,
-                v.Provider,
+                v.Brand,
                 v.FuelTypeId,
                 v.Liters,
                 v.Liters,

@@ -8,7 +8,7 @@ namespace FuelFlow.Features.Vouchers;
 public class FuelVoucher
 {
     public Guid Id { get; set; }
-    public string Provider { get; set; } = null!;
+    public string Brand { get; set; } = null!;
     public string FuelTypeId { get; set; } = null!;
     public FuelTypeEntity? FuelType { get; set; }
     public decimal Liters { get; set; }
@@ -19,11 +19,11 @@ public class FuelVoucher
     /// and how far a customer's renewal may extend. Set once at import and never moved afterwards -
     /// a supplier voucher cannot be extended by us.
     /// </summary>
-    public DateOnly ProviderExpirationDate { get; set; }
+    public DateOnly SupplierExpirationDate { get; set; }
 
     /// <summary>
     /// What the customer was actually sold, and the date their wallet shows. Normally equal to
-    /// <see cref="ProviderExpirationDate"/>; it is a separate column because we sell short terms -
+    /// <see cref="SupplierExpirationDate"/>; it is a separate column because we sell short terms -
     /// a voucher with three months of real life may be sold with one week, and only this date moves
     /// when the customer pays to extend it.
     /// </summary>
@@ -69,7 +69,7 @@ public class FuelVoucher
     public DateTime UpdatedAtUtc { get; set; }
 
     /// <summary>
-    /// Who issued THIS voucher. Distinct from <see cref="Provider"/>, which is the brand: the same brand is
+    /// Who issued THIS voucher. Distinct from <see cref="Brand"/>, which is the brand: the same brand is
     /// bought from several suppliers, and an exchange goes back to the supplier the voucher came from, so the
     /// link cannot be derived from the brand.
     /// </summary>

@@ -5,7 +5,7 @@ using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.Features.Orders.GetUserPurchases;
 using FuelFlow.Features.Orders.SharedModels;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Vouchers;
@@ -170,7 +170,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         var stock = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == stockId);
         stock.Status.Should().Be(VoucherStatus.Assigned);
         stock.AssignedToUserId.Should().Be(userId);
-        stock.ProviderExpirationDate.Should().Be(today.AddMonths(6), "the supplier term stays as printed");
+        stock.SupplierExpirationDate.Should().Be(today.AddMonths(6), "the supplier term stays as printed");
         // The customer is promised what they paid for ON TOP of what they still held, and the stock was
         // chosen to reach at least that date ΓÇö so this never needs clamping to the paper term.
         stock.CustomerExpirationDate.Should().Be(sourceExpiry.AddMonths(1),
@@ -231,7 +231,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         var source = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == sourceId);
         source.CustomerExpirationDate.Should().Be(sourceExpiry,
             "the customer date must not move past the supplier's real term");
-        source.ProviderExpirationDate.Should().Be(providerExpiry, "the supplier term is immutable");
+        source.SupplierExpirationDate.Should().Be(providerExpiry, "the supplier term is immutable");
         source.Status.Should().Be(VoucherStatus.Assigned);
 
         // The line stays unfulfilled so the per-minute backfill retries it once stock exists, and the
@@ -249,7 +249,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
 
     /// <summary>
     /// The happy path of the ceiling: a term that lands exactly on the supplier's real term is allowed,
-    /// and the provider date itself is never touched by an extension.
+    /// and the brand date itself is never touched by an extension.
     /// </summary>
     [Fact]
     public async Task ExtendBranch_ExtendingExactlyToTheSupplierTermIsAllowed()
@@ -293,7 +293,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
 
         var source = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == sourceId);
         source.CustomerExpirationDate.Should().Be(providerExpiry, "the extension lands exactly on the ceiling");
-        source.ProviderExpirationDate.Should().Be(providerExpiry, "the supplier term never moves");
+        source.SupplierExpirationDate.Should().Be(providerExpiry, "the supplier term never moves");
         source.Status.Should().Be(VoucherStatus.Assigned);
 
         var order = await verify.Orders.AsNoTracking().FirstAsync(o => o.Id == orderId);
@@ -579,7 +579,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             var v = await afterFirst.FuelVouchers.AsNoTracking().FirstAsync(x => x.Id == sourceId);
             v.Status.Should().Be(VoucherStatus.Assigned, "extend keeps the same voucher");
             v.CustomerExpirationDate.Should().Be(boughtFor.AddDays(7), "1 week on top of the week already held");
-            v.ProviderExpirationDate.Should().Be(providerTerm, "the paper term is never touched");
+            v.SupplierExpirationDate.Should().Be(providerTerm, "the paper term is never touched");
         }
 
         using (var ctx = CreateContext())
@@ -593,7 +593,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         final.Status.Should().Be(VoucherStatus.Assigned);
         final.AssignedToUserId.Should().Be(userId);
         final.QrPayload.Should().Be($"qr-{sourceId:N}", "still the same code ΓÇö no new voucher, no new QR");
-        final.ProviderExpirationDate.Should().Be(providerTerm);
+        final.SupplierExpirationDate.Should().Be(providerTerm);
         final.CustomerExpirationDate.Should().Be(boughtFor.AddDays(7).AddMonths(2),
             "2 months on top of the previous step, not on top of today");
 
@@ -645,7 +645,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             SeedUser(seed, userId);
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
 
-            // Customer term == provider term: no room to grow, so the branch is Replace.
+            // Customer term == brand term: no room to grow, so the branch is Replace.
             seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", 50m,
                 sourceExpiry, providerExpiry: sourceExpiry));
             seed.FuelVouchers.Add(StockVoucher(twoMonthsId, "OKKO", "okko-95", 50m, today.AddMonths(2)));
@@ -682,7 +682,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         issued.Status.Should().Be(VoucherStatus.Assigned);
         issued.CustomerExpirationDate.Should().Be(promise,
             "the customer is given what they paid for on top of what they still held ΓÇö the rest is reserve");
-        issued.ProviderExpirationDate.Should().Be(today.AddMonths(3), "the paper term itself is untouched");
+        issued.SupplierExpirationDate.Should().Be(today.AddMonths(3), "the paper term itself is untouched");
 
         item.PreviousCustomerExpiration.Should().Be(sourceExpiry);
         item.NewCustomerExpiration.Should().Be(promise);
@@ -833,7 +833,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
                     {
                         Id = Guid.NewGuid(),
                         OrderId = secondOrderId,
-                        Provider = "OKKO",
+                        Brand = "OKKO",
                         FuelTypeId = "okko-95",
                         Liters = 50m,
                         Quantity = 1,
@@ -1016,7 +1016,7 @@ var exchangedId = Guid.NewGuid();
                 ExchangeBatchId = Guid.NewGuid(),
                 OldVoucherId = exchangedId,
                 FuelTypeId = "okko-95",
-                Provider = "OKKO",
+                Brand = "OKKO",
                 SupplierId = supplierId,
                 SurchargeUah = 0m,
                 ActingUserId = Guid.NewGuid(),
@@ -1129,7 +1129,7 @@ var exchangedId = Guid.NewGuid();
         => new(
             ctx,
             NullLogger<FulfillmentService>.Instance,
-            new RefundOrderCommandHandler(ctx, new StubMonobankClientFactory(monobankClient), new ProviderEventService(ctx)),
+            new RefundOrderCommandHandler(ctx, new StubMonobankClientFactory(monobankClient), new AuditEventService(ctx)),
             new RuntimeSettingsService(ctx),
             NotificationDispatcher.Disabled,
             new ConfigurationBuilder().Build());
@@ -1299,14 +1299,14 @@ var exchangedId = Guid.NewGuid();
         released.CostPerLiter.Should().Be(sourceCost, "the lapsed voucher went back to the pool at its purchase price");
     }
 
-    private static FuelVoucher SourceVoucher(Guid id, Guid userId, Guid orderId, string provider, string fuelTypeId, decimal liters, DateOnly expiry, DateOnly? providerExpiry = null)
+    private static FuelVoucher SourceVoucher(Guid id, Guid userId, Guid orderId, string brand, string fuelTypeId, decimal liters, DateOnly expiry, DateOnly? providerExpiry = null)
         => new()
         {
             Id = id,
-            Provider = provider,
+            Brand = brand,
             FuelTypeId = fuelTypeId,
             Liters = liters,
-            ProviderExpirationDate = providerExpiry ?? expiry.AddYears(1),
+            SupplierExpirationDate = providerExpiry ?? expiry.AddYears(1),
             CustomerExpirationDate = expiry,
             VoucherNumber = $"SRC-{id:N}"[..16],
             QrPayload = $"qr-{id:N}",
@@ -1317,14 +1317,14 @@ var exchangedId = Guid.NewGuid();
             UpdatedAtUtc = DateTime.UtcNow
         };
 
-    private static FuelVoucher StockVoucher(Guid id, string provider, string fuelTypeId, decimal liters, DateOnly expiry)
+    private static FuelVoucher StockVoucher(Guid id, string brand, string fuelTypeId, decimal liters, DateOnly expiry)
         => new()
         {
             Id = id,
-            Provider = provider,
+            Brand = brand,
             FuelTypeId = fuelTypeId,
             Liters = liters,
-            ProviderExpirationDate = expiry,
+            SupplierExpirationDate = expiry,
             CustomerExpirationDate = expiry,
             VoucherNumber = $"STK-{id:N}"[..16],
             QrPayload = $"qr-{id:N}",
@@ -1338,7 +1338,7 @@ var exchangedId = Guid.NewGuid();
         Guid userId,
         int price,
         string? monobankInvoiceId,
-        params (string Provider, string FuelTypeId, decimal Liters, int Amount)[] lines)
+        params (string Brand, string FuelTypeId, decimal Liters, int Amount)[] lines)
     {
         var order = new Order
         {
@@ -1349,7 +1349,7 @@ var exchangedId = Guid.NewGuid();
             MonobankInvoiceId = monobankInvoiceId,
             // Paid. PendingFulfillment is only ever reached by a `success` webhook, and that
             // handler records MonobankStatus=Success. Stated explicitly because refundable
-            // value is now gated on the provider having confirmed the payment - without it an
+            // value is now gated on the brand having confirmed the payment - without it an
             // auto-refund silently becomes a no-op and the test passes for the wrong reason.
             MonobankStatus = MonobankStatus.Success,
             CreatedAtUtc = DateTime.UtcNow.AddMinutes(-5),
@@ -1357,13 +1357,13 @@ var exchangedId = Guid.NewGuid();
             LineItems = new List<OrderLineItem>()
         };
 
-        foreach (var (provider, fuelTypeId, liters, amount) in lines)
+        foreach (var (brand, fuelTypeId, liters, amount) in lines)
         {
             order.LineItems.Add(new OrderLineItem
             {
                 Id = Guid.NewGuid(),
                 OrderId = orderId,
-                Provider = provider,
+                Brand = brand,
                 FuelTypeId = fuelTypeId,
                 Liters = liters,
                 Quantity = 1,

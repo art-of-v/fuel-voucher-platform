@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
@@ -11,7 +11,7 @@ namespace FuelFlow.API.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AddColumn<string>(
-                name: "provider",
+                name: "brand",
                 table: "order_line_items",
                 type: "character varying(50)",
                 maxLength: 50,
@@ -19,7 +19,7 @@ namespace FuelFlow.API.Migrations
                 defaultValue: "");
 
             migrationBuilder.Sql(
-                @"UPDATE ""order_line_items"" SET ""provider"" = ""orders"".""provider"" FROM ""orders"" WHERE ""order_line_items"".""order_id"" = ""orders"".""id""");
+                @"UPDATE ""order_line_items"" SET ""brand"" = ""orders"".""brand"" FROM ""orders"" WHERE ""order_line_items"".""order_id"" = ""orders"".""id""");
 
             migrationBuilder.DropColumn(
                 name: "fuel_type_id",
@@ -34,7 +34,7 @@ namespace FuelFlow.API.Migrations
                 table: "orders");
 
             migrationBuilder.DropColumn(
-                name: "provider",
+                name: "brand",
                 table: "orders");
 
             migrationBuilder.DropColumn(
@@ -46,7 +46,7 @@ namespace FuelFlow.API.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
-                name: "provider",
+                name: "brand",
                 table: "order_line_items");
 
             migrationBuilder.AddColumn<string>(
@@ -73,7 +73,7 @@ namespace FuelFlow.API.Migrations
                 defaultValue: "");
 
             migrationBuilder.AddColumn<string>(
-                name: "provider",
+                name: "brand",
                 table: "orders",
                 type: "character varying(50)",
                 maxLength: 50,

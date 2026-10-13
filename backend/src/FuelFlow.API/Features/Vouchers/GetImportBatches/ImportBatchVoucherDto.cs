@@ -3,12 +3,12 @@ namespace FuelFlow.Features.Vouchers.GetImportBatches;
 public sealed class ImportBatchVoucherDto
 {
     public Guid Id { get; set; }
-    public string Provider { get; set; } = null!;
+    public string Brand { get; set; } = null!;
     public string FuelTypeId { get; set; } = null!;
     public string? FuelTypeName { get; set; }
     public decimal Liters { get; set; }
     /// <summary>Real term printed on the supplier's document - the ceiling for this stock.</summary>
-    public DateOnly ProviderExpirationDate { get; set; }
+    public DateOnly SupplierExpirationDate { get; set; }
     /// <summary>What the customer was sold; differs only once short terms ship.</summary>
     public DateOnly CustomerExpirationDate { get; set; }
     public string VoucherNumber { get; set; } = null!;

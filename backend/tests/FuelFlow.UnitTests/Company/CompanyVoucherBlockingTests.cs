@@ -13,7 +13,7 @@ namespace FuelFlow.UnitTests.Company;
 /// separate action). This suite pins the pure guard branches both handlers evaluate before the
 /// state transition — ownership/scoping via <c>OwnerCompanyResolver</c> and the state preconditions.
 /// The transition itself uses atomic <c>ExecuteUpdateAsync</c> (race-safe against a concurrent
-/// redemption), which the InMemory provider cannot run — the durable round-trip, the owner-only
+/// redemption), which the InMemory brand cannot run — the durable round-trip, the owner-only
 /// visibility rule, and the block-vs-redeem race live in
 /// <c>CompanyVoucherBlockingIntegrationTests</c> on real Postgres.
 /// </summary>

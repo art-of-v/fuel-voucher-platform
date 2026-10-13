@@ -6,7 +6,7 @@ using Microsoft.Extensions.Options;
 
 namespace FuelFlow.Features.Feedback;
 
-/// <summary>Provider settings for the triage step. Separate from Telegram's own configuration
+/// <summary>Brand settings for the triage step. Separate from Telegram's own configuration
 /// because the two services fail, expire and get rotated independently.</summary>
 public sealed class FeedbackClassifierOptions
 {
@@ -30,7 +30,7 @@ public sealed class FeedbackClassifierOptions
 /// <summary>
 /// Classifies feedback with Gemini.
 /// <para>
-/// The response is requested as JSON with a fixed schema and parsed strictly: a provider that
+/// The response is requested as JSON with a fixed schema and parsed strictly: a brand that
 /// answers with prose, a fenced code block, or an unknown category is treated as a failure rather
 /// than being coerced into something plausible, because a confidently wrong category is worse than
 /// an unclassified message - it filters the admin view and the staff group's labels.
@@ -206,7 +206,7 @@ public sealed class GeminiFeedbackClassifier : IFeedbackClassifier
         }
         catch (JsonException ex)
         {
-            // A provider that answers with prose instead of the schema it was handed is a failure,
+            // A brand that answers with prose instead of the schema it was handed is a failure,
             // not an empty classification: silently defaulting here is how a greeting ends up in
             // the staff group labelled as a complaint.
             throw new InvalidOperationException("Classifier response was not JSON.", ex);

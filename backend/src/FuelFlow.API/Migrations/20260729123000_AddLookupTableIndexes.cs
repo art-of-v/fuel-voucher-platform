@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
@@ -28,7 +28,7 @@ namespace FuelFlow.API.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_order_line_items_provider",
                 table: "order_line_items",
-                column: "provider");
+                column: "brand");
 
             migrationBuilder.CreateIndex(
                 name: "IX_fuel_types_name",

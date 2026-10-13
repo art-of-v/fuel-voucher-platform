@@ -1,6 +1,6 @@
 using FluentAssertions;
 using FuelFlow.Features.Orders.SharedModels;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.BulkActionVouchers;
 using FuelFlow.Features.Vouchers.Exchange;
@@ -19,7 +19,7 @@ using Xunit;
 namespace FuelFlow.IntegrationTests;
 
 /// <summary>
-/// Testcontainers coverage for the operator→provider exchange path (planning #104). Unlike the pure
+/// Testcontainers coverage for the operator→brand exchange path (planning #104). Unlike the pure
 /// pairing helper (unit-tested on <see cref="VoucherExchangePairing"/>),
 /// <see cref="ConfirmVoucherExchangeCommandHandler"/> leans on a real transaction that chains the
 /// reuse handlers (SetBatchCost's SaveChanges-first reprice + BulkAction's cost-gate activate) and
@@ -109,7 +109,7 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
         exchanges.Should().OnlyContain(x => x.SurchargeUah == 100m);   // 50 L of the 100 new L
         exchanges.Sum(x => x.SurchargeUah).Should().Be(200m);          // the whole surcharge, once
 
-        var audit = await verify.Set<ProviderEventOutbox>().AsNoTracking()
+        var audit = await verify.Set<AuditEventOutbox>().AsNoTracking()
             .Where(e => e.EventType == "VoucherExchanged").ToListAsync();
         audit.Should().ContainSingle(e => e.AggregateId == result.ExchangeBatchId.ToString());
     }
@@ -341,7 +341,7 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
     [Fact]
 public async Task MoreOldThanNew_IsRefused_BecausePaperWouldBeLost()
     {
-        // Retiring an old voucher with nothing to replace it would hand paper to the provider and record no
+        // Retiring an old voucher with nothing to replace it would hand paper to the brand and record no
         // replacement, so the exchange is refused rather than allowed to expire an old voucher with a null
         // new voucher — that record said "renewed" while nothing came back.
         var actingUserId = Guid.NewGuid();
@@ -582,7 +582,7 @@ var actingUserId = Guid.NewGuid();
     private static ConfirmVoucherExchangeCommandHandler BuildHandler(ApplicationDbContext ctx)
     {
         var recalculator = new BlendedCostRecalculator(ctx);
-        var eventService = new ProviderEventService(ctx);
+        var eventService = new AuditEventService(ctx);
 
         var backgroundJobClient = new Mock<IBackgroundJobClient>();
         backgroundJobClient.Setup(c => c.Create(It.IsAny<Job>(), It.IsAny<IState>())).Returns("job-id");
@@ -641,14 +641,14 @@ var actingUserId = Guid.NewGuid();
         return orderId;
     }
 
-    private static FuelVoucher Stock(Guid id, string provider, string fuelTypeId, decimal liters, DateOnly expiry, VoucherStatus status, Guid? importId = null, Guid? orderId = null, Guid? supplierId = null, decimal? costPerLiter = null)
+    private static FuelVoucher Stock(Guid id, string brand, string fuelTypeId, decimal liters, DateOnly expiry, VoucherStatus status, Guid? importId = null, Guid? orderId = null, Guid? supplierId = null, decimal? costPerLiter = null)
         => new()
         {
             Id = id,
-            Provider = provider,
+            Brand = brand,
             FuelTypeId = fuelTypeId,
             Liters = liters,
-            ProviderExpirationDate = expiry,
+            SupplierExpirationDate = expiry,
             CustomerExpirationDate = expiry,
             VoucherNumber = $"VX-{id:N}"[..16],
             QrPayload = $"qr-{id:N}",

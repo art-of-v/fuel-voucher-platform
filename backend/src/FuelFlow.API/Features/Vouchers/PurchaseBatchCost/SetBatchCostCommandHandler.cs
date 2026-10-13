@@ -1,6 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
@@ -39,13 +39,13 @@ public sealed class SetBatchCostCommandHandler
 {
     private readonly ApplicationDbContext _context;
     private readonly BlendedCostRecalculator _recalculator;
-    private readonly ProviderEventService _eventService;
+    private readonly AuditEventService _eventService;
     private readonly NotificationDispatcher _notifications;
 
     public SetBatchCostCommandHandler(
         ApplicationDbContext context,
         BlendedCostRecalculator recalculator,
-        ProviderEventService eventService,
+        AuditEventService eventService,
         NotificationDispatcher notifications)
     {
         _context = context;
@@ -63,15 +63,15 @@ public sealed class SetBatchCostCommandHandler
         if (!importExists)
             return new SetBatchCostResult(false, true, "Import not found", null, 0);
 
-        // The fuel must actually appear in this import; grab its provider to denormalize onto the batch.
+        // The fuel must actually appear in this import; grab its brand to denormalize onto the batch.
         // !IsDeleted for the same reason the readers filter it (#980): a deleted voucher is not
         // stock, so it cannot be the only thing that proves the fuel is in this import.
-        var provider = await _context.FuelVouchers
+        var brand = await _context.FuelVouchers
             .IgnoreQueryFilters()
             .Where(v => v.ImportJobId == command.ImportJobId && v.FuelTypeId == command.FuelTypeId && !v.IsDeleted)
-            .Select(v => v.Provider)
+            .Select(v => v.Brand)
             .FirstOrDefaultAsync(cancellationToken);
-        if (provider is null)
+        if (brand is null)
             return new SetBatchCostResult(false, true, "No vouchers for this fuel in the import", null, 0);
 
         var now = DateTime.UtcNow;
@@ -134,7 +134,7 @@ public sealed class SetBatchCostCommandHandler
                     Id = Guid.CreateVersion7(),
                     ImportJobId = command.ImportJobId,
                     FuelTypeId = command.FuelTypeId,
-                    Provider = provider,
+                    Brand = brand,
                     SupplierId = sid,
                     EnteredByUserId = actingUser,
                     CreatedAtUtc = now,
@@ -145,7 +145,7 @@ public sealed class SetBatchCostCommandHandler
         }
         else
         {
-            batch.Provider = provider;
+            batch.Brand = brand;
             batch.EnteredByUserId = actingUser;
             batch.UpdatedAtUtc = now;
             _context.PurchaseBatches.Update(batch);
@@ -176,7 +176,7 @@ public sealed class SetBatchCostCommandHandler
                 if (FuelPricing.IsBelowCost(b, profit, pkg.PumpPricePerLiter, minDiscount))
                 {
                     var finalPerLiter = FuelPricing.FinalPerLiter(b, profit, pkg.PumpPricePerLiter, minDiscount);
-                    await _notifications.BelowCostAsync(provider, command.FuelTypeId, b, finalPerLiter, deliberate: false, cancellationToken);
+                    await _notifications.BelowCostAsync(brand, command.FuelTypeId, b, finalPerLiter, deliberate: false, cancellationToken);
                 }
             }
         }
@@ -188,7 +188,7 @@ public sealed class SetBatchCostCommandHandler
             var blendedText = blended.HasValue ? blended.Value.ToString("F2", CultureInfo.InvariantCulture) : "—";
             // old_value/new_value are jsonb and every other audit event stores an OBJECT. Handing them a
             // bare decimal stores a JSON scalar instead: Postgres accepts it, so nothing fails loudly,
-            // but the before/after is no longer machine-readable and the provider history has nothing
+            // but the before/after is no longer machine-readable and the brand history has nothing
             // to render. This row is the only trace of what we paid — there is no supplier invoice to
             // fall back on — so it has to be as readable as the rest of the audit log.
             await _eventService.RecordEventAsync(
@@ -207,8 +207,8 @@ public sealed class SetBatchCostCommandHandler
                 }),
                 userId,
                 command.ActingUserName,
-                $"{provider} / {command.FuelTypeId}: cost {oldText} → {newText} UAH/L on {targets.Count} voucher(s); blended {blendedText}",
-                provider,
+                $"{brand} / {command.FuelTypeId}: cost {oldText} → {newText} UAH/L on {targets.Count} voucher(s); blended {blendedText}",
+                brand,
                 cancellationToken);
         }
 

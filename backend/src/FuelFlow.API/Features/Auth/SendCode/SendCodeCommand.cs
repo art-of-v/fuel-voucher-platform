@@ -67,7 +67,7 @@ public sealed class SendCodeCommandHandler
 
         // QA branch: only for the seeded QA phone, and only while QA access is configured AND the
         // runtime switch is on. We store the pre-computed QA code hash directly (the plaintext is
-        // never held anywhere) and skip SMS entirely — no provider cost, works before the gateway
+        // never held anywhere) and skip SMS entirely — no brand cost, works before the gateway
         // is live, and the fixed code never rides an SMS. Any other phone, or QA disabled, falls
         // through to the ordinary random-code path below, so the QA number is indistinguishable
         // from any other number when the feature is off (no enumeration oracle, spec §7).

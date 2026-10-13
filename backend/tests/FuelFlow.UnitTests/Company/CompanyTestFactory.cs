@@ -12,7 +12,7 @@ namespace FuelFlow.UnitTests.Company;
 /// <summary>
 /// Shared in-memory context + entity builders for the Company/B2B handler unit tests.
 /// The transaction warning is ignored so handlers that open a DB transaction
-/// (e.g. <c>FireWorkerCommandHandler</c>) run against the in-memory provider without throwing.
+/// (e.g. <c>FireWorkerCommandHandler</c>) run against the in-memory brand without throwing.
 /// Phone numbers here are fully synthetic — never a real customer's.
 /// </summary>
 internal static class CompanyTestFactory
@@ -93,16 +93,16 @@ internal static class CompanyTestFactory
         Guid? legalEntityId = null,
         Guid? assignedToUserId = null,
         Guid? workerUserId = null,
-        string provider = "OKKO",
+        string brand = "OKKO",
         string fuelTypeId = "okko-95",
         decimal liters = 50)
         => new()
         {
             Id = id,
-            Provider = provider,
+            Brand = brand,
             FuelTypeId = fuelTypeId,
             Liters = liters,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             VoucherNumber = $"V-{id.ToString()[..8]}",
             QrPayload = $"qr-{id}",

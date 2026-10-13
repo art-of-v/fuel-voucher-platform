@@ -23,8 +23,8 @@ namespace FuelFlow.Features.Orders.CreateCheckout;
 public static class TermStockCoverage
 {
     /// <summary>
-    /// The latest paper expiry among <see cref="VoucherStatus.Available"/> vouchers matching the provider,
-    /// fuel type and nominal, or null when nothing is in stock. Provider is matched case-insensitively:
+    /// The latest paper expiry among <see cref="VoucherStatus.Available"/> vouchers matching the brand,
+    /// fuel type and nominal, or null when nothing is in stock. Brand is matched case-insensitively:
     /// order lines and the catalog carry <c>okko</c> while imported stock carries <c>OKKO</c>, and the
     /// fulfilment matcher compares the same way.
     /// </summary>
@@ -35,16 +35,16 @@ public static class TermStockCoverage
         decimal liters,
         CancellationToken cancellationToken = default)
     {
-        var provider = stationId.ToLower();
+        var brand = stationId.ToLower();
 
         return await context.FuelVouchers
             .AsNoTracking()
             .Where(v => v.Status == VoucherStatus.Available
-                     && v.Provider.ToLower() == provider
+                     && v.Brand.ToLower() == brand
                      && v.FuelTypeId == fuelTypeId
                      && v.Liters == liters)
-            .OrderByDescending(v => v.ProviderExpirationDate)
-            .Select(v => (DateOnly?)v.ProviderExpirationDate)
+            .OrderByDescending(v => v.SupplierExpirationDate)
+            .Select(v => (DateOnly?)v.SupplierExpirationDate)
             .FirstOrDefaultAsync(cancellationToken);
     }
 

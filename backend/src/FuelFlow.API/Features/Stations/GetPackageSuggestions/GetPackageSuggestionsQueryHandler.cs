@@ -13,7 +13,7 @@ public sealed class GetPackageSuggestionsQueryHandler
     {
         var allVouchers = await _context.FuelVouchers.AsNoTracking().ToListAsync(ct);
         var uniqueCombos = allVouchers
-            .GroupBy(v => new { v.Provider, v.FuelTypeId, v.Liters })
+            .GroupBy(v => new { v.Brand, v.FuelTypeId, v.Liters })
             .Select(g => g.First())
             .ToList();
 
@@ -25,7 +25,7 @@ public sealed class GetPackageSuggestionsQueryHandler
 
         foreach (var voucher in uniqueCombos)
         {
-            var cleanProvider = voucher.Provider.ToLowerInvariant().Trim();
+            var cleanProvider = voucher.Brand.ToLowerInvariant().Trim();
             var station = allStations.FirstOrDefault(s => s.Name.ToLowerInvariant().Trim() == cleanProvider);
             if (station is null) continue;
 

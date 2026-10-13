@@ -147,10 +147,10 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
         _context.FuelVouchers.Add(new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = fuelTypeId,
             Liters = liters,
-            ProviderExpirationDate = expiry,
+            SupplierExpirationDate = expiry,
             CustomerExpirationDate = expiry,
             VoucherNumber = $"STOCK-{Guid.NewGuid().ToString()[..8]}",
             QrPayload = Guid.NewGuid().ToString(),
@@ -174,7 +174,7 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
             new OrderLineItem
             {
                 Id = Guid.NewGuid(),
-                Provider = "okko",
+                Brand = "okko",
                 FuelTypeId = "okko-95",
                 Liters = 50,
                 Quantity = 1,
@@ -186,7 +186,7 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
 
     private static CheckoutItem CheckoutItem(string fuelTypeId, int price, string? stationId = "okko") => new()
     {
-        Provider = "okko",
+        Brand = "okko",
         FuelTypeId = fuelTypeId,
         Liters = 50,
         Quantity = 1,
@@ -377,12 +377,12 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
             Voucher = new FuelVoucher
             {
                 Id = Guid.NewGuid(),
-                Provider = "okko",
+                Brand = "okko",
                 FuelTypeId = "okko-95",
                 Liters = 50,
                 VoucherNumber = "V-test",
                 QrPayload = "q",
-                ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
+                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
                 CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow

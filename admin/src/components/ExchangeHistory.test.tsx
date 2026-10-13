@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientBrand } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { ExchangeHistory } from "@/components/ExchangeHistory";
 import { formatMoney } from "@/lib/money";
@@ -23,7 +23,7 @@ const BATCHES = {
       atUtc: "2026-10-01T10:00:00Z",
       supplierId: "sup-1",
       supplierName: SUPPLIER,
-      providers: ["OKKO"],
+      brands: ["OKKO"],
       fuelTypeIds: ["okko-95"],
       vouchersExchanged: 4,
       litersOut: 40,
@@ -57,7 +57,7 @@ const DETAIL = {
       newVoucherId: "new-1",
       newVoucherNumber: "NEW-0001",
       fuelTypeId: "okko-95",
-      provider: "OKKO",
+      brand: "OKKO",
       surchargeShareUah: 25,
       newCostPerLiter: 90.5,
     },
@@ -69,7 +69,7 @@ const DETAIL = {
       newVoucherId: "new-2",
       newVoucherNumber: "NEW-0002",
       fuelTypeId: "okko-95",
-      provider: "OKKO",
+      brand: "OKKO",
       surchargeShareUah: 25,
       newCostPerLiter: 94,
     },
@@ -79,7 +79,7 @@ const DETAIL = {
 function renderHistory() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const wrapper = ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    <QueryClientBrand client={client}>{children}</QueryClientBrand>
   );
   return render(<ExchangeHistory />, { wrapper });
 }

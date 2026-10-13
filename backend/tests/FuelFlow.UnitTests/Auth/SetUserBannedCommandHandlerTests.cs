@@ -1,7 +1,7 @@
 using FluentAssertions;
 using FuelFlow.Features.Auth.AdminUser.SetUserBanned;
 using FuelFlow.Features.Auth.SharedModels;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -31,7 +31,7 @@ public sealed class SetUserBannedCommandHandlerTests
         result.Forbidden.Should().BeTrue();
         target.IsBanned.Should().BeFalse();
         target.TokenVersion.Should().Be(7);
-        (await context.Set<ProviderEventOutbox>().CountAsync()).Should().Be(0);
+        (await context.Set<AuditEventOutbox>().CountAsync()).Should().Be(0);
     }
 
     [Theory]
@@ -62,7 +62,7 @@ public sealed class SetUserBannedCommandHandlerTests
         (await context.Devices.FirstAsync(d => d.Id == device.Id)).Status
             .Should().Be(DeviceStatus.Revoked);
 
-        var audit = await context.Set<ProviderEventOutbox>().SingleAsync();
+        var audit = await context.Set<AuditEventOutbox>().SingleAsync();
         audit.EventType.Should().Be("UserBanned");
         audit.ChangedByUserId.Should().Be(actingId);
 
@@ -93,7 +93,7 @@ public sealed class SetUserBannedCommandHandlerTests
         t1.IsRevoked.Should().BeTrue();
         t2.IsRevoked.Should().BeTrue();
 
-        var audit = await context.Set<ProviderEventOutbox>().SingleAsync();
+        var audit = await context.Set<AuditEventOutbox>().SingleAsync();
         audit.EventType.Should().Be("UserUnbanned");
     }
 
@@ -111,7 +111,7 @@ public sealed class SetUserBannedCommandHandlerTests
         // A second ban is a no-op: no extra version bump, no second audit row.
         (await handler.HandleAsync(command, CancellationToken.None)).Success.Should().BeTrue();
         target.TokenVersion.Should().Be(versionAfterFirst);
-        (await context.Set<ProviderEventOutbox>().CountAsync()).Should().Be(1);
+        (await context.Set<AuditEventOutbox>().CountAsync()).Should().Be(1);
     }
 
     [Fact]
@@ -127,7 +127,7 @@ public sealed class SetUserBannedCommandHandlerTests
 
         result.Forbidden.Should().BeTrue();
         actor.IsBanned.Should().BeFalse();
-        (await context.Set<ProviderEventOutbox>().CountAsync()).Should().Be(0);
+        (await context.Set<AuditEventOutbox>().CountAsync()).Should().Be(0);
     }
 
     [Fact]
@@ -145,7 +145,7 @@ public sealed class SetUserBannedCommandHandlerTests
         result.Success.Should().BeFalse();
         result.Error.Should().Contain("last active ProductOwner");
         lonelyOwner.IsBanned.Should().BeFalse();
-        (await context.Set<ProviderEventOutbox>().CountAsync()).Should().Be(0);
+        (await context.Set<AuditEventOutbox>().CountAsync()).Should().Be(0);
     }
 
     [Fact]
@@ -236,7 +236,7 @@ public sealed class SetUserBannedCommandHandlerTests
             .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking).Options);
 
     private static SetUserBannedCommandHandler CreateHandler(ApplicationDbContext context) => new(
-        context, NullLogger<SetUserBannedCommandHandler>.Instance, new ProviderEventService(context));
+        context, NullLogger<SetUserBannedCommandHandler>.Instance, new AuditEventService(context));
 
     private static async Task<User> AddUserAsync(ApplicationDbContext context, string roleName, Guid? roleId = null)
     {

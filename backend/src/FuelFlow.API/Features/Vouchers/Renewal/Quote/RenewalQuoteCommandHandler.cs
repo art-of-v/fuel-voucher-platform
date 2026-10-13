@@ -67,9 +67,9 @@ public sealed class RenewalQuoteCommandHandler
             .Where(ft => fuelTypeIds.Contains(ft.Id))
             .ToDictionaryAsync(ft => ft.Id, ft => ft.Name, cancellationToken);
 
-        // For replace lines we need, per (provider, fuel, litres) group, the best stock expiry in hand.
+        // For replace lines we need, per (brand, fuel, litres) group, the best stock expiry in hand.
         // Gather the groups of eligible replace vouchers, then one lookup each.
-        var replaceGroups = new Dictionary<(string Provider, string FuelTypeId, decimal Liters), DateOnly?>();
+        var replaceGroups = new Dictionary<(string Brand, string FuelTypeId, decimal Liters), DateOnly?>();
 
         foreach (var voucherId in command.VoucherIds)
         {
@@ -85,7 +85,7 @@ public sealed class RenewalQuoteCommandHandler
                 continue;
             }
 
-            quote.Provider = source.Provider;
+            quote.Brand = source.Brand;
             quote.FuelTypeId = source.FuelTypeId;
             quote.FuelName = fuelNames.TryGetValue(source.FuelTypeId, out var name) && !string.IsNullOrEmpty(name)
                 ? name
@@ -93,7 +93,7 @@ public sealed class RenewalQuoteCommandHandler
             quote.Liters = source.Liters;
             quote.ExpirationDate = source.CustomerExpirationDate;
 
-            // The branch depends on which tiers can clear the provider-term ceiling, so the offered
+            // The branch depends on which tiers can clear the brand-term ceiling, so the offered
             // ladder has to be resolved before the branch - not after.
             var offeredTerms = VoucherRenewalTerms.All
                 .Where(term => config.Tier(term) is { IsOfferable: true })
@@ -102,7 +102,7 @@ public sealed class RenewalQuoteCommandHandler
             if (!VoucherRenewalEligibility.TryResolveBranch(
                     source.Status,
                     source.CustomerExpirationDate,
-                    source.ProviderExpirationDate,
+                    source.SupplierExpirationDate,
                     today,
                     config.TriggerThresholdDays,
                     offeredTerms,
@@ -147,7 +147,7 @@ public sealed class RenewalQuoteCommandHandler
                     unavailableReason = available ? null : "no_stock";
                 }
                 else if (VoucherRenewalEligibility.CanExtend(
-                             source.CustomerExpirationDate, source.ProviderExpirationDate, term))
+                             source.CustomerExpirationDate, source.SupplierExpirationDate, term))
                 {
                     // Extend needs no stock - only room left in the voucher's real term.
                     available = true;
@@ -177,27 +177,27 @@ public sealed class RenewalQuoteCommandHandler
     }
 
     /// <summary>
-    /// Best (latest) expiry among Available stock matching a source voucher's provider/fuel/litres, or
+    /// Best (latest) expiry among Available stock matching a source voucher's brand/fuel/litres, or
     /// null when nothing is in stock. Memoised per group so a batch of same-group replace lines costs
     /// one query. A tier is buyable when this reaches at least today + term.
     /// </summary>
     private async Task<DateOnly?> BestStockExpiryAsync(
-        Dictionary<(string Provider, string FuelTypeId, decimal Liters), DateOnly?> cache,
+        Dictionary<(string Brand, string FuelTypeId, decimal Liters), DateOnly?> cache,
         FuelVoucher source,
         CancellationToken cancellationToken)
     {
-        var key = (source.Provider.ToLower(), source.FuelTypeId, source.Liters);
+        var key = (source.Brand.ToLower(), source.FuelTypeId, source.Liters);
         if (cache.TryGetValue(key, out var cached))
             return cached;
 
         var best = await _context.FuelVouchers
             .AsNoTracking()
             .Where(v => v.Status == VoucherStatus.Available
-                     && v.Provider.ToLower() == key.Item1
+                     && v.Brand.ToLower() == key.Item1
                      && v.FuelTypeId == source.FuelTypeId
                      && v.Liters == source.Liters)
-            .OrderByDescending(v => v.ProviderExpirationDate)
-            .Select(v => (DateOnly?)v.ProviderExpirationDate)
+            .OrderByDescending(v => v.SupplierExpirationDate)
+            .Select(v => (DateOnly?)v.SupplierExpirationDate)
             .FirstOrDefaultAsync(cancellationToken);
 
         cache[key] = best;

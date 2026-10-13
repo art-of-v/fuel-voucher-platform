@@ -35,17 +35,17 @@ public sealed class OperatorVoucherRenewalController : ControllerBase
         _logger = logger;
     }
 
-    /// <summary>Customer-owned renewable vouchers (search by number / owner, filter by provider + status).</summary>
+    /// <summary>Customer-owned renewable vouchers (search by number / owner, filter by brand + status).</summary>
     [HttpGet("vouchers")]
     [ProducesResponseType(typeof(List<RenewableCustomerVoucherDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> SearchVouchers(
         [FromQuery] string? query,
-        [FromQuery] string? provider,
+        [FromQuery] string? brand,
         [FromQuery] string? status,
         CancellationToken cancellationToken)
     {
         var result = await _searchHandler.HandleAsync(
-            new GetRenewableCustomerVouchersQuery(query, provider, status), cancellationToken);
+            new GetRenewableCustomerVouchersQuery(query, brand, status), cancellationToken);
         return Ok(result);
     }
 

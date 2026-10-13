@@ -47,7 +47,7 @@ public sealed class GetAdminVoucherByIdQueryHandler
             Liters = item.Liters,
             FuelTypeId = item.FuelTypeId,
             FuelType = item.FuelType == null ? null : new FuelTypeRefDto { Id = item.FuelType.Id, Name = item.FuelType.Name },
-            Provider = item.Provider,
+            Brand = item.Brand,
             SupplierId = item.SupplierId,
             SupplierName = item.Supplier?.Name,
             // Null stays null here for the reason it stays null in the list: nobody recorded what we
@@ -55,7 +55,7 @@ public sealed class GetAdminVoucherByIdQueryHandler
             CostPerLiter = item.CostPerLiter,
             // Staff-facing detail: the real supplier term is what they plan against. The
             // customer-facing date is not relevant on a stock record.
-            ProviderExpirationDate = item.ProviderExpirationDate,
+            SupplierExpirationDate = item.SupplierExpirationDate,
             CustomerExpirationDate = item.CustomerExpirationDate,
             VoucherNumber = item.VoucherNumber,
             Status = item.Status.ToString(),

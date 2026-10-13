@@ -8,7 +8,7 @@ using Microsoft.Extensions.Options;
 namespace FuelFlow.API.BackgroundJobs;
 
 /// <summary>
-/// Watches the available voucher pool and raises an alert when a provider/fuel-type
+/// Watches the available voucher pool and raises an alert when a brand/fuel-type
 /// combination drops to or below the configured threshold, or reaches zero.
 /// <para>
 /// This complements the Prometheus <c>VoucherPoolLow</c> rule: the metric drives the
@@ -63,10 +63,10 @@ public sealed class VoucherStockMonitor
 
         var counts = await _context.FuelVouchers
             .Where(v => !v.IsDeleted)
-            .GroupBy(v => new { v.Provider, v.FuelTypeId })
+            .GroupBy(v => new { v.Brand, v.FuelTypeId })
             .Select(g => new
             {
-                g.Key.Provider,
+                g.Key.Brand,
                 g.Key.FuelTypeId,
                 Available = g.Count(v => v.AssignedToUserId == null && v.Status == VoucherStatus.Available),
                 ExpiringSoon = g.Count(v => v.AssignedToUserId == null
@@ -101,12 +101,12 @@ public sealed class VoucherStockMonitor
             if (combination.ExpiringSoon > 0)
             {
                 _logger.LogWarning(
-                    "Voucher pool expiring for {Provider}/{FuelType} ({FuelTypeId}): {Expiring} of {Available} available expire within {Days} days",
-                    combination.Provider, fuelTypeLabel, combination.FuelTypeId,
+                    "Voucher pool expiring for {Brand}/{FuelType} ({FuelTypeId}): {Expiring} of {Available} available expire within {Days} days",
+                    combination.Brand, fuelTypeLabel, combination.FuelTypeId,
                     combination.ExpiringSoon, combination.Available, config.ExpiringWithinDays);
 
                 await _notifications.VoucherStockExpiringAsync(
-                    combination.Provider,
+                    combination.Brand,
                     fuelTypeLabel,
                     combination.ExpiringSoon,
                     combination.Available,
@@ -117,11 +117,11 @@ public sealed class VoucherStockMonitor
             if (combination.Available <= threshold)
             {
                 _logger.LogWarning(
-                    "Voucher pool low for {Provider}/{FuelType} ({FuelTypeId}): {Count} remaining (threshold {Threshold})",
-                    combination.Provider, fuelTypeLabel, combination.FuelTypeId, combination.Available, threshold);
+                    "Voucher pool low for {Brand}/{FuelType} ({FuelTypeId}): {Count} remaining (threshold {Threshold})",
+                    combination.Brand, fuelTypeLabel, combination.FuelTypeId, combination.Available, threshold);
 
                 await _notifications.VoucherStockLowAsync(
-                    combination.Provider,
+                    combination.Brand,
                     fuelTypeLabel,
                     combination.Available,
                     threshold,

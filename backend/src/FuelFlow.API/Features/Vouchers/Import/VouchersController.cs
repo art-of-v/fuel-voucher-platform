@@ -1,4 +1,4 @@
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -13,7 +13,7 @@ public sealed class VouchersController : ControllerBase
     private readonly ImportVouchersCommandHandler _importHandler;
     private readonly GetVouchersQueryHandler _getHandler;
     private readonly IQrGenerator _qrGenerator;
-    private readonly ProviderEventService _eventService;
+    private readonly AuditEventService _eventService;
     private readonly ImportConcurrencyGuard _importGuard;
     private readonly ILogger<VouchersController> _logger;
 
@@ -21,7 +21,7 @@ public sealed class VouchersController : ControllerBase
         ImportVouchersCommandHandler importHandler,
         GetVouchersQueryHandler getHandler,
         IQrGenerator qrGenerator,
-        ProviderEventService eventService,
+        AuditEventService eventService,
         ImportConcurrencyGuard importGuard,
         ILogger<VouchersController> logger)
     {

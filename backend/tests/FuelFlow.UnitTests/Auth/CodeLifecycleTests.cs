@@ -3,7 +3,7 @@ using FuelFlow.Features.Auth.SendCode;
 using FuelFlow.Features.Auth.SendCode.Abstractions;
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Auth.Verify;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.SharedKernel.Notifications.Email;
@@ -154,7 +154,7 @@ public sealed class CodeLifecycleTests : IDisposable
         var handler = BuildVerifyHandler();
         await handler.HandleAsync(new VerifyCodeCommand(phone, "111111"), CancellationToken.None);
 
-        var audit = await _context.Set<ProviderEventOutbox>()
+        var audit = await _context.Set<AuditEventOutbox>()
             .SingleAsync(e => e.EventType == "StaffLoggedIn");
         audit.AggregateType.Should().Be("Auth");
         audit.NewValue.Should().Contain(SeedRoles.ProductOwnerName, "the audit payload must name the actual staff role");
@@ -209,7 +209,7 @@ public sealed class CodeLifecycleTests : IDisposable
             phoneNumberServiceMock.Object,
             jwtOptionsMock.Object,
             new Mock<ILogger<VerifyCodeCommandHandler>>().Object,
-            new ProviderEventService(_context));
+            new AuditEventService(_context));
     }
 
     private SendCodeCommandHandler BuildSendHandler()

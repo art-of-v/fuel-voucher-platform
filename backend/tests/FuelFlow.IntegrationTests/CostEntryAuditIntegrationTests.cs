@@ -1,6 +1,6 @@
 using System.Text.Json;
 using FluentAssertions;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.PurchaseBatchCost;
 using FuelFlow.Features.Vouchers.SharedModels;
@@ -17,7 +17,7 @@ namespace FuelFlow.IntegrationTests;
 /// no supplier invoice to fall back on, so this is the sole trace of the money.
 /// <para>
 /// It runs against the real Postgres container on purpose: <c>old_value</c>/<c>new_value</c> are
-/// <c>jsonb</c> columns, and the in-memory provider behind the unit tests accepts anything handed to
+/// <c>jsonb</c> columns, and the in-memory brand behind the unit tests accepts anything handed to
 /// it. Only Postgres rejects a value that is not valid JSON — exactly the class of defect a unit test
 /// cannot see.
 /// </para>
@@ -37,7 +37,7 @@ public sealed class CostEntryAuditIntegrationTests : IClassFixture<TestDatabaseF
             .Options);
 
     private static SetBatchCostCommandHandler Handler(ApplicationDbContext ctx)
-        => new(ctx, new BlendedCostRecalculator(ctx), new ProviderEventService(ctx), NotificationDispatcher.Disabled);
+        => new(ctx, new BlendedCostRecalculator(ctx), new AuditEventService(ctx), NotificationDispatcher.Disabled);
 
     /// <summary>One import holding one uncosted voucher of a fuel the migrations already seed.</summary>
     private static async Task<Guid> SeedUncostedImportAsync(ApplicationDbContext context, string suffix)
@@ -67,13 +67,13 @@ public sealed class CostEntryAuditIntegrationTests : IClassFixture<TestDatabaseF
             Id = Guid.NewGuid(),
             ImportJobId = import.Id,
             SupplierId = supplier.Id,
-            Provider = "okko",
+            Brand = "okko",
             FuelTypeId = "okko-95",
             Liters = 50,
             VoucherNumber = $"audit-{suffix}",
             QrPayload = $"9015$2000$;{suffix}=x?",
             Status = VoucherStatus.Imported,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(180),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(180),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(180),
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
@@ -96,7 +96,7 @@ public sealed class CostEntryAuditIntegrationTests : IClassFixture<TestDatabaseF
         result.Success.Should().BeTrue();
 
         using var verify = CreateContext();
-        var row = await verify.Set<ProviderEventOutbox>().AsNoTracking()
+        var row = await verify.Set<AuditEventOutbox>().AsNoTracking()
             .Where(e => e.EventType == "BatchCostEntered" && e.AggregateId == $"{importId}:okko-95")
             .SingleOrDefaultAsync();
 
@@ -122,11 +122,11 @@ public sealed class CostEntryAuditIntegrationTests : IClassFixture<TestDatabaseF
         }
 
         using var verify = CreateContext();
-        var row = await verify.Set<ProviderEventOutbox>().AsNoTracking()
+        var row = await verify.Set<AuditEventOutbox>().AsNoTracking()
             .Where(e => e.EventType == "BatchCostEntered" && e.AggregateId == $"{importId}:okko-95")
             .SingleAsync();
 
-        // A bare "51.25" is not valid JSON and the provider history cannot render it — hence an
+        // A bare "51.25" is not valid JSON and the brand history cannot render it — hence an
         // assertion on parse, not on a shape someone chose in advance.
         var act = () => JsonDocument.Parse(row.NewValue);
         act.Should().NotThrow("old_value/new_value are jsonb: they must hold JSON, never a bare string");
@@ -157,7 +157,7 @@ public sealed class CostEntryAuditIntegrationTests : IClassFixture<TestDatabaseF
         }
 
         using var verify = CreateContext();
-        var rows = await verify.Set<ProviderEventOutbox>().AsNoTracking()
+        var rows = await verify.Set<AuditEventOutbox>().AsNoTracking()
             .Where(e => e.EventType == "BatchCostEntered" && e.AggregateId == $"{importId}:okko-95")
             .OrderBy(e => e.ChangedAtUtc)
             .ToListAsync();

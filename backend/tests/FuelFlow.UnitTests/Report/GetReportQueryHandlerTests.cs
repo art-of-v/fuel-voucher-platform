@@ -57,7 +57,7 @@ public sealed class GetReportQueryHandlerTests : IDisposable
         {
             Id = Guid.NewGuid(),
             OrderId = paidOrder.Id,
-            Provider = "okko",
+            Brand = "okko",
             FuelTypeId = "okko-95",
             Liters = 50m,
             Quantity = 1,
@@ -79,7 +79,7 @@ public sealed class GetReportQueryHandlerTests : IDisposable
         {
             Id = Guid.NewGuid(),
             OrderId = pendingOrder.Id,
-            Provider = "okko",
+            Brand = "okko",
             FuelTypeId = "okko-dp",
             Liters = 20m,
             Quantity = 2,
@@ -100,7 +100,7 @@ public sealed class GetReportQueryHandlerTests : IDisposable
         {
             Id = Guid.NewGuid(),
             OrderId = excludedOrder.Id,
-            Provider = "okko",
+            Brand = "okko",
             FuelTypeId = "okko-95",
             Liters = 50m,
             Quantity = 1,
@@ -149,10 +149,10 @@ public sealed class GetReportQueryHandlerTests : IDisposable
         var voucher95 = new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Provider = "okko",
+            Brand = "okko",
             FuelTypeId = "okko-95",
             Liters = 50m,
-            ProviderExpirationDate = DateOnly.FromDateTime(now.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(now.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(now.AddMonths(1)),
             VoucherNumber = "V-1",
             QrPayload = "payload-1",
@@ -164,10 +164,10 @@ public sealed class GetReportQueryHandlerTests : IDisposable
         var voucherDp = new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Provider = "okko",
+            Brand = "okko",
             FuelTypeId = "okko-dp",
             Liters = 20m,
-            ProviderExpirationDate = DateOnly.FromDateTime(now.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(now.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(now.AddMonths(1)),
             VoucherNumber = "V-2",
             QrPayload = "payload-2",
@@ -182,10 +182,10 @@ public sealed class GetReportQueryHandlerTests : IDisposable
             new FuelVoucher
             {
                 Id = Guid.NewGuid(),
-                Provider = "okko",
+                Brand = "okko",
                 FuelTypeId = "okko-95",
                 Liters = 50m,
-                ProviderExpirationDate = DateOnly.FromDateTime(now.AddMonths(1)),
+                SupplierExpirationDate = DateOnly.FromDateTime(now.AddMonths(1)),
                 CustomerExpirationDate = DateOnly.FromDateTime(now.AddMonths(1)),
                 VoucherNumber = "V-3",
                 QrPayload = "payload-3",
@@ -238,7 +238,7 @@ public sealed class GetReportQueryHandlerTests : IDisposable
         var payment = response.Payments.Single(p => p.OrderId == paidOrder.Id);
         payment.Amount.Should().Be(5100);
         payment.Status.Should().Be("Paid");
-        payment.Provider.Should().Be("okko");
+        payment.Brand.Should().Be("okko");
         payment.FuelType.Should().Be("okko-95");
         payment.FuelName.Should().Be("A-95");
         payment.Liters.Should().Be(50m);
@@ -252,7 +252,7 @@ public sealed class GetReportQueryHandlerTests : IDisposable
         refundedPayment.RefundedKopecks.Should().Be(100000);
         refundedPayment.RefundStatus.Should().Be("Completed");
 
-        var redemption = response.Redemptions.Single(r => r.Provider == "okko" && r.FuelType == "okko-95");
+        var redemption = response.Redemptions.Single(r => r.Brand == "okko" && r.FuelType == "okko-95");
         redemption.FuelName.Should().Be("A-95");
         redemption.Liters.Should().Be(50m);
 
@@ -306,7 +306,7 @@ public sealed class GetReportQueryHandlerTests : IDisposable
         {
             Id = Guid.NewGuid(),
             OrderId = orderA.Id,
-            Provider = "okko",
+            Brand = "okko",
             FuelTypeId = "okko-95",
             Liters = 10m,
             Quantity = 1,
@@ -327,7 +327,7 @@ public sealed class GetReportQueryHandlerTests : IDisposable
         {
             Id = Guid.NewGuid(),
             OrderId = orderB.Id,
-            Provider = "okko",
+            Brand = "okko",
             FuelTypeId = "okko-95",
             Liters = 10m,
             Quantity = 1,

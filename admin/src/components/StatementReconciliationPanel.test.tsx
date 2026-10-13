@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientBrand } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { StatementReconciliationPanel } from "@/components/StatementReconciliationPanel";
 
@@ -67,7 +67,7 @@ const ACT = {
 function renderPanel() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const wrapper = ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    <QueryClientBrand client={client}>{children}</QueryClientBrand>
   );
   return render(<StatementReconciliationPanel />, { wrapper });
 }

@@ -21,7 +21,7 @@ namespace FuelFlow.IntegrationTests;
 /// matters more: the same paper cannot be <em>live</em> twice under two numbers.
 /// </para>
 /// <para>
-/// Integration, not unit: the filter lives in a partial unique index, and the in-memory provider has
+/// Integration, not unit: the filter lives in a partial unique index, and the in-memory brand has
 /// no indexes at all - a unit test here would pass whether or not the database enforces anything.
 /// </para>
 /// </summary>
@@ -104,10 +104,10 @@ public sealed class ArchivedVoucherKeysIntegrationTests : IClassFixture<TestData
     private static FuelVoucher Voucher(string number, string qr) => new()
     {
         Id = Guid.NewGuid(),
-        Provider = "OKKO",
+        Brand = "OKKO",
         FuelTypeId = "okko-95",
         Liters = 10m,
-        ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
+        SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
         CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
         VoucherNumber = number,
         QrPayload = qr,

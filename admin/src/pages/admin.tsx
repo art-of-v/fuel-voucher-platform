@@ -21,7 +21,7 @@ import { useI18n } from "@/lib/i18n";
 import { isLoggedIn, sendCode, verifyCode, clearTokens, fetchCurrentUser, refreshAccessToken, isSessionRejected, logout, type CurrentUser, type RefreshStatus } from "@/lib/admin-auth";
 import { STAFF_ROLES, assignableRoles } from "@/lib/roles";
 import { formatMoney } from "@/lib/money";
-import ProvidersTab from "@/components/ProvidersTab";
+import BrandsTab from "@/components/BrandsTab";
 import { BatchCostTimeline } from "@/components/BatchCostTimeline";
 import { StatementReconciliationPanel } from "@/components/StatementReconciliationPanel";
 import StationNodesTab from "@/components/StationNodesTab";
@@ -166,9 +166,9 @@ export default function AdminScreen() {
 
   const [activeTab, setActiveTab] = useState(() => {
     // Guard against stale stored tabs (e.g. the removed 'stations' view).
-    const validTabs = ['providers', 'purchases', 'users', 'vouchers', 'imports', 'voucherExchange', 'suppliers', 'stationNodes', 'customerRenewal', 'contracts', 'reconciliation', 'auditlog', 'errorlogs', 'feedback', 'reports', 'settings'];
+    const validTabs = ['brands', 'purchases', 'users', 'vouchers', 'imports', 'voucherExchange', 'suppliers', 'stationNodes', 'customerRenewal', 'contracts', 'reconciliation', 'auditlog', 'errorlogs', 'feedback', 'reports', 'settings'];
     const stored = localStorage.getItem('admin_active_tab');
-    return stored && validTabs.includes(stored) ? stored : 'providers';
+    return stored && validTabs.includes(stored) ? stored : 'brands';
   });
 
   const handleTabChange = (tab: string) => {
@@ -261,7 +261,7 @@ export default function AdminScreen() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [filterFuelType, setFilterFuelType] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
-  const [filterProvider, setFilterProvider] = useState("");
+  const [filterBrand, setFilterBrand] = useState("");
   const [filterAmount, setFilterAmount] = useState("");
   const [filterExpirationDate, setFilterExpirationDate] = useState("");
   const [selectedVoucherIds, setSelectedVoucherIds] = useState<Set<string>>(new Set());
@@ -283,15 +283,15 @@ export default function AdminScreen() {
     liters: number;
     fuelType: { name: string } | null;
     fuelTypeId: string;
-provider: string;
-      /** The company we bought the voucher from. Not the brand above - that is `provider`. */
+brand: string;
+      /** The company we bought the voucher from. Not the brand above - that is `brand`. */
       supplierId: string | null;
       supplierName: string | null;
       /** UAH per liter, stamped by the import batch. Null = cost never entered, not zero. */
       costPerLiter: number | null;
       /** Real term printed on the supplier's document - the ceiling. Staff-only. */
-      providerExpirationDate: string;
-    /** What the customer was sold. Diverges from the provider term once short terms ship. */
+      brandExpirationDate: string;
+    /** What the customer was sold. Diverges from the brand term once short terms ship. */
     customerExpirationDate: string;
 voucherNumber: string;
   createdAtUtc: string;
@@ -302,7 +302,7 @@ voucherNumber: string;
   interface PurchaseType {
     id: string;
     userId: string;
-    provider: string;
+    brand: string;
     fuelTypeId: string;
     liters: number;
     quantity: number;
@@ -318,7 +318,7 @@ voucherNumber: string;
     refundMonobankStatus: string | null;
     lineItems: {
       id: string;
-      provider: string;
+      brand: string;
       fuelTypeId: string;
       liters: number;
       quantity: number;
@@ -560,12 +560,12 @@ voucherNumber: string;
     total: number;
     globalTotal: number;
     fuelTypes: string[];
-    fuelTypesByProvider: Record<string, { id: string; name: string }[]>;
-    providers: string[];
+    fuelTypesByBrand: Record<string, { id: string; name: string }[]>;
+    brands: string[];
     statuses: string[];
     amounts: number[];
   }>({
-    queryKey: ["/api/admin/vouchers", page, sortBy, sortOrder, filterFuelType, filterStatus, filterProvider, filterAmount, filterExpirationDate],
+    queryKey: ["/api/admin/vouchers", page, sortBy, sortOrder, filterFuelType, filterStatus, filterBrand, filterAmount, filterExpirationDate],
     enabled: !!user,
     staleTime: 30_000,
     queryFn: async () => {
@@ -576,7 +576,7 @@ voucherNumber: string;
         sortDirection: sortOrder,
         ...(filterFuelType ? { fuelTypeId: filterFuelType } : {}),
         ...(filterStatus ? { status: filterStatus } : {}),
-        ...(filterProvider ? { provider: filterProvider } : {}),
+        ...(filterBrand ? { brand: filterBrand } : {}),
         ...(filterAmount ? { amount: filterAmount } : {}),
         ...(filterExpirationDate ? { expirationDate: filterExpirationDate } : {})
       });
@@ -590,11 +590,11 @@ voucherNumber: string;
   const globalTotal = vouchersResponse?.globalTotal || 0;
   // Scoped by the selected brand, so the operator cannot pick a pairing that can never match a
   // voucher. With no brand chosen, every fuel any voucher actually carries is offered.
-  const fuelTypesByProvider = vouchersResponse?.fuelTypesByProvider || {};
-  const dropdownFuelTypes: { id: string; name: string }[] = filterProvider
-    ? fuelTypesByProvider[filterProvider] || []
-    : Object.values(fuelTypesByProvider).flat();
-  const dropdownProviders = vouchersResponse?.providers || [];
+  const fuelTypesByBrand = vouchersResponse?.fuelTypesByBrand || {};
+  const dropdownFuelTypes: { id: string; name: string }[] = filterBrand
+    ? fuelTypesByBrand[filterBrand] || []
+    : Object.values(fuelTypesByBrand).flat();
+  const dropdownBrands = vouchersResponse?.brands || [];
   const dropdownStatuses = vouchersResponse?.statuses || [];
   const dropdownAmounts = vouchersResponse?.amounts || [];
 
@@ -771,7 +771,7 @@ voucherNumber: string;
     matched: boolean;
     fuelTypeId: string | null;
     fuelTypeName: string | null;
-    provider: string | null;
+    brand: string | null;
     importLiters: number | null;
     warning: string | null;
   }
@@ -958,14 +958,14 @@ voucherNumber: string;
   return (
     <Layout activeTab={activeTab} onTabChange={handleTabChange} onLogout={async () => { await logout(); setUser(null); setLoggedIn(false); }} user={user} badges={{ voucherExchange: exchangeAttentionCount }}>
       <div className="space-y-6">
-        {/* Providers Tab (new consolidated view) */}
-        {activeTab === 'providers' && (
+        {/* Brands Tab (new consolidated view) */}
+        {activeTab === 'brands' && (
           <div className="animate-in fade-in duration-300">
             <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
               <Building className="w-6 h-6 text-primary" />
-              {t('nav.providers')}
+              {t('nav.brands')}
             </h2>
-            <ProvidersTab onNavigateToImports={() => handleTabChange('imports')} />
+            <BrandsTab onNavigateToImports={() => handleTabChange('imports')} />
           </div>
         )}
 
@@ -991,7 +991,7 @@ voucherNumber: string;
           </div>
         )}
 
-        {/* Voucher Exchange Tab (Заміна талонів — operator→provider stock renewal, #104) */}
+        {/* Voucher Exchange Tab (Заміна талонів — operator→brand stock renewal, #104) */}
         {activeTab === 'voucherExchange' && (
           <div className="animate-in fade-in duration-300">
             <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
@@ -1211,7 +1211,7 @@ voucherNumber: string;
                     <tr key={purchase.id} className="border-border">
                       <td className="p-4 font-mono text-xs" title={purchase.id}>{index + 1}</td>
                       <td className="p-4">{clientLabel(purchase.userId)}</td>
-                      <td className="p-4">{purchase.provider}</td>
+                      <td className="p-4">{purchase.brand}</td>
                       <td className="p-4">{fuelNameById.get(purchase.fuelTypeId) || purchase.fuelTypeId}</td>
                       <td className="p-4">{purchase.liters}L</td>
                       <td className="p-4 text-primary font-bold">{purchase.price} UAH</td>
@@ -1545,21 +1545,21 @@ voucherNumber: string;
                       </SelectContent>
                     </Select>
 
-                    <Select value={filterProvider || "all"} onValueChange={(val) => {
-                      setFilterProvider(val === "all" ? "" : val);
+                    <Select value={filterBrand || "all"} onValueChange={(val) => {
+                      setFilterBrand(val === "all" ? "" : val);
                       // The fuel filter is scoped to the brand, so a fuel chosen under the old
                       // brand may not exist under the new one. Drop it rather than leave a filter
                       // that silently returns nothing.
-                      if (val !== "all" && filterFuelType && !(fuelTypesByProvider[val] || []).some((f) => f.id === filterFuelType))
+                      if (val !== "all" && filterFuelType && !(fuelTypesByBrand[val] || []).some((f) => f.id === filterFuelType))
                         setFilterFuelType("");
                       setPage(1);
                     }}>
                       <SelectTrigger className="w-[140px] bg-muted border-border text-foreground rounded-lg h-9">
-                        <SelectValue placeholder={t('vouchers.provider')} />
+                        <SelectValue placeholder={t('vouchers.brand')} />
                       </SelectTrigger>
                       <SelectContent className="text-foreground shadow-2xl">
-                        <SelectItem value="all">{t('vouchers.allProviders')}</SelectItem>
-                        {dropdownProviders.map((p: string) => (
+                        <SelectItem value="all">{t('vouchers.allBrands')}</SelectItem>
+                        {dropdownBrands.map((p: string) => (
                           <SelectItem key={p} value={p}>{p}</SelectItem>
                         ))}
                       </SelectContent>
@@ -1583,14 +1583,14 @@ voucherNumber: string;
                       className="w-[140px] bg-muted border-border text-foreground rounded-lg h-9 text-xs"
                     />
 
-                    {(filterFuelType || filterStatus || filterProvider || filterAmount || filterExpirationDate) && (
+                    {(filterFuelType || filterStatus || filterBrand || filterAmount || filterExpirationDate) && (
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => {
                           setFilterFuelType("");
                           setFilterStatus("");
-                          setFilterProvider("");
+                          setFilterBrand("");
                           setFilterAmount("");
                           setFilterExpirationDate("");
                           setPage(1);
@@ -1636,7 +1636,7 @@ voucherNumber: string;
                         { id: 'qrCodeData', label: t('vouchers.image'), sortable: false },
                         { id: 'amount', label: t('vouchers.volume'), sortable: true },
                         { id: 'fuelType', label: t('vouchers.fuelType'), sortable: true },
-                        { id: 'provider', label: t('vouchers.provider'), sortable: true },
+                        { id: 'brand', label: t('vouchers.brand'), sortable: true },
                         { id: 'supplier', label: t('vouchers.supplier'), sortable: true },
                         { id: 'costPerLiter', label: t('vouchers.costPerLiter'), sortable: true },
                         { id: 'expirationDate', label: t('vouchers.expires'), sortable: true },
@@ -1689,7 +1689,7 @@ voucherNumber: string;
                               {v.fuelType?.name || v.fuelTypeId}
                             </span>
                           </td>
-                          <td className="p-4 font-medium text-foreground/80 uppercase">{v.provider || "Unknown"}</td>
+                          <td className="p-4 font-medium text-foreground/80 uppercase">{v.brand || "Unknown"}</td>
                           <td className="p-4 text-muted-foreground">
                             {v.supplierName || <span className="opacity-50">-</span>}
                           </td>
@@ -1700,10 +1700,10 @@ voucherNumber: string;
                             {formatMoney(v.costPerLiter)}
                           </td>
                           <td className="p-4 text-muted-foreground font-mono text-xs">
-                            {v.providerExpirationDate ? formatDate(v.providerExpirationDate) : '-'}
+                            {v.brandExpirationDate ? formatDate(v.brandExpirationDate) : '-'}
                             {/* Only worth a second line once we sell shorter terms than we bought -
                                 today the two are always identical. */}
-                            {v.customerExpirationDate !== v.providerExpirationDate && (
+                            {v.customerExpirationDate !== v.brandExpirationDate && (
                               <div className="text-[10px] text-muted-foreground/70">
                                 {t('vouchers.customerExpires')}: {formatDate(v.customerExpirationDate)}
                               </div>
@@ -1861,7 +1861,7 @@ voucherNumber: string;
                           <div key={b.fuelTypeId} className="flex flex-wrap items-end gap-4 rounded-lg border border-border p-4">
                             <div className="min-w-[180px] flex-1">
                               <div className="font-semibold">{b.fuelTypeName || b.fuelTypeId}</div>
-                              <div className="text-xs uppercase text-muted-foreground">{b.provider}</div>
+                              <div className="text-xs uppercase text-muted-foreground">{b.brand}</div>
                               <div className="text-xs text-muted-foreground mt-1">{t('imports.batchStock', b.voucherCount, b.totalLiters)}</div>
                             </div>
                             <div className="w-40">
@@ -1929,10 +1929,10 @@ voucherNumber: string;
                           </thead>
                           <tbody>
                             {batchPnl.map((b: any) => (
-                              <tr key={`${b.fuelTypeId}-${b.provider}`} className="border-b border-border/50">
+                              <tr key={`${b.fuelTypeId}-${b.brand}`} className="border-b border-border/50">
                                 <td className="p-2">
                                   <div className="font-semibold">{b.fuelTypeName || b.fuelTypeId}</div>
-                                  <div className="text-xs uppercase text-muted-foreground">{b.provider}</div>
+                                  <div className="text-xs uppercase text-muted-foreground">{b.brand}</div>
                                 </td>
                                 <td className="p-2 text-right font-mono">{b.vouchersSold} · {b.litersSold} L</td>
                                 <td className="p-2 text-right font-mono">{b.vouchersRemaining} · {b.litersRemaining} L</td>
@@ -1975,7 +1975,7 @@ voucherNumber: string;
                   <table className="w-full">
                     <thead className="bg-muted">
                       <tr>
-                        <th className="text-left p-4">{t('vouchers.provider')}</th>
+                        <th className="text-left p-4">{t('vouchers.brand')}</th>
                         <th className="text-left p-4">{t('vouchers.fuelType')}</th>
                         <th className="text-left p-4">{t('vouchers.volume')}</th>
                         <th className="text-left p-4">{t('imports.number')}</th>
@@ -1999,13 +1999,13 @@ voucherNumber: string;
                         };
                         return (
                           <tr key={v.id} className="border-border hover:bg-foreground/5">
-                            <td className="p-4 uppercase">{v.provider}</td>
+                            <td className="p-4 uppercase">{v.brand}</td>
                             <td className="p-4">{v.fuelTypeName || v.fuelTypeId}</td>
                             <td className="p-4">{v.liters}L</td>
                             <td className="p-4 font-mono text-xs">{v.voucherNumber}</td>
                             <td className="p-4 text-sm">
-                              {v.providerExpirationDate}
-                              {v.customerExpirationDate !== v.providerExpirationDate && (
+                              {v.brandExpirationDate}
+                              {v.customerExpirationDate !== v.brandExpirationDate && (
                                 <div className="text-[10px] text-muted-foreground">
                                   {t('vouchers.customerExpires')}: {v.customerExpirationDate}
                                 </div>
@@ -2177,8 +2177,8 @@ voucherNumber: string;
                     <p className="text-xs text-muted-foreground">{t('reconciliation.orphanVouchers')}</p>
                   </div>
                   <div className="glass-panel p-4">
-                    <p className="text-sm text-muted-foreground">{t('reconciliation.providersDeficit')}</p>
-                    <p className={`text-2xl font-bold ${reconciliationData.summary.lowInventoryProviders > 0 ? 'text-warning' : 'text-success'}`}>{reconciliationData.summary.lowInventoryProviders}</p>
+                    <p className="text-sm text-muted-foreground">{t('reconciliation.brandsDeficit')}</p>
+                    <p className={`text-2xl font-bold ${reconciliationData.summary.lowInventoryBrands > 0 ? 'text-warning' : 'text-success'}`}>{reconciliationData.summary.lowInventoryBrands}</p>
                     <p className="text-xs text-muted-foreground">{reconciliationData.summary.importErrors7d} {t('reconciliation.importErrors7d')}</p>
                   </div>
                 </div>
@@ -2220,7 +2220,7 @@ voucherNumber: string;
                       <thead className="bg-muted">
                         <tr>
                           <th className="text-left p-3">{t('reconciliation.threeOrder')}</th>
-                          <th className="text-left p-3">{t('report.provider')}</th>
+                          <th className="text-left p-3">{t('report.brand')}</th>
                           <th className="text-left p-3">{t('report.fuel')}</th>
                           <th className="text-right p-3">{t('report.amountHeader')}</th>
                           <th className="text-left p-3">{t('reconciliation.threePayment')}</th>
@@ -2244,7 +2244,7 @@ voucherNumber: string;
                           return (
                             <tr key={row.orderId} className="border-border">
                               <td className="p-3 font-mono text-xs">{row.orderId.slice(0, 8)}</td>
-                              <td className="p-3 uppercase">{row.provider}</td>
+                              <td className="p-3 uppercase">{row.brand}</td>
                               <td className="p-3">{row.fuelType}</td>
                               <td className="p-3 text-right">{formatMoney(row.totalPrice)}</td>
                               <td className="p-3">
@@ -2533,7 +2533,7 @@ voucherNumber: string;
                       <thead className="bg-muted">
                         <tr>
                           <th className="text-left p-3">{t('report.paymentId')}</th>
-                          <th className="text-left p-3">{t('report.provider')}</th>
+                          <th className="text-left p-3">{t('report.brand')}</th>
                           <th className="text-left p-3">{t('report.fuel')}</th>
                           <th className="text-right p-3">{t('report.amountHeader')}</th>
                           <th className="text-right p-3">{t('report.liters')}</th>
@@ -2547,7 +2547,7 @@ voucherNumber: string;
                         {reportData.payments.map((p: any) => (
                           <tr key={p.orderId} className="border-border">
                             <td className="p-3 font-mono text-xs text-muted-foreground">{p.orderId.slice(0, 8)}</td>
-                            <td className="p-3 uppercase text-xs">{p.provider || '—'}</td>
+                            <td className="p-3 uppercase text-xs">{p.brand || '—'}</td>
                             <td className="p-3">{p.fuelName || p.fuelType || '—'}</td>
                             <td className="p-3 text-right font-mono">{formatMoney(p.amount)}</td>
                             <td className="p-3 text-right">{(p.liters / p.quantity)}L</td>
@@ -2595,7 +2595,7 @@ voucherNumber: string;
                       <thead className="bg-muted">
                         <tr>
                           <th className="text-left p-3">{t('report.redemptionId')}</th>
-                          <th className="text-left p-3">{t('report.provider')}</th>
+                          <th className="text-left p-3">{t('report.brand')}</th>
                           <th className="text-left p-3">{t('report.fuelName')}</th>
                           <th className="text-right p-3">{t('report.liters')}</th>
                           <th className="text-left p-3">{t('report.redeemedAt')}</th>
@@ -2605,7 +2605,7 @@ voucherNumber: string;
                         {reportData.redemptions.map((r: any) => (
                           <tr key={r.voucherId} className="border-border">
                             <td className="p-3 font-mono text-xs text-muted-foreground">{r.voucherId.slice(0, 8)}</td>
-                            <td className="p-3 uppercase">{r.provider || '—'}</td>
+                            <td className="p-3 uppercase">{r.brand || '—'}</td>
                             <td className="p-3">{r.fuelName || r.fuelType || '—'}</td>
                             <td className="p-3 text-right">{r.liters}L</td>
                             <td className="p-3 text-xs text-muted-foreground">{formatDate(r.redeemedAt)}</td>

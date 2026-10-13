@@ -235,10 +235,10 @@ public sealed class MyCompanyMembershipsIntegrationTests : IClassFixture<TestDat
         seed.FuelVouchers.Add(new FuelVoucher
         {
             Id = id,
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-95",
             Liters = 50m,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             VoucherNumber = $"OKKO-{id:N}"[..20],
             QrPayload = $"payload-{id:N}",

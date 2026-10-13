@@ -99,7 +99,7 @@ public sealed class RenewalCheckoutCommandHandlerTests : IDisposable
         order.IdempotencyKey.Should().StartWith("renew:");
 
         var line = order.LineItems.Should().ContainSingle().Subject;
-        line.Provider.Should().Be(source.Provider);
+        line.Brand.Should().Be(source.Brand);
         line.FuelTypeId.Should().Be(source.FuelTypeId);
         line.Liters.Should().Be(50m);
         line.Quantity.Should().Be(1);
@@ -368,7 +368,7 @@ public sealed class RenewalCheckoutCommandHandlerTests : IDisposable
     }
 
     /// <summary>
-    /// Seeds a customer voucher. The provider term defaults to well past the customer term so the
+    /// Seeds a customer voucher. The brand term defaults to well past the customer term so the
     /// date rules under test are not shadowed by the ceiling; pass <paramref name="providerExpiry"/>
     /// explicitly to exercise the ceiling itself.
     /// </summary>
@@ -379,10 +379,10 @@ public sealed class RenewalCheckoutCommandHandlerTests : IDisposable
         var voucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-95",
             Liters = liters,
-            ProviderExpirationDate = providerExpiry ?? expiry.AddYears(1),
+            SupplierExpirationDate = providerExpiry ?? expiry.AddYears(1),
             CustomerExpirationDate = expiry,
             VoucherNumber = $"V-{Guid.NewGuid():N}"[..16],
             QrPayload = $"qr-{Guid.NewGuid():N}",
@@ -401,10 +401,10 @@ public sealed class RenewalCheckoutCommandHandlerTests : IDisposable
         _context.FuelVouchers.Add(new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Provider = matching.Provider,
+            Brand = matching.Brand,
             FuelTypeId = matching.FuelTypeId,
             Liters = matching.Liters,
-            ProviderExpirationDate = expiry,
+            SupplierExpirationDate = expiry,
             CustomerExpirationDate = expiry,
             VoucherNumber = $"S-{Guid.NewGuid():N}"[..16],
             QrPayload = $"qr-{Guid.NewGuid():N}",

@@ -149,7 +149,7 @@ public class ParserTests : IDisposable
         // Assert
         result.Should().HaveCount(1);
         var parsed = result.First();
-        parsed.Provider.Should().Be("OKKO");
+        parsed.Brand.Should().Be("OKKO");
         parsed.FuelTypeId.Should().Be("okko-dp");
         parsed.Liters.Should().Be(20m);
         parsed.ExpirationDate.Should().Be(new DateOnly(2025, 6, 17));
@@ -292,7 +292,7 @@ public class ParserTests : IDisposable
 
         result.Should().HaveCount(1);
         var parsed = result.First();
-        parsed.Provider.Should().Be("WOG");
+        parsed.Brand.Should().Be("WOG");
         parsed.FuelTypeId.Should().Be("wog-95-euro");
         parsed.Liters.Should().Be(10m);
         parsed.ExpirationDate.Should().Be(new DateOnly(2026, 5, 13));
@@ -347,7 +347,7 @@ public class ParserTests : IDisposable
         // production catalog, tripped the fuel_type_id foreign key and 500'd the whole import.
         result.Should().HaveCount(1);
         var parsed = result.First();
-        parsed.Provider.Should().Be("WOG");
+        parsed.Brand.Should().Be("WOG");
         parsed.FuelTypeId.Should().BeNull();
         parsed.Liters.Should().Be(20m);
         parsed.VoucherNumber.Should().Be("99999600000020368126");
@@ -406,7 +406,7 @@ public class ParserTests : IDisposable
 
         result.Should().HaveCount(1);
         var parsed = result.First();
-        parsed.Provider.Should().Be("WOG");
+        parsed.Brand.Should().Be("WOG");
         parsed.FuelTypeId.Should().Be("wog-95-euro");
         parsed.Liters.Should().Be(20m);
         parsed.ExpirationDate.Should().Be(new DateOnly(2026, 2, 9));

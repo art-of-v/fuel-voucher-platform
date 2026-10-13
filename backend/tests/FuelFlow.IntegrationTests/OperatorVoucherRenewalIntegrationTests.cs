@@ -1,6 +1,6 @@
 using FluentAssertions;
 using FuelFlow.Features.Orders.SharedModels;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Renewal.Checkout;
 using FuelFlow.Features.Vouchers.Renewal.Operator;
@@ -84,7 +84,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
         row.ActingUserId.Should().Be(actingUserId);
         row.InvoiceNumber.Should().Be("INV-1");
 
-        var audit = await verify.ProviderEventOutbox.AsNoTracking()
+        var audit = await verify.AuditEventOutbox.AsNoTracking()
             .Where(e => e.AggregateId == voucherId.ToString() && e.EventType == "VoucherRenewedByOperator")
             .ToListAsync();
         audit.Should().ContainSingle();
@@ -520,7 +520,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
     // ---- Helpers -------------------------------------------------------------------------------
 
     private static ConfirmOperatorRenewalCommandHandler Handler(ApplicationDbContext ctx)
-        => new(ctx, new ProviderEventService(ctx));
+        => new(ctx, new AuditEventService(ctx));
 
     private static void SeedUser(ApplicationDbContext ctx, Guid userId)
         => ctx.Users.Add(new User
@@ -555,14 +555,14 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
         return orderId;
     }
 
-    private static FuelVoucher CustomerVoucher(Guid id, Guid userId, Guid orderId, string provider, string fuelTypeId, decimal liters, DateOnly expiry)
+    private static FuelVoucher CustomerVoucher(Guid id, Guid userId, Guid orderId, string brand, string fuelTypeId, decimal liters, DateOnly expiry)
         => new()
         {
             Id = id,
-            Provider = provider,
+            Brand = brand,
             FuelTypeId = fuelTypeId,
             Liters = liters,
-            ProviderExpirationDate = expiry,
+            SupplierExpirationDate = expiry,
             CustomerExpirationDate = expiry,
             VoucherNumber = $"CUS-{id:N}"[..16],
             QrPayload = $"qr-{id:N}",
@@ -573,14 +573,14 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
             UpdatedAtUtc = DateTime.UtcNow
         };
 
-    private static FuelVoucher StockVoucher(Guid id, string provider, string fuelTypeId, decimal liters, DateOnly expiry, decimal? costPerLiter = null)
+    private static FuelVoucher StockVoucher(Guid id, string brand, string fuelTypeId, decimal liters, DateOnly expiry, decimal? costPerLiter = null)
         => new()
         {
             Id = id,
-            Provider = provider,
+            Brand = brand,
             FuelTypeId = fuelTypeId,
             Liters = liters,
-            ProviderExpirationDate = expiry,
+            SupplierExpirationDate = expiry,
             CustomerExpirationDate = expiry,
             VoucherNumber = $"STK-{id:N}"[..16],
             QrPayload = $"qr-{id:N}",

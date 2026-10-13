@@ -124,10 +124,10 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
             context.FuelVouchers.Add(new FuelVoucher
             {
                 Id = Guid.CreateVersion7(),
-                Provider = stationId.ToUpperInvariant(),
+                Brand = stationId.ToUpperInvariant(),
                 FuelTypeId = fuelTypeId,
                 Liters = liters,
-                ProviderExpirationDate = expiry,
+                SupplierExpirationDate = expiry,
                 CustomerExpirationDate = expiry,
                 VoucherNumber = $"STOCK-{stationId}-{fuelTypeId}-{liters}-{Guid.NewGuid().ToString()[..8]}",
                 QrPayload = Guid.NewGuid().ToString(),
@@ -150,7 +150,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
 
         var request = new CreateCheckoutCommand
         {
-            Provider = "okko",
+            Brand = "okko",
             FuelTypeId = "okko-95",
             Liters = 50,
             Quantity = 1,
@@ -177,7 +177,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
         // Arrange
         var request = new CreateCheckoutCommand
         {
-            Provider = "okko",
+            Brand = "okko",
             FuelTypeId = "okko-95",
             Liters = 50,
             Quantity = 1,
@@ -200,7 +200,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
 
         var request = new CreateCheckoutCommand
         {
-            Provider = "", // Invalid
+            Brand = "", // Invalid
             FuelTypeId = "okko-95",
             Liters = 50,
             Quantity = 1,
@@ -226,7 +226,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
 
         var createRequest = new CreateCheckoutCommand
         {
-            Provider = "wog",
+            Brand = "wog",
             FuelTypeId = "wog-95",
             Liters = 20,
             Quantity = 2,
@@ -246,7 +246,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
         var purchases = await response.Content.ReadFromJsonAsync<List<PurchaseDto>>();
         Assert.NotNull(purchases);
         Assert.NotEmpty(purchases);
-        Assert.Contains(purchases, p => p.Provider == "wog");
+        Assert.Contains(purchases, p => p.Brand == "wog");
     }
 
     [Fact]
@@ -261,7 +261,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
 
         var createRequest = new CreateCheckoutCommand
         {
-            Provider = "okko",
+            Brand = "okko",
             FuelTypeId = "okko-dp",
             Liters = 50,
             Quantity = 1,
@@ -302,7 +302,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
 
         var createRequest = new CreateCheckoutCommand
         {
-            Provider = "okko",
+            Brand = "okko",
             FuelTypeId = "okko-95",
             Liters = 20,
             Quantity = 1,
@@ -342,7 +342,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
 
         var request = new CreateCheckoutCommand
         {
-            Provider = "okko",
+            Brand = "okko",
             FuelTypeId = "okko-95",
             Liters = 50,
             Quantity = 1,
@@ -375,7 +375,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
 
         var request = new CreateCheckoutCommand
         {
-            Provider = "wog",
+            Brand = "wog",
             FuelTypeId = "wog-dp",
             Liters = 10,
             Quantity = 1,
