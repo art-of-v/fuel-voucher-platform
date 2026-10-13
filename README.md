@@ -498,6 +498,22 @@ cd backend/src/FuelFlow.API
 dotnet ef database update
 ```
 
+### Running the backend tests
+
+```bash
+cd backend
+dotnet test tests/FuelFlow.UnitTests/FuelFlow.UnitTests.csproj
+dotnet test tests/FuelFlow.IntegrationTests/FuelFlow.IntegrationTests.csproj
+```
+
+Nothing needs to be running first. The integration suite starts its own containers: one Postgres for
+the whole suite (migrated once, then cloned per test class) and one Redis. **Redis is not optional
+there** — the API resolves `ConnectionStrings:Redis` and falls back to `localhost:6379`, so a test
+host without Redis does not fail, it *stalls*: every request that touches the device-signature
+nonce cache waits out StackExchange.Redis' 5 s timeout and then throws. That was 92% of the suite's
+wall time before the fixture supplied a container. The container is configured with production's
+`--maxmemory 128mb --maxmemory-policy noeviction` on purpose — see `TestDatabaseFixture.cs`.
+
 ---
 
 ## Environment variables
