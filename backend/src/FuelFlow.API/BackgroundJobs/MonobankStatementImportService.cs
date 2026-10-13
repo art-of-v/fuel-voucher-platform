@@ -89,7 +89,22 @@ public class MonobankStatementImportService
         var client = _monobankClientFactory.ForMerchant(merchant);
         var items = await client.GetStatementAsync(fromUtc, toUtc, cancellationToken);
 
-        if (items.Count == 0)
+        // Defence in depth behind the client, which already refuses a row it cannot name. Two rows
+        // sharing one key would throw out of ToDictionary and cost the whole period, and one nameless
+        // row keyed as "" would overwrite the other forever - so the guard sits here rather than
+        // trusting every future IMonobankClient to have made the same call.
+        var nameable = items
+            .Where(i => !string.IsNullOrWhiteSpace(i.StatementId))
+            .ToList();
+
+        if (nameable.Count != items.Count)
+        {
+            _logger.LogWarning(
+                "Skipped {Count} {Merchant} statement row(s) that carry no id to file them under",
+                items.Count - nameable.Count, merchant);
+        }
+
+        if (nameable.Count == 0)
         {
             _logger.LogDebug(
                 "No statement rows for the {Merchant} merchant in [{From} - {To})", merchant, fromUtc, toUtc);
@@ -98,7 +113,7 @@ public class MonobankStatementImportService
 
         var now = DateTime.UtcNow;
 
-        var statementIds = items.Select(i => i.StatementId).Distinct().ToList();
+        var statementIds = nameable.Select(i => i.StatementId).Distinct().ToList();
 
         // One query for everything this pass touches, rather than a lookup per row: a busy month is
         // thousands of rows and the per-row variant turns that into thousands of round trips.
@@ -109,7 +124,7 @@ public class MonobankStatementImportService
         var inserted = 0;
         var updated = 0;
 
-        foreach (var item in items)
+        foreach (var item in nameable)
         {
             var entry = new MonobankStatementEntry
             {
@@ -120,10 +135,11 @@ public class MonobankStatementImportService
                 AmountKopecks = item.Amount,
                 Ccy = item.Ccy,
                 Status = item.Status,
-                AcquirerCreatedAtUtc = item.CreatedDate,
-                AcquirerModifiedAtUtc = item.ModifiedDate,
-                ExtRef = item.ExtRef,
-                MaskedCard = item.MaskedCard,
+                // `date` is the financial operation time - the period the act filters on. It is not
+                // the moment the row was created on the acquirer's side, and there is no separate
+                // value for that: the statement reports one timestamp per row.
+                AcquirerCreatedAtUtc = item.Date,
+                MaskedCard = item.MaskedPan,
                 Rrn = item.Rrn,
                 ApprovalCode = item.ApprovalCode,
                 RawPayload = item.RawJson,

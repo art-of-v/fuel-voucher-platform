@@ -33,9 +33,11 @@ internal sealed class MonobankStatementEntryConfiguration : IEntityTypeConfigura
             .HasColumnName("invoice_id")
             .HasMaxLength(200);
 
-        // Indexed because it is the primary cross-match key: the reconciler looks up by reference
-        // first and by invoice second, and neither lookup should be a sequential scan of a table
-        // that grows by a row per transaction, per merchant, forever.
+        // Indexed because it is the cross-match key the reconciler looks rows up by: the period read
+        // filters on it, and neither that nor the per-invoice lookup should be a sequential scan of a
+        // table that grows by a row per transaction, per merchant, forever. Reference is indexed
+        // because it is the acquirer's echo of ours and operators do search the act by it - it is
+        // never joined on, because it is not unique.
         builder.Property(e => e.Reference)
             .HasColumnName("reference")
             .HasMaxLength(200);

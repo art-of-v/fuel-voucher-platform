@@ -32,8 +32,16 @@ public class MonobankStatementEntry
     /// merchants, so the unique key is scoped by merchant rather than by id alone.</summary>
     public MonobankMerchant Merchant { get; set; }
 
-    /// <summary>The acquirer's own id for the row. Stable across re-fetches of the same period,
-    /// which is what makes re-importing a month idempotent.</summary>
+    /// <summary>
+    /// The key this row is filed under. OURS, composed from what the acquirer sends - the statement
+    /// carries no id of its own - and stable across re-fetches of the same period, which is what
+    /// makes re-importing a month idempotent.
+    /// </summary>
+    /// <remarks>
+    /// Composed by <c>MonobankStatementItem.ComposeStatementId()</c>: the invoice, or failing that
+    /// the payment-system id or the masked pan, then the operation time, amount and currency. It is
+    /// printed in the act an accountant signs, so it is readable rather than a hash.
+    /// </remarks>
     public string StatementId { get; set; } = null!;
 
     public string? InvoiceId { get; set; }
@@ -52,9 +60,20 @@ public class MonobankStatementEntry
     /// <summary>Acquirer-side status, in the acquirer's vocabulary.</summary>
     public string? Status { get; set; }
 
+    /// <summary>The financial operation time (<c>date</c> on the wire). The period the act filters on.</summary>
     public DateTime? AcquirerCreatedAtUtc { get; set; }
+
+    /// <summary>Kept, and empty. The documented statement payload carries one timestamp per row and
+    /// no separate modification time, so nothing populates this column today - it stays rather than
+    /// being dropped so a future acquirer field does not need a migration to accept.</summary>
     public DateTime? AcquirerModifiedAtUtc { get; set; }
+
+    /// <summary>Kept, and empty, for the same reason as <see cref="AcquirerModifiedAtUtc"/>: the
+    /// documented statement row carries no <c>extRef</c>. The value we send on <c>invoice/cancel</c>
+    /// is echoed back to us, not to the statement.</summary>
     public string? ExtRef { get; set; }
+
+    /// <summary>The masked pan, from the wire's <c>maskedPan</c>.</summary>
     public string? MaskedCard { get; set; }
     public string? Rrn { get; set; }
     public string? ApprovalCode { get; set; }

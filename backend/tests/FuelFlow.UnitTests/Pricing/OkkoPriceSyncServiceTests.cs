@@ -8,6 +8,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Xunit;
@@ -63,12 +64,12 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
         new("Pulls Diesel", 102.90m),
     ];
 
-    private OkkoPriceSyncService Service(StubClient client, bool enabled)
+    private OkkoPriceSyncService Service(StubClient client, bool enabled, ILogger<OkkoPriceSyncService>? logger = null)
         => new(
             client,
             new ImportOkkoPumpPricesCommandHandler(_context, _events),
             Options.Create(new OkkoPriceOptions { Enabled = enabled }),
-            NullLogger<OkkoPriceSyncService>.Instance);
+            logger ?? NullLogger<OkkoPriceSyncService>.Instance);
 
     /// <summary>The production seed shape: five OKKO fuels, each with a cost/margin/pump already set.</summary>
     private async Task SeedAsync(decimal pump = 50m)
@@ -184,6 +185,42 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
         _context.ChangeTracker.Clear();
         (await _context.FuelPackages.AsNoTracking().FirstAsync(p => p.Id == "okko-95-50"))
             .PumpPricePerLiter.Should().Be(50m);
+    }
+
+    // The refusal is a guard doing its job, not a fault - and this runs every 15 minutes. At Error it
+    // filled the admin error journal with the same refusal until a real failure could not be found
+    // in it; the journal only keeps Error and above, so the level is what keeps it readable.
+    [Fact]
+    public async Task Sync_ShouldReportABelowCostRefusalAsAWarning_NotAnError()
+    {
+        await SeedAsync(pump: 50m);
+        var logger = new CapturingLogger<OkkoPriceSyncService>();
+
+        // A-95 costs 40 + 3 margin = 43; a pump of 40.50 puts the ceiling under cost.
+        await Service(new StubClient(() => [new OkkoPumpPrice("A-95", 40.50m)]), enabled: true, logger)
+            .SyncPricesAsync();
+
+        var refusal = logger.Entries.Should().ContainSingle(e => e.Message.Contains("below cost")).Which;
+        refusal.Level.Should().Be(LogLevel.Warning);
+        refusal.Message.Should().Contain("A-95");
+        logger.Entries.Should().NotContain(e => e.Level >= LogLevel.Error);
+    }
+
+    private sealed class CapturingLogger<T> : ILogger<T>
+    {
+        public List<(LogLevel Level, string Message)> Entries { get; } = new();
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+            => Entries.Add((logLevel, formatter(state, exception)));
     }
 
     [Fact]
