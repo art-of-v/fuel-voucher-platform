@@ -169,12 +169,27 @@ public sealed class DeviceSignatureMiddleware
             return;
         }
 
-        // Nonce TTL must be at least as long as the timestamp tolerance, or a
-        // consumed signed request becomes replayable once its nonce is evicted
-        // from cache but its timestamp is still within the accepted window.
+        // Nonce TTL must outlast the timestamp tolerance, or a consumed signed
+        // request becomes replayable once its nonce is evicted from cache but its
+        // timestamp is still within the accepted window.
+        //
+        // Twice the tolerance, not once, and the factor is load-bearing. The timestamp
+        // check is SYMMETRIC - |now - T| <= tolerance - so a device whose clock runs up to a
+        // full tolerance FAST is accepted, which anchors the signed timestamp as late as
+        // (arrival + tolerance). The nonce is written on ARRIVAL, and the timestamp stays
+        // acceptable until (T + tolerance), i.e. up to (2 * tolerance) after the nonce was
+        // written. With a TTL of only `tolerance`, a fast-clocked device therefore had a real
+        // replay window of up to `tolerance` seconds on /api/purchases{,/bulk,/renew}: the note
+        // came down while the ticket was still valid. Ordering the nonce expiry at exactly
+        // (T + tolerance) for the worst-case anchor is what closes that window, and 2 * tolerance
+        // is the smallest value that does so for every accepted timestamp.
+        //
+        // `SignatureNonceTtlSeconds` stays as an operator floor: a configured value LOWER than
+        // the computed one cannot re-open the window, so it only ever raises it.
+        var toleranceSeconds = deviceAuthOptions.TimestampToleranceMs / 1000;
         var nonceTtlSeconds = Math.Max(
             deviceAuthOptions.SignatureNonceTtlSeconds,
-            deviceAuthOptions.TimestampToleranceMs / 1000);
+            toleranceSeconds * 2);
         await cacheService.SetAsync(
             nonce,
             "1",
