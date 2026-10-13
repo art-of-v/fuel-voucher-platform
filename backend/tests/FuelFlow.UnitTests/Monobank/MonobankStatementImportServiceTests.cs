@@ -209,16 +209,66 @@ public class MonobankStatementImportServiceTests
         (await context.MonobankStatementEntries.CountAsync()).Should().Be(2);
     }
 
+    // The configured window is wider than the acquirer accepts in one statement request, and asking
+    // for it in one request was refused outright ("to-'from' cannot be more than 31 days") - so the
+    // whole window arrived as an error and nothing was imported. These two assertions are the
+    // regression: the window is still covered end to end, and no single request exceeds the limit.
     [Fact]
-    public async Task Asks_For_A_Rolling_Window_Of_The_Configured_Length()
+    public async Task The_Configured_Window_Is_Fetched_Whole_But_Never_In_One_Request_Over_The_Limit()
     {
         var (service, _, factory) = Build(new());
 
         await service.ImportRecentStatementsAsync();
 
-        factory.LiveFroms.Should().HaveCount(1);
-        var span = factory.LiveTos[0] - factory.LiveFroms[0];
-        span.TotalDays.Should().BeApproximately(35, 0.1);
+        factory.LiveFroms.Should().HaveCountGreaterThan(1);
+        factory.LiveFroms.Zip(factory.LiveTos).Should().OnlyContain(
+            pair => pair.Second - pair.First <= TimeSpan.FromDays(MonobankStatementWindow.MaxRangeDays));
+
+        // Oldest slice first, each one ending exactly where the next begins: together they cover the
+        // configured window with nothing dropped between them and nothing counted twice.
+        factory.LiveFroms[0].Should().Be(factory.LiveTos[^1].AddDays(-35));
+        factory.LiveFroms
+            .Skip(1)
+            .Zip(factory.LiveTos)
+            .Should().OnlyContain(pair => pair.First - pair.Second == TimeSpan.Zero);
+    }
+
+    // A window the acquirer cannot serve at all - a negative or zero setting - must say so rather
+    // than report a healthy pass that found nothing, which is indistinguishable from "no activity".
+    [Fact]
+    public async Task A_Window_Covering_No_Period_Asks_The_Acquirer_For_Nothing()
+    {
+        var context = NewContext();
+        var factory = new FakeMonobankClientFactory(new());
+
+        var service = new MonobankStatementImportService(
+            context, factory,
+            Options.Create(new MonobankOptions { Enabled = true, StatementImportWindowDays = 0 }),
+            NullLogger<MonobankStatementImportService>.Instance);
+
+        await service.ImportRecentStatementsAsync();
+
+        factory.LiveFroms.Should().BeEmpty();
+        (await context.MonobankStatementEntries.CountAsync()).Should().Be(0);
+    }
+
+    // The period arrives in pieces, and one piece failing must not cost the others - or the other
+    // merchant, which is a separate account entirely.
+    [Fact]
+    public async Task One_Slice_Failing_Does_Not_Cost_The_Rest_Of_The_Period()
+    {
+        var context = NewContext();
+        var factory = new FirstSliceFailsFactory();
+
+        var service = new MonobankStatementImportService(
+            context, factory,
+            Options.Create(new MonobankOptions { Enabled = true, StatementImportWindowDays = 35 }),
+            NullLogger<MonobankStatementImportService>.Instance);
+
+        await service.ImportRecentStatementsAsync();
+
+        factory.LiveAttempts.Should().Be(2);
+        (await context.MonobankStatementEntries.SingleAsync()).StatementId.Should().Be("L2");
     }
 
     [Fact]
@@ -251,6 +301,40 @@ public class MonobankStatementImportServiceTests
 
         // Sandbox down says nothing about live, and the act is per-merchant regardless.
         (await context.MonobankStatementEntries.CountAsync()).Should().Be(1);
+    }
+
+    /// <summary>Fails the oldest slice of every merchant and serves the rest, so a test can see what
+    /// one refusal costs.</summary>
+    private sealed class FirstSliceFailsFactory : IMonobankClientFactory
+    {
+        private int _liveCalls;
+
+        public int LiveAttempts => _liveCalls;
+
+        public IMonobankClient ForMerchant(MonobankMerchant merchant) => new Client(this, merchant);
+
+        private sealed class Client(FirstSliceFailsFactory owner, MonobankMerchant merchant) : IMonobankClient
+        {
+            public Task<IReadOnlyList<MonobankStatementItem>> GetStatementAsync(DateTime fromUtc, DateTime toUtc, CancellationToken cancellationToken = default)
+            {
+                if (merchant == MonobankMerchant.Live)
+                {
+                    owner._liveCalls++;
+                    if (owner._liveCalls == 1)
+                    {
+                        throw new HttpRequestException("acquirer refused the range");
+                    }
+
+                    return Task.FromResult<IReadOnlyList<MonobankStatementItem>>(new[] { Item("L2") });
+                }
+
+                return Task.FromResult<IReadOnlyList<MonobankStatementItem>>(Array.Empty<MonobankStatementItem>());
+            }
+
+            public Task<MonobankInvoiceResponse> CreateInvoiceAsync(MonobankInvoiceRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<MonobankInvoiceStatus> GetInvoiceStatusAsync(string invoiceId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<MonobankCancelResponse> CancelInvoiceAsync(string invoiceId, long amountKopecks, string extRef, IReadOnlyList<MonobankBasketItem>? items = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        }
     }
 
     private sealed class ThrowingFactory : IMonobankClientFactory

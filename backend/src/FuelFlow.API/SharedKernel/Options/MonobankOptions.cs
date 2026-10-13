@@ -104,10 +104,17 @@ public sealed class MonobankOptions
     /// exactly the thing this table exists to make visible.
     ///
     /// The default of 35 covers a calendar month with a week of slack on either side, so a run that
-    /// was skipped, a deploy, or a delayed settlement all heal on the next pass. Note the two
-    /// settings are independent on purpose: the import window is about catching late movement, while
-    /// the reconciliation period stays a calendar month, because "October's act" has to mean
-    /// October to whoever reads it.
+    /// was missed, a deploy, or a delayed settlement all heal on the next pass. Note the two settings
+    /// are independent on purpose: the import window is about catching late movement, while the
+    /// reconciliation period stays a calendar month, because "October's act" has to mean October to
+    /// whoever reads it.
+    ///
+    /// Wider than the acquirer's own limit, deliberately: it rejects a statement request covering
+    /// more than 31 days outright, so the import fetches this window as consecutive slices rather
+    /// than as one request (see <c>MonobankStatementWindow</c>). Shortening the window below that
+    /// limit is the wrong fix - it would drop the oldest days of every pass instead of reading them -
+    /// and setting it to zero or less asks for no period at all, which the job says out loud rather
+    /// than reporting a healthy pass that found nothing.
     /// </remarks>
     public int StatementImportWindowDays { get; set; } = 35;
 
