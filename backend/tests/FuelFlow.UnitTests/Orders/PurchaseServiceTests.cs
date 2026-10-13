@@ -119,18 +119,21 @@ public OrderCommandHandlersTests()
 
     /// <summary>
     /// Checkout now refuses a package with nothing sellable behind it, so every test that expects a
-    /// completed sale needs real <c>Available</c> stock under the line it buys.
+    /// completed sale needs real <c>Available</c> stock under the line it buys. Keyed on the same
+    /// (brand, fuel, nominal) triple the handler matches on — a test that buys 10 L is not covered
+    /// by stock seeded for 50 L.
     /// </summary>
-    private void SeedSellableStock()
+    private void SeedSellableStock(string fuelTypeId = "okko-95", decimal liters = 50m)
     {
+        var expiry = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1));
         _context.FuelVouchers.Add(new FuelVoucher
         {
             Id = Guid.NewGuid(),
             Provider = "OKKO",
-            FuelTypeId = "okko-95",
-            Liters = 50m,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            FuelTypeId = fuelTypeId,
+            Liters = liters,
+            ProviderExpirationDate = expiry,
+            CustomerExpirationDate = expiry,
             VoucherNumber = $"STOCK-{Guid.NewGuid().ToString()[..8]}",
             QrPayload = Guid.NewGuid().ToString(),
             Status = VoucherStatus.Available,
@@ -201,6 +204,10 @@ public OrderCommandHandlersTests()
             CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
         });
         _context.SaveChanges();
+        // Stock behind it, so these tests reach the PRICING guard they are about. The stock gate runs
+        // first on purpose: without stock here they would all fail as out-of-stock and assert nothing
+        // about below-cost at all — which is exactly what happened before this line existed.
+        SeedSellableStock("okko-loss", 50m);
     }
 
     private CreateCheckoutCommand BelowCostCommand() => new()
@@ -389,6 +396,8 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
             CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
         });
         await _context.SaveChangesAsync();
+        // A 10 L line needs a 10 L voucher behind it; the constructor's stock is 50 L of a different fuel.
+        SeedSellableStock("okko-frac", 10m);
 
         MonobankInvoiceRequest? captured = null;
         _monobankClientMock

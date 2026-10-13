@@ -369,17 +369,14 @@ export function PackageCard({
           >
             <ShoppingCart
               size={20}
-              color={
-                isAdded || !isAvailable ? activeBrandColor : tokens.colors.text.onPrimary
-              }
+              color={isAdded || !isAvailable ? activeBrandColor : tokens.colors.text.onPrimary}
             />
             <Text
               allowFontScaling={false}
               style={[
                 styles.mainBtnText,
                 {
-                  color:
-                    isAdded || !isAvailable ? activeBrandColor : tokens.colors.text.onPrimary,
+                  color: isAdded || !isAvailable ? activeBrandColor : tokens.colors.text.onPrimary,
                 },
               ]}
             >

@@ -37,7 +37,8 @@ let mockTotal = 0;
 let mockDiscounted = 0;
 let mockIsWorker = false;
 // The catalog snapshot the availability check reads. `undefined` until a test says otherwise.
-let mockCatalog: { stationId: string; fuelTypeId: string; liters: number; isAvailable?: boolean }[] | undefined;
+let mockCatalog:
+  { stationId: string; fuelTypeId: string; liters: number; isAvailable?: boolean }[] | undefined;
 
 jest.mock('expo-router', () => {
   const R = jest.requireActual<typeof import('react')>('react');
@@ -582,7 +583,9 @@ describe('Basket - stock that ran out while the basket was open', () => {
     // A package can leave the catalog entirely (archived, or a brand no longer listed). Absent is not
     // the same as unavailable, and guessing "unavailable" here would strand a legitimate basket.
     stocked();
-    mockCatalog = [{ stationId: 'other-station', fuelTypeId: 'ft-9', liters: 5, isAvailable: true }];
+    mockCatalog = [
+      { stationId: 'other-station', fuelTypeId: 'ft-9', liters: 5, isAvailable: true },
+    ];
 
     render(<BasketScreen />);
 
