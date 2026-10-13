@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
 using Testcontainers.PostgreSql;
+using Testcontainers.Redis;
 using Xunit;
 
 namespace FuelFlow.IntegrationTests;
@@ -65,6 +66,16 @@ public sealed class TestDatabaseFixture : WebApplicationFactory<Program>, IAsync
     private const string LokiEnabledVariable = "Observability__Loki__Enabled";
 
     /// <summary>
+    /// Environment-variable form of <c>ConnectionStrings:Redis</c>, which is the channel
+    /// <c>Program.cs:121</c> reads and the same one deploy/docker-compose.prod.yml:136 sets. No new
+    /// plumbing, and no test-only branch in production code.
+    /// </summary>
+    private const string RedisConnectionStringVariable = "ConnectionStrings__Redis";
+
+    /// <summary>Pinned to the same major the production compose file runs.</summary>
+    private const string RedisImage = "redis:7-alpine";
+
+    /// <summary>
     /// The database the container is created with, migrated, and then frozen as a template. Named
     /// as before so a developer's muscle memory and the container's own default still line up.
     /// </summary>
@@ -86,6 +97,13 @@ public sealed class TestDatabaseFixture : WebApplicationFactory<Program>, IAsync
     /// <summary>Names the per-class databases <c>fuelflow_it_1..N</c>; Interlocked because the
     /// ordinal is handed out from fixture construction on several threads.</summary>
     private static int nextDatabaseOrdinal;
+
+    /// <summary>
+    /// The suite's one Redis container. Started together with <see cref="SuiteContainer"/> and
+    /// shared by every class, with no per-class reset.
+    /// </summary>
+    private static readonly Lazy<Task<RedisContainer>> SuiteRedis =
+        new(StartSuiteRedisAsync, LazyThreadSafetyMode.ExecutionAndPublication);
 
     /// <summary>
     /// The suite-wide container. Still exposed so a test that needs the container itself (rather
@@ -138,6 +156,44 @@ public sealed class TestDatabaseFixture : WebApplicationFactory<Program>, IAsync
         // composition root throw at startup (see LokiEnabledVariable). Set alongside the
         // connection string, before any host is built.
         Environment.SetEnvironmentVariable(LokiEnabledVariable, "false");
+
+        // Redis, through the very same configuration channel production uses (Program.cs:121).
+        // Before this the suite had no Redis at all, so every request that touches the cache
+        // waited out StackExchange.Redis' 5000 ms AsyncTimeout against localhost:6379 and then
+        // threw. Measured on CI: 396 RedisConnectionException events in one run, and 59 discrete
+        // stalls of >= 4.5 s accounting for 599 s of a 654 s suite. That was 92% of the wall
+        // time of the integration job, and it was not test work.
+        //
+        // Process-global on purpose, unlike the database: one Redis serves every class, and
+        // nothing here needs per-class isolation. The keys written through it are
+        // device-signature replay nonces and device challenges, both scoped to a specific device
+        // or a random nonce, so two classes cannot collide on one - and a FLUSHALL between
+        // classes would be slower than the problem it pretended to solve.
+        var redis = await SuiteRedis.Value;
+        Environment.SetEnvironmentVariable(RedisConnectionStringVariable, redis.GetConnectionString());
+    }
+
+    /// <summary>
+    /// Starts the suite's one Redis, configured the way production configures it.
+    /// </summary>
+    /// <remarks>
+    /// The options below are copied from deploy/docker-compose.prod.yml, and not for realism's
+    /// sake but because the second one is a security decision the tests are otherwise unable to
+    /// exercise: <c>noeviction</c> means a full Redis raises on write instead of silently dropping
+    /// a device-signature replay nonce, which is what keeps a signed purchase endpoint
+    /// non-replayable. A permissive default here would hide the very property the compose file
+    /// deliberately chose. The password is the one thing not carried over - the suite has no
+    /// secret to keep, and a throwaway one would only add a string to compare.
+    /// </remarks>
+    private static async Task<RedisContainer> StartSuiteRedisAsync()
+    {
+        var container = new RedisBuilder(RedisImage)
+            .WithCommand("redis-server",
+                "--maxmemory", "128mb",
+                "--maxmemory-policy", "noeviction")
+            .Build();
+        await container.StartAsync();
+        return container;
     }
 
     /// <summary>
