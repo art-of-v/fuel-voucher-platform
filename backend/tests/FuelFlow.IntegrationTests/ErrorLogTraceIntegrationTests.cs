@@ -125,7 +125,7 @@ public sealed class ErrorLogTraceIntegrationTests : IClassFixture<TestDatabaseFi
     {
         var before = await CountRowsAsync();
 
-        await using var dataSource = new NpgsqlDataSourceBuilder(_fixture.DbContainer.GetConnectionString()).Build();
+        await using var dataSource = new NpgsqlDataSourceBuilder(_fixture.ConnectionString).Build();
         var services = new ServiceCollection().AddSingleton(dataSource).BuildServiceProvider();
         var provider = new DatabaseLoggerProvider(services);
 
@@ -172,6 +172,6 @@ public sealed class ErrorLogTraceIntegrationTests : IClassFixture<TestDatabaseFi
 
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseNpgsql(_fixture.DbContainer.GetConnectionString())
+            .UseNpgsql(_fixture.ConnectionString)
             .Options);
 }

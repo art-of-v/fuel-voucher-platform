@@ -31,7 +31,7 @@ public sealed class CostEntryAuditIntegrationTests : IClassFixture<TestDatabaseF
 
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseNpgsql(_fixture.DbContainer.GetConnectionString())
+            .UseNpgsql(_fixture.ConnectionString)
             // Matches production: the API DbContext is read-only for queries and the handler
             // re-attaches explicitly. Running tracking here would hide a missing Update call.
             .Options);

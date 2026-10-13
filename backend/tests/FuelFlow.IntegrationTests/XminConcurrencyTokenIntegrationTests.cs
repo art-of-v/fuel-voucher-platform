@@ -182,7 +182,7 @@ public sealed class XminConcurrencyTokenIntegrationTests : IClassFixture<TestDat
 
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseNpgsql(_fixture.DbContainer.GetConnectionString())
+            .UseNpgsql(_fixture.ConnectionString)
             .UseQueryTrackingBehavior(QueryTrackingBehavior.TrackAll)
             .Options);
 }

@@ -358,6 +358,6 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
 
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseNpgsql(_fixture.DbContainer.GetConnectionString())
+            .UseNpgsql(_fixture.ConnectionString)
             .Options);
 }

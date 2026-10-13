@@ -253,7 +253,7 @@ public sealed class FulfillmentMismatchRepairTests : IClassFixture<TestDatabaseF
     /// </summary>
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseNpgsql(_fixture.DbContainer.GetConnectionString())
+            .UseNpgsql(_fixture.ConnectionString)
             .Options);
 
     private FulfillmentService CreateService(ApplicationDbContext context)

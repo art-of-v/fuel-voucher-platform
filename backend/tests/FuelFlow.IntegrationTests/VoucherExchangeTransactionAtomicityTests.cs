@@ -216,7 +216,7 @@ public sealed class VoucherExchangeTransactionAtomicityTests : IClassFixture<Tes
     private ApplicationDbContext CreateContext(IInterceptor? interceptor = null)
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseNpgsql(_fixture.DbContainer.GetConnectionString());
+            .UseNpgsql(_fixture.ConnectionString);
 
         if (interceptor != null)
             options.AddInterceptors(interceptor);

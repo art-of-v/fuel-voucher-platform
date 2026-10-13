@@ -608,7 +608,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
 
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseNpgsql(_fixture.DbContainer.GetConnectionString())
+            .UseNpgsql(_fixture.ConnectionString)
             .Options);
 
     private ConcurrentFulfillmentService CreateService(DualBarrier barrier, IMonobankClient monobankClient)

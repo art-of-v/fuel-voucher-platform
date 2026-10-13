@@ -136,7 +136,7 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
             // "SSL Mode=Disable" is not cosmetic here: DatabaseSetup.BuildConnectionString
             // appends SSL Mode=Require to any string that does not carry one, which a container
             // on localhost cannot satisfy.
-            .UseNpgsql(_fixture.DbContainer.GetConnectionString() + ";SSL Mode=Disable")
+            .UseNpgsql(_fixture.ConnectionString + ";SSL Mode=Disable")
             .Options;
         return new ApplicationDbContext(options);
     }

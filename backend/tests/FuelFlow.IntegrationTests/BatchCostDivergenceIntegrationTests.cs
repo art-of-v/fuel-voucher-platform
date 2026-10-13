@@ -174,7 +174,7 @@ var afterCosts = (await CostsAsync(context, importId)).Single(c => c.FuelTypeId 
 
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseNpgsql(_fixture.DbContainer.GetConnectionString())
+            .UseNpgsql(_fixture.ConnectionString)
             .Options);
 
     private static async Task ResetAsync(ApplicationDbContext context)
