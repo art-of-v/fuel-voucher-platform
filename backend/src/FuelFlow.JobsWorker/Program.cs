@@ -1,4 +1,3 @@
-using FuelFlow.SharedKernel.Observability;
 using FuelFlow.JobsWorker.Services;
 // Aliased rather than imported: the API defines its own NotificationService, so a plain
 // using would make that name ambiguous here.

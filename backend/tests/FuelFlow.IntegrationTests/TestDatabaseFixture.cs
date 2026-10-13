@@ -246,8 +246,14 @@ public sealed class TestDatabaseFixture : WebApplicationFactory<Program>, IAsync
         // command, so this is fine - but it is why this cannot be a Migrate() call.
         await using (var maintenance = new ApplicationDbContext(MaintenanceContextOptions(DbContainer)))
         {
+            // EF1002 suppressed rather than satisfied: a database name is an IDENTIFIER, and
+            // Postgres will not take an identifier as a bind parameter, so ExecuteSqlAsync cannot
+            // express this statement at all. Nothing is interpolated in from outside - both values
+            // are built from literals and an ordinal counter a few lines up.
+#pragma warning disable EF1002
             await maintenance.Database.ExecuteSqlRawAsync(
                 $"CREATE DATABASE \"{name}\" TEMPLATE \"{TemplateDatabaseName}\"");
+#pragma warning restore EF1002
         }
 
         // Pooling left at the Npgsql default (on) here, unlike the two maintenance connections:

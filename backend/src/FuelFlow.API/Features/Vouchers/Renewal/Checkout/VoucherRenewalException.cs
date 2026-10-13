@@ -17,8 +17,13 @@ public sealed class VoucherRenewalException : Exception
 {
     public string Code { get; }
 
-    /// <summary>Structured detail for this code — empty when the code needs none.</summary>
-    public IReadOnlyDictionary<string, decimal> Data { get; }
+    /// <summary>
+    /// Structured detail for this code - empty when the code needs none. Deliberately hides
+    /// <see cref="Exception.Data"/>: this is a decimal lookup the API serialises into the response
+    /// body, not the object graph a handler would stuff exception metadata into, and the two have
+    /// never shared a purpose here.
+    /// </summary>
+    public new IReadOnlyDictionary<string, decimal> Data { get; }
 
     public VoucherRenewalException(
         string code,
