@@ -30,9 +30,19 @@ public sealed class AdminFeedbackIntegrationTests : IClassFixture<TestDatabaseFi
 
     public AdminFeedbackIntegrationTests(TestDatabaseFixture fixture) => _fixture = fixture;
 
+    /// <summary>
+    /// The per-class clone the fixture made, not the container's default database.
+    /// <para>
+    /// The fixture now gives every class its own database cloned from a frozen template, and the
+    /// template itself refuses connections (`datallowconn = false`) so a stray session cannot
+    /// disturb a clone. Connecting to <c>DbContainer.GetConnectionString()</c> therefore fails
+    /// with "database ... is not currently accepting connections" - a message that reads like a
+    /// crash and is really this one wrong line.
+    /// </para>
+    /// </summary>
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseNpgsql(_fixture.DbContainer.GetConnectionString())
+            .UseNpgsql(_fixture.ConnectionString)
             .Options);
 
     [Fact]
