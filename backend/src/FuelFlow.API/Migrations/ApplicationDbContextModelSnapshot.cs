@@ -1331,12 +1331,14 @@ namespace FuelFlow.API.Migrations
                     b.HasIndex("QrParametersId");
 
                     b.HasIndex("QrPayload")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("is_deleted = false");
 
                     b.HasIndex("SupplierId");
 
                     b.HasIndex("VoucherNumber")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("is_deleted = false");
 
                     b.HasIndex("WorkerUserId");
 
