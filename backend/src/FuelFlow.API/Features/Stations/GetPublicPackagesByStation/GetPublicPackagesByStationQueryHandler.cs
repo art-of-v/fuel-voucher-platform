@@ -23,12 +23,18 @@ public sealed class GetPublicPackagesByStationQueryHandler
     // selects only store-front columns + pump (a public list number); cost/margin never leave the DB.
     public async Task<List<PublicPackageResponse>> HandleAsync(GetPublicPackagesByStationQuery query, CancellationToken ct = default)
     {
+        // Resolved before the rows for the same reason as in GetPublicPackagesQueryHandler: which
+        // packages exist depends on who is asking. The two routes must read the pool identically, or
+        // whichever of them is laxer becomes the way into the other pool's catalogue.
+        var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
+
         var rows = await _context.FuelPackages
             .AsNoTracking()
             // Same rule as GetPublicPackagesQueryHandler, and for the same reason: this is the
             // second anonymous storefront route, so a filter on one of the two would leave the
-            // rehearsal package purchasable through the other.
-            .Where(x => x.StationId == query.StationId && !x.IsTestData)
+            // rehearsal package purchasable through the other. Pool-aware there and here, because a
+            // filter that hid the QA catalogue from everyone also hid it from QA.
+            .Where(x => x.StationId == query.StationId && x.IsTestData == isTestAccount)
             .OrderBy(x => x.FuelName)
             .ThenBy(x => x.Liters)
             .Select(x => new
@@ -44,7 +50,6 @@ public sealed class GetPublicPackagesByStationQueryHandler
             })
             .ToListAsync(ct);
 
-        var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
         var available = await _stock.AvailableKeysAsync(isTestAccount, ct);
 
         return rows
