@@ -135,6 +135,7 @@ public sealed class AdminLoginHandlersTests : IDisposable
     [InlineData(SeedRoles.AdminName)]
     [InlineData(SeedRoles.ProductOwnerName)]
     [InlineData(SeedRoles.ManagerName)]
+    [InlineData(SeedRoles.QaName)]
     public async Task AdminSendCode_StaffPhone_GeneratesAndSendsCode(string staffRole)
     {
         const string phone = "+380991112233";

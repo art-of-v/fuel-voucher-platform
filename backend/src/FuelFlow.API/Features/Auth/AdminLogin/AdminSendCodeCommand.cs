@@ -19,11 +19,11 @@ public sealed record AdminSendCodeCommand(string PhoneNumber);
 /// </summary>
 public sealed class AdminSendCodeCommandHandler
 {
-    // Staff role names, spelled out as a list because EF Core cannot translate the
-    // SeedRoles.IsStaff method call into SQL. Mirrors the set enforced by the "Staff"
-    // authorization policy and by AdminUserController.
-    private static readonly string[] StaffRoleNames =
-        [SeedRoles.ProductOwnerName, SeedRoles.AdminName, SeedRoles.ManagerName];
+    // SeedRoles.StaffRoleNames, not a private copy: EF Core cannot translate the
+    // SeedRoles.IsStaff method call into SQL, so the names are spelled out — but they must be
+    // spelled out ONCE. A local list of the same names silently omitted every role added later,
+    // which is how a role could exist and still be unable to sign in to the admin panel.
+    private static readonly string[] StaffRoleNames = SeedRoles.StaffRoleNames;
 
     private readonly ApplicationDbContext _context;
     private readonly IPhoneNumberService _phoneNumberService;

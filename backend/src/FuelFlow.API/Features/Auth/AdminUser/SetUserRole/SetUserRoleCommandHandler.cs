@@ -55,8 +55,8 @@ public sealed class SetUserRoleCommandHandler
         }
 
         // Cannot demote the last active ProductOwner.
-        if (AuthorizationHelpers.RoleEquals(target.Role?.Name, "ProductOwner") &&
-            !AuthorizationHelpers.RoleEquals(command.RoleName, "ProductOwner"))
+        if (AuthorizationHelpers.RoleEquals(target.Role?.Name, SeedRoles.ProductOwnerName) &&
+            !AuthorizationHelpers.RoleEquals(command.RoleName, SeedRoles.ProductOwnerName))
         {
             var otherOwners = await _context.Users
                 .AsNoTracking()
