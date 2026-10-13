@@ -69,7 +69,13 @@ public static class FeedbackDeepLink
     /// when the feature is not configured, so callers can report "unavailable" instead of handing the
     /// user a link that opens nothing.
     /// </summary>
-    public static string? BuildDeepLink(string botUsername, string payload)
+    /// <remarks>
+    /// The parameters are nullable because the body already treats them that way —
+    /// <see cref="string.IsNullOrWhiteSpace(string)"/> is true for null — and a bot username that
+    /// never got configured arrives exactly that way. Declaring them non-nullable said otherwise
+    /// and cost the test that proves the case a suppression it did not need.
+    /// </remarks>
+    public static string? BuildDeepLink(string? botUsername, string? payload)
     {
         if (string.IsNullOrWhiteSpace(botUsername) || string.IsNullOrWhiteSpace(payload))
             return null;
