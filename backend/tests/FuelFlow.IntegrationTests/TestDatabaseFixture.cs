@@ -120,6 +120,7 @@ public sealed class TestDatabaseFixture : WebApplicationFactory<Program>, IAsync
     public async Task InitializeAsync()
     {
         DbContainer = await SuiteContainer.Value;
+        await ReapPreviousClassesAsync();
         ConnectionString = await CloneTemplateDatabaseAsync();
 
         // ";SSL Mode=Disable" is mandatory, not cosmetic: BuildConnectionString appends
@@ -151,6 +152,16 @@ public sealed class TestDatabaseFixture : WebApplicationFactory<Program>, IAsync
             .WithDatabase(TemplateDatabaseName)
             .WithUsername("postgres")
             .WithPassword("postgres")
+            // One server for the whole suite instead of one per class means one connection budget
+            // for all of them, and PostgreSQL's default of 100 is sized for a single application.
+            // ReapPreviousClassesAsync is what actually keeps the count flat; this is the headroom
+            // for the window between that sweep and the next class's host finishing its startup
+            // migrations, which overlap by design.
+            //
+            // The flags only, no `postgres` prefix: the image's entrypoint prepends the binary
+            // itself when the first argument starts with a dash, and passing it explicitly makes
+            // the server read "postgres" as a data directory and exit 1.
+            .WithCommand("-c", "max_connections=300")
             .Build();
         await container.StartAsync();
 
@@ -186,6 +197,41 @@ public sealed class TestDatabaseFixture : WebApplicationFactory<Program>, IAsync
         }
 
         return container;
+    }
+
+    /// <summary>
+    /// Drops every connection still open on a database an EARLIER test class used.
+    /// </summary>
+    /// <remarks>
+    /// Sharing one container means sharing one <c>max_connections</c> budget for all 56 classes,
+    /// where each class used to get a fresh server with its own 100 slots. Connections outlive
+    /// their class: Npgsql keeps idle connections in a pool until its idle-lifetime expires, and
+    /// each class now has its own connection string - hence its own pool - so the leftovers add up
+    /// instead of sharing one pool. Hosted CI does not sit on a clean boundary either, because a
+    /// class that builds a <c>WebApplicationFactory</c> of its own (see
+    /// <c>AuthIntegrationTests</c>) disposes it asynchronously.
+    ///
+    /// The symptom is this, 303 tests into a green run:
+    /// <c>Npgsql.PostgresException : 53300: sorry, too many clients already</c>, thrown from
+    /// <c>MigrateDatabaseOnStartup</c> while the NEXT class's host boots - a failure in a class
+    /// that has nothing to do with connections, pointing at a connection limit nobody set.
+    ///
+    /// Terminating is always safe here rather than merely usually: the databases being swept are
+    /// the throwaway clones of classes that have already finished (the collection disables
+    /// parallelisation, so no class is mid-test), and nothing can be connected to the template at
+    /// all once it is frozen. Keeping the server-wide count flat is what stops the failure from
+    /// coming back as the suite grows.
+    /// </remarks>
+    private async Task ReapPreviousClassesAsync()
+    {
+        await using var maintenance = new ApplicationDbContext(MaintenanceContextOptions(DbContainer));
+        await maintenance.Database.ExecuteSqlRawAsync(
+            """
+            SELECT pg_terminate_backend(pid)
+              FROM pg_stat_activity
+             WHERE datname LIKE 'fuelflow\_it\_%'
+               AND pid <> pg_backend_pid()
+            """);
     }
 
     /// <summary>
