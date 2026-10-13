@@ -23,6 +23,12 @@ namespace FuelFlow.API.BackgroundJobs;
 /// One pass over a rolling window per merchant, upserted on (merchant, statement_id). A window
 /// rather than a per-month fetch so a late correction is picked up on the next pass instead of being
 /// lost for good.
+/// <para>
+/// The window is fetched as consecutive slices no wider than the acquirer accepts, because the
+/// configured window is deliberately wider than that limit. Every earlier pass asked for the whole
+/// window in one request, was refused with <c>to-'from' cannot be more than 31 days</c>, and imported
+/// nothing at all - which left <c>monobank_statement_entries</c> empty and every reconciliation act
+/// built on it empty too.
 /// </para>
 /// </remarks>
 public class MonobankStatementImportService
@@ -59,34 +65,64 @@ public class MonobankStatementImportService
 
         var toUtc = DateTime.UtcNow;
         var fromUtc = toUtc.AddDays(-_options.StatementImportWindowDays);
+        var slices = MonobankStatementWindow.Split(fromUtc, toUtc);
+
+        if (slices.Count == 0)
+        {
+            // A non-positive window asks for no period at all, and would otherwise look like a
+            // perfectly healthy pass that found nothing. Said out loud, because the fix is one number
+            // in configuration.
+            _logger.LogWarning(
+                "Statement import window of {Days} day(s) covers no period; check Monobank:StatementImportWindowDays",
+                _options.StatementImportWindowDays);
+            return;
+        }
 
         foreach (var merchant in new[] { MonobankMerchant.Live, MonobankMerchant.Sandbox })
         {
-            // One merchant failing must not abort the other. Sandbox being down says nothing about
-            // live, and the act is per-merchant anyway.
+            IMonobankClient client;
+
             try
             {
-                await ImportMerchantAsync(merchant, fromUtc, toUtc, cancellationToken);
+                // Resolved once per merchant rather than once per slice: a merchant with no token
+                // raises here, and repeating that for every slice would say the same thing several
+                // times over.
+                client = _monobankClientFactory.ForMerchant(merchant);
             }
             catch (MonobankMerchantUnavailableException ex)
             {
                 // Expected, not an error: a merchant with no token configured is simply not in use.
                 _logger.LogInformation(ex, "Statement import skipped for the {Merchant} merchant", merchant);
+                continue;
             }
-            catch (Exception ex)
+
+            foreach (var slice in slices)
             {
-                _logger.LogError(ex, "Statement import failed for the {Merchant} merchant", merchant);
+                try
+                {
+                    await ImportMerchantAsync(client, merchant, slice.FromUtc, slice.ToUtc, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    // One slice failing must not cost the rest of the period, and must not cost the
+                    // other merchant either: the remaining slices are still importable now, and the
+                    // next pass re-reads this one regardless.
+                    _logger.LogError(
+                        ex,
+                        "Statement import failed for the {Merchant} merchant over [{From} - {To})",
+                        merchant, slice.FromUtc, slice.ToUtc);
+                }
             }
         }
     }
 
     private async Task ImportMerchantAsync(
+        IMonobankClient client,
         MonobankMerchant merchant,
         DateTime fromUtc,
         DateTime toUtc,
         CancellationToken cancellationToken)
     {
-        var client = _monobankClientFactory.ForMerchant(merchant);
         var items = await client.GetStatementAsync(fromUtc, toUtc, cancellationToken);
 
         // Defence in depth behind the client, which already refuses a row it cannot name. Two rows
