@@ -11,7 +11,7 @@ import { apiFetch } from '../../../core/api/apiClient';
 
 export interface WorkerUsageItem {
   id: string;
-  provider: string;
+  brand: string;
   fuelTypeId: string;
   voucherNumber: string;
   liters: number;

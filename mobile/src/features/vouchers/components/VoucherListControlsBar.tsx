@@ -47,10 +47,10 @@ export function VoucherListControlsBar({
   const setFilter = (patch: Partial<ListControls['filters']>) =>
     onChange({ ...controls, filters: { ...controls.filters, ...patch } });
 
-  const sortKeys: VoucherSortKey[] = ['expiry', 'provider', 'fuel', 'liters'];
+  const sortKeys: VoucherSortKey[] = ['expiry', 'brand', 'fuel', 'liters'];
   const sortLabels: Record<VoucherSortKey, string> = {
     expiry: t('voucherList.sort.expiry'),
-    provider: t('voucherList.sort.provider'),
+    brand: t('voucherList.sort.brand'),
     fuel: t('voucherList.sort.fuel'),
     liters: t('voucherList.sort.liters'),
   };
@@ -79,19 +79,19 @@ export function VoucherListControlsBar({
           onPress={() => setFilter({ hideExpired: !controls.filters.hideExpired })}
         />
 
-        {facets.providers.map((provider) => (
+        {facets.brands.map((brand) => (
           <Chip
-            key={`provider-${provider}`}
-            testID={`filter-provider-${provider}`}
-            label={provider}
+            key={`brand-${brand}`}
+            testID={`filter-brand-${brand}`}
+            label={brand}
             count={
-              controls.filters.provider === provider
-                ? vouchers.filter((v) => v.provider === provider).length
+              controls.filters.brand === brand
+                ? vouchers.filter((v) => v.brand === brand).length
                 : undefined
             }
-            selected={controls.filters.provider === provider}
+            selected={controls.filters.brand === brand}
             onPress={() =>
-              setFilter({ provider: controls.filters.provider === provider ? undefined : provider })
+              setFilter({ brand: controls.filters.brand === brand ? undefined : brand })
             }
           />
         ))}
@@ -124,7 +124,7 @@ export function VoucherListControlsBar({
                 ...controls,
                 filters: {
                   ...controls.filters,
-                  provider: undefined,
+                  brand: undefined,
                   fuel: undefined,
                   status: undefined,
                   hideExpired: false,

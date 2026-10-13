@@ -9,7 +9,7 @@ import HomeScreen from './index';
  * Two things here have bitten the app before, and both are silent:
  *
  * - The station list used to be filtered through a hardcoded
- *   `['okko','wog','upg','klo']` allowlist, so every provider an admin added after
+ *   `['okko','wog','upg','klo']` allowlist, so every brand an admin added after
  *   that list was written simply did not appear. Nothing errored; the station was
  *   just absent. So the suite asserts on *count and identity*, not on the presence of
  *   a few known names.
@@ -179,7 +179,7 @@ describe('Home — the cold-start gate', () => {
   });
 });
 
-describe('Home — every provider is rendered', () => {
+describe('Home — every brand is rendered', () => {
   it('renders each station the server sent', () => {
     mockStations = [
       station('st-1', 'Shell'),

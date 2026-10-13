@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { QueryClient, QueryClientBrand } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { ExchangeHistory } from "@/components/ExchangeHistory";
 import { formatMoney } from "@/lib/money";
@@ -79,7 +79,7 @@ const DETAIL = {
 function renderHistory() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const wrapper = ({ children }: { children: ReactNode }) => (
-    <QueryClientBrand client={client}>{children}</QueryClientBrand>
+    <QueryClientProvider client={client}>{children}</QueryClientProvider>
   );
   return render(<ExchangeHistory />, { wrapper });
 }

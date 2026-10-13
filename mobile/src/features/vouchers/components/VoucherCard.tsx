@@ -2,8 +2,8 @@
 // stock section (pool and per-worker) so they cannot drift apart
 // (multi-company #103, S2).
 //
-// `resolveBrand` decides *which* brand a provider string is; the theme supplies the
-// colour. An unknown provider falls back to the action colour rather than
+// `resolveBrand` decides *which* brand a brand string is; the theme supplies the
+// colour. An unknown brand falls back to the action colour rather than
 // guessing a network — a near-miss would paint the wrong brand on the card.
 import { View, Text, Pressable, StyleSheet, Animated } from 'react-native';
 import { AlertTriangle, Ban, Copy } from 'lucide-react-native';
@@ -36,7 +36,7 @@ export function VoucherCard({ voucher, userId, pulseAnim, onSelect }: VoucherCar
     .filter(Boolean)
     .join(' ')
     .trim();
-  const bColor = brandColorFor(voucher.provider, tokens);
+  const bColor = brandColorFor(voucher.brand, tokens);
   const expDays = daysUntilExpiration(voucher.expirationDate);
   const expiringSoon = isExpiringSoon(expDays);
   return (
@@ -100,7 +100,7 @@ export function VoucherCard({ voucher, userId, pulseAnim, onSelect }: VoucherCar
               }}
               numberOfLines={1}
             >
-              {voucher.provider}
+              {voucher.brand}
             </Text>
             <Text
               allowFontScaling={false}

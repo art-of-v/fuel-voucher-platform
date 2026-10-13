@@ -116,7 +116,7 @@ export default function HomeScreen() {
   const sortedStations = useMemo(() => {
     if (!stations) return [];
     /*
-     * Every provider the admin creates is rendered — the old hardcoded
+     * Every brand the admin creates is rendered — the old hardcoded
      * ['okko','wog','upg','klo'] allowlist silently dropped anything else.
      * Order comes from the server: stations.sort_order (admin-managed
      * priority), name as the tiebreaker. The client re-sorts defensively in

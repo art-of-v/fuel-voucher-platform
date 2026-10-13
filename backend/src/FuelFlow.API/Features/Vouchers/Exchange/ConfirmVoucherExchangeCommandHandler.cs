@@ -13,7 +13,7 @@ namespace FuelFlow.Features.Vouchers.Exchange;
 public sealed record ExchangeFuelCost(string FuelTypeId, decimal CostPerLiter);
 
 /// <summary>
-/// Records one operator→brand exchange (planning #104): retire the selected OLD stock vouchers,
+/// Records one operator→supplier exchange (planning #104): retire the selected OLD stock vouchers,
 /// activate the freshly-imported NEW ones at a cost that bakes in the доплата (so the remaining stock
 /// reprices upward), pair old→new flexibly, and write an audit-grade <c>voucher_exchanges</c> row per
 /// old voucher. No payment, no device signature — <c>Staff</c> policy only.

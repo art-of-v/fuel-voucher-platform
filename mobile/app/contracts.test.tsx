@@ -231,7 +231,7 @@ describe('Contracts — the safety net', () => {
   });
 });
 
-describe('Contracts — choosing a provider', () => {
+describe('Contracts — choosing a brand', () => {
   it('lists every station and marks the unsigned ones', () => {
     render(<ContractsScreen />);
 
@@ -255,9 +255,9 @@ describe('Contracts — choosing a provider', () => {
 
     fireEvent.press(screen.getAllByTestId('icon-PenTool')[1]);
 
-    // The sheet header and the summary both name the provider; the count is what proves
+    // The sheet header and the summary both name the brand; the count is what proves
     // the sheet opened on the station that was pressed.
-    expect(screen.getAllByText('contracts.provider: OKKO')).toHaveLength(2);
+    expect(screen.getAllByText('contracts.brand: OKKO')).toHaveLength(2);
   });
 });
 
@@ -408,7 +408,7 @@ describe('Contracts — reading what is already signed', () => {
     fireEvent.press(screen.getByText('contracts.signed'));
 
     expect(screen.getByText('Framework')).toBeTruthy();
-    expect(screen.getByText('contracts.provider: Shell')).toBeTruthy();
+    expect(screen.getByText('contracts.brand: Shell')).toBeTruthy();
     expect(screen.getByText('contracts.signedAt: formatted(2026-01-01)')).toBeTruthy();
   });
 
@@ -429,7 +429,7 @@ describe('Contracts — reading what is already signed', () => {
     fireEvent.press(screen.getByText('contracts.signed'));
 
     // A signed contract whose station no longer resolves must still be attributable.
-    expect(screen.getByText('contracts.provider: FuelFlow Network')).toBeTruthy();
+    expect(screen.getByText('contracts.brand: FuelFlow Network')).toBeTruthy();
   });
 
   it('does not carry a signature over into the next contract', async () => {
@@ -441,7 +441,7 @@ describe('Contracts — reading what is already signed', () => {
 
     await waitFor(() => expect(alertSpy).toHaveBeenCalled());
 
-    // A successful signature lands the user on the signed tab, so the providers are
+    // A successful signature lands the user on the signed tab, so the brands are
     // behind a tab switch.
     fireEvent.press(screen.getByText('contracts.available'));
 
@@ -494,9 +494,9 @@ describe('Contracts — reading what is already signed', () => {
     render(<ContractsScreen />);
 
     fireEvent.press(screen.getByText('contracts.signed'));
-    expect(screen.getByText('contracts.provider: Shell')).toBeTruthy();
+    expect(screen.getByText('contracts.brand: Shell')).toBeTruthy();
 
     fireEvent.press(screen.getByText('contracts.available'));
-    expect(screen.getByText('contracts.selectProvider')).toBeTruthy();
+    expect(screen.getByText('contracts.selectBrand')).toBeTruthy();
   });
 });

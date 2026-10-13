@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -20,7 +20,7 @@ namespace FuelFlow.API.Migrations
                     old_voucher_id = table.Column<Guid>(type: "uuid", nullable: false),
                     new_voucher_id = table.Column<Guid>(type: "uuid", nullable: true),
                     fuel_type_id = table.Column<string>(type: "text", nullable: false),
-                    brand = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    provider = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
                     surcharge_uah = table.Column<decimal>(type: "numeric(10,2)", nullable: false),
                     cost_per_liter_applied = table.Column<decimal>(type: "numeric(10,4)", nullable: true),
                     invoice_number = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),

@@ -8,7 +8,7 @@ const cfg = { enabled: true, thresholdDays: 14 };
 function makeVoucher(overrides: Partial<Voucher> = {}): Voucher {
   return {
     id: 'v1',
-    provider: 'okko',
+    brand: 'okko',
     fuelType: 'a95',
     amount: 10,
     status: 'active',

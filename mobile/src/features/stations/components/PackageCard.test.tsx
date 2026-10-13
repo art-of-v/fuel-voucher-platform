@@ -40,7 +40,7 @@ jest.mock('../../vouchers/hooks/useTermQuote', () => ({
 function mkPackage(overrides: Partial<FuelPackage> = {}): FuelPackage {
   return {
     id: 'p1',
-    provider: 'OKKO',
+    brand: 'OKKO',
     fuelTypeId: 'ft1',
     fuelName: 'ДП ЄВРО',
     liters: 3,

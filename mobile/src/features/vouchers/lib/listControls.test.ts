@@ -12,7 +12,7 @@ import {
 function v(over: Partial<Voucher>): Voucher {
   return {
     id: over.id ?? Math.random().toString(),
-    provider: over.provider ?? 'OKKO',
+    brand: over.brand ?? 'OKKO',
     fuelType: over.fuelType ?? 'a95',
     amount: over.amount ?? 10,
     status: over.status ?? 'active',
@@ -24,9 +24,9 @@ const NOW = new Date('2026-10-10T12:00:00Z');
 
 describe('applyListControls - filtering', () => {
   const list = [
-    v({ id: '1', provider: 'OKKO', fuelType: 'a95', status: 'active', amount: 10 }),
-    v({ id: '2', provider: 'WOG', fuelType: 'upg95', status: 'used', amount: 20 }),
-    v({ id: '3', provider: 'OKKO', fuelType: 'dp', status: 'active', amount: 30 }),
+    v({ id: '1', brand: 'OKKO', fuelType: 'a95', status: 'active', amount: 10 }),
+    v({ id: '2', brand: 'WOG', fuelType: 'upg95', status: 'used', amount: 20 }),
+    v({ id: '3', brand: 'OKKO', fuelType: 'dp', status: 'active', amount: 30 }),
   ];
 
   const run = (filters: ListControls['filters']) =>
@@ -38,8 +38,8 @@ describe('applyListControls - filtering', () => {
     expect(run(EMPTY_FILTERS)).toEqual(['1', '2', '3']);
   });
 
-  it('filters by provider', () => {
-    expect(run({ ...EMPTY_FILTERS, provider: 'OKKO' })).toEqual(['1', '3']);
+  it('filters by brand', () => {
+    expect(run({ ...EMPTY_FILTERS, brand: 'OKKO' })).toEqual(['1', '3']);
   });
 
   it('filters by fuel', () => {
@@ -51,11 +51,11 @@ describe('applyListControls - filtering', () => {
   });
 
   it('combines filters', () => {
-    expect(run({ ...EMPTY_FILTERS, provider: 'OKKO', status: 'active' })).toEqual(['1', '3']);
+    expect(run({ ...EMPTY_FILTERS, brand: 'OKKO', status: 'active' })).toEqual(['1', '3']);
   });
 
   it('returns nothing when a filter matches nothing', () => {
-    expect(run({ ...EMPTY_FILTERS, provider: 'KLO' })).toEqual([]);
+    expect(run({ ...EMPTY_FILTERS, brand: 'KLO' })).toEqual([]);
   });
 
   it('does not mutate the caller array', () => {
@@ -138,17 +138,17 @@ describe('applyListControls - sorting', () => {
     expect(sorted).toEqual(['far', 'mid', 'near']);
   });
 
-  it('sorts by provider', () => {
+  it('sorts by brand', () => {
     const mixed = [
-      v({ id: 'w', provider: 'WOG' }),
-      v({ id: 'k', provider: 'KLO' }),
-      v({ id: 'o', provider: 'OKKO' }),
+      v({ id: 'w', brand: 'WOG' }),
+      v({ id: 'k', brand: 'KLO' }),
+      v({ id: 'o', brand: 'OKKO' }),
     ];
     const sorted = applyListControls(
       mixed,
-      { sortKey: 'provider', sortDirection: 'asc', filters: EMPTY_FILTERS },
+      { sortKey: 'brand', sortDirection: 'asc', filters: EMPTY_FILTERS },
       NOW,
-    ).map((x) => x.provider);
+    ).map((x) => x.brand);
     expect(sorted).toEqual(['KLO', 'OKKO', 'WOG']);
   });
 
@@ -191,8 +191,8 @@ describe('toggleSort', () => {
   });
 
   it('starts ascending on a new key', () => {
-    expect(toggleSort(base, 'provider')).toMatchObject({
-      sortKey: 'provider',
+    expect(toggleSort(base, 'brand')).toMatchObject({
+      sortKey: 'brand',
       sortDirection: 'asc',
     });
   });
@@ -203,23 +203,23 @@ describe('toggleSort', () => {
 });
 
 describe('availableFacets', () => {
-  it('offers only providers and fuels actually present', () => {
+  it('offers only brands and fuels actually present', () => {
     const facets = availableFacets([
-      v({ provider: 'WOG', fuelType: 'upg95' }),
-      v({ provider: 'OKKO', fuelType: 'a95' }),
-      v({ provider: 'OKKO', fuelType: 'dp' }),
+      v({ brand: 'WOG', fuelType: 'upg95' }),
+      v({ brand: 'OKKO', fuelType: 'a95' }),
+      v({ brand: 'OKKO', fuelType: 'dp' }),
     ]);
-    expect(facets.providers).toEqual(['OKKO', 'WOG']);
+    expect(facets.brands).toEqual(['OKKO', 'WOG']);
     expect(facets.fuels).toEqual(['a95', 'dp', 'upg95']);
   });
 
   it('returns empty lists for no vouchers', () => {
-    expect(availableFacets([])).toEqual({ providers: [], fuels: [] });
+    expect(availableFacets([])).toEqual({ brands: [], fuels: [] });
   });
 });
 
 describe('countActiveFilters', () => {
-  const keys: VoucherSortKey[] = ['expiry', 'provider', 'fuel', 'liters'];
+  const keys: VoucherSortKey[] = ['expiry', 'brand', 'fuel', 'liters'];
   expect(keys).toHaveLength(4);
 
   it('counts nothing when nothing is set', () => {
@@ -228,7 +228,7 @@ describe('countActiveFilters', () => {
 
   it('counts each active filter', () => {
     expect(
-      countActiveFilters({ provider: 'OKKO', fuel: 'a95', status: 'active', hideExpired: true }),
+      countActiveFilters({ brand: 'OKKO', fuel: 'a95', status: 'active', hideExpired: true }),
     ).toBe(4);
     expect(countActiveFilters({ hideExpired: true })).toBe(1);
   });

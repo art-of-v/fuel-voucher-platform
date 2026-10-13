@@ -61,7 +61,7 @@ export interface FuelPackage {
 
 export interface Voucher {
   id: string;
-  provider: string;
+  brand: string;
   fuelType: string;
   fuelName?: string;
   amount: number;
@@ -120,7 +120,7 @@ export function classifyVoucher(
 
 export interface OrderLineItem {
   id: string;
-  provider: string;
+  brand: string;
   fuelTypeId: string;
   liters: number;
   quantity: number;
@@ -128,7 +128,7 @@ export interface OrderLineItem {
 
 export interface Order {
   id: string;
-  provider: string;
+  brand: string;
   fuelType: string;
   fuelName?: string;
   liters: number;

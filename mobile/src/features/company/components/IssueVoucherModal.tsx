@@ -187,9 +187,9 @@ export function IssueVoucherModal(props: IssueVoucherModalProps) {
                   </Text>
                 </Pressable>
                 {giftGroups.map((group) => (
-                  <View key={group.provider} style={{ gap: 10 }}>
+                  <View key={group.brand} style={{ gap: 10 }}>
                     <Text style={[styles.groupHeader, { color: tokens.colors.text.dim }]}>
-                      {group.provider}
+                      {group.brand}
                     </Text>
                     {group.items.map((v) => {
                       const isSel = selected.has(v.id);
@@ -237,7 +237,7 @@ export function IssueVoucherModal(props: IssueVoucherModalProps) {
                               }}
                               numberOfLines={1}
                             >
-                              {v.provider} · {v.amount} {v.unit || t('common.liter')}
+                              {v.brand} · {v.amount} {v.unit || t('common.liter')}
                             </Text>
                             <Text
                               style={{ color: tokens.colors.text.dim, fontSize: 11 }}

@@ -342,7 +342,7 @@ namespace FuelFlow.API.Migrations
                 oldType: "text");
 
             migrationBuilder.AlterColumn<string>(
-                name: "scope_id",
+                name: "provider_id",
                 table: "provider_event_outbox",
                 type: "character varying(200)",
                 maxLength: 200,
@@ -1093,7 +1093,7 @@ namespace FuelFlow.API.Migrations
                 oldMaxLength: 500);
 
             migrationBuilder.AlterColumn<string>(
-                name: "scope_id",
+                name: "provider_id",
                 table: "provider_event_outbox",
                 type: "text",
                 nullable: false,
@@ -1343,7 +1343,7 @@ namespace FuelFlow.API.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_fuel_vouchers_provider",
                 table: "fuel_vouchers",
-                column: "brand");
+                column: "provider");
 
             migrationBuilder.CreateIndex(
                 name: "IX_fuel_vouchers_status",

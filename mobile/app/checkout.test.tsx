@@ -153,7 +153,7 @@ function makeItem(over: Partial<CartItem> = {}): CartItem {
       liters: 50,
       price: 2000,
       originalPrice: 2200,
-      provider: 'MONOBANK',
+      brand: 'MONOBANK',
       fuelType: 'A95',
     },
     station: {
@@ -175,7 +175,7 @@ function basket(over: Partial<CartItem> = {}) {
   mockDiscountedTotal = 4000;
 }
 
-describe('Checkout — what gets sent to the payment provider', () => {
+describe('Checkout — what gets sent to the payment brand', () => {
   beforeEach(() => {
     mockCart = [];
     mockDiscountedTotal = 0;
@@ -417,19 +417,19 @@ describe('Checkout — the basket and the payment page', () => {
 
   it('keeps the basket when the invoice request fails', async () => {
     basket();
-    mockCreateInvoice.mockRejectedValue(new Error('Provider unavailable'));
+    mockCreateInvoice.mockRejectedValue(new Error('Brand unavailable'));
     render(<CheckoutScreen />);
 
     fireEvent.press(screen.getByText(/packages\.payTitle/));
 
-    await waitFor(() => expect(global.alert).toHaveBeenCalledWith('Provider unavailable'));
+    await waitFor(() => expect(global.alert).toHaveBeenCalledWith('Brand unavailable'));
     expect(mockClearCart).not.toHaveBeenCalled();
     expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('re-enables the pay button after a failure so the user can retry', async () => {
     basket();
-    mockCreateInvoice.mockRejectedValue(new Error('Provider unavailable'));
+    mockCreateInvoice.mockRejectedValue(new Error('Brand unavailable'));
     render(<CheckoutScreen />);
 
     fireEvent.press(screen.getByText(/packages\.payTitle/));

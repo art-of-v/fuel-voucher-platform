@@ -4,7 +4,7 @@ import { collectWorkerListVouchers, narrowIssuanceOrders } from './workerList';
 function v(id: string, expirationDate?: string): Voucher {
   return {
     id,
-    provider: 'OKKO',
+    brand: 'OKKO',
     fuelType: 'a95',
     amount: 10,
     status: 'active',
@@ -13,7 +13,7 @@ function v(id: string, expirationDate?: string): Voucher {
 }
 
 function receipt(id: string, vouchers: Voucher[]): Order {
-  return { id, vouchers, status: 'FULFILLED', provider: 'OKKO' } as unknown as Order;
+  return { id, vouchers, status: 'FULFILLED', brand: 'OKKO' } as unknown as Order;
 }
 
 describe('collectWorkerListVouchers', () => {

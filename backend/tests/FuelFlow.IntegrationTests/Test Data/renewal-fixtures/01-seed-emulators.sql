@@ -159,7 +159,7 @@ FROM _src s
 CROSS JOIN _qa q;
 
 INSERT INTO order_line_items
-    (id, order_id, provider, fuel_type_id, liters, quantity, unit_price, line_total)
+    (id, order_id, brand, fuel_type_id, liters, quantity, unit_price, line_total)
 SELECT gen_random_uuid(), s.order_id, f.station_id, f.id, 10, 1, 99.90, 999.00
 FROM _src s
 CROSS JOIN _fuel f;
@@ -168,11 +168,11 @@ CROSS JOIN _fuel f;
 -- 3. Sources: what a customer holds, and therefore what they can renew
 --
 -- Each row is one branch of `TryResolveBranch` plus the cases that must never renew at all.
--- `provider_expiration_date` is the ceiling; `customer_expiration_date` is what the wallet shows.
+-- `supplier_expiration_date` is the ceiling; `customer_expiration_date` is what the wallet shows.
 -- ---------------------------------------------------------------------------------------------
 
 INSERT INTO fuel_vouchers
-    (id, provider, fuel_type_id, liters, provider_expiration_date, customer_expiration_date,
+    (id, brand, fuel_type_id, liters, supplier_expiration_date, customer_expiration_date,
      voucher_number, qr_payload, status, assigned_to_user_id, legal_entity_id, order_id,
      created_at_utc, updated_at_utc)
 SELECT gen_random_uuid(), 'OKKO', f.id, 10,
@@ -182,7 +182,7 @@ SELECT gen_random_uuid(), 'OKKO', f.id, 10,
 FROM _qa q, _fuel f, _src s WHERE s.voucher_number = 'EMU2-SRC-EXT-1M';
 
 INSERT INTO fuel_vouchers
-    (id, provider, fuel_type_id, liters, provider_expiration_date, customer_expiration_date,
+    (id, brand, fuel_type_id, liters, supplier_expiration_date, customer_expiration_date,
      voucher_number, qr_payload, status, assigned_to_user_id, legal_entity_id, order_id,
      created_at_utc, updated_at_utc)
 SELECT gen_random_uuid(), 'OKKO', f.id, 10,
@@ -194,7 +194,7 @@ FROM _qa q, _fuel f, _src s WHERE s.voucher_number = 'EMU2-SRC-EXT-EXACT';
 -- Customer term has caught up with the supplier's real term: no room to grow at all. Checkout sells a
 -- replacement here, and fulfilment used to try to extend, hit the ceiling and stall the paid order.
 INSERT INTO fuel_vouchers
-    (id, provider, fuel_type_id, liters, provider_expiration_date, customer_expiration_date,
+    (id, brand, fuel_type_id, liters, supplier_expiration_date, customer_expiration_date,
      voucher_number, qr_payload, status, assigned_to_user_id, legal_entity_id, order_id,
      created_at_utc, updated_at_utc)
 SELECT gen_random_uuid(), 'OKKO', f.id, 10,
@@ -204,7 +204,7 @@ SELECT gen_random_uuid(), 'OKKO', f.id, 10,
 FROM _qa q, _fuel f, _src s WHERE s.voucher_number = 'EMU2-SRC-CEIL-NOROOM';
 
 INSERT INTO fuel_vouchers
-    (id, provider, fuel_type_id, liters, provider_expiration_date, customer_expiration_date,
+    (id, brand, fuel_type_id, liters, supplier_expiration_date, customer_expiration_date,
      voucher_number, qr_payload, status, assigned_to_user_id, legal_entity_id, order_id,
      created_at_utc, updated_at_utc)
 SELECT gen_random_uuid(), 'OKKO', f.id, 10,
@@ -214,7 +214,7 @@ SELECT gen_random_uuid(), 'OKKO', f.id, 10,
 FROM _qa q, _fuel f, _src s WHERE s.voucher_number = 'EMU2-SRC-LAPSED-CUST';
 
 INSERT INTO fuel_vouchers
-    (id, provider, fuel_type_id, liters, provider_expiration_date, customer_expiration_date,
+    (id, brand, fuel_type_id, liters, supplier_expiration_date, customer_expiration_date,
      voucher_number, qr_payload, status, assigned_to_user_id, legal_entity_id, order_id,
      created_at_utc, updated_at_utc)
 SELECT gen_random_uuid(), 'OKKO', f.id, 10,
@@ -224,7 +224,7 @@ SELECT gen_random_uuid(), 'OKKO', f.id, 10,
 FROM _qa q, _fuel f, _src s WHERE s.voucher_number = 'EMU2-SRC-DEAD-BOTH';
 
 INSERT INTO fuel_vouchers
-    (id, provider, fuel_type_id, liters, provider_expiration_date, customer_expiration_date,
+    (id, brand, fuel_type_id, liters, supplier_expiration_date, customer_expiration_date,
      voucher_number, qr_payload, status, assigned_to_user_id, legal_entity_id, order_id,
      created_at_utc, updated_at_utc)
 SELECT gen_random_uuid(), 'OKKO', f.id, 10,
@@ -236,7 +236,7 @@ FROM _qa q, _fuel f, _src s WHERE s.voucher_number = 'EMU2-SRC-OUTSIDE-WINDOW';
 -- Statuses that must be refused regardless of dates. Same dates as the extendable one, so the only
 -- thing that can reject them is the status guard.
 INSERT INTO fuel_vouchers
-    (id, provider, fuel_type_id, liters, provider_expiration_date, customer_expiration_date,
+    (id, brand, fuel_type_id, liters, supplier_expiration_date, customer_expiration_date,
      voucher_number, qr_payload, status, assigned_to_user_id, legal_entity_id, order_id,
      created_at_utc, updated_at_utc)
 SELECT gen_random_uuid(), 'OKKO', f.id, 10, (CURRENT_DATE + 100), (CURRENT_DATE + 10),
@@ -244,7 +244,7 @@ SELECT gen_random_uuid(), 'OKKO', f.id, 10, (CURRENT_DATE + 100), (CURRENT_DATE 
 FROM _qa q, _fuel f, _src s WHERE s.voucher_number = 'EMU2-SRC-BLOCKED';
 
 INSERT INTO fuel_vouchers
-    (id, provider, fuel_type_id, liters, provider_expiration_date, customer_expiration_date,
+    (id, brand, fuel_type_id, liters, supplier_expiration_date, customer_expiration_date,
      voucher_number, qr_payload, status, assigned_to_user_id, legal_entity_id, order_id,
      created_at_utc, updated_at_utc)
 SELECT gen_random_uuid(), 'OKKO', f.id, 10, (CURRENT_DATE + 100), (CURRENT_DATE + 10),
@@ -253,7 +253,7 @@ FROM _qa q, _fuel f, _src s WHERE s.voucher_number = 'EMU2-SRC-USED';
 
 -- Company-owned: a replacement must inherit the entity, not silently become personal.
 INSERT INTO fuel_vouchers
-    (id, provider, fuel_type_id, liters, provider_expiration_date, customer_expiration_date,
+    (id, brand, fuel_type_id, liters, supplier_expiration_date, customer_expiration_date,
      voucher_number, qr_payload, status, assigned_to_user_id, legal_entity_id, order_id,
      created_at_utc, updated_at_utc)
 SELECT gen_random_uuid(), 'OKKO', f.id, 10, (CURRENT_DATE + 90), (CURRENT_DATE - 2),
@@ -284,14 +284,14 @@ JOIN fuel_vouchers v ON v.voucher_number = s.voucher_number;
 -- ---------------------------------------------------------------------------------------------
 -- 4. Stock: what a replacement can be served from
 --
--- The selector requires provider + fuel + litres to match exactly and the paper term to reach
+-- The selector requires brand + fuel + litres to match exactly and the paper term to reach
 -- `today + chosen term`. So the interesting stock is the stock that must NOT match: another
--- nominal, another fuel, another provider, and one whose paper is too short to serve a long tier.
+-- nominal, another fuel, another brand, and one whose paper is too short to serve a long tier.
 -- Stock carries no order_id — it has never been bought by a customer.
 -- ---------------------------------------------------------------------------------------------
 
 INSERT INTO fuel_vouchers
-    (id, provider, fuel_type_id, liters, provider_expiration_date, customer_expiration_date,
+    (id, brand, fuel_type_id, liters, supplier_expiration_date, customer_expiration_date,
      voucher_number, qr_payload, status, assigned_to_user_id, legal_entity_id, created_at_utc, updated_at_utc)
 SELECT gen_random_uuid(), 'OKKO', f.id, 10, CURRENT_DATE + 180, CURRENT_DATE + 180,
        'EMU2-STK-LONG-6M',  'EMU2-QR-STK-LONG-6M',  'Available', NULL::uuid, NULL::uuid, now(), now()
@@ -316,7 +316,7 @@ UNION ALL SELECT gen_random_uuid(), 'OKKO', f3.id, 10, CURRENT_DATE + 180, CURRE
 -- Three identical long-dated rows for the batch scenario: every replace line needs a DISTINCT
 -- voucher, so one row cannot serve a three-line order.
 INSERT INTO fuel_vouchers
-    (id, provider, fuel_type_id, liters, provider_expiration_date, customer_expiration_date,
+    (id, brand, fuel_type_id, liters, supplier_expiration_date, customer_expiration_date,
      voucher_number, qr_payload, status, assigned_to_user_id, legal_entity_id, created_at_utc, updated_at_utc)
 SELECT gen_random_uuid(), 'OKKO', f.id, 10, CURRENT_DATE + 180, CURRENT_DATE + 180,
        'EMU2-STK-BATCH-' || s, 'EMU2-QR-STK-BATCH-' || s, 'Available', NULL::uuid, NULL::uuid, now(), now()
@@ -325,7 +325,7 @@ FROM _fuel f, generate_series(1, 3) s;
 -- Company stock: a company-owned replacement candidate, to prove the entity can be inherited from
 -- either the source voucher or the stock.
 INSERT INTO fuel_vouchers
-    (id, provider, fuel_type_id, liters, provider_expiration_date, customer_expiration_date,
+    (id, brand, fuel_type_id, liters, supplier_expiration_date, customer_expiration_date,
      voucher_number, qr_payload, status, assigned_to_user_id, legal_entity_id, created_at_utc, updated_at_utc)
 SELECT gen_random_uuid(), 'OKKO', f.id, 10, CURRENT_DATE + 180, CURRENT_DATE + 180,
        'EMU2-STK-COMPANY', 'EMU2-QR-STK-COMPANY', 'Available', NULL, c.id, now(), now()
@@ -364,8 +364,8 @@ COMMIT;
 \echo '=== sources (customer-owned) ==='
 SELECT v.voucher_number, v.status, v.liters,
        v.customer_expiration_date AS customer_term,
-       v.provider_expiration_date AS provider_term,
-       (v.provider_expiration_date - v.customer_expiration_date) AS room,
+       v.supplier_expiration_date AS provider_term,
+       (v.supplier_expiration_date - v.customer_expiration_date) AS room,
        v.legal_entity_id IS NOT NULL AS in_company
 FROM fuel_vouchers v
 WHERE v.voucher_number LIKE 'EMU2-SRC-%'
@@ -373,8 +373,8 @@ ORDER BY v.voucher_number;
 
 \echo ''
 \echo '=== stock (unowned) ==='
-SELECT voucher_number, liters, provider_expiration_date AS provider_term,
-       (provider_expiration_date - CURRENT_DATE) AS covers_days
+SELECT voucher_number, liters, supplier_expiration_date AS provider_term,
+       (supplier_expiration_date - CURRENT_DATE) AS covers_days
 FROM fuel_vouchers
 WHERE voucher_number LIKE 'EMU2-STK-%'
 ORDER BY voucher_number;

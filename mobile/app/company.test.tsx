@@ -157,7 +157,7 @@ const voucher = (id: string) => ({
   id,
   status: 'active',
   amount: 10,
-  provider: 'okko',
+  brand: 'okko',
   fuelType: 'A95',
   expirationDate: null,
   workerUserId: 'u-1',

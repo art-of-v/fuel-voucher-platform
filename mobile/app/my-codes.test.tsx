@@ -177,7 +177,7 @@ jest.mock('../src/features/company/hooks/useWorkerUsage', () => ({
 const order = (id: string, status: string, extra: Record<string, unknown> = {}) => ({
   id,
   status,
-  provider: 'okko',
+  brand: 'okko',
   fuelType: 'A95',
   amount: 10,
   totalAmount: 500,

@@ -3,8 +3,8 @@ using FuelFlow.SharedKernel.Domain;
 namespace FuelFlow.Features.Vouchers.Exchange;
 
 /// <summary>
-/// One row per OLD stock voucher retired in an operator→brand exchange (planning #104). When the
-/// operator renews our own lapsing stock with the brand off-platform (no Monobank, no in-app
+/// One row per OLD stock voucher retired in an operator→supplier exchange (planning #104). When the
+/// operator renews our own lapsing stock with the supplier off-platform (no Monobank, no in-app
 /// charge), the admin app records the exchange: which old stock voucher was replaced by which new
 /// one, the доплата paid, and the cost/liter applied to the new batch.
 ///

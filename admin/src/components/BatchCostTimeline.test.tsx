@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientBrand } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { ReactNode } from "react";
@@ -45,7 +45,7 @@ const RESPONSE: BatchCostTimelineResponse = {
 function renderTimeline(props: { importId: string | null; enabled?: boolean } = { importId: "import-1" }) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const wrap = ({ children }: { children: ReactNode }) => (
-    <QueryClientBrand client={client}>{children}</QueryClientBrand>
+    <QueryClientProvider client={client}>{children}</QueryClientProvider>
   );
   return render(<BatchCostTimeline importId={props.importId} enabled={props.enabled ?? true} />, { wrapper: wrap });
 }

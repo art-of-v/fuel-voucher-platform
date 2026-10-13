@@ -2,7 +2,7 @@ namespace FuelFlow.Features.Vouchers.Exchange;
 
 /// <summary>
 /// Pure, deterministic pairing of retired OLD stock vouchers to freshly-imported NEW ones for an
-/// operator→brand exchange (planning #104). Pairing is flexible: the operator may select a
+/// operator→supplier exchange (planning #104). Pairing is flexible: the operator may select a
 /// different number of old vouchers than the brand PDF contains. We pair 1:1 only WITHIN the same
 /// <c>(brand, fuel, liters)</c> bucket, in a stable sorted order; leftover old vouchers expire
 /// unpaired (null NewVoucherId) and leftover new vouchers simply enter stock with no row.

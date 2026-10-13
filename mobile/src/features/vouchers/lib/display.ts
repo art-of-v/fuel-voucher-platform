@@ -7,7 +7,7 @@
  *
  * - how many days a voucher has left, and the threshold at which the customer is
  *   warned about it (money-adjacent: an off-by-one hides a real expiry warning)
- * - which brand a provider string resolves to, for the colour on a card
+ * - which brand a brand string resolves to, for the colour on a card
  * - whether the wallet is empty, which differs per account context — get it wrong
  *   and a company owner is told they have nothing while their stock is full
  */
@@ -40,10 +40,10 @@ export function isExpiringSoon(days: number | null, thresholdDays: number = 30):
 export type BrandId = 'okko' | 'wog' | 'upg' | 'klo' | 'shell' | 'socar';
 
 /**
- * Which network a voucher provider string refers to, or `null` when it is none
+ * Which network a voucher brand string refers to, or `null` when it is none
  * of the known ones.
  *
- * Matched on a substring rather than an equality because provider strings are not
+ * Matched on a substring rather than an equality because brand strings are not
  * clean identifiers: they arrive with legal-entity suffixes and site codes ("ПАТ
  * ОККО", "Shell Ukraine"). Returns the id rather than a colour so the caller keeps
  * the theme lookup — that part needs the token set and is not this rule.
@@ -59,8 +59,8 @@ const BRAND_MATCHERS: [BrandId, string][] = [
   ['socar', 'socar'],
 ];
 
-export function resolveBrand(provider: string | null | undefined): BrandId | null {
-  const p = (provider ?? '').toLowerCase();
+export function resolveBrand(brand: string | null | undefined): BrandId | null {
+  const p = (brand ?? '').toLowerCase();
   if (!p) return null;
 
   const match = BRAND_MATCHERS.find(([, needle]) => p.includes(needle));
@@ -125,20 +125,20 @@ export function countUsed(vouchers: { status: string }[]): number {
 }
 
 /**
- * The colour to paint a voucher card for a given provider string.
+ * The colour to paint a voucher card for a given brand string.
  *
  * Lives here, next to `resolveBrand`, because both the wallet screen and the card
- * component it renders need it — an unknown provider deliberately falls back to the
+ * component it renders need it — an unknown brand deliberately falls back to the
  * action colour rather than guessing a network, since a near-miss paints the wrong
  * brand's colour on the card. Takes the token object as an argument so this stays a
  * pure function with no hook in it.
  */
 export function brandColorFor(
-  provider: string | null | undefined,
+  raw: string | null | undefined,
   tokens: { colors: { primary: string; text: { brand: Record<string, string> } } },
 ): string {
-  const brand = resolveBrand(provider);
-  return brand ? tokens.colors.text.brand[brand] : tokens.colors.primary;
+  const resolved = resolveBrand(raw);
+  return resolved ? tokens.colors.text.brand[resolved] : tokens.colors.primary;
 }
 
 /**

@@ -102,7 +102,7 @@ const asMock = (fn: unknown) => fn as jest.Mock;
 function makeVoucher(overrides: Partial<Voucher> = {}): Voucher {
   return {
     id: 'v1',
-    provider: 'okko',
+    brand: 'okko',
     fuelType: 'a95',
     amount: 10,
     status: 'active',
@@ -115,7 +115,7 @@ function makeVoucher(overrides: Partial<Voucher> = {}): Voucher {
 function makeOrder(overrides: Partial<Order> = {}): Order {
   return {
     id: 'o1',
-    provider: 'okko',
+    brand: 'okko',
     fuelType: 'a95',
     liters: 10,
     quantity: 1,

@@ -810,7 +810,7 @@ public class FulfillmentService
     /// <remarks>
     /// A floor on the promise, not a gate on stock. A line asking for more life than the cheapest matching
     /// voucher has is still fulfilled; <see cref="TryAssignVoucherAsync"/> clamps the written date to the
-    /// voucher's own brand term, so the customer gets exactly what the supplier backs and never more.
+    /// voucher's own supplier term, so the customer gets exactly what the supplier backs and never more.
     /// Refusing the sale here instead would strand a paid order over a stock-mix detail.
     /// </remarks>
     private static DateOnly? CustomerExpirationFor(OrderLineItem lineItem)
@@ -845,7 +845,7 @@ public class FulfillmentService
         // date, so a shortened date written by a separate statement would survive the rollback and the
         // stock would silently re-enter the pool with less life than the supplier granted.
         //
-        // The brand term is the ceiling, so the promise is clamped rather than trusted: a line whose
+        // The supplier term is the ceiling, so the promise is clamped rather than trusted: a line whose
         // term outruns the voucher gets the voucher's full remaining life, which is what it would have
         // got before short terms existed.
         //

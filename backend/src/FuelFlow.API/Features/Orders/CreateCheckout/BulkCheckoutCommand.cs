@@ -9,11 +9,19 @@ public sealed class BulkCheckoutCommand
 
 public sealed class CheckoutItem
 {
-    public string Brand { get; set; } = null!;
     public string FuelTypeId { get; set; } = null!;
     public decimal Liters { get; set; }
     public int Quantity { get; set; }
     public decimal Price { get; set; }
+
+    /// <summary>
+    /// The fuel brand, as a station id. The line's brand is written from this, so it is the only
+    /// place the brand travels.
+    /// </summary>
+    /// <remarks>
+    /// The item also used to carry a required <c>Provider</c> that the handler overwrote with this
+    /// value - see <see cref="CreateCheckoutCommand.StationId"/> for why the duplicate went away.
+    /// </remarks>
     public string? StationId { get; set; }
     public string? StationName { get; set; }
 

@@ -183,7 +183,7 @@ internal static class ServiceSetup
         // The undo for the soft delete: without it a mistaken delete_all has no way back (#217).
         services.AddScoped<UnarchiveVoucherCommandHandler>();
 
-        // Operator→brand voucher exchange / renewal (#104).
+        // Operator→supplier voucher exchange / renewal (#104).
         services.AddScoped<GetVoucherExchangeAttentionQueryHandler>();
         services.AddScoped<GetVoucherExchangeCostContextQueryHandler>();
         // The exchange audit, as batches and as pairs (#223). Read-only: the table was written for

@@ -38,7 +38,7 @@ function workerContext(id: string): ResolvedContext {
 function mkVoucher(overrides: Partial<Voucher> = {}): Voucher {
   return {
     id: 'v1',
-    provider: 'OKKO',
+    brand: 'OKKO',
     fuelType: 'a95',
     amount: 10,
     status: 'active',
@@ -51,7 +51,7 @@ function mkVoucher(overrides: Partial<Voucher> = {}): Voucher {
 function mkOrder(overrides: Partial<Order> = {}): Order {
   return {
     id: 'o1',
-    provider: 'OKKO',
+    brand: 'OKKO',
     fuelType: 'a95',
     liters: 10,
     quantity: 1,
@@ -267,21 +267,21 @@ describe('ownerActionsForVoucher (#159)', () => {
 describe('groupVouchersByProvider', () => {
   it('groups by brand and totals the litres behind each brand', () => {
     const groups = groupVouchersByProvider([
-      mkVoucher({ id: 'a', provider: 'okko', amount: 10 }),
-      mkVoucher({ id: 'b', provider: 'WOG', amount: 20 }),
-      mkVoucher({ id: 'c', provider: 'OKKO', amount: 5 }),
+      mkVoucher({ id: 'a', brand: 'okko', amount: 10 }),
+      mkVoucher({ id: 'b', brand: 'WOG', amount: 20 }),
+      mkVoucher({ id: 'c', brand: 'OKKO', amount: 5 }),
     ]);
 
-    expect(groups.map((g) => g.provider)).toEqual(['OKKO', 'WOG']);
+    expect(groups.map((g) => g.brand)).toEqual(['OKKO', 'WOG']);
     expect(groups[0].items.map((v) => v.id)).toEqual(['a', 'c']);
     expect(groups[0].liters).toBe(15);
     expect(groups[1].liters).toBe(20);
   });
 
-  it('keeps a voucher with no provider visible instead of dropping it', () => {
-    const groups = groupVouchersByProvider([mkVoucher({ id: 'a', provider: '' })]);
+  it('keeps a voucher with no brand visible instead of dropping it', () => {
+    const groups = groupVouchersByProvider([mkVoucher({ id: 'a', brand: '' })]);
     expect(groups).toHaveLength(1);
-    expect(groups[0].provider).toBe('-');
+    expect(groups[0].brand).toBe('-');
   });
 });
 
@@ -321,7 +321,7 @@ describe('buildWorkerRoster', () => {
 
   it('lists a worker holding nothing instead of dropping them from the roster', () => {
     const roster = buildWorkerRoster([member()], []);
-    expect(roster[0]).toMatchObject({ activeCount: 0, activeLiters: 0, providers: [] });
+    expect(roster[0]).toMatchObject({ activeCount: 0, activeLiters: 0, brands: [] });
   });
 
   it('ignores company stock, which belongs to no worker', () => {
@@ -333,13 +333,13 @@ describe('buildWorkerRoster', () => {
     const roster = buildWorkerRoster(
       [member()],
       [
-        mkVoucher({ id: 'a', workerUserId: 'w1', provider: 'OKKO', amount: 10 }),
-        mkVoucher({ id: 'b', workerUserId: 'w1', provider: 'wog', amount: 20 }),
+        mkVoucher({ id: 'a', workerUserId: 'w1', brand: 'OKKO', amount: 10 }),
+        mkVoucher({ id: 'b', workerUserId: 'w1', brand: 'wog', amount: 20 }),
       ],
     );
 
-    expect(roster[0].providers.map((g) => g.provider)).toEqual(['OKKO', 'WOG']);
-    expect(roster[0].providers[1].items.map((v) => v.id)).toEqual(['b']);
+    expect(roster[0].brands.map((g) => g.brand)).toEqual(['OKKO', 'WOG']);
+    expect(roster[0].brands[1].items.map((v) => v.id)).toEqual(['b']);
   });
 
   it('orders the roster by name so it does not reshuffle on refetch', () => {
@@ -369,7 +369,7 @@ describe('filterRoster', () => {
     usedCount: 0,
     frozenCount: 0,
     activeLiters: 0,
-    providers: [],
+    brands: [],
   });
 
   it('matches a name fragment, case-insensitively', () => {
@@ -401,13 +401,13 @@ describe('filterRoster', () => {
 });
 describe('brandsOfOrder', () => {
   it('reads every brand from the line items, not just the first one', () => {
-    // order.provider is the FIRST line item's provider, so grouping by it would hide half
+    // order.brand is the FIRST line item's brand, so grouping by it would hide half
     // the fuel the owner is looking at.
     const order = mkOrder({
-      provider: 'OKKO',
+      brand: 'OKKO',
       lineItems: [
-        { id: 'l1', provider: 'OKKO', fuelTypeId: 'a95', liters: 50, quantity: 1 },
-        { id: 'l2', provider: 'WOG', fuelTypeId: 'a95', liters: 50, quantity: 1 },
+        { id: 'l1', brand: 'OKKO', fuelTypeId: 'a95', liters: 50, quantity: 1 },
+        { id: 'l2', brand: 'WOG', fuelTypeId: 'a95', liters: 50, quantity: 1 },
       ],
     });
 
@@ -416,18 +416,18 @@ describe('brandsOfOrder', () => {
 
   it('de-duplicates repeated brands', () => {
     const order = mkOrder({
-      provider: 'OKKO',
+      brand: 'OKKO',
       lineItems: [
-        { id: 'l1', provider: 'okko', fuelTypeId: 'a95', liters: 50, quantity: 1 },
-        { id: 'l2', provider: 'OKKO', fuelTypeId: 'dp', liters: 10, quantity: 1 },
+        { id: 'l1', brand: 'okko', fuelTypeId: 'a95', liters: 50, quantity: 1 },
+        { id: 'l2', brand: 'OKKO', fuelTypeId: 'dp', liters: 10, quantity: 1 },
       ],
     });
 
     expect(brandsOfOrder(order)).toEqual(['OKKO']);
   });
 
-  it('falls back to the order provider when it has no line items', () => {
-    expect(brandsOfOrder(mkOrder({ provider: 'wog', lineItems: [] }))).toEqual(['WOG']);
+  it('falls back to the order brand when it has no line items', () => {
+    expect(brandsOfOrder(mkOrder({ brand: 'wog', lineItems: [] }))).toEqual(['WOG']);
   });
 });
 
@@ -469,11 +469,11 @@ describe('groupOrdersByBrand', () => {
     mkOrder({
       id,
       createdAt,
-      provider: brand,
+      brand: brand,
       lineItems: [
-        { id: `${id}-l`, provider: brand, fuelTypeId: 'a95', liters: 50, quantity: 1 },
+        { id: `${id}-l`, brand: brand, fuelTypeId: 'a95', liters: 50, quantity: 1 },
         ...(extraBrand
-          ? [{ id: `${id}-x`, provider: extraBrand, fuelTypeId: 'a95', liters: 50, quantity: 1 }]
+          ? [{ id: `${id}-x`, brand: extraBrand, fuelTypeId: 'a95', liters: 50, quantity: 1 }]
           : []),
       ],
     });

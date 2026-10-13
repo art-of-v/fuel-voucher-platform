@@ -188,7 +188,7 @@ export default function RenewScreen() {
             return (
               <Card key={v.voucherId} accent="neutral">
                 <Text role="bodyStrong">
-                  {v.provider} · {v.fuelName}
+                  {v.brand} · {v.fuelName}
                 </Text>
                 <Text role="secondary" tone="muted">
                   {t(reasonKey)}
@@ -212,7 +212,7 @@ export default function RenewScreen() {
             <Card key={v.voucherId}>
               <View style={{ gap: tokens.spacing.xs }}>
                 <Text role="bodyStrong">
-                  {v.provider} · {v.fuelName}
+                  {v.brand} · {v.fuelName}
                 </Text>
                 <Text role="secondary" tone="muted">
                   {v.liters} {t('common.liter')} · {t(branchKey)}

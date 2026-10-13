@@ -104,7 +104,7 @@ public static class AppSettingKeys
     /// <summary>
     /// How many days after the printed expiration date the expired-voucher loss-booking job
     /// should wait before retiring a voucher to <c>Expired</c>. During this grace window the
-    /// operator can still exchange the voucher with the brand for a surcharge, so the loss
+    /// operator can still exchange the voucher with the supplier for a surcharge, so the loss
     /// is not yet realised. A value of 0 means the legacy behaviour — the job books the loss
     /// immediately on the printed expiry date. Default: 14 (two weeks), matching the renewal
     /// trigger threshold.

@@ -330,7 +330,7 @@ export function OrderCard({
                   { color: tokens.colors.text.primary, fontFamily: 'Rajdhani-Bold' },
                 ]}
               >
-                {order.provider}
+                {order.brand}
               </Text>
             </View>
 

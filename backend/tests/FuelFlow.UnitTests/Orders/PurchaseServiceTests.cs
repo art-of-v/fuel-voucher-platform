@@ -155,7 +155,7 @@ public OrderCommandHandlersTests()
     private CreateCheckoutCommand CheckoutCommand() => new()
     {
         UserId = _context.Users.First().Id,
-        Brand = "okko",
+        
         FuelTypeId = "okko-95",
         StationId = "okko",
         StationName = "OKKO",
@@ -171,7 +171,7 @@ public OrderCommandHandlersTests()
         {
             new CheckoutItem
             {
-                Brand = "okko",
+                
                 FuelTypeId = "okko-95",
                 StationId = "okko",
                 StationName = "OKKO",
@@ -213,7 +213,7 @@ public OrderCommandHandlersTests()
     private CreateCheckoutCommand BelowCostCommand() => new()
     {
         UserId = _context.Users.First().Id,
-        Brand = "okko", FuelTypeId = "okko-loss", StationId = "okko", StationName = "OKKO",
+        FuelTypeId = "okko-loss", StationId = "okko", StationName = "OKKO",
         Liters = 50, Quantity = 1, Price = 2425
     };
 
@@ -224,7 +224,7 @@ public OrderCommandHandlersTests()
         {
             new CheckoutItem
             {
-                Brand = "okko", FuelTypeId = "okko-loss", StationId = "okko", StationName = "OKKO",
+                FuelTypeId = "okko-loss", StationId = "okko", StationName = "OKKO",
                 Liters = 50, Quantity = 1, Price = 2425
             }
         }
@@ -408,7 +408,7 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
         var command = new CreateCheckoutCommand
         {
             UserId = _context.Users.First().Id,
-            Brand = "okko", FuelTypeId = "okko-frac", StationId = "okko", StationName = "OKKO",
+            FuelTypeId = "okko-frac", StationId = "okko", StationName = "OKKO",
             Liters = 10, Quantity = 1, Price = 4567   // client price is ignored; server recomputes 456.70
         };
 

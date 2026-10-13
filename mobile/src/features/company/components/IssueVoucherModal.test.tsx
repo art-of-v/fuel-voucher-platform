@@ -29,7 +29,7 @@ function mkMember(overrides: Partial<CompanyMemberDto> = {}): CompanyMemberDto {
 function mkVoucher(overrides: Partial<Voucher> = {}): Voucher {
   return {
     id: 'v1',
-    provider: 'OKKO',
+    brand: 'OKKO',
     fuelType: 'a95',
     amount: 10,
     status: 'active',
@@ -62,7 +62,7 @@ function renderSheet(props: {
       <IssueVoucherModal
         members={props.members ?? [mkMember()]}
         giftable={giftable}
-        giftGroups={giftable.map((v) => ({ provider: v.provider, items: [v] }))}
+        giftGroups={giftable.map((v) => ({ brand: v.brand, items: [v] }))}
         gift={gift}
         isGifting={false}
         allGiftableSelected={giftable.every((v) => (props.selected ?? []).includes(v.id))}

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -589,7 +589,7 @@ namespace FuelFlow.API.Migrations
                     created_at_utc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     external_id = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     fuel_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    brand = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    provider = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
                     status = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false)
                 },
                 constraints: table =>

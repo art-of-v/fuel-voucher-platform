@@ -4,8 +4,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace FuelFlow.Features.Vouchers.Exchange;
 
 /// <summary>
-/// Admin-only operator→brand voucher exchange / renewal (planning #104). The operator renews our
-/// own lapsing STOCK vouchers with the brand off-platform (no payment, no device signature) and
+/// Admin-only operator→supplier voucher exchange / renewal (planning #104). The operator renews our
+/// own lapsing STOCK vouchers with the supplier off-platform (no payment, no device signature) and
 /// records it here: which old stock → which new stock, the доплата, and the cost that reprices the
 /// remaining stock. See <see cref="ConfirmVoucherExchangeCommandHandler"/>.
 /// </summary>

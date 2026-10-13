@@ -12,12 +12,12 @@ import type { Voucher } from '../../../core/types/api';
  * to be testable without a renderer.
  */
 
-export type VoucherSortKey = 'expiry' | 'provider' | 'fuel' | 'liters';
+export type VoucherSortKey = 'expiry' | 'brand' | 'fuel' | 'liters';
 export type SortDirection = 'asc' | 'desc';
 
 export interface VoucherFilters {
-  /** Exact provider match (the brand, e.g. OKKO). */
-  provider?: string;
+  /** Exact brand match (the brand, e.g. OKKO). */
+  brand?: string;
   /** Exact fuel-type match. */
   fuel?: string;
   /** Exact status match, as the API reports it. */
@@ -50,21 +50,21 @@ function isExpired(voucher: Voucher, now: Date): boolean {
 }
 
 /**
- * The distinct providers and fuels present in the list, for populating the filter options.
+ * The distinct brands and fuels present in the list, for populating the filter options.
  *
  * Derived from the data rather than a fixed catalogue: the platform supports any number of brands, and
  * a dropdown offering a filter that matches nothing is worse than no dropdown.
  */
-export function availableFacets(vouchers: Voucher[]): { providers: string[]; fuels: string[] } {
-  const providers = new Set<string>();
+export function availableFacets(vouchers: Voucher[]): { brands: string[]; fuels: string[] } {
+  const brands = new Set<string>();
   const fuels = new Set<string>();
   for (const v of vouchers) {
-    if (v.provider) providers.add(v.provider);
+    if (v.brand) brands.add(v.brand);
     if (v.fuelType) fuels.add(v.fuelType);
   }
   const byName = (a: string, b: string) => a.localeCompare(b);
   return {
-    providers: [...providers].sort(byName),
+    brands: [...brands].sort(byName),
     fuels: [...fuels].sort(byName),
   };
 }
@@ -72,7 +72,7 @@ export function availableFacets(vouchers: Voucher[]): { providers: string[]; fue
 /** How many filters are currently narrowing the list - drives the "clear (N)" affordance. */
 export function countActiveFilters(filters: VoucherFilters): number {
   let count = 0;
-  if (filters.provider) count++;
+  if (filters.brand) count++;
   if (filters.fuel) count++;
   if (filters.status) count++;
   if (filters.hideExpired) count++;
@@ -80,7 +80,7 @@ export function countActiveFilters(filters: VoucherFilters): number {
 }
 
 function matchesFilters(voucher: Voucher, filters: VoucherFilters, today: Date): boolean {
-  if (filters.provider && voucher.provider !== filters.provider) return false;
+  if (filters.brand && voucher.brand !== filters.brand) return false;
   if (filters.fuel && voucher.fuelType !== filters.fuel) return false;
   if (filters.status && voucher.status !== filters.status) return false;
   if (filters.hideExpired && isExpired(voucher, today)) return false;
@@ -96,8 +96,8 @@ function compareVouchers(a: Voucher, b: Voucher, key: VoucherSortKey): number {
       if (!b.expirationDate) return -1;
       return new Date(a.expirationDate).getTime() - new Date(b.expirationDate).getTime();
     }
-    case 'provider':
-      return (a.provider ?? '').localeCompare(b.provider ?? '');
+    case 'brand':
+      return (a.brand ?? '').localeCompare(b.brand ?? '');
     case 'fuel':
       return (a.fuelName || a.fuelType || '').localeCompare(b.fuelName || b.fuelType || '');
     case 'liters':
@@ -118,7 +118,7 @@ export function applyListControls(
 
   const sorted = [...filtered].sort((a, b) => {
     const result = compareVouchers(a, b, controls.sortKey);
-    // Ties fall back to expiry so a provider- or fuel-sorted list still reads chronologically.
+    // Ties fall back to expiry so a brand- or fuel-sorted list still reads chronologically.
     const tieBreak = result === 0 ? compareVouchers(a, b, 'expiry') : result;
     return controls.sortDirection === 'asc' ? tieBreak : -tieBreak;
   });

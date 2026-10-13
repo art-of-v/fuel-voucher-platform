@@ -38,7 +38,7 @@ describe("localizeEventSummary", () => {
   });
 
   it("localizes brand creation", () => {
-    expect(localizeEventSummary("Created brand OKKO", mockT)).toBe("[history.brandCreated]");
+    expect(localizeEventSummary("Created brand OKKO", mockT)).toBe("[history.providerCreated]");
   });
 
   it("localizes nominals change", () => {
@@ -68,7 +68,7 @@ describe("csvCell", () => {
   });
 
   it("neutralises formula-leading characters so spreadsheets treat them as text", () => {
-    // The reachable case: DatabaseLoggerBrand stores Request.Path verbatim, so the
+    // The reachable case: DatabaseLoggerProvider stores Request.Path verbatim, so the
     // attacker picks this string simply by requesting that path.
     expect(csvCell("=cmd|'/c calc'!A0")).toBe(`"'=cmd|'/c calc'!A0"`);
     expect(csvCell('=HYPERLINK("http://evil")')).toBe(`"'=HYPERLINK(""http://evil"")"`);

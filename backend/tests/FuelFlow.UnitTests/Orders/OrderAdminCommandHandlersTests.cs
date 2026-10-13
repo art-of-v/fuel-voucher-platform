@@ -186,7 +186,7 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
 
     private static CheckoutItem CheckoutItem(string fuelTypeId, int price, string? stationId = "okko") => new()
     {
-        Brand = "okko",
+        
         FuelTypeId = fuelTypeId,
         Liters = 50,
         Quantity = 1,
