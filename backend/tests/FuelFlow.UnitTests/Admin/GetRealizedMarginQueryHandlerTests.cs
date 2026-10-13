@@ -3,7 +3,6 @@ using FuelFlow.Features.Admin.GetRealizedMargin;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Features.Vouchers;
-using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -19,6 +18,12 @@ namespace FuelFlow.UnitTests.Admin;
 public sealed class GetRealizedMarginQueryHandlerTests : IDisposable
 {
     private readonly ApplicationDbContext _context;
+
+    /// <summary>
+    /// EF Core needs an int identity, so it must be unique across the whole context and not just
+    /// within one order - hence a counter on the fixture rather than a fresh 1 per seed.
+    /// </summary>
+    private int _nextFulfillmentId = 1000;
 
     public GetRealizedMarginQueryHandlerTests()
     {
@@ -72,7 +77,6 @@ private async Task<Order> SeedAsync(
         });
         _context.Orders.Add(order);
 
-        var fulfillmentId = 0;
         foreach (var _ in Enumerable.Range(0, vouchers))
         {
             var voucher = new FuelVoucher
@@ -91,7 +95,6 @@ private async Task<Order> SeedAsync(
                 UpdatedAtUtc = DateTime.UtcNow,
             };
             _context.FuelVouchers.Add(voucher);
-            // int identity, so it must be unique across the whole context, not per order.
             order.Fulfillments.Add(new Fulfillment
             {
                 Id = Interlocked.Increment(ref _nextFulfillmentId),
@@ -106,8 +109,6 @@ private async Task<Order> SeedAsync(
         _context.ChangeTracker.Clear();
         return order;
     }
-
-    private int _nextFulfillmentId = 1000;
 
     [Fact]
     public async Task ShouldReportALoss_WhenAnExpensiveVoucherIsSoldAtTheBlendedPrice()

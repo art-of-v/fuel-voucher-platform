@@ -161,7 +161,7 @@ private readonly RuntimeSettingsService _runtimeSettings;
                 // Same as the single-line path: a blocked basket tells nobody unless we say so.
                 // Throttled per fuel inside the dispatcher, so one customer's retry loop is one message.
                 await _notifications.BelowCostAsync(
-                    item.StationId, fuelType.Name,
+                    item.StationId!, fuelType.Name,
                     package.SupplierPricePerLiter ?? 0m, discountPerLiter, deliberate: false, cancellationToken);
                 throw new BelowCostSaleBlockedException(item.FuelTypeId);
             }

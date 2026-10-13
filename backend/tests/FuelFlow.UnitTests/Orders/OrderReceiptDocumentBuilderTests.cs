@@ -91,6 +91,8 @@ public sealed class OrderReceiptDocumentBuilderTests
     public void TheEmbeddedFont_CoversEveryCharacterTheDocumentUses(string fileName)
     {
         using var typeface = LoadEmbeddedFont(fileName);
+        // Glyph lookup lives on SKFont now; SKTypeface keeps the face, SKFont the shaping side of it.
+        using var font = new SKFont(typeface);
 
         // Read the shipped bytes back through Skia rather than a hand-rolled cmap parser, which
         // would only prove the parser's own arithmetic was right. The native library behind this
@@ -98,7 +100,7 @@ public sealed class OrderReceiptDocumentBuilderTests
         // on the Linux runner, so the test project now carries the native assets for both - a font
         // assertion that only runs on the machine it was written on is not an assertion.
         var missing = RequiredCharacters
-            .Where(rc => !typeface.ContainsGlyph(rc.Codepoint))
+            .Where(rc => !font.ContainsGlyph(rc.Codepoint))
             .Select(rc => rc.Character)
             .ToArray();
 
@@ -115,8 +117,9 @@ public sealed class OrderReceiptDocumentBuilderTests
         // Guards the guard: if ContainsGlyph answered true for everything, the test above would pass
         // for the wrong reason. U+E000 is a private-use codepoint that belongs to no font.
         using var typeface = LoadEmbeddedFont("PT_Sans-Web-Regular.ttf");
+        using var font = new SKFont(typeface);
 
-        typeface.ContainsGlyph(0xE000).Should().BeFalse();
-        typeface.ContainsGlyph(0x0456).Should().BeTrue("і must be present");
+        font.ContainsGlyph(0xE000).Should().BeFalse();
+        font.ContainsGlyph(0x0456).Should().BeTrue("і must be present");
     }
 }

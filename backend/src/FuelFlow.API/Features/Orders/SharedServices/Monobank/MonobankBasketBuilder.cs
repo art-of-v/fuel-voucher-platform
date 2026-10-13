@@ -44,9 +44,15 @@ public static class MonobankBasketBuilder
     /// A refund passes lines describing only the unfulfilled part, so a half-returned order yields
     /// half the litres rather than the whole line.
     /// </para>
+    /// <para>
+    /// <c>FuelName</c> is nullable on purpose: <see cref="FuelNamesAsync"/> simply omits a fuel type
+    /// it could not find, and the declared type says so rather than making every caller lie with a
+    /// placeholder. Such a line falls back to the provider name, which at least tells an inspector
+    /// who supplied the fuel.
+    /// </para>
     /// </summary>
     public static List<MonobankBasketItem> Build(
-        IEnumerable<(string Provider, string FuelTypeId, string FuelName, decimal Liters, int Quantity, decimal UnitPrice, decimal LineTotal)> lines)
+        IEnumerable<(string Provider, string FuelTypeId, string? FuelName, decimal Liters, int Quantity, decimal UnitPrice, decimal LineTotal)> lines)
     {
         var items = new List<MonobankBasketItem>();
 
@@ -54,11 +60,13 @@ public static class MonobankBasketBuilder
         {
             if (line.Quantity <= 0 || line.Liters <= 0) continue;
 
+            var fuelName = line.FuelName;
+
             items.Add(new MonobankBasketItem
             {
-                Name = string.IsNullOrWhiteSpace(line.FuelName)
+                Name = string.IsNullOrWhiteSpace(fuelName)
                     ? line.Provider.ToUpperInvariant()
-                    : line.FuelName,
+                    : fuelName,
                 Qty = line.Liters * line.Quantity,
                 Sum = (long)Math.Round(Money.ToKopecks(line.UnitPrice), MidpointRounding.AwayFromZero),
                 Total = (long)Math.Round(Money.ToKopecks(line.LineTotal), MidpointRounding.AwayFromZero),

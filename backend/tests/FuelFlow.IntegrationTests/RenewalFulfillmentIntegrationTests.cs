@@ -933,7 +933,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             var purchases = await handler.HandleAsync(
                 new GetUserPurchasesCommand(userId), CancellationToken.None);
 
-            var shown = purchases.SelectMany(p => p.Vouchers).ToList();
+            var shown = purchases.SelectMany(p => p.Vouchers ?? []).ToList();
             shown.Should().ContainSingle("the replacement is the only thing the customer still holds");
             shown.Should().NotContain(v => v.Id == sourceId,
                 "the voucher they gave back is Fuel Flow's stock, not theirs");
