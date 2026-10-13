@@ -112,6 +112,13 @@ public sealed class RuntimeSettingsService
     public async Task<int> GetExpiredVoucherLossGraceDaysAsync(CancellationToken cancellationToken = default)
         => await GetIntAsync(AppSettingKeys.ExpiredVoucherLossGraceDays, DefaultExpiredVoucherLossGraceDays, cancellationToken);
 
+    /// <summary>Whether the in-app feedback channel (Telegram bot) is offered to customers.
+    /// Fail-safe: defaults to false, so the bottom-bar tab does not appear until a manager turns
+    /// it on. Read fresh on every call, so turning it off takes effect on the next request rather
+    /// than at the next deploy.</summary>
+    public async Task<bool> IsFeedbackBotEnabledAsync(CancellationToken cancellationToken = default)
+        => await GetBoolAsync(AppSettingKeys.FeedbackBotEnabled, defaultValue: false, cancellationToken);
+
     /// <summary>Whether the paid voucher renewal/replacement flow is live. Fail-safe: defaults to false,
     /// so nothing renews until a manager turns it on and configures tier prices.</summary>
     public async Task<bool> IsVoucherRenewalEnabledAsync(CancellationToken cancellationToken = default)

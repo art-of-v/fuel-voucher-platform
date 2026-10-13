@@ -109,6 +109,13 @@ public class AnonymousEndpointSurfaceTests : IClassFixture<TestDatabaseFixture>
         // (per-IP named rate limit + global limiter + a "website" honeypot answered 204), see
         // SupportController. A reviewed decision, not a missing [Authorize].
         "POST /api/support/messages",
+
+        // Telegram's webhook for the in-app feedback bot. Authenticates by the
+        // X-Telegram-Bot-Api-Secret-Token header (constant-time compared), which is the only
+        // credential a bot platform can offer - see TelegramFeedbackWebhookController. Without it
+        // anyone who learned the URL could post fake updates into a customer's chat or flood the
+        // staff group. A reviewed decision, not a missing [Authorize].
+        "POST /api/telegram/feedback/webhook",
     ];
 
     [Fact]

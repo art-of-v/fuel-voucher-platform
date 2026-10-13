@@ -17,6 +17,7 @@ using FuelFlow.Features.Auth.Verify;
 using FuelFlow.Features.Auth.VerifyChallenge;
 using FuelFlow.Features.Contracts.GetAdminContracts;
 using FuelFlow.Features.Contracts.GetSignedContracts;
+using FuelFlow.Features.Feedback;
 using FuelFlow.Features.Monobank.ProcessWebhook;
 using FuelFlow.Features.Notifications.DeregisterPushToken;
 using FuelFlow.Features.Notifications.GetNotifications;
@@ -134,6 +135,7 @@ internal static class ServiceSetup
         AddAdminServices(services);
         AddNotificationServices(services);
         AddSupportServices(services, config);
+        AddFeedbackServices(services, config);
         AddBackgroundJobServices(services);
         AddOkkoPriceServices(services, config);
         AddUpdateServices(services);
@@ -398,6 +400,39 @@ services.AddScoped<TermQuoteQueryHandler>();
         services.AddScoped<ISupportMailSender, SupportMailSender>();
         // Reuses the SupportMail SMTP connection for transactional mail (admin OTP).
         services.AddScoped<IEmailSender, SmtpEmailSender>();
+    }
+
+    private static void AddFeedbackServices(IServiceCollection services, IConfiguration config)
+    {
+        services.Configure<TelegramFeedbackOptions>(
+            config.GetSection(TelegramFeedbackOptions.SectionName));
+        services.Configure<FeedbackClassifierOptions>(
+            config.GetSection(FeedbackClassifierOptions.SectionName));
+
+        var feedback = config.GetSection(TelegramFeedbackOptions.SectionName)
+            .Get<TelegramFeedbackOptions>();
+        services.AddHttpClient<ITelegramFeedbackClient, TelegramFeedbackClient>(client =>
+        {
+            var baseUrl = feedback?.BaseUrl;
+            if (!string.IsNullOrWhiteSpace(baseUrl))
+                client.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
+            var timeout = feedback?.TimeoutSeconds ?? 10;
+            if (timeout > 0)
+                client.Timeout = TimeSpan.FromSeconds(timeout);
+        });
+
+        var classifier = config.GetSection(FeedbackClassifierOptions.SectionName)
+            .Get<FeedbackClassifierOptions>();
+        services.AddHttpClient<IFeedbackClassifier, GeminiFeedbackClassifier>(client =>
+        {
+            var timeout = classifier?.TimeoutSeconds ?? 20;
+            if (timeout > 0)
+                client.Timeout = TimeSpan.FromSeconds(timeout);
+        });
+
+        // Scoped rather than singleton: the router writes through the request-scoped DbContext.
+        services.AddScoped<FeedbackUpdateRouter>();
+        services.AddScoped<FeedbackTriageService>();
     }
 
     private static void AddBackgroundJobServices(IServiceCollection services)

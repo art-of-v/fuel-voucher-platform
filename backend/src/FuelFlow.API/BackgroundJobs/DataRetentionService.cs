@@ -75,6 +75,19 @@ public class DataRetentionService
     /// </summary>
     public const int SupportMessageRetentionDays = 365;
 
+    /// <summary>
+    /// Customer feedback from the Telegram bot. Shorter than <see cref="SupportMessageRetentionDays"/>
+    /// because these rows are linked to a real account (<c>user_id</c>) and carry the customer's own
+    /// words, so they are both product backlog and personal data. 180 days is long enough to act on
+    /// a quarterly roadmap cycle; past that the backlog has already been triaged and the row is
+    /// only a liability.
+    /// <para>
+    /// Replies are purged with the same window. The FK is Restrict precisely so this ordering is
+    /// explicit: replies first, then the messages they answer.
+    /// </para>
+    /// </summary>
+    public const int FeedbackMessageRetentionDays = 180;
+
     // Deliberately NOT covered, and the reason matters more than the list:
     //
     //   voucher_exchanges          - the settlement record. "Who do we settle with, for what, at
@@ -122,6 +135,7 @@ public class DataRetentionService
         var voucherImportCutoff = now.AddDays(-VoucherImportRetentionDays);
         var qrParametersCutoff = now.AddDays(-QrParametersRetentionDays);
         var supportMessageCutoff = now.AddDays(-SupportMessageRetentionDays);
+        var feedbackMessageCutoff = now.AddDays(-FeedbackMessageRetentionDays);
 
         // Devices are purged by TWO predicates rather than the one
         // `Status == Revoked || LastSeenAt < cutoff` they read as, and the reason is the planner,
@@ -217,6 +231,16 @@ public class DataRetentionService
             // the row surviving.
             ("support_messages", await PurgeAsync(
                 _context.SupportMessages.Where(m => m.CreatedAtUtc < supportMessageCutoff),
+                dryRun, cancellationToken)),
+
+            // Bot feedback: replies first, because the FK from replies to messages is Restrict and
+            // the two tables share one window - deleting the message first would fail the job.
+            ("feedback_message_replies", await PurgeAsync(
+                _context.FeedbackMessageReplies.Where(r => r.SentAtUtc < feedbackMessageCutoff),
+                dryRun, cancellationToken)),
+
+            ("feedback_messages", await PurgeAsync(
+                _context.FeedbackMessages.Where(m => m.CreatedAtUtc < feedbackMessageCutoff),
                 dryRun, cancellationToken)),
         };
 

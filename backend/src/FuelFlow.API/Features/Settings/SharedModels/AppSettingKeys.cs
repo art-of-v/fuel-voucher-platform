@@ -38,6 +38,15 @@ public static class AppSettingKeys
     public const string DeletedUnpaidOrderCleanupRetentionDays = "DeletedUnpaidOrderCleanup:RetentionDays";
 
     /// <summary>
+    /// Master switch for the in-app feedback channel (the Telegram bot behind the bottom-bar tab).
+    /// Fail-safe: defaults to false, so the tab is absent from the mobile app until a manager turns
+    /// it on AND the Telegram integration is provisioned. This is the switch an operator flips to
+    /// take the channel out of service without a redeploy; <c>Telegram:Feedback:Enabled</c> is the
+    /// coarser one that only a server restart can change.
+    /// </summary>
+    public const string FeedbackBotEnabled = "FeedbackBot:Enabled";
+
+    /// <summary>
     /// Master switch for the nightly data-retention job (<c>DataRetentionService</c>), which prunes
     /// high-churn operational rows — spent OTPs, dead refresh tokens, processed outbox events, read
     /// notifications, aged error logs, stale push tokens — each past its own fixed window. It never

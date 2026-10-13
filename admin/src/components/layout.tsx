@@ -1,5 +1,5 @@
 import { ReactNode, useState } from "react";
-import { Archive, BarChart3, Building, ShoppingCart, Users, Menu, Ticket, X, FileSignature, FileCheck, ScrollText, Bug, LogOut, Settings, MapPin, Replace, RefreshCw, Handshake } from "lucide-react";
+import { Archive, BarChart3, Building, ShoppingCart, Users, Menu, Ticket, X, FileSignature, FileCheck, ScrollText, Bug, LogOut, Settings, MapPin, Replace, RefreshCw, Handshake, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -38,6 +38,7 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, className, onClose, user, b
         { id: "reconciliation", label: t("nav.reconciliation"), icon: FileCheck },
         { id: "auditlog", label: t("nav.auditlog"), icon: ScrollText },
         { id: "errorlogs", label: t("nav.errorlogs"), icon: Bug },
+        { id: "feedback", label: t("nav.feedback"), icon: MessageSquare },
         { id: "reports", label: t("nav.reports"), icon: BarChart3 },
         { id: "settings", label: t("nav.settings"), icon: Settings },
     ];

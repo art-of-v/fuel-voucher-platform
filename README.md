@@ -90,6 +90,7 @@ backend/src/
 │       ├── Report/                # Per-user profit/spending reports
 │       ├── Admin/                 # Dashboard, reconciliation, admin voucher/user/order ops
 │       ├── Audit/ & ErrorLogs/    # audit_log + error_logs tables and admin UIs
+│       ├── Feedback/              # Telegram feedback bot: webhook, triage, admin backlog
 │       ├── Notifications/ Referral/ Sync/ Settings/
 │       └── ...
 └── FuelFlow.JobsWorker/           # Standalone Hangfire worker (jobs also run in-process in the API)
@@ -205,7 +206,35 @@ level stored in `roles.level` and the authority matrix enforced in
 5. The app polls `GET /api/vouchers/my` + `GET /api/sync/orders`; redemption at the pump is
    self-reported via `PATCH /api/vouchers/{id}/mark-used`.
 
-### 4. Reconciliation, refunds & reports (admin)
+### 4. Feedback bot (mobile)
+
+1. The bottom bar carries a **Feedback** tab, visible only when `GET /api/feedback/deep-link`
+   answers — the tab is *absent*, not disabled, so switching `FeedbackBot:Enabled` off in the
+   admin takes it out of every installed app without a release.
+2. That endpoint returns a **server-signed** `https://t.me/<bot>?start=<payload>` link. The app
+   never signs anything: a key inside a shipped binary is a public key, and would let anyone start
+   a chat as any account.
+3. The customer writes in a **private 1-on-1 Telegram chat** — other customers cannot see it.
+   Every message is acknowledged immediately, stored in `feedback_messages`, and queued for
+   triage out of band (the webhook answers 200 first; a classifier round-trip in the request
+   would make Telegram redeliver the same update forever).
+4. `FeedbackTriageService` (Hangfire) asks an LLM (`Llm:*`, Gemini by default) whether the
+   message carries information — greetings and jokes are dropped — and posts the rest, with a
+   category, a severity and a one-sentence restatement, to a **private staff group**. Dropped
+   messages are still stored, so a classifier that starts eating real complaints is visible in
+   the admin's "unsure drops" filter instead of vanishing.
+5. A staff member answers by **quoting the bot's post** in that group. Two independent gates
+   relay it to the customer: the sender must be in `Telegram:Feedback:StaffUserIds`, and the
+   quoted message must be one the bot posted. Every answer is recorded in
+   `feedback_message_replies`.
+6. Everything lands in the admin **Feedback** tab (filters, triage state, full history); Telegram
+   is where the team works, the admin tab is the durable backlog.
+
+Configured entirely off by default (`Telegram:Feedback:Enabled`, `Llm:Enabled`,
+`app_settings.FeedbackBot:Enabled`). Design and rationale:
+`docs/FEEDBACK_BOT.md` in the private planning repo.
+
+### 5. Reconciliation, refunds & reports (admin)
 
 - Reconciliation compares paid orders vs. delivered vouchers vs. imported stock; the money
   ledger is `received = delivered value + refunded + outstanding`.
@@ -214,7 +243,7 @@ level stored in `roles.level` and the authority matrix enforced in
   job reconciles refund state. See `docs/RECONCILIATION.md` in the private docs repo.
 - **Profit** is earned margin on liters actually delivered (`FuelPackage.MarginUahPerLiter × liters × delivered qty`).
 
-### 5. Company workers
+### 6. Company workers
 
 A user who creates a `LegalEntity` becomes a company **owner**: they can buy vouchers for the
 company (`legalEntityId` on checkout), invite registered users as **workers**, gift/recall
@@ -290,6 +319,7 @@ The primary tables:
 | `notifications` | In-app user notifications |
 | `error_logs` | Persisted application errors (90d) |
 | `support_messages` | Public support form submissions |
+| `feedback_messages` / `feedback_message_replies` / `feedback_chat_bindings` | Customer feedback collected through the in-app Telegram bot (below) |
 | `app_settings` | Runtime feature toggles an admin can flip without a deploy |
 
 Referral codes are two columns on `users` (`referral_code`, `referred_by`), not a table of
@@ -365,12 +395,23 @@ role required; — = public. This lists the primary endpoints; admin sub-resourc
 | `GET` | `/api/packages` · `/api/packages/station/{id}` | Fuel packages (all / by station), each with `isAvailable` (scoped to the caller's own stock pool) |
 | `GET` | `/api/report` | Per-user report (authenticated) |
 
+### Feedback
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/feedback/deep-link` | ✅ | Server-signed `t.me` deep link for the signed-in user; **404 when the channel is off** (the mobile tab hides itself) |
+| `POST` | `/api/telegram/feedback/webhook` | — (secret header) | Telegram webhook for the feedback bot; authenticates by `X-Telegram-Bot-Api-Secret-Token` (constant-time), always answers 2xx once authenticated |
+
+Admin: `GET /api/admin/feedback` (filters + paging), `GET /api/admin/feedback/facets`,
+`GET /api/admin/feedback/{id}`, `POST /api/admin/feedback/status`,
+`DELETE /api/admin/feedback?id=|verdict=` (deletes the replies first — the FK is `Restrict`).
+
 ### Admin
 
 Admin CRUD/reporting lives under `/api/admin/*` (all `Admin`-role): `stations`, `fuel-types`,
 `packages`, `providers`, `vouchers`, `fuel-vouchers`, `voucher-imports`, `qr-codes`, `orders`
 (incl. `POST /api/admin/orders/{id}/refund`), `users`, `settings`, `report`, `audit`, `errors`,
-`legal-entity/contracts`, and `dashboard` (aggregated counts). See
+`feedback`, `legal-entity/contracts`, and `dashboard` (aggregated counts). See
 `docs/RECONCILIATION.md` in the private docs repo for the reconciliation-specific endpoints.
 
 ### Monitoring
@@ -475,6 +516,8 @@ Backend (`appsettings.json` / environment overrides — use `__` for nested keys
 
 - **`Jwt:Secret`** — required (≥32 chars) in non-development environments; the app fails fast otherwise.
 - **`Auth:DevBypass`** — `true` enables the `000000` OTP + fake SMS; keep `false` in production.
+- **`Telegram:Feedback:*`** - the feedback bot (own token, own staff group, own `WebhookSecret`, `SigningKey`, `StaffUserIds`); off by default. `Telegram:*` beside it is the unrelated **alerting** bot - two tokens on purpose, because Telegram allows one webhook per token.
+- **`Llm:*`** - the feedback triage classifier (API key + model); off by default, and with it off every message is stored and shown unfiltered rather than lost.
 - **`Monobank:PublicKey`** — PEM (or base64-of-PEM) used to verify webhook signatures; production fails fast if `Monobank:Enabled=true` with a placeholder key.
 
 Mobile (`mobile/.env`): `EXPO_PUBLIC_API_URL=...` · Admin (build arg in `admin/Dockerfile` / dev env): `VITE_API_URL=...`
@@ -520,6 +563,7 @@ in code comments and scripts throughout this repo point at that private repo.
 | `docs/COMPANY_WORKERS.md` | Company owner/worker feature (data model + `/api/company` API) |
 | `docs/OBSERVABILITY.md` | Prometheus/Grafana/Loki observability stack + Telegram alerting + Sentry error tracking |
 | `docs/TESTING.md` | How the test suite is wired, and what each layer actually proves |
+| `docs/FEEDBACK_BOT.md` | In-app feedback channel: the Telegram bot, its LLM triage, the two-way staff relay, and why each gate exists |
 | `docs/WORKFLOW.md` | Branching, PR and merge conventions |
 
 They were removed from this repository on 2026-10-12; the git history still contains them.

@@ -263,6 +263,27 @@ services:
       Telegram__BotToken: ${TELEGRAM_BOT_TOKEN:-}
       Telegram__ChatIds__0: ${TELEGRAM_CHAT_ID:-}
 
+      # --- Feedback bot (in-app Telegram feedback channel, optional) ----------------------
+      # A SEPARATE bot token from the alerting one above: Telegram allows one webhook per
+      # token, so sharing them would mean routing both by update type at one endpoint and
+      # letting feedback traffic interfere with alerting.
+      # Unset => IsConfigured is false, the webhook 401s every delivery, and the mobile tab
+      # stays hidden. Also needs the app_settings row FeedbackBot:Enabled=true.
+      Telegram__Feedback__Enabled: ${TELEGRAM_FEEDBACK_ENABLED:-false}
+      Telegram__Feedback__BotToken: ${TELEGRAM_FEEDBACK_BOT_TOKEN:-}
+      Telegram__Feedback__BotUsername: ${TELEGRAM_FEEDBACK_BOT_USERNAME:-}
+      Telegram__Feedback__WebhookSecret: ${TELEGRAM_FEEDBACK_WEBHOOK_SECRET:-}
+      Telegram__Feedback__SigningKey: ${TELEGRAM_FEEDBACK_SIGNING_KEY:-}
+      Telegram__Feedback__StaffChatId: ${TELEGRAM_FEEDBACK_STAFF_CHAT_ID:-0}
+      Telegram__Feedback__StaffUserIds__0: ${TELEGRAM_FEEDBACK_STAFF_USER_IDS:-}
+
+      # --- Feedback triage classifier (optional) -------------------------------------------
+      # Unset => IsConfigured is false, and every message is stored and shown unfiltered
+      # rather than lost. The LLM is a filter, not a gate.
+      Llm__Enabled: ${LLM_ENABLED:-false}
+      Llm__ApiKey: ${LLM_API_KEY:-}
+      Llm__Model: ${LLM_MODEL:-gemini-2.0-flash}
+
       # --- Over-the-air JS updates (self-hosted Expo Updates, planning #42) -----------------
       # Public, CDN-fronted base URL of the R2 bucket holding the pre-signed update descriptors
       # + assets. The API only fetches and relays already-signed bytes; the private signing key
