@@ -21,12 +21,7 @@ interface CartItemCardProps {
   isAvailable?: boolean;
 }
 
-export function CartItemCard({
-  item,
-  onUpdateQuantity,
-  onRemove,
-  isAvailable,
-}: CartItemCardProps) {
+export function CartItemCard({ item, onUpdateQuantity, onRemove, isAvailable }: CartItemCardProps) {
   const tokens = useDesignTokens();
   const { t } = useI18n();
   const soft = tokens.surface.soft;
@@ -73,55 +68,55 @@ export function CartItemCard({
           shows only the way out. Leaving a stepper that changes a total nobody will be charged is how
           a basket starts contradicting the payment screen. */}
       {!outOfStock && (
-      <View style={styles.cardFooter}>
-        <View style={styles.stepper}>
-          <Pressable
-            onPress={() => onUpdateQuantity(item.id, (item.quantity ?? 1) - 1)}
-            style={[
-              styles.stepperBtn,
-              {
-                backgroundColor: tokens.colors.background,
-                borderColor: tokens.colors.borderLight,
-                borderRadius: soft ? tokens.surface.field : undefined,
-              },
-            ]}
-          >
-            <Minus size={20} color={tokens.colors.text.primary} />
-          </Pressable>
-          <Text style={[styles.stepperValue, { color: tokens.colors.primary }]}>
-            {item.quantity ?? 1}
-          </Text>
-          <Pressable
-            onPress={() => onUpdateQuantity(item.id, (item.quantity ?? 1) + 1)}
-            style={[
-              styles.stepperBtn,
-              {
-                backgroundColor: tokens.colors.background,
-                borderColor: tokens.colors.borderLight,
-                borderRadius: soft ? tokens.surface.field : undefined,
-              },
-            ]}
-          >
-            <Plus size={20} color={tokens.colors.text.primary} />
-          </Pressable>
-        </View>
-        <View style={{ alignItems: 'flex-end', gap: 2 }}>
-          {/* The term price, not the package price: the total below this screen already used it, so
+        <View style={styles.cardFooter}>
+          <View style={styles.stepper}>
+            <Pressable
+              onPress={() => onUpdateQuantity(item.id, (item.quantity ?? 1) - 1)}
+              style={[
+                styles.stepperBtn,
+                {
+                  backgroundColor: tokens.colors.background,
+                  borderColor: tokens.colors.borderLight,
+                  borderRadius: soft ? tokens.surface.field : undefined,
+                },
+              ]}
+            >
+              <Minus size={20} color={tokens.colors.text.primary} />
+            </Pressable>
+            <Text style={[styles.stepperValue, { color: tokens.colors.primary }]}>
+              {item.quantity ?? 1}
+            </Text>
+            <Pressable
+              onPress={() => onUpdateQuantity(item.id, (item.quantity ?? 1) + 1)}
+              style={[
+                styles.stepperBtn,
+                {
+                  backgroundColor: tokens.colors.background,
+                  borderColor: tokens.colors.borderLight,
+                  borderRadius: soft ? tokens.surface.field : undefined,
+                },
+              ]}
+            >
+              <Plus size={20} color={tokens.colors.text.primary} />
+            </Pressable>
+          </View>
+          <View style={{ alignItems: 'flex-end', gap: 2 }}>
+            {/* The term price, not the package price: the total below this screen already used it, so
               leaving the line on the package price made the basket contradict its own total - 299.70 for
               the line against 284.70 to pay, with nothing explaining the difference. */}
-          <Text style={[styles.itemMeta, { color: tokens.colors.text.dim }]}>
-            {item.quantity ?? 0} × {formatMoney(unitPrice)}
-          </Text>
-          <Text style={[styles.itemTotal, { color: tokens.colors.text.primary }]}>
-            {formatMoney(unitPrice * (item.quantity ?? 0))}
-          </Text>
-          {saved > 0 && (
-            <Text style={[styles.itemMeta, { color: tokens.colors.primary }]}>
-              {t('term.saves', formatMoney(saved))}
+            <Text style={[styles.itemMeta, { color: tokens.colors.text.dim }]}>
+              {item.quantity ?? 0} × {formatMoney(unitPrice)}
             </Text>
-          )}
+            <Text style={[styles.itemTotal, { color: tokens.colors.text.primary }]}>
+              {formatMoney(unitPrice * (item.quantity ?? 0))}
+            </Text>
+            {saved > 0 && (
+              <Text style={[styles.itemMeta, { color: tokens.colors.primary }]}>
+                {t('term.saves', formatMoney(saved))}
+              </Text>
+            )}
+          </View>
         </View>
-      </View>
       )}
     </View>
   );
