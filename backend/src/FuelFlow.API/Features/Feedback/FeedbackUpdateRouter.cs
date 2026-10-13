@@ -183,7 +183,7 @@ public class FeedbackUpdateRouter
             FeedbackMessageId = target.Id,
             StaffUserId = sender.Id,
             StaffUserName = Truncate(sender.DisplayName, 200),
-            Text = Truncate(text, _options.MaxMessageLength),
+            Text = Clip(text, _options.MaxMessageLength),
             SentAtUtc = DateTime.UtcNow
         };
 
@@ -315,7 +315,7 @@ public class FeedbackUpdateRouter
             UserId = userId,
             TelegramChatId = chatId,
             TelegramMessageId = message.MessageId,
-            Text = Truncate(text, _options.MaxMessageLength),
+            Text = Clip(text, _options.MaxMessageLength),
             Status = FeedbackStatus.New,
             CreatedAtUtc = DateTime.UtcNow
         };
@@ -392,6 +392,21 @@ public class FeedbackUpdateRouter
     /// the real check on purpose; see the lookup in <see cref="HandleStaffAsync"/>.</summary>
     private static long BotIdGuess() => 0;
 
+    /// <summary>
+    /// Clips to <paramref name="maxLength"/>. The overload taking a nullable value is for the one
+    /// caller that genuinely has one — <c>TelegramMessage.From.DisplayName</c> is <c>string?</c> and
+    /// lands on a nullable column.
+    /// </summary>
     private static string? Truncate(string? value, int maxLength) =>
-        string.IsNullOrEmpty(value) ? value : value[..Math.Min(value.Length, maxLength)];
+        string.IsNullOrEmpty(value) ? value : Clip(value, maxLength);
+
+    /// <summary>
+    /// Same clip for a value already known to be non-null, typed so it cannot hand back null. A
+    /// single nullable signature served both callers, which made the compiler flag every
+    /// non-nullable assignment even though <see cref="string.IsNullOrEmpty"/> on a non-null input
+    /// can only ever return that input — the warning was noise that trains people to ignore the
+    /// real ones. C# cannot overload on nullability alone (CS0111), hence the distinct name.
+    /// </summary>
+    private static string Clip(string value, int maxLength) =>
+        value[..Math.Min(value.Length, maxLength)];
 }

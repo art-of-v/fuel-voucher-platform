@@ -171,7 +171,13 @@ public class FeedbackDeepLinkTests
     [InlineData("", "abc")]
     [InlineData("bot", "")]
     [InlineData(null, "abc")]
-    public void ADeepLinkIsNotBuiltWithoutBothParts(string username, string payload)
+    /// <summary>
+    /// Nullable because the null row below is the point of the test, not an accident: an unconfigured
+    /// bot username reaches <c>BuildDeepLink</c> exactly that way, and the method's
+    /// <c>IsNullOrWhiteSpace</c> guard is what turns it into "no link" rather than a link that opens
+    /// nothing. Declaring the parameters non-nullable asserted a contract the callers do not honour.
+    /// </summary>
+    public void ADeepLinkIsNotBuiltWithoutBothParts(string? username, string? payload)
     {
         FeedbackDeepLink.BuildDeepLink(username, payload).Should().BeNull();
     }

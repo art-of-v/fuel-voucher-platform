@@ -455,6 +455,7 @@ public sealed class FeedbackBotIntegrationTests : IClassFixture<TestDatabaseFixt
         var client = new RecordingTelegramFeedbackClient();
         var jobs = new RecordingJobClient();
         var (messageId, _) = await SeedDeliveredRowAsync(client);
+        var customerInboxAfterSeed = client.SentTo(CustomerChatId).Count();
 
         await using var context = CreateContext();
         await FeedbackTestFactory.Router(context, client, jobs).HandleAsync(
@@ -465,7 +466,7 @@ public sealed class FeedbackBotIntegrationTests : IClassFixture<TestDatabaseFixt
                 fromId: FeedbackTestFactory.StaffUserId,
                 replyToChatId: FeedbackTestFactory.StaffChatId));
 
-        AssertNothingRelayed(client, context, messageId);
+        await AssertNothingRelayed(client, context, messageId, customerInboxAfterSeed);
     }
 
     [Fact]
@@ -474,6 +475,7 @@ public sealed class FeedbackBotIntegrationTests : IClassFixture<TestDatabaseFixt
         var client = new RecordingTelegramFeedbackClient();
         var jobs = new RecordingJobClient();
         var (messageId, _) = await SeedDeliveredRowAsync(client);
+        var customerInboxAfterSeed = client.SentTo(CustomerChatId).Count();
 
         await using var context = CreateContext();
         await FeedbackTestFactory.Router(context, client, jobs).HandleAsync(
@@ -485,7 +487,7 @@ public sealed class FeedbackBotIntegrationTests : IClassFixture<TestDatabaseFixt
                 replyToMessageId: 123_456_789,
                 replyToChatId: FeedbackTestFactory.StaffChatId));
 
-        AssertNothingRelayed(client, context, messageId);
+        await AssertNothingRelayed(client, context, messageId, customerInboxAfterSeed);
     }
 
     [Fact]
@@ -496,6 +498,7 @@ public sealed class FeedbackBotIntegrationTests : IClassFixture<TestDatabaseFixt
         var client = new RecordingTelegramFeedbackClient();
         var jobs = new RecordingJobClient();
         var (messageId, deliveredId) = await SeedDeliveredRowAsync(client);
+        var customerInboxAfterSeed = client.SentTo(CustomerChatId).Count();
 
         await using var context = CreateContext();
         await FeedbackTestFactory.Router(context, client, jobs).HandleAsync(
@@ -507,7 +510,7 @@ public sealed class FeedbackBotIntegrationTests : IClassFixture<TestDatabaseFixt
                 replyToMessageId: deliveredId,
                 replyToChatId: FeedbackTestFactory.StaffChatId));
 
-        AssertNothingRelayed(client, context, messageId);
+        await AssertNothingRelayed(client, context, messageId, customerInboxAfterSeed);
     }
 
     [Fact]
@@ -701,12 +704,26 @@ public sealed class FeedbackBotIntegrationTests : IClassFixture<TestDatabaseFixt
         return (messageId, postId ?? 0);
     }
 
+    /// <summary>
+    /// The guard these callers exist to prove. It MUST be awaited: un-awaited, xUnit finishes the
+    /// test the moment the method returns, the assertions below never run, and a failure inside
+    /// lands in an unobserved Task where it is silently dropped — so the test would report PASS
+    /// on exactly the regressions it was written to catch (group chatter reaching a customer).
+    /// </summary>
     private async Task AssertNothingRelayed(
         RecordingTelegramFeedbackClient client,
         ApplicationDbContext context,
-        Guid messageId)
+        Guid messageId,
+        int customerInboxAfterSeed)
     {
-        client.SentTo(CustomerChatId).Should().BeEmpty(
+        // Measured against a snapshot taken right after the seed, NOT against an empty inbox.
+        // SeedDeliveredRowAsync ingests the customer's own message through the real router, which
+        // answers it with the bot's acknowledgement (FeedbackUpdateRouter:133) — so an inbox of
+        // zero was never a reachable state, and asserting it is what made this helper unpassable.
+        // The guard is that the count must NOT GROW: the seed's acknowledgement is the customer
+        // chat's due, anything after it is group chatter leaking.
+        client.SentTo(CustomerChatId).Should().HaveCount(
+            customerInboxAfterSeed,
             "group chatter must never reach a customer");
 
         await using var verify = CreateContext();
