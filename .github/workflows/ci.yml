@@ -488,15 +488,34 @@ jobs:
   # Each job needs only its own component's checks, so a green admin image does
   # not wait on the website suite, and vice versa.
 
-  # `always()` is load-bearing, not decoration. A job whose `needs` were SKIPPED is itself skipped
-  # unless its own `if:` opts out of that rule — and now that pushes are change-filtered, a
-  # component's check job IS skipped when the diff did not touch it. Without `always()` here, a
-  # website-only merge would stop building the backend image for that commit, and the box would
-  # silently keep serving the previous backend build while the workflow still reported success.
-  # `!cancelled()` keeps a superseded run from starting new work.
+  # `always()` is load-bearing, not decoration — and it is only half the condition.
+  #
+  # A job whose `needs` were SKIPPED is itself skipped unless its own `if:` opts out of that rule,
+  # and now that pushes are change-filtered a component's check job IS skipped when the diff did
+  # not touch it. Without `always()` here, a backend-only merge would stop building the admin and
+  # website images; resolve-image-tags.sh would then read those two as `skipped`, hand the box the
+  # moving `main` tag instead of this commit's SHA, and report every such merge as a partial
+  # release. So `always()` is what keeps a skipped component still getting an image.
+  #
+  # But `always()` also fires on FAILED needs, which is not wanted: a red backend check would still
+  # build and push a `:${sha}` backend image for a commit whose backend tests did not pass. The
+  # release is still stopped (deploy-staging and deploy both refuse `failure`), so nothing reaches
+  # prod — but it burns a Docker build, pushes an image that must never be deployed, and, worse,
+  # breaks the meaning of the `BACKEND_RESULT` that resolve-image-tags.sh is handed: it receives
+  # `needs.image-backend.result`, so `success` there would mean "the Docker build worked" instead
+  # of "this component passed its checks for this commit". Inert today, a landmine the day some
+  # gate is relaxed.
+  #
+  # Hence `success || skipped` spelled out: opt out of the skip-on-skipped-needs rule, keep the
+  # skip-on-failed-needs behaviour that predates the change filter. `!cancelled()` keeps a
+  # superseded run from starting new work.
   image-backend:
     name: Build & push backend image
-    if: always() && !cancelled() && github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: >-
+      always() && !cancelled() &&
+      github.ref == 'refs/heads/main' && github.event_name == 'push' &&
+      (needs.backend.result == 'success' || needs.backend.result == 'skipped') &&
+      (needs.backend-integration.result == 'success' || needs.backend-integration.result == 'skipped')
     needs: [backend, backend-integration]
     runs-on: ubuntu-latest
     permissions:
@@ -529,7 +548,11 @@ jobs:
 
   image-admin:
     name: Build & push admin image
-    if: always() && !cancelled() && github.ref == 'refs/heads/main' && github.event_name == 'push'
+    # Same success-or-skipped rule as image-backend, and for the same reason.
+    if: >-
+      always() && !cancelled() &&
+      github.ref == 'refs/heads/main' && github.event_name == 'push' &&
+      (needs.admin.result == 'success' || needs.admin.result == 'skipped')
     needs: [admin]
     runs-on: ubuntu-latest
     permissions:
@@ -562,7 +585,11 @@ jobs:
 
   image-website:
     name: Build & push website image
-    if: always() && !cancelled() && github.ref == 'refs/heads/main' && github.event_name == 'push'
+    # Same success-or-skipped rule as image-backend, and for the same reason.
+    if: >-
+      always() && !cancelled() &&
+      github.ref == 'refs/heads/main' && github.event_name == 'push' &&
+      (needs.website.result == 'success' || needs.website.result == 'skipped')
     needs: [website]
     runs-on: ubuntu-latest
     permissions:
