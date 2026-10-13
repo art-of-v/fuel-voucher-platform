@@ -4,7 +4,7 @@ using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.Features.Orders.DeleteOrder;
 using FuelFlow.Features.Orders.SharedModels;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Renewal;
@@ -27,7 +27,7 @@ namespace FuelFlow.IntegrationTests;
 /// A voucher in someone's hands must always be traceable to the order that put it there
 /// (<c>fuel_vouchers.order_id</c>). The claim that hands fuel over is a raw SQL UPDATE, so these
 /// tests drive the real <see cref="FulfillmentService"/> against real Postgres: an InMemory
-/// provider would happily accept an assignment that forgets the order, which is exactly the bug
+/// brand would happily accept an assignment that forgets the order, which is exactly the bug
 /// this column exists to make impossible.
 /// </summary>
 [Collection("Integration Tests")]
@@ -301,7 +301,7 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
         }
 
         using var ctx = CreateContext();
-        var handler = new UpdateVoucherCommandHandler(ctx, new ProviderEventService(ctx));
+        var handler = new UpdateVoucherCommandHandler(ctx, new AuditEventService(ctx));
 
         foreach (var status in new[] { VoucherStatus.Assigned, VoucherStatus.Used, VoucherStatus.Blocked })
         {
@@ -344,7 +344,7 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
 
         using (var ctx = CreateContext())
         {
-            var handler = new ConfirmOperatorRenewalCommandHandler(ctx, new ProviderEventService(ctx));
+            var handler = new ConfirmOperatorRenewalCommandHandler(ctx, new AuditEventService(ctx));
 
             var result = await handler.HandleAsync(new ConfirmOperatorRenewalCommand
             {
@@ -392,7 +392,7 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
         => new(
             ctx,
             NullLogger<FulfillmentService>.Instance,
-            new RefundOrderCommandHandler(ctx, new StubMonobankClientFactory(new Mock<IMonobankClient>().Object), new ProviderEventService(ctx)),
+            new RefundOrderCommandHandler(ctx, new StubMonobankClientFactory(new Mock<IMonobankClient>().Object), new AuditEventService(ctx)),
             new RuntimeSettingsService(ctx),
             NotificationDispatcher.Disabled,
             new ConfigurationBuilder().Build());
@@ -407,14 +407,14 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
             UpdatedAtUtc = DateTime.UtcNow
         });
 
-    private static FuelVoucher StockVoucher(Guid id, string provider, string fuelTypeId, decimal liters, DateOnly? expiry = null)
+    private static FuelVoucher StockVoucher(Guid id, string brand, string fuelTypeId, decimal liters, DateOnly? expiry = null)
         => new()
         {
             Id = id,
-            Provider = provider,
+            Brand = brand,
             FuelTypeId = fuelTypeId,
             Liters = liters,
-            ProviderExpirationDate = expiry ?? DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+            SupplierExpirationDate = expiry ?? DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
             CustomerExpirationDate = expiry ?? DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
             VoucherNumber = $"STK-{id:N}"[..16],
             QrPayload = $"qr-{id:N}",
@@ -423,14 +423,14 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
             UpdatedAtUtc = DateTime.UtcNow
         };
 
-    private static FuelVoucher SourceVoucher(Guid id, Guid userId, string provider, string fuelTypeId, decimal liters, DateOnly expiry, Guid? orderId = null)
+    private static FuelVoucher SourceVoucher(Guid id, Guid userId, string brand, string fuelTypeId, decimal liters, DateOnly expiry, Guid? orderId = null)
         => new()
         {
             Id = id,
-            Provider = provider,
+            Brand = brand,
             FuelTypeId = fuelTypeId,
             Liters = liters,
-            ProviderExpirationDate = expiry,
+            SupplierExpirationDate = expiry,
             CustomerExpirationDate = expiry,
             VoucherNumber = $"SRC-{id:N}"[..16],
             QrPayload = $"qr-{id:N}",
@@ -441,7 +441,7 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
             UpdatedAtUtc = DateTime.UtcNow
         };
 
-    private static Order PurchaseOrder(Guid orderId, Guid userId, params (string Provider, string FuelTypeId, decimal Liters, decimal Amount)[] lines)
+    private static Order PurchaseOrder(Guid orderId, Guid userId, params (string Brand, string FuelTypeId, decimal Liters, decimal Amount)[] lines)
     {
         var order = new Order
         {
@@ -453,13 +453,13 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
             UpdatedAtUtc = DateTime.UtcNow.AddDays(-1)
         };
 
-        foreach (var (provider, fuelTypeId, liters, amount) in lines)
+        foreach (var (brand, fuelTypeId, liters, amount) in lines)
         {
             order.LineItems.Add(new OrderLineItem
             {
                 Id = Guid.NewGuid(),
                 OrderId = orderId,
-                Provider = provider,
+                Brand = brand,
                 FuelTypeId = fuelTypeId,
                 Liters = liters,
                 Quantity = 1,

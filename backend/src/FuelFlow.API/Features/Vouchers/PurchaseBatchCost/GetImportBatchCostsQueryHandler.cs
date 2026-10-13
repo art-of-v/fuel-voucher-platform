@@ -34,11 +34,11 @@ public sealed class GetImportBatchCostsQueryHandler
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(v => v.ImportJobId == query.ImportId && !v.IsDeleted)
-            .GroupBy(v => new { v.FuelTypeId, v.Provider })
+            .GroupBy(v => new { v.FuelTypeId, v.Brand })
             .Select(g => new
             {
                 g.Key.FuelTypeId,
-                g.Key.Provider,
+                g.Key.Brand,
                 VoucherCount = g.Count(),
                 TotalLiters = g.Sum(v => v.Liters),
                 // Liters-weighted mean of the vouchers' own costs: a customer payment has since reduced
@@ -66,7 +66,7 @@ public sealed class GetImportBatchCostsQueryHandler
             {
                 FuelTypeId = g.FuelTypeId,
                 FuelTypeName = names.TryGetValue(g.FuelTypeId, out var name) ? name : null,
-                Provider = g.Provider,
+                Brand = g.Brand,
                 VoucherCount = g.VoucherCount,
                 TotalLiters = g.TotalLiters,
                 CostPerLiter = g.CostedLiters > 0m ? g.WeightedCost / g.CostedLiters : null,

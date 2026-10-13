@@ -2,7 +2,7 @@ using FluentAssertions;
 using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.Features.Orders.SharedModels;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
@@ -30,7 +30,7 @@ namespace FuelFlow.IntegrationTests;
 [Collection("Integration Tests")]
 public sealed class QaTestPoolSegregationIntegrationTests : IClassFixture<TestDatabaseFixture>
 {
-    private const string Provider = "OKKO";
+    private const string Brand = "OKKO";
     private const string FuelTypeId = "okko-95";
     private const decimal Liters = 10m;
 
@@ -62,7 +62,7 @@ public sealed class QaTestPoolSegregationIntegrationTests : IClassFixture<TestDa
             seed.Orders.Add(MakeOrder(qaOrderId, qaUserId));
             seed.Orders.Add(MakeOrder(realOrderId, realUserId));
 
-            // One voucher in each pool, identical on provider/fuel/nominal so only the flag can decide
+            // One voucher in each pool, identical on brand/fuel/nominal so only the flag can decide
             // who gets which.
             seed.FuelVouchers.Add(MakeVoucher(testVoucherId, "test", isTestData: true));
             seed.FuelVouchers.Add(MakeVoucher(realVoucherId, "real", isTestData: false));
@@ -160,7 +160,7 @@ public sealed class QaTestPoolSegregationIntegrationTests : IClassFixture<TestDa
         using var claimContext = CreateContext();
         var service = new TestableFulfillmentService(
             claimContext,
-            new RefundOrderCommandHandler(claimContext, new StubMonobankClientFactory(new Mock<IMonobankClient>().Object), new ProviderEventService(claimContext)),
+            new RefundOrderCommandHandler(claimContext, new StubMonobankClientFactory(new Mock<IMonobankClient>().Object), new AuditEventService(claimContext)),
             new RuntimeSettingsService(claimContext));
 
         // Real stock for a QA account: refused by the subquery, nothing written.
@@ -210,7 +210,7 @@ public sealed class QaTestPoolSegregationIntegrationTests : IClassFixture<TestDa
             {
                 Id = Guid.NewGuid(),
                 OrderId = orderId,
-                Provider = Provider,
+                Brand = Brand,
                 FuelTypeId = FuelTypeId,
                 Liters = Liters,
                 Quantity = 1,
@@ -223,10 +223,10 @@ public sealed class QaTestPoolSegregationIntegrationTests : IClassFixture<TestDa
     private static FuelVoucher MakeVoucher(Guid id, string tag, bool isTestData) => new()
     {
         Id = id,
-        Provider = Provider,
+        Brand = Brand,
         FuelTypeId = FuelTypeId,
         Liters = Liters,
-        ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(3),
+        SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(3),
         CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(3),
         VoucherNumber = $"{tag}-{id:N}",
         QrPayload = $"{tag}-qr-{id:N}",
@@ -251,7 +251,7 @@ public sealed class QaTestPoolSegregationIntegrationTests : IClassFixture<TestDa
         => new(
             context,
             NullLogger<FuelFlow.API.BackgroundJobs.FulfillmentService>.Instance,
-            new RefundOrderCommandHandler(context, new StubMonobankClientFactory(new Mock<IMonobankClient>().Object), new ProviderEventService(context)),
+            new RefundOrderCommandHandler(context, new StubMonobankClientFactory(new Mock<IMonobankClient>().Object), new AuditEventService(context)),
             new RuntimeSettingsService(context),
             NotificationDispatcher.Disabled,
             new ConfigurationBuilder().Build());

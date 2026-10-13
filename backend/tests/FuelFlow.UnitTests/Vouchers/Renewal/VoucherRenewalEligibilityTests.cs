@@ -132,7 +132,7 @@ public sealed class VoucherRenewalEligibilityTests
             .Should().Be(new DateOnly(2026, 9, 1));
     }
 
-    // ── The provider-term ceiling ──────────────────────────────────────────────────────────────
+    // ── The brand-term ceiling ──────────────────────────────────────────────────────────────
     // We sell a shorter term than we bought, and the customer's extension may never reach past the
     // supplier voucher's real term. Before this rule the extend branch wrote `old + term` with no
     // ceiling, so a 1-month purchase on a 15-month voucher produced a date the supplier never

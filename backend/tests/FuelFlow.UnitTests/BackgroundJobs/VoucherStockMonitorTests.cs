@@ -55,22 +55,22 @@ public sealed class VoucherStockMonitorTests : IDisposable
     }
 
     /// <summary>
-    /// The dispatcher's throttle is a process-static dictionary keyed on provider+fuel, so two
+    /// The dispatcher's throttle is a process-static dictionary keyed on brand+fuel, so two
     /// tests that alert on the same combination would silently suppress each other within the
     /// reminder interval. Each test therefore gets its own brand.
     /// </summary>
     private readonly string _provider = $"OKKO-{Guid.NewGuid().ToString()[..6]}";
 
-    private void Voucher(int daysUntilExpiry, VoucherStatus status = VoucherStatus.Available, string? provider = null)
+    private void Voucher(int daysUntilExpiry, VoucherStatus status = VoucherStatus.Available, string? brand = null)
         => _context.FuelVouchers.Add(new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Provider = provider ?? _provider,
+            Brand = brand ?? _provider,
             FuelTypeId = "test-expiring-dp",
             Liters = 10,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(daysUntilExpiry)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(daysUntilExpiry)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(daysUntilExpiry)),
-            VoucherNumber = $"{provider}-{Guid.NewGuid().ToString()[..8]}",
+            VoucherNumber = $"{brand}-{Guid.NewGuid().ToString()[..8]}",
             QrPayload = Guid.NewGuid().ToString(),
             Status = status,
             CreatedAtUtc = DateTime.UtcNow,

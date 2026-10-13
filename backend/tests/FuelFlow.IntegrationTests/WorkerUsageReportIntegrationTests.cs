@@ -20,7 +20,7 @@ namespace FuelFlow.IntegrationTests;
 /// Pattern A - the controller is driven directly with a fabricated <see cref="HttpContext"/>, so the
 /// identity claim is under the test's control and the "only my own vouchers" property is testable.
 /// Real Postgres rather than InMemory because the report aggregates over filtered rows, which is
-/// exactly the kind of query an in-memory provider answers differently.
+/// exactly the kind of query an in-memory brand answers differently.
 /// </remarks>
 [Collection("Integration Tests")]
 public sealed class WorkerUsageReportIntegrationTests : IClassFixture<TestDatabaseFixture>
@@ -275,10 +275,10 @@ public sealed class WorkerUsageReportIntegrationTests : IClassFixture<TestDataba
         => new()
         {
             Id = Guid.NewGuid(),
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-dp",
             Liters = liters,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6)),
             VoucherNumber = number,
             QrPayload = Guid.NewGuid().ToString(),

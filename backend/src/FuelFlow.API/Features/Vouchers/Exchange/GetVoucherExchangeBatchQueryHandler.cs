@@ -46,7 +46,7 @@ public sealed class GetVoucherExchangeBatchQueryHandler
                 e.OldVoucherId,
                 e.NewVoucherId,
                 e.FuelTypeId,
-                e.Provider,
+                e.Brand,
                 e.SupplierId,
                 e.ActingUserName,
                 e.SurchargeUah,
@@ -108,7 +108,7 @@ public sealed class GetVoucherExchangeBatchQueryHandler
                     NewVoucherId = r.NewVoucherId,
                     NewVoucherNumber = r.NewNumber,
                     FuelTypeId = r.FuelTypeId,
-                    Provider = r.Provider,
+                    Brand = r.Brand,
                     /// <summary>This pair's own share of the batch surcharge — not the batch total.</summary>
                     SurchargeShareUah = r.SurchargeUah,
                     NewCostPerLiter = r.CostPerLiterApplied
@@ -145,7 +145,7 @@ public sealed class VoucherExchangePairDto
     public Guid? NewVoucherId { get; set; }
     public string? NewVoucherNumber { get; set; }
     public string FuelTypeId { get; set; } = string.Empty;
-    public string Provider { get; set; } = string.Empty;
+    public string Brand { get; set; } = string.Empty;
 
     /// <summary>This pair's own share of the surcharge. One row of the batch total, never the total.</summary>
     public decimal SurchargeShareUah { get; set; }

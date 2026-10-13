@@ -1,5 +1,5 @@
 using FluentAssertions;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Features.Vouchers.UnarchiveVoucher;
@@ -17,7 +17,7 @@ namespace FuelFlow.IntegrationTests;
 /// <para>
 /// These live in the integration suite rather than the unit suite deliberately: the write is an
 /// <c>ExecuteUpdateAsync</c> behind the global <c>!IsDeleted</c> query filter, and the EF Core
-/// in-memory provider neither translates <c>ExecuteUpdate</c> nor models the filter.
+/// in-memory brand neither translates <c>ExecuteUpdate</c> nor models the filter.
 /// </para>
 /// </summary>
 [Collection("Integration Tests")]
@@ -37,7 +37,7 @@ public sealed class UnarchiveVoucherIntegrationTests : IClassFixture<TestDatabas
 
         await using (var context = CreateContext())
         {
-            var handler = new UnarchiveVoucherCommandHandler(context, new ProviderEventService(context));
+            var handler = new UnarchiveVoucherCommandHandler(context, new AuditEventService(context));
             var result = await handler.HandleAsync(new UnarchiveVoucherCommand(voucherId));
 
             result.Should().NotBeNull();
@@ -75,7 +75,7 @@ public sealed class UnarchiveVoucherIntegrationTests : IClassFixture<TestDatabas
         var voucherId = await SeedAsync(status, archived: true);
 
         await using var context = CreateContext();
-        var handler = new UnarchiveVoucherCommandHandler(context, new ProviderEventService(context));
+        var handler = new UnarchiveVoucherCommandHandler(context, new AuditEventService(context));
         await handler.HandleAsync(new UnarchiveVoucherCommand(voucherId));
 
         await using var verify = CreateContext();
@@ -95,7 +95,7 @@ public sealed class UnarchiveVoucherIntegrationTests : IClassFixture<TestDatabas
         var voucherId = await SeedAsync(VoucherStatus.Available, archived: false);
 
         await using var context = CreateContext();
-        var handler = new UnarchiveVoucherCommandHandler(context, new ProviderEventService(context));
+        var handler = new UnarchiveVoucherCommandHandler(context, new AuditEventService(context));
         var result = await handler.HandleAsync(new UnarchiveVoucherCommand(voucherId));
 
         // The operator's intent - "this voucher should be visible" - already holds, so reporting an
@@ -108,7 +108,7 @@ public sealed class UnarchiveVoucherIntegrationTests : IClassFixture<TestDatabas
     public async Task A_Missing_Voucher_Is_Null_So_The_Controller_Can_Answer_404()
     {
         await using var context = CreateContext();
-        var handler = new UnarchiveVoucherCommandHandler(context, new ProviderEventService(context));
+        var handler = new UnarchiveVoucherCommandHandler(context, new AuditEventService(context));
 
         var result = await handler.HandleAsync(new UnarchiveVoucherCommand(Guid.NewGuid()));
 
@@ -126,11 +126,11 @@ public sealed class UnarchiveVoucherIntegrationTests : IClassFixture<TestDatabas
         var adminId = Guid.NewGuid();
 
         await using var context = CreateContext();
-        var handler = new UnarchiveVoucherCommandHandler(context, new ProviderEventService(context));
+        var handler = new UnarchiveVoucherCommandHandler(context, new AuditEventService(context));
         await handler.HandleAsync(new UnarchiveVoucherCommand(voucherId, adminId, "Operator"));
 
         await using var verify = CreateContext();
-        var recorded = await verify.Set<ProviderEventOutbox>()
+        var recorded = await verify.Set<AuditEventOutbox>()
             .Where(e => e.EventType == "VoucherUnarchived")
             .ToListAsync();
 
@@ -147,10 +147,10 @@ public sealed class UnarchiveVoucherIntegrationTests : IClassFixture<TestDatabas
         seed.FuelVouchers.Add(new FuelVoucher
         {
             Id = voucherId,
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-95",
             Liters = 50m,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             VoucherNumber = $"OKKO-{voucherId:N}"[..20],
             QrPayload = $"payload-{voucherId:N}",

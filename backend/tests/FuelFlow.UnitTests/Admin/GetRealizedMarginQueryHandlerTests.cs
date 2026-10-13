@@ -68,7 +68,7 @@ private async Task<Order> SeedAsync(
         {
             Id = Guid.NewGuid(),
             OrderId = order.Id,
-            Provider = "okko",
+            Brand = "okko",
             FuelTypeId = fuelTypeId,
             Liters = liters,
             Quantity = vouchers,
@@ -82,14 +82,14 @@ private async Task<Order> SeedAsync(
             var voucher = new FuelVoucher
             {
                 Id = Guid.NewGuid(),
-                Provider = "okko",
+                Brand = "okko",
                 FuelTypeId = fuelTypeId,
                 Liters = liters,
                 CostPerLiter = deliveredCostPerLiter,
                 VoucherNumber = Guid.NewGuid().ToString("N"),
                 QrPayload = $"9015$2000$;{fuelTypeId}={vouchers}?",
                 Status = VoucherStatus.Assigned,
-                ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(90),
+                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(90),
                 CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(90),
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow,
@@ -190,7 +190,7 @@ private async Task<Order> SeedAsync(
         {
             Id = Guid.NewGuid(),
             OrderId = order.Id,
-            Provider = "okko",
+            Brand = "okko",
             FuelTypeId = "okko-95",
             Liters = 50,
             Quantity = 1,

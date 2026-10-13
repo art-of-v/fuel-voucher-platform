@@ -25,7 +25,7 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, className, onClose, user, b
     const isForge = themes[theme].forge;
 
     const navItems = [
-        { id: "providers", label: t("nav.providers"), icon: Building },
+        { id: "brands", label: t("nav.brands"), icon: Building },
         { id: "purchases", label: t("nav.purchases"), icon: ShoppingCart },
         { id: "users", label: t("nav.users"), icon: Users },
         { id: "vouchers", label: t("nav.vouchers"), icon: Ticket },

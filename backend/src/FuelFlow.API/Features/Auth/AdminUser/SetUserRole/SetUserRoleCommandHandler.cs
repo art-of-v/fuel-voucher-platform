@@ -1,5 +1,5 @@
 using FuelFlow.Features.Auth.Logout;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -12,13 +12,13 @@ public sealed class SetUserRoleCommandHandler
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<SetUserRoleCommandHandler> _logger;
-    private readonly ProviderEventService _eventService;
+    private readonly AuditEventService _eventService;
     private readonly LogoutEverywhereCommandHandler _logoutEverywhere;
 
     public SetUserRoleCommandHandler(
         ApplicationDbContext context,
         ILogger<SetUserRoleCommandHandler> logger,
-        ProviderEventService eventService,
+        AuditEventService eventService,
         LogoutEverywhereCommandHandler logoutEverywhere)
     {
         _context = context;

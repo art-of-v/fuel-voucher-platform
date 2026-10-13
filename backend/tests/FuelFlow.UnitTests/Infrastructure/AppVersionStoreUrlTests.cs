@@ -30,7 +30,7 @@ public sealed class AppVersionStoreUrlTests
             if (!File.Exists(path))
                 continue;
 
-            // The real configuration provider, so the JSON-with-comments this file
+            // The real configuration brand, so the JSON-with-comments this file
             // actually uses parses exactly as it does at runtime.
             var config = new ConfigurationBuilder().AddJsonFile(path, optional: false).Build();
             return config[$"{SectionName}:{key}"]

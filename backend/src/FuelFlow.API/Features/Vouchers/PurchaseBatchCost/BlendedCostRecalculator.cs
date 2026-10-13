@@ -53,7 +53,7 @@ public sealed class BlendedCostRecalculator
     /// <summary>
     /// Rewrites every fuel package for <paramref name="fuelTypeId"/> to price off
     /// <paramref name="blendedCost"/>, preserving each package's profit/pump/min-discount knobs, and
-    /// syncs the fuel type's base/discount headline — mirroring <c>ProvidersController.UpdateFuel</c>.
+    /// syncs the fuel type's base/discount headline — mirroring <c>BrandsController.UpdateFuel</c>.
     /// Does NOT call SaveChanges (the caller batches the save); returns the number of packages repriced.
     /// </summary>
     public async Task<int> RepriceAsync(string fuelTypeId, decimal blendedCost, Guid actingUserId, CancellationToken ct = default)

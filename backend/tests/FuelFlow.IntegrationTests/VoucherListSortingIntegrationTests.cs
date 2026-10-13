@@ -16,7 +16,7 @@ namespace FuelFlow.IntegrationTests;
 /// <b>Nulls last.</b> PostgreSQL sorts NULLs <i>first</i> on a descending sort (the opposite of SQL
 /// Server). Written the obvious way, "most expensive first" would therefore open on the vouchers
 /// nobody has priced yet — the rows an operator most needs to find, presented as the dearest in the
-/// stock. The unit tests cannot catch this: the in-memory provider has no such rule.
+/// stock. The unit tests cannot catch this: the in-memory brand has no such rule.
 /// </summary>
 [Collection("Integration Tests")]
 public sealed class VoucherListSortingIntegrationTests : IClassFixture<TestDatabaseFixture>
@@ -70,7 +70,7 @@ public sealed class VoucherListSortingIntegrationTests : IClassFixture<TestDatab
         var response = await handler.HandleAsync(new GetAdminVouchersQuery(
             SortBy: sortBy,
             SortDirection: sortDirection,
-            Provider: brand));
+            Brand: brand));
 
         return response.Data;
     }
@@ -119,10 +119,10 @@ public sealed class VoucherListSortingIntegrationTests : IClassFixture<TestDatab
                 Id = Guid.NewGuid(),
                 QrPayload = $"sort-{tag}-{Guid.NewGuid():N}",
                 VoucherNumber = $"sort-{tag}-{Guid.NewGuid():N}",
-                Provider = brand,
+                Brand = brand,
                 FuelTypeId = fuelTypeId,
                 Liters = 5m,
-                ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
+                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
                 CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
                 Status = VoucherStatus.Available,
                 CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),

@@ -125,9 +125,9 @@ public class AnonymousEndpointSurfaceTests : IClassFixture<TestDatabaseFixture>
         // endpoint that never carried an [Authorize] attribute would quietly go back to anonymous
         // without appearing in the IAllowAnonymous set.
         using var scope = _fixture.Services.CreateScope();
-        var provider = scope.ServiceProvider.GetRequiredService<IAuthorizationPolicyProvider>();
+        var brand = scope.ServiceProvider.GetRequiredService<IAuthorizationPolicyProvider>();
 
-        var fallback = await provider.GetFallbackPolicyAsync();
+        var fallback = await brand.GetFallbackPolicyAsync();
 
         fallback.Should().NotBeNull("authorization must be opt-out, not opt-in");
         fallback!.Requirements.Should().ContainSingle(r => r is DenyAnonymousAuthorizationRequirement);
@@ -179,7 +179,7 @@ public class AnonymousEndpointSurfaceTests : IClassFixture<TestDatabaseFixture>
 
     private IReadOnlyList<RouteEndpoint> RoutedEndpoints()
     {
-        // The composite EndpointDataSource is assembled by UseEndpoints, so ask the root provider
+        // The composite EndpointDataSource is assembled by UseEndpoints, so ask the root brand
         // for every registered source and flatten. CreateClient() forces the host - and therefore
         // the endpoint graph - to be built before this runs.
         _ = _fixture.CreateClient();

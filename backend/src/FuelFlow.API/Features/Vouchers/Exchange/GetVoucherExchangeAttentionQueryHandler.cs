@@ -7,7 +7,7 @@ namespace FuelFlow.Features.Vouchers.Exchange;
 
 /// <summary>
 /// Lists operator STOCK vouchers that are already expired or lapsing soon (≤ the renewal threshold,
-/// default 14 days) so staff can renew them with the provider. Stock-only: assigned / worker-held /
+/// default 14 days) so staff can renew them with the brand. Stock-only: assigned / worker-held /
 /// deleted vouchers are excluded. Drives both the "Заміна талонів" attention list and the nav badge
 /// count (planning #104).
 /// </summary>
@@ -29,16 +29,16 @@ public sealed class GetVoucherExchangeAttentionQueryHandler
         var cutoff = today.AddDays(threshold);
 
         var items = await Filter(cutoff)
-            .OrderBy(v => v.ProviderExpirationDate)
+            .OrderBy(v => v.SupplierExpirationDate)
             .Select(v => new VoucherExchangeAttentionItem
             {
                 Id = v.Id,
                 VoucherNumber = v.VoucherNumber,
-                Provider = v.Provider,
+                Brand = v.Brand,
                 FuelTypeId = v.FuelTypeId,
                 FuelName = v.FuelType != null ? v.FuelType.Name : null,
                 Liters = v.Liters,
-                ExpirationDate = v.ProviderExpirationDate,
+                ExpirationDate = v.SupplierExpirationDate,
                 Status = v.Status.ToString(),
                 // True when this voucher reached us because a customer bought past its real term and we
                 // issued them a different one. Those are the ones owed to the supplier with a surcharge, so
@@ -54,7 +54,7 @@ public sealed class GetVoucherExchangeAttentionQueryHandler
         {
             Data = items,
             ThresholdDays = threshold,
-            Providers = items.Select(i => i.Provider).Distinct().OrderBy(p => p).ToList(),
+            Providers = items.Select(i => i.Brand).Distinct().OrderBy(p => p).ToList(),
             Fuels = items.Where(i => i.FuelName != null).Select(i => i.FuelName!).Distinct().OrderBy(f => f).ToList()
         };
     }
@@ -82,7 +82,7 @@ public sealed class GetVoucherExchangeAttentionQueryHandler
                 && !_context.VoucherExchanges.Any(e => e.OldVoucherId == v.Id)
                 && (v.Status == VoucherStatus.Expired
                     || ((v.Status == VoucherStatus.Available || v.Status == VoucherStatus.Imported)
-                        && v.ProviderExpirationDate <= cutoff)));
+                        && v.SupplierExpirationDate <= cutoff)));
 }
 
 public sealed class VoucherExchangeAttentionResponse
@@ -97,7 +97,7 @@ public sealed class VoucherExchangeAttentionItem
 {
     public Guid Id { get; set; }
     public string VoucherNumber { get; set; } = string.Empty;
-    public string Provider { get; set; } = string.Empty;
+    public string Brand { get; set; } = string.Empty;
     public string FuelTypeId { get; set; } = string.Empty;
     public string? FuelName { get; set; }
     public decimal Liters { get; set; }

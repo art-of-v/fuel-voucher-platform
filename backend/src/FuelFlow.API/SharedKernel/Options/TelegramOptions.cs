@@ -111,13 +111,13 @@ public sealed class TelegramOptions
     public sealed class VoucherNotificationOptions
     {
         /// <summary>
-        /// Sends a message when the available pool for a provider/fuel-type combination
+        /// Sends a message when the available pool for a brand/fuel-type combination
         /// drops to or below <see cref="LowLevelThreshold"/>.
         /// </summary>
         public bool NotifyOnLowStock { get; set; } = false;
 
         /// <summary>
-        /// Sends a separate, higher-severity message when a provider/fuel-type
+        /// Sends a separate, higher-severity message when a brand/fuel-type
         /// combination reaches zero. Kept distinct from <see cref="NotifyOnLowStock"/>
         /// so the "warning" and the "we are out" cases can be routed independently.
         /// </summary>
@@ -131,7 +131,7 @@ public sealed class TelegramOptions
         public bool NotifyOnOrderUnfulfillable { get; set; } = false;
 
         /// <summary>
-        /// Evaluated per provider/fuel-type combination rather than on the total, so an
+        /// Evaluated per brand/fuel-type combination rather than on the total, so an
         /// exhausted single combination is not hidden by a healthy overall count.
         /// </summary>
         public int LowLevelThreshold { get; set; } = 20;
@@ -161,7 +161,7 @@ public sealed class TelegramOptions
         public int ExpiringWithinDays { get; set; } = 14;
 
         /// <summary>
-        /// Minimum gap between messages for the same provider/fuel-type combination.
+        /// Minimum gap between messages for the same brand/fuel-type combination.
         /// The check runs on a schedule, so without this a persistent shortage would
         /// repeat every run until someone tops the pool up.
         /// </summary>

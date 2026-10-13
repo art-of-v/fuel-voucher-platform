@@ -63,7 +63,7 @@ public sealed class ParsedInvoiceLineDto
     public bool Matched { get; set; }
     public string? FuelTypeId { get; set; }
     public string? FuelTypeName { get; set; }
-    public string? Provider { get; set; }
+    public string? Brand { get; set; }
 
     /// <summary>Liters this fuel actually holds in the import — a sanity cross-check against the invoice quantity.</summary>
     public decimal? ImportLiters { get; set; }

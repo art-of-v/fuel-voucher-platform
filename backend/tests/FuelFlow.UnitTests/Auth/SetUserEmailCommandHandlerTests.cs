@@ -3,7 +3,7 @@ using FluentAssertions;
 using FuelFlow.Features.Auth.AdminUser.SetUserEmail;
 using FuelFlow.Features.Auth.ConfirmEmailChange;
 using FuelFlow.Features.Auth.SharedModels;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Notifications.Email;
@@ -40,7 +40,7 @@ public sealed class SetUserEmailCommandHandlerTests
         sends.Should().ContainSingle();
         sends[0].To.Should().Be("new@example.com", "the confirmation link goes to the NEW address");
 
-        var audit = await context.Set<ProviderEventOutbox>().SingleAsync();
+        var audit = await context.Set<AuditEventOutbox>().SingleAsync();
         audit.EventType.Should().Be("EmailChangeRequested");
     }
 
@@ -60,7 +60,7 @@ public sealed class SetUserEmailCommandHandlerTests
         token.Should().NotBeNullOrEmpty();
 
         var confirm = new ConfirmEmailChangeCommandHandler(
-            context, EmailSenderMock().Object, new ProviderEventService(context),
+            context, EmailSenderMock().Object, new AuditEventService(context),
             NullLogger<ConfirmEmailChangeCommandHandler>.Instance);
 
         var confirmResult = await confirm.HandleAsync(new ConfirmEmailChangeCommand(token), CancellationToken.None);
@@ -78,7 +78,7 @@ public sealed class SetUserEmailCommandHandlerTests
         await using var context = CreateContext();
         await SeedRolesAsync(context);
         var confirm = new ConfirmEmailChangeCommandHandler(
-            context, EmailSenderMock().Object, new ProviderEventService(context),
+            context, EmailSenderMock().Object, new AuditEventService(context),
             NullLogger<ConfirmEmailChangeCommandHandler>.Instance);
 
         var result = await confirm.HandleAsync(new ConfirmEmailChangeCommand("DEADBEEF"), CancellationToken.None);
@@ -157,7 +157,7 @@ public sealed class SetUserEmailCommandHandlerTests
             .Returns(Task.CompletedTask);
 
         var handler = new SetUserEmailCommandHandler(
-            context, mock.Object, new ProviderEventService(context),
+            context, mock.Object, new AuditEventService(context),
             NullLogger<SetUserEmailCommandHandler>.Instance);
         return (handler, sends);
     }

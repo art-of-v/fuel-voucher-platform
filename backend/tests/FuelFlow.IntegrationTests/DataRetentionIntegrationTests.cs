@@ -65,7 +65,7 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
         (await verify.Notifications.AllAsync(n => n.Title != "eligible")).Should().BeTrue();
         (await verify.ErrorLogs.AllAsync(e => e.Message != "eligible")).Should().BeTrue();
         (await verify.PushTokens.AllAsync(p => p.Token != "eligible")).Should().BeTrue();
-        (await verify.ProviderEventOutbox.AllAsync(e => e.Summary != "eligible")).Should().BeTrue();
+        (await verify.AuditEventOutbox.AllAsync(e => e.Summary != "eligible")).Should().BeTrue();
         // Both dead-device shapes go, and the live one survives even though its last sighting is
         // recent rather than old: age alone never removes a device that still reports in.
         (await verify.Devices.AllAsync(d => d.DeviceId != "eligible-silent")).Should().BeTrue();
@@ -176,7 +176,7 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
         (await verify.Notifications.CountAsync()).Should().Be(3);
         (await verify.ErrorLogs.CountAsync()).Should().Be(2);
         (await verify.PushTokens.CountAsync()).Should().Be(2);
-        (await verify.ProviderEventOutbox.CountAsync()).Should().Be(2);
+        (await verify.AuditEventOutbox.CountAsync()).Should().Be(2);
         (await verify.Devices.CountAsync()).Should().Be(3);
         (await verify.SupportMessages.CountAsync()).Should().Be(2);
     }
@@ -233,8 +233,8 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
         // The admin change audit trail, aged only: a change two seasons old is pruned, last season's
         // is kept, and there is no "live" variant because a row here is not work waiting to happen -
         // it is a record of something a person already did.
-        seed.ProviderEventOutbox.Add(NewProviderEvent("eligible", changedAtUtc: now.AddDays(-400)));
-        seed.ProviderEventOutbox.Add(NewProviderEvent("recent", changedAtUtc: now.AddDays(-100)));
+        seed.AuditEventOutbox.Add(NewProviderEvent("eligible", changedAtUtc: now.AddDays(-400)));
+        seed.AuditEventOutbox.Add(NewProviderEvent("recent", changedAtUtc: now.AddDays(-100)));
 
         // Devices are pruned on the same rule as push tokens, plus revocation: a revoked device is
         // dead whatever its age, and an active one that has gone quiet for a season is an uninstall.
@@ -243,11 +243,11 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
         seed.Devices.Add(NewDevice("live", status: DeviceStatus.Active, lastSeenAt: now.AddDays(-2)));
     }
 
-    private static ProviderEventOutbox NewProviderEvent(string summary, DateTime changedAtUtc) => new()
+    private static AuditEventOutbox NewProviderEvent(string summary, DateTime changedAtUtc) => new()
     {
         AggregateType = "FuelPackage",
         AggregateId = "pkg-1",
-        ProviderId = "okko",
+        ScopeId = "okko",
         EventType = "Updated",
         NewValue = "{}",
         ChangedByUserId = UserId,

@@ -19,8 +19,8 @@ internal sealed class OrderLineItemConfiguration : IEntityTypeConfiguration<Orde
             .HasColumnName("order_id")
             .IsRequired();
 
-        builder.Property(e => e.Provider)
-            .HasColumnName("provider")
+        builder.Property(e => e.Brand)
+            .HasColumnName("brand")
             .HasMaxLength(50)
             .IsRequired();
 
@@ -64,7 +64,7 @@ internal sealed class OrderLineItemConfiguration : IEntityTypeConfiguration<Orde
 
         builder.HasIndex(e => e.OrderId);
         builder.HasIndex(e => e.FuelTypeId);
-        builder.HasIndex(e => e.Provider);
+        builder.HasIndex(e => e.Brand);
 
         builder.ToTable(t =>
         {

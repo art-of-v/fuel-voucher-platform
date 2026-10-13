@@ -1,4 +1,4 @@
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -10,12 +10,12 @@ public sealed class SetUserActiveCommandHandler
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<SetUserActiveCommandHandler> _logger;
-    private readonly ProviderEventService _eventService;
+    private readonly AuditEventService _eventService;
 
     public SetUserActiveCommandHandler(
         ApplicationDbContext context,
         ILogger<SetUserActiveCommandHandler> logger,
-        ProviderEventService eventService)
+        AuditEventService eventService)
     {
         _context = context;
         _logger = logger;

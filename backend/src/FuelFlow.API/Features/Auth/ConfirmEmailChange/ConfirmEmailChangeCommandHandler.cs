@@ -1,5 +1,5 @@
 using System.Text.Json;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Notifications.Email;
 using FuelFlow.SharedKernel.Security;
@@ -18,13 +18,13 @@ public sealed class ConfirmEmailChangeCommandHandler
 {
     private readonly ApplicationDbContext _context;
     private readonly IEmailSender _emailSender;
-    private readonly ProviderEventService _eventService;
+    private readonly AuditEventService _eventService;
     private readonly ILogger<ConfirmEmailChangeCommandHandler> _logger;
 
     public ConfirmEmailChangeCommandHandler(
         ApplicationDbContext context,
         IEmailSender emailSender,
-        ProviderEventService eventService,
+        AuditEventService eventService,
         ILogger<ConfirmEmailChangeCommandHandler> logger)
     {
         _context = context;

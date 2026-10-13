@@ -48,10 +48,10 @@ public sealed class OperatorVoucherRenewal
     /// <summary>The доплата the customer paid off-platform; 0 = free compensation. Audit only — never reprices stock.</summary>
     public decimal SurchargeUah { get; set; }
 
-    /// <summary>Optional provider накладна / invoice number.</summary>
+    /// <summary>Optional brand накладна / invoice number.</summary>
     public string? InvoiceNumber { get; set; }
 
-    /// <summary>Optional provider накладна / invoice date.</summary>
+    /// <summary>Optional brand накладна / invoice date.</summary>
     public DateOnly? InvoiceDate { get; set; }
 
     /// <summary>Admin who recorded the renewal.</summary>

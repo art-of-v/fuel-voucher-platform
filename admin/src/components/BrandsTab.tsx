@@ -25,7 +25,7 @@ import {
   parseNominals,
 } from "@/lib/utils";
 
-interface ProviderFuelDto {
+interface BrandFuelDto {
   id: string;
   name: string;
   supplierPricePerLiter: number;
@@ -37,7 +37,7 @@ interface ProviderFuelDto {
   discountPerLiter: number;
   allowBelowCost: boolean;
   packageLiters: number[];
-  /** Set only when this fuel's packages disagree; see ProviderFuelPriceSpreadDto on the API. */
+  /** Set only when this fuel's packages disagree; see BrandFuelPriceSpreadDto on the API. */
   priceSpread: {
     minSupplierPricePerLiter: number;
     maxSupplierPricePerLiter: number;
@@ -46,17 +46,17 @@ interface ProviderFuelDto {
   } | null;
 }
 
-interface ProviderDto {
+interface BrandDto {
   id: string;
   name: string;
   logoText: string;
   color: string;
   sortOrder: number;
-  fuels: ProviderFuelDto[];
+  fuels: BrandFuelDto[];
   nominals: number[];
 }
 
-interface ProviderEventDto {
+interface AuditEventDto {
   id: string;
   aggregateType: string;
   aggregateId: string;
@@ -86,21 +86,21 @@ function computeFinal(
   return costPlus;
 }
 
-interface ProvidersTabProps {
+interface BrandsTabProps {
   // Jumps to the Imports tab, where batch costs — the source of the derived supplier cost — are entered.
   onNavigateToImports?: () => void;
 }
 
-export default function ProvidersTab({
+export default function BrandsTab({
   onNavigateToImports,
-}: ProvidersTabProps) {
+}: BrandsTabProps) {
   const { t } = useI18n();
   const queryClient = useQueryClient();
-  const [expandedProvider, setExpandedProvider] = useState<string | null>(null);
+  const [expandedBrand, setExpandedBrand] = useState<string | null>(null);
   const [expandedHistory, setExpandedHistory] = useState<string | null>(null);
   const [editingFuel, setEditingFuel] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<
-    Record<string, Partial<ProviderFuelDto>>
+    Record<string, Partial<BrandFuelDto>>
   >({});
   const [addingFuel, setAddingFuel] = useState<string | null>(null);
   const [newFuelName, setNewFuelName] = useState("");
@@ -111,17 +111,17 @@ export default function ProvidersTab({
   const [newFuelAllowBelowCost, setNewFuelAllowBelowCost] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
-  const [isAddingProvider, setIsAddingProvider] = useState(false);
-  const [newProvider, setNewProvider] = useState({
+  const [isAddingBrand, setIsAddingBrand] = useState(false);
+  const [newBrand, setNewBrand] = useState({
     name: "",
     logoText: "",
     color: DEFAULT_PROVIDER_COLOR,
     sortOrder: 999,
   });
-  const [editingProviderId, setEditingProviderId] = useState<string | null>(
+  const [editingBrandId, setEditingBrandId] = useState<string | null>(
     null,
   );
-  const [editProvider, setEditProvider] = useState({
+  const [editBrand, setEditBrand] = useState({
     name: "",
     logoText: "",
     color: DEFAULT_PROVIDER_COLOR,
@@ -145,24 +145,24 @@ export default function ProvidersTab({
   const [editingNominals, setEditingNominals] = useState<string | null>(null);
   const [nominalInput, setNominalInput] = useState("");
 
-  const { data: providers = [], isLoading } = useQuery<ProviderDto[]>({
-    queryKey: ["/api/admin/providers"],
+  const { data: brands = [], isLoading } = useQuery<BrandDto[]>({
+    queryKey: ["/api/admin/brands"],
   });
 
-  const { data: history = [] } = useQuery<ProviderEventDto[]>({
-    queryKey: ["/api/admin/providers", expandedHistory, "history"],
+  const { data: history = [] } = useQuery<AuditEventDto[]>({
+    queryKey: ["/api/admin/brands", expandedHistory, "history"],
     enabled: !!expandedHistory,
     queryFn: async () => {
       if (!expandedHistory) return [];
-      const res = await apiRequest<any, ProviderEventDto[]>(
+      const res = await apiRequest<any, AuditEventDto[]>(
         "GET",
-        `/api/admin/providers/${expandedHistory}/history`,
+        `/api/admin/brands/${expandedHistory}/history`,
       );
       return res;
     },
   });
 
-  const createProviderMutation = useMutation({
+  const createBrandMutation = useMutation({
     mutationFn: async (data: {
       id: string;
       name: string;
@@ -170,12 +170,12 @@ export default function ProvidersTab({
       color: string;
       sortOrder: number;
     }) => {
-      await apiRequest("POST", "/api/admin/providers", data);
+      await apiRequest("POST", "/api/admin/brands", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/providers"] });
-      setIsAddingProvider(false);
-      setNewProvider({
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/brands"] });
+      setIsAddingBrand(false);
+      setNewBrand({
         name: "",
         logoText: "",
         color: DEFAULT_PROVIDER_COLOR,
@@ -186,8 +186,8 @@ export default function ProvidersTab({
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const handleCreateProvider = () => {
-    const name = newProvider.name.trim();
+  const handleCreateBrand = () => {
+    const name = newBrand.name.trim();
     if (!name) return;
     const id =
       name
@@ -195,18 +195,18 @@ export default function ProvidersTab({
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-+|-+$/g, "")
         .slice(0, 32) || crypto.randomUUID();
-    createProviderMutation.mutate({
+    createBrandMutation.mutate({
       id,
       name,
-      logoText: newProvider.logoText.trim(),
-      color: newProvider.color,
-      sortOrder: Number.isFinite(newProvider.sortOrder)
-        ? newProvider.sortOrder
+      logoText: newBrand.logoText.trim(),
+      color: newBrand.color,
+      sortOrder: Number.isFinite(newBrand.sortOrder)
+        ? newBrand.sortOrder
         : 999,
     });
   };
 
-  const updateProviderMutation = useMutation({
+  const updateBrandMutation = useMutation({
     mutationFn: async ({
       id,
       data,
@@ -220,49 +220,49 @@ export default function ProvidersTab({
         sortOrder: number;
       };
     }) => {
-      await apiRequest("PUT", `/api/admin/providers/${id}`, data);
+      await apiRequest("PUT", `/api/admin/brands/${id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/providers"] });
-      setEditingProviderId(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/brands"] });
+      setEditingBrandId(null);
       toast.success(t("common.saved"));
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const startEditProvider = (provider: ProviderDto) => {
-    setEditingProviderId(provider.id);
-    setEditProvider({
-      name: provider.name,
-      logoText: provider.logoText,
-      color: provider.color,
-      sortOrder: provider.sortOrder ?? 999,
+  const startEditBrand = (brand: BrandDto) => {
+    setEditingBrandId(brand.id);
+    setEditBrand({
+      name: brand.name,
+      logoText: brand.logoText,
+      color: brand.color,
+      sortOrder: brand.sortOrder ?? 999,
     });
   };
 
-  const handleSaveProvider = () => {
-    const id = editingProviderId;
-    if (!id || !editProvider.name.trim()) return;
-    updateProviderMutation.mutate({
+  const handleSaveBrand = () => {
+    const id = editingBrandId;
+    if (!id || !editBrand.name.trim()) return;
+    updateBrandMutation.mutate({
       id,
       data: {
         id,
-        name: editProvider.name.trim(),
-        logoText: editProvider.logoText.trim(),
-        color: editProvider.color,
-        sortOrder: Number.isFinite(editProvider.sortOrder)
-          ? editProvider.sortOrder
+        name: editBrand.name.trim(),
+        logoText: editBrand.logoText.trim(),
+        color: editBrand.color,
+        sortOrder: Number.isFinite(editBrand.sortOrder)
+          ? editBrand.sortOrder
           : 999,
       },
     });
   };
 
-  const deleteProviderMutation = useMutation({
+  const deleteBrandMutation = useMutation({
     mutationFn: async (id: string) => {
-      await apiRequest("DELETE", `/api/admin/providers/${id}`);
+      await apiRequest("DELETE", `/api/admin/brands/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/providers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/brands"] });
       toast.success(t("common.deleted"));
     },
     onError: (e: Error) => toast.error(e.message),
@@ -274,12 +274,12 @@ export default function ProvidersTab({
       data,
     }: {
       fuelId: string;
-      data: ProviderFuelDto;
+      data: BrandFuelDto;
     }) => {
-      await apiRequest("PUT", `/api/admin/providers/fuels/${fuelId}`, data);
+      await apiRequest("PUT", `/api/admin/brands/fuels/${fuelId}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/providers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/brands"] });
       setEditingFuel(null);
       toast.success(t("common.saved"));
     },
@@ -288,10 +288,10 @@ export default function ProvidersTab({
 
   const deleteFuelMutation = useMutation({
     mutationFn: async (fuelId: string) => {
-      await apiRequest("DELETE", `/api/admin/providers/fuels/${fuelId}`);
+      await apiRequest("DELETE", `/api/admin/brands/fuels/${fuelId}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/providers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/brands"] });
       toast.success(t("common.deleted"));
     },
     onError: (e: Error) => toast.error(e.message),
@@ -299,20 +299,20 @@ export default function ProvidersTab({
 
   const addFuelMutation = useMutation({
     mutationFn: async ({
-      providerId,
+      brandId,
       data,
     }: {
-      providerId: string;
-      data: Partial<ProviderFuelDto>;
+      brandId: string;
+      data: Partial<BrandFuelDto>;
     }) => {
       await apiRequest(
         "POST",
-        `/api/admin/providers/${providerId}/fuels`,
+        `/api/admin/brands/${brandId}/fuels`,
         data,
       );
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/providers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/brands"] });
       setAddingFuel(null);
       setNewFuelName("");
       setNewFuelSupplierPrice("");
@@ -327,27 +327,27 @@ export default function ProvidersTab({
 
   const updateNominalsMutation = useMutation({
     mutationFn: async ({
-      providerId,
+      brandId,
       nominals,
     }: {
-      providerId: string;
+      brandId: string;
       nominals: number[];
     }) => {
       await apiRequest(
         "PUT",
-        `/api/admin/providers/${providerId}/nominals`,
+        `/api/admin/brands/${brandId}/nominals`,
         nominals,
       );
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/providers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/brands"] });
       setEditingNominals(null);
       toast.success(t("common.saved"));
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const startEditFuel = (fuel: ProviderFuelDto) => {
+  const startEditFuel = (fuel: BrandFuelDto) => {
     setEditingFuel(fuel.id);
     setEditValues({
       [fuel.id]: {
@@ -362,7 +362,7 @@ export default function ProvidersTab({
     });
   };
 
-  const saveFuel = (fuel: ProviderFuelDto) => {
+  const saveFuel = (fuel: BrandFuelDto) => {
     const vals = editValues[fuel.id];
     if (!vals) return;
     const supplier = vals.supplierPricePerLiter ?? fuel.supplierPricePerLiter;
@@ -395,10 +395,10 @@ export default function ProvidersTab({
     });
   };
 
-  const handleAddFuel = (providerId: string) => {
+  const handleAddFuel = (brandId: string) => {
     if (!newFuelName || !newFuelFinalPrice) return;
     addFuelMutation.mutate({
-      providerId,
+      brandId,
       data: {
         name: newFuelName,
         supplierPricePerLiter: parseFloat(newFuelSupplierPrice) || 0,
@@ -412,9 +412,9 @@ export default function ProvidersTab({
     });
   };
 
-  const handleSaveNominals = (provider: ProviderDto) => {
+  const handleSaveNominals = (brand: BrandDto) => {
     updateNominalsMutation.mutate({
-      providerId: provider.id,
+      brandId: brand.id,
       nominals: parseNominals(nominalInput),
     });
   };
@@ -434,14 +434,14 @@ export default function ProvidersTab({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => setIsAddingProvider(true)}
+          onClick={() => setIsAddingBrand(true)}
         >
           <Plus className="w-3.5 h-3.5 mr-1" />
-          {t("providers.addProvider")}
+          {t("brands.addBrand")}
         </Button>
       </div>
 
-      {isAddingProvider && (
+      {isAddingBrand && (
         <div className="bg-card border border-border rounded-xl p-4 animate-in fade-in slide-in-from-top-2 duration-200">
           <div className="flex items-end gap-3 flex-wrap">
             <div className="flex flex-col gap-1">
@@ -450,24 +450,24 @@ export default function ProvidersTab({
               </label>
               <Input
                 autoFocus
-                placeholder={t("providers.namePlaceholder")}
-                value={newProvider.name}
+                placeholder={t("brands.namePlaceholder")}
+                value={newBrand.name}
                 onChange={(e) =>
-                  setNewProvider((prev) => ({ ...prev, name: e.target.value }))
+                  setNewBrand((prev) => ({ ...prev, name: e.target.value }))
                 }
                 className="h-8 w-64"
               />
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
-                {t("providers.logoText")}
+                {t("brands.logoText")}
               </label>
               <Input
                 maxLength={6}
-                placeholder={t("providers.logoTextPlaceholder")}
-                value={newProvider.logoText}
+                placeholder={t("brands.logoTextPlaceholder")}
+                value={newBrand.logoText}
                 onChange={(e) =>
-                  setNewProvider((prev) => ({
+                  setNewBrand((prev) => ({
                     ...prev,
                     logoText: e.target.value,
                   }))
@@ -477,14 +477,14 @@ export default function ProvidersTab({
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
-                {t("providers.color")}
+                {t("brands.color")}
               </label>
               <div className="flex items-center gap-2">
                 <input
                   type="color"
-                  value={newProvider.color}
+                  value={newBrand.color}
                   onChange={(e) =>
-                    setNewProvider((prev) => ({
+                    setNewBrand((prev) => ({
                       ...prev,
                       color: e.target.value,
                     }))
@@ -492,16 +492,16 @@ export default function ProvidersTab({
                   className="h-8 w-12 cursor-pointer rounded bg-transparent border border-border"
                 />
                 <span className="text-xs font-mono text-muted-foreground">
-                  {newProvider.color}
+                  {newBrand.color}
                 </span>
               </div>
             </div>
             <div className="flex flex-col gap-1">
               <label
                 className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider"
-                title={t("providers.priorityHint")}
+                title={t("brands.priorityHint")}
               >
-                {t("providers.priority")}
+                {t("brands.priority")}
               </label>
               <DecimalSettingInput
                 type="number"
@@ -509,27 +509,27 @@ export default function ProvidersTab({
                 min={1}
                 max={999}
                 placeholder="999"
-                value={newProvider.sortOrder}
+                value={newBrand.sortOrder}
                 onCommit={(value) =>
-                  setNewProvider((prev) => ({
+                  setNewBrand((prev) => ({
                     ...prev,
                     sortOrder: Math.max(1, Math.round(value ?? 999)),
                   }))
                 }
                 className="h-8 w-20 text-right"
-                aria-label={t("providers.priority")}
+                aria-label={t("brands.priority")}
               />
             </div>
             <div className="flex items-end gap-1 pb-0.5 ml-auto">
               <Button
                 size="sm"
-                onClick={handleCreateProvider}
+                onClick={handleCreateBrand}
                 disabled={
-                  !newProvider.name.trim() || createProviderMutation.isPending
+                  !newBrand.name.trim() || createBrandMutation.isPending
                 }
                 className="h-8"
               >
-                {createProviderMutation.isPending ? (
+                {createBrandMutation.isPending ? (
                   <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
                 ) : (
                   <Save className="w-3.5 h-3.5 mr-1" />
@@ -540,15 +540,15 @@ export default function ProvidersTab({
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  setIsAddingProvider(false);
-                  setNewProvider({
+                  setIsAddingBrand(false);
+                  setNewBrand({
                     name: "",
                     logoText: "",
                     color: DEFAULT_PROVIDER_COLOR,
                     sortOrder: 999,
                   });
                 }}
-                disabled={createProviderMutation.isPending}
+                disabled={createBrandMutation.isPending}
                 className="h-8"
               >
                 <X className="w-3.5 h-3.5" />
@@ -558,15 +558,15 @@ export default function ProvidersTab({
         </div>
       )}
 
-      {editingProviderId &&
+      {editingBrandId &&
         (() => {
-          const provider = providers.find((p) => p.id === editingProviderId);
-          if (!provider) return null;
+          const brand = brands.find((p) => p.id === editingBrandId);
+          if (!brand) return null;
           return (
             <div className="bg-card border border-border rounded-xl p-4 animate-in fade-in slide-in-from-top-2 duration-200">
               <div className="flex items-center justify-between mb-3">
                 <h4 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">
-                  {t("providers.editProvider")}
+                  {t("brands.editBrand")}
                 </h4>
               </div>
               <div className="flex items-end gap-3 flex-wrap">
@@ -576,10 +576,10 @@ export default function ProvidersTab({
                   </label>
                   <Input
                     autoFocus
-                    placeholder={t("providers.namePlaceholder")}
-                    value={editProvider.name}
+                    placeholder={t("brands.namePlaceholder")}
+                    value={editBrand.name}
                     onChange={(e) =>
-                      setEditProvider((prev) => ({
+                      setEditBrand((prev) => ({
                         ...prev,
                         name: e.target.value,
                       }))
@@ -589,14 +589,14 @@ export default function ProvidersTab({
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
-                    {t("providers.logoText")}
+                    {t("brands.logoText")}
                   </label>
                   <Input
                     maxLength={6}
-                    placeholder={t("providers.logoTextPlaceholder")}
-                    value={editProvider.logoText}
+                    placeholder={t("brands.logoTextPlaceholder")}
+                    value={editBrand.logoText}
                     onChange={(e) =>
-                      setEditProvider((prev) => ({
+                      setEditBrand((prev) => ({
                         ...prev,
                         logoText: e.target.value,
                       }))
@@ -606,14 +606,14 @@ export default function ProvidersTab({
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
-                    {t("providers.color")}
+                    {t("brands.color")}
                   </label>
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
-                      value={editProvider.color}
+                      value={editBrand.color}
                       onChange={(e) =>
-                        setEditProvider((prev) => ({
+                        setEditBrand((prev) => ({
                           ...prev,
                           color: e.target.value,
                         }))
@@ -621,44 +621,44 @@ export default function ProvidersTab({
                       className="h-8 w-12 cursor-pointer rounded bg-transparent border border-border"
                     />
                     <span className="text-xs font-mono text-muted-foreground">
-                      {editProvider.color}
+                      {editBrand.color}
                     </span>
                   </div>
                 </div>
                 <div className="flex flex-col gap-1">
                   <label
                     className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider"
-                    title={t("providers.priorityHint")}
+                    title={t("brands.priorityHint")}
                   >
-                    {t("providers.priority")}
+                    {t("brands.priority")}
                   </label>
                   <DecimalSettingInput
                     type="number"
                     inputMode="numeric"
                     min={1}
                     max={999}
-                    value={editProvider.sortOrder}
+                    value={editBrand.sortOrder}
                     onCommit={(value) =>
-                      setEditProvider((prev) => ({
+                      setEditBrand((prev) => ({
                         ...prev,
                         sortOrder: Math.max(1, Math.round(value ?? 999)),
                       }))
                     }
                     className="h-8 w-20 text-right"
-                    aria-label={t("providers.priority")}
+                    aria-label={t("brands.priority")}
                   />
                 </div>
                 <div className="flex items-end gap-1 pb-0.5 ml-auto">
                   <Button
                     size="sm"
-                    onClick={handleSaveProvider}
+                    onClick={handleSaveBrand}
                     disabled={
-                      !editProvider.name.trim() ||
-                      updateProviderMutation.isPending
+                      !editBrand.name.trim() ||
+                      updateBrandMutation.isPending
                     }
                     className="h-8"
                   >
-                    {updateProviderMutation.isPending ? (
+                    {updateBrandMutation.isPending ? (
                       <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
                     ) : (
                       <Save className="w-3.5 h-3.5 mr-1" />
@@ -668,8 +668,8 @@ export default function ProvidersTab({
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setEditingProviderId(null)}
-                    disabled={updateProviderMutation.isPending}
+                    onClick={() => setEditingBrandId(null)}
+                    disabled={updateBrandMutation.isPending}
                     className="h-8"
                   >
                     <X className="w-3.5 h-3.5" />
@@ -680,40 +680,40 @@ export default function ProvidersTab({
           );
         })()}
 
-      {providers.map((provider) => {
-        const isExpanded = expandedProvider === provider.id;
-        const isHistoryExpanded = expandedHistory === provider.id;
+      {brands.map((brand) => {
+        const isExpanded = expandedBrand === brand.id;
+        const isHistoryExpanded = expandedHistory === brand.id;
         const busy =
           updateFuelMutation.isPending ||
           deleteFuelMutation.isPending ||
-          deleteProviderMutation.isPending;
+          deleteBrandMutation.isPending;
 
         return (
           <div
-            key={provider.id}
+            key={brand.id}
             className="bg-card border border-border rounded-xl overflow-hidden transition-all duration-200 hover:border-primary/20"
           >
-            {/* Provider Header */}
+            {/* Brand Header */}
             <div
               className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50 transition-colors"
               onClick={() =>
-                setExpandedProvider(isExpanded ? null : provider.id)
+                setExpandedBrand(isExpanded ? null : brand.id)
               }
             >
               <div className="flex items-center gap-3">
                 <div
                   className="min-w-10 h-10 px-2.5 rounded-lg flex items-center justify-center text-lg font-bold text-black"
-                  style={{ backgroundColor: provider.color }}
+                  style={{ backgroundColor: brand.color }}
                 >
-                  {provider.logoText}
+                  {brand.logoText}
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold">{provider.name}</h3>
+                  <h3 className="text-lg font-bold">{brand.name}</h3>
                   <p className="text-xs text-muted-foreground">
-                    {provider.fuels.length} {t("nav.fueltypes")} ·{" "}
+                    {brand.fuels.length} {t("nav.fueltypes")} ·{" "}
                     {t(
-                      "providers.nominalsCount",
-                      provider.nominals.length.toString(),
+                      "brands.nominalsCount",
+                      brand.nominals.length.toString(),
                     )}
                   </p>
                 </div>
@@ -724,30 +724,30 @@ export default function ProvidersTab({
                   size="sm"
                   onClick={(e) => {
                     e.stopPropagation();
-                    startEditProvider(provider);
+                    startEditBrand(brand);
                   }}
                   className="text-info hover:brightness-125"
                 >
                   <Edit2 className="w-4 h-4" />
                 </Button>
-                {confirmDelete === provider.id ? (
+                {confirmDelete === brand.id ? (
                   <div className="flex items-center gap-1 animate-in fade-in slide-in-from-right-2">
                     <span className="text-xs text-destructive font-medium flex items-center gap-1 mr-1">
                       <AlertTriangle className="w-3 h-3" />{" "}
-                      {t("providers.deleteConfirm", provider.name)}
+                      {t("brands.deleteConfirm", brand.name)}
                     </span>
                     <Button
                       variant="destructive"
                       size="sm"
                       className="h-7 text-xs"
-                      disabled={deleteProviderMutation.isPending}
+                      disabled={deleteBrandMutation.isPending}
                       onClick={(e) => {
                         e.stopPropagation();
-                        deleteProviderMutation.mutate(provider.id);
+                        deleteBrandMutation.mutate(brand.id);
                         setConfirmDelete(null);
                       }}
                     >
-                      {deleteProviderMutation.isPending ? (
+                      {deleteBrandMutation.isPending ? (
                         <Loader2 className="w-3 h-3 animate-spin" />
                       ) : (
                         <Trash2 className="w-3 h-3" />
@@ -771,7 +771,7 @@ export default function ProvidersTab({
                     size="sm"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setConfirmDelete(provider.id);
+                      setConfirmDelete(brand.id);
                     }}
                     className="text-destructive hover:text-destructive"
                   >
@@ -802,7 +802,7 @@ export default function ProvidersTab({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setAddingFuel(provider.id)}
+                      onClick={() => setAddingFuel(brand.id)}
                       disabled={addFuelMutation.isPending}
                     >
                       {addFuelMutation.isPending ? (
@@ -842,8 +842,8 @@ export default function ProvidersTab({
                             </div>
                           </th>
                           <th className="text-right p-3 whitespace-nowrap">
-                            <div title={t("providers.minDiscountHint")}>
-                              {t("providers.minDiscount")}
+                            <div title={t("brands.minDiscountHint")}>
+                              {t("brands.minDiscount")}
                             </div>
                             <div className="text-[10px] text-muted-foreground font-normal">
                               {t("price.unit")}
@@ -864,7 +864,7 @@ export default function ProvidersTab({
                         </tr>
                       </thead>
                       <tbody>
-                        {provider.fuels.map((fuel) => {
+                        {brand.fuels.map((fuel) => {
                           const isEditing = editingFuel === fuel.id;
                           const vals = editValues[fuel.id];
                           const saving =
@@ -1032,7 +1032,7 @@ className="w-24 h-8 text-right text-xs"
                                       }))
                                     }
                                     className="w-24 h-8 text-right text-xs"
-                                    aria-label={`${t("providers.minDiscount")} — ${fuel.name}`}
+                                    aria-label={`${t("brands.minDiscount")} — ${fuel.name}`}
                                   />
                                 ) : (
                                   <span className="block text-right tabular-nums text-muted-foreground">
@@ -1161,7 +1161,7 @@ className="w-24 h-8 text-right text-xs"
                                           <Trash2 className="w-3.5 h-3.5 mr-1" />
                                         )}
                                         {t(
-                                          "providers.deleteConfirm",
+                                          "brands.deleteConfirm",
                                           fuel.name,
                                         )}
                                       </Button>
@@ -1210,7 +1210,7 @@ className="w-24 h-8 text-right text-xs"
                           );
                         })}
                         {/* Add Fuel Row */}
-                        {addingFuel === provider.id && (
+                        {addingFuel === brand.id && (
                           <tr className="border-t border-border bg-muted/30">
                             <td colSpan={8} className="p-3">
                               <div className="flex items-end gap-3 flex-wrap">
@@ -1284,9 +1284,9 @@ className="w-24 h-8 text-right text-xs"
                                 <div className="flex flex-col gap-1">
                                   <label
                                     className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider"
-                                    title={t("providers.minDiscountHint")}
+                                    title={t("brands.minDiscountHint")}
                                   >
-                                    {t("providers.minDiscount")},{" "}
+                                    {t("brands.minDiscount")},{" "}
                                     {t("price.unit")}
                                   </label>
                                   <Input
@@ -1358,7 +1358,7 @@ className="w-24 h-8 text-right text-xs"
                                 <div className="flex items-end gap-1 pb-0.5">
                                   <Button
                                     size="sm"
-                                    onClick={() => handleAddFuel(provider.id)}
+                                    onClick={() => handleAddFuel(brand.id)}
                                     disabled={
                                       !newFuelName ||
                                       !newFuelFinalPrice ||
@@ -1403,8 +1403,8 @@ className="w-24 h-8 text-right text-xs"
                       size="sm"
                       disabled={updateNominalsMutation.isPending}
                       onClick={() => {
-                        setEditingNominals(provider.id);
-                        setNominalInput(provider.nominals.join(", "));
+                        setEditingNominals(brand.id);
+                        setNominalInput(brand.nominals.join(", "));
                       }}
                     >
                       {updateNominalsMutation.isPending ? (
@@ -1415,7 +1415,7 @@ className="w-24 h-8 text-right text-xs"
                       {t("common.edit")}
                     </Button>
                   </div>
-                  {editingNominals === provider.id ? (
+                  {editingNominals === brand.id ? (
                     <div className="flex gap-2 items-center">
                       <Input
                         value={nominalInput}
@@ -1426,7 +1426,7 @@ className="w-24 h-8 text-right text-xs"
                       <Button
                         size="sm"
                         disabled={updateNominalsMutation.isPending}
-                        onClick={() => handleSaveNominals(provider)}
+                        onClick={() => handleSaveNominals(brand)}
                       >
                         {updateNominalsMutation.isPending ? (
                           <Loader2 className="w-4 h-4 mr-1 animate-spin" />
@@ -1446,7 +1446,7 @@ className="w-24 h-8 text-right text-xs"
                     </div>
                   ) : (
                     <div className="flex flex-wrap gap-2">
-                      {provider.nominals.map((n) => (
+                      {brand.nominals.map((n) => (
                         <span
                           key={n}
                           className="px-3 py-1 bg-muted rounded-full text-sm font-mono border border-border"
@@ -1463,7 +1463,7 @@ className="w-24 h-8 text-right text-xs"
                   <div
                     className="flex items-center gap-2 cursor-pointer text-muted-foreground hover:text-foreground transition-colors p-2 -ml-2 rounded hover:bg-muted/30"
                     onClick={() =>
-                      setExpandedHistory(isHistoryExpanded ? null : provider.id)
+                      setExpandedHistory(isHistoryExpanded ? null : brand.id)
                     }
                   >
                     <History className="w-4 h-4" />
@@ -1490,9 +1490,9 @@ className="w-24 h-8 text-right text-xs"
                           >
                             <div
                               className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${
-                                evt.eventType === "ProviderCreated"
+                                evt.eventType === "BrandCreated"
                                   ? "bg-success"
-                                  : evt.eventType === "ProviderDeleted"
+                                  : evt.eventType === "BrandDeleted"
                                     ? "bg-destructive"
                                     : evt.eventType === "PriceChanged"
                                       ? "bg-warning"
@@ -1523,17 +1523,17 @@ className="w-24 h-8 text-right text-xs"
           </div>
         );
       })}
-      {providers.length === 0 && !isLoading && (
+      {brands.length === 0 && !isLoading && (
         <div className="text-center py-16 text-muted-foreground">
           <h3 className="text-lg font-medium mb-1">{t("common.noData")}</h3>
-          <p className="text-sm mb-4">{t("providers.noProviders")}</p>
+          <p className="text-sm mb-4">{t("brands.noBrands")}</p>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setIsAddingProvider(true)}
+            onClick={() => setIsAddingBrand(true)}
           >
             <Plus className="w-3.5 h-3.5 mr-1" />
-            {t("providers.addProvider")}
+            {t("brands.addBrand")}
           </Button>
         </div>
       )}

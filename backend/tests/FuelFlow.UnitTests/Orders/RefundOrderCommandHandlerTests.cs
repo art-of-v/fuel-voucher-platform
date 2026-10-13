@@ -3,7 +3,7 @@ using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.Features.Orders.SharedModels;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Options;
@@ -40,7 +40,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         _handler = new RefundOrderCommandHandler(
             _context,
             _monobankClientFactory,
-            new ProviderEventService(_context));
+            new AuditEventService(_context));
     }
 
     public void Dispose()
@@ -77,7 +77,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
             new OrderLineItem
             {
                 Id = Guid.NewGuid(),
-                Provider = "okko",
+                Brand = "okko",
                 FuelTypeId = "okko-95",
                 Liters = 50,
                 Quantity = 2,
@@ -87,15 +87,15 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         }
     };
 
-    private static FuelVoucher BuildVoucher(string provider, string fuelTypeId, decimal liters) => new()
+    private static FuelVoucher BuildVoucher(string brand, string fuelTypeId, decimal liters) => new()
     {
         Id = Guid.NewGuid(),
-        Provider = provider,
+        Brand = brand,
         FuelTypeId = fuelTypeId,
         Liters = liters,
         VoucherNumber = $"V-{Guid.NewGuid():N}",
         QrPayload = "q",
-        ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
+        SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
         CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
         CreatedAtUtc = DateTime.UtcNow,
         UpdatedAtUtc = DateTime.UtcNow
@@ -502,7 +502,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
 
         // Nothing was delivered (no fulfilments exist on this fixture), so fulfilled value is zero
         // while the whole amount stays refundable. The point is that neither figure is derived
-        // from OrderStatus here - both come from the provider's payment truth.
+        // from OrderStatus here - both come from the brand's payment truth.
         RefundOrderCommandHandler.ComputeFulfilledValueKopecks(order).Should().Be(0);
         RefundOrderCommandHandler.ComputeRefundAmountKopecks(order).Should().Be(500000);
     }
@@ -551,7 +551,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
             x => x.CancelInvoiceAsync("INV123", 500000, "idem-key-1", It.IsAny<IReadOnlyList<MonobankBasketItem>>(), It.IsAny<CancellationToken>()),
             Times.Once);
 
-        // Cancelled is NOT itself a reason to refuse. Only the provider's word about payment
+        // Cancelled is NOT itself a reason to refuse. Only the brand's word about payment
         // decides, so this stays refundable.
         RefundOrderCommandHandler.ComputeRefundAmountKopecks(order).Should().Be(500000);
     }
@@ -559,7 +559,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
     [Fact]
     public async Task HandleAsync_ShouldRefuse_WhenInvoiceCreationFailedAndNoInvoiceExists()
     {
-        // Checkout failed before it reached the provider: no invoice, nothing charged.
+        // Checkout failed before it reached the brand: no invoice, nothing charged.
         var order = BuildOrder(OrderStatus.PendingPayment, MonobankStatus.Pending);
         order.MonobankInvoiceId = null;
         _context.Orders.Add(order);
@@ -568,7 +568,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         var result = await _handler.HandleAsync(new RefundOrderCommand { OrderId = order.Id });
 
         // Distinct from "nothing left to return": here the reason is structural - there was
-        // never an invoice to reverse, because checkout failed before it reached the provider.
+        // never an invoice to reverse, because checkout failed before it reached the brand.
         result.Status.Should().Be("NotPayable");
         result.ErrorMessage.Should().Contain("no Monobank invoice");
         (await _context.Refunds.CountAsync()).Should().Be(0);

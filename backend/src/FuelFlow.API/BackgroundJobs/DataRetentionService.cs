@@ -199,7 +199,7 @@ public class DataRetentionService
             // processed state to exclude here: a row is a record of something a person did, so the
             // only question is how far back it is still worth answering for.
             ("provider_event_outbox", await PurgeAsync(
-                _context.ProviderEventOutbox.Where(e => e.ChangedAtUtc < providerEventCutoff),
+                _context.AuditEventOutbox.Where(e => e.ChangedAtUtc < providerEventCutoff),
                 dryRun, cancellationToken)),
 
             // A revoked device is dead the moment it is revoked, whatever its age; a device the app

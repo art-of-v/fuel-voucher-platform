@@ -10,7 +10,7 @@ export interface ExchangeBatch {
   atUtc: string;
   supplierId: string;
   supplierName: string | null;
-  providers: string[];
+  brands: string[];
   fuelTypeIds: string[];
   vouchersExchanged: number;
   litersOut: number;
@@ -36,7 +36,7 @@ export interface ExchangePair {
   newVoucherId: string | null;
   newVoucherNumber: string | null;
   fuelTypeId: string;
-  provider: string;
+  brand: string;
   surchargeShareUah: number;
   newCostPerLiter: number | null;
 }

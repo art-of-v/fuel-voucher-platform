@@ -139,15 +139,15 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
     }
 
     /// <summary>A freshly imported voucher: not sellable, and carries no cost until an operator enters one.</summary>
-    private static FuelVoucher ImportedVoucher(string provider, string fuelTypeId, decimal liters, decimal? costPerLiter)
+    private static FuelVoucher ImportedVoucher(string brand, string fuelTypeId, decimal liters, decimal? costPerLiter)
         => new()
         {
             Id = Guid.CreateVersion7(),
-            Provider = provider,
+            Brand = brand,
             FuelTypeId = fuelTypeId,
             Liters = liters,
             CostPerLiter = costPerLiter,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6)),
             VoucherNumber = $"IMPORT-{Guid.NewGuid().ToString()[..10]}",
             QrPayload = Guid.NewGuid().ToString(),

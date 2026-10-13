@@ -45,10 +45,10 @@ using FuelFlow.Features.Stations.GetAdminStationNodeById;
 using FuelFlow.Features.Stations.GetAdminStationNodes;
 using FuelFlow.Features.Stations.ImportStationNodes;
 using FuelFlow.Features.Stations.UpdateStationNode;
-using FuelFlow.Features.Providers;
-using FuelFlow.Features.Providers.GetProviderById;
-using FuelFlow.Features.Providers.GetProviderHistory;
-using FuelFlow.Features.Providers.GetProviders;
+using FuelFlow.Features.Brands;
+using FuelFlow.Features.Brands.GetProviderById;
+using FuelFlow.Features.Brands.GetProviderHistory;
+using FuelFlow.Features.Brands.GetProviders;
 using FuelFlow.Features.Stations.GetAdminStations;
 using FuelFlow.Features.Stations.GetPublicFuelTypes;
 using FuelFlow.Features.Stations.GetPublicPackages;
@@ -183,7 +183,7 @@ internal static class ServiceSetup
         // The undo for the soft delete: without it a mistaken delete_all has no way back (#217).
         services.AddScoped<UnarchiveVoucherCommandHandler>();
 
-        // Operator→provider voucher exchange / renewal (#104).
+        // Operator→brand voucher exchange / renewal (#104).
         services.AddScoped<GetVoucherExchangeAttentionQueryHandler>();
         services.AddScoped<GetVoucherExchangeCostContextQueryHandler>();
         // The exchange audit, as batches and as pairs (#223). Read-only: the table was written for
@@ -249,7 +249,7 @@ services.AddScoped<TermQuoteQueryHandler>();
             return;
         }
 
-        // SMS Club is the sole real provider. Without credentials the app falls back to
+        // SMS Club is the sole real brand. Without credentials the app falls back to
         // FakeSmsService (dev only - OTP codes go to logs, never delivered); the Production
         // startup guard refuses to boot in that state (see SecurityConfigurationValidator).
         if (HasSmsClubConfiguration(config))
@@ -264,7 +264,7 @@ services.AddScoped<TermQuoteQueryHandler>();
 
     /// <summary>
     /// True when real SMS Club credentials are present. Shared with the
-    /// production startup guard (SecurityConfigurationValidator): without a provider the app
+    /// production startup guard (SecurityConfigurationValidator): without a brand the app
     /// silently falls back to FakeSmsService and OTP codes are never
     /// delivered to users.
     /// </summary>
@@ -335,10 +335,10 @@ services.AddScoped<TermQuoteQueryHandler>();
 
     private static void AddProviderServices(IServiceCollection services)
     {
-        services.AddScoped<GetProvidersQueryHandler>();
-        services.AddScoped<GetProviderByIdQueryHandler>();
-        services.AddScoped<GetProviderHistoryQueryHandler>();
-        services.AddScoped<ProviderEventService>();
+        services.AddScoped<GetBrandsQueryHandler>();
+        services.AddScoped<GetBrandByIdQueryHandler>();
+        services.AddScoped<GetBrandHistoryQueryHandler>();
+        services.AddScoped<AuditEventService>();
     }
 
     private static void AddStationServices(IServiceCollection services)

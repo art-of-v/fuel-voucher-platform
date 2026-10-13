@@ -1,6 +1,6 @@
 using System.Text.Json;
 using FuelFlow.Features.Orders.SharedModels;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers.Renewal.Checkout;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
@@ -53,9 +53,9 @@ public sealed class ConfirmOperatorRenewalResult
 public sealed class ConfirmOperatorRenewalCommandHandler
 {
     private readonly ApplicationDbContext _context;
-    private readonly ProviderEventService _events;
+    private readonly AuditEventService _events;
 
-    public ConfirmOperatorRenewalCommandHandler(ApplicationDbContext context, ProviderEventService events)
+    public ConfirmOperatorRenewalCommandHandler(ApplicationDbContext context, AuditEventService events)
     {
         _context = context;
         _events = events;
@@ -137,7 +137,7 @@ public sealed class ConfirmOperatorRenewalCommandHandler
         {
             var promisedExpiration = VoucherRenewalEligibility.PromisedExpirationForReplace(
                 today, voucher.CustomerExpirationDate, term);
-            var providerLower = voucher.Provider.ToLower();
+            var providerLower = voucher.Brand.ToLower();
 
             // Shortest qualifying voucher first, mirroring FulfillmentService.FindReplacementVoucherAsync:
             // the floor is what we owe the customer, and handing out a shorter voucher that still covers
@@ -145,17 +145,17 @@ public sealed class ConfirmOperatorRenewalCommandHandler
             var stock = await _context.FuelVouchers
                 .AsTracking()
                 .Where(v => v.Status == VoucherStatus.Available
-                         && v.Provider.ToLower() == providerLower
+                         && v.Brand.ToLower() == providerLower
                          && v.FuelTypeId == voucher.FuelTypeId
                          && v.Liters == voucher.Liters
-                         && v.ProviderExpirationDate >= promisedExpiration)
-                .OrderBy(v => v.ProviderExpirationDate)
+                         && v.SupplierExpirationDate >= promisedExpiration)
+                .OrderBy(v => v.SupplierExpirationDate)
                 .FirstOrDefaultAsync(cancellationToken);
 
             if (stock is null)
                 throw new VoucherRenewalException(
                     "no_stock",
-                    "No replacement voucher is available in stock for this provider, fuel and volume. Import stock first.");
+                    "No replacement voucher is available in stock for this brand, fuel and volume. Import stock first.");
 
             stock.Status = VoucherStatus.Assigned;
             stock.AssignedToUserId = customerUserId;
@@ -234,7 +234,7 @@ public sealed class ConfirmOperatorRenewalCommandHandler
                 new()
                 {
                     Id = Guid.CreateVersion7(),
-                    Provider = voucher.Provider,
+                    Brand = voucher.Brand,
                     FuelTypeId = voucher.FuelTypeId,
                     Liters = voucher.Liters,
                     Quantity = 1,
@@ -306,7 +306,7 @@ public sealed class ConfirmOperatorRenewalCommandHandler
             changedByUserId: command.ActingUserId,
             changedByUserName: command.ActingUserName,
             summary: summary,
-            providerId: voucher.Provider,
+            providerId: voucher.Brand,
             ct: cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);

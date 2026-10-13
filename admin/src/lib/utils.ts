@@ -63,12 +63,12 @@ function localizeChange(change: string, t: Translator): string {
 }
 
 export function localizeEventSummary(summary: string, t: Translator): string {
-  let m = summary.match(/^Created provider (.+)$/);
-  if (m) return t('history.providerCreated', m[1]);
-  m = summary.match(/^Deleted provider (.+)$/);
-  if (m) return t('history.providerDeleted', m[1]);
-  m = summary.match(/^Updated provider (.+)$/);
-  if (m) return t('history.providerUpdated', m[1]);
+  let m = summary.match(/^Created brand (.+)$/);
+  if (m) return t('history.brandCreated', m[1]);
+  m = summary.match(/^Deleted brand (.+)$/);
+  if (m) return t('history.brandDeleted', m[1]);
+  m = summary.match(/^Updated brand (.+)$/);
+  if (m) return t('history.brandUpdated', m[1]);
   m = summary.match(/^(.+): nominals changed \[(.+)\]$/);
   if (m) return t('history.nominalsChanged', m[1], m[2]);
   m = summary.match(/^(.+) \/ (.+): added at (.+) UAH\/L$/);
@@ -93,8 +93,8 @@ export function localizeEventSummary(summary: string, t: Translator): string {
  * not suppress that, because the quotes are consumed by the CSV parser before the cell text
  * is interpreted. So a value the attacker controls becomes a formula on the admin's machine.
  *
- * That path is reachable: DatabaseLoggerProvider stores `HttpContext.Request.Path` verbatim
- * (DatabaseLoggerProvider.cs:161) and the error-log export writes it into a cell, so any
+ * That path is reachable: DatabaseLoggerBrand stores `HttpContext.Request.Path` verbatim
+ * (DatabaseLoggerBrand.cs:161) and the error-log export writes it into a cell, so any
  * request to a path beginning with `=` plants a formula that runs when an admin opens the
  * exported file. `=HYPERLINK(...)`/`=WEBSERVICE(...)` exfiltrate neighbouring cells; the
  * legacy DDE form (`=cmd|'/c ...'!A0`) attempts local execution.

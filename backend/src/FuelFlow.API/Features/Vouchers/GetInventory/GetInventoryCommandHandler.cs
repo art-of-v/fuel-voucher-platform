@@ -25,9 +25,9 @@ public sealed class GetInventoryCommandHandler
 
 
         var inventory = vouchers
-            .GroupBy(v => new { v.Provider, v.FuelTypeId, FuelTypeName = v.FuelType?.Name ?? v.FuelTypeId, v.Liters })
+            .GroupBy(v => new { v.Brand, v.FuelTypeId, FuelTypeName = v.FuelType?.Name ?? v.FuelTypeId, v.Liters })
             .Select(g => new InventoryItemDto(
-                g.Key.Provider,
+                g.Key.Brand,
                 g.Key.FuelTypeId,
                 g.Key.FuelTypeName,
                 g.Key.Liters,
@@ -37,7 +37,7 @@ public sealed class GetInventoryCommandHandler
                 g.Count(v => v.Status == VoucherStatus.Expired),
                 g.Count()
             ))
-            .OrderBy(i => i.Provider)
+            .OrderBy(i => i.Brand)
             .ThenBy(i => i.FuelTypeName)
             .ThenBy(i => i.Liters)
             .ToList();

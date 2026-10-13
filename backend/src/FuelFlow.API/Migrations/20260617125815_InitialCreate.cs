@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -17,7 +17,7 @@ namespace FuelFlow.API.Migrations
                 columns: table => new
                 {
                     id = table.Column<Guid>(type: "uuid", nullable: false),
-                    provider = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    brand = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
                     fuel_type = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
                     liters = table.Column<decimal>(type: "numeric(10,2)", nullable: false),
                     expiration_date = table.Column<DateOnly>(type: "date", nullable: false),
@@ -59,7 +59,7 @@ namespace FuelFlow.API.Migrations
                     id = table.Column<Guid>(type: "uuid", nullable: false),
                     user_id = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     product_type = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    provider = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    brand = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
                     fuel_type = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
                     liters = table.Column<int>(type: "integer", nullable: false),
                     quantity = table.Column<int>(type: "integer", nullable: false, defaultValue: 1),
@@ -231,12 +231,12 @@ namespace FuelFlow.API.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_fuel_vouchers_provider",
                 table: "fuel_vouchers",
-                column: "provider");
+                column: "brand");
 
             migrationBuilder.CreateIndex(
                 name: "IX_fuel_vouchers_provider_fuel_type_liters_status",
                 table: "fuel_vouchers",
-                columns: new[] { "provider", "fuel_type", "liters", "status" });
+                columns: new[] { "brand", "fuel_type", "liters", "status" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_fuel_vouchers_qr_payload",

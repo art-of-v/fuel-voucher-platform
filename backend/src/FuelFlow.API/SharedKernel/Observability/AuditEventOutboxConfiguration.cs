@@ -4,9 +4,9 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace FuelFlow.Features.Providers.Configurations;
 
-internal sealed class ProviderEventOutboxConfiguration : IEntityTypeConfiguration<ProviderEventOutbox>
+internal sealed class AuditEventOutboxConfiguration : IEntityTypeConfiguration<AuditEventOutbox>
 {
-    public void Configure(EntityTypeBuilder<ProviderEventOutbox> builder)
+    public void Configure(EntityTypeBuilder<AuditEventOutbox> builder)
     {
         builder.ToTable("provider_event_outbox");
 
@@ -15,7 +15,7 @@ internal sealed class ProviderEventOutboxConfiguration : IEntityTypeConfiguratio
         builder.Property(e => e.Id).HasColumnName("id");
         builder.Property(e => e.AggregateType).HasColumnName("aggregate_type").HasMaxLength(100).IsRequired();
         builder.Property(e => e.AggregateId).HasColumnName("aggregate_id").HasMaxLength(200).IsRequired();
-        builder.Property(e => e.ProviderId).HasColumnName("provider_id").HasMaxLength(200).IsRequired();
+        builder.Property(e => e.ScopeId).HasColumnName("scope_id").HasMaxLength(200).IsRequired();
         builder.Property(e => e.EventType).HasColumnName("event_type").HasMaxLength(100).IsRequired();
         builder.Property(e => e.OldValue).HasColumnName("old_value").HasColumnType("jsonb");
         builder.Property(e => e.NewValue).HasColumnName("new_value").HasColumnType("jsonb").IsRequired();

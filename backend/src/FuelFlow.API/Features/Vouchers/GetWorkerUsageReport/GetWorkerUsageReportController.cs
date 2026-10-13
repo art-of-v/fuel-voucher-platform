@@ -61,7 +61,7 @@ public sealed class GetWorkerUsageReportController : ControllerBase
             .ThenByDescending(v => v.CreatedAtUtc)
             .Select(v => new WorkerUsageListItem(
                 v.Id,
-                v.Provider,
+                v.Brand,
                 v.FuelTypeId,
                 v.VoucherNumber,
                 v.Liters,
@@ -102,7 +102,7 @@ public sealed class GetWorkerUsageReportController : ControllerBase
 /// <param name="UsedAtUtc">When it was refuelled with; null while unused.</param>
 public sealed record WorkerUsageListItem(
     Guid Id,
-    string Provider,
+    string Brand,
     string FuelTypeId,
     string VoucherNumber,
     decimal Liters,

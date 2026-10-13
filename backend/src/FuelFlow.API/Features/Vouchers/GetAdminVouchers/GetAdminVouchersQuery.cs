@@ -12,7 +12,7 @@ public sealed record GetAdminVouchersQuery(
     /// </summary>
     string? FuelTypeId = null,
     string? Status = null,
-    string? Provider = null,
+    string? Brand = null,
     string? Amount = null,
     string? ExpirationDate = null,
     Guid? WorkerUserId = null,

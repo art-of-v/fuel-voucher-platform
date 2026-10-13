@@ -25,7 +25,7 @@ namespace FuelFlow.IntegrationTests;
 /// </para>
 /// <para>
 /// Real PostgreSQL because the candidate set is a query with an <c>IgnoreQueryFilters</c> and a
-/// period bound; an in-memory provider would answer a different question.
+/// period bound; an in-memory brand would answer a different question.
 /// </para>
 /// </remarks>
 [Collection("Integration Tests")]

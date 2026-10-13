@@ -4,7 +4,7 @@ using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.Features.Orders.SharedModels;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
@@ -67,7 +67,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
         RefundOrderResult result;
         using (var context = CreateContext())
         {
-            var handler = new RefundOrderCommandHandler(context, new StubMonobankClientFactory(monobankMock.Object), new ProviderEventService(context));
+            var handler = new RefundOrderCommandHandler(context, new StubMonobankClientFactory(monobankMock.Object), new AuditEventService(context));
             result = await handler.HandleAsync(new RefundOrderCommand
             {
                 OrderId = orderId,
@@ -142,7 +142,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
         RefundOrderResult result;
         using (var context = CreateContext())
         {
-            var handler = new RefundOrderCommandHandler(context, new StubMonobankClientFactory(monobankMock.Object), new ProviderEventService(context));
+            var handler = new RefundOrderCommandHandler(context, new StubMonobankClientFactory(monobankMock.Object), new AuditEventService(context));
             result = await handler.HandleAsync(new RefundOrderCommand
             {
                 OrderId = orderId,
@@ -183,13 +183,13 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
         RefundOrderResult first;
         using (var context = CreateContext())
         {
-            var handler = new RefundOrderCommandHandler(context, new StubMonobankClientFactory(monobankMock.Object), new ProviderEventService(context));
+            var handler = new RefundOrderCommandHandler(context, new StubMonobankClientFactory(monobankMock.Object), new AuditEventService(context));
             first = await handler.HandleAsync(command);
         }
 
         using (var context = CreateContext())
         {
-            var handler = new RefundOrderCommandHandler(context, new StubMonobankClientFactory(monobankMock.Object), new ProviderEventService(context));
+            var handler = new RefundOrderCommandHandler(context, new StubMonobankClientFactory(monobankMock.Object), new AuditEventService(context));
             var second = await handler.HandleAsync(command);
             second.RefundId.Should().Be(first.RefundId); // same row, not a new one
             second.Status.Should().Be("Processing");
@@ -248,7 +248,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
         RefundOrderResult retry;
         using (var context = CreateContext())
         {
-            var handler = new RefundOrderCommandHandler(context, new StubMonobankClientFactory(monobankMock.Object), new ProviderEventService(context));
+            var handler = new RefundOrderCommandHandler(context, new StubMonobankClientFactory(monobankMock.Object), new AuditEventService(context));
             retry = await handler.HandleAsync(new RefundOrderCommand { OrderId = orderId, ChangedByUserName = "admin-test" });
         }
 
@@ -290,10 +290,10 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
             var voucher = new FuelVoucher
             {
                 Id = Guid.NewGuid(),
-                Provider = "OKKO",
+                Brand = "OKKO",
                 FuelTypeId = "okko-dp",
                 Liters = 10m,
-                ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
                 CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
                 VoucherNumber = $"OC-{orderId:N}-000",
                 QrPayload = $"payload-{orderId:N}-000",
@@ -317,7 +317,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
         RefundOrderResult result;
         using (var context = CreateContext())
         {
-            var handler = new RefundOrderCommandHandler(context, new StubMonobankClientFactory(monobankMock.Object), new ProviderEventService(context));
+            var handler = new RefundOrderCommandHandler(context, new StubMonobankClientFactory(monobankMock.Object), new AuditEventService(context));
             result = await handler.HandleAsync(new RefundOrderCommand
             {
                 OrderId = orderId,
@@ -356,10 +356,10 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
             var voucher = new FuelVoucher
             {
                 Id = Guid.NewGuid(),
-                Provider = "OKKO",
+                Brand = "OKKO",
                 FuelTypeId = "okko-dp",
                 Liters = 10m,
-                ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
                 CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
                 VoucherNumber = $"MR-{orderId:N}-000",
                 QrPayload = $"payload-{orderId:N}-000",
@@ -398,7 +398,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
         RefundOrderResult result;
         using (var context = CreateContext())
         {
-            var handler = new RefundOrderCommandHandler(context, new StubMonobankClientFactory(monobankMock.Object), new ProviderEventService(context));
+            var handler = new RefundOrderCommandHandler(context, new StubMonobankClientFactory(monobankMock.Object), new AuditEventService(context));
             result = await handler.HandleAsync(new RefundOrderCommand { OrderId = orderId });
         }
 
@@ -456,7 +456,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
 
         using (var context = CreateContext())
         {
-            var handler = new RefundOrderCommandHandler(context, new StubMonobankClientFactory(monobankMock.Object), new ProviderEventService(context));
+            var handler = new RefundOrderCommandHandler(context, new StubMonobankClientFactory(monobankMock.Object), new AuditEventService(context));
             await handler.HandleAsync(new RefundOrderCommand { OrderId = orderId });
         }
 
@@ -499,10 +499,10 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
             var voucher = new FuelVoucher
             {
                 Id = Guid.NewGuid(),
-                Provider = "OKKO",
+                Brand = "OKKO",
                 FuelTypeId = "okko-dp",
                 Liters = 10m,
-                ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
                 CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
                 VoucherNumber = $"SR-{orderId:N}-000",
                 QrPayload = $"payload-{orderId:N}-000",
@@ -585,7 +585,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
             {
                 Id = Guid.NewGuid(),
                 OrderId = orderId,
-                Provider = "OKKO",
+                Brand = "OKKO",
                 FuelTypeId = "okko-dp",
                 Liters = 10m,
                 Quantity = quantity,

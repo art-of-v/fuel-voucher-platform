@@ -129,10 +129,10 @@ public OrderCommandHandlersTests()
         _context.FuelVouchers.Add(new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = fuelTypeId,
             Liters = liters,
-            ProviderExpirationDate = expiry,
+            SupplierExpirationDate = expiry,
             CustomerExpirationDate = expiry,
             VoucherNumber = $"STOCK-{Guid.NewGuid().ToString()[..8]}",
             QrPayload = Guid.NewGuid().ToString(),
@@ -155,7 +155,7 @@ public OrderCommandHandlersTests()
     private CreateCheckoutCommand CheckoutCommand() => new()
     {
         UserId = _context.Users.First().Id,
-        Provider = "okko",
+        Brand = "okko",
         FuelTypeId = "okko-95",
         StationId = "okko",
         StationName = "OKKO",
@@ -171,7 +171,7 @@ public OrderCommandHandlersTests()
         {
             new CheckoutItem
             {
-                Provider = "okko",
+                Brand = "okko",
                 FuelTypeId = "okko-95",
                 StationId = "okko",
                 StationName = "OKKO",
@@ -213,7 +213,7 @@ public OrderCommandHandlersTests()
     private CreateCheckoutCommand BelowCostCommand() => new()
     {
         UserId = _context.Users.First().Id,
-        Provider = "okko", FuelTypeId = "okko-loss", StationId = "okko", StationName = "OKKO",
+        Brand = "okko", FuelTypeId = "okko-loss", StationId = "okko", StationName = "OKKO",
         Liters = 50, Quantity = 1, Price = 2425
     };
 
@@ -224,7 +224,7 @@ public OrderCommandHandlersTests()
         {
             new CheckoutItem
             {
-                Provider = "okko", FuelTypeId = "okko-loss", StationId = "okko", StationName = "OKKO",
+                Brand = "okko", FuelTypeId = "okko-loss", StationId = "okko", StationName = "OKKO",
                 Liters = 50, Quantity = 1, Price = 2425
             }
         }
@@ -243,7 +243,7 @@ public OrderCommandHandlersTests()
             new OrderLineItem
             {
                 Id = Guid.NewGuid(),
-                Provider = "okko",
+                Brand = "okko",
                 FuelTypeId = "okko-95",
                 Liters = 50,
                 Quantity = 1,
@@ -268,7 +268,7 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
         Assert.Equal(OrderStatus.PendingPayment, order.Status);
 
         var lineItem = Assert.Single(order.LineItems);
-        Assert.Equal("okko", lineItem.Provider);
+        Assert.Equal("okko", lineItem.Brand);
         Assert.Equal("okko-95", lineItem.FuelTypeId);
         Assert.Equal(50, lineItem.Liters);
         Assert.Equal(1, lineItem.Quantity);
@@ -313,7 +313,7 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
 /// <summary>
     /// A merchant that is not configured degrades the same way any other Monobank failure does:
     /// the order is still created, with no invoice, and the failure is logged. Taking the shop's
-    /// checkout down is not the failure mode we want for a payment-provider problem - and a
+    /// checkout down is not the failure mode we want for a payment-brand problem - and a
     /// missing live token in one environment must not take every customer's checkout with it.
     /// </summary>
     [Fact]
@@ -408,7 +408,7 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
         var command = new CreateCheckoutCommand
         {
             UserId = _context.Users.First().Id,
-            Provider = "okko", FuelTypeId = "okko-frac", StationId = "okko", StationName = "OKKO",
+            Brand = "okko", FuelTypeId = "okko-frac", StationId = "okko", StationName = "OKKO",
             Liters = 10, Quantity = 1, Price = 4567   // client price is ignored; server recomputes 456.70
         };
 
@@ -602,7 +602,7 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
         Assert.Equal(2, purchases.Count);
         Assert.Contains(purchases, p => p.Status == OrderStatus.Fulfilled.ToString());
         Assert.Contains(purchases, p => p.Status == OrderStatus.PendingFulfillment.ToString());
-        Assert.All(purchases, p => Assert.Equal("okko", p.Provider));
+        Assert.All(purchases, p => Assert.Equal("okko", p.Brand));
         Assert.All(purchases, p => Assert.Equal("A-95", p.FuelName));
     }
 

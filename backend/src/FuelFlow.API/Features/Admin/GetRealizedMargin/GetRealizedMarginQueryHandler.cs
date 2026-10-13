@@ -64,13 +64,13 @@ public sealed class GetRealizedMarginQueryHandler
 
         foreach (var order in orders)
         {
-            foreach (var group in order.LineItems.GroupBy(li => (li.Provider, li.FuelTypeId)))
+            foreach (var group in order.LineItems.GroupBy(li => (li.Brand, li.FuelTypeId)))
             {
                 var revenue = group.Sum(li => li.LineTotal);
 
                 var delivered = order.Fulfillments
                     .Where(f => f.Voucher is not null
-                                && string.Equals(f.Voucher.Provider, group.Key.Provider, StringComparison.OrdinalIgnoreCase)
+                                && string.Equals(f.Voucher.Brand, group.Key.Brand, StringComparison.OrdinalIgnoreCase)
                                 && f.Voucher.FuelTypeId == group.Key.FuelTypeId)
                     .Select(f => f.Voucher!)
                     .ToList();
@@ -91,7 +91,7 @@ public sealed class GetRealizedMarginQueryHandler
                 {
                     OrderId = order.Id,
                     CreatedAtUtc = order.CreatedAtUtc,
-                    Provider = group.Key.Provider,
+                    Brand = group.Key.Brand,
                     FuelTypeId = group.Key.FuelTypeId,
                     LitersSold = group.Sum(li => li.Liters * li.Quantity),
                     VouchersDelivered = delivered.Count,
@@ -151,7 +151,7 @@ public sealed class RealizedMarginLine
 {
     public Guid OrderId { get; init; }
     public DateTime CreatedAtUtc { get; init; }
-    public string Provider { get; init; } = null!;
+    public string Brand { get; init; } = null!;
     public string FuelTypeId { get; init; } = null!;
     public decimal LitersSold { get; init; }
     public int VouchersDelivered { get; init; }

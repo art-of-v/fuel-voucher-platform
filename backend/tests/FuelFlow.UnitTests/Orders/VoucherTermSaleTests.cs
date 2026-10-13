@@ -133,7 +133,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         {
             new CheckoutItem
             {
-                Provider = "okko",
+                Brand = "okko",
                 FuelTypeId = "okko-95",
                 StationId = "okko",
                 StationName = "OKKO",
@@ -162,15 +162,15 @@ public sealed class VoucherTermSaleTests : IDisposable
     /// Puts one <c>Available</c> voucher in stock with the given paper term. The term ladder is gated on
     /// stock now, so any quote that should offer a term needs this behind it.
     /// </summary>
-    private void SeedStock(int daysUntilPaperExpiry, string provider = "OKKO", string fuelTypeId = "okko-95", decimal liters = 10m)
+    private void SeedStock(int daysUntilPaperExpiry, string brand = "OKKO", string fuelTypeId = "okko-95", decimal liters = 10m)
     {
         _context.FuelVouchers.Add(new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Provider = provider,
+            Brand = brand,
             FuelTypeId = fuelTypeId,
             Liters = liters,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(daysUntilPaperExpiry),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(daysUntilPaperExpiry),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(daysUntilPaperExpiry),
             VoucherNumber = $"STOCK-{Guid.NewGuid().ToString()[..8]}",
             QrPayload = Guid.NewGuid().ToString(),
@@ -581,10 +581,10 @@ public sealed class VoucherTermSaleTests : IDisposable
         _context.FuelVouchers.Add(new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-95",
             Liters = 10m,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(6),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(6),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(6),
             VoucherNumber = "OKKO-ASSIGNED",
             QrPayload = Guid.NewGuid().ToString(),
@@ -605,7 +605,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         // The catalog and order lines carry "okko"; imported stock carries "OKKO". A case-sensitive match
         // would hide every term from the customer despite the shelf being full.
         EnableTermSale(("1w", 20m));
-        SeedStock(daysUntilPaperExpiry: 8, provider: "OKKO");
+        SeedStock(daysUntilPaperExpiry: 8, brand: "OKKO");
 
         var quote = await QuoteHandler().HandleAsync("okko", "okko-95", 10m);
 

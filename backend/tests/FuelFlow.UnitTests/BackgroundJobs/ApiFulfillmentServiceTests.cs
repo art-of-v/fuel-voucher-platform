@@ -4,7 +4,7 @@ using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.Features.Orders.SharedModels;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Vouchers;
@@ -39,7 +39,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
         var refundHandler = new RefundOrderCommandHandler(
             _context,
             new StubMonobankClientFactory(monobankClientMock.Object),
-            new ProviderEventService(_context));
+            new AuditEventService(_context));
 
         _service = new TestableApiFulfillmentService(
             _context,
@@ -121,7 +121,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             {
                 new OrderLineItem
                 {
-                    Provider = "OKKO",
+                    Brand = "OKKO",
                     FuelTypeId = "okko-95",
                     Liters = 50,
                     Quantity = 1,
@@ -134,10 +134,10 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
         var voucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-95",
             Liters = 50,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
             VoucherNumber = "OKKO-12345",
             QrPayload = "test-payload",
@@ -210,7 +210,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             {
                 new OrderLineItem
                 {
-                    Provider = "OKKO",
+                    Brand = "OKKO",
                     FuelTypeId = "okko-95",
                     Liters = 50,
                     Quantity = 3,
@@ -223,10 +223,10 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
         var voucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-95",
             Liters = 50,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
             VoucherNumber = "OKKO-1",
             QrPayload = "payload-1",
@@ -285,7 +285,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             {
                 new OrderLineItem
                 {
-                    Provider = "OKKO",
+                    Brand = "OKKO",
                     FuelTypeId = "okko-95",
                     Liters = 50,
                     Quantity = 1,
@@ -298,10 +298,10 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
         var voucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-95",
             Liters = 50,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
             VoucherNumber = "OKKO-BACKFILL",
             QrPayload = "backfill",
@@ -435,7 +435,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             // Paid. Reaching this fixture means a `success` webhook moved the order into
             // fulfillment, and that handler records MonobankStatus=Success - so an order that
             // auto-refund is asked to return money for is one the customer paid for. Stated
-            // explicitly because the refund amount is now gated on the provider saying so.
+            // explicitly because the refund amount is now gated on the brand saying so.
             MonobankStatus = MonobankStatus.Success,
             CreatedAtUtc = DateTime.UtcNow.AddDays(-2),
             UpdatedAtUtc = DateTime.UtcNow.AddDays(-2),
@@ -443,7 +443,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             {
                 new OrderLineItem
                 {
-                    Provider = "OKKO",
+                    Brand = "OKKO",
                     FuelTypeId = "okko-95",
                     Liters = 50,
                     Quantity = 3,
@@ -458,10 +458,10 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             _context.FuelVouchers.Add(new FuelVoucher
             {
                 Id = Guid.NewGuid(),
-                Provider = "OKKO",
+                Brand = "OKKO",
                 FuelTypeId = "okko-95",
                 Liters = 50,
-                ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
                 CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
                 VoucherNumber = $"AR-{order.Id:N}-{i:D3}",
                 QrPayload = $"payload-{order.Id:N}-{i:D3}",

@@ -37,8 +37,8 @@ internal sealed class VoucherExchangeConfiguration : IEntityTypeConfiguration<Vo
             .HasColumnType("text")
             .IsRequired();
 
-        builder.Property(e => e.Provider)
-            .HasColumnName("provider")
+        builder.Property(e => e.Brand)
+            .HasColumnName("brand")
             .HasMaxLength(50)
             .IsRequired();
 

@@ -54,7 +54,7 @@ public sealed class SimulatePaymentCommandHandler
         if (command.Scenario == MonobankStatus.Failure.ToString().ToLower())
         {
             // Same guard the real webhook uses. Without it this endpoint could cancel an
-            // already-Fulfilled or Refunded order, which no payment provider can do.
+            // already-Fulfilled or Refunded order, which no payment brand can do.
             if (!OrderStateMachine.CanTransition(order.Status, OrderStatus.Cancelled))
             {
                 _logger.LogWarning(
@@ -127,7 +127,7 @@ public sealed class SimulatePaymentCommandHandler
                         {
                             orderId = order.Id,
                             userId = order.UserId,
-                            provider = firstLi?.Provider ?? "",
+                            brand = firstLi?.Brand ?? "",
                             fuelType = firstLi?.FuelTypeId ?? "",
                             liters = firstLi?.Liters ?? 0m,
                             quantity = firstLi?.Quantity ?? 0

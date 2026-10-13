@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using FluentAssertions;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Pricing.ImportOkkoPumpPrices;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
@@ -13,7 +13,7 @@ namespace FuelFlow.UnitTests.Pricing;
 public sealed class ImportOkkoPumpPricesTests : IDisposable
 {
     private readonly ApplicationDbContext _context;
-    private readonly ProviderEventService _events;
+    private readonly AuditEventService _events;
 
     public ImportOkkoPumpPricesTests()
     {
@@ -22,7 +22,7 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
             .Options;
 
         _context = new ApplicationDbContext(options);
-        _events = new ProviderEventService(_context);
+        _events = new AuditEventService(_context);
     }
 
     public void Dispose()
@@ -246,7 +246,7 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
         var after = await _context.FuelPackages.AsNoTracking().FirstAsync(p => p.Id == "okko-95-20");
         after.PumpPricePerLiter.Should().Be(before.PumpPricePerLiter);
         after.Price.Should().Be(before.Price);
-        _context.ProviderEventOutbox.Should().BeEmpty();
+        _context.AuditEventOutbox.Should().BeEmpty();
     }
 
     [Fact]
@@ -293,13 +293,13 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
         await Handler().HandleAsync(Import(ScrapedSheet), Guid.Empty, "tester");
         _context.ChangeTracker.Clear();
 
-        var events = await _context.ProviderEventOutbox
+        var events = await _context.AuditEventOutbox
             .Where(e => e.EventType == "PumpPriceImported")
             .OrderBy(e => e.AggregateId)
             .ToListAsync();
 
         events.Should().HaveCount(5);
-        events.Should().OnlyContain(e => e.ProviderId == "okko");
+        events.Should().OnlyContain(e => e.ScopeId == "okko");
         events.Select(e => e.AggregateId).Should().BeEquivalentTo(
             ["okko-95", "okko-dp", "okko-gas", "okko-p95", "okko-pulls-dp"]);
         events.Should().OnlyContain(e => e.ChangedByUserName == "tester");
@@ -314,7 +314,7 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
         // First import moves every fuel onto the site's prices.
         await Handler().HandleAsync(Import(ScrapedSheet), Guid.Empty, "tester");
         _context.ChangeTracker.Clear();
-        _context.ProviderEventOutbox.RemoveRange(_context.ProviderEventOutbox);
+        _context.AuditEventOutbox.RemoveRange(_context.AuditEventOutbox);
         await _context.SaveChangesAsync();
 
         // Re-importing the same sheet is a no-op: no churn in the audit trail, no writes.
@@ -323,7 +323,7 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
         result.FuelsMatched.Should().Be(5);
         result.FuelsChanged.Should().Be(0);
         _context.ChangeTracker.Clear();
-        _context.ProviderEventOutbox.Should().BeEmpty();
+        _context.AuditEventOutbox.Should().BeEmpty();
     }
 
     [Fact]
@@ -418,7 +418,7 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
         await Handler().HandleAsync(Import("fuelCode,pricePerLiter\r\nPulls Diesel,102.90\r\n"), Guid.Empty, "tester");
         _context.ChangeTracker.Clear();
 
-        var ev = await _context.ProviderEventOutbox.AsNoTracking().FirstAsync(e => e.EventType == "PumpPriceImported");
+        var ev = await _context.AuditEventOutbox.AsNoTracking().FirstAsync(e => e.EventType == "PumpPriceImported");
         using var doc = JsonDocument.Parse(ev.NewValue!);
         doc.RootElement.GetProperty("SiteFuelCode").GetString().Should().Be("Pulls Diesel");
         doc.RootElement.GetProperty("PumpPricePerLiter").GetDecimal().Should().Be(102.90m);

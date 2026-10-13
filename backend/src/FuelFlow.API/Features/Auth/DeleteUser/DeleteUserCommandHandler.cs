@@ -1,5 +1,5 @@
 using FuelFlow.Features.Auth.SharedModels;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
@@ -15,12 +15,12 @@ public sealed class DeleteUserCommandHandler
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<DeleteUserCommandHandler> _logger;
-    private readonly ProviderEventService _eventService;
+    private readonly AuditEventService _eventService;
 
     public DeleteUserCommandHandler(
         ApplicationDbContext context,
         ILogger<DeleteUserCommandHandler> logger,
-        ProviderEventService eventService)
+        AuditEventService eventService)
     {
         _context = context;
         _logger = logger;

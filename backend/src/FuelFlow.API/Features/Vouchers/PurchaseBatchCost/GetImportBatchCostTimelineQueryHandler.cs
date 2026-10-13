@@ -14,7 +14,7 @@ public sealed record BatchCostTimelineEntry
     public Guid ExchangeBatchId { get; init; }
     public DateTime AtUtc { get; init; }
     public string FuelTypeId { get; init; } = string.Empty;
-    public string Provider { get; init; } = string.Empty;
+    public string Brand { get; init; } = string.Empty;
 
     /// <summary>Vouchers of this import that this exchange retired.</summary>
     public int VouchersExchangedOut { get; init; }
@@ -23,7 +23,7 @@ public sealed record BatchCostTimelineEntry
     public decimal LitersExchangedOut { get; init; }
 
     /// <summary>
-    /// What the provider charged for the exchange: the bucket's whole surcharge, summed from the rows.
+    /// What the brand charged for the exchange: the bucket's whole surcharge, summed from the rows.
     /// Each row carries only its OWN share of the batch surcharge - the share of that pair's liters -
     /// so one row is a fraction of the total and the bucket's surcharge is the sum of them. Taking a
     /// single row instead would under-report it by the number of vouchers exchanged.
@@ -54,7 +54,7 @@ public sealed record ImportBatchCostTimeline
 /// Built as an aggregation over <c>voucher_exchanges</c> rather than a new ledger table, because
 /// that table already holds the raw record of every exchange - which vouchers went out, the surcharge,
 /// the resulting cost/liter, the invoice - and it is a durable entity, not a transport queue. (The
-/// <c>BatchCostEntered</c> provider event also records cost entries, but provider events are an
+/// <c>BatchCostEntered</c> brand event also records cost entries, but brand events are an
 /// outbox: they exist to be dispatched and are not a ledger to audit against.)
 /// </para>
 /// <para>
@@ -94,7 +94,7 @@ public sealed class GetImportBatchCostTimelineQueryHandler
                 e.ExchangeBatchId,
                 e.OldVoucherId,
                 e.FuelTypeId,
-                e.Provider,
+                e.Brand,
                 e.SurchargeUah,
                 e.CostPerLiterApplied,
                 e.CreatedAtUtc,
@@ -120,7 +120,7 @@ public sealed class GetImportBatchCostTimelineQueryHandler
                 ExchangeBatchId = g.Key.ExchangeBatchId,
                 AtUtc = g.Min(e => e.CreatedAtUtc),
                 FuelTypeId = g.Key.FuelTypeId,
-                Provider = g.First().Provider,
+                Brand = g.First().Brand,
                 VouchersExchangedOut = g.Count(),
                 LitersExchangedOut = g.Sum(e => e.OldLiters ?? 0m),
                 // Summed, because each row carries only its own share of the surcharge. The rows of one

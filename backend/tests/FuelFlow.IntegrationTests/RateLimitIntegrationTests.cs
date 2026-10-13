@@ -19,7 +19,7 @@ namespace FuelFlow.IntegrationTests;
 ///
 /// The default integration host boots Development with Auth:DevBypass=true, which sets every
 /// PermitLimit to int.MaxValue - so a bespoke host with DevBypass off is required. With no SMS
-/// provider configured (SmsClub creds are empty in Development) the composition root
+/// brand configured (SmsClub creds are empty in Development) the composition root
 /// resolves FakeSmsService, so no real SMS is sent even with bypass off. Each test uses its own
 /// factory instance so the process-global limiter partitions start empty.
 /// </summary>
@@ -35,7 +35,7 @@ public sealed class RateLimitIntegrationTests : IClassFixture<TestDatabaseFixtur
 
     /// <summary>
     /// A Development host with the OTP rate limits actually enforced (DevBypass off). SmsClub token
-    /// is pinned empty so a developer's user-secrets cannot wire a real SMS provider into the suite.
+    /// is pinned empty so a developer's user-secrets cannot wire a real SMS brand into the suite.
     /// </summary>
     private sealed class NoBypassFactory : WebApplicationFactory<Program>
     {

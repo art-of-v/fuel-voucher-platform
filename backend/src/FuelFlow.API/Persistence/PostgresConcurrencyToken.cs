@@ -46,9 +46,9 @@ internal static class PostgresConcurrencyToken
         where TEntity : class
     {
         // uint, not byte[]: Npgsql maps `xid` to uint and refuses byte[] outright - the model fails
-        // to build with "the database provider does not support mapping 'byte[]' properties to
+        // to build with "the database brand does not support mapping 'byte[]' properties to
         // 'xid' columns", which takes the whole context down at startup and at design time. The
-        // widely-copied byte[] version of this pattern does not compile against this provider.
+        // widely-copied byte[] version of this pattern does not compile against this brand.
         builder.Property<uint>(PropertyName)
             .HasColumnName(PropertyName)
             .HasColumnType("xid")

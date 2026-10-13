@@ -1,24 +1,24 @@
-using FuelFlow.Features.Providers.GetProviderHistory;
+using FuelFlow.Features.Brands.GetProviderHistory;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 
-namespace FuelFlow.Features.Providers.GetProviderHistory;
+namespace FuelFlow.Features.Brands.GetProviderHistory;
 
-public sealed class GetProviderHistoryQueryHandler
+public sealed class GetBrandHistoryQueryHandler
 {
     private readonly ApplicationDbContext _context;
 
-    public GetProviderHistoryQueryHandler(ApplicationDbContext context) => _context = context;
+    public GetBrandHistoryQueryHandler(ApplicationDbContext context) => _context = context;
 
-    public async Task<List<ProviderEventDto>> HandleAsync(GetProviderHistoryQuery query, CancellationToken ct = default)
+    public async Task<List<AuditEventDto>> HandleAsync(GetBrandHistoryQuery query, CancellationToken ct = default)
     {
-        var events = await _context.Set<ProviderEventOutbox>()
+        var events = await _context.Set<AuditEventOutbox>()
             .AsNoTracking()
-            .Where(e => e.ProviderId == query.ProviderId)
+            .Where(e => e.ScopeId == query.ScopeId)
             .OrderByDescending(e => e.ChangedAtUtc)
             .Take(PageLimits.ClampPageSize(query.Limit))
-            .Select(e => new ProviderEventDto
+            .Select(e => new AuditEventDto
             {
                 Id = e.Id,
                 AggregateType = e.AggregateType,

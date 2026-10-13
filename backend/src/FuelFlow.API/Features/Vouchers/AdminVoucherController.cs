@@ -55,14 +55,14 @@ public sealed class AdminVoucherController : ControllerBase
         [FromQuery] string? fuelType = null,
         [FromQuery] string? fuelTypeId = null,
         [FromQuery] string? status = null,
-        [FromQuery] string? provider = null,
+        [FromQuery] string? brand = null,
         [FromQuery] string? amount = null,
         [FromQuery] string? expirationDate = null,
         [FromQuery] Guid? workerUserId = null)
     {
         var query = new GetAdminVouchersQuery(
             page, limit, sortBy, sortDirection,
-            fuelType, fuelTypeId, status, provider, amount, expirationDate, workerUserId);
+            fuelType, fuelTypeId, status, brand, amount, expirationDate, workerUserId);
 
         var result = await _getAllHandler.HandleAsync(query, cancellationToken);
         return Ok(result);

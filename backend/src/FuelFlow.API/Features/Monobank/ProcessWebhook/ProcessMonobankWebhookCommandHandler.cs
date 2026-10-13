@@ -140,7 +140,7 @@ public sealed class ProcessMonobankWebhookCommandHandler
                 "Illegal Monobank transition {From} -> {To} for order {OrderId} rejected",
                 order.Status, targetStatus, order.Id);
 
-            // Record what the provider says even though we will not act on it.
+            // Record what the brand says even though we will not act on it.
             //
             // Returning here without persisting anything is how a customer ends up charged and
             // invisible: the invoice stays payable for its whole `validity` window, they can
@@ -153,7 +153,7 @@ public sealed class ProcessMonobankWebhookCommandHandler
             // said, so the order reads as unpaid, the revenue report excludes it, reconciliation
             // never polls it (it only looks at PendingPayment), and no screen offers an operator
             // anything to act on. The one remedy that exists - a manual refund - is discoverable
-            // only by knowing to look, and only by querying the provider by hand.
+            // only by knowing to look, and only by querying the brand by hand.
             await RecordUnappliedPaymentTruthAsync(
                 order, command.Status, command.ModifiedDate, cancellationToken);
 
@@ -218,7 +218,7 @@ public sealed class ProcessMonobankWebhookCommandHandler
                         {
                             orderId = order.Id,
                             userId = order.UserId,
-                            provider = firstLi?.Provider ?? "",
+                            brand = firstLi?.Brand ?? "",
                             fuelType = firstLi?.FuelTypeId ?? "",
                             liters = firstLi?.Liters ?? 0m,
                             quantity = firstLi?.Quantity ?? 0
@@ -284,14 +284,14 @@ public sealed class ProcessMonobankWebhookCommandHandler
     }
 
     /// <summary>
-    /// Persists the provider's view of the payment for a webhook we refuse to act on.
+    /// Persists the brand's view of the payment for a webhook we refuse to act on.
     /// </summary>
     /// <remarks>
     /// Only <c>monobank_status</c> and the two webhook timestamps move. The order status, the
     /// voucher allocation and the outbox are deliberately untouched: the transition was refused
     /// for a reason, and this records the evidence without undoing that decision.
     ///
-    /// A no-op when the provider says nothing new, so a retried webhook does not rewrite history
+    /// A no-op when the brand says nothing new, so a retried webhook does not rewrite history
     /// or churn <c>updated_at_utc</c> on every delivery.
     /// </remarks>
     private async Task RecordUnappliedPaymentTruthAsync(
@@ -331,7 +331,7 @@ public sealed class ProcessMonobankWebhookCommandHandler
         order.MonobankStatus = observed;
         order.UpdatedAtUtc = DateTime.UtcNow;
         order.LastWebhookProcessedAtUtc = DateTime.UtcNow;
-        // The provider's own modified date, not UtcNow: the stale-replay guard compares against
+        // The brand's own modified date, not UtcNow: the stale-replay guard compares against
         // it, and stamping "now" here would make a legitimately older-but-relevant retry look
         // already-handled.
         order.LastWebhookModifiedDateUtc = providerModifiedDateUtc;

@@ -1,5 +1,5 @@
 using System.Text.Json;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,11 +13,11 @@ namespace FuelFlow.Features.Vouchers.UnarchiveVoucher;
 public sealed class UnarchiveVoucherCommandHandler
 {
     private readonly ApplicationDbContext _context;
-    private readonly ProviderEventService _eventService;
+    private readonly AuditEventService _eventService;
 
     public UnarchiveVoucherCommandHandler(
         ApplicationDbContext context,
-        ProviderEventService eventService)
+        AuditEventService eventService)
     {
         _context = context;
         _eventService = eventService;
@@ -38,7 +38,7 @@ public sealed class UnarchiveVoucherCommandHandler
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(v => v.Id == command.VoucherId)
-            .Select(v => new { v.IsDeleted, v.VoucherNumber, v.Provider, v.Status })
+            .Select(v => new { v.IsDeleted, v.VoucherNumber, v.Brand, v.Status })
             .FirstOrDefaultAsync(cancellationToken);
 
         if (voucher is null)
@@ -82,8 +82,8 @@ public sealed class UnarchiveVoucherCommandHandler
                 JsonSerializer.Serialize(new { isDeleted = false, status = voucher.Status.ToString() }),
                 command.ActingAdminUserId.Value,
                 command.ActingAdminName,
-                $"Unarchived voucher {voucher.VoucherNumber} ({voucher.Provider})",
-                voucher.Provider,
+                $"Unarchived voucher {voucher.VoucherNumber} ({voucher.Brand})",
+                voucher.Brand,
                 cancellationToken);
         }
 

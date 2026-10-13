@@ -166,7 +166,7 @@ Guid? ResolveOriginOrderId(Guid voucherId)
 
             var lineItemsList = order.LineItems.ToList();
             var firstLi = lineItemsList.FirstOrDefault();
-            var provider = firstLi?.Provider ?? "";
+            var brand = firstLi?.Brand ?? "";
             var firstFuelTypeId = firstLi?.FuelTypeId ?? "";
             var fuelName = fuelTypeNames.GetValueOrDefault(firstFuelTypeId) ?? firstFuelTypeId;
             var totalLiters = lineItemsList.Sum(li => li.Liters * li.Quantity);
@@ -176,7 +176,7 @@ Guid? ResolveOriginOrderId(Guid voucherId)
             {
                 Id = order.Id,
                 ProductType = "",
-                Provider = provider,
+                Brand = brand,
                 FuelType = firstFuelTypeId,
                 FuelName = fuelName,
                 Liters = totalLiters,
@@ -199,7 +199,7 @@ Guid? ResolveOriginOrderId(Guid voucherId)
                     Quantity = li.Quantity,
                     UnitPrice = li.UnitPrice,
                     LineTotal = li.LineTotal,
-                    Provider = li.Provider,
+                    Brand = li.Brand,
                 }).ToList(),
                 Vouchers = orderVouchers.Select(v =>
                 {
@@ -207,7 +207,7 @@ Guid? ResolveOriginOrderId(Guid voucherId)
                     return new VoucherDto
                     {
                         Id = v.Id,
-                        Provider = v.Provider,
+                        Brand = v.Brand,
                         FuelType = v.FuelTypeId,
                         FuelName = fuelTypeNames.GetValueOrDefault(v.FuelTypeId) ?? v.FuelTypeId,
                         Liters = v.Liters,

@@ -4,7 +4,7 @@ using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.Features.Orders.SharedModels;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
@@ -48,7 +48,7 @@ public sealed class ApiFulfillmentServicePartialBackfillTests : IDisposable
         _service = new TestableFulfillmentService(
             _context,
             new Mock<ILogger<FuelFlow.API.BackgroundJobs.FulfillmentService>>().Object,
-            new RefundOrderCommandHandler(_context, new StubMonobankClientFactory(monobankClientMock.Object), new ProviderEventService(_context)),
+            new RefundOrderCommandHandler(_context, new StubMonobankClientFactory(monobankClientMock.Object), new AuditEventService(_context)),
             new RuntimeSettingsService(_context),
             new ConfigurationBuilder().AddInMemoryCollection().Build());
     }
@@ -126,7 +126,7 @@ public sealed class ApiFulfillmentServicePartialBackfillTests : IDisposable
             {
                 new OrderLineItem
                 {
-                    Provider = "OKKO",
+                    Brand = "OKKO",
                     FuelTypeId = "okko-95",
                     Liters = 20,
                     Quantity = 2,
@@ -139,10 +139,10 @@ public sealed class ApiFulfillmentServicePartialBackfillTests : IDisposable
         var existingAssignedVoucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-95",
             Liters = 20,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
             VoucherNumber = "OKKO-ASSIGNED-1",
             QrPayload = "assigned-1",
@@ -162,10 +162,10 @@ public sealed class ApiFulfillmentServicePartialBackfillTests : IDisposable
         var newAvailableVoucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-95",
             Liters = 20,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(2),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(2),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(2),
             VoucherNumber = "OKKO-AVAILABLE-2",
             QrPayload = "available-2",

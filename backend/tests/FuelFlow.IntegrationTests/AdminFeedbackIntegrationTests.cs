@@ -294,7 +294,7 @@ public sealed class AdminFeedbackIntegrationTests : IClassFixture<TestDatabaseFi
     {
         var controller = new AdminFeedbackController(
             context,
-            new FuelFlow.Features.Providers.ProviderEventService(context));
+            new FuelFlow.Features.Brands.AuditEventService(context));
 
         controller.ControllerContext = new ControllerContext
         {

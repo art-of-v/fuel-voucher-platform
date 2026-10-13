@@ -4,7 +4,7 @@ using FuelFlow.Features.Auth.SendCode;
 using FuelFlow.Features.Auth.SendCode.Abstractions;
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Auth.Verify;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.SharedKernel.Domain;
@@ -86,7 +86,7 @@ public sealed class AdminLoginHandlersTests : IDisposable
             IdentityPhone(),
             jwtOptionsMock.Object,
             new Mock<ILogger<VerifyCodeCommandHandler>>().Object,
-            new ProviderEventService(_context));
+            new AuditEventService(_context));
     }
 
     private AdminSendCodeCommandHandler BuildAdminSendCode(Mock<ISmsService> smsMock) =>

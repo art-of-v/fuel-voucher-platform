@@ -23,8 +23,8 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
         builder.Property(e => e.Id)
             .HasColumnName("id");
 
-        builder.Property(e => e.Provider)
-            .HasColumnName("provider")
+        builder.Property(e => e.Brand)
+            .HasColumnName("brand")
             .HasMaxLength(50)
             .IsRequired();
 
@@ -38,8 +38,8 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
             .HasColumnType("numeric(10,2)")
             .IsRequired();
 
-        builder.Property(e => e.ProviderExpirationDate)
-            .HasColumnName("provider_expiration_date")
+        builder.Property(e => e.SupplierExpirationDate)
+            .HasColumnName("supplier_expiration_date")
             .IsRequired();
 
         builder.Property(e => e.CustomerExpirationDate)
@@ -188,10 +188,10 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
                            'Assigned', 'Used', 'Expired', 'Blocked', 'Deactivated')
                 """);
 
-            // Deliberately NOT constrained: customer_expiration_date <= provider_expiration_date.
+            // Deliberately NOT constrained: customer_expiration_date <= supplier_expiration_date.
             // It looks obviously true and is not - ConfirmOperatorRenewalCommandHandler stamps the
             // customer's promise from the *renewal term*, not from the paper's own date ("the extra
-            // real life is a reserve"), so a deliberate business rule produces customer > provider.
+            // real life is a reserve"), so a deliberate business rule produces customer > brand.
             // A constraint here would refuse a renewal the business has already decided to allow.
             // VOUCHER_RENEWAL.md:371-374 records that as an open commercial decision, so it stays
             // a decision rather than becoming an exception nobody can add.
@@ -239,7 +239,7 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
             .IsUnique()
             .HasFilter("is_deleted = false");
 
-        builder.HasIndex(e => e.ProviderExpirationDate);
+        builder.HasIndex(e => e.SupplierExpirationDate);
         builder.HasIndex(e => e.CustomerExpirationDate);
         builder.HasIndex(e => e.WorkerUserId);
         builder.HasIndex(e => e.OrderId);
@@ -248,7 +248,7 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
 
         // Cleanup and "is this stock real?" queries filter on it, so it is indexed alongside status.
         builder.HasIndex(e => new { e.Status, e.IsTestData, e.IsDeleted });
-        builder.HasIndex(e => new { e.Provider, e.FuelTypeId, e.Liters, e.Status });
+        builder.HasIndex(e => new { e.Brand, e.FuelTypeId, e.Liters, e.Status });
         // The blended-cost recompute reads this pool filtered by fuel and status.
         builder.HasIndex(e => new { e.FuelTypeId, e.Status, e.IsDeleted });
         builder.HasIndex(e => new { e.AssignedToUserId, e.Status });

@@ -6,14 +6,14 @@ namespace FuelFlow.Features.Vouchers.Availability;
 
 /// <summary>
 /// The composite a voucher is matched on, and therefore the composite a package's stock is counted by:
-/// brand + fuel type + nominal. <see cref="Provider"/> is always lower-cased, because the catalog and
+/// brand + fuel type + nominal. <see cref="Brand"/> is always lower-cased, because the catalog and
 /// order lines carry <c>okko</c> while imported stock carries <c>OKKO</c> and every matcher compares
 /// case-insensitively.
 /// </summary>
-public readonly record struct StockKey(string Provider, string FuelTypeId, decimal Liters)
+public readonly record struct StockKey(string Brand, string FuelTypeId, decimal Liters)
 {
-    public static StockKey For(string provider, string fuelTypeId, decimal liters)
-        => new(provider.ToLowerInvariant(), fuelTypeId, liters);
+    public static StockKey For(string brand, string fuelTypeId, decimal liters)
+        => new(brand.ToLowerInvariant(), fuelTypeId, liters);
 }
 
 /// <summary>
@@ -92,14 +92,14 @@ public sealed class PackageStockAvailability
             return [];
 
         // Narrowed by IN-lists so Postgres can still walk the
-        // (provider, fuel_type_id, liters, status) index instead of grouping the whole table.
+        // (brand, fuel_type_id, liters, status) index instead of grouping the whole table.
         var rows = await SellableKeys(isTestAccount)
-            .Where(k => wanted.Select(w => w.Provider).Contains(k.Provider)
+            .Where(k => wanted.Select(w => w.Brand).Contains(k.Brand)
                      && wanted.Select(w => w.FuelTypeId).Contains(k.FuelTypeId)
                      && wanted.Select(w => w.Liters).Contains(k.Liters))
             .ToListAsync(cancellationToken);
 
-        var available = rows.Select(k => new StockKey(k.Provider, k.FuelTypeId, k.Liters)).ToHashSet();
+        var available = rows.Select(k => new StockKey(k.Brand, k.FuelTypeId, k.Liters)).ToHashSet();
 
         // The three IN-lists are independent, so the DB can hand back a cross product the cart never
         // asked about. Only the exact keys count.
@@ -108,7 +108,7 @@ public sealed class PackageStockAvailability
 
     /// <summary>
     /// Whether at least one sellable voucher backs this exact package for this customer. One row, answered
-    /// through the <c>(provider, fuel_type_id, liters, status)</c> index.
+    /// through the <c>(brand, fuel_type_id, liters, status)</c> index.
     /// </summary>
     public Task<bool> IsInStockAsync(
         bool isTestAccount,
@@ -118,17 +118,17 @@ public sealed class PackageStockAvailability
         CancellationToken cancellationToken = default)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var provider = stationId.ToLower();
+        var brand = stationId.ToLower();
 
         return _context.FuelVouchers
             .AsNoTracking()
             .AnyAsync(
                 v => v.Status == VoucherStatus.Available
-                  && v.Provider.ToLower() == provider
+                  && v.Brand.ToLower() == brand
                   && v.FuelTypeId == fuelTypeId
                   && v.Liters == liters
                   && v.IsTestData == isTestAccount
-                  && (!_expiryEnabled || v.ProviderExpirationDate >= today),
+                  && (!_expiryEnabled || v.SupplierExpirationDate >= today),
                 cancellationToken);
     }
 
@@ -140,8 +140,8 @@ public sealed class PackageStockAvailability
             .AsNoTracking()
             .Where(v => v.Status == VoucherStatus.Available
                      && v.IsTestData == isTestAccount
-                     && (!_expiryEnabled || v.ProviderExpirationDate >= today))
-            .Select(v => new StockKey(v.Provider.ToLower(), v.FuelTypeId, v.Liters))
+                     && (!_expiryEnabled || v.SupplierExpirationDate >= today))
+            .Select(v => new StockKey(v.Brand.ToLower(), v.FuelTypeId, v.Liters))
             .Distinct();
     }
 }

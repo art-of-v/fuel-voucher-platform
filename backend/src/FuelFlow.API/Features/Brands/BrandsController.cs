@@ -1,9 +1,9 @@
 using System.Security.Claims;
 using System.Text.Json;
 using FuelFlow.Features.Orders.CreateCheckout;
-using FuelFlow.Features.Providers.GetProviderById;
-using FuelFlow.Features.Providers.GetProviderHistory;
-using FuelFlow.Features.Providers.GetProviders;
+using FuelFlow.Features.Brands.GetProviderById;
+using FuelFlow.Features.Brands.GetProviderHistory;
+using FuelFlow.Features.Brands.GetProviders;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
@@ -11,25 +11,25 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace FuelFlow.Features.Providers;
+namespace FuelFlow.Features.Brands;
 
 [ApiController]
-[Route("api/admin/providers")]
+[Route("api/admin/brands")]
 [Authorize(Policy = "Staff")]
-public sealed class ProvidersController : ControllerBase
+public sealed class BrandsController : ControllerBase
 {
-    private readonly GetProvidersQueryHandler _getAll;
-    private readonly GetProviderByIdQueryHandler _getById;
-    private readonly GetProviderHistoryQueryHandler _getHistory;
-    private readonly ProviderEventService _eventService;
+    private readonly GetBrandsQueryHandler _getAll;
+    private readonly GetBrandByIdQueryHandler _getById;
+    private readonly GetBrandHistoryQueryHandler _getHistory;
+    private readonly AuditEventService _eventService;
     private readonly ApplicationDbContext _context;
     private readonly NotificationDispatcher _notifications;
 
-    public ProvidersController(
-        GetProvidersQueryHandler getAll,
-        GetProviderByIdQueryHandler getById,
-        GetProviderHistoryQueryHandler getHistory,
-        ProviderEventService eventService,
+    public BrandsController(
+        GetBrandsQueryHandler getAll,
+        GetBrandByIdQueryHandler getById,
+        GetBrandHistoryQueryHandler getHistory,
+        AuditEventService eventService,
         ApplicationDbContext context,
         NotificationDispatcher notifications)
     {
@@ -45,12 +45,12 @@ public sealed class ProvidersController : ControllerBase
 
     [HttpGet]
     public async Task<IActionResult> GetAll(CancellationToken ct) =>
-        Ok(await _getAll.HandleAsync(new GetProvidersQuery(), ct));
+        Ok(await _getAll.HandleAsync(new GetBrandsQuery(), ct));
 
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById([FromRoute] string id, CancellationToken ct)
     {
-        var result = await _getById.HandleAsync(new GetProviderByIdQuery(id), ct);
+        var result = await _getById.HandleAsync(new GetBrandByIdQuery(id), ct);
         return result is null ? NotFound() : Ok(result);
     }
 
@@ -59,14 +59,14 @@ public sealed class ProvidersController : ControllerBase
         [FromRoute] string id,
         [FromQuery] int limit = 50,
         CancellationToken ct = default) =>
-        Ok(await _getHistory.HandleAsync(new GetProviderHistoryQuery(id, limit), ct));
+        Ok(await _getHistory.HandleAsync(new GetBrandHistoryQuery(id, limit), ct));
 
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] ProviderDto request, CancellationToken ct)
+    public async Task<IActionResult> Create([FromBody] BrandDto request, CancellationToken ct)
     {
         var exists = await _context.Stations.AnyAsync(s => s.Id == request.Id, ct);
         if (exists)
-            return Conflict(new { error = "Provider with this ID already exists" });
+            return Conflict(new { error = "Brand with this ID already exists" });
 
         var station = new Station
         {
@@ -84,9 +84,9 @@ public sealed class ProvidersController : ControllerBase
         var userId = GetUserId();
         var newValue = JsonSerializer.Serialize(new { station.Id, station.Name });
         await _eventService.RecordEventAsync(
-            "Provider", station.Id, "ProviderCreated",
+            "Brand", station.Id, "BrandCreated",
             null, newValue, userId, GetUserName(),
-            $"Created provider {station.Name}",
+            $"Created brand {station.Name}",
             station.Id,
             ct);
 
@@ -94,7 +94,7 @@ public sealed class ProvidersController : ControllerBase
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update([FromRoute] string id, [FromBody] ProviderDto request, CancellationToken ct)
+    public async Task<IActionResult> Update([FromRoute] string id, [FromBody] BrandDto request, CancellationToken ct)
     {
         var station = await _context.Stations.FirstOrDefaultAsync(s => s.Id == id, ct);
         if (station is null) return NotFound();
@@ -127,9 +127,9 @@ public sealed class ProvidersController : ControllerBase
         var newValue = JsonSerializer.Serialize(new { station.Name, station.LogoText, station.Color, station.SortOrder });
         var summary = changes.Count > 0
             ? $"{station.Name}: {string.Join(", ", changes)}"
-            : $"Updated provider {station.Name}";
+            : $"Updated brand {station.Name}";
         await _eventService.RecordEventAsync(
-            "Provider", id, "ProviderUpdated",
+            "Brand", id, "BrandUpdated",
             oldValue, newValue, userId, GetUserName(),
             summary,
             id,
@@ -169,9 +169,9 @@ public sealed class ProvidersController : ControllerBase
 
         var userId = GetUserId();
         await _eventService.RecordEventAsync(
-            "Provider", id, "ProviderDeleted",
+            "Brand", id, "BrandDeleted",
             JsonSerializer.Serialize(new { name }), "{}", userId, GetUserName(),
-            $"Deleted provider {name}",
+            $"Deleted brand {name}",
             id,
             ct);
 
@@ -278,7 +278,7 @@ public sealed class ProvidersController : ControllerBase
     }
 
     [HttpPut("fuels/{fuelId}")]
-    public async Task<IActionResult> UpdateFuel([FromRoute] string fuelId, [FromBody] ProviderFuelDto request, CancellationToken ct)
+    public async Task<IActionResult> UpdateFuel([FromRoute] string fuelId, [FromBody] BrandFuelDto request, CancellationToken ct)
     {
         var fuel = await _context.FuelTypes.FirstOrDefaultAsync(f => f.Id == fuelId, ct);
         if (fuel is null) return NotFound();
@@ -432,7 +432,7 @@ public sealed class ProvidersController : ControllerBase
 
         var packages = await _context.FuelPackages.Where(p => p.FuelTypeId == fuelId).ToListAsync(ct);
 
-        // Archive rather than remove - same reasoning as the provider branch above: the cascade from
+        // Archive rather than remove - same reasoning as the brand branch above: the cascade from
         // fuel_types reaches fuel_vouchers (#217).
         var archivedAt = DateTime.UtcNow;
         foreach (var package in packages)

@@ -57,11 +57,11 @@ internal static class DatabaseSetup
         var dataSource = dataSourceBuilder.Build();
         services.AddSingleton(dataSource);
 
-        services.AddScoped<IImportVouchersDbContext>(provider => provider.GetRequiredService<ApplicationDbContext>());
-        services.AddDbContext<ApplicationDbContext>((provider, options) =>
+        services.AddScoped<IImportVouchersDbContext>(brand => brand.GetRequiredService<ApplicationDbContext>());
+        services.AddDbContext<ApplicationDbContext>((brand, options) =>
         {
-            var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
-            var environment = provider.GetRequiredService<IHostEnvironment>();
+            var loggerFactory = brand.GetRequiredService<ILoggerFactory>();
+            var environment = brand.GetRequiredService<IHostEnvironment>();
             // Tracking is deliberately left at the default, TrackAll.
             //
             // This context used to be configured NoTracking globally, on the reasonable-sounding grounds

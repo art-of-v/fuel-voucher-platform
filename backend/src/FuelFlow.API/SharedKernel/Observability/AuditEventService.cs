@@ -1,13 +1,13 @@
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 
-namespace FuelFlow.Features.Providers;
+namespace FuelFlow.Features.Brands;
 
-public sealed class ProviderEventService
+public sealed class AuditEventService
 {
     private readonly ApplicationDbContext _context;
 
-    public ProviderEventService(ApplicationDbContext context) => _context = context;
+    public AuditEventService(ApplicationDbContext context) => _context = context;
 
     public async Task RecordEventAsync(
         string aggregateType,
@@ -21,7 +21,7 @@ public sealed class ProviderEventService
         string providerId,
         CancellationToken ct = default)
     {
-        _context.Set<ProviderEventOutbox>().Add(new ProviderEventOutbox
+        _context.Set<AuditEventOutbox>().Add(new AuditEventOutbox
         {
             Id = Guid.CreateVersion7(),
             AggregateType = aggregateType,
@@ -33,7 +33,7 @@ public sealed class ProviderEventService
             ChangedByUserName = changedByUserName,
             Summary = summary,
             ChangedAtUtc = DateTime.UtcNow,
-            ProviderId = providerId
+            ScopeId = providerId
         });
 
         await _context.SaveChangesAsync(ct);

@@ -2,7 +2,7 @@ namespace FuelFlow.SharedKernel.Domain;
 
 /// <summary>
 /// Single source of truth for the customer-facing per-liter price (pricing epic,
-/// slice 1a). Shared by the operator write paths in ProvidersController
+/// slice 1a). Shared by the operator write paths in BrandsController
 /// (recompute-and-store) and by checkout in ServerPricing (compute-fresh), so the
 /// two can never drift.
 /// </summary>

@@ -5,7 +5,7 @@ using Xunit;
 namespace FuelFlow.UnitTests.Vouchers;
 
 /// <summary>
-/// A voucher records its brand twice — printed on the paper as <c>provider</c>, and in the catalog as
+/// A voucher records its brand twice — printed on the paper as <c>brand</c>, and in the catalog as
 /// the fuel type's <c>station_id</c>. Only the catalog side is constrained, so the two can disagree and
 /// nothing in the schema would say so.
 /// </summary>

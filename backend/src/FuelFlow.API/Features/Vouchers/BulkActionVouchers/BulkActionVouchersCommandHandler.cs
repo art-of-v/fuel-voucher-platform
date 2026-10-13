@@ -1,5 +1,5 @@
 using FuelFlow.API.BackgroundJobs;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
@@ -13,12 +13,12 @@ public sealed class BulkActionVouchersCommandHandler
 {
     private readonly ApplicationDbContext _context;
     private readonly IBackgroundJobClient _backgroundJobClient;
-    private readonly ProviderEventService _eventService;
+    private readonly AuditEventService _eventService;
 
     public BulkActionVouchersCommandHandler(
         ApplicationDbContext context,
         IBackgroundJobClient backgroundJobClient,
-        ProviderEventService eventService)
+        AuditEventService eventService)
     {
         _context = context;
         _backgroundJobClient = backgroundJobClient;
@@ -199,7 +199,7 @@ if (command.Action == "delete_all")
             // OutboxEventType.VoucherActivated row: nothing consumes that type, so it only
             // left permanently-unprocessed rows that inflate the admin "unprocessed outbox
             // events" alert (GetReconciliationQueryHandler). The activate action itself is
-            // already audited via ProviderEventService above.
+            // already audited via AuditEventService above.
             _backgroundJobClient.Enqueue<FulfillmentService>(
                 s => s.ProcessPendingOrdersAsync(CancellationToken.None));
         }

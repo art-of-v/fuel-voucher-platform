@@ -1,6 +1,6 @@
 using System.Text.Json;
 using FuelFlow.Features.Auth.EmailChange;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Notifications.Email;
 using Microsoft.EntityFrameworkCore;
@@ -12,13 +12,13 @@ public sealed class SetUserEmailCommandHandler
 {
     private readonly ApplicationDbContext _context;
     private readonly IEmailSender _emailSender;
-    private readonly ProviderEventService _eventService;
+    private readonly AuditEventService _eventService;
     private readonly ILogger<SetUserEmailCommandHandler> _logger;
 
     public SetUserEmailCommandHandler(
         ApplicationDbContext context,
         IEmailSender emailSender,
-        ProviderEventService eventService,
+        AuditEventService eventService,
         ILogger<SetUserEmailCommandHandler> logger)
     {
         _context = context;

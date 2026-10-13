@@ -2,7 +2,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using FluentAssertions;
 using FuelFlow.Features.ErrorLogs;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.AspNetCore.Http;
@@ -77,7 +77,7 @@ public sealed class ErrorLogResolutionIntegrationTests : IClassFixture<TestDatab
         afterDoubleClick.ResolvedByUserId.Should().Be(StaffId);
 
         await using var verify = CreateContext();
-        (await verify.Set<ProviderEventOutbox>().CountAsync(o => o.EventType == "ErrorLogsResolved"))
+        (await verify.Set<AuditEventOutbox>().CountAsync(o => o.EventType == "ErrorLogsResolved"))
             .Should().Be(1, "the audit log records the decision, not the click");
     }
 
@@ -126,7 +126,7 @@ public sealed class ErrorLogResolutionIntegrationTests : IClassFixture<TestDatab
         (await ReadAsync(controller.GetAll())).Should().ContainSingle();
 
         await using var verify = CreateContext();
-        (await verify.Set<ProviderEventOutbox>().CountAsync(o => o.EventType == "ErrorLogsReopened")).Should().Be(1);
+        (await verify.Set<AuditEventOutbox>().CountAsync(o => o.EventType == "ErrorLogsReopened")).Should().Be(1);
     }
 
     [Fact]
@@ -143,7 +143,7 @@ public sealed class ErrorLogResolutionIntegrationTests : IClassFixture<TestDatab
     private static readonly Guid StaffId = Guid.NewGuid();
 
     private ErrorLogsController NewController(ApplicationDbContext context)
-        => new(context, new ProviderEventService(context))
+        => new(context, new AuditEventService(context))
         {
             ControllerContext = new ControllerContext
             {

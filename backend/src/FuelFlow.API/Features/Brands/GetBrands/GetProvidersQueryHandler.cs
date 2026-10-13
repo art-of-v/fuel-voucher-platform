@@ -1,15 +1,15 @@
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace FuelFlow.Features.Providers.GetProviders;
+namespace FuelFlow.Features.Brands.GetProviders;
 
-public sealed class GetProvidersQueryHandler
+public sealed class GetBrandsQueryHandler
 {
     private readonly ApplicationDbContext _context;
 
-    public GetProvidersQueryHandler(ApplicationDbContext context) => _context = context;
+    public GetBrandsQueryHandler(ApplicationDbContext context) => _context = context;
 
-    public async Task<List<ProviderDto>> HandleAsync(GetProvidersQuery query, CancellationToken ct = default)
+    public async Task<List<BrandDto>> HandleAsync(GetBrandsQuery query, CancellationToken ct = default)
     {
         var stations = await _context.Stations.AsNoTracking()
             .OrderBy(s => s.SortOrder).ThenBy(s => s.Name)
@@ -21,10 +21,10 @@ public sealed class GetProvidersQueryHandler
         {
             var stationFuels = fuels.Where(f => f.StationId == station.Id).ToList();
             var fuelDtos = stationFuels
-                .Select(f => ProviderFuelCard.Build(f, packages.Where(p => p.FuelTypeId == f.Id).ToList()))
+                .Select(f => BrandFuelCard.Build(f, packages.Where(p => p.FuelTypeId == f.Id).ToList()))
                 .OrderBy(f => f.Name).ToList();
 
-            return new ProviderDto
+            return new BrandDto
             {
                 Id = station.Id,
                 Name = station.Name,

@@ -211,7 +211,7 @@ public class FulfillmentService
                         await _notifications.FulfillmentMismatchAsync(
                             currentOrder.Id.ToString(),
                             currentOrder.Id.ToString()[..8],
-                            currentOrder.LineItems?.FirstOrDefault()?.Provider ?? "?",
+                            currentOrder.LineItems?.FirstOrDefault()?.Brand ?? "?",
                             0,
                             lineItemCounts.Values.Sum(),
                             voucherCounts.Values.Sum(),
@@ -320,7 +320,7 @@ public class FulfillmentService
                         await _notifications.FulfillmentMismatchAsync(
                             currentOrder.Id.ToString(),
                             currentOrder.Id.ToString()[..8],
-                            currentOrder.LineItems?.FirstOrDefault()?.Provider ?? "?",
+                            currentOrder.LineItems?.FirstOrDefault()?.Brand ?? "?",
                             notifyMismatch,
                             lineItemCounts.Sum(l => l.Value),
                             voucherCounts.Sum(v => v.Value),
@@ -587,7 +587,7 @@ public class FulfillmentService
                 : [];
 
             var assignedCounts = existingFulfillmentVouchers
-                .GroupBy(v => new { Provider = v.Provider.ToLowerInvariant(), v.FuelTypeId, v.Liters })
+                .GroupBy(v => new { Brand = v.Brand.ToLowerInvariant(), v.FuelTypeId, v.Liters })
                 .ToDictionary(g => g.Key, g => g.Count());
 
             // Which stock pool this order draws from: a QA test account is served only test vouchers,
@@ -602,7 +602,7 @@ public class FulfillmentService
 
             foreach (var lineItem in lineItems)
             {
-                var key = new { Provider = lineItem.Provider.ToLowerInvariant(), lineItem.FuelTypeId, lineItem.Liters };
+                var key = new { Brand = lineItem.Brand.ToLowerInvariant(), lineItem.FuelTypeId, lineItem.Liters };
                 var alreadyForThisLine = assignedCounts.GetValueOrDefault(key, 0);
                 var remainingNeeded = Math.Max(0, lineItem.Quantity - alreadyForThisLine);
 
@@ -618,7 +618,7 @@ public class FulfillmentService
                             order.Id, lineItem.FuelTypeId, lineItem.Liters, i, lineItem.Quantity);
 
                         // The alert goes to staff Telegram, where a raw FuelTypeId GUID is useless.
-                        // Resolve the display name (e.g. "ДП ЄВРО") and include provider + litres so
+                        // Resolve the display name (e.g. "ДП ЄВРО") and include brand + litres so
                         // staff know exactly which stock to top up; fall back to the id if unmatched.
                         var fuelTypeName = await _context.FuelTypes
                             .AsNoTracking()
@@ -628,7 +628,7 @@ public class FulfillmentService
 
                         var fuelLabel = string.IsNullOrEmpty(fuelTypeName)
                             ? lineItem.FuelTypeId
-                            : $"{fuelTypeName} ({lineItem.Provider.ToUpperInvariant()}, {lineItem.Liters:0.##} L)";
+                            : $"{fuelTypeName} ({lineItem.Brand.ToUpperInvariant()}, {lineItem.Liters:0.##} L)";
 
                         await _notifications.OrderUnfulfillableAsync(
                             order.Id, fuelLabel, i, lineItem.Quantity, cancellationToken);
@@ -772,7 +772,7 @@ public class FulfillmentService
         CancellationToken cancellationToken)
     {
         // Expiry is enforced, not optional. With this filter commented out, the ascending
-        // provider-term sort handed every paying customer the *most* expired stock first, and
+        // brand-term sort handed every paying customer the *most* expired stock first, and
         // nothing in the system ever flips stale rows to Expired (that is a manual admin
         // action), so the oldest unredeemable voucher was permanently at the head of the queue.
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -792,13 +792,13 @@ public class FulfillmentService
         return await _context.FuelVouchers
             .AsNoTracking()
             .Where(v => v.Status == VoucherStatus.Available
-                     && v.Provider.ToLower() == lineItem.Provider.ToLower()
+                     && v.Brand.ToLower() == lineItem.Brand.ToLower()
                      && v.FuelTypeId == lineItem.FuelTypeId
                      && v.Liters == lineItem.Liters
                      && v.IsTestData == isTestAccount
-                     && (!expiryEnabled || v.ProviderExpirationDate >= today)
+                     && (!expiryEnabled || v.SupplierExpirationDate >= today)
                      && !usedVoucherIds.Contains(v.Id))
-            .OrderBy(v => v.ProviderExpirationDate)
+            .OrderBy(v => v.SupplierExpirationDate)
             .FirstOrDefaultAsync(cancellationToken);
     }
 
@@ -810,7 +810,7 @@ public class FulfillmentService
     /// <remarks>
     /// A floor on the promise, not a gate on stock. A line asking for more life than the cheapest matching
     /// voucher has is still fulfilled; <see cref="TryAssignVoucherAsync"/> clamps the written date to the
-    /// voucher's own provider term, so the customer gets exactly what the supplier backs and never more.
+    /// voucher's own brand term, so the customer gets exactly what the supplier backs and never more.
     /// Refusing the sale here instead would strand a paid order over a stock-mix detail.
     /// </remarks>
     private static DateOnly? CustomerExpirationFor(OrderLineItem lineItem)
@@ -845,7 +845,7 @@ public class FulfillmentService
         // date, so a shortened date written by a separate statement would survive the rollback and the
         // stock would silently re-enter the pool with less life than the supplier granted.
         //
-        // The provider term is the ceiling, so the promise is clamped rather than trusted: a line whose
+        // The brand term is the ceiling, so the promise is clamped rather than trusted: a line whose
         // term outruns the voucher gets the voucher's full remaining life, which is what it would have
         // got before short terms existed.
         //
@@ -855,10 +855,10 @@ public class FulfillmentService
         // and this statement can never hand stock across the pools.
         var rowsAffected = customerExpiration is null
             ? await _context.Database.ExecuteSqlInterpolatedAsync(
-                $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND provider_expiration_date >= {expiryCutoff} AND is_test_data = (SELECT u.is_qa_account FROM "users" u WHERE u.id = {userId})""",
+                $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND supplier_expiration_date >= {expiryCutoff} AND is_test_data = (SELECT u.is_qa_account FROM "users" u WHERE u.id = {userId})""",
                 cancellationToken)
             : await _context.Database.ExecuteSqlInterpolatedAsync(
-                $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, customer_expiration_date = LEAST({customerExpiration.Value}, provider_expiration_date), updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND provider_expiration_date >= {expiryCutoff} AND is_test_data = (SELECT u.is_qa_account FROM "users" u WHERE u.id = {userId})""",
+                $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, customer_expiration_date = LEAST({customerExpiration.Value}, supplier_expiration_date), updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND supplier_expiration_date >= {expiryCutoff} AND is_test_data = (SELECT u.is_qa_account FROM "users" u WHERE u.id = {userId})""",
                 cancellationToken);
 
         return rowsAffected;
@@ -941,7 +941,7 @@ public class FulfillmentService
     //   • Extend  — the source voucher is still valid: push its expiry out by the bought term
     //               (old expiry + term, leftover days kept), same row/code stays with the customer.
     //   • Replace — the source voucher has lapsed: claim a fresh stock voucher of the same
-    //               provider/fuel/nominal valid at least until today+term, hand it to the customer,
+    //               brand/fuel/nominal valid at least until today+term, hand it to the customer,
     //               and flip the old one to Expired.
     // Idempotency: each item's FulfilledVoucherId marker is the done-flag, so a re-run (webhook +
     // per-minute backfill, or a retry) skips lines already applied. Concurrency mirrors buy-fuel:
@@ -1056,7 +1056,7 @@ public class FulfillmentService
                 // already paid - so the ceiling decides the branch, exactly as it did at sale time.
                 var canExtendInPlace = source.CustomerExpirationDate >= today
                                        && VoucherRenewalEligibility.CanExtend(
-                                           source.CustomerExpirationDate, source.ProviderExpirationDate, term);
+                                           source.CustomerExpirationDate, source.SupplierExpirationDate, term);
 
                 if (canExtendInPlace)
                 {
@@ -1066,13 +1066,13 @@ public class FulfillmentService
                     // supplier term, so reaching here means the source row changed under us mid-transaction.
                     // Writing a customer date past the real term would promise validity the station may
                     // never honour, so we refuse rather than over-extend.
-                    if (newExpiration > source.ProviderExpirationDate)
+                    if (newExpiration > source.SupplierExpirationDate)
                     {
                         _logger.LogWarning(
                             "Renewal order {OrderId}: refusing to extend voucher {VoucherId} past its supplier term " +
-                            "(customer {CustomerExpiration} + {TermCode} = {Requested}, provider {ProviderExpiration})",
+                            "(customer {CustomerExpiration} + {TermCode} = {Requested}, brand {ProviderExpiration})",
                             orderId, source.Id, source.CustomerExpirationDate, item.TermCode, newExpiration,
-                            source.ProviderExpirationDate);
+                            source.SupplierExpirationDate);
                         continue;
                     }
 
@@ -1080,7 +1080,7 @@ public class FulfillmentService
                         source.Id,
                         order.UserId,
                         source.CustomerExpirationDate,
-                        source.ProviderExpirationDate,
+                        source.SupplierExpirationDate,
                         newExpiration,
                         cancellationToken);
                     if (extended == 0)
@@ -1128,7 +1128,7 @@ public class FulfillmentService
 
                         var fuelLabel = string.IsNullOrEmpty(fuelTypeName)
                             ? source.FuelTypeId
-                            : $"{fuelTypeName} ({source.Provider.ToUpperInvariant()}, {source.Liters:0.##} L)";
+                            : $"{fuelTypeName} ({source.Brand.ToUpperInvariant()}, {source.Liters:0.##} L)";
 
                         _logger.LogWarning(
                             "Renewal order {OrderId}: no replacement stock for {FuelLabel} valid until {PromisedExpiration}",
@@ -1313,7 +1313,7 @@ public class FulfillmentService
         bool isTestAccount,
         CancellationToken cancellationToken)
     {
-        // Same provider/fuel/nominal as the source, valid at least until the promise we owe the
+        // Same brand/fuel/nominal as the source, valid at least until the promise we owe the
         // customer (their leftover term + what they just paid for), not already claimed in this run.
         // Oldest-eligible first, so the SHORTEST qualifying voucher goes out and Fuel Flow's near-expiry
         // stock is preserved for the tiers that actually need it — a shorter voucher that still covers the
@@ -1324,13 +1324,13 @@ public class FulfillmentService
         return await _context.FuelVouchers
             .AsNoTracking()
             .Where(v => v.Status == VoucherStatus.Available
-                     && v.Provider.ToLower() == source.Provider.ToLower()
+                     && v.Brand.ToLower() == source.Brand.ToLower()
                      && v.FuelTypeId == source.FuelTypeId
                      && v.Liters == source.Liters
                      && v.IsTestData == isTestAccount
-                     && v.ProviderExpirationDate >= promisedExpiration
+                     && v.SupplierExpirationDate >= promisedExpiration
                      && !usedStockIds.Contains(v.Id))
-            .OrderBy(v => v.ProviderExpirationDate)
+            .OrderBy(v => v.SupplierExpirationDate)
             .FirstOrDefaultAsync(cancellationToken);
     }
 
@@ -1349,7 +1349,7 @@ public class FulfillmentService
         CancellationToken cancellationToken)
     {
         return await _context.Database.ExecuteSqlInterpolatedAsync(
-            $"""UPDATE "fuel_vouchers" SET customer_expiration_date = {newExpiration}, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND assigned_to_user_id = {userId} AND status = 'Assigned' AND customer_expiration_date = {expectedCustomerExpiration} AND {newExpiration} <= provider_expiration_date""",
+            $"""UPDATE "fuel_vouchers" SET customer_expiration_date = {newExpiration}, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND assigned_to_user_id = {userId} AND status = 'Assigned' AND customer_expiration_date = {expectedCustomerExpiration} AND {newExpiration} <= supplier_expiration_date""",
             cancellationToken);
     }
 
@@ -1366,13 +1366,13 @@ public class FulfillmentService
         //
         // customer_expiration_date is stamped with the PROMISE (what the customer paid for on top of
         // what they already held), not the voucher's own customer date. The voucher is chosen with
-        // provider_expiration_date >= promise, so the promise always fits and never needs clamping —
+        // supplier_expiration_date >= promise, so the promise always fits and never needs clamping —
         // whatever real life is left above it is a hidden reserve the customer can extend again.
         //
         // Same QA/test segregation as the buy claim: the replacement must come from the owner's pool
         // (test for a QA account, real otherwise), re-asserted atomically here against the owning user.
         return await _context.Database.ExecuteSqlInterpolatedAsync(
-            $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, customer_expiration_date = {promisedExpiration}, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND provider_expiration_date >= {promisedExpiration} AND is_test_data = (SELECT u.is_qa_account FROM "users" u WHERE u.id = {userId})""",
+            $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, customer_expiration_date = {promisedExpiration}, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND supplier_expiration_date >= {promisedExpiration} AND is_test_data = (SELECT u.is_qa_account FROM "users" u WHERE u.id = {userId})""",
             cancellationToken);
     }
 

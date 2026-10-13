@@ -18,8 +18,8 @@ namespace FuelFlow.IntegrationTests;
 ///
 /// These tests live in the integration suite rather than the unit suite deliberately: the fix is an
 /// <c>ExecuteUpdateAsync</c> whose WHERE clause carries the status predicate, and the EF Core
-/// in-memory provider neither translates <c>ExecuteUpdate</c> nor models row locking. A concurrency
-/// guard cannot be verified against a provider that has no concurrency.
+/// in-memory brand neither translates <c>ExecuteUpdate</c> nor models row locking. A concurrency
+/// guard cannot be verified against a brand that has no concurrency.
 /// </summary>
 [Collection("Integration Tests")]
 public sealed class MarkVoucherAsUsedConcurrencyIntegrationTests : IClassFixture<TestDatabaseFixture>
@@ -133,10 +133,10 @@ public sealed class MarkVoucherAsUsedConcurrencyIntegrationTests : IClassFixture
         seed.FuelVouchers.Add(new FuelVoucher
         {
             Id = voucherId,
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-95",
             Liters = 50m,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             VoucherNumber = $"OKKO-{voucherId:N}"[..20],
             QrPayload = $"payload-{voucherId:N}",

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -16,18 +16,18 @@ namespace FuelFlow.API.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             // The existing column holds the date read off the supplier's paper at import, so it is
-            // the provider term by definition - rename rather than copy, keeping the index.
+            // the brand term by definition - rename rather than copy, keeping the index.
             migrationBuilder.RenameColumn(
                 name: "expiration_date",
                 table: "fuel_vouchers",
-                newName: "provider_expiration_date");
+                newName: "supplier_expiration_date");
 
             migrationBuilder.RenameIndex(
                 name: "IX_fuel_vouchers_expiration_date",
                 table: "fuel_vouchers",
-                newName: "IX_fuel_vouchers_provider_expiration_date");
+                newName: "IX_fuel_vouchers_supplier_expiration_date");
 
-            // Added nullable first so the backfill can copy the provider date across. Letting EF emit
+            // Added nullable first so the backfill can copy the brand date across. Letting EF emit
             // a NOT NULL column here would stamp every existing row with its default (0001-01-01),
             // which would expire the entire installed base overnight.
             migrationBuilder.AddColumn<DateOnly>(
@@ -37,12 +37,12 @@ namespace FuelFlow.API.Migrations
                 nullable: true);
 
             // Every voucher sold so far was sold with its full remaining term - nothing shortens a
-            // term yet - so the customer date starts equal to the provider date. When short terms
+            // term yet - so the customer date starts equal to the brand date. When short terms
             // ship, this is the column that diverges.
             migrationBuilder.Sql(
                 """
                 UPDATE "fuel_vouchers"
-                SET "customer_expiration_date" = "provider_expiration_date"
+                SET "customer_expiration_date" = "supplier_expiration_date"
                 WHERE "customer_expiration_date" IS NULL;
                 """);
 
@@ -64,7 +64,7 @@ namespace FuelFlow.API.Migrations
         /// <inheritdoc />
         /// <remarks>
         /// Lossy by nature: the single old column cannot represent two dates, so rolling back keeps
-        /// the provider term and discards any shortened customer term. Acceptable only while the
+        /// the brand term and discards any shortened customer term. Acceptable only while the
         /// two are equal, which is the case until short terms ship.
         /// </remarks>
         protected override void Down(MigrationBuilder migrationBuilder)
@@ -78,12 +78,12 @@ namespace FuelFlow.API.Migrations
                 table: "fuel_vouchers");
 
             migrationBuilder.RenameColumn(
-                name: "provider_expiration_date",
+                name: "supplier_expiration_date",
                 table: "fuel_vouchers",
                 newName: "expiration_date");
 
             migrationBuilder.RenameIndex(
-                name: "IX_fuel_vouchers_provider_expiration_date",
+                name: "IX_fuel_vouchers_supplier_expiration_date",
                 table: "fuel_vouchers",
                 newName: "IX_fuel_vouchers_expiration_date");
         }

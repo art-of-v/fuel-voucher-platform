@@ -97,7 +97,7 @@ public sealed class GetReportQueryHandler
                 o.Price,
                 o.Status.ToString(),
                 o.CreatedAtUtc,
-                firstLi?.Provider ?? "",
+                firstLi?.Brand ?? "",
                 firstLi?.FuelTypeId ?? "",
                 firstLi is null ? "" : fuelTypeNames.GetValueOrDefault(firstLi.FuelTypeId) ?? firstLi.FuelTypeId,
                 totalLiters,
@@ -112,7 +112,7 @@ public sealed class GetReportQueryHandler
 
         var redemptions = usedVouchers.Select(v => new RedemptionEntry(
             v.Id,
-            v.Provider,
+            v.Brand,
             v.FuelTypeId,
             fuelTypeNames.GetValueOrDefault(v.FuelTypeId) ?? v.FuelTypeId,
             v.Liters,
@@ -123,7 +123,7 @@ public sealed class GetReportQueryHandler
         // vouchers; refunded or still-undelivered liters contribute no profit.
         long GetProfit(Order o)
         {
-            var groups = o.LineItems.GroupBy(li => (li.Provider, li.FuelTypeId, li.Liters));
+            var groups = o.LineItems.GroupBy(li => (li.Brand, li.FuelTypeId, li.Liters));
             long sum = 0;
 
             foreach (var g in groups)
@@ -134,7 +134,7 @@ public sealed class GetReportQueryHandler
                 }
 
                 var delivered = o.Fulfillments.Count(f => f.Voucher is not null
-                    && string.Equals(f.Voucher.Provider, g.Key.Provider, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(f.Voucher.Brand, g.Key.Brand, StringComparison.OrdinalIgnoreCase)
                     && f.Voucher.FuelTypeId == g.Key.FuelTypeId
                     && f.Voucher.Liters == g.Key.Liters);
 

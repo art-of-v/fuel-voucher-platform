@@ -36,10 +36,10 @@ public sealed class TestDataFlagIntegrationTests : IClassFixture<TestDatabaseFix
         var voucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-95",
             Liters = 10m,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
             VoucherNumber = $"flag-default-{Guid.NewGuid():N}",
             QrPayload = $"flag-qr-{Guid.NewGuid():N}",
@@ -84,10 +84,10 @@ public sealed class TestDataFlagIntegrationTests : IClassFixture<TestDatabaseFix
         => new()
         {
             Id = id,
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-95",
             Liters = 10m,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
             VoucherNumber = $"{tag}-{id:N}",
             QrPayload = $"{tag}-qr-{id:N}",

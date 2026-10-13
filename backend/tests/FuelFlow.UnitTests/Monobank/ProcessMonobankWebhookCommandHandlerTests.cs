@@ -59,7 +59,7 @@ public sealed class ProcessMonobankWebhookCommandHandlerTests : IDisposable
             new OrderLineItem
             {
                 Id = Guid.NewGuid(),
-                Provider = "okko",
+                Brand = "okko",
                 FuelTypeId = "okko-95",
                 Liters = 50,
                 Quantity = 1,
@@ -257,7 +257,7 @@ public sealed class ProcessMonobankWebhookCommandHandlerTests : IDisposable
 
         // Refusing the transition must not also throw away the fact that the money arrived.
         // The fixture starts with no recorded payment status; the webhook now persists what the
-        // provider said, so the order stops looking unpaid.
+        // brand said, so the order stops looking unpaid.
         updated.MonobankStatus.Should().Be(MonobankStatus.Success);
 
         _context.OutboxEvents.Should().BeEmpty();

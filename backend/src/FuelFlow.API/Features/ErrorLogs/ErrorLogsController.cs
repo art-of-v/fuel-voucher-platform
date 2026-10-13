@@ -1,6 +1,6 @@
 using System.Security.Claims;
 using System.Text.Json;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.AspNetCore.Authorization;
@@ -33,9 +33,9 @@ public sealed class ErrorLogsController : ControllerBase
     private const int MaxIdsPerResolveCall = 500;
 
     private readonly ApplicationDbContext _context;
-    private readonly ProviderEventService _eventService;
+    private readonly AuditEventService _eventService;
 
-    public ErrorLogsController(ApplicationDbContext context, ProviderEventService eventService)
+    public ErrorLogsController(ApplicationDbContext context, AuditEventService eventService)
     {
         _context = context;
         _eventService = eventService;
@@ -177,7 +177,7 @@ public sealed class ErrorLogsController : ControllerBase
 
         if (changed > 0)
         {
-            // ProviderId is required and an error record has none, so the acting user stands in -
+            // ScopeId is required and an error record has none, so the acting user stands in -
             // the same workaround the user and QA-access aggregates already use.
             await _eventService.RecordEventAsync(
                 "ErrorLog",

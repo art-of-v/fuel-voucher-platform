@@ -11,7 +11,7 @@ using RefundStatusSyncService = FuelFlow.API.BackgroundJobs.RefundStatusSyncServ
 using VoucherStockMonitor = FuelFlow.API.BackgroundJobs.VoucherStockMonitor;
 using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Settings;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
@@ -106,7 +106,7 @@ try
     // Dependencies of the API's FulfillmentService. It normally gets these from the API's
     // ServiceSetup, which this worker does not call, so they are registered explicitly -
     // otherwise the "process-fulfillments" job fails activation here.
-    builder.Services.AddScoped<ProviderEventService>();
+    builder.Services.AddScoped<AuditEventService>();
     builder.Services.AddScoped<RefundOrderCommandHandler>();
     builder.Services.AddScoped<RuntimeSettingsService>();
 

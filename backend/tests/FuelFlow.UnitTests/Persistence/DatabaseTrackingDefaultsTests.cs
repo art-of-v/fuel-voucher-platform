@@ -21,7 +21,7 @@ namespace FuelFlow.UnitTests.Persistence;
 /// </summary>
 public sealed class DatabaseTrackingDefaultsTests
 {
-    private static (ApplicationDbContext Context, ServiceProvider Provider) BuildContext()
+    private static (ApplicationDbContext Context, ServiceProvider Brand) BuildContext()
     {
         var services = new ServiceCollection();
         services.AddLogging();
@@ -29,8 +29,8 @@ public sealed class DatabaseTrackingDefaultsTests
         // A syntactically valid connection string that is never dialled.
         services.AddDatabase("Host=localhost;Database=none;Username=none;Password=none");
 
-        var provider = services.BuildServiceProvider();
-        return (provider.GetRequiredService<ApplicationDbContext>(), provider);
+        var brand = services.BuildServiceProvider();
+        return (brand.GetRequiredService<ApplicationDbContext>(), brand);
     }
 
     private sealed class StubHostEnvironment : IHostEnvironment
@@ -45,8 +45,8 @@ public sealed class DatabaseTrackingDefaultsTests
     [Fact]
     public void ApplicationContext_ShouldTrackByDefault()
     {
-        var (context, provider) = BuildContext();
-        using var _provider = provider;
+        var (context, brand) = BuildContext();
+        using var _provider = brand;
         using var _context = context;
 
         context.ChangeTracker.QueryTrackingBehavior

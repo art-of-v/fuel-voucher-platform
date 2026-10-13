@@ -75,8 +75,8 @@ public sealed class AdminVoucherDetailSupplierCostTests : IDisposable
         QrPayload = "qr",
         Liters = 5,
         FuelTypeId = "okko-95",
-        Provider = "OKKO",
-        ProviderExpirationDate = new DateOnly(2027, 1, 31),
+        Brand = "OKKO",
+        SupplierExpirationDate = new DateOnly(2027, 1, 31),
         CustomerExpirationDate = new DateOnly(2027, 1, 31),
         VoucherNumber = "VC-1",
         Status = VoucherStatus.Available,
@@ -113,8 +113,8 @@ public sealed class AdminVoucherDetailSupplierCostTests : IDisposable
     {
         var detail = await DetailAsync(Voucher(50m, SupplierId));
 
-        detail.Provider.Should().Be("OKKO");
-        detail.SupplierName.Should().Be(SupplierName).And.NotBe(detail.Provider);
+        detail.Brand.Should().Be("OKKO");
+        detail.SupplierName.Should().Be(SupplierName).And.NotBe(detail.Brand);
     }
 
     [Fact]

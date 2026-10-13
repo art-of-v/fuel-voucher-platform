@@ -112,7 +112,7 @@ public sealed class MonobankReconciliationServiceTests : IDisposable
                 new OrderLineItem
                 {
                     Id = Guid.NewGuid(),
-                    Provider = "okko",
+                    Brand = "okko",
                     FuelTypeId = "okko-95",
                     Liters = 50,
                     Quantity = 1,

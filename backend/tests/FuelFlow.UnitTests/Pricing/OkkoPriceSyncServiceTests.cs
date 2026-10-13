@@ -2,7 +2,7 @@ using FluentAssertions;
 using FuelFlow.BackgroundJobs;
 using FuelFlow.Features.Orders.CreateCheckout;
 using FuelFlow.Features.Pricing.ImportOkkoPumpPrices;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Pricing.ScrapeOkkoPrices;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
@@ -23,7 +23,7 @@ namespace FuelFlow.UnitTests.Pricing;
 public sealed class OkkoPriceSyncServiceTests : IDisposable
 {
     private readonly ApplicationDbContext _context;
-    private readonly ProviderEventService _events;
+    private readonly AuditEventService _events;
 
     public OkkoPriceSyncServiceTests()
     {
@@ -31,7 +31,7 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
             new DbContextOptionsBuilder<ApplicationDbContext>()
                 .UseInMemoryDatabase(Guid.NewGuid().ToString())
                 .Options);
-        _events = new ProviderEventService(_context);
+        _events = new AuditEventService(_context);
     }
 
     public void Dispose()
@@ -288,7 +288,7 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
 
         // Nobody typed these numbers, so the audit trail is the only way to answer "who moved this
         // price and when" — it must name the scheduler rather than leave the actor blank.
-        var events = await _context.ProviderEventOutbox.AsNoTracking()
+        var events = await _context.AuditEventOutbox.AsNoTracking()
             .Where(e => e.EventType == "PumpPriceImported")
             .ToListAsync();
 
@@ -309,8 +309,8 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
         await second.SyncPricesAsync();
         _context.ChangeTracker.Clear();
 
-        // No new audit rows on the second pass: the provider history must not fill with daily
+        // No new audit rows on the second pass: the brand history must not fill with daily
         // no-ops that say "nothing changed" every morning.
-        (await _context.ProviderEventOutbox.AsNoTracking().CountAsync()).Should().Be(5);
+        (await _context.AuditEventOutbox.AsNoTracking().CountAsync()).Should().Be(5);
     }
 }

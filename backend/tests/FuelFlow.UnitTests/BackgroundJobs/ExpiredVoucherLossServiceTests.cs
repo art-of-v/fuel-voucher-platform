@@ -15,9 +15,9 @@ namespace FuelFlow.UnitTests.BackgroundJobs;
 /// <summary>
 /// The nightly expired-voucher loss-booking job must respect the exchange grace window: a voucher
 /// whose printed expiry has passed is not retired until the window has closed, because inside it
-/// the operator can still swap the voucher with the provider for a surcharge. Booking the loss at
+/// the operator can still swap the voucher with the brand for a surcharge. Booking the loss at
 /// the printed date writes off stock that is still salvageable — and, once the voucher is
-/// <c>Expired</c>, the operator→provider exchange (#104) may no longer accept it, so the job would
+/// <c>Expired</c>, the operator→brand exchange (#104) may no longer accept it, so the job would
 /// itself have destroyed the option it was too early to close.
 ///
 /// Both switches are read from the <c>app_settings</c> table, which is what the tests seed — the
@@ -46,10 +46,10 @@ public sealed class ExpiredVoucherLossServiceTests : IDisposable
         => _context.FuelVouchers.Add(new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-dp",
             Liters = 10m,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-expiredDaysAgo)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-expiredDaysAgo)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-expiredDaysAgo)),
             VoucherNumber = number,
             QrPayload = Guid.NewGuid().ToString(),

@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
@@ -33,18 +33,18 @@ namespace FuelFlow.API.Migrations
                 maxLength: 100,
                 nullable: true);
 
-            // Migrate data for vouchers: map old enum to provider-specific fuel type IDs
+            // Migrate data for vouchers: map old enum to brand-specific fuel type IDs
             migrationBuilder.Sql(@"
                 UPDATE fuel_vouchers
                 SET fuel_type_id = CASE
-                    WHEN provider = 'WOG' AND fuel_type = 'Diesel' THEN 'wog-dp'
-                    WHEN provider = 'WOG' AND fuel_type = 'Gasoline95' THEN 'wog-95'
-                    WHEN provider = 'WOG' AND fuel_type = 'Gasoline98' THEN 'wog-100'
-                    WHEN provider = 'WOG' AND fuel_type = 'LPG' THEN 'wog-gas'
-                    WHEN provider = 'OKKO' AND fuel_type = 'Diesel' THEN 'okko-dp'
-                    WHEN provider = 'OKKO' AND fuel_type = 'Gasoline95' THEN 'okko-95'
-                    WHEN provider = 'OKKO' AND fuel_type = 'Gasoline98' THEN 'okko-p95'
-                    WHEN provider = 'OKKO' AND fuel_type = 'LPG' THEN 'okko-gas'
+                    WHEN brand = 'WOG' AND fuel_type = 'Diesel' THEN 'wog-dp'
+                    WHEN brand = 'WOG' AND fuel_type = 'Gasoline95' THEN 'wog-95'
+                    WHEN brand = 'WOG' AND fuel_type = 'Gasoline98' THEN 'wog-100'
+                    WHEN brand = 'WOG' AND fuel_type = 'LPG' THEN 'wog-gas'
+                    WHEN brand = 'OKKO' AND fuel_type = 'Diesel' THEN 'okko-dp'
+                    WHEN brand = 'OKKO' AND fuel_type = 'Gasoline95' THEN 'okko-95'
+                    WHEN brand = 'OKKO' AND fuel_type = 'Gasoline98' THEN 'okko-p95'
+                    WHEN brand = 'OKKO' AND fuel_type = 'LPG' THEN 'okko-gas'
                     ELSE 'okko-dp'
                 END
             ");
@@ -53,14 +53,14 @@ namespace FuelFlow.API.Migrations
             migrationBuilder.Sql(@"
                 UPDATE orders
                 SET fuel_type_id = CASE
-                    WHEN provider = 'WOG' AND fuel_type = 'Diesel' THEN 'wog-dp'
-                    WHEN provider = 'WOG' AND fuel_type = 'Gasoline95' THEN 'wog-95'
-                    WHEN provider = 'WOG' AND fuel_type = 'Gasoline98' THEN 'wog-100'
-                    WHEN provider = 'WOG' AND fuel_type = 'LPG' THEN 'wog-gas'
-                    WHEN provider = 'OKKO' AND fuel_type = 'Diesel' THEN 'okko-dp'
-                    WHEN provider = 'OKKO' AND fuel_type = 'Gasoline95' THEN 'okko-95'
-                    WHEN provider = 'OKKO' AND fuel_type = 'Gasoline98' THEN 'okko-p95'
-                    WHEN provider = 'OKKO' AND fuel_type = 'LPG' THEN 'okko-gas'
+                    WHEN brand = 'WOG' AND fuel_type = 'Diesel' THEN 'wog-dp'
+                    WHEN brand = 'WOG' AND fuel_type = 'Gasoline95' THEN 'wog-95'
+                    WHEN brand = 'WOG' AND fuel_type = 'Gasoline98' THEN 'wog-100'
+                    WHEN brand = 'WOG' AND fuel_type = 'LPG' THEN 'wog-gas'
+                    WHEN brand = 'OKKO' AND fuel_type = 'Diesel' THEN 'okko-dp'
+                    WHEN brand = 'OKKO' AND fuel_type = 'Gasoline95' THEN 'okko-95'
+                    WHEN brand = 'OKKO' AND fuel_type = 'Gasoline98' THEN 'okko-p95'
+                    WHEN brand = 'OKKO' AND fuel_type = 'LPG' THEN 'okko-gas'
                     ELSE 'okko-dp'
                 END
             ");
@@ -106,7 +106,7 @@ namespace FuelFlow.API.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_fuel_vouchers_provider_fuel_type_id_liters_status",
                 table: "fuel_vouchers",
-                columns: new[] { "provider", "fuel_type_id", "liters", "status" });
+                columns: new[] { "brand", "fuel_type_id", "liters", "status" });
 
             migrationBuilder.AddForeignKey(
                 name: "FK_fuel_vouchers_fuel_types_fuel_type_id",
@@ -164,7 +164,7 @@ namespace FuelFlow.API.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_fuel_vouchers_provider_fuel_type_liters_status",
                 table: "fuel_vouchers",
-                columns: new[] { "provider", "fuel_type", "liters", "status" });
+                columns: new[] { "brand", "fuel_type", "liters", "status" });
         }
     }
 }

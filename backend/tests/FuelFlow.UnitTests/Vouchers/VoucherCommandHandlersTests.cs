@@ -67,10 +67,10 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         var assignedVoucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-95",
             Liters = 50,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             VoucherNumber = "OKKO-1",
             QrPayload = "payload-1",
@@ -83,10 +83,10 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         var usedVoucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-dp",
             Liters = 50,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(2)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(2)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(2)),
             VoucherNumber = "OKKO-2",
             QrPayload = "payload-2",
@@ -99,10 +99,10 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         var availableVoucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-95",
             Liters = 50,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
             VoucherNumber = "OKKO-3",
             QrPayload = "payload-3",
@@ -154,10 +154,10 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         var giftedVoucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-95",
             Liters = 20,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             VoucherNumber = "OKKO-GIFT-1",
             QrPayload = "gift-payload-1",
@@ -205,17 +205,17 @@ public sealed class VoucherCommandHandlersTests : IDisposable
 
         response.Inventory.Should().HaveCount(3);
 
-        var okkoA95 = response.Inventory.First(i => i.Provider == "OKKO" && i.FuelTypeId == "okko-95");
+        var okkoA95 = response.Inventory.First(i => i.Brand == "OKKO" && i.FuelTypeId == "okko-95");
         okkoA95.Available.Should().Be(1);
         okkoA95.Assigned.Should().Be(1);
         okkoA95.Used.Should().Be(1);
         okkoA95.Total.Should().Be(3);
 
-        var okkoDiesel = response.Inventory.First(i => i.Provider == "OKKO" && i.FuelTypeId == "okko-dp");
+        var okkoDiesel = response.Inventory.First(i => i.Brand == "OKKO" && i.FuelTypeId == "okko-dp");
         okkoDiesel.Available.Should().Be(1);
         okkoDiesel.Total.Should().Be(1);
 
-        var wogA95 = response.Inventory.First(i => i.Provider == "WOG" && i.FuelTypeId == "wog-95");
+        var wogA95 = response.Inventory.First(i => i.Brand == "WOG" && i.FuelTypeId == "wog-95");
         wogA95.Available.Should().Be(1);
         wogA95.Total.Should().Be(1);
     }
@@ -223,7 +223,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
     // MarkVoucherAsUsed_ShouldTransitionFromAssignedToUsed moved to
     // FuelFlow.IntegrationTests.MarkVoucherAsUsedConcurrencyIntegrationTests. The handler now performs
     // the Assigned -> Used transition with an atomic conditional ExecuteUpdateAsync (WP-4), which the
-    // EF Core in-memory provider cannot translate. The tests below all return before that write, so
+    // EF Core in-memory brand cannot translate. The tests below all return before that write, so
     // they still exercise the in-memory path.
 
     [Fact]
@@ -234,10 +234,10 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         var voucher = new FuelVoucher
         {
             Id = voucherId,
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-95",
             Liters = 50,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             VoucherNumber = "OKKO-1",
             QrPayload = "payload-1",
@@ -267,10 +267,10 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         var voucher = new FuelVoucher
         {
             Id = voucherId,
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-95",
             Liters = 50,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             VoucherNumber = "OKKO-1",
             QrPayload = "payload-1",
@@ -301,10 +301,10 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         var voucher = new FuelVoucher
         {
             Id = voucherId,
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-95",
             Liters = 50,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             VoucherNumber = "OKKO-GIFT-OWNER",
             QrPayload = "payload-gift-owner",
@@ -331,7 +331,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
 
     /// <summary>
     /// Moved to <c>RestoreVoucherIntegrationTests</c>, which could no longer execute it once the
-    /// write became an <c>ExecuteUpdateAsync</c> - the EF Core in-memory provider does not
+    /// write became an <c>ExecuteUpdateAsync</c> - the EF Core in-memory brand does not
     /// translate <c>ExecuteUpdate</c>.
     /// </summary>
     [Fact]
@@ -342,10 +342,10 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         var voucher = new FuelVoucher
         {
             Id = voucherId,
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-95",
             Liters = 50,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             VoucherNumber = "OKKO-1",
             QrPayload = "payload-1",
@@ -378,10 +378,10 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         var voucher = new FuelVoucher
         {
             Id = voucherId,
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-95",
             Liters = 50,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             VoucherNumber = "OKKO-1",
             QrPayload = "payload-1",
@@ -411,10 +411,10 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         var voucher = new FuelVoucher
         {
             Id = voucherId,
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-95",
             Liters = 50,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             VoucherNumber = "OKKO-1",
             QrPayload = "payload-1",
@@ -439,17 +439,17 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         response.Message.Should().Contain("cannot be restored");
     }
 
-    private FuelVoucher CreateVoucher(string provider, string fuelTypeId, decimal liters, VoucherStatus status)
+    private FuelVoucher CreateVoucher(string brand, string fuelTypeId, decimal liters, VoucherStatus status)
     {
         return new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Provider = provider,
+            Brand = brand,
             FuelTypeId = fuelTypeId,
             Liters = liters,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
-            VoucherNumber = $"{provider}-{Guid.NewGuid().ToString()[..8]}",
+            VoucherNumber = $"{brand}-{Guid.NewGuid().ToString()[..8]}",
             QrPayload = Guid.NewGuid().ToString(),
             Status = status,
             AssignedToUserId = status == VoucherStatus.Assigned || status == VoucherStatus.Used ? UserId : null,

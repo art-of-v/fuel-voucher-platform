@@ -3,7 +3,7 @@ using FuelFlow.API.BackgroundJobs;
 using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.Features.Orders.SharedModels;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Vouchers;
@@ -60,7 +60,7 @@ public sealed class FulfillmentMismatchRepairTests : IClassFixture<TestDatabaseF
     {
         var userId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
-        const string provider = "OKKO";
+        const string brand = "OKKO";
         const string fuelTypeId = "okko-95";
         const decimal liters = 50m;
 
@@ -90,8 +90,8 @@ public sealed class FulfillmentMismatchRepairTests : IClassFixture<TestDatabaseF
             order.FulfilledAtUtc = DateTime.UtcNow;
             seed.Orders.Add(order);
 
-            seed.FuelVouchers.Add(Assigned(voucherA, provider, fuelTypeId, liters, "MR-A", userId, orderId));
-            seed.FuelVouchers.Add(Assigned(voucherB, provider, fuelTypeId, liters, "MR-B", userId, orderId));
+            seed.FuelVouchers.Add(Assigned(voucherA, brand, fuelTypeId, liters, "MR-A", userId, orderId));
+            seed.FuelVouchers.Add(Assigned(voucherB, brand, fuelTypeId, liters, "MR-B", userId, orderId));
 
             seed.Fulfillments.Add(new Fulfillment
             {
@@ -215,7 +215,7 @@ public sealed class FulfillmentMismatchRepairTests : IClassFixture<TestDatabaseF
             {
                 Id = Guid.NewGuid(),
                 OrderId = id,
-                Provider = "OKKO",
+                Brand = "OKKO",
                 FuelTypeId = "okko-95",
                 Liters = 50m,
                 Quantity = quantity,
@@ -226,13 +226,13 @@ public sealed class FulfillmentMismatchRepairTests : IClassFixture<TestDatabaseF
     };
 
     private static FuelVoucher Assigned(
-        Guid id, string provider, string fuelTypeId, decimal liters, string tag, Guid userId, Guid orderId) => new()
+        Guid id, string brand, string fuelTypeId, decimal liters, string tag, Guid userId, Guid orderId) => new()
     {
         Id = id,
-        Provider = provider,
+        Brand = brand,
         FuelTypeId = fuelTypeId,
         Liters = liters,
-        ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+        SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
         CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
         VoucherNumber = $"{tag}-{id:N}",
         QrPayload = $"{tag}-{id:N}",
@@ -262,7 +262,7 @@ public sealed class FulfillmentMismatchRepairTests : IClassFixture<TestDatabaseF
         var refundHandler = new RefundOrderCommandHandler(
             context,
             new StubMonobankClientFactory(monobank),
-            new ProviderEventService(context));
+            new AuditEventService(context));
 
         return new FulfillmentService(
             context,

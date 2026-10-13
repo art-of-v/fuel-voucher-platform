@@ -25,7 +25,7 @@ public sealed record GetReconciliationResponse(
     public sealed record ThreeWayMatchItem(
         Guid OrderId,
         string? UserPhone,
-        string Provider,
+        string Brand,
         string FuelType,
         decimal Liters,
         int Quantity,

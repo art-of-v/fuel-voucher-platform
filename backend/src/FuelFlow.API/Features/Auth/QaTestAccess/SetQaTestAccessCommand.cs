@@ -1,5 +1,5 @@
 using FuelFlow.Features.Auth.SharedModels;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Persistence;
@@ -37,14 +37,14 @@ public sealed class SetQaTestAccessCommandHandler
 {
     private readonly ApplicationDbContext _context;
     private readonly RuntimeSettingsService _settings;
-    private readonly ProviderEventService _eventService;
+    private readonly AuditEventService _eventService;
     private readonly ILogger<SetQaTestAccessCommandHandler> _logger;
     private readonly FuelFlowMetrics? _metrics;
 
     public SetQaTestAccessCommandHandler(
         ApplicationDbContext context,
         RuntimeSettingsService settings,
-        ProviderEventService eventService,
+        AuditEventService eventService,
         ILogger<SetQaTestAccessCommandHandler> logger,
         FuelFlowMetrics? metrics = null)
     {

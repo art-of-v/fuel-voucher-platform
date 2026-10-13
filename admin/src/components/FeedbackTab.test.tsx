@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientBrand } from "@tanstack/react-query";
 import FeedbackTab from "@/components/FeedbackTab";
 
 /**
@@ -45,9 +45,9 @@ function renderTab() {
   });
 
   return render(
-    <QueryClientProvider client={client}>
+    <QueryClientBrand client={client}>
       <FeedbackTab />
-    </QueryClientProvider>,
+    </QueryClientBrand>,
   );
 }
 

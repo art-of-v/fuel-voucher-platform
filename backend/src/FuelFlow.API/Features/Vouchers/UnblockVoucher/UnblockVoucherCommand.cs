@@ -1,6 +1,6 @@
 using System.Text.Json;
 using FuelFlow.API.Features.Orders.SharedServices;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -15,11 +15,11 @@ public sealed record UnblockVoucherCommand(
 public sealed class UnblockVoucherCommandHandler
 {
     private readonly ApplicationDbContext _context;
-    private readonly ProviderEventService _eventService;
+    private readonly AuditEventService _eventService;
 
     public UnblockVoucherCommandHandler(
         ApplicationDbContext context,
-        ProviderEventService eventService)
+        AuditEventService eventService)
     {
         _context = context;
         _eventService = eventService;
@@ -76,8 +76,8 @@ public sealed class UnblockVoucherCommandHandler
                 JsonSerializer.Serialize(new { status = voucher.Status.ToString(), workerUserId = voucher.WorkerUserId }),
                 command.ActingAdminUserId.Value,
                 command.ActingAdminName,
-                $"Unblocked voucher {voucher.VoucherNumber} ({voucher.Provider})",
-                voucher.Provider,
+                $"Unblocked voucher {voucher.VoucherNumber} ({voucher.Brand})",
+                voucher.Brand,
                 cancellationToken);
         }
 

@@ -121,7 +121,7 @@ var monobankEnabled = configuration.GetValue<bool?>("Monobank:Enabled") ?? false
         }
 
         // OTP codes must actually reach users' phones. With DevBypass off and no
-        // SMS provider credentials the app silently falls back to FakeSmsService: codes
+        // SMS brand credentials the app silently falls back to FakeSmsService: codes
         // are only written to logs, nobody can log in, and the failure is easy to
         // miss. Refuse to start instead, like the Monobank guard above.
         var hasSmsClub = ServiceSetup.HasSmsClubConfiguration(configuration);

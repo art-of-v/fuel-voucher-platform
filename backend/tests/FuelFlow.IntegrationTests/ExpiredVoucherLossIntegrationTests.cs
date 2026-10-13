@@ -67,9 +67,9 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
 
     /// <summary>
     /// The window itself, proven against a real PostgreSQL <c>date</c> column rather than the
-    /// InMemory provider the unit suite uses. The job must retire only stock older than
+    /// InMemory brand the unit suite uses. The job must retire only stock older than
     /// <c>today - GraceDays</c>; a voucher still inside the window is salvageable, because the operator
-    /// can still swap it with the provider for a surcharge (#104) - and once it is Expired the exchange
+    /// can still swap it with the brand for a surcharge (#104) - and once it is Expired the exchange
     /// may no longer accept it, so an early flip destroys the option itself.
     ///
     /// The setting row is deliberately absent: the unset case must fall back to the default window
@@ -199,7 +199,7 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
             Id = Guid.NewGuid(),
             ImportJobId = ImportId,
             FuelTypeId = "okko-dp",
-            Provider = "OKKO",
+            Brand = "OKKO",
             SupplierId = supplierId,
             CreatedAtUtc = now,
             UpdatedAtUtc = now
@@ -283,10 +283,10 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
         Guid? orderId = null) => new()
     {
         Id = Guid.NewGuid(),
-        Provider = "OKKO",
+        Brand = "OKKO",
         FuelTypeId = "okko-dp",
         Liters = 100m,
-        ProviderExpirationDate = expirationDate,
+        SupplierExpirationDate = expirationDate,
         CustomerExpirationDate = expirationDate,
         VoucherNumber = number,
         QrPayload = Guid.NewGuid().ToString(),

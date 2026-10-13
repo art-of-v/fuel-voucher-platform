@@ -28,8 +28,8 @@ public sealed class GetAdminVouchersQueryHandler
         if (!string.IsNullOrWhiteSpace(query.Status) && Enum.TryParse<VoucherStatus>(query.Status, true, out var parsedStatus))
             q = q.Where(v => v.Status == parsedStatus);
 
-        if (!string.IsNullOrWhiteSpace(query.Provider))
-            q = q.Where(v => v.Provider == query.Provider);
+        if (!string.IsNullOrWhiteSpace(query.Brand))
+            q = q.Where(v => v.Brand == query.Brand);
 
         if (!string.IsNullOrWhiteSpace(query.FuelTypeId))
             q = q.Where(v => v.FuelTypeId == query.FuelTypeId);
@@ -40,7 +40,7 @@ public sealed class GetAdminVouchersQueryHandler
             q = q.Where(v => v.Liters == parsedAmount);
 
         if (!string.IsNullOrWhiteSpace(query.ExpirationDate) && DateOnly.TryParse(query.ExpirationDate, out var parsedDate))
-            q = q.Where(v => v.ProviderExpirationDate == parsedDate);
+            q = q.Where(v => v.SupplierExpirationDate == parsedDate);
 
         if (query.WorkerUserId.HasValue)
             q = q.Where(v => v.WorkerUserId == query.WorkerUserId.Value);
@@ -70,9 +70,9 @@ public sealed class GetAdminVouchersQueryHandler
         var ordered = (query.SortBy, query.SortDirection) switch
         {
             ("createdAt", "asc") => q.OrderBy(v => v.CreatedAtUtc).ThenBy(v => v.Id),
-            ("expirationDate", "asc") => q.OrderBy(v => v.ProviderExpirationDate).ThenBy(v => v.Id),
+            ("expirationDate", "asc") => q.OrderBy(v => v.SupplierExpirationDate).ThenBy(v => v.Id),
             ("amount", "asc") => q.OrderBy(v => v.Liters).ThenBy(v => v.Id),
-            ("provider", "asc") => q.OrderBy(v => v.Provider).ThenBy(v => v.Id),
+            ("brand", "asc") => q.OrderBy(v => v.Brand).ThenBy(v => v.Id),
             ("fuelType", "asc") => q.OrderBy(v => v.FuelType != null ? v.FuelType.Name : "").ThenBy(v => v.Id),
             ("status", "asc") => q.OrderBy(v => v.Status).ThenBy(v => v.Id),
             // The admin labels this column "external ID" but renders it from the voucher number, so
@@ -88,9 +88,9 @@ public sealed class GetAdminVouchersQueryHandler
             ("costPerLiter", _) => q.OrderByDescending(v => v.CostPerLiter != null)
                 .ThenByDescending(v => v.CostPerLiter).ThenBy(v => v.Id),
             ("createdAt", _) => q.OrderByDescending(v => v.CreatedAtUtc).ThenBy(v => v.Id),
-            ("expirationDate", _) => q.OrderByDescending(v => v.ProviderExpirationDate).ThenBy(v => v.Id),
+            ("expirationDate", _) => q.OrderByDescending(v => v.SupplierExpirationDate).ThenBy(v => v.Id),
             ("amount", _) => q.OrderByDescending(v => v.Liters).ThenBy(v => v.Id),
-            ("provider", _) => q.OrderByDescending(v => v.Provider).ThenBy(v => v.Id),
+            ("brand", _) => q.OrderByDescending(v => v.Brand).ThenBy(v => v.Id),
             ("fuelType", _) => q.OrderByDescending(v => v.FuelType != null ? v.FuelType.Name : "").ThenBy(v => v.Id),
             ("status", _) => q.OrderByDescending(v => v.Status).ThenBy(v => v.Id),
             ("externalId", _) => q.OrderByDescending(v => v.VoucherNumber).ThenBy(v => v.Id),
@@ -114,11 +114,11 @@ public sealed class GetAdminVouchersQueryHandler
             Liters = v.Liters,
             FuelTypeId = v.FuelTypeId,
             FuelType = v.FuelType == null ? null : new FuelTypeRefDto { Id = v.FuelType.Id, Name = v.FuelType.Name },
-            Provider = v.Provider,
+            Brand = v.Brand,
             SupplierId = v.SupplierId,
             SupplierName = v.Supplier?.Name,
             CostPerLiter = v.CostPerLiter,
-            ProviderExpirationDate = v.ProviderExpirationDate,
+            SupplierExpirationDate = v.SupplierExpirationDate,
             CustomerExpirationDate = v.CustomerExpirationDate,
             VoucherNumber = v.VoucherNumber,
             Status = v.Status.ToString(),
@@ -137,13 +137,13 @@ public sealed class GetAdminVouchersQueryHandler
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(v => v.FuelType != null)
-            .Select(v => new { v.Provider, Id = v.FuelType!.Id, Name = v.FuelType!.Name })
+            .Select(v => new { v.Brand, Id = v.FuelType!.Id, Name = v.FuelType!.Name })
             .Distinct()
             .ToListAsync(cancellationToken);
         var providers = await _context.FuelVouchers
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .Select(v => v.Provider)
+            .Select(v => v.Brand)
             .Distinct()
             .ToListAsync(cancellationToken);
         var amounts = await _context.FuelVouchers
@@ -166,7 +166,7 @@ public sealed class GetAdminVouchersQueryHandler
                 .OrderBy(n => n, StringComparer.CurrentCulture)
                 .ToList(),
             FuelTypesByProvider = fuelTypeOptions
-                .GroupBy(o => o.Provider, StringComparer.Ordinal)
+                .GroupBy(o => o.Brand, StringComparer.Ordinal)
                 .ToDictionary(
                     g => g.Key,
                     g => g

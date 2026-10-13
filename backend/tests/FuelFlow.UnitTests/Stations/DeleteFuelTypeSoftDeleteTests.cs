@@ -48,13 +48,13 @@ public sealed class DeleteFuelTypeSoftDeleteTests : IDisposable
             var voucher = new FuelVoucher
             {
                 Id = Guid.NewGuid(),
-                Provider = "OKKO",
+                Brand = "OKKO",
                 FuelTypeId = fuel.Id,
                 Liters = 10m,
                 VoucherNumber = $"V-PAID-{i}",
                 QrPayload = Guid.NewGuid().ToString(),
                 Status = VoucherStatus.Assigned,
-                ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
+                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
                 CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow,

@@ -84,8 +84,8 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
         // hands out vouchers for the positive lines, so this is a money-integrity check.
         foreach (var item in command.Items)
         {
-            if (string.IsNullOrWhiteSpace(item.Provider))
-                return BadRequest("Provider is required for every item");
+            if (string.IsNullOrWhiteSpace(item.Brand))
+                return BadRequest("Brand is required for every item");
 
             if (string.IsNullOrWhiteSpace(item.FuelTypeId))
                 return BadRequest("FuelTypeId is required for every item");
@@ -291,8 +291,8 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CreatePurchase([FromBody] CreateCheckoutCommand command, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(command.Provider))
-            return BadRequest("Provider is required");
+        if (string.IsNullOrWhiteSpace(command.Brand))
+            return BadRequest("Brand is required");
 
         if (string.IsNullOrWhiteSpace(command.FuelTypeId))
             return BadRequest("FuelTypeId is required");

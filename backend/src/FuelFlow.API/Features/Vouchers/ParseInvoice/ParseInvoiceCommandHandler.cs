@@ -33,8 +33,8 @@ public sealed class ParseInvoiceCommandHandler
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(v => v.ImportJobId == command.ImportId)
-            .GroupBy(v => new { v.FuelTypeId, v.Provider })
-            .Select(g => new { g.Key.FuelTypeId, g.Key.Provider, TotalLiters = g.Sum(v => v.Liters) })
+            .GroupBy(v => new { v.FuelTypeId, v.Brand })
+            .Select(g => new { g.Key.FuelTypeId, g.Key.Brand, TotalLiters = g.Sum(v => v.Liters) })
             .ToListAsync(cancellationToken);
 
         var fuelIds = groups.Select(g => g.FuelTypeId).Distinct().ToList();
@@ -47,7 +47,7 @@ public sealed class ParseInvoiceCommandHandler
             .Select(g => new ImportFuel(
                 g.FuelTypeId,
                 names.TryGetValue(g.FuelTypeId, out var n) ? n : null,
-                g.Provider,
+                g.Brand,
                 g.TotalLiters))
             .ToList();
 
@@ -80,7 +80,7 @@ public sealed class ParseInvoiceCommandHandler
                 lineDto.Matched = true;
                 lineDto.FuelTypeId = fuel.FuelTypeId;
                 lineDto.FuelTypeName = fuel.FuelTypeName;
-                lineDto.Provider = fuel.Provider;
+                lineDto.Brand = fuel.Brand;
                 lineDto.ImportLiters = fuel.TotalLiters;
                 matched.Add(fuel.FuelTypeId);
 
@@ -147,5 +147,5 @@ public sealed class ParseInvoiceCommandHandler
     private static string Append(string? existing, string add) =>
         string.IsNullOrEmpty(existing) ? add : $"{existing}; {add}";
 
-    private sealed record ImportFuel(string FuelTypeId, string? FuelTypeName, string Provider, decimal TotalLiters);
+    private sealed record ImportFuel(string FuelTypeId, string? FuelTypeName, string Brand, decimal TotalLiters);
 }

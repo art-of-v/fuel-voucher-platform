@@ -17,7 +17,7 @@ export interface BatchCostTimelineEntry {
   exchangeBatchId: string;
   atUtc: string;
   fuelTypeId: string;
-  provider: string;
+  brand: string;
   vouchersExchangedOut: number;
   litersExchangedOut: number;
   surchargeUah: number;
@@ -31,7 +31,7 @@ export interface BatchCostTimelineResponse {
   currentCosts: {
     fuelTypeId: string;
     fuelTypeName: string | null;
-    provider: string;
+    brand: string;
     voucherCount: number;
     totalLiters: number;
     costPerLiter: number | null;
@@ -117,7 +117,7 @@ export function BatchCostTimeline({
                     <td className="p-2 font-mono">{date(entry.atUtc)}</td>
                     <td className="p-2">
                       <div>{entry.fuelTypeId}</div>
-                      <div className="text-muted-foreground uppercase text-[10px]">{entry.provider}</div>
+                      <div className="text-muted-foreground uppercase text-[10px]">{entry.brand}</div>
                     </td>
                     <td className="p-2 text-right font-mono">
                       {entry.vouchersExchangedOut} · {entry.litersExchangedOut} L
@@ -140,7 +140,7 @@ export function BatchCostTimeline({
           {data && data.currentCosts.length > 0 && (
             <div className="border-t border-border/50 p-2 text-xs text-muted-foreground">
               {data.currentCosts.map((cost) => (
-                <div key={`${cost.fuelTypeId}-${cost.provider}`} className="font-mono">
+                <div key={`${cost.fuelTypeId}-${cost.brand}`} className="font-mono">
                   {cost.fuelTypeName || cost.fuelTypeId} · {perL(cost.costPerLiter)}
                 </div>
               ))}

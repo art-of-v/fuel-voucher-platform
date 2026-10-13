@@ -98,7 +98,7 @@ public sealed class KloVoucherParser : IVoucherProviderParser
 
             parsedVouchers.Add(new ParsedVoucher
             {
-                Provider = "KLO",
+                Brand = "KLO",
                 FuelTypeId = fuelTypeId,
                 Liters = liters,
                 ExpirationDate = expirationDate,

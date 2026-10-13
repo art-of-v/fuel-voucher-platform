@@ -33,7 +33,7 @@ public static class VoucherCosting
     /// </summary>
     /// <remarks>
     /// An exchange moves paper, it does not create value: the new voucher is the old one plus the доплата we
-    /// paid the provider. Spreading the lump sum evenly over the new liters matches what was actually paid and
+    /// paid the brand. Spreading the lump sum evenly over the new liters matches what was actually paid and
     /// keeps the pool conserved — <c>Σ old + surcharge = Σ new</c> — so a reprice after an exchange moves the
     /// blended price by exactly the surcharge and nothing else.
     /// <para>

@@ -13,7 +13,7 @@ namespace FuelFlow.IntegrationTests;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Only the constraints matter here, and only PostgreSQL can prove them - an in-memory provider
+/// Only the constraints matter here, and only PostgreSQL can prove them - an in-memory brand
 /// enforces neither the unique index nor the column mapping, so a test written against it would
 /// pass on a schema that cannot actually store these rows.
 /// </para>

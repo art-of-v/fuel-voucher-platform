@@ -1004,6 +1004,12 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("Brand")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("brand");
+
                     b.Property<string>("FuelTypeId")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -1026,12 +1032,6 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("numeric(12,2)")
                         .HasColumnName("original_line_total");
 
-                    b.Property<string>("Provider")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("provider");
-
                     b.Property<int>("Quantity")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
@@ -1049,11 +1049,11 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Brand");
+
                     b.HasIndex("FuelTypeId");
 
                     b.HasIndex("OrderId");
-
-                    b.HasIndex("Provider");
 
                     b.ToTable("order_line_items", null, t =>
                         {
@@ -1302,6 +1302,12 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("acting_user_name");
 
+                    b.Property<string>("Brand")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("brand");
+
                     b.Property<decimal?>("CostPerLiterApplied")
                         .HasColumnType("numeric(10,4)")
                         .HasColumnName("cost_per_liter_applied");
@@ -1326,12 +1332,6 @@ namespace FuelFlow.API.Migrations
                     b.Property<Guid>("OldVoucherId")
                         .HasColumnType("uuid")
                         .HasColumnName("old_voucher_id");
-
-                    b.Property<string>("Provider")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("provider");
 
                     b.Property<Guid>("SupplierId")
                         .HasColumnType("uuid")
@@ -1380,6 +1380,12 @@ namespace FuelFlow.API.Migrations
                     b.Property<Guid?>("AssignedToUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("assigned_to_user_id");
+
+                    b.Property<string>("Brand")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("brand");
 
                     b.Property<decimal?>("CostPerLiter")
                         .HasColumnType("numeric(10,4)")
@@ -1441,16 +1447,6 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("order_id");
 
-                    b.Property<string>("Provider")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("provider");
-
-                    b.Property<DateOnly>("ProviderExpirationDate")
-                        .HasColumnType("date")
-                        .HasColumnName("provider_expiration_date");
-
                     b.Property<Guid?>("QrParametersId")
                         .HasColumnType("uuid")
                         .HasColumnName("qr_parameters_id");
@@ -1470,6 +1466,10 @@ namespace FuelFlow.API.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)")
                         .HasColumnName("status");
+
+                    b.Property<DateOnly>("SupplierExpirationDate")
+                        .HasColumnType("date")
+                        .HasColumnName("supplier_expiration_date");
 
                     b.Property<Guid?>("SupplierId")
                         .HasColumnType("uuid")
@@ -1519,13 +1519,13 @@ namespace FuelFlow.API.Migrations
 
                     b.HasIndex("OrderId");
 
-                    b.HasIndex("ProviderExpirationDate");
-
                     b.HasIndex("QrParametersId");
 
                     b.HasIndex("QrPayload")
                         .IsUnique()
                         .HasFilter("is_deleted = false");
+
+                    b.HasIndex("SupplierExpirationDate");
 
                     b.HasIndex("SupplierId");
 
@@ -1541,9 +1541,9 @@ namespace FuelFlow.API.Migrations
 
                     b.HasIndex("Status", "IsTestData", "IsDeleted");
 
-                    b.HasIndex("LegalEntityId", "WorkerUserId", "Status", "IsDeleted");
+                    b.HasIndex("Brand", "FuelTypeId", "Liters", "Status");
 
-                    b.HasIndex("Provider", "FuelTypeId", "Liters", "Status");
+                    b.HasIndex("LegalEntityId", "WorkerUserId", "Status", "IsDeleted");
 
                     b.ToTable("fuel_vouchers", null, t =>
                         {
@@ -1854,6 +1854,77 @@ namespace FuelFlow.API.Migrations
                     b.HasIndex("ImportId");
 
                     b.ToTable("voucher_import_errors", (string)null);
+                });
+
+            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.AuditEventOutbox", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AggregateId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("aggregate_id");
+
+                    b.Property<string>("AggregateType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("aggregate_type");
+
+                    b.Property<DateTime>("ChangedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("changed_at_utc");
+
+                    b.Property<Guid>("ChangedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("changed_by_user_id");
+
+                    b.Property<string>("ChangedByUserName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("changed_by_user_name");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("event_type");
+
+                    b.Property<string>("NewValue")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("new_value");
+
+                    b.Property<string>("OldValue")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("old_value");
+
+                    b.Property<string>("ScopeId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("scope_id");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("summary");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AggregateId");
+
+                    b.HasIndex("ChangedAtUtc");
+
+                    b.HasIndex("EventType", "ChangedAtUtc")
+                        .IsDescending(false, true);
+
+                    b.ToTable("provider_event_outbox", (string)null);
                 });
 
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.ErrorLog", b =>
@@ -2784,83 +2855,18 @@ namespace FuelFlow.API.Migrations
                         });
                 });
 
-            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.ProviderEventOutbox", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("AggregateId")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("aggregate_id");
-
-                    b.Property<string>("AggregateType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("aggregate_type");
-
-                    b.Property<DateTime>("ChangedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("changed_at_utc");
-
-                    b.Property<Guid>("ChangedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("changed_by_user_id");
-
-                    b.Property<string>("ChangedByUserName")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("changed_by_user_name");
-
-                    b.Property<string>("EventType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("event_type");
-
-                    b.Property<string>("NewValue")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("new_value");
-
-                    b.Property<string>("OldValue")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("old_value");
-
-                    b.Property<string>("ProviderId")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("provider_id");
-
-                    b.Property<string>("Summary")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("summary");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AggregateId");
-
-                    b.HasIndex("ChangedAtUtc");
-
-                    b.HasIndex("EventType", "ChangedAtUtc")
-                        .IsDescending(false, true);
-
-                    b.ToTable("provider_event_outbox", (string)null);
-                });
-
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.PurchaseBatch", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<string>("Brand")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("brand");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
@@ -2878,12 +2884,6 @@ namespace FuelFlow.API.Migrations
                     b.Property<Guid>("ImportJobId")
                         .HasColumnType("uuid")
                         .HasColumnName("import_job_id");
-
-                    b.Property<string>("Provider")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("provider");
 
                     b.Property<Guid>("SupplierId")
                         .HasColumnType("uuid")

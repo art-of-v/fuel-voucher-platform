@@ -321,7 +321,7 @@ public class KloVoucherParserTests : IDisposable
 
         result.Should().HaveCount(1);
         var parsed = result.First();
-        parsed.Provider.Should().Be("KLO");
+        parsed.Brand.Should().Be("KLO");
         parsed.Liters.Should().Be(20m);
         parsed.ExpirationDate.Should().Be(new DateOnly(2026, 6, 17));
         parsed.VoucherNumber.Should().Be("99999600000020368126");

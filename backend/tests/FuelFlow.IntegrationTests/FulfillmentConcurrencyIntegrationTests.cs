@@ -4,7 +4,7 @@ using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.Features.Orders.SharedModels;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Vouchers;
@@ -34,7 +34,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
     {
         var userId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
-        const string provider = "OKKO";
+        const string brand = "OKKO";
         const string fuelTypeId = "okko-95";
         const decimal liters = 50m;
         const int quantity = 3;
@@ -72,7 +72,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                     {
                         Id = Guid.NewGuid(),
                         OrderId = orderId,
-                        Provider = provider,
+                        Brand = brand,
                         FuelTypeId = fuelTypeId,
                         Liters = liters,
                         Quantity = quantity,
@@ -87,10 +87,10 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 seed.FuelVouchers.Add(new FuelVoucher
                 {
                     Id = Guid.NewGuid(),
-                    Provider = provider,
+                    Brand = brand,
                     FuelTypeId = fuelTypeId,
                     Liters = liters,
-                    ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                    SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
                     CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
                     VoucherNumber = $"OKKO-{orderId:N}-{i:D3}",
                     QrPayload = $"payload-{orderId:N}-{i:D3}",
@@ -142,7 +142,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
     {
         var userId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
-        const string provider = "okko";
+        const string brand = "okko";
         const string fuelTypeId = "okko-dp";
         const decimal liters = 10m;
         const int quantity = 3;
@@ -179,7 +179,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                     {
                         Id = Guid.NewGuid(),
                         OrderId = orderId,
-                        Provider = provider,
+                        Brand = brand,
                         FuelTypeId = fuelTypeId,
                         Liters = liters,
                         Quantity = quantity,
@@ -194,10 +194,10 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 seed.FuelVouchers.Add(new FuelVoucher
                 {
                     Id = Guid.NewGuid(),
-                    Provider = "OKKO",
+                    Brand = "OKKO",
                     FuelTypeId = fuelTypeId,
                     Liters = liters,
-                    ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                    SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
                     CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
                     VoucherNumber = $"PF-{orderId:N}-{i:D3}",
                     QrPayload = $"payload-{orderId:N}-{i:D3}",
@@ -297,7 +297,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 {
                     Id = Guid.NewGuid(),
                     OrderId = orderId,
-                    Provider = "OKKO",
+                    Brand = "OKKO",
                     FuelTypeId = fuelTypeId,
                     Liters = liters,
                     Quantity = quantity,
@@ -312,10 +312,10 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
             seed.FuelVouchers.Add(new FuelVoucher
             {
                 Id = Guid.NewGuid(),
-                Provider = "OKKO",
+                Brand = "OKKO",
                 FuelTypeId = fuelTypeId,
                 Liters = liters,
-                ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
                 CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
                 VoucherNumber = $"{prefix}-{orderId:N}-{i:D3}",
                 QrPayload = $"payload-{orderId:N}-{i:D3}",
@@ -364,7 +364,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                     {
                         Id = Guid.NewGuid(),
                         OrderId = orderId,
-                        Provider = "OKKO",
+                        Brand = "OKKO",
                         FuelTypeId = "okko-dp",
                         Liters = 10m,
                         Quantity = 3,
@@ -378,10 +378,10 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
             seed.FuelVouchers.Add(new FuelVoucher
             {
                 Id = usedVoucherId,
-                Provider = "OKKO",
+                Brand = "OKKO",
                 FuelTypeId = "okko-dp",
                 Liters = 10m,
-                ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
                 CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
                 VoucherNumber = $"EX-{orderId:N}-used",
                 QrPayload = $"payload-{orderId:N}-used",
@@ -404,10 +404,10 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 seed.FuelVouchers.Add(new FuelVoucher
                 {
                     Id = Guid.NewGuid(),
-                    Provider = "OKKO",
+                    Brand = "OKKO",
                     FuelTypeId = "okko-dp",
                     Liters = 10m,
-                    ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                    SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
                     CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
                     VoucherNumber = $"EX-{orderId:N}-avail-{i}",
                     QrPayload = $"payload-{orderId:N}-avail-{i}",
@@ -483,7 +483,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 // Paid. Reaching PendingFulfillment means a `success` webhook applied the
                 // transition and that handler records MonobankStatus=Success, so an order this
                 // service is asked to auto-refund is one money was collected for. Stated
-                // explicitly because refundable value is now gated on the provider's word.
+                // explicitly because refundable value is now gated on the brand's word.
                 MonobankStatus = MonobankStatus.Success,
                 CreatedAtUtc = DateTime.UtcNow.AddDays(-2),
                 UpdatedAtUtc = DateTime.UtcNow.AddDays(-2),
@@ -493,7 +493,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                     {
                         Id = Guid.NewGuid(),
                         OrderId = partialOrderId,
-                        Provider = "OKKO",
+                        Brand = "OKKO",
                         FuelTypeId = "okko-dp",
                         Liters = 10m,
                         Quantity = 3,
@@ -508,10 +508,10 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 seed.FuelVouchers.Add(new FuelVoucher
                 {
                     Id = Guid.NewGuid(),
-                    Provider = "OKKO",
+                    Brand = "OKKO",
                     FuelTypeId = "okko-dp",
                     Liters = 10m,
-                    ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                    SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
                     CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
                     VoucherNumber = $"AR-{partialOrderId:N}-{i:D3}",
                     QrPayload = $"payload-{partialOrderId:N}-{i:D3}",
@@ -537,7 +537,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                     {
                         Id = Guid.NewGuid(),
                         OrderId = fullOrderId,
-                        Provider = "OKKO",
+                        Brand = "OKKO",
                         FuelTypeId = "okko-95",
                         Liters = 50m,
                         Quantity = 2,
@@ -552,10 +552,10 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 seed.FuelVouchers.Add(new FuelVoucher
                 {
                     Id = Guid.NewGuid(),
-                    Provider = "OKKO",
+                    Brand = "OKKO",
                     FuelTypeId = "okko-95",
                     Liters = 50m,
-                    ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                    SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
                     CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
                     VoucherNumber = $"AR-{fullOrderId:N}-{i:D3}",
                     QrPayload = $"payload-{fullOrderId:N}-{i:D3}",
@@ -617,7 +617,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
         var refundHandler = new RefundOrderCommandHandler(
             context,
             new StubMonobankClientFactory(monobankClient),
-            new ProviderEventService(context));
+            new AuditEventService(context));
         return new ConcurrentFulfillmentService(
             context,
             barrier,

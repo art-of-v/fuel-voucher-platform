@@ -33,10 +33,10 @@ public sealed class ValidationFilterTests
     {
         var services = new ServiceCollection();
         services.AddScoped<IValidator<CreateOrderCommand>, CreateOrderCommandValidator>();
-        using var provider = services.BuildServiceProvider();
+        using var brand = services.BuildServiceProvider();
 
         var context = CreateActionExecutingContext(
-            provider,
+            brand,
             new Dictionary<string, object?> { ["command"] = new CreateOrderCommand("Fuel", 3) });
 
         await InvokeAndCaptureResultAsync(_attribute, context, markNextCalled: true);
@@ -50,10 +50,10 @@ public sealed class ValidationFilterTests
     {
         var services = new ServiceCollection();
         services.AddScoped<IValidator<CreateOrderCommand>, CreateOrderCommandValidator>();
-        using var provider = services.BuildServiceProvider();
+        using var brand = services.BuildServiceProvider();
 
         var context = CreateActionExecutingContext(
-            provider,
+            brand,
             new Dictionary<string, object?> { ["command"] = new CreateOrderCommand("", 0) });
 
         await InvokeAndCaptureResultAsync(_attribute, context, markNextCalled: true);

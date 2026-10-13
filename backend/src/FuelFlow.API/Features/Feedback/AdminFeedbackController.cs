@@ -3,7 +3,7 @@ using System.Text.Json;
 using FuelFlow.SharedKernel;
 using FuelFlow.Persistence;
 using FuelFlow.Features.Feedback.SharedModels;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -25,9 +25,9 @@ public sealed class AdminFeedbackController : ControllerBase
     private const int MaxIdsPerStatusCall = 200;
 
     private readonly ApplicationDbContext _context;
-    private readonly ProviderEventService _eventService;
+    private readonly AuditEventService _eventService;
 
-    public AdminFeedbackController(ApplicationDbContext context, ProviderEventService eventService)
+    public AdminFeedbackController(ApplicationDbContext context, AuditEventService eventService)
     {
         _context = context;
         _eventService = eventService;

@@ -1,7 +1,7 @@
 using FluentAssertions;
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Auth.Verify;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Users.ChangeEmail;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
@@ -87,7 +87,7 @@ public sealed class RequestEmailChangeCommandHandlerTests : IDisposable
             _context,
             new OtpVerificationService(_context),
             email.Object,
-            new ProviderEventService(_context),
+            new AuditEventService(_context),
             NullLogger<RequestEmailChangeCommandHandler>.Instance);
     }
 

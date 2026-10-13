@@ -7,10 +7,10 @@ public sealed class AdminVoucherListItemDto
     public decimal Liters { get; set; }
     public string FuelTypeId { get; set; } = null!;
     public FuelTypeRefDto? FuelType { get; set; }
-    public string Provider { get; set; } = null!;
+    public string Brand { get; set; } = null!;
 
     /// <summary>
-    /// The company this voucher was bought from. Distinct from <see cref="Provider"/>, which is the
+    /// The company this voucher was bought from. Distinct from <see cref="Brand"/>, which is the
     /// brand printed on it (OKKO, Shell) - a brand says what the fuel is, a supplier says who we owe.
     /// Null until a voucher is imported against a supplier.
     /// </summary>
@@ -25,9 +25,9 @@ public sealed class AdminVoucherListItemDto
     public decimal? CostPerLiter { get; set; }
 
     /// <summary>Real supplier term, from the printed document. Never moves after import.</summary>
-    public DateOnly ProviderExpirationDate { get; set; }
+    public DateOnly SupplierExpirationDate { get; set; }
 
-    /// <summary>What the customer was sold; differs from the provider term only once we sell short terms.</summary>
+    /// <summary>What the customer was sold; differs from the brand term only once we sell short terms.</summary>
     public DateOnly CustomerExpirationDate { get; set; }
 
     public string VoucherNumber { get; set; } = null!;
@@ -69,7 +69,7 @@ public sealed class AdminVoucherListResponse
     public int TestDataTotal { get; set; }
     public List<string> FuelTypes { get; set; } = [];
     /// <summary>
-    /// Which fuels each brand actually has vouchers for, keyed by <c>fuel_vouchers.provider</c>.
+    /// Which fuels each brand actually has vouchers for, keyed by <c>fuel_vouchers.brand</c>.
     /// Without this the fuel-type dropdown offered every fuel in the catalog no matter which brand
     /// was selected, so the operator could pick a pairing that can never match a row and be shown an
     /// empty list. Built from the vouchers themselves rather than the catalog, so an option is only

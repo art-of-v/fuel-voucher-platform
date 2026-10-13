@@ -56,16 +56,16 @@ public sealed class PurchaseBatchPnlHandlerTests : IDisposable
         return id;
     }
 
-    private Guid SeedVoucher(Guid importId, decimal liters, VoucherStatus status, string fuelTypeId = "okko-dp", string provider = "OKKO")
+    private Guid SeedVoucher(Guid importId, decimal liters, VoucherStatus status, string fuelTypeId = "okko-dp", string brand = "OKKO")
     {
         var id = Guid.NewGuid();
         _context.FuelVouchers.Add(new FuelVoucher
         {
             Id = id,
-            Provider = provider,
+            Brand = brand,
             FuelTypeId = fuelTypeId,
             Liters = liters,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             VoucherNumber = $"V-{Guid.NewGuid().ToString()[..8]}",
             QrPayload = Guid.NewGuid().ToString(),
@@ -99,7 +99,7 @@ public sealed class PurchaseBatchPnlHandlerTests : IDisposable
             Id = Guid.NewGuid(),
             ImportJobId = importId,
             FuelTypeId = fuelTypeId,
-            Provider = "OKKO",
+            Brand = "OKKO",
             SupplierId = supplierId,
             CreatedAtUtc = now,
             UpdatedAtUtc = now
@@ -128,7 +128,7 @@ public sealed class PurchaseBatchPnlHandlerTests : IDisposable
     {
         var orderId = Guid.NewGuid();
         _context.Orders.Add(new Order { Id = orderId, UserId = Guid.NewGuid(), Price = unitPrice, Status = status, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
-        _context.OrderLineItems.Add(new OrderLineItem { Id = Guid.NewGuid(), OrderId = orderId, Provider = "okko", FuelTypeId = fuelTypeId, Liters = liters, Quantity = 1, UnitPrice = unitPrice, LineTotal = unitPrice });
+        _context.OrderLineItems.Add(new OrderLineItem { Id = Guid.NewGuid(), OrderId = orderId, Brand = "okko", FuelTypeId = fuelTypeId, Liters = liters, Quantity = 1, UnitPrice = unitPrice, LineTotal = unitPrice });
         _context.Fulfillments.Add(new Fulfillment { OrderId = orderId, VoucherId = voucherId, FulfilledAtUtc = DateTime.UtcNow });
     }
 

@@ -11,13 +11,13 @@ namespace FuelFlow.Features.Vouchers.Renewal.Operator;
 /// flow there is no trigger-window gate: an operator acts deliberately and may renew any renewable
 /// customer voucher. Read-only.
 /// </summary>
-public sealed record GetRenewableCustomerVouchersQuery(string? Query, string? Provider, string? Status);
+public sealed record GetRenewableCustomerVouchersQuery(string? Query, string? Brand, string? Status);
 
 public sealed class RenewableCustomerVoucherDto
 {
     public Guid Id { get; set; }
     public string VoucherNumber { get; set; } = string.Empty;
-    public string Provider { get; set; } = string.Empty;
+    public string Brand { get; set; } = string.Empty;
     public string FuelTypeId { get; set; } = string.Empty;
     public string? FuelName { get; set; }
     public decimal Liters { get; set; }
@@ -52,8 +52,8 @@ public sealed class GetRenewableCustomerVouchersQueryHandler
                      && v.AssignedToUserId != null
                      && (v.Status == VoucherStatus.Assigned || v.Status == VoucherStatus.Expired));
 
-        if (!string.IsNullOrWhiteSpace(query.Provider))
-            q = q.Where(v => v.Provider == query.Provider);
+        if (!string.IsNullOrWhiteSpace(query.Brand))
+            q = q.Where(v => v.Brand == query.Brand);
 
         if (!string.IsNullOrWhiteSpace(query.Status)
             && Enum.TryParse<VoucherStatus>(query.Status, true, out var parsedStatus))
@@ -81,7 +81,7 @@ public sealed class GetRenewableCustomerVouchersQueryHandler
         {
             Id = v.Id,
             VoucherNumber = v.VoucherNumber,
-            Provider = v.Provider,
+            Brand = v.Brand,
             FuelTypeId = v.FuelTypeId,
             FuelName = v.FuelType?.Name,
             Liters = v.Liters,

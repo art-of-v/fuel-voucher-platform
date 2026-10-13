@@ -4,7 +4,7 @@ namespace FuelFlow.Features.Vouchers.GetUserVouchers;
 
 public sealed record VoucherDto(
     Guid Id,
-    string Provider,
+    string Brand,
     string FuelType,
     decimal Liters,
     decimal Amount,

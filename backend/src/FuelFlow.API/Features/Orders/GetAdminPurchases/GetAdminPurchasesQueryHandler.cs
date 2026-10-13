@@ -10,7 +10,7 @@ public sealed class AdminPurchaseDto
 {
     public Guid Id { get; set; }
     public Guid UserId { get; set; }
-    public string Provider { get; set; } = null!;
+    public string Brand { get; set; } = null!;
     public string FuelTypeId { get; set; } = null!;
     public decimal Liters { get; set; }
     public int Quantity { get; set; }
@@ -68,7 +68,7 @@ public sealed class GetAdminPurchasesQueryHandler
             {
                 Id = o.Id,
                 UserId = o.UserId,
-                Provider = firstLi?.Provider ?? "",
+                Brand = firstLi?.Brand ?? "",
                 FuelTypeId = firstLi?.FuelTypeId ?? "",
                 Liters = totalLiters,
                 Quantity = totalQuantity,
@@ -85,7 +85,7 @@ public sealed class GetAdminPurchasesQueryHandler
                 LineItems = lineItemsList.Select(li => new OrderLineItemDto
                 {
                     Id = li.Id,
-                    Provider = li.Provider,
+                    Brand = li.Brand,
                     FuelTypeId = li.FuelTypeId,
                     Liters = li.Liters,
                     Quantity = li.Quantity,

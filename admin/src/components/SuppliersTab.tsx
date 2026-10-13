@@ -44,7 +44,7 @@ const SUPPLIER_ERROR_KEYS: Record<string, string> = {
 };
 
 /**
- * Suppliers — the external parties we buy vouchers from. A separate screen from "Providers", which is
+ * Suppliers — the external parties we buy vouchers from. A separate screen from "Brands", which is
  * the fuel brand, and separate from our own legal entities: a supplier is someone we settle with, and
  * the requisites differ by legal form (an ФОП has an ІПН, an LLC has an ЄДРОПУ), so nothing but the name
  * is required.

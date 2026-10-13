@@ -1,8 +1,8 @@
 using FluentAssertions;
-using FuelFlow.Features.Providers;
-using FuelFlow.Features.Providers.GetProviders;
-using FuelFlow.Features.Providers.GetProviderById;
-using FuelFlow.Features.Providers.GetProviderHistory;
+using FuelFlow.Features.Brands;
+using FuelFlow.Features.Brands.GetProviders;
+using FuelFlow.Features.Brands.GetProviderById;
+using FuelFlow.Features.Brands.GetProviderHistory;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
@@ -32,13 +32,13 @@ public sealed class UpdateNominalsReuseTests : IDisposable
 
     public void Dispose() => _context.Dispose();
 
-    private ProvidersController CreateController()
+    private BrandsController CreateController()
     {
-        var controller = new ProvidersController(
-            new GetProvidersQueryHandler(_context),
-            new GetProviderByIdQueryHandler(_context),
-            new GetProviderHistoryQueryHandler(_context),
-            new ProviderEventService(_context),
+        var controller = new BrandsController(
+            new GetBrandsQueryHandler(_context),
+            new GetBrandByIdQueryHandler(_context),
+            new GetBrandHistoryQueryHandler(_context),
+            new AuditEventService(_context),
             _context,
             NotificationDispatcher.Disabled);
 

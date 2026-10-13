@@ -1,6 +1,6 @@
 using FluentAssertions;
 using FuelFlow.Features.Orders.SharedModels;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.BulkActionVouchers;
 using FuelFlow.Features.Vouchers.DeleteVoucher;
@@ -36,7 +36,7 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
     private readonly ApplicationDbContext _context;
     private readonly Mock<IQrGenerator> _qrGeneratorMock;
     private readonly Mock<IBackgroundJobClient> _backgroundJobClientMock;
-    private readonly ProviderEventService _eventService;
+    private readonly AuditEventService _eventService;
 
     public VoucherAdminCommandHandlersTests()
     {
@@ -55,7 +55,7 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         _backgroundJobClientMock = new Mock<IBackgroundJobClient>();
         _backgroundJobClientMock.Setup(c => c.Create(It.IsAny<Job>(), It.IsAny<IState>())).Returns("job-id");
 
-        _eventService = new ProviderEventService(_context);
+        _eventService = new AuditEventService(_context);
     }
 
     private void SeedFuelTypes()
@@ -89,7 +89,7 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
     };
 
     private FuelVoucher CreateVoucher(
-        string provider = "OKKO",
+        string brand = "OKKO",
         string fuelTypeId = "okko-95",
         VoucherStatus status = VoucherStatus.Available,
         DateTime? createdAtUtc = null,
@@ -99,12 +99,12 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         return new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Provider = provider,
+            Brand = brand,
             FuelTypeId = fuelTypeId,
             Liters = 50,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
-            VoucherNumber = voucherNumber ?? $"{provider}-{Guid.NewGuid().ToString()[..8]}",
+            VoucherNumber = voucherNumber ?? $"{brand}-{Guid.NewGuid().ToString()[..8]}",
             QrPayload = Guid.NewGuid().ToString(),
             Status = status,
             AssignedToUserId = status == VoucherStatus.Assigned || status == VoucherStatus.Used ? UserId : null,
@@ -210,7 +210,7 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         result.Should().NotBeNull();
         result!.Success.Should().BeTrue();
 
-        var evt = _context.ProviderEventOutbox.Single(e => e.EventType == "VoucherUpdated");
+        var evt = _context.AuditEventOutbox.Single(e => e.EventType == "VoucherUpdated");
         evt.AggregateType.Should().Be("Voucher");
         evt.AggregateId.Should().Be(voucher.Id.ToString());
         evt.ChangedByUserId.Should().Be(UserId);
@@ -285,10 +285,10 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         result.Should().NotBeNull();
         result!.Success.Should().BeTrue();
 
-        var evt = _context.ProviderEventOutbox.Single(e => e.EventType == "VoucherDeleted");
+        var evt = _context.AuditEventOutbox.Single(e => e.EventType == "VoucherDeleted");
         evt.AggregateId.Should().Be(voucher.Id.ToString());
         evt.OldValue.Should().Contain("OKKO-AUDIT-1");
-        evt.ProviderId.Should().Be("OKKO");
+        evt.ScopeId.Should().Be("OKKO");
     }
 
     [Fact]
@@ -309,7 +309,7 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         updated.Status.Should().Be(VoucherStatus.Available);
         updated.AssignedToUserId.Should().BeNull();
 
-        _context.ProviderEventOutbox.Should().NotContain(e => e.EventType == "VoucherBulkAction");
+        _context.AuditEventOutbox.Should().NotContain(e => e.EventType == "VoucherBulkAction");
     }
 
     // ── 3. BulkActionVouchersCommandHandler ──────────────────────────────────
@@ -556,7 +556,7 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
         updated.AssignedToUserId.Should().Be(UserId);
         updated.WorkerUserId.Should().BeNull();
 
-        var evt = _context.ProviderEventOutbox.Single(e => e.EventType == "VoucherUnblocked");
+        var evt = _context.AuditEventOutbox.Single(e => e.EventType == "VoucherUnblocked");
         evt.AggregateId.Should().Be(voucher.Id.ToString());
         evt.ChangedByUserId.Should().Be(UserId);
         evt.ChangedByUserName.Should().Be("Admin User");
@@ -780,7 +780,7 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
     {
         return new ParsedVoucher
         {
-            Provider = "OKKO",
+            Brand = "OKKO",
             FuelTypeId = "okko-95",
             Liters = 50,
             ExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
@@ -913,7 +913,7 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
 
         var first = result.Vouchers.First(v => v.Id == v1.Id);
         first.VoucherNumber.Should().Be("OKKO-LIST-1");
-        first.Provider.Should().Be("OKKO");
+        first.Brand.Should().Be("OKKO");
         first.FuelTypeName.Should().Be("A-95");
         first.QrCodeUrl.Should().Be($"/api/voucher-catalog/{v1.Id}/qr");
     }
@@ -956,8 +956,8 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
         // it still offered WOG's diesel - a pairing that can never match a voucher row and always
         // returns an empty page.
         _context.FuelVouchers.AddRange(
-            CreateVoucher(provider: "OKKO", fuelTypeId: "okko-95", voucherNumber: "OKKO-95-1"),
-            CreateVoucher(provider: "WOG", fuelTypeId: "wog-dp", voucherNumber: "WOG-DP-1"));
+            CreateVoucher(brand: "OKKO", fuelTypeId: "okko-95", voucherNumber: "OKKO-95-1"),
+            CreateVoucher(brand: "WOG", fuelTypeId: "wog-dp", voucherNumber: "WOG-DP-1"));
         await _context.SaveChangesAsync();
 
         var result = await new GetAdminVouchersQueryHandler(_context)
@@ -977,8 +977,8 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
         // Two brands can name a fuel the same. Matching on the name alone would return WOG's
         // voucher while OKKO is selected - the "impossible combination" in reverse.
         _context.FuelVouchers.AddRange(
-            CreateVoucher(provider: "OKKO", fuelTypeId: "okko-95", voucherNumber: "OKKO-95-1"),
-            CreateVoucher(provider: "WOG", fuelTypeId: "wog-95", voucherNumber: "WOG-95-1"));
+            CreateVoucher(brand: "OKKO", fuelTypeId: "okko-95", voucherNumber: "OKKO-95-1"),
+            CreateVoucher(brand: "WOG", fuelTypeId: "wog-95", voucherNumber: "WOG-95-1"));
         await _context.SaveChangesAsync();
 
         var result = await new GetAdminVouchersQueryHandler(_context)

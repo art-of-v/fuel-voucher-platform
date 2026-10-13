@@ -1,6 +1,6 @@
 using System.Text.Json;
 using FluentAssertions;
-using FuelFlow.Features.Providers;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers.Suppliers;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
@@ -40,7 +40,7 @@ public sealed class SuppliersControllerTests : IDisposable
             new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Name, "+380677757766"),
             new System.Security.Claims.Claim("first_name", "QA")
         };
-        _controller = new SuppliersController(_context, new ProviderEventService(_context))
+        _controller = new SuppliersController(_context, new AuditEventService(_context))
         {
             ControllerContext = new ControllerContext
             {
@@ -271,7 +271,7 @@ var result = await _controller.Create(new CreateSupplierRequest { Name = "ФОП
 
         await _controller.Create(ValidRequest());
 
-        (await _context.Set<ProviderEventOutbox>().CountAsync()).Should().Be(0);
+        (await _context.Set<AuditEventOutbox>().CountAsync()).Should().Be(0);
     }
 
     [Fact]
@@ -453,11 +453,11 @@ var result = await _controller.Create(new CreateSupplierRequest { Name = "ФОП
     public async Task Create_ShouldWriteAnAuditRowWhoseNewValueIsValidJson()
     {
         // provider_event_outbox.old_value/new_value are jsonb. Passing a bare string throws 22P02 on
-        // SaveChanges in Postgres, and the in-memory provider will happily accept it, so this asserts
+        // SaveChanges in Postgres, and the in-memory brand will happily accept it, so this asserts
         // the shape directly instead of trusting the save to fail.
         await _controller.Create(ValidRequest());
 
-        var @event = await _context.Set<ProviderEventOutbox>()
+        var @event = await _context.Set<AuditEventOutbox>()
             .SingleAsync(e => e.EventType == "SupplierCreated");
 
         var act = () => JsonDocument.Parse(@event.NewValue);
@@ -467,13 +467,13 @@ var result = await _controller.Create(new CreateSupplierRequest { Name = "ФОП
         doc.RootElement.GetProperty("Name").GetString().Should().Be("ФОП Стретович Микола");
         doc.RootElement.GetProperty("EdrIpn").GetString().Should().Be("1234567890");
         @event.AggregateType.Should().Be("Supplier");
-        @event.ProviderId.Should().Be("all");
+        @event.ScopeId.Should().Be("all");
     }
 
     [Fact]
     public async Task List_ShouldOrderByName()
     {
-        // Deliberately ASCII: the ordering is done by the provider's collation, so Cyrillic-vs-Latin
+        // Deliberately ASCII: the ordering is done by the brand's collation, so Cyrillic-vs-Latin
         // names sort differently under the Windows and Linux ICU data and would make this flaky.
         Seed("Zulu supplier");
         Seed("Alpha supplier");
