@@ -62,29 +62,29 @@ ON CONFLICT (id) DO NOTHING;
 -- indistinguishable from the real batch.
 INSERT INTO fuel_vouchers
     (id, provider, fuel_type_id, liters, provider_expiration_date, customer_expiration_date,
-     voucher_number, external_id, qr_payload, created_at_utc, updated_at_utc, status, order_id,
+     voucher_number, qr_payload, created_at_utc, updated_at_utc, status, order_id,
      assigned_to_user_id, legal_entity_id, worker_user_id, is_test_data, is_deleted)
 VALUES
     -- room to extend: customer +7d, provider +90d
     ('22222222-2222-4222-8222-000000000001', 'OKKO', :'fuel_type_id', 10.00, current_date + 90, current_date + 7,
-     'EMU-VCH-EXT', 'EMU-VCH-EXT', 'EMU-QR-EXT', now() - interval '3 days', now(), 'Assigned',
+     'EMU-VCH-EXT', 'EMU-QR-EXT', now() - interval '3 days', now(), 'Assigned',
      '11111111-1111-4111-8111-000000000001', :'qa_user_id', NULL, NULL, true, false),
     -- ceiling reached while still valid: must refuse to extend and replace instead
     ('22222222-2222-4222-8222-000000000002', 'OKKO', :'fuel_type_id', 10.00, current_date + 7, current_date + 7,
-     'EMU-VCH-FULL', 'EMU-VCH-FULL', 'EMU-QR-FULL', now() - interval '3 days', now(), 'Assigned',
+     'EMU-VCH-FULL', 'EMU-QR-FULL', now() - interval '3 days', now(), 'Assigned',
      '11111111-1111-4111-8111-000000000001', :'qa_user_id', NULL, NULL, true, false),
     -- already lapsed: the replace branch on entry
     ('22222222-2222-4222-8222-000000000003', 'OKKO', :'fuel_type_id', 10.00, current_date + 90, current_date - 2,
-     'EMU-VCH-LAPSED', 'EMU-VCH-LAPSED', 'EMU-QR-LAPSED', now() - interval '20 days', now(), 'Expired',
+     'EMU-VCH-LAPSED', 'EMU-QR-LAPSED', now() - interval '20 days', now(), 'Expired',
      '11111111-1111-4111-8111-000000000001', NULL, NULL, NULL, true, false),
     -- stock for a replacement, long enough for any tier up to 6 months
     ('33333333-3333-4333-8333-000000000001', 'OKKO', :'fuel_type_id', 10.00, current_date + 180, current_date + 180,
-     'EMU-STK-A', 'EMU-STK-A', 'EMU-QR-STK-A', now(), now(), 'Available', NULL, NULL, NULL, NULL, true, false),
+     'EMU-STK-A', 'EMU-QR-STK-A', now(), now(), 'Available', NULL, NULL, NULL, NULL, true, false),
     ('33333333-3333-4333-8333-000000000002', 'OKKO', :'fuel_type_id', 10.00, current_date + 180, current_date + 180,
-     'EMU-STK-B', 'EMU-STK-B', 'EMU-QR-STK-B', now(), now(), 'Available', NULL, NULL, NULL, NULL, true, false),
+     'EMU-STK-B', 'EMU-QR-STK-B', now(), now(), 'Available', NULL, NULL, NULL, NULL, true, false),
     -- short paper term: buying a longer tier must clamp to this date, never past it
     ('33333333-3333-4333-8333-000000000003', 'OKKO', :'fuel_type_id', 10.00, current_date + 20, current_date + 20,
-     'EMU-STK-SHORT', 'EMU-STK-SHORT', 'EMU-QR-STK-SHORT', now(), now(), 'Available', NULL, NULL, NULL, NULL, true, false)
+     'EMU-STK-SHORT', 'EMU-QR-STK-SHORT', now(), now(), 'Available', NULL, NULL, NULL, NULL, true, false)
 ON CONFLICT (id) DO NOTHING;
 
 -- The wallet nests vouchers by reading fulfillments, not fuel_vouchers.order_id: without these rows
