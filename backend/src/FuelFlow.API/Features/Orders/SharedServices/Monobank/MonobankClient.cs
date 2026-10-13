@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.Json;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.SharedKernel.Options;
@@ -260,11 +259,16 @@ public sealed class MonobankClient : IMonobankClient
 
         try
         {
-            // The acquirer takes ISO-8601 instants. toUtc is exclusive on our side and stays
-            // exclusive here - sending a bound that looks inclusive is how one row lands in two
-            // consecutive periods and the month total comes out double.
-            var from = Uri.EscapeDataString(fromUtc.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture));
-            var to = Uri.EscapeDataString(toUtc.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture));
+            // UTC unix timestamps, in seconds - what the acquirer documents for `from`/`to`. An
+            // ISO-8601 instant is rejected with 400 {"errCode":"1001","errText":"invalid 'from'"},
+            // which is what every import pass used to send: the statement was never fetched, and the
+            // reconciliation act it feeds was permanently empty.
+            //
+            // toUtc is exclusive on our side and stays exclusive here - sending a bound that looks
+            // inclusive is how one row lands in two consecutive periods and the month total comes
+            // out double.
+            var from = ToUnixSeconds(fromUtc);
+            var to = ToUnixSeconds(toUtc);
 
             var response = await _httpClient.GetAsync(
                 $"/api/merchant/statement?from={from}&to={to}",
@@ -273,21 +277,39 @@ public sealed class MonobankClient : IMonobankClient
             if (!response.IsSuccessStatusCode)
             {
                 var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
-                _logger.LogError(
-                    "Monobank statement fetch failed. Status: {StatusCode}, Error: {Error}",
-                    response.StatusCode,
-                    errorContent);
 
+                // Deliberately not logged here: the catch below logs this once, with the status and
+                // the acquirer's own error body already carried by the exception.
                 throw new HttpRequestException(
                     $"Monobank API returned {response.StatusCode}: {errorContent}");
             }
 
-            // Deserialised through JsonElement first so each row keeps its original text. Re-serialising the
-            // parsed object would give back the same fields in a different order and with the
-            // acquirer's spelling already normalised away - good enough to read, not good enough to
-            // be the record of what they actually sent.
-            var rawRows = await response.Content.ReadFromJsonAsync<List<JsonElement>>(cancellationToken)
-                          ?? new List<JsonElement>();
+            // The body is an envelope - {"list":[...]} - not the rows themselves, so the shape is
+            // checked before it is trusted. A 200 we cannot read is NOT a period with nothing in it:
+            // reading it as one would publish an act that quietly omits every payment reported.
+            using var document = await response.Content.ReadFromJsonAsync<JsonDocument>(cancellationToken);
+
+            if (document is null || document.RootElement.ValueKind == JsonValueKind.Null)
+            {
+                // A body that is not JSON at all, or a literal null. Nothing to file, and nothing that
+                // contradicts us either - an empty period is the only reading that does not invent
+                // payments. A body that IS JSON but is not the documented envelope is refused below.
+                return [];
+            }
+
+            if (document.RootElement.ValueKind != JsonValueKind.Object
+                || !document.RootElement.TryGetProperty("list", out var rowsElement)
+                || rowsElement.ValueKind != JsonValueKind.Array)
+            {
+                throw new InvalidOperationException(
+                    "Monobank statement response carried no 'list' array; refusing to read it as an empty period");
+            }
+
+            // Read through JsonElement so each row keeps its original text. Re-serialising the parsed
+            // object would give back the same fields in a different order and with the acquirer's
+            // spelling already normalised away - good enough to read, not good enough to be the record
+            // of what they actually sent.
+            var rawRows = rowsElement.EnumerateArray().ToList();
 
             var items = new List<MonobankStatementItem>(rawRows.Count);
             foreach (var row in rawRows)
@@ -301,10 +323,22 @@ public sealed class MonobankClient : IMonobankClient
                 {
                     // One unusable row does not cost us the period. Skipping loudly is the point:
                     // silently dropping rows is how a reconciliation ends up quietly short.
-                    _logger.LogWarning("Skipping an unparseable Monobank statement row");
+                    _logger.LogWarning("Skipping an unparseable Monobank statement row: {Row}", row.GetRawText());
                     continue;
                 }
 
+                // The statement carries no id of its own, so the key comes from what it does send.
+                var statementId = item.ComposeStatementId();
+                if (statementId is null)
+                {
+                    // Nothing in the row names it, so a second such row would collide with it and the
+                    // next import pass would overwrite one with the other.
+                    _logger.LogWarning(
+                        "Skipping a Monobank statement row that carries no identity: {Row}", row.GetRawText());
+                    continue;
+                }
+
+                item.StatementId = statementId;
                 item.RawJson = row.GetRawText();
                 items.Add(item);
             }
@@ -320,4 +354,16 @@ public sealed class MonobankClient : IMonobankClient
             throw;
         }
     }
+
+    /// <summary>
+    /// UTC unix seconds, the unit the acquirer's <c>from</c>/<c>to</c> take.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="DateTime.SpecifyKind(DateTime, DateTimeKind)"/> rather than trusting
+    /// <see cref="DateTime.Kind"/>: both bounds are built from <c>DateTime.UtcNow</c>, so they are
+    /// already UTC, and constructing a <see cref="DateTimeOffset"/> from a Utc DateTime is a
+    /// no-op rather than a conversion through the server's local zone.
+    /// </remarks>
+    private static long ToUnixSeconds(DateTime utc)
+        => new DateTimeOffset(DateTime.SpecifyKind(utc, DateTimeKind.Utc)).ToUnixTimeSeconds();
 }

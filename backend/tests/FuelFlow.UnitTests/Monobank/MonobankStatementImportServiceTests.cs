@@ -26,9 +26,9 @@ public class MonobankStatementImportServiceTests
         Reference = "order-" + statementId,
         Amount = amount,
         Ccy = 980,
-        Status = "settled",
-        CreatedDate = DateTime.UtcNow.AddDays(-2),
-        RawJson = """{"statementId":"ST1"}"""
+        Status = "success",
+        Date = DateTime.UtcNow.AddDays(-2),
+        RawJson = """{"invoiceId":"INV-ST1"}"""
     };
 
     /// <summary>Returns the rows it is handed per merchant, so a test can give Live and Sandbox
@@ -172,6 +172,25 @@ public class MonobankStatementImportServiceTests
         await second.ImportRecentStatementsAsync();
 
         (await context.MonobankStatementEntries.SingleAsync()).AmountKopecks.Should().Be(1000);
+    }
+
+    // A row nothing can be filed under would collide with the next such row and overwrite it forever,
+    // and the unique key would throw the whole period out mid-import. The client already refuses to
+    // hand one over; the job must not depend on every future client remembering that.
+    [Fact]
+    public async Task A_Row_With_No_Id_Is_Skipped_Rather_Than_Filed_Under_A_Blank_Key()
+    {
+        var nameless = new MonobankStatementItem { StatementId = "", Amount = 1000, Ccy = 980 };
+        var (service, context, _) = Build(new()
+        {
+            [MonobankMerchant.Live] = new() { Item("L1"), nameless, nameless }
+        });
+
+        await service.ImportRecentStatementsAsync();
+
+        var stored = await context.MonobankStatementEntries.ToListAsync();
+        stored.Should().ContainSingle();
+        stored[0].StatementId.Should().Be("L1");
     }
 
     // The two are separate accounts. One merchant's rows must never be written under the other -

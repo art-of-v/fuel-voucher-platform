@@ -146,12 +146,14 @@ public sealed class MockMonobankClient : IMonobankClient
         {
             items.Add(new MonobankStatementItem
             {
+                // Real statements carry no row id either - the real client composes one from
+                // invoice/rrn, date, amount and currency, and this mock has the same amount on every
+                // day, so the date alone identifies it here.
                 StatementId = $"MOCK_STMT_{day:yyyyMMdd}",
                 Amount = 0,
                 Ccy = 980,
-                Status = "settled",
-                CreatedDate = day,
-                ModifiedDate = day
+                Status = "success",
+                Date = day
             });
         }
 
