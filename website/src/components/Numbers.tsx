@@ -8,6 +8,9 @@ import { fetchCatalogue, pickReferencePackage } from '../lib/catalogue';
 /** The bucket the multiplication is shown on - the standard full fill. */
 const BUCKET_LITERS = 50;
 
+/** Applied inline when the price locks. See the note at the element. */
+const LOCKED_COLOUR = { color: 'var(--accent)' } as const;
+
 /**
  * The price band: the numbers move, then stop and turn green.
  *
@@ -23,8 +26,6 @@ const BUCKET_LITERS = 50;
 export default function Numbers() {
   const [stats, setStats] = useState<{
     perLiter: number;
-    fuelName: string;
-    stationId: string;
     networks: number;
     reel: number[];
   } | null>(null);
@@ -53,8 +54,6 @@ export default function Numbers() {
 
         setStats({
           perLiter: reference.finalPricePerLiter,
-          fuelName: reference.fuelName,
-          stationId: reference.stationId,
           networks: new Set(rows.map((r) => r.stationId)).size,
           reel: reel.length > 1 ? reel : [reference.finalPricePerLiter],
         });
@@ -144,10 +143,14 @@ export default function Numbers() {
         </header>
 
         <div className={`${styles.stage} ${styles.reveal}`}>
-          <div className={`${styles.priceBlock} ${locked ? styles.priceLocked : ''}`}>
-            <span
-              className={`${styles.price} ${locked ? styles.locked : ''}`}
-            >
+          <div className={styles.priceBlock}>
+            {/* The lock colour is inline, not a class. It went through a parent-modifier
+                selector once and then a single class once, and both times the deployed rule was
+                present, ordered correctly, and still produced a white number. An inline style
+                cannot be lost to a stylesheet that is missing, stale or out of order - which is
+                the only thing that can be relied on for a decorative effect that has failed
+                twice. */}
+            <span className={styles.price} style={locked ? LOCKED_COLOUR : undefined}>
               {(() => {
                 if (!stats) return '—';
                 const shown = locked
@@ -157,15 +160,10 @@ export default function Numbers() {
               })()}
               <span className={styles.priceUnit}>/ л</span>
             </span>
-            <span
-              className={`${styles.lockState} ${locked ? styles.locked : ''}`}
-            >
+            <span className={styles.lockState} style={locked ? LOCKED_COLOUR : undefined}>
               {locked
                 ? '✓ Зафіксовано в момент оплати'
                 : 'Ціна рухається, поки не оплатив…'}
-            </span>
-            <span className={styles.referenceNote}>
-              {stats ? `орієнтир: ${stats.fuelName} · ${stats.stationId.toUpperCase()}` : ' '}
             </span>
           </div>
 
