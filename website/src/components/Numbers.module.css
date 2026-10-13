@@ -62,7 +62,7 @@
 }
 
 .lockState {
-  display: inline-block;
+  display: block;
   margin-top: 28px;
   font-family: var(--font-sans);
   font-size: 14px;
@@ -121,23 +121,24 @@
   .headRight {
     justify-self: start;
   }
-/* The moment the price stops: it turns accent green and stays there. */
-.priceLocked .price {
-  color: var(--accent);
-}
+/* The moment the price stops: it turns accent green and stays there.
 
-.priceLocked .lockState {
+   Applied to the elements themselves (class="locked") rather than through
+   .priceLocked on the parent. A descendant selector is one more thing that has to
+   match at runtime, and a parent class that fails to apply silently turns the
+   whole effect off - which is exactly what happened once already. */
+.locked {
   color: var(--accent);
 }
 
 .referenceNote {
   display: block;
+  margin-top: 8px;
   font-family: var(--font-sans);
   font-size: 11px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--ink-mute);
-  margin-top: 8px;
 }
 
 .footnote {

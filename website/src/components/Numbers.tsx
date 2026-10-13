@@ -145,7 +145,9 @@ export default function Numbers() {
 
         <div className={`${styles.stage} ${styles.reveal}`}>
           <div className={`${styles.priceBlock} ${locked ? styles.priceLocked : ''}`}>
-            <span className={styles.price}>
+            <span
+              className={`${styles.price} ${locked ? styles.locked : ''}`}
+            >
               {(() => {
                 if (!stats) return '—';
                 const shown = locked
@@ -155,7 +157,9 @@ export default function Numbers() {
               })()}
               <span className={styles.priceUnit}>/ л</span>
             </span>
-            <span className={styles.lockState}>
+            <span
+              className={`${styles.lockState} ${locked ? styles.locked : ''}`}
+            >
               {locked
                 ? '✓ Зафіксовано в момент оплати'
                 : 'Ціна рухається, поки не оплатив…'}
