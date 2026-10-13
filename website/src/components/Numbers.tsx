@@ -9,19 +9,16 @@ import { fetchCatalogue, pickReferencePackage } from '../lib/catalogue';
 const BUCKET_LITERS = 50;
 
 /**
- * The figures here used to be hardcoded: a rotating fake price, "50 litres in
- * the wallet", "2 920 UAH paid once" and "3 months, the standard term". None of
- * it held up against the system, and three of the four were invented numbers.
+ * The price band: the numbers move, then stop and turn green.
  *
- * The price is real and read from the catalogue, but it is not the cheapest row
- * we sell - that is KLO's LPG at 44.90, which put a gas number on the front page
- * as the headline. The headline quotes diesel at OKKO instead: the network the app
- * lists first, and the grade with the largest volumes.
+ * This animation was removed in #1076 because the values it cycled through
+ * (97.60, 99.90, 98.40, 100.30, 99.20) were invented, and a moving number that
+ * looks measured is worse than a static one that lies - it implies the motion is
+ * data.
  *
- * The multiplication is the original design's "50 litres = one payment", restored
- * with the live reference price. Nothing accumulates in a wallet - a package is
- * one voucher, redeemed by one fill - so this is arithmetic on a price, not a
- * balance the user is shown they hold.
+ * So the motion is back and the fiction is not: it cycles through the real
+ * per-litre prices of the anchor network, every one of which is a price someone
+ * can buy today, and locks on the reference - diesel at OKKO.
  */
 export default function Numbers() {
   const [stats, setStats] = useState<{
@@ -29,7 +26,10 @@ export default function Numbers() {
     fuelName: string;
     stationId: string;
     networks: number;
+    reel: number[];
   } | null>(null);
+  const [locked, setLocked] = useState(false);
+  const [tick, setTick] = useState(0);
   const ref = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -39,11 +39,24 @@ export default function Numbers() {
         if (!alive) return;
         const reference = pickReferencePackage(rows);
         if (!reference) return;
+
+        // Everything the anchor network really sells, per litre, deduplicated.
+        // Sorted so the sequence is stable between renders instead of depending
+        // on whatever order the endpoint happened to return.
+        const reel = [
+          ...new Set(
+            rows
+              .filter((r) => r.stationId === reference.stationId)
+              .map((r) => r.finalPricePerLiter)
+          ),
+        ].sort((a, b) => a - b);
+
         setStats({
           perLiter: reference.finalPricePerLiter,
           fuelName: reference.fuelName,
           stationId: reference.stationId,
           networks: new Set(rows.map((r) => r.stationId)).size,
+          reel: reel.length > 1 ? reel : [reference.finalPricePerLiter],
         });
       })
       .catch(() => {
@@ -53,6 +66,34 @@ export default function Numbers() {
       alive = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!stats) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setLocked(true);
+      return;
+    }
+
+    let interval: ReturnType<typeof setInterval> | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return;
+        interval = setInterval(() => setTick((t) => t + 1), 900);
+        timer = setTimeout(() => {
+          if (interval) clearInterval(interval);
+          setLocked(true);
+        }, 4500);
+      },
+      { threshold: 0.5 }
+    );
+    io.observe(ref.current!);
+    return () => {
+      io.disconnect();
+      if (interval) clearInterval(interval);
+      if (timer) clearTimeout(timer);
+    };
+  }, [stats]);
 
   useEffect(() => {
     const root = ref.current;
@@ -95,13 +136,21 @@ export default function Numbers() {
         </header>
 
         <div className={`${styles.stage} ${styles.reveal}`}>
-          <div className={styles.priceBlock}>
+          <div className={`${styles.priceBlock} ${locked ? styles.priceLocked : ''}`}>
             <span className={styles.price}>
-              {stats ? stats.perLiter.toFixed(2).replace('.', ',') : '—'}
+              {(() => {
+                if (!stats) return '—';
+                const shown = locked
+                  ? stats.perLiter
+                  : stats.reel[tick % stats.reel.length];
+                return shown.toFixed(2).replace('.', ',');
+              })()}
               <span className={styles.priceUnit}>/ л</span>
             </span>
             <span className={styles.lockState}>
-              ✓ Ціна фіксується в момент оплати
+              {locked
+                ? '✓ Зафіксовано в момент оплати'
+                : 'Ціна рухається, поки не оплатив…'}
             </span>
             <span className={styles.referenceNote}>
               {stats ? `орієнтир: ${stats.fuelName} · ${stats.stationId.toUpperCase()}` : ' '}
