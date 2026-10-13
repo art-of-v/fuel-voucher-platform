@@ -1,0 +1,299 @@
+using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text.Json;
+using FuelFlow.Features.Stations;
+using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.SharedModels;
+using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Xunit;
+
+namespace FuelFlow.IntegrationTests;
+
+/// <summary>
+/// The operator workflow the whole out-of-stock feature rests on, proved end to end on a real
+/// Postgres: <b>import → cost → activate → the package becomes purchasable</b>.
+/// </summary>
+/// <remarks>
+/// <para>
+/// The existing coverage stops one layer short. <c>VoucherAdminCommandHandlersTests</c> proves in
+/// memory that the bulk-action handler moves a voucher's status, and the stock-gate integration test
+/// seeds an <c>Available</c> row directly — bypassing the step that produces it. Nothing joined those
+/// two: if activation had failed to flip the storefront flag, every unit test would still be green and
+/// the demo scenario ("import A95 OKKO 10 L, that one package becomes buyable") would fail in front
+/// of a customer with nothing pointing at the cause.
+/// </para>
+/// <para>
+/// Driven through the real HTTP endpoints, so the controller's auth, the cost gate, the status flip and
+/// the catalog projection are all in the path. Per [[package-stock-availability]] in the planning repo,
+/// this is precondition #1 for the on-device campaign — the rest of that plan is a device run, but this
+/// is the part that can be proved without one.
+/// </para>
+/// </remarks>
+[Collection("Integration Tests")]
+public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDatabaseFixture>
+{
+    private readonly TestDatabaseFixture _fixture;
+    private readonly HttpClient _client;
+    private string? _accessToken;
+
+    public VoucherActivationStorefrontIntegrationTests(TestDatabaseFixture fixture)
+    {
+        _fixture = fixture;
+        _client = _fixture.CreateClient();
+    }
+
+    /// <summary>
+    /// Staff session, because activation is an operator action. Same OTP dance as the purchase tests,
+    /// plus the Admin role the bulk-action route is behind.
+    /// </summary>
+    private async Task AuthenticateStaffAsync()
+    {
+        if (_accessToken is not null)
+            return;
+
+        const string phone = "+380991009900";
+        (await _client.PostAsJsonAsync("/api/auth/send-code", new { phoneNumber = phone }))
+            .EnsureSuccessStatusCode();
+        (await _client.PostAsJsonAsync("/api/auth/verify", new { phoneNumber = phone, code = "000000" }))
+            .EnsureSuccessStatusCode();
+
+        using (var scope = _fixture.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var role = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Admin", CancellationToken.None);
+            if (role is null)
+            {
+                role = new Role { Id = Guid.NewGuid(), Name = "Admin", CreatedAtUtc = DateTime.UtcNow };
+                context.Roles.Add(role);
+                await context.SaveChangesAsync();
+            }
+
+            var user = await context.Users.FirstAsync(u => u.PhoneNumber == phone, CancellationToken.None);
+            user.RoleId = role.Id;
+            // OTP verify registers a user as inactive; payment and staff routes both refuse those.
+            user.IsActive = true;
+            user.UpdatedAtUtc = DateTime.UtcNow;
+            await context.SaveChangesAsync();
+        }
+
+        // Re-login so the token carries the role it was just granted.
+        (await _client.PostAsJsonAsync("/api/auth/send-code", new { phoneNumber = phone }))
+            .EnsureSuccessStatusCode();
+        var verify = await _client.PostAsJsonAsync("/api/auth/verify", new { phoneNumber = phone, code = "000000" });
+        verify.EnsureSuccessStatusCode();
+        var body = await verify.Content.ReadFromJsonAsync<JsonElement>();
+        _accessToken = body.GetProperty("accessToken").GetString();
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
+    }
+
+    /// <summary>
+    /// A fuel and a package to hang stock off. Both rows are required, not optional dressing:
+    /// <c>fuel_vouchers.fuel_type_id</c> is a real FK (Restrict), and without a package the storefront
+    /// has nothing to report availability for.
+    /// </summary>
+    private async Task SeedFuelAndPackageAsync(string stationId, string fuelTypeId, decimal liters)
+    {
+        using var scope = _fixture.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var now = DateTime.UtcNow;
+
+        if (!await context.FuelTypes.AnyAsync(f => f.Id == fuelTypeId, CancellationToken.None))
+        {
+            context.FuelTypes.Add(new FuelTypeEntity
+            {
+                Id = fuelTypeId,
+                Name = fuelTypeId,
+                StationId = stationId,
+                BasePrice = 50,
+                DiscountPrice = 47,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now
+            });
+        }
+
+        if (!await context.FuelPackages.AnyAsync(
+                p => p.StationId == stationId && p.FuelTypeId == fuelTypeId && p.Liters == liters, CancellationToken.None))
+        {
+            context.FuelPackages.Add(new FuelPackage
+            {
+                Id = $"{fuelTypeId}-{liters:0.##}".Replace('.', '_'),
+                StationId = stationId,
+                FuelTypeId = fuelTypeId,
+                FuelName = fuelTypeId,
+                Liters = liters,
+                Price = 470m * liters,
+                OriginalPrice = 470m * liters,
+                SupplierPricePerLiter = 45m,
+                MarginUahPerLiter = 2m,
+                FinalPricePerLiter = 47m,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now
+            });
+        }
+
+        await context.SaveChangesAsync();
+    }
+
+    /// <summary>A freshly imported voucher: not sellable, and carries no cost until an operator enters one.</summary>
+    private static FuelVoucher ImportedVoucher(string provider, string fuelTypeId, decimal liters, decimal? costPerLiter)
+        => new()
+        {
+            Id = Guid.CreateVersion7(),
+            Provider = provider,
+            FuelTypeId = fuelTypeId,
+            Liters = liters,
+            CostPerLiter = costPerLiter,
+            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6)),
+            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6)),
+            VoucherNumber = $"IMPORT-{Guid.NewGuid().ToString()[..10]}",
+            QrPayload = Guid.NewGuid().ToString(),
+            Status = VoucherStatus.Imported,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+
+    private async Task<bool> IsPackageAvailableAsync(string stationId, string fuelTypeId, decimal liters)
+    {
+        var response = await _client.GetAsync("/api/packages");
+        response.EnsureSuccessStatusCode();
+        var packages = await response.Content.ReadFromJsonAsync<List<PublicPackageResponse>>();
+        return packages!.Single(p =>
+            p.StationId == stationId && p.FuelTypeId == fuelTypeId && p.Liters == liters).IsAvailable;
+    }
+
+    private async Task<(HttpStatusCode Status, string Body)> ActivateAsync(params Guid[] ids)
+    {
+        var response = await _client.PostAsJsonAsync("/api/admin/vouchers/bulk-action", new
+        {
+            action = "activate",
+            ids = ids
+        });
+        return (response.StatusCode, await response.Content.ReadAsStringAsync());
+    }
+
+    /// <summary>
+    /// The one the demo rests on: a package nobody can buy becomes buyable the moment an operator
+    /// activates its stock — and only that one. Proves the import ≠ available gate (the package is
+    /// unavailable while the voucher sits in <c>Imported</c>), the activation itself, and that a sibling
+    /// nominal of the same fuel is untouched.
+    /// </summary>
+    [Fact]
+    public async Task ActivatingAnImportedBatch_TurnsThatPackageOn_AndLeavesItsSiblingsOff()
+    {
+        await AuthenticateStaffAsync();
+        await SeedFuelAndPackageAsync("okko", "act-95", 10m);
+        await SeedFuelAndPackageAsync("okko", "act-95", 20m);
+
+        using (var scope = _fixture.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            context.FuelVouchers.AddRange(
+                ImportedVoucher("OKKO", "act-95", 10m, costPerLiter: 45m),
+                ImportedVoucher("OKKO", "act-95", 20m, costPerLiter: 45m));
+            await context.SaveChangesAsync();
+        }
+
+        // Before activation: both nominals sit on the shelf and neither can be bought. This is the
+        // precondition the campaign assumes and, before this change, was silently untrue.
+        Assert.False(await IsPackageAvailableAsync("okko", "act-95", 10m));
+        Assert.False(await IsPackageAvailableAsync("okko", "act-95", 20m));
+
+        // Activate ONLY the 10 L voucher — the same single-package act the demo performs.
+        Guid tenLitre;
+        using (var scope = _fixture.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            tenLitre = await context.FuelVouchers
+                .Where(v => v.FuelTypeId == "act-95" && v.Liters == 10m)
+                .Select(v => v.Id)
+                .FirstAsync();
+        }
+
+        var (status, body) = await ActivateAsync(tenLitre);
+        Assert.Equal(HttpStatusCode.OK, status);
+        Assert.DoesNotContain("Cannot activate", body);
+
+        // The whole point: activation is what turns the storefront on. Without this, "import A95 OKKO
+        // 10 L and only that package is buyable" would not happen and no other test would say so.
+        Assert.True(await IsPackageAvailableAsync("okko", "act-95", 10m));
+
+        // Its sibling stays dark. Availability is per (brand, fuel, nominal), not per fuel.
+        Assert.False(await IsPackageAvailableAsync("okko", "act-95", 20m));
+    }
+
+    /// <summary>
+    /// The cost gate, which is why "imported" and "buyable" are two different things: a voucher with
+    /// no cost of its own cannot be put on sale, so its package must stay unavailable. Without this the
+    /// operator could put on the shelf stock the pricing engine has nothing to price.
+    /// </summary>
+    [Fact]
+    public async Task AnUncostedBatch_CannotBeActivated_AndSoLeavesThePackageDark()
+    {
+        await AuthenticateStaffAsync();
+        await SeedFuelAndPackageAsync("okko", "act-uncosted", 5m);
+
+        using (var scope = _fixture.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            context.FuelVouchers.Add(ImportedVoucher("OKKO", "act-uncosted", 5m, costPerLiter: null));
+            await context.SaveChangesAsync();
+        }
+
+        Assert.False(await IsPackageAvailableAsync("okko", "act-uncosted", 5m));
+
+        Guid id;
+        using (var scope = _fixture.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            id = await context.FuelVouchers.Where(v => v.FuelTypeId == "act-uncosted").Select(v => v.Id).FirstAsync();
+        }
+
+        var (_, body) = await ActivateAsync(id);
+
+        Assert.Contains("Cannot activate", body);
+        Assert.Contains("cost", body, StringComparison.OrdinalIgnoreCase);
+        Assert.False(await IsPackageAvailableAsync("okko", "act-uncosted", 5m),
+            "a batch that could not be activated must not have lit the storefront");
+    }
+
+    /// <summary>
+    /// Activating is the on-switch, so deactivating has to be the off-switch — otherwise the demo's
+    /// first step (activate one package) could never be undone without a database edit.
+    /// </summary>
+    [Fact]
+    public async Task DeactivatingAPackage_PutsItBackOutOfStock()
+    {
+        await AuthenticateStaffAsync();
+        await SeedFuelAndPackageAsync("okko", "act-toggle", 10m);
+
+        using (var scope = _fixture.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            context.FuelVouchers.Add(ImportedVoucher("OKKO", "act-toggle", 10m, costPerLiter: 45m));
+            await context.SaveChangesAsync();
+        }
+
+        Guid id;
+        using (var scope = _fixture.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            id = await context.FuelVouchers.Where(v => v.FuelTypeId == "act-toggle").Select(v => v.Id).FirstAsync();
+        }
+
+        Assert.Equal(HttpStatusCode.OK, (await ActivateAsync(id)).Status);
+        Assert.True(await IsPackageAvailableAsync("okko", "act-toggle", 10m));
+
+        var off = await _client.PostAsJsonAsync("/api/admin/vouchers/bulk-action", new
+        {
+            action = "deactivate",
+            ids = new[] { id }
+        });
+        Assert.Equal(HttpStatusCode.OK, off.StatusCode);
+
+        Assert.False(await IsPackageAvailableAsync("okko", "act-toggle", 10m));
+    }
+}
