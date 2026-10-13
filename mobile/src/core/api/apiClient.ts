@@ -112,6 +112,11 @@ async function tryRefreshToken(): Promise<boolean> {
   return promise;
 }
 
+// /api/packages is deliberately NOT here even though the endpoint is anonymous. The backend reads
+// the bearer token (when present) to scope availability to the caller's own stock pool — a QA
+// account is only ever served test vouchers — and skipping the token would answer for the wrong
+// customer. An unauthenticated caller still gets a valid real-stock answer, so pre-login browsing
+// is unaffected.
 const PUBLIC_ENDPOINTS = [
   '/api/auth/send-code',
   '/api/auth/verify',
@@ -119,7 +124,6 @@ const PUBLIC_ENDPOINTS = [
   '/api/auth/device/challenge',
   '/api/stations',
   '/api/stations/fuel-types',
-  '/api/packages',
   '/api/logs',
 ];
 

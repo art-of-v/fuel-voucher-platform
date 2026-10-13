@@ -60,7 +60,7 @@ Three applications share one backend:
 
 **Key design decisions:**
 - The backend is the single source of truth. Both the mobile app and the admin panel are pure API clients.
-- Orders are decoupled from voucher availability. A purchase can succeed with zero inventory; when vouchers are imported later, the fulfillment job automatically backfills pending orders (FEFO — First Expiry, First Out).
+- Orders are **gated** on voucher availability. A package is sellable only while at least one `Available` voucher matches its `(provider, fuelTypeId, liters)`; `GET /api/packages` reports this per package as `isAvailable`, and checkout refuses a line with no stock (409 `package_out_of_stock`). An unavailable package is still **listed** — the app greys it out with the reason rather than hiding it. Stock that runs out *after* the sale is still the worker's problem: fulfilment backfills `PartiallyFulfilled` orders FEFO once stock arrives (First Expiry, First Out), which also covers orders that predate this gate.
 - A voucher in somebody's hands always belongs to the order that delivered it — `fuel_vouchers.order_id` is DB-enforced for every held voucher, and an order that still owns one cannot be deleted. `orders.kind` separates fuel bought for money (`Purchase`), a customer's paid renewal (`Renewal`) and a company handing its own fuel to a worker (`ReceivedFromCompany`, priced 0 and excluded from every money view).
 - Money-affecting values (checkout price, webhook amount, order status) are computed and enforced server-side; the client only ever *proposes*.
 - Background jobs run **in-process** via Hangfire (PostgreSQL storage) by default; the same jobs can also run in the standalone `FuelFlow.JobsWorker` for horizontal scaling.
@@ -179,7 +179,8 @@ Admins use the **same** login flow; the `Admin` role is granted by setting the u
 
 ### 3. Purchase / checkout (mobile)
 
-1. User picks a station → selects fuel packages (liters × quantity) → basket.
+1. User picks a station → selects fuel packages (liters × quantity) → basket. A package with no stock is
+   shown but not buyable (`isAvailable: false`).
 2. `POST /api/purchases` (or `POST /api/purchases/bulk`), device-signed, creates an order
    (`PendingPayment`) and a Monobank invoice, returning a payment URL. **Price is recomputed
    server-side from `FuelPackages`** — the client value is only a proposal.
@@ -188,8 +189,9 @@ Admins use the **same** login flow; the `Admin` role is granted by setting the u
    checked; on success the order → `PendingFulfillment` and an `OrderCreated` outbox event is queued.
    (In dev, `POST /api/purchases/simulate` — Admin — stands in for the webhook.)
 4. The Hangfire `FulfillmentService` (`*/1 * * * *`) assigns `Available` vouchers matching
-   `(provider, fuelTypeId, liters)` via **FEFO**; the order → `Fulfilled` (or `PartiallyFulfilled`
-   if stock is short). `NotificationService` then creates an in-app notification.
+   `(provider, fuelTypeId, liters)` via **FEFO**; the order → `Fulfilled`, or `PartiallyFulfilled` when
+   stock ran short between the checkout gate and the claim (or when the order predates that gate).
+   `NotificationService` then creates an in-app notification.
 5. The app polls `GET /api/vouchers/my` + `GET /api/sync/orders`; redemption at the pump is
    self-reported via `PATCH /api/vouchers/{id}/mark-used`.
 
@@ -311,6 +313,7 @@ role required; — = public. This lists the primary endpoints; admin sub-resourc
 |---|---|---|---|
 | `POST` | `/api/purchases` | ✅ (device-signed) | Create a single purchase + Monobank invoice |
 | `POST` | `/api/purchases/bulk` | ✅ (device-signed) | Create a multi-item purchase |
+| — | | | Both answer 409 with a stable code on a deliberate refusal: `below_cost`, `term_stock_unavailable`, `package_out_of_stock` |
 | `GET` | `/api/purchases/my` | ✅ | Current user's purchases (with vouchers) |
 | `POST` | `/api/purchases/simulate` | Admin | Simulate a Monobank callback (dev/testing) |
 | `POST` | `/api/monobank/webhook` | — (signed) | Monobank payment callback — signature-verified, fail-closed 401 |
@@ -349,7 +352,7 @@ role required; — = public. This lists the primary endpoints; admin sub-resourc
 |---|---|---|
 | `GET` | `/api/stations` · `/api/station-nodes` | Stations and physical locations |
 | `GET` | `/api/stations/fuel-types` | Fuel types with base/discount pricing (public catalog) |
-| `GET` | `/api/packages` · `/api/packages/station/{id}` | Fuel packages (all / by station) |
+| `GET` | `/api/packages` · `/api/packages/station/{id}` | Fuel packages (all / by station), each with `isAvailable` (scoped to the caller's own stock pool) |
 | `GET` | `/api/report` | Per-user report (authenticated) |
 
 ### Admin

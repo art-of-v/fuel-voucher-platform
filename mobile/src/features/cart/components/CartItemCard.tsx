@@ -10,12 +10,27 @@ interface CartItemCardProps {
   item: CartItem;
   onUpdateQuantity: (id: string, quantity: number) => void;
   onRemove: (id: string) => void;
+  /**
+   * Whether this line's package still has stock. The basket re-reads the catalog rather than trusting
+   * the copy of the package it was handed when the line was added: stock moves while a basket sits
+   * open, and the alternative is discovering it as a rejected payment.
+   *
+   * `undefined` means "not known yet" (the catalog is still loading) and must not disable anything —
+   * failing the whole basket on a slow fetch would be worse than letting the server have the final word.
+   */
+  isAvailable?: boolean;
 }
 
-export function CartItemCard({ item, onUpdateQuantity, onRemove }: CartItemCardProps) {
+export function CartItemCard({
+  item,
+  onUpdateQuantity,
+  onRemove,
+  isAvailable,
+}: CartItemCardProps) {
   const tokens = useDesignTokens();
   const { t } = useI18n();
   const soft = tokens.surface.soft;
+  const outOfStock = isAvailable === false;
 
   // The line is priced at whatever the customer was quoted when they chose a term, falling back to the
   // package price when they did not. Both totals in the basket already read from `termLinePrice`, so this
@@ -29,7 +44,8 @@ export function CartItemCard({ item, onUpdateQuantity, onRemove }: CartItemCardP
         styles.card,
         {
           backgroundColor: tokens.colors.card,
-          borderColor: tokens.colors.borderLight,
+          borderColor: outOfStock ? tokens.colors.error : tokens.colors.borderLight,
+          opacity: outOfStock ? 0.6 : 1,
           borderRadius: soft ? tokens.surface.card : undefined,
         },
       ]}
@@ -42,12 +58,21 @@ export function CartItemCard({ item, onUpdateQuantity, onRemove }: CartItemCardP
           <Text style={[styles.cardBadge, { color: tokens.colors.primary }]}>
             {item.package?.liters ?? 0} {t('packages.liters')}
           </Text>
+          {outOfStock && (
+            <Text style={[styles.outOfStockText, { color: tokens.colors.error }]}>
+              {t('packages.outOfStock')}
+            </Text>
+          )}
         </View>
         <Pressable onPress={() => onRemove(item.id)} style={{ padding: 4 }}>
           <Trash2 size={20} color={tokens.colors.error} />
         </Pressable>
       </View>
 
+      {/* Quantity and the total are pointless on a line that cannot be paid for, so an emptied shelf
+          shows only the way out. Leaving a stepper that changes a total nobody will be charged is how
+          a basket starts contradicting the payment screen. */}
+      {!outOfStock && (
       <View style={styles.cardFooter}>
         <View style={styles.stepper}>
           <Pressable
@@ -97,6 +122,7 @@ export function CartItemCard({ item, onUpdateQuantity, onRemove }: CartItemCardP
           )}
         </View>
       </View>
+      )}
     </View>
   );
 }
@@ -124,6 +150,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textTransform: 'uppercase',
     marginTop: 2,
+  },
+  outOfStockText: {
+    fontSize: 11,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    marginTop: 4,
   },
   cardFooter: {
     flexDirection: 'row',

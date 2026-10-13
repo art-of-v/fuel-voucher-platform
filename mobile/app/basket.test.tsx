@@ -36,6 +36,8 @@ let mockDiscount = 0;
 let mockTotal = 0;
 let mockDiscounted = 0;
 let mockIsWorker = false;
+// The catalog snapshot the availability check reads. `undefined` until a test says otherwise.
+let mockCatalog: { stationId: string; fuelTypeId: string; liters: number; isAvailable?: boolean }[] | undefined;
 
 jest.mock('expo-router', () => {
   const R = jest.requireActual<typeof import('react')>('react');
@@ -71,6 +73,14 @@ jest.mock('../src/features/cart/store/cartStore', () => ({
 
 jest.mock('../src/features/company/hooks/useAccountContext', () => ({
   useAccountContext: () => ({ kind: mockIsWorker ? 'worker' : 'personal' }),
+}));
+
+// The screen re-reads the catalog to find out whether the stock behind each line still exists. Mocked at
+// the hook rather than at the network layer: this file already stubs the store and the router, and
+// pulling the real API client in would drag a native biometrics module into a screen test for nothing.
+// `undefined` models "the catalog has not answered yet", which must NOT block payment — see the tests.
+jest.mock('../src/features/stations/hooks/useAllPackages', () => ({
+  useAllPackages: () => ({ data: mockCatalog }),
 }));
 
 jest.mock('../src/core/hooks/useTheme', () => {
@@ -148,11 +158,15 @@ jest.mock('../src/features/cart/components/CartItemCard', () => {
   return {
     __esModule: true,
     // Exposes the two callbacks so the wiring can be asserted directly. Drawing the
-    // card is that component's own tested concern.
-    CartItemCard: ({ item, onUpdateQuantity, onRemove }: any) =>
+    // card is that component's own tested concern. Availability rides out on a real
+    // View prop so the screen->card hand-off is assertable without a custom one.
+    CartItemCard: ({ item, onUpdateQuantity, onRemove, isAvailable }: any) =>
       R.createElement(
         View,
-        { testID: `card-${item.id}` },
+        {
+          testID: `card-${item.id}`,
+          accessibilityState: { disabled: isAvailable === false },
+        },
         R.createElement(RNText, null, item.station.logoText),
         R.createElement(
           Pressable,
@@ -233,6 +247,7 @@ describe('Basket — the arithmetic the customer reads', () => {
     mockTotal = 0;
     mockDiscounted = 0;
     mockIsWorker = false;
+    mockCatalog = undefined;
     mockPush.mockClear();
     mockUpdateQuantity.mockClear();
     mockRemoveFromCart.mockClear();
@@ -280,6 +295,7 @@ describe('Basket — the promocode', () => {
     mockTotal = 0;
     mockDiscounted = 0;
     mockIsWorker = false;
+    mockCatalog = undefined;
     mockPush.mockClear();
     mockClearCart.mockClear();
     mockApplyPromocode.mockClear();
@@ -388,6 +404,7 @@ describe('Basket — the ways out', () => {
     mockTotal = 0;
     mockDiscounted = 0;
     mockIsWorker = false;
+    mockCatalog = undefined;
     mockPush.mockClear();
     mockUpdateQuantity.mockClear();
     mockRemoveFromCart.mockClear();
@@ -464,6 +481,7 @@ describe('Basket — wiring the lines to the store', () => {
     mockTotal = 0;
     mockDiscounted = 0;
     mockIsWorker = false;
+    mockCatalog = undefined;
     mockPush.mockClear();
     mockUpdateQuantity.mockClear();
     mockRemoveFromCart.mockClear();
@@ -495,5 +513,79 @@ describe('Basket — wiring the lines to the store', () => {
 
     fireEvent.press(screen.getByTestId('remove-line-2'));
     expect(mockRemoveFromCart).toHaveBeenCalledWith('line-2');
+  });
+});
+
+/**
+ * The basket is persisted across launches and stock moves underneath it, so the screen re-reads the
+ * catalog and refuses to hand the customer to a payment that will be rejected.
+ */
+describe('Basket - stock that ran out while the basket was open', () => {
+  beforeEach(() => {
+    mockCart = [];
+    mockPromocode = null;
+    mockDiscount = 0;
+    mockTotal = 0;
+    mockDiscounted = 0;
+    mockIsWorker = false;
+    mockCatalog = undefined;
+    mockPush.mockClear();
+    mockClearCart.mockClear();
+  });
+
+  it('blocks checkout and says why when a line has no stock left', () => {
+    stocked();
+    mockCatalog = [{ stationId: 'st-1', fuelTypeId: 'ft-1', liters: 50, isAvailable: false }];
+
+    render(<BasketScreen />);
+
+    expect(screen.getByText('basket.blockedByStock')).toBeTruthy();
+    fireEvent.press(screen.getByText('basket.blockedByStock'));
+    expect(mockPush).not.toHaveBeenCalledWith('/checkout');
+  });
+
+  it('marks the emptied line and passes the answer down to its card', () => {
+    stocked();
+    mockCatalog = [{ stationId: 'st-1', fuelTypeId: 'ft-1', liters: 50, isAvailable: false }];
+
+    render(<BasketScreen />);
+
+    expect(screen.getByTestId('card-line-1').props.accessibilityState.disabled).toBe(true);
+    expect(screen.getByTestId('card-line-2').props.accessibilityState.disabled).toBe(true);
+  });
+
+  it('still checks out when every line is in stock', () => {
+    stocked();
+    mockCatalog = [{ stationId: 'st-1', fuelTypeId: 'ft-1', liters: 50, isAvailable: true }];
+
+    render(<BasketScreen />);
+
+    expect(screen.queryByText('basket.blockedByStock')).toBeNull();
+    fireEvent.press(screen.getByText('basket.checkout'));
+    expect(mockPush).toHaveBeenCalledWith('/checkout');
+  });
+
+  it('does not block the basket while the catalog is still loading', () => {
+    // "Not known yet" is not "out of stock". Blocking payment on a slow fetch would make a network
+    // hiccup look like an empty shelf — and the server's 409 is the real guard, not this.
+    stocked();
+    mockCatalog = undefined;
+
+    render(<BasketScreen />);
+
+    expect(screen.queryByText('basket.blockedByStock')).toBeNull();
+    fireEvent.press(screen.getByText('basket.checkout'));
+    expect(mockPush).toHaveBeenCalledWith('/checkout');
+  });
+
+  it('does not block a line it has never heard of in the catalog', () => {
+    // A package can leave the catalog entirely (archived, or a brand no longer listed). Absent is not
+    // the same as unavailable, and guessing "unavailable" here would strand a legitimate basket.
+    stocked();
+    mockCatalog = [{ stationId: 'other-station', fuelTypeId: 'ft-9', liters: 5, isAvailable: true }];
+
+    render(<BasketScreen />);
+
+    expect(screen.queryByText('basket.blockedByStock')).toBeNull();
   });
 });

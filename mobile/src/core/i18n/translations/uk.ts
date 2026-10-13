@@ -27,6 +27,11 @@ export const uk: Record<string, string> = {
   // be shown: all they can act on is that this fuel cannot be bought right now.
   'purchase.error.belowCost':
     'Це пальне зараз недоступне для купівлі. Спробуйте обрати інше або зачекайте.',
+  // The shelf emptied after the basket was filled. Unlike belowCost this one resolves on its own, so
+  // it is stated as a stock fact rather than as "this fuel cannot be bought" — the customer can check
+  // back, and the package reappears on its own once stock is activated.
+  'purchase.error.outOfStock':
+    'Цього пального зараз немає на складі. Приберіть його з кошика або зачекайте, поки зʼявиться.',
   'renew.error.providerTermExhausted':
     'Цей талон не може стільки протримати — оберіть коротший термін.',
   'renew.error.unknownTerm': 'Невідомий термін.',
@@ -97,6 +102,9 @@ export const uk: Record<string, string> = {
   'packages.liters': 'ЛІТРІВ',
   'packages.save': 'ЗНИЖКА',
   'packages.addToCart': 'ДОДАТИ В КОШИК',
+  // Shown on the card itself and on its disabled button, so the customer learns the shelf is empty
+  // from the offer rather than from a rejected payment.
+  'packages.outOfStock': 'Недоступно на складі',
   'packages.browseOnly': 'Тут лише перегляд. Щоб купити пально, перейдіть в особистий контекст.',
   'packages.addedToCart': 'ДОДАНО В КОШИК',
   'packages.added': 'ДОДАНО',
@@ -118,6 +126,9 @@ export const uk: Record<string, string> = {
   'basket.discount': 'Знижка',
   'basket.totalToPay': 'ДО СПЛАТИ',
   'basket.checkout': 'ОФОРМИТИ ЗАМОВЛЕННЯ',
+  // Replaces the checkout button while a line in the basket has no stock. It states the block and the
+  // way out in one line rather than leaving a live button that fails at the payment screen.
+  'basket.blockedByStock': 'Приберіть позиції без залишків',
   'basket.cards': 'талонів',
 
   'checkout.title': 'ОПЛАТА',

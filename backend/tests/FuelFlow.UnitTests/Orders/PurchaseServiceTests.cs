@@ -6,10 +6,14 @@ using FuelFlow.Features.Orders.GetUserPurchases;
 using FuelFlow.Features.Orders.SimulatePayment;
 using FuelFlow.Features.Orders.UpdateMonobankInfo;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.Availability;
 using FuelFlow.Features.Vouchers.Import;
+using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -40,6 +44,7 @@ public OrderCommandHandlersTests()
             SeedFuelTypes();
             SeedFuelPackages();
             SeedDefaultUser(); // active user for checkout tests
+            SeedSellableStock(); // checkout refuses a package with nothing sellable behind it
 
             var createCheckoutLogger = new Mock<ILogger<CreateCheckoutCommandHandler>>().Object;
         var bulkCheckoutLogger = new Mock<ILogger<BulkCheckoutCommandHandler>>().Object;
@@ -67,8 +72,8 @@ public OrderCommandHandlersTests()
                 It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<string?>(), It.IsAny<int?>()))
             .Returns("qr-code-data");
 
-        _createCheckoutHandler = new CreateCheckoutCommandHandler(_context, new StubMonobankClientFactory(_monobankClientMock.Object), new StubMonobankMerchantResolver(), mockMonobankOptions.Object, createCheckoutLogger, new FuelFlow.SharedKernel.Observability.FuelFlowMetrics(), NotificationDispatcher.Disabled);
-        _bulkCheckoutHandler = new BulkCheckoutCommandHandler(_context, new StubMonobankClientFactory(_monobankClientMock.Object), new StubMonobankMerchantResolver(), mockMonobankOptions.Object, new RuntimeSettingsService(_context), bulkCheckoutLogger, NotificationDispatcher.Disabled);
+        _createCheckoutHandler = new CreateCheckoutCommandHandler(_context, new StubMonobankClientFactory(_monobankClientMock.Object), new StubMonobankMerchantResolver(), mockMonobankOptions.Object, createCheckoutLogger, new FuelFlow.SharedKernel.Observability.FuelFlowMetrics(), NotificationDispatcher.Disabled, Stock());
+        _bulkCheckoutHandler = new BulkCheckoutCommandHandler(_context, new StubMonobankClientFactory(_monobankClientMock.Object), new StubMonobankMerchantResolver(), mockMonobankOptions.Object, new RuntimeSettingsService(_context), bulkCheckoutLogger, NotificationDispatcher.Disabled, Stock());
         _getUserPurchasesHandler = new GetUserPurchasesCommandHandler(_context, qrGeneratorMock.Object, getUserPurchasesLogger);
         _simulatePaymentHandler = new SimulatePaymentCommandHandler(_context, _getUserPurchasesHandler, simulatePaymentLogger, new Mock<IBackgroundJobClient>().Object);
         _updateMonobankInfoHandler = new UpdateMonobankInfoCommandHandler(_context, updateMonobankInfoLogger);
@@ -111,6 +116,32 @@ public OrderCommandHandlersTests()
         _context.FuelPackages.AddRange(packages);
         _context.SaveChanges();
     }
+
+    /// <summary>
+    /// Checkout now refuses a package with nothing sellable behind it, so every test that expects a
+    /// completed sale needs real <c>Available</c> stock under the line it buys.
+    /// </summary>
+    private void SeedSellableStock()
+    {
+        _context.FuelVouchers.Add(new FuelVoucher
+        {
+            Id = Guid.NewGuid(),
+            Provider = "OKKO",
+            FuelTypeId = "okko-95",
+            Liters = 50m,
+            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            VoucherNumber = $"STOCK-{Guid.NewGuid().ToString()[..8]}",
+            QrPayload = Guid.NewGuid().ToString(),
+            Status = VoucherStatus.Available,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        _context.SaveChanges();
+    }
+
+    private PackageStockAvailability Stock()
+        => new(_context, new ConfigurationBuilder().Build());
 
     public void Dispose()
     {
@@ -333,7 +364,8 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
             }),
             new Mock<ILogger<CreateCheckoutCommandHandler>>().Object,
             new FuelFlow.SharedKernel.Observability.FuelFlowMetrics(),
-            NotificationDispatcher.Disabled);
+            NotificationDispatcher.Disabled,
+            Stock());
 
     [Fact]
     public async Task CreateCheckout_ShouldChargeFractionalKopecks_AndMatchMonobankAmountExactly()

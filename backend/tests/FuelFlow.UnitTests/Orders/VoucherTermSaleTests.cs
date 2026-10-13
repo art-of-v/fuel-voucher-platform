@@ -6,6 +6,8 @@ using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.Availability;
+using Microsoft.Extensions.Configuration;
 using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
@@ -146,7 +148,15 @@ public sealed class VoucherTermSaleTests : IDisposable
     private BulkCheckoutCommandHandler Handler()
         => new(_context, new StubMonobankClientFactory(_monobank.Object), new StubMonobankMerchantResolver(), _monobankOptions, _settings,
                new Mock<ILogger<BulkCheckoutCommandHandler>>().Object,
-               NotificationDispatcher.Disabled);
+               NotificationDispatcher.Disabled,
+               Stock());
+
+    /// <summary>
+    /// Checkout refuses a package with no sellable stock behind it, so every test that expects a sale
+    /// needs a seeded <c>Available</c> voucher behind the line it buys.
+    /// </summary>
+    private PackageStockAvailability Stock()
+        => new(_context, new ConfigurationBuilder().Build());
 
     /// <summary>
     /// Puts one <c>Available</c> voucher in stock with the given paper term. The term ladder is gated on
@@ -178,6 +188,7 @@ public sealed class VoucherTermSaleTests : IDisposable
     {
         // Even with a ladder configured, the master switch being off must not touch the sale.
         EnableTermSale(("1w", 20m));
+        SeedStock(daysUntilPaperExpiry: 8);   // checkout refuses a package with nothing sellable behind it
         _context.AppSettings.First(s => s.Key == AppSettingKeys.VoucherTermSaleEnabled).Value = "false";
         _context.SaveChanges();
 
@@ -192,6 +203,7 @@ public sealed class VoucherTermSaleTests : IDisposable
     public async Task TermSaleDisabled_TermRequested_IsIgnoredRatherThanRejected()
     {
         // Fail-safe direction: a settings problem must never stop a customer buying fuel.
+        SeedStock(daysUntilPaperExpiry: 8);   // checkout refuses a package with nothing sellable behind it
         var response = await Handler().HandleAsync(Command("1w"));
 
         var order = await _context.Orders.Include(o => o.LineItems).FirstAsync(o => o.Id == response.OrderIds[0]);
@@ -219,6 +231,7 @@ public sealed class VoucherTermSaleTests : IDisposable
     {
         // Only 1w is configured; asking for 3m must not invent a price for it.
         EnableTermSale(("1w", 20m));
+        SeedStock(daysUntilPaperExpiry: 8);   // checkout refuses a package with nothing sellable behind it
 
         var response = await Handler().HandleAsync(Command("3m"));
 
@@ -231,6 +244,7 @@ public sealed class VoucherTermSaleTests : IDisposable
     public async Task UnknownTermCode_FallsBackToTheFullTerm()
     {
         EnableTermSale(("1w", 20m));
+        SeedStock(daysUntilPaperExpiry: 8);   // checkout refuses a package with nothing sellable behind it
 
         var response = await Handler().HandleAsync(Command("99y"));
 
@@ -244,6 +258,7 @@ public sealed class VoucherTermSaleTests : IDisposable
     {
         // Zero discount means "not configured", so the term falls away rather than being free.
         EnableTermSale(("1w", 0m));
+        SeedStock(daysUntilPaperExpiry: 8);   // checkout refuses a package with nothing sellable behind it
 
         var response = await Handler().HandleAsync(Command("1w"));
 
@@ -256,6 +271,7 @@ public sealed class VoucherTermSaleTests : IDisposable
     public async Task DisabledTier_FallsBackToTheFullTerm()
     {
         EnableTermSale(("1w", 20m));
+        SeedStock(daysUntilPaperExpiry: 8);   // checkout refuses a package with nothing sellable behind it
         _context.AppSettings.First(s => s.Key == AppSettingKeys.VoucherTermTierEnabled("1w")).Value = "false";
         _context.SaveChanges();
 
@@ -291,6 +307,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         // The ladder is a discount on top of the cost+margin price, so the below-cost guard has to see
         // the discounted figure — otherwise a generous tier becomes a silent under-cost sale.
         EnableTermSale(("1w", 25m));   // 60 → 35 ₴/L against a 40 ₴/L supplier cost
+        SeedStock(daysUntilPaperExpiry: 8);   // checkout refuses a package with nothing sellable behind it
 
         var act = () => Handler().HandleAsync(Command("1w"));
 
@@ -315,6 +332,7 @@ public sealed class VoucherTermSaleTests : IDisposable
     public async Task DiscountOneTickBelowCost_IsBlocked()
     {
         EnableTermSale(("1w", 20.01m));   // 39.99 ₴/L against a 40 ₴/L cost
+        SeedStock(daysUntilPaperExpiry: 8);   // checkout refuses a package with nothing sellable behind it
 
         var act = () => Handler().HandleAsync(Command("1w"));
 
@@ -599,12 +617,29 @@ public sealed class VoucherTermSaleTests : IDisposable
     {
         // Defence in depth: even if a stale client posts a term the picker no longer offers, checkout must
         // refuse it rather than charge the long-term price for a validity that gets clamped.
+        // The shelf is NOT empty — an empty one is refused earlier, by the package gate. What is wrong
+        // here is the stock's paper term: 2 days of validity cannot carry a 1-month promise.
         EnableTermSale(("1m", 5m));
+        SeedStock(daysUntilPaperExpiry: 2);
 
         var act = () => Handler().HandleAsync(Command("1m"));
 
         await act.Should().ThrowAsync<TermStockUnavailableException>();
         (await _context.Orders.AsNoTracking().CountAsync()).Should().Be(0, "no order may be created");
+    }
+
+    [Fact]
+    public async Task Checkout_RefusesTheWholeCart_WhenAnyLineHasNoStock()
+    {
+        // The package gate and the term gate answer different questions and must not be confused: no
+        // stock at all is PackageOutOfStockException (409 package_out_of_stock), while stock whose paper
+        // term is too short is TermStockUnavailableException. If this ever starts throwing the latter,
+        // the package gate has stopped firing.
+        var act = () => Handler().HandleAsync(Command(termCode: null));
+
+        await act.Should().ThrowAsync<PackageOutOfStockException>()
+            .WithMessage("*okko-95*", "the message has to name what could not be bought");
+        (await _context.Orders.AsNoTracking().CountAsync()).Should().Be(0, "no order, and so no invoice");
     }
 
     [Fact]
@@ -623,7 +658,11 @@ public sealed class VoucherTermSaleTests : IDisposable
     public async Task Checkout_FullTermSale_NeedsNoStockGate()
     {
         // The feature off (or no term asked for) sells the voucher's full remaining life, which any stock
-        // satisfies. That path must not start failing because a stock check was bolted onto it.
+        // satisfies. That path must not pick up the TERM gate, which measures the stock's paper term
+        // against a promise. It is not a licence to skip the package gate — there still has to be stock
+        // at all, or nothing can be sold (see Checkout_RefusesTheWholeCart_WhenAnyLineHasNoStock).
+        SeedStock(daysUntilPaperExpiry: 8);
+
         var response = await Handler().HandleAsync(Command(termCode: null));
 
         var order = await _context.Orders.AsNoTracking().Include(o => o.LineItems)

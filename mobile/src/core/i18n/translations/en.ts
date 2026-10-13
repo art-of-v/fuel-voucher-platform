@@ -26,6 +26,10 @@ export const en: Record<string, string> = {
   // told only what they can: this fuel cannot be bought right now.
   'purchase.error.belowCost':
     'This fuel is currently unavailable for purchase. Try another one or check back later.',
+  // The shelf emptied after the basket was filled. Unlike belowCost this one resolves on its own, so
+  // it is stated as a stock fact rather than as "this fuel cannot be bought".
+  'purchase.error.outOfStock':
+    'This fuel is out of stock. Remove it from your basket or check back later.',
   'renew.error.providerTermExhausted':
     'This voucher cannot last that long - choose a shorter term.',
 
@@ -97,6 +101,9 @@ export const en: Record<string, string> = {
   'packages.liters': 'LITERS',
   'packages.save': 'SAVE',
   'packages.addToCart': 'ADD TO CART',
+  // Shown on the card itself and on its disabled button, so the customer learns the shelf is empty
+  // from the offer rather than from a rejected payment.
+  'packages.outOfStock': 'Out of stock',
   'packages.browseOnly': 'Browsing only here. Switch to your personal context to buy fuel.',
   'packages.addedToCart': 'ADDED TO CART',
   'packages.quantity': 'Quantity',
@@ -118,6 +125,9 @@ export const en: Record<string, string> = {
   'basket.discount': 'Discount',
   'basket.totalToPay': 'TOTAL TO PAY',
   'basket.checkout': 'PROCEED TO CHECKOUT',
+  // Replaces the checkout button while a line in the basket has no stock: states the block and the way
+  // out in one line instead of leaving a live button that fails at the payment screen.
+  'basket.blockedByStock': 'Remove out-of-stock items',
   'basket.cards': 'codes',
 
   'checkout.title': 'PAYMENT',

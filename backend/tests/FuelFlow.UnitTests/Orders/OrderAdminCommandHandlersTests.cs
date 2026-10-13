@@ -11,10 +11,12 @@ using FuelFlow.Features.Orders.GetAdminPurchases;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Orders.UpdateOrderStatus;
 using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
@@ -66,7 +68,8 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
             mockMonobankOptions.Object,
             new RuntimeSettingsService(_context),
             new Mock<ILogger<BulkCheckoutCommandHandler>>().Object,
-            NotificationDispatcher.Disabled);
+            NotificationDispatcher.Disabled,
+            new FuelFlow.Features.Vouchers.Availability.PackageStockAvailability(_context, new ConfigurationBuilder().Build()));
 
         _deleteOrderHandler = new DeleteOrderCommandHandler(_context);
         _updateOrderStatusHandler = new UpdateOrderStatusCommandHandler(_context);
@@ -132,6 +135,30 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
     {
         _context.Database.EnsureDeleted();
         _context.Dispose();
+    }
+
+    /// <summary>
+    /// Checkout refuses a package with nothing sellable behind it, so a test that expects a completed
+    /// sale has to put an activated voucher under every line it buys.
+    /// </summary>
+    private void SeedSellableStock(string fuelTypeId, decimal liters = 50m)
+    {
+        var expiry = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1));
+        _context.FuelVouchers.Add(new FuelVoucher
+        {
+            Id = Guid.NewGuid(),
+            Provider = "OKKO",
+            FuelTypeId = fuelTypeId,
+            Liters = liters,
+            ProviderExpirationDate = expiry,
+            CustomerExpirationDate = expiry,
+            VoucherNumber = $"STOCK-{Guid.NewGuid().ToString()[..8]}",
+            QrPayload = Guid.NewGuid().ToString(),
+            Status = VoucherStatus.Available,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        _context.SaveChanges();
     }
 
     private static Order BuildOrder(Guid userId, OrderStatus status = OrderStatus.PendingPayment) => new()
@@ -238,6 +265,8 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
     public async Task BulkCheckout_ShouldCreateSingleOrder_WithAllLineItems_AndSharedInvoice()
     {
         var user = await _context.Users.FirstAsync();
+        SeedSellableStock("okko-95");
+        SeedSellableStock("okko-p95");
         var command = new BulkCheckoutCommand
         {
             UserId = user.Id,

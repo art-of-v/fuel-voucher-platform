@@ -125,6 +125,10 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
         {
             return Conflict(new { code = TermStockUnavailableException.Code, message = ex.Message });
         }
+        catch (PackageOutOfStockException ex)
+        {
+            return Conflict(new { code = PackageOutOfStockException.Code, message = ex.Message });
+        }
         catch (AccountInactiveException ex)
         {
             return StatusCode(StatusCodes.Status403Forbidden, new { code = AccountInactiveException.Code, message = ex.Message });
@@ -325,6 +329,10 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
         catch (BelowCostSaleBlockedException ex)
         {
             return Conflict(new { code = BelowCostSaleBlockedException.Code, message = ex.Message });
+        }
+        catch (PackageOutOfStockException ex)
+        {
+            return Conflict(new { code = PackageOutOfStockException.Code, message = ex.Message });
         }
         catch (AccountInactiveException ex)
         {

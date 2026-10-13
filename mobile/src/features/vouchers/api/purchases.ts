@@ -92,6 +92,13 @@ export function purchaseErrorKey(code?: string): string | null {
     // can do nothing about. They are told only what they can act on.
     case 'below_cost':
       return 'purchase.error.belowCost';
+    // The shelf emptied between opening the shop and pressing pay. Not our fault and not the
+    // customer's either; it is the one refusal that resolves on its own.
+    //
+    // Deliberately NOT the same key as `below_cost`: they look identical to the customer and mean
+    // different things to the operator, and one of them ("wait for stock") is actionable now.
+    case 'package_out_of_stock':
+      return 'purchase.error.outOfStock';
     default:
       return null;
   }

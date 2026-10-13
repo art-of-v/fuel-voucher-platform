@@ -13,6 +13,8 @@ using FuelFlow.Features.Stations.GetPublicStationNodes;
 using FuelFlow.Features.Stations.GetPublicStationNodesByStation;
 using FuelFlow.Features.Stations.GetPublicStations;
 using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.Availability;
+using Microsoft.Extensions.Configuration;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
@@ -149,9 +151,9 @@ public sealed class StationsQueryHandlersTests : IDisposable
             CreatePackage("pkg-2", "station-b", "ft-b", "Diesel", 20m));
         await _context.SaveChangesAsync();
 
-        var handler = new GetPublicPackagesQueryHandler(_context);
+        var handler = new GetPublicPackagesQueryHandler(_context, Stock());
 
-        var result = await handler.HandleAsync(new GetPublicPackagesQuery());
+        var result = await handler.HandleAsync(new GetPublicPackagesQuery(CallerUserId: null));
 
         result.Should().HaveCount(2);
     }
@@ -168,9 +170,9 @@ public sealed class StationsQueryHandlersTests : IDisposable
             CreatePackage("pkg-qa", "station-a", "ft-qa", "QA-CHECK-95", 5m, isTestData: true));
         await _context.SaveChangesAsync();
 
-        var handler = new GetPublicPackagesQueryHandler(_context);
+        var handler = new GetPublicPackagesQueryHandler(_context, Stock());
 
-        var result = await handler.HandleAsync(new GetPublicPackagesQuery());
+        var result = await handler.HandleAsync(new GetPublicPackagesQuery(CallerUserId: null));
 
         result.Should().ContainSingle("a rehearsal package reaching the store front is purchasable");
         result[0].Id.Should().Be("pkg-real");
@@ -188,9 +190,9 @@ public sealed class StationsQueryHandlersTests : IDisposable
             CreatePackage("pkg-qa", "station-a", "ft-qa", "QA-CHECK-95", 5m, isTestData: true));
         await _context.SaveChangesAsync();
 
-        var handler = new GetPublicPackagesByStationQueryHandler(_context);
+        var handler = new GetPublicPackagesByStationQueryHandler(_context, Stock());
 
-        var result = await handler.HandleAsync(new GetPublicPackagesByStationQuery("station-a"));
+        var result = await handler.HandleAsync(new GetPublicPackagesByStationQuery("station-a", CallerUserId: null));
 
         result.Should().ContainSingle();
         result[0].Id.Should().Be("pkg-real");
@@ -225,9 +227,9 @@ public sealed class StationsQueryHandlersTests : IDisposable
             CreatePackage("pkg-3", "station-b", "ft-b", "Diesel", 20m));
         await _context.SaveChangesAsync();
 
-        var handler = new GetPublicPackagesByStationQueryHandler(_context);
+        var handler = new GetPublicPackagesByStationQueryHandler(_context, Stock());
 
-        var result = await handler.HandleAsync(new GetPublicPackagesByStationQuery("station-a"));
+        var result = await handler.HandleAsync(new GetPublicPackagesByStationQuery("station-a", CallerUserId: null));
 
         result.Should().HaveCount(2);
         result.Should().OnlyContain(p => p.StationId == "station-a");
@@ -257,9 +259,9 @@ public sealed class StationsQueryHandlersTests : IDisposable
         });
         await _context.SaveChangesAsync();
 
-        var handler = new GetPublicPackagesQueryHandler(_context);
+        var handler = new GetPublicPackagesQueryHandler(_context, Stock());
 
-        var result = await handler.HandleAsync(new GetPublicPackagesQuery());
+        var result = await handler.HandleAsync(new GetPublicPackagesQuery(CallerUserId: null));
 
         var pkg = result.Should().ContainSingle().Which;
         pkg.Id.Should().Be("pkg-1");
@@ -295,14 +297,153 @@ public sealed class StationsQueryHandlersTests : IDisposable
         });
         await _context.SaveChangesAsync();
 
-        var handler = new GetPublicPackagesQueryHandler(_context);
+        var handler = new GetPublicPackagesQueryHandler(_context, Stock());
 
-        var result = await handler.HandleAsync(new GetPublicPackagesQuery());
+        var result = await handler.HandleAsync(new GetPublicPackagesQuery(CallerUserId: null));
 
         var pkg = result.Should().ContainSingle().Which;
         pkg.OriginalPrice.Should().Be(500);   // == sale price → no saving shown
     }
 
+    /// <summary>
+    /// The whole point of the flag: the catalog keeps listing every package, and says which of them
+    /// the shop can actually sell right now. A package with no activated voucher behind it is marked
+    /// unavailable rather than hidden — the customer can still read the price and walk the app.
+    /// </summary>
+    [Fact]
+    public async Task GetPublicPackages_ShouldFlagAvailability_PromotingNothingAndHidingNothing()
+    {
+        _context.FuelPackages.AddRange(
+            CreatePackage("pkg-in-stock", "station-a", "ft-a", "A-95", 10m),
+            CreatePackage("pkg-empty", "station-a", "ft-a", "A-95", 20m));
+        _context.FuelVouchers.Add(CreateVoucher("station-a", "ft-a", 10m));
+        await _context.SaveChangesAsync();
+
+        var handler = new GetPublicPackagesQueryHandler(_context, Stock());
+
+        var result = await handler.HandleAsync(new GetPublicPackagesQuery(CallerUserId: null));
+
+        result.Should().HaveCount(2, "an empty shelf is greyed out, not removed from the catalog");
+        result.Single(p => p.Id == "pkg-in-stock").IsAvailable.Should().BeTrue();
+        result.Single(p => p.Id == "pkg-empty").IsAvailable.Should().BeFalse();
+    }
+
+    /// <summary>
+    /// Imported stock is not sellable stock. A freshly imported batch sits in <c>Imported</c> until a
+    /// manager costs it and activates it, and until then the package must read as unavailable — this
+    /// is the same "import ≠ available" gate the activation action enforces.
+    /// </summary>
+    [Fact]
+    public async Task GetPublicPackages_ShouldNotCountUnactivatedImportedStockAsAvailable()
+    {
+        _context.FuelPackages.Add(CreatePackage("pkg-1", "station-a", "ft-a", "A-95", 10m));
+        _context.FuelVouchers.Add(CreateVoucher("station-a", "ft-a", 10m, status: VoucherStatus.Imported));
+        await _context.SaveChangesAsync();
+
+        var handler = new GetPublicPackagesQueryHandler(_context, Stock());
+
+        var result = await handler.HandleAsync(new GetPublicPackagesQuery(CallerUserId: null));
+
+        result.Should().ContainSingle().Which.IsAvailable.Should().BeFalse();
+    }
+
+    /// <summary>
+    /// The QA⇄test split is a fulfilment guarantee (#914): a test voucher can never reach a paying
+    /// customer. The catalog has to honour it too, or it advertises to a real customer stock that
+    /// fulfilment would then refuse to hand over.
+    /// </summary>
+    [Fact]
+    public async Task GetPublicPackages_ShouldNotShowTestStockToARegularCustomer()
+    {
+        _context.FuelPackages.Add(CreatePackage("pkg-1", "station-a", "ft-a", "A-95", 10m));
+        _context.FuelVouchers.Add(CreateVoucher("station-a", "ft-a", 10m, isTestData: true));
+        await _context.SaveChangesAsync();
+
+        var handler = new GetPublicPackagesQueryHandler(_context, Stock());
+
+        var result = await handler.HandleAsync(new GetPublicPackagesQuery(CallerUserId: null));
+
+        result.Should().ContainSingle().Which.IsAvailable.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task GetPublicPackages_ShouldMatchStockByBrandCaseInsensitively()
+    {
+        // The catalog carries "station-a"; imported stock carries whatever the supplier printed.
+        // Fulfilment compares case-insensitively, so a case difference must not read as "no stock".
+        _context.FuelPackages.Add(CreatePackage("pkg-1", "station-a", "ft-a", "A-95", 10m));
+        _context.FuelVouchers.Add(CreateVoucher("STATION-A", "ft-a", 10m));
+        await _context.SaveChangesAsync();
+
+        var handler = new GetPublicPackagesQueryHandler(_context, Stock());
+
+        var result = await handler.HandleAsync(new GetPublicPackagesQuery(CallerUserId: null));
+
+        result.Should().ContainSingle().Which.IsAvailable.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task GetPublicPackages_ShouldIgnoreExpiredStock_WhileExpiryIsEnforced()
+    {
+        _context.FuelPackages.Add(CreatePackage("pkg-1", "station-a", "ft-a", "A-95", 10m));
+        _context.FuelVouchers.Add(CreateVoucher(
+            "station-a", "ft-a", 10m, providerExpiration: DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1))));
+        await _context.SaveChangesAsync();
+
+        var handler = new GetPublicPackagesQueryHandler(_context, Stock());
+
+        var result = await handler.HandleAsync(new GetPublicPackagesQuery(CallerUserId: null));
+
+        result.Should().ContainSingle().Which.IsAvailable.Should().BeFalse();
+    }
+
+    /// <summary>
+    /// The sandbox escape hatch has to move both sides together. While <c>VoucherExpiration:Enabled</c>
+    /// is off the worker sells expired stock anyway, so the shop must not grey it out — otherwise the
+    /// catalogue and the worker disagree during a sandbox run.
+    /// </summary>
+    [Fact]
+    public async Task GetPublicPackages_ShouldCountExpiredStock_WhileExpiryIsDisabled()
+    {
+        _context.FuelPackages.Add(CreatePackage("pkg-1", "station-a", "ft-a", "A-95", 10m));
+        _context.FuelVouchers.Add(CreateVoucher(
+            "station-a", "ft-a", 10m, providerExpiration: DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1))));
+        await _context.SaveChangesAsync();
+
+        var handler = new GetPublicPackagesQueryHandler(_context, Stock(
+            new Dictionary<string, string?> { ["VoucherExpiration:Enabled"] = "false" }));
+
+        var result = await handler.HandleAsync(new GetPublicPackagesQuery(CallerUserId: null));
+
+        result.Should().ContainSingle().Which.IsAvailable.Should().BeTrue();
+    }
+
+    /// <summary>
+    /// The second anonymous storefront route carries the same flag; a filter on the first alone would
+    /// let it advertise stock checkout then refuses.
+    /// </summary>
+    [Fact]
+    public async Task GetPublicPackagesByStation_ShouldFlagAvailabilityToo()
+    {
+        _context.FuelPackages.AddRange(
+            CreatePackage("pkg-in-stock", "station-a", "ft-a", "A-95", 10m),
+            CreatePackage("pkg-empty", "station-a", "ft-a", "A-95", 20m));
+        _context.FuelVouchers.Add(CreateVoucher("station-a", "ft-a", 10m));
+        await _context.SaveChangesAsync();
+
+        var handler = new GetPublicPackagesByStationQueryHandler(_context, Stock());
+
+        var result = await handler.HandleAsync(new GetPublicPackagesByStationQuery("station-a", CallerUserId: null));
+
+        result.Should().HaveCount(2);
+        result.Single(p => p.Id == "pkg-in-stock").IsAvailable.Should().BeTrue();
+        result.Single(p => p.Id == "pkg-empty").IsAvailable.Should().BeFalse();
+    }
+
+    /// <summary>
+    /// The literal reason the shop may not advertise it is operational, not commercial: the supplier
+    /// cost is the operator's crown jewel and this DTO goes to anonymous callers.
+    /// </summary>
     [Fact]
     public void PublicPackageResponse_ShouldNotExposeSupplierCostOrMargin()
     {
@@ -495,6 +636,16 @@ public sealed class StationsQueryHandlersTests : IDisposable
         result.Should().ContainSingle();
     }
 
+    /// <summary>
+    /// The stock rule reads <c>VoucherExpiration:Enabled</c> from configuration, exactly as the
+    /// fulfilment worker does. Defaults to on, so a test that does not care about expiry gets the
+    /// strict, production behaviour unless it says otherwise.
+    /// </summary>
+    private PackageStockAvailability Stock(Dictionary<string, string?>? settings = null)
+        => new(_context, new ConfigurationBuilder()
+            .AddInMemoryCollection(settings ?? new Dictionary<string, string?>())
+            .Build());
+
     private static Station CreateStation(string id, string name)
     {
         return new Station
@@ -542,19 +693,27 @@ public sealed class StationsQueryHandlersTests : IDisposable
         };
     }
 
-    private static FuelVoucher CreateVoucher(string provider, string fuelTypeId, decimal liters)
+    private static FuelVoucher CreateVoucher(
+        string provider,
+        string fuelTypeId,
+        decimal liters,
+        VoucherStatus status = VoucherStatus.Available,
+        bool isTestData = false,
+        DateOnly? providerExpiration = null)
     {
+        var expiry = providerExpiration ?? DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1));
         return new FuelVoucher
         {
             Id = Guid.NewGuid(),
             Provider = provider,
             FuelTypeId = fuelTypeId,
             Liters = liters,
-            ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            ProviderExpirationDate = expiry,
+            CustomerExpirationDate = expiry,
             VoucherNumber = $"{provider}-{Guid.NewGuid().ToString()[..8]}",
             QrPayload = Guid.NewGuid().ToString(),
-            Status = VoucherStatus.Available,
+            Status = status,
+            IsTestData = isTestData,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };

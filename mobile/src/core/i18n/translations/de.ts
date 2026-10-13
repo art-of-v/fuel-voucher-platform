@@ -27,6 +27,10 @@ export const de: Record<string, string> = {
   // keinen Einfluss hat. Er erfährt nur, was ihn betrifft — dieser Kraftstoff ist gerade nicht kaufbar.
   'purchase.error.belowCost':
     'Dieser Kraftstoff ist derzeit nicht erhältlich. Wählen Sie einen anderen oder versuchen Sie es später.',
+  // Das Regal war zum Zeitpunkt der Zahlung leer — anders als beim unter Kosten liegenden Preis behebt
+  // sich das von selbst, sobald Bestand aktiviert wird.
+  'purchase.error.outOfStock':
+    'Dieser Kraftstoff ist nicht auf Lager. Entfernen Sie ihn aus dem Warenkorb oder versuchen Sie es später.',
   'renew.error.providerTermExhausted':
     'Dieser Gutschein hält nicht so lange - wählen Sie eine kürzere Laufzeit.',
 
@@ -100,6 +104,9 @@ export const de: Record<string, string> = {
   'packages.liters': 'LITER',
   'packages.save': 'SPAREN',
   'packages.addToCart': 'IN DEN WARENKORB',
+  // Steht auf der Karte selbst und auf dem deaktivierten Button, damit der Kunde das leere Regal am
+  // Angebot erkennt und nicht erst an einer abgelehnten Zahlung.
+  'packages.outOfStock': 'Nicht auf Lager',
   'packages.browseOnly':
     'Hier nur Ansicht. Zum Kauf von Kraftstoff wechseln Sie in Ihren persönlichen Kontext.',
   'packages.addedToCart': 'ZUM WARENKORB HINZUGEFÜGT',
@@ -122,6 +129,9 @@ export const de: Record<string, string> = {
   'basket.discount': 'Rabatt',
   'basket.totalToPay': 'GESAMTBETRAG',
   'basket.checkout': 'ZUR KASSE',
+  // Ersetzt den Kassena-Knopf, solange eine Position keinen Bestand hat: nennt Sperre und Ausweg in
+  // einer Zeile, statt einen aktiven Knopf zu lassen, der erst an der Kasse scheitert.
+  'basket.blockedByStock': 'Positionen ohne Bestand entfernen',
   'basket.cards': 'Karten',
 
   'checkout.title': 'ZAHLUNG',
