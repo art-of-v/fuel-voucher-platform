@@ -142,7 +142,7 @@ export function VoucherDetailModal({
                         allowFontScaling={false}
                         style={[styles.modalProvider, { color: tokens.colors.text.secondary }]}
                       >
-                        {voucher.provider}
+                        {voucher.brand}
                       </Text>
                       <Text
                         allowFontScaling={false}

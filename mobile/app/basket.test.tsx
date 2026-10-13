@@ -222,7 +222,7 @@ function makeItem(id = 'line-1', over: Partial<CartItem> = {}): CartItem {
       liters: 50,
       price: 2000,
       originalPrice: 2200,
-      provider: 'MONOBANK',
+      brand: 'MONOBANK',
       fuelType: 'A95',
     },
     station: { id: 'st-1', name: 'Shell', color: '#f00', logoText: 'SH', sortOrder: 1 },

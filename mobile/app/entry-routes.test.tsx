@@ -239,7 +239,7 @@ describe('Payment result — the last frame of a purchase', () => {
 
   it('renders nothing while it does so', () => {
     // The screen exists only to redirect; a stray "processing" spinner would flash
-    // between the payment provider and the wallet.
+    // between the payment brand and the wallet.
     const { toJSON } = render(<PaymentResultScreen />);
 
     expect(toJSON()).toBeNull();

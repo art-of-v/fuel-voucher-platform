@@ -129,7 +129,7 @@ export function groupCompanyStock(vouchers: Voucher[]): CompanyStock {
  * station: fuel accounting is per brand, and the station stays visible on the voucher itself.
  */
 export interface ProviderGroup {
-  provider: string;
+  brand: string;
   items: Voucher[];
   liters: number;
 }
@@ -140,10 +140,10 @@ export function groupVouchersByProvider(vouchers: Voucher[]): ProviderGroup[] {
   const byProvider = new Map<string, ProviderGroup>();
 
   for (const v of vouchers) {
-    const key = (v.provider || '').toUpperCase() || '-';
+    const key = (v.brand || '').toUpperCase() || '-';
     let group = byProvider.get(key);
     if (!group) {
-      group = { provider: key, items: [], liters: 0 };
+      group = { brand: key, items: [], liters: 0 };
       byProvider.set(key, group);
       groups.push(group);
     }
@@ -175,7 +175,7 @@ export interface WorkerRosterEntry {
   frozenCount: number;
   activeLiters: number;
   /** Everything this worker holds, by brand, for the drill-down. */
-  providers: ProviderGroup[];
+  brands: ProviderGroup[];
 }
 
 /** What the roster needs from a member row; kept structural so the hook stays the only source. */
@@ -213,7 +213,7 @@ export function buildWorkerRoster(
         usedCount: used.length,
         frozenCount: frozen.length,
         activeLiters: active.reduce((sum, v) => sum + (v.amount ?? 0), 0),
-        providers: groupVouchersByProvider(held),
+        brands: groupVouchersByProvider(held),
       };
     })
     .sort((a, b) => a.workerName.localeCompare(b.workerName));
@@ -257,18 +257,18 @@ export interface OrderBranchEntry {
 /**
  * The brands an order touched.
  *
- * `order.provider` is the provider of its FIRST line item, so a two-brand order reports only one
+ * `order.brand` is the brand of its FIRST line item, so a two-brand order reports only one
  * of them. Grouping by it would hide half the fuel the owner is looking for, so the line items are
- * the source of truth and the top-level provider is only a fallback for an order that somehow has
+ * the source of truth and the top-level brand is only a fallback for an order that somehow has
  * none.
  */
 export function brandsOfOrder(order: Order): string[] {
   const fromLines = (order.lineItems ?? [])
-    .map((li) => (li.provider || '').toUpperCase())
+    .map((li) => (li.brand || '').toUpperCase())
     .filter((p) => p.length > 0);
   const brands = [...new Set(fromLines)];
   if (brands.length > 0) return brands;
-  const fallback = (order.provider || '').toUpperCase();
+  const fallback = (order.brand || '').toUpperCase();
   return fallback.length > 0 ? [fallback] : ['-'];
 }
 

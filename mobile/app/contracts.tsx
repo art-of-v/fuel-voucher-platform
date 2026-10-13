@@ -335,7 +335,7 @@ export default function ContractsScreen() {
         {activeTab === 'AVAILABLE' ? (
           <View style={{ marginTop: tokens.spacing.xl, gap: tokens.spacing.lg }}>
             <Text style={[styles.sectionLabel, { color: tokens.colors.text.dim }]}>
-              {t('contracts.selectProvider')}
+              {t('contracts.selectBrand')}
             </Text>
             {stations?.map((station) => {
               const signed = isProviderSigned(station.id);
@@ -438,7 +438,7 @@ export default function ContractsScreen() {
                           fontSize: tokens.type.caption.fontSize,
                         }}
                       >
-                        {t('contracts.provider')}: {sc.station?.name || 'FuelFlow Network'}
+                        {t('contracts.brand')}: {sc.station?.name || 'FuelFlow Network'}
                       </Text>
                       <Text
                         style={{
@@ -510,7 +510,7 @@ export default function ContractsScreen() {
                   style={{ color: tokens.colors.text.dim, marginTop: tokens.spacing.xxs }}
                   numberOfLines={1}
                 >
-                  {t('contracts.provider')}: {selectedStation?.name}
+                  {t('contracts.brand')}: {selectedStation?.name}
                 </Text>
               </View>
               <Pressable
@@ -581,7 +581,7 @@ export default function ContractsScreen() {
                     {signingContract.title}
                   </Text>
                   <Text style={[styles.summaryProvider, { color: tokens.colors.text.dim }]}>
-                    {t('contracts.provider')}: {selectedStation?.name}
+                    {t('contracts.brand')}: {selectedStation?.name}
                   </Text>
                 </View>
               )}

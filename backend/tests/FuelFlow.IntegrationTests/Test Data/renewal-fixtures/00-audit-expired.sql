@@ -74,8 +74,8 @@ WHERE order_id IS NOT NULL;
 -- these, but the date is what actually matters, so the date is what the filter uses — a voucher left
 -- as `Available` with a lapsed date is exactly the row that makes the stock count lie.
 CREATE TEMP TABLE _expired AS
-SELECT v.id, v.voucher_number, v.provider, v.fuel_type_id, v.liters,
-       v.status, v.customer_expiration_date, v.provider_expiration_date
+SELECT v.id, v.voucher_number, v.brand, v.fuel_type_id, v.liters,
+       v.status, v.customer_expiration_date, v.supplier_expiration_date
 FROM fuel_vouchers v
 WHERE v.customer_expiration_date < CURRENT_DATE
   AND NOT EXISTS (SELECT 1 FROM _keep k WHERE k.id = v.id);
@@ -91,10 +91,10 @@ SELECT
 
 \echo ''
 \echo '=== what WOULD be deleted (expired, unowned, unreferenced) ==='
-SELECT voucher_number, provider, fuel_type_id, liters, status,
-       customer_expiration_date, provider_expiration_date
+SELECT voucher_number, brand, fuel_type_id, liters, status,
+       customer_expiration_date, supplier_expiration_date
 FROM _expired
-ORDER BY provider, fuel_type_id, liters, voucher_number;
+ORDER BY brand, fuel_type_id, liters, voucher_number;
 
 \echo ''
 \echo '=== kept, with the reason (first 50) ==='
@@ -103,8 +103,8 @@ FROM _keep k GROUP BY k.reason ORDER BY 2 DESC;
 
 \echo ''
 \echo '=== kept expired rows, in detail — this is the part that must look right ==='
-SELECT v.voucher_number, v.provider, v.fuel_type_id, v.liters, v.status,
-       v.customer_expiration_date, v.provider_expiration_date,
+SELECT v.voucher_number, v.brand, v.fuel_type_id, v.liters, v.status,
+       v.customer_expiration_date, v.supplier_expiration_date,
        k.reason
 FROM _keep k
 JOIN fuel_vouchers v ON v.id = k.id
@@ -149,7 +149,7 @@ COMMIT;
       AS protected_customer_still_there,
     (SELECT count(*) FROM fuel_vouchers WHERE customer_expiration_date < CURRENT_DATE)
       AS expired_remaining;
-  SELECT v.voucher_number, v.customer_expiration_date, v.provider_expiration_date
+  SELECT v.voucher_number, v.customer_expiration_date, v.supplier_expiration_date
   FROM fuel_vouchers v
   WHERE v.assigned_to_user_id IN (SELECT id FROM _protected_user)
   ORDER BY v.customer_expiration_date;

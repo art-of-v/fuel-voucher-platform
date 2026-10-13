@@ -162,7 +162,7 @@ export default function RenewSelectScreen() {
                 )}
                 <View style={{ flex: 1, gap: tokens.spacing.xxs }}>
                   <Text role="bodyStrong">
-                    {v.provider} · {v.fuelName || v.fuelType}
+                    {v.brand} · {v.fuelName || v.fuelType}
                   </Text>
                   <Text role="secondary" tone="muted">
                     {v.amount} {t('common.liter')}

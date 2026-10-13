@@ -150,7 +150,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
 
         var request = new CreateCheckoutCommand
         {
-            Brand = "okko",
+            
             FuelTypeId = "okko-95",
             Liters = 50,
             Quantity = 1,
@@ -177,7 +177,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
         // Arrange
         var request = new CreateCheckoutCommand
         {
-            Brand = "okko",
+            StationId = "okko",
             FuelTypeId = "okko-95",
             Liters = 50,
             Quantity = 1,
@@ -200,7 +200,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
 
         var request = new CreateCheckoutCommand
         {
-            Brand = "", // Invalid
+            StationId = "", // Invalid
             FuelTypeId = "okko-95",
             Liters = 50,
             Quantity = 1,
@@ -226,7 +226,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
 
         var createRequest = new CreateCheckoutCommand
         {
-            Brand = "wog",
+            
             FuelTypeId = "wog-95",
             Liters = 20,
             Quantity = 2,
@@ -261,7 +261,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
 
         var createRequest = new CreateCheckoutCommand
         {
-            Brand = "okko",
+            
             FuelTypeId = "okko-dp",
             Liters = 50,
             Quantity = 1,
@@ -302,7 +302,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
 
         var createRequest = new CreateCheckoutCommand
         {
-            Brand = "okko",
+            
             FuelTypeId = "okko-95",
             Liters = 20,
             Quantity = 1,
@@ -342,7 +342,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
 
         var request = new CreateCheckoutCommand
         {
-            Brand = "okko",
+            
             FuelTypeId = "okko-95",
             Liters = 50,
             Quantity = 1,
@@ -375,7 +375,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
 
         var request = new CreateCheckoutCommand
         {
-            Brand = "wog",
+            
             FuelTypeId = "wog-dp",
             Liters = 10,
             Quantity = 1,

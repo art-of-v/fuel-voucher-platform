@@ -24,7 +24,7 @@ jest.mock('expo-blur', () => ({ BlurView: 'BlurView' }));
 function makeVoucher(overrides: Partial<Voucher> = {}): Voucher {
   return {
     id: 'v1',
-    provider: 'okko',
+    brand: 'okko',
     fuelType: 'a95',
     fuelName: 'A95',
     amount: 10,

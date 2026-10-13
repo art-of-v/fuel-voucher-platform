@@ -155,7 +155,7 @@ function OrderBlock({
         isExpanded={isExpanded}
         onToggle={onToggleOrder}
         onVoucherPress={(v) => issueVoucher(v.id)}
-        brandColor={brandColorFor(entry.order.provider, tokens)}
+        brandColor={brandColorFor(entry.order.brand, tokens)}
       />
 
       {isExpanded && entry.undistributed.length > 0 && (
@@ -202,7 +202,7 @@ function OrderBlock({
  *
  * The wallet keeps receipts only, so this is the one place a purchase is reconciled
  * against what is left of it. Grouping is by brand rather than by the order's own
- * provider (`groupOrdersByBrand`), because an order that bought from two brands would
+ * brand (`groupOrdersByBrand`), because an order that bought from two brands would
  * otherwise hide half the fuel behind the wrong row.
  *
  * It holds only its own open/expanded state; the issue-voucher modal, the mutation and
@@ -248,7 +248,7 @@ export function HubOrdersBranch({ companyOrders, giftable, onIssue }: HubOrdersB
   };
 
   // The company's purchases by brand. Grouping reads every brand an order touched, not
-  // just the provider of its first line item, so a two-brand order cannot hide half the
+  // just the brand of its first line item, so a two-brand order cannot hide half the
   // fuel the owner is looking for.
   const orderBrands = useMemo(
     () => groupOrdersByBrand(companyOrders, orderBranchEntry),

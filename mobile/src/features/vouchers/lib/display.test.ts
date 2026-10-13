@@ -93,8 +93,8 @@ describe('resolveBrand', () => {
     ['klo', 'KLO'],
     ['shell', 'Shell'],
     ['socar', 'Socar'],
-  ])('resolves %s from "%s"', (expected, provider) => {
-    expect(resolveBrand(provider)).toBe(expected);
+  ])('resolves %s from "%s"', (expected, brand) => {
+    expect(resolveBrand(brand)).toBe(expected);
   });
 
   it('is case-insensitive', () => {
@@ -102,20 +102,20 @@ describe('resolveBrand', () => {
   });
 
   it('matches inside a longer name, not only an exact one', () => {
-    // Matched on a substring because providers do not arrive as clean ids.
+    // Matched on a substring because brands do not arrive as clean ids.
     expect(resolveBrand('Shell Ukraine')).toBe('shell');
     expect(resolveBrand('WOG Retail')).toBe('wog');
   });
 
   it('matches Latin only, which is all the API emits', () => {
-    // Verified against the backend: every `Provider = "..."` it writes is Latin
-    // ("KLO", "OKKO", "wog"), and no Cyrillic provider exists. Adding Cyrillic
+    // Verified against the backend: every `Brand = "..."` it writes is Latin
+    // ("KLO", "OKKO", "wog"), and no Cyrillic brand exists. Adding Cyrillic
     // matching here would be speculative — it would look like support for a case
     // that cannot occur, and would need its own test to justify.
     expect(resolveBrand('ПАТ ОККО')).toBeNull();
   });
 
-  it('returns null for an unknown provider rather than guessing', () => {
+  it('returns null for an unknown brand rather than guessing', () => {
     // The caller falls back to the theme primary. Guessing a brand from a
     // near-miss would paint the wrong network's colour on the card.
     expect(resolveBrand('Приватбанк')).toBeNull();
@@ -217,19 +217,19 @@ describe('brandColorFor', () => {
     },
   } as any;
 
-  it('resolves a known provider to that brand colour', () => {
+  it('resolves a known brand to that brand colour', () => {
     expect(brandColorFor('okko', tokens)).toBe('#OKKO');
   });
 
-  it('falls back to the action colour for an unknown provider', () => {
+  it('falls back to the action colour for an unknown brand', () => {
     // The important one. Guessing a nearby brand would paint the wrong network's
     // colour on the card, and a brand missing from the palette must not yield
     // undefined either — that renders as no colour at all.
-    expect(brandColorFor('some-new-provider', tokens)).toBe('#ACTION');
+    expect(brandColorFor('some-new-brand', tokens)).toBe('#ACTION');
     expect(brandColorFor('brand-not-in-palette', tokens)).toBe('#ACTION');
   });
 
-  it('falls back for a missing provider rather than throwing', () => {
+  it('falls back for a missing brand rather than throwing', () => {
     expect(brandColorFor(null, tokens)).toBe('#ACTION');
     expect(brandColorFor(undefined, tokens)).toBe('#ACTION');
     expect(brandColorFor('', tokens)).toBe('#ACTION');

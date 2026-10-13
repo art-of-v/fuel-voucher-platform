@@ -14,7 +14,7 @@ export async function getMyVouchers(): Promise<Voucher[]> {
 function mapVoucher(v: any): Voucher {
   return {
     id: v.id,
-    provider: v.provider,
+    brand: v.brand,
     fuelType: v.fuelType ?? v.fuelTypeId ?? '',
     fuelName: v.fuelName,
     amount: v.amount ?? v.liters ?? 0,
@@ -101,7 +101,7 @@ export async function getMyOrders(): Promise<Order[]> {
       lineItems: Array.isArray(o.lineItems)
         ? o.lineItems.map((li: any) => ({
             id: li.id,
-            provider: li.provider,
+            brand: li.brand,
             fuelTypeId: li.fuelTypeId ?? li.fuelType ?? '',
             liters: li.liters,
             quantity: li.quantity,

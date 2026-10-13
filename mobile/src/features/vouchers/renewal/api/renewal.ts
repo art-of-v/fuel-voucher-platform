@@ -45,7 +45,7 @@ export interface RenewalVoucherQuote {
   ineligibleReason?: string | null;
   /** 'extend' | 'replace' when eligible. */
   branch?: string | null;
-  provider: string;
+  brand: string;
   fuelTypeId: string;
   fuelName: string;
   liters: number;

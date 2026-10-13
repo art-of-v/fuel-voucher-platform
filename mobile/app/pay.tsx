@@ -32,7 +32,7 @@ import { isAppDeepLink } from '../src/features/payments/paymentSession';
  *     never opens and the customer is left on a blank page. Caught in
  *     onShouldStartLoadWithRequest, where the scheme list comes from the manifest instead of
  *     a constant, so a new scheme in app.config.ts needs no change here.
- *  3. WebView failure. A provider can block embedded user agents, and a WebView that never
+ *  3. WebView failure. A brand can block embedded user agents, and a WebView that never
  *     loads is an empty screen on a checkout where the customer has already committed money.
  *     Every failure path falls back to the appUrl deep link, which resolves to the Monobank
  *     app or, failing that, the web.

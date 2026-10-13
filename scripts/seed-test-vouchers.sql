@@ -40,7 +40,7 @@ BEGIN;
 -- fulfillments loses three vouchers in about nine seconds, which reads as silent data loss and is not.
 
 -- A single purchase order holding two vouchers: one with room to extend (customer term well short of
--- the provider term) and one whose customer term has caught up with it, which is the case that must
+-- the brand term) and one whose customer term has caught up with it, which is the case that must
 -- take the replace branch. The third voucher is already lapsed, so it exercises replace on entry.
 --
 -- `current_date + 7` keeps both inside the renewal trigger window (14 days by default): a customer
@@ -51,7 +51,7 @@ VALUES (
     now() - interval '3 days', now(), now() - interval '3 days', false)
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO order_line_items (id, order_id, provider, fuel_type_id, liters, quantity, unit_price, line_total, term_code)
+INSERT INTO order_line_items (id, order_id, brand, fuel_type_id, liters, quantity, unit_price, line_total, term_code)
 VALUES (
     '44444444-4444-4444-8444-000000000001', '11111111-1111-4111-8111-000000000001', 'OKKO',
     :'fuel_type_id', 10.00, 3, 96.90, 2907.00, '1w')
@@ -61,11 +61,11 @@ ON CONFLICT (id) DO NOTHING;
 -- rows are flagged too: a QA account may only draw on test fuel, and unflagged test stock would be
 -- indistinguishable from the real batch.
 INSERT INTO fuel_vouchers
-    (id, provider, fuel_type_id, liters, provider_expiration_date, customer_expiration_date,
+    (id, brand, fuel_type_id, liters, supplier_expiration_date, customer_expiration_date,
      voucher_number, qr_payload, created_at_utc, updated_at_utc, status, order_id,
      assigned_to_user_id, legal_entity_id, worker_user_id, is_test_data, is_deleted)
 VALUES
-    -- room to extend: customer +7d, provider +90d
+    -- room to extend: customer +7d, brand +90d
     ('22222222-2222-4222-8222-000000000001', 'OKKO', :'fuel_type_id', 10.00, current_date + 90, current_date + 7,
      'EMU-VCH-EXT', 'EMU-QR-EXT', now() - interval '3 days', now(), 'Assigned',
      '11111111-1111-4111-8111-000000000001', :'qa_user_id', NULL, NULL, true, false),
@@ -101,7 +101,7 @@ VALUES
 ON CONFLICT DO NOTHING;
 
 \echo '--- seeded ---'
-SELECT voucher_number, status, customer_expiration_date AS customer, provider_expiration_date AS provider, is_test_data
+SELECT voucher_number, status, customer_expiration_date AS customer, supplier_expiration_date AS brand, is_test_data
 FROM fuel_vouchers WHERE is_test_data ORDER BY voucher_number;
 
 SELECT 'test_vouchers_total' AS check, count(*) FROM fuel_vouchers WHERE is_test_data;

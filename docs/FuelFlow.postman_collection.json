@@ -1,4 +1,4 @@
-﻿{
+{
     "info":  {
                  "name":  "FuelFlow API",
                  "_postman_id":  "fuelflow-api-collection",
@@ -386,7 +386,7 @@
                                                                                     "disabled":  true
                                                                                 },
                                                                                 {
-                                                                                    "key":  "provider",
+                                                                                    "key":  "brand",
                                                                                     "value":  "",
                                                                                     "disabled":  true
                                                                                 },
@@ -727,7 +727,7 @@
                                                       "url":  "{{baseUrl}}/api/purchases",
                                                       "body":  {
                                                                    "mode":  "raw",
-                                                                   "raw":  "{\n  \"provider\": \"okko\",\n  \"fuelTypeId\": \"okko-a95\",\n  \"liters\": 20,\n  \"quantity\": 1,\n  \"price\": 11600,\n  \"stationId\": \"okko\",\n  \"stationName\": \"OKKO\"\n}"
+                                                                   "raw":  "{\n  \"brand\": \"okko\",\n  \"fuelTypeId\": \"okko-a95\",\n  \"liters\": 20,\n  \"quantity\": 1,\n  \"price\": 11600,\n  \"stationId\": \"okko\",\n  \"stationName\": \"OKKO\"\n}"
                                                                }
                                                   }
                                   },
@@ -1154,7 +1154,7 @@
                                                                        "url":  "{{baseUrl}}/api/purchases",
                                                                        "body":  {
                                                                                     "mode":  "raw",
-                                                                                    "raw":  "{\n  \"legalEntityId\": \"{{legalEntityId}}\",\n  \"provider\": \"okko\",\n  \"fuelTypeId\": \"okko-a95\",\n  \"liters\": 20,\n  \"quantity\": 1,\n  \"price\": 11600,\n  \"stationId\": \"okko\",\n  \"stationName\": \"OKKO\"\n}"
+                                                                                    "raw":  "{\n  \"legalEntityId\": \"{{legalEntityId}}\",\n  \"brand\": \"okko\",\n  \"fuelTypeId\": \"okko-a95\",\n  \"liters\": 20,\n  \"quantity\": 1,\n  \"price\": 11600,\n  \"stationId\": \"okko\",\n  \"stationName\": \"OKKO\"\n}"
                                                                                 }
                                                                    },
                                                        "event":  [

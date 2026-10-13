@@ -86,7 +86,7 @@ export default function VoucherExchangeTab() {
 
   // Step 1 — old-stock selection
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [brandFilter, setBrandFilter] = useState("");
+  const [providerFilter, setProviderFilter] = useState("");
   const [fuelFilter, setFuelFilter] = useState("");
   const [numberQuery, setNumberQuery] = useState("");
 
@@ -112,11 +112,11 @@ export default function VoucherExchangeTab() {
   const numberQ = numberQuery.trim().toLowerCase();
   const filtered = items.filter(
     (i) =>
-      (!brandFilter || i.brand === brandFilter) &&
+      (!providerFilter || i.brand === providerFilter) &&
       (!fuelFilter || i.fuelName === fuelFilter) &&
       (!numberQ || i.voucherNumber.toLowerCase().includes(numberQ)),
   );
-  const filtersActive = !!(brandFilter || fuelFilter || numberQ);
+  const filtersActive = !!(providerFilter || fuelFilter || numberQ);
 
   const { data: costContext, isLoading: costLoading } = useQuery<CostContext>({
     queryKey: ["/api/admin/voucher-exchange/cost-context", importId],
@@ -223,7 +223,7 @@ export default function VoucherExchangeTab() {
   const resetAll = () => {
     setStep(1);
     setSelected(new Set());
-    setBrandFilter("");
+    setProviderFilter("");
     setFuelFilter("");
     setNumberQuery("");
     setImportId(null);
@@ -321,7 +321,7 @@ export default function VoucherExchangeTab() {
                   className="h-8 w-56 pl-9"
                 />
               </div>
-              <Select value={brandFilter || "__all__"} onValueChange={(v) => setBrandFilter(v === "__all__" ? "" : v)}>
+              <Select value={providerFilter || "__all__"} onValueChange={(v) => setProviderFilter(v === "__all__" ? "" : v)}>
                 <SelectTrigger className="h-8 w-44"><SelectValue placeholder={t("voucherExchange.allBrands")} /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">{t("voucherExchange.allBrands")}</SelectItem>

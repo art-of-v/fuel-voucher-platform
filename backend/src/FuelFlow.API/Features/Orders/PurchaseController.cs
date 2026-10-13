@@ -84,8 +84,12 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
         // hands out vouchers for the positive lines, so this is a money-integrity check.
         foreach (var item in command.Items)
         {
-            if (string.IsNullOrWhiteSpace(item.Brand))
-                return BadRequest("Brand is required for every item");
+            // The brand is StationId and nothing else - the request used to carry a second, required
+            // `Provider` field that the handler overwrote with this same value. Validating the one
+            // the handler actually reads is what keeps a blank station a 400 instead of the 500 the
+            // handler's own guard would raise.
+            if (string.IsNullOrWhiteSpace(item.StationId))
+                return BadRequest("StationId is required for every item");
 
             if (string.IsNullOrWhiteSpace(item.FuelTypeId))
                 return BadRequest("FuelTypeId is required for every item");
@@ -291,8 +295,9 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CreatePurchase([FromBody] CreateCheckoutCommand command, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(command.Brand))
-            return BadRequest("Brand is required");
+        // The brand is StationId - see the note on the bulk path above.
+        if (string.IsNullOrWhiteSpace(command.StationId))
+            return BadRequest("StationId is required");
 
         if (string.IsNullOrWhiteSpace(command.FuelTypeId))
             return BadRequest("FuelTypeId is required");

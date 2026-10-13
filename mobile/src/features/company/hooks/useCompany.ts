@@ -45,14 +45,14 @@ function scopedOrders(orders: Order[], ownedEntityId: string | null): Order[] {
   return orders.filter((o) => o.legalEntityId === ownedEntityId);
 }
 
-function groupGiftableByProvider(vouchers: Voucher[]): { provider: string; items: Voucher[] }[] {
-  const groups: { provider: string; items: Voucher[] }[] = [];
-  const byProvider = new Map<string, { provider: string; items: Voucher[] }>();
+function groupGiftableByProvider(vouchers: Voucher[]): { brand: string; items: Voucher[] }[] {
+  const groups: { brand: string; items: Voucher[] }[] = [];
+  const byProvider = new Map<string, { brand: string; items: Voucher[] }>();
   for (const v of vouchers) {
-    const key = (v.provider || '').toUpperCase() || '—';
+    const key = (v.brand || '').toUpperCase() || '—';
     let group = byProvider.get(key);
     if (!group) {
-      group = { provider: key, items: [] };
+      group = { brand: key, items: [] };
       byProvider.set(key, group);
       groups.push(group);
     }

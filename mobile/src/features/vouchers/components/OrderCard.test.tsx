@@ -36,7 +36,7 @@ jest.mock('react-native-gesture-handler/ReanimatedSwipeable', () => {
 function mkVoucher(overrides: Partial<Voucher> = {}): Voucher {
   return {
     id: 'v1',
-    provider: 'OKKO',
+    brand: 'OKKO',
     fuelType: 'a95',
     amount: 10,
     status: 'active',
@@ -49,7 +49,7 @@ function mkVoucher(overrides: Partial<Voucher> = {}): Voucher {
 function mkOrder(overrides: Partial<Order> = {}): Order {
   return {
     id: 'order-1',
-    provider: 'OKKO',
+    brand: 'OKKO',
     fuelType: 'a95',
     liters: 10,
     quantity: 1,
@@ -58,7 +58,7 @@ function mkOrder(overrides: Partial<Order> = {}): Order {
     createdAt: '2026-01-01T00:00:00Z',
     fulfilledAt: '2026-01-02T00:00:00Z',
     legalEntityId: 'e1',
-    lineItems: [{ id: 'l1', provider: 'OKKO', fuelTypeId: 'a95', liters: 10, quantity: 1 }],
+    lineItems: [{ id: 'l1', brand: 'OKKO', fuelTypeId: 'a95', liters: 10, quantity: 1 }],
     ...overrides,
   } as Order;
 }
@@ -95,9 +95,9 @@ function renderCard(
 
 describe('OrderCard - the vouchers it lists', () => {
   it('renders one card per voucher in the order', () => {
-    renderCard([mkVoucher({ id: 'v1' }), mkVoucher({ id: 'v2', provider: 'Shell' })]);
+    renderCard([mkVoucher({ id: 'v1' }), mkVoucher({ id: 'v2', brand: 'Shell' })]);
 
-    // The order header names its own provider too, so a brand appearing twice is
+    // The order header names its own brand too, so a brand appearing twice is
     // the signal that a card was rendered for it.
     expect(screen.getAllByText('OKKO').length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText('Shell').length).toBeGreaterThanOrEqual(1);

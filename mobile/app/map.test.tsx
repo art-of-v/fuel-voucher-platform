@@ -215,7 +215,7 @@ jest.mock('expo-blur', () => ({
 
 /**
  * The screen reads `useQueryClient()` directly (it calls `queryClient.invalidateQueries`
- * after refetching), so it is rendered inside a real provider rather than with
+ * after refetching), so it is rendered inside a real brand rather than with
  * react-query mocked — a mock here would hide the invalidation calls this suite is
  * positioned to check later.
  */

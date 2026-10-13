@@ -133,7 +133,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         {
             new CheckoutItem
             {
-                Brand = "okko",
+                
                 FuelTypeId = "okko-95",
                 StationId = "okko",
                 StationName = "OKKO",

@@ -33,7 +33,7 @@ jest.mock('react-native-gesture-handler/ReanimatedSwipeable', () => {
 function mkVoucher(overrides: Partial<Voucher> = {}): Voucher {
   return {
     id: 'v1',
-    provider: 'OKKO',
+    brand: 'OKKO',
     fuelType: 'a95',
     amount: 10,
     status: 'active',
@@ -46,7 +46,7 @@ function mkVoucher(overrides: Partial<Voucher> = {}): Voucher {
 function mkOrder(overrides: Partial<Order> = {}): Order {
   return {
     id: 'order-1',
-    provider: 'OKKO',
+    brand: 'OKKO',
     fuelType: 'a95',
     liters: 10,
     quantity: 1,
@@ -55,7 +55,7 @@ function mkOrder(overrides: Partial<Order> = {}): Order {
     createdAt: '2026-01-01T00:00:00Z',
     fulfilledAt: '2026-01-02T00:00:00Z',
     legalEntityId: 'e1',
-    lineItems: [{ id: 'l1', provider: 'OKKO', fuelTypeId: 'a95', liters: 10, quantity: 1 }],
+    lineItems: [{ id: 'l1', brand: 'OKKO', fuelTypeId: 'a95', liters: 10, quantity: 1 }],
     ...overrides,
   };
 }
@@ -111,10 +111,10 @@ describe('HubOrdersBranch', () => {
 
   it('files an order that bought from two brands under both of them', () => {
     const order = mkOrder({
-      provider: 'OKKO',
+      brand: 'OKKO',
       lineItems: [
-        { id: 'l1', provider: 'OKKO', fuelTypeId: 'a95', liters: 50, quantity: 1 },
-        { id: 'l2', provider: 'WOG', fuelTypeId: 'a95', liters: 50, quantity: 1 },
+        { id: 'l1', brand: 'OKKO', fuelTypeId: 'a95', liters: 50, quantity: 1 },
+        { id: 'l2', brand: 'WOG', fuelTypeId: 'a95', liters: 50, quantity: 1 },
       ],
     });
     renderBranch({ companyOrders: [order] });

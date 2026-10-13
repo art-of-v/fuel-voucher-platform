@@ -86,7 +86,7 @@ export default function CustomerRenewalTab() {
 
   const [queryInput, setQueryInput] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
-  const [brandFilter, setBrandFilter] = useState("");
+  const [providerFilter, setProviderFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
 
   const [selected, setSelected] = useState<RenewableVoucher | null>(null);
@@ -117,11 +117,11 @@ export default function CustomerRenewalTab() {
   const tiers = config?.tiers ?? [];
 
   const { data: vouchers = [], isLoading, isFetching } = useQuery<RenewableVoucher[]>({
-    queryKey: ["/api/admin/voucher-renewal/vouchers", debouncedQuery, brandFilter, statusFilter],
+    queryKey: ["/api/admin/voucher-renewal/vouchers", debouncedQuery, providerFilter, statusFilter],
     queryFn: () => {
       const params = new URLSearchParams();
       if (debouncedQuery) params.set("query", debouncedQuery);
-      if (brandFilter) params.set("brand", brandFilter);
+      if (providerFilter) params.set("brand", providerFilter);
       if (statusFilter) params.set("status", statusFilter);
       const qs = params.toString();
       return apiRequest<unknown, RenewableVoucher[]>(
@@ -129,7 +129,7 @@ export default function CustomerRenewalTab() {
     },
   });
 
-  const brandOptions = useMemo(
+  const providerOptions = useMemo(
     () => Array.from(new Set(vouchers.map((v) => v.brand))).sort(),
     [vouchers],
   );
@@ -146,7 +146,7 @@ const RENEWAL_ERROR_KEYS: Record<string, string> = {
   not_customer_voucher: "customerRenewal.error.notCustomerVoucher",
   invalid_surcharge: "customerRenewal.error.invalidSurcharge",
   unknown_term: "customerRenewal.error.unknownTerm",
-  brand_term_exhausted: "customerRenewal.error.brandTermExhausted",
+  provider_term_exhausted: "customerRenewal.error.providerTermExhausted",
   not_found: "customerRenewal.error.notFound",
 };
 
@@ -283,11 +283,11 @@ const RENEWAL_ERROR_PARAMS: Record<string, (error: ApiError) => { key: string; p
             className="pl-9"
           />
         </div>
-        <Select value={brandFilter || "__all__"} onValueChange={(v) => setBrandFilter(v === "__all__" ? "" : v)}>
+        <Select value={providerFilter || "__all__"} onValueChange={(v) => setProviderFilter(v === "__all__" ? "" : v)}>
           <SelectTrigger className="h-9 w-40"><SelectValue placeholder={t("customerRenewal.allBrands")} /></SelectTrigger>
           <SelectContent>
             <SelectItem value="__all__">{t("customerRenewal.allBrands")}</SelectItem>
-            {brandOptions.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+            {providerOptions.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={statusFilter || "__all__"} onValueChange={(v) => setStatusFilter(v === "__all__" ? "" : v)}>

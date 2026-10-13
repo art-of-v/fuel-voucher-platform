@@ -31,7 +31,7 @@ function mkMember(overrides: Partial<CompanyMemberDto> = {}): CompanyMemberDto {
 function mkVoucher(overrides: Partial<Voucher> = {}): Voucher {
   return {
     id: 'v1',
-    provider: 'OKKO',
+    brand: 'OKKO',
     fuelType: 'a95',
     amount: 10,
     status: 'active',

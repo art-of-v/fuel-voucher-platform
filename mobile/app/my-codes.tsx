@@ -675,7 +675,7 @@ export default function MyCodesScreen() {
 
                     onPay={handlePay}
                     onDelete={handleDeleteOrder}
-                    brandColor={brandColorFor(order.provider, tokens)}
+                    brandColor={brandColorFor(order.brand, tokens)}
                   />
                 ))}
               </View>
@@ -719,7 +719,7 @@ export default function MyCodesScreen() {
                     // when an owner is looking at their company context. An issuance receipt carries
                     // no money and so has no invoice behind it.
                     onReceipt={handleGetReceipt}
-                    brandColor={brandColorFor(order.provider, tokens)}
+                    brandColor={brandColorFor(order.brand, tokens)}
                   />
                 ))}
               </View>
@@ -769,7 +769,7 @@ export default function MyCodesScreen() {
                         onToggle={toggleOrderExpand}
                         onVoucherPress={openVoucher}
 
-                        brandColor={brandColorFor(order.provider, tokens)}
+                        brandColor={brandColorFor(order.brand, tokens)}
                       />
                     ))}
                   </>
@@ -857,7 +857,7 @@ export default function MyCodesScreen() {
         user={user}
         onClose={() => setSelectedVoucher(null)}
         onToggleUsed={toggleUsed}
-        brandColor={brandColorFor(selectedVoucher?.provider, tokens)}
+        brandColor={brandColorFor(selectedVoucher?.brand, tokens)}
         canRenew={selectedCanRenew}
         onRenew={(v) => {
           setSelectedVoucher(null);

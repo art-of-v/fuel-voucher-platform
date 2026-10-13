@@ -100,7 +100,7 @@ jest.mock('lucide-react-native', () => {
 
 const voucher = (id: string, over: Record<string, unknown> = {}) => ({
   id,
-  provider: 'Shell',
+  brand: 'Shell',
   fuelName: 'A95',
   fuelType: 'A95',
   amount: 50,

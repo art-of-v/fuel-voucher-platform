@@ -7,7 +7,7 @@ namespace FuelFlow.Features.Vouchers.Exchange;
 
 /// <summary>
 /// Lists operator STOCK vouchers that are already expired or lapsing soon (≤ the renewal threshold,
-/// default 14 days) so staff can renew them with the brand. Stock-only: assigned / worker-held /
+/// default 14 days) so staff can renew them with the supplier. Stock-only: assigned / worker-held /
 /// deleted vouchers are excluded. Drives both the "Заміна талонів" attention list and the nav badge
 /// count (planning #104).
 /// </summary>

@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FuelFlow.API.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20261013150406_RenameProviderToBrand")]
+    [Migration("20261013173857_RenameProviderToBrand")]
     partial class RenameProviderToBrand
     {
         /// <inheritdoc />

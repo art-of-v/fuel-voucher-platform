@@ -27,7 +27,7 @@ public sealed class AdminVoucherListItemDto
     /// <summary>Real supplier term, from the printed document. Never moves after import.</summary>
     public DateOnly SupplierExpirationDate { get; set; }
 
-    /// <summary>What the customer was sold; differs from the brand term only once we sell short terms.</summary>
+    /// <summary>What the customer was sold; differs from the supplier term only once we sell short terms.</summary>
     public DateOnly CustomerExpirationDate { get; set; }
 
     public string VoucherNumber { get; set; } = null!;

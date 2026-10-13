@@ -122,7 +122,7 @@ export async function createMonobankInvoice(
   const response = await apiFetch('/api/purchases', {
     method: 'POST',
     body: JSON.stringify({
-      provider: 'MONOBANK',
+      brand: 'MONOBANK',
       packageId: data.packageId,
       fuelTypeId: data.fuelType,
       liters: data.liters,
@@ -161,7 +161,7 @@ export async function createBulkMonobankInvoice(
       // every item), not per-item.
       ...(legalEntityId ? { legalEntityId } : {}),
       items: items.map((data) => ({
-        provider: 'MONOBANK',
+        brand: 'MONOBANK',
         packageId: data.packageId,
         fuelTypeId: data.fuelType,
         liters: data.liters,

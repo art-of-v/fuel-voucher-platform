@@ -153,7 +153,7 @@ function voucher(over: Record<string, any> = {}) {
     voucherId: 'v-1',
     eligible: true,
     branch: 'extend',
-    provider: 'Shell',
+    brand: 'Shell',
     fuelTypeId: 'ft-1',
     fuelName: 'A95',
     liters: 50,

@@ -118,7 +118,7 @@ function VoucherActionRow({
     <View style={[styles.row, { borderColor: tokens.colors.borderLight }]}>
       <View style={{ flex: 1 }}>
         <Text style={[styles.rowTitle, { color: tokens.colors.text.primary }]} numberOfLines={1}>
-          {voucher.provider} · {voucher.amount} {voucher.unit || t('common.liter')}
+          {voucher.brand} · {voucher.amount} {voucher.unit || t('common.liter')}
         </Text>
         <Text style={[styles.metaText, { color: tokens.colors.text.dim }]} numberOfLines={1}>
           {voucher.fuelName || voucher.fuelType}
@@ -297,15 +297,15 @@ function WorkerRosterRow({
               ? t('company.members.joined', formatExpirationDate(member.joinedAtUtc))
               : t('company.recall.formerWorker')}
           </Text>
-          {entry.providers.length === 0 ? (
+          {entry.brands.length === 0 ? (
             <Text style={[styles.metaText, { color: tokens.colors.text.dim }]}>
               {t('company.recall.empty')}
             </Text>
           ) : (
-            entry.providers.map((group) => (
-              <View key={group.provider} style={{ gap: 10 }}>
+            entry.brands.map((group) => (
+              <View key={group.brand} style={{ gap: 10 }}>
                 <Text style={[styles.groupHeader, { color: tokens.colors.text.dim }]}>
-                  {group.provider} · {group.liters} {t('common.liter')}
+                  {group.brand} · {group.liters} {t('common.liter')}
                 </Text>
                 {group.items.map((v) => (
                   <VoucherActionRow

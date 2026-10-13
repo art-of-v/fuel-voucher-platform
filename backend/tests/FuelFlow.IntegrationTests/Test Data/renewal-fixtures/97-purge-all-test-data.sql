@@ -114,7 +114,7 @@ UNION ALL SELECT 'push tokens', count(*) FROM push_tokens WHERE user_id IN (SELE
 UNION ALL SELECT 'refresh tokens', count(*) FROM refresh_tokens
 UNION ALL SELECT 'verification codes', count(*) FROM verification_codes
 UNION ALL SELECT 'notifications', count(*) FROM notifications
-UNION ALL SELECT 'provider event outbox', count(*) FROM provider_event_outbox
+UNION ALL SELECT 'brand event outbox', count(*) FROM provider_event_outbox
 UNION ALL SELECT 'error logs', count(*) FROM error_logs
 UNION ALL SELECT 'voucher imports', count(*) FROM voucher_imports
 UNION ALL SELECT 'purchase batches', count(*) FROM purchase_batches
@@ -230,7 +230,7 @@ COMMIT;
   UNION ALL SELECT 'refresh tokens', count(*) FROM refresh_tokens
   UNION ALL SELECT 'verification codes', count(*) FROM verification_codes
   UNION ALL SELECT 'notifications', count(*) FROM notifications
-  UNION ALL SELECT 'provider event outbox', count(*) FROM provider_event_outbox
+  UNION ALL SELECT 'brand event outbox', count(*) FROM provider_event_outbox
   UNION ALL SELECT 'error logs', count(*) FROM error_logs
   UNION ALL SELECT 'voucher imports', count(*) FROM voucher_imports
   UNION ALL SELECT 'outbox events', count(*) FROM outbox_events
@@ -243,7 +243,7 @@ COMMIT;
 
   \echo ''
   \echo '--- the real customer must be intact ---'
-  SELECT v.voucher_number, v.status, v.customer_expiration_date, v.provider_expiration_date
+  SELECT v.voucher_number, v.status, v.customer_expiration_date, v.supplier_expiration_date
   FROM fuel_vouchers v JOIN users u ON u.id = v.assigned_to_user_id
   WHERE u.phone_number LIKE '%1771' ORDER BY v.customer_expiration_date;
 \else
