@@ -1,10 +1,10 @@
 -- Seeds a QA-only mirror of the live fuel catalogue, so the App Store reviewer (and any QA session)
 -- can browse and buy fuel under names that cannot be confused with the real thing.
 --
--- What this creates, for every live package at one station:
+-- What this creates, for every live package at every station:
 --   * a `fuel_packages` row whose `fuel_name` is the live name plus a `(QA)` suffix, flagged
 --     `is_test_data = true`, reusing the live `station_id` and `fuel_type_id`;
---   * one sellable `fuel_vouchers` row behind it, also `is_test_data = true`.
+--   * `vouchers_per_package` sellable `fuel_vouchers` rows behind it, also `is_test_data = true`.
 --
 -- Why the names are mirrored here rather than listed: they stay 1:1 with whatever the catalogue
 -- actually sells today. Add a brand in admin and re-run this, and its QA twin appears too. A
@@ -24,23 +24,34 @@
 -- ever consumes test stock and a real order only ever real stock. Give the QA rows a different
 -- nominal if that confusion is worse than a per-row constant to maintain.
 --
--- Idempotent: re-running tops the pool up rather than failing.
+-- Idempotent: re-running tops the pool up to `vouchers_per_package` rather than failing, and never
+-- exceeds it. A reviewer who burns through one package and re-runs gets the count back, not a double.
 --
 -- Usage:
 --   docker exec -i fuelflow-postgres psql -U fuelflow -d fuelflow -v ON_ERROR_STOP=1 \
---     -v station_id=okko -v qa_liters=10 \
 --     -f - < scripts/seed-qa-catalogue.sql
 --
--- `station_id` is required and deliberately not defaulted: seeding the wrong station is exactly the
--- mistake this script exists to prevent. The live packages themselves already need `supplier_id`,
--- batch costs and activation before this produces anything sellable - see scripts/seed-test-vouchers.sql
--- and docs/testing/voucher-renewal-80.md for the operator side.
+--   # one station only
+--   ... -v station_id=okko -f - < scripts/seed-qa-catalogue.sql
+--
+--   # a different depth of stock
+--   ... -v vouchers_per_package=25 -f - < scripts/seed-qa-catalogue.sql
+--
+-- `station_id` is optional; with none given every network in the catalogue is mirrored, which is
+-- what an App Review run wants - the reviewer should be able to open any brand and find it stocked.
+-- The live packages themselves already need `supplier_id`, batch costs and activation before this
+-- produces anything sellable - see scripts/seed-test-vouchers.sql and the operator side in
+-- docs/testing/voucher-renewal-80.md.
 
 \set ON_ERROR_STOP on
+
+-- `station_id` is optional. Resolved here rather than in SQL because psql exposes "was this passed?"
+-- only as a command, so the branch has to become a variable the query can read.
 \if :{?station_id}
+\set seed_all_stations false
 \else
-\echo 'station_id is required (see the header of this file)'
-\quit
+\set seed_all_stations true
+\set station_id ''
 \endif
 
 BEGIN;
@@ -51,7 +62,15 @@ BEGIN;
 \set qa_suffix '(QA)'
 \endif
 
--- One QA package per live package at this station. The id is derived, so re-running collides on the
+-- Ten per package is deep enough that a reviewer cannot exhaust a brand by accident, and shallow
+-- enough that the "one left" state - and the out-of-stock state, which renders the package disabled -
+-- are both still reachable during a session.
+\if :{?vouchers_per_package}
+\else
+\set vouchers_per_package 10
+\endif
+
+-- One QA package per live package. The id is derived from the live id, so re-running collides on the
 -- primary key and does nothing rather than creating a second twin.
 INSERT INTO fuel_packages
     (id, station_id, fuel_type_id, fuel_name, liters, price, original_price,
@@ -72,9 +91,12 @@ SELECT
     false,
     now(), now()
 FROM fuel_packages live
-WHERE live.station_id = :'station_id'
-  AND NOT live.is_test_data
+WHERE NOT live.is_test_data
   AND NOT live.is_deleted
+  AND (
+      :'seed_all_stations'::boolean
+      OR live.station_id = :'station_id'
+  )
 ON CONFLICT (id) DO NOTHING;
 
 -- Stock behind each QA package.
@@ -97,6 +119,9 @@ ON CONFLICT (id) DO NOTHING;
 -- near-expiry banner and the renewal entry point only while the customer term sits inside the
 -- 14-day trigger window, and a full-term voucher shows neither. Hence customer +7d against a
 -- provider term of +180d - the same shape as the live stock.
+--
+-- `vouchers_per_package` of them, and only the shortfall: the series is bounded by what is already
+-- behind the package, so re-running tops the pool back up and stops, instead of multiplying it.
 INSERT INTO fuel_vouchers
     (id, provider, fuel_type_id, liters, cost_per_liter,
      provider_expiration_date, customer_expiration_date, voucher_number, qr_payload,
@@ -109,20 +134,31 @@ SELECT
     pkg.supplier_price_per_liter,
     current_date + 180,
     current_date + 7,
-    'QA-CAT-' || substr(md5(pkg.id), 1, 10),
-    'QA-QR-' || substr(md5(pkg.id), 1, 10),
+    'QA-CAT-' || substr(md5(pkg.id), 1, 8) || '-' || lpad(n::text, 2, '0'),
+    'QA-QR-' || substr(md5(pkg.id), 1, 8) || '-' || lpad(n::text, 2, '0'),
     'Available',
     true,
     false,
     now(), now()
 FROM fuel_packages pkg
+CROSS JOIN LATERAL (
+    SELECT generate_series(
+        1,
+        GREATEST(0, :vouchers_per_package::int - (
+            SELECT count(*)
+            FROM fuel_vouchers v
+            WHERE v.is_test_data
+              AND v.fuel_type_id = pkg.fuel_type_id
+              AND v.liters = pkg.liters
+              AND lower(v.provider) = lower(pkg.station_id)
+        ))
+    ) AS n
+) AS shortfall
 WHERE pkg.id LIKE 'qa-pkg-%'
-  AND NOT EXISTS (
-      SELECT 1 FROM fuel_vouchers v
-      WHERE v.is_test_data
-        AND v.fuel_type_id = pkg.fuel_type_id
-        AND v.liters = pkg.liters
-        AND lower(v.provider) = lower(pkg.station_id)
+  AND NOT pkg.is_deleted
+  AND (
+      :'seed_all_stations'::boolean
+      OR pkg.station_id = :'station_id'
   )
 ON CONFLICT DO NOTHING;
 
