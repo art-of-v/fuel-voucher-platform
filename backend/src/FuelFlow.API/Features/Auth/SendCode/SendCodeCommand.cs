@@ -152,9 +152,9 @@ public sealed class SendCodeCommandHandler
     }
 
     // Every Staff role, not just Admin: a ProductOwner or Manager with an email on file
-    // authenticates by email too (spec §3/§15). New Staff roles added later must be added here.
-    private static readonly string[] StaffRoleNames =
-        { SeedRoles.ProductOwnerName, SeedRoles.AdminName, SeedRoles.ManagerName };
+    // authenticates by email too (spec §3/§15). SeedRoles.StaffRoleNames is already the
+    // complete list, so there is nothing to add here when a staff role is introduced.
+    private static readonly string[] StaffRoleNames = SeedRoles.StaffRoleNames;
 
     /// <summary>Email of the non-deleted Staff account bound to this phone, or null when no
     /// such account exists. The channel follows the account's current role and email at send

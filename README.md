@@ -164,8 +164,18 @@ FuelFlow/
    signature (`/api/auth/device/*`); biometric/PIN unlock is a local gate. The device
    signature protects money-moving endpoints (checkout).
 
-Admins use the **same** login flow; the `Admin` role is granted by setting the user's
-`role_id` in the DB.
+Staff use the **same** login flow; a role is granted by setting the user's `role_id` in the DB.
+The staff hierarchy is `ProductOwner(100) > Admin(50) > Manager(10) > QA(5) > User(0)`, with the
+level stored in `roles.level` and the authority matrix enforced in
+`Features/Auth/AdminUser/RoleHierarchy.cs`:
+
+| role | can do |
+|---|---|
+| `ProductOwner` | everything; the singleton, never assignable or re-roled by anyone |
+| `Admin` | manage `User` / `Manager` accounts; ban and delete them |
+| `Manager` | activate/deactivate `User` accounts only |
+| `QA` | activate/deactivate `User` accounts only — the tester role; no ban, delete, or role assignment |
+| `User` | no staff rights at all |
 
 ### 2. Voucher import (admin)
 
@@ -252,7 +262,7 @@ The primary tables:
 | Table | Purpose |
 |---|---|
 | `users` | Accounts (UUID, unique phone, email, role); `is_active`, `token_version`, `is_deleted` drive session revocation & soft-delete |
-| `roles` | Role definitions with a level (`User`, `Manager`, `Admin`, `ProductOwner`) |
+| `roles` | Role definitions with a level (`User` 0, `QA` 5, `Manager` 10, `Admin` 50, `ProductOwner` 100) |
 | `verification_codes` | OTP records (stored hashed) |
 | `devices` | Registered device public keys for challenge/signature auth |
 | `refresh_tokens` | Rotating refresh tokens (`family_id` for reuse detection) |

@@ -168,12 +168,13 @@ public sealed class SetUserRoleCommandHandlerTests
         // to decide whether a demotion happened. Seeding it as 0 would make every theory
         // below vacuously "not a demotion", so these must mirror what production actually
         // ships - migration 20260917192136_AddRoleLevelAndSeedProductOwnerManager writes
-        // ProductOwner 100 / Admin 50 / Manager 10 / User 0.
+        // ProductOwner 100 / Admin 50 / Manager 10 / User 0, and AddQaRole writes QA 5.
         // AdminRoleDemotionIntegrationTests proves the same rule against real seeded rows.
         context.Roles.AddRange(
             new Role { Id = SeedRoles.ProductOwnerId, Name = SeedRoles.ProductOwnerName, Level = 100, CreatedAtUtc = DateTime.UtcNow },
             new Role { Id = SeedRoles.AdminRoleId, Name = SeedRoles.AdminName, Level = 50, CreatedAtUtc = DateTime.UtcNow },
             new Role { Id = SeedRoles.ManagerRoleId, Name = SeedRoles.ManagerName, Level = 10, CreatedAtUtc = DateTime.UtcNow },
+            new Role { Id = SeedRoles.QaRoleId, Name = SeedRoles.QaName, Level = 5, CreatedAtUtc = DateTime.UtcNow },
             new Role { Id = SeedRoles.UserRoleId, Name = SeedRoles.UserName, Level = 0, CreatedAtUtc = DateTime.UtcNow });
         await context.SaveChangesAsync();
     }
@@ -193,12 +194,17 @@ public sealed class SetUserRoleCommandHandlerTests
         return user;
     }
 
+    // Every role listed explicitly, and anything unrecognised throws. A trailing `_ => UserRoleId`
+    // used to make a mistyped or newly added role silently resolve to the User row, so a test
+    // written against QA would assert against the wrong role and still pass.
     private static Guid RoleIdFor(string roleName) => roleName switch
     {
-        "ProductOwner" => SeedRoles.ProductOwnerId,
-        "Admin" => SeedRoles.AdminRoleId,
-        "Manager" => SeedRoles.ManagerRoleId,
-        _ => SeedRoles.UserRoleId,
+        SeedRoles.ProductOwnerName => SeedRoles.ProductOwnerId,
+        SeedRoles.AdminName => SeedRoles.AdminRoleId,
+        SeedRoles.ManagerName => SeedRoles.ManagerRoleId,
+        SeedRoles.QaName => SeedRoles.QaRoleId,
+        SeedRoles.UserName => SeedRoles.UserRoleId,
+        _ => throw new ArgumentOutOfRangeException(nameof(roleName), roleName, "Unmapped role name"),
     };
 
     private static async Task<(RefreshToken, RefreshToken)> AddTwoActiveRefreshTokensAsync(

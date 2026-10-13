@@ -20,8 +20,9 @@ public sealed record AdminVerifyCodeCommand(string PhoneNumber, string Code);
 /// </summary>
 public sealed class AdminVerifyCodeCommandHandler
 {
-    private static readonly string[] StaffRoleNames =
-        [SeedRoles.ProductOwnerName, SeedRoles.AdminName, SeedRoles.ManagerName];
+    // The single staff list, not a copy of it: a private copy omitted roles added later and
+    // locked them out of admin sign-in. See SeedRoles.StaffRoleNames.
+    private static readonly string[] StaffRoleNames = SeedRoles.StaffRoleNames;
 
     private readonly ApplicationDbContext _context;
     private readonly IPhoneNumberService _phoneNumberService;

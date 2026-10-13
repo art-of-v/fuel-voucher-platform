@@ -307,7 +307,7 @@ public sealed class VerifyCodeCommandHandler
 
     private async Task LogFailedAdminLoginAsync(string phoneNumber, string reason, CancellationToken cancellationToken)
     {
-        var staffRoleNames = new[] { SeedRoles.ProductOwnerName, SeedRoles.AdminName, SeedRoles.ManagerName };
+        var staffRoleNames = SeedRoles.StaffRoleNames;
         
         var adminUser = await _context.Users
             .Include(u => u.Role)
