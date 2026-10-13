@@ -293,8 +293,13 @@ jobs:
           echo "::error::Could not pull postgres:16-alpine after 5 attempts. This is registry throttling, not a code fault - re-run rather than investigate."
           exit 1
 
+      # TEMPORARY MEASUREMENT - throwaway, revert after reading the answer.
+      # The default console logger only prints a summary, so the 10m54s this step takes is a single
+      # number with no way to attribute it. `verbosity=normal` makes it print every test as it
+      # completes, with its own duration, which is the only way to find out whether the remaining
+      # time is test bodies or the ~33 WebApplicationFactory host boots.
       - name: Integration tests
-        run: dotnet test tests/FuelFlow.IntegrationTests/FuelFlow.IntegrationTests.csproj --configuration Release
+        run: dotnet test tests/FuelFlow.IntegrationTests/FuelFlow.IntegrationTests.csproj --configuration Release --logger "console;verbosity=normal"
 
   admin:
     name: Admin (Vite React)
