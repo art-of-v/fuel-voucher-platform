@@ -605,11 +605,11 @@ jobs:
     if: >-
       always() && !cancelled() &&
       github.ref == 'refs/heads/main' && github.event_name == 'push' &&
-      needs.backend.result in ['success', 'skipped'] &&
-      needs.backend-integration.result in ['success', 'skipped'] &&
-      needs.admin.result in ['success', 'skipped'] &&
-      needs.mobile.result in ['success', 'skipped'] &&
-      needs.website.result in ['success', 'skipped']
+      (needs.backend.result == 'success' || needs.backend.result == 'skipped') &&
+      (needs.backend-integration.result == 'success' || needs.backend-integration.result == 'skipped') &&
+      (needs.admin.result == 'success' || needs.admin.result == 'skipped') &&
+      (needs.mobile.result == 'success' || needs.mobile.result == 'skipped') &&
+      (needs.website.result == 'success' || needs.website.result == 'skipped')
     needs: [backend, backend-integration, admin, mobile, website, image-backend, image-admin, image-website]
     runs-on: [self-hosted, linux, x64]
     permissions:
@@ -705,11 +705,11 @@ jobs:
     if: >-
       always() && !cancelled() &&
       github.ref == 'refs/heads/main' && github.event_name == 'push' &&
-      needs.backend.result in ['success', 'skipped'] &&
-      needs.backend-integration.result in ['success', 'skipped'] &&
-      needs.admin.result in ['success', 'skipped'] &&
-      needs.mobile.result in ['success', 'skipped'] &&
-      needs.website.result in ['success', 'skipped'] &&
+      (needs.backend.result == 'success' || needs.backend.result == 'skipped') &&
+      (needs.backend-integration.result == 'success' || needs.backend-integration.result == 'skipped') &&
+      (needs.admin.result == 'success' || needs.admin.result == 'skipped') &&
+      (needs.mobile.result == 'success' || needs.mobile.result == 'skipped') &&
+      (needs.website.result == 'success' || needs.website.result == 'skipped') &&
       needs.deploy-staging.result == 'success'
     needs: [backend, backend-integration, admin, mobile, website, image-backend, image-admin, image-website, deploy-staging]
     runs-on: [self-hosted, linux, x64]
