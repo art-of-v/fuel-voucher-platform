@@ -101,6 +101,6 @@ public sealed class ConcurrencyTokenTrackingRuleIntegrationTests : IClassFixture
     /// <summary>The production default, deliberately: no <c>UseQueryTrackingBehavior</c> override.</summary>
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseNpgsql(_fixture.DbContainer.GetConnectionString())
+            .UseNpgsql(_fixture.ConnectionString)
             .Options);
 }
