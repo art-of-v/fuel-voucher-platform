@@ -13,8 +13,15 @@ namespace FuelFlow.API.Migrations
         // the least-privilege built-in "User" role and is_active=true so a reviewer can exercise the
         // full workflow (including a test purchase); it can still only authenticate while an admin
         // has QA access enabled AND a QA code is configured, so seeding it grants nothing on its own.
-        private const string QaUserId = "a10c1de5-4a11-4b00-8000-000000000001"; // == AuthOptions.QaTestAccountUserId
+        // NOTE: the identity values here were rekeyed by the QaAccountIdentity data migration, which
+        // also gave the row a name and an email. This seed is amended to match so a fresh environment
+        // lands directly on the final state instead of seeding an old key that the later migration
+        // then has to rekey. The earlier hand-written id was a10c1de5-4a11-4b00-8000-000000000001.
+        private const string QaUserId = "01a136cb-e966-79bf-8cd3-99ccf51bd6b0"; // == AuthOptions.QaTestAccountUserId
         private const string QaPhoneNumber = "+380110010203";                   // == AuthOptions.QaTestAccountPhoneNumber
+        private const string QaFirstName = "Quality";                            // == AuthOptions.QaTestAccountFirstName
+        private const string QaLastName = "Assurance Engineer";                 // == AuthOptions.QaTestAccountLastName
+        private const string QaEmail = "qa@fuelflow.com";                       // == AuthOptions.QaTestAccountEmail
         private const string UserRoleId = "1b445bd0-6f91-4b5a-ac2d-a9601691142f"; // == SeedRoles.UserRoleId
         private const string QaEnabledKey = "QaTestAccess:Enabled";              // == AppSettingKeys.QaTestAccessEnabled
 
@@ -31,17 +38,29 @@ namespace FuelFlow.API.Migrations
                 $"""
                 INSERT INTO users (
                     id, phone_number, role_id, created_at_utc, updated_at_utc,
-                    bonus_balance, is_active, token_version, is_deleted, is_banned, is_qa_account)
+                    bonus_balance, is_active, token_version, is_deleted, is_banned, is_qa_account,
+                    first_name, last_name, email)
                 SELECT
                     '{QaUserId}'::uuid, '{QaPhoneNumber}', '{UserRoleId}'::uuid, now(), now(),
-                    0, true, 1, false, false, true
+                    0, true, 1, false, false, true,
+                    '{QaFirstName}', '{QaLastName}', '{QaEmail}'
                 WHERE NOT EXISTS (SELECT 1 FROM users WHERE phone_number = '{QaPhoneNumber}');
                 """);
 
             // Make sure an already-present row is flagged as the QA account (e.g. the number was
-            // registered as an ordinary user before this feature). Never touches any other row.
+            // registered as an ordinary user before this feature), and carries the identity it should
+            // have had. Never touches any other row, and never overwrites values a human set.
             migrationBuilder.Sql(
-                $"""UPDATE users SET is_qa_account = true WHERE phone_number = '{QaPhoneNumber}' AND is_qa_account = false;""");
+                $"""
+                UPDATE users
+                SET is_qa_account = true,
+                    first_name = COALESCE(first_name, '{QaFirstName}'),
+                    last_name  = COALESCE(last_name,  '{QaLastName}'),
+                    email      = COALESCE(email,      '{QaEmail}')
+                WHERE phone_number = '{QaPhoneNumber}'
+                  AND (is_qa_account = false
+                       OR first_name IS NULL OR last_name IS NULL OR email IS NULL);
+                """);
 
             // Seed the switch explicitly OFF so the admin panel has a row to show. Absence already
             // means "disabled" (fail-safe), so this is only for a clean initial UI state.

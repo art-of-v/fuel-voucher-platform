@@ -52,7 +52,15 @@ public sealed class AuthOptions
     /// Fixed deterministic id of the seeded QA test <c>User</c> row (role <c>User</c>, least
     /// privilege). Matches the value inserted by the QA-access migration.
     /// </summary>
-    public static readonly Guid QaTestAccountUserId = Guid.Parse("a10c1de5-4a11-4b00-8000-000000000001");
+    /// <remarks>
+    /// Rekeyed from a hand-written literal to a v7 key by the <c>QaAccountIdentity</c> data
+    /// migration, which rekeys the account only while nothing names it - see that migration for why
+    /// an environment with history may legitimately still be on the old value. Nothing in the
+    /// running system reads this: QA is identified at runtime by
+    /// <see cref="QaTestAccountPhoneNumber"/>, and this constant exists for the test suite's
+    /// convenience.
+    /// </remarks>
+    public static readonly Guid QaTestAccountUserId = Guid.Parse("01a136cb-e966-79bf-8cd3-99ccf51bd6b0");
 
     /// <summary>
     /// The QA verification code, supplied in plaintext through configuration/secret
