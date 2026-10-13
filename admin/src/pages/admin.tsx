@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Trash2, Loader2, FileUp, Filter, CheckSquare, ChevronUp, ChevronDown, ArrowUpDown, ChevronLeft, ChevronRight, FileSignature, Package, X, ArrowLeft, CheckCircle, XCircle, QrCode, BarChart, Building, ScrollText, Bug, Ban, ShieldCheck, MapPin, Replace, RefreshCw, Handshake } from "lucide-react";
+import { Trash2, Loader2, FileUp, Filter, CheckSquare, ChevronUp, ChevronDown, ArrowUpDown, ChevronLeft, ChevronRight, FileSignature, Package, X, ArrowLeft, CheckCircle, XCircle, QrCode, BarChart, Building, ScrollText, Bug, Ban, ShieldCheck, MapPin, Replace, RefreshCw, Handshake, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -30,6 +30,7 @@ import SuppliersTab from "@/components/SuppliersTab";
 import CustomerRenewalTab from "@/components/CustomerRenewalTab";
 import AuditTab from "@/components/AuditTab";
 import ErrorLogsTab from "@/components/ErrorLogsTab";
+import FeedbackTab from "@/components/FeedbackTab";
 import SettingsTab from "@/components/SettingsTab";
 import DateInput from "@/components/DateInput";
 import { formatDate, formatDateTime } from "@/lib/utils";
@@ -165,7 +166,7 @@ export default function AdminScreen() {
 
   const [activeTab, setActiveTab] = useState(() => {
     // Guard against stale stored tabs (e.g. the removed 'stations' view).
-    const validTabs = ['providers', 'purchases', 'users', 'vouchers', 'imports', 'voucherExchange', 'suppliers', 'stationNodes', 'customerRenewal', 'contracts', 'reconciliation', 'auditlog', 'errorlogs', 'reports', 'settings'];
+    const validTabs = ['providers', 'purchases', 'users', 'vouchers', 'imports', 'voucherExchange', 'suppliers', 'stationNodes', 'customerRenewal', 'contracts', 'reconciliation', 'auditlog', 'errorlogs', 'feedback', 'reports', 'settings'];
     const stored = localStorage.getItem('admin_active_tab');
     return stored && validTabs.includes(stored) ? stored : 'providers';
   });
@@ -2362,6 +2363,17 @@ voucherNumber: string;
               {t('errorlogs.title')}
             </h2>
             <ErrorLogsTab />
+          </div>
+        )}
+
+        {/* Feedback Tab */}
+        {activeTab === 'feedback' && (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              <MessageSquare className="w-6 h-6 text-primary" />
+              {t('feedback.title')}
+            </h2>
+            <FeedbackTab />
           </div>
         )}
 

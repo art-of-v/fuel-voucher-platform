@@ -29,6 +29,7 @@ let mockPathname = '/';
 let mockIsAuthenticated = true;
 let mockHookAuth = true;
 let mockContextKind: 'personal' | 'owner' | 'worker' = 'personal';
+let mockFeedbackAvailable = true;
 
 jest.mock('expo-router', () => {
   const { createElement } = jest.requireActual<typeof import('react')>('react');
@@ -65,6 +66,7 @@ jest.mock('lucide-react-native', () => {
     ShoppingCart: Icon,
     QrCode: Icon,
     User: Icon,
+    MessageSquare: Icon,
   };
 });
 
@@ -89,6 +91,14 @@ jest.mock('../features/cart/store/cartStore', () => ({
 
 jest.mock('../features/notifications/hooks/useNotifications', () => ({
   useUnreadNotificationCount: () => 0,
+}));
+
+// The feedback tab is server-gated: it appears only once GET /api/feedback/deep-link has
+// positively confirmed the channel. mockFeedbackAvailable stands in for that answer, and the
+// default is ON so the existing tab-count and target-size assertions keep describing the bar a
+// customer actually sees.
+jest.mock('../features/feedback/hooks/useFeedbackChannel', () => ({
+  useFeedbackChannel: () => ({ available: mockFeedbackAvailable, deepLink: null }),
 }));
 
 jest.mock('../core/i18n', () => ({
@@ -119,7 +129,14 @@ jest.mock('@sentry/react-native', () => ({
 const tokens = getTokens('lemberg');
 
 /** The `i18n` mock echoes keys back, so a tab's accessible name is its key. */
-const TAB_NAMES = ['nav.stations', 'map.title', 'nav.basket', 'nav.codes', 'nav.profile'] as const;
+const TAB_NAMES = [
+  'nav.stations',
+  'map.title',
+  'nav.basket',
+  'nav.codes',
+  'nav.feedback',
+  'nav.profile',
+] as const;
 
 type TabName = (typeof TAB_NAMES)[number];
 
@@ -181,6 +198,7 @@ beforeEach(() => {
   mockIsAuthenticated = true;
   mockHookAuth = true;
   mockContextKind = 'personal';
+  mockFeedbackAvailable = true;
   jest.spyOn(Haptics, 'impactAsync').mockResolvedValue(undefined as any);
 });
 
@@ -328,8 +346,42 @@ describe('BottomTabs — rendering', () => {
 
     // The share-out has to survive a changing tab count, or dropping the basket
     // tab would silently reintroduce dead space into the row.
-    const remaining: TabName[] = ['nav.stations', 'map.title', 'nav.codes', 'nav.profile'];
+    const remaining: TabName[] = [
+      'nav.stations',
+      'map.title',
+      'nav.codes',
+      'nav.feedback',
+      'nav.profile',
+    ];
     for (const name of remaining) {
+      expect(flat(tab(name)).flex).toBe(1);
+      expect(flat(tab(name)).minWidth).toBe(tokens.touchTarget.min);
+    }
+  });
+
+  it('carries the feedback tab in a worker context too — a worker is still a customer', () => {
+    mockContextKind = 'worker';
+    render(<BottomTabs />);
+
+    expect(screen.queryByRole('tab', { name: 'nav.feedback' })).toBeTruthy();
+  });
+
+  it('drops the feedback tab when the server says the channel is off', () => {
+    // Server-decided on purpose: an admin flipping FeedbackBot:Enabled takes the button out of
+    // every installed app without a release. Absent, not disabled — a disabled tab would still
+    // take a sixth of the bar's width for something that cannot be used.
+    mockFeedbackAvailable = false;
+    render(<BottomTabs />);
+
+    expect(screen.queryByRole('tab', { name: 'nav.feedback' })).toBeNull();
+    expect(screen.getAllByRole('tab')).toHaveLength(TAB_NAMES.length - 1);
+  });
+
+  it('keeps the remaining tabs full-width when the feedback tab is dropped', () => {
+    mockFeedbackAvailable = false;
+    render(<BottomTabs />);
+
+    for (const name of ['nav.stations', 'map.title', 'nav.basket', 'nav.codes', 'nav.profile'] as TabName[]) {
       expect(flat(tab(name)).flex).toBe(1);
       expect(flat(tab(name)).minWidth).toBe(tokens.touchTarget.min);
     }

@@ -1,0 +1,55 @@
+using FuelFlow.Features.Feedback.SharedModels;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace FuelFlow.Features.Feedback.Configurations;
+
+internal sealed class FeedbackMessageReplyConfiguration : IEntityTypeConfiguration<FeedbackMessageReply>
+{
+    public void Configure(EntityTypeBuilder<FeedbackMessageReply> builder)
+    {
+        builder.ToTable("feedback_message_replies");
+
+        builder.HasKey(e => e.Id);
+
+        builder.Property(e => e.Id).HasColumnName("id");
+
+        builder.Property(e => e.FeedbackMessageId)
+            .HasColumnName("feedback_message_id")
+            .IsRequired();
+
+        // No cascade: replies are the audit trail of a conversation, and a row that can be deleted
+        // by deleting its parent is not an audit trail. DataRetentionService removes them on the
+        // same 180-day schedule as the messages they answer, oldest first.
+        builder.HasOne(e => e.FeedbackMessage)
+            .WithMany()
+            .HasForeignKey(e => e.FeedbackMessageId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Property(e => e.StaffUserId)
+            .HasColumnName("staff_user_id")
+            .IsRequired();
+
+        builder.Property(e => e.StaffUserName)
+            .HasColumnName("staff_user_name")
+            .HasMaxLength(200);
+
+        builder.Property(e => e.Text)
+            .HasColumnName("text")
+            .HasMaxLength(2000)
+            .IsRequired();
+
+        builder.Property(e => e.DeliveredMessageId).HasColumnName("delivered_message_id");
+
+        builder.Property(e => e.DeliveryError)
+            .HasColumnName("delivery_error")
+            .HasMaxLength(1000);
+
+        builder.Property(e => e.SentAtUtc)
+            .HasColumnName("sent_at_utc")
+            .IsRequired();
+
+        builder.HasIndex(e => e.FeedbackMessageId);
+        builder.HasIndex(e => e.SentAtUtc);
+    }
+}

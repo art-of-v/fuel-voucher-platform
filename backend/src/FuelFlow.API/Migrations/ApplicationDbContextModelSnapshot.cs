@@ -533,6 +533,199 @@ namespace FuelFlow.API.Migrations
                     b.ToTable("user_contracts", (string)null);
                 });
 
+            modelBuilder.Entity("FuelFlow.Features.Feedback.SharedModels.FeedbackChatBinding", b =>
+                {
+                    b.Property<long>("TelegramChatId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("telegram_chat_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("TelegramChatId"));
+
+                    b.Property<DateTime>("BoundAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("bound_at_utc");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("TelegramChatId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("feedback_chat_bindings", (string)null);
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Feedback.SharedModels.FeedbackMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AppVersion")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("app_version");
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("category");
+
+                    b.Property<DateTime?>("ClassifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("classified_at_utc");
+
+                    b.Property<string>("ClassifierError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("classifier_error");
+
+                    b.Property<double?>("Confidence")
+                        .HasPrecision(3, 2)
+                        .HasColumnType("double precision")
+                        .HasColumnName("confidence");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("Language")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("language");
+
+                    b.Property<string>("Platform")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("platform");
+
+                    b.Property<string>("Severity")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("severity");
+
+                    b.Property<long?>("StaffChatId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("staff_chat_id");
+
+                    b.Property<long?>("StaffMessageId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("staff_message_id");
+
+                    b.Property<DateTime?>("StaffRepliedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("staff_replied_at_utc");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Summary")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("summary");
+
+                    b.Property<long>("TelegramChatId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("telegram_chat_id");
+
+                    b.Property<long>("TelegramMessageId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("telegram_message_id");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("text");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("Verdict")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("verdict");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Category");
+
+                    b.HasIndex("CreatedAtUtc");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("TelegramChatId", "TelegramMessageId")
+                        .IsUnique();
+
+                    b.ToTable("feedback_messages", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_feedback_message_category", "category IS NULL OR category IN ('Bug', 'Idea', 'Complaint', 'Ux', 'Question', 'Praise', 'Other')");
+
+                            t.HasCheckConstraint("ck_feedback_message_language", "language IS NULL OR language IN ('Uk', 'Ru', 'En', 'Other')");
+
+                            t.HasCheckConstraint("ck_feedback_message_severity", "severity IS NULL OR severity IN ('Low', 'Medium', 'High')");
+
+                            t.HasCheckConstraint("ck_feedback_message_status", "status IN ('New', 'Triaged', 'Handled', 'Rejected')");
+
+                            t.HasCheckConstraint("ck_feedback_message_verdict", "verdict IS NULL OR verdict IN ('Junk', 'Kept')");
+                        });
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Feedback.SharedModels.FeedbackMessageReply", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long?>("DeliveredMessageId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("delivered_message_id");
+
+                    b.Property<string>("DeliveryError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("delivery_error");
+
+                    b.Property<Guid>("FeedbackMessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("feedback_message_id");
+
+                    b.Property<DateTime>("SentAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at_utc");
+
+                    b.Property<long>("StaffUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("staff_user_id");
+
+                    b.Property<string>("StaffUserName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("staff_user_name");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FeedbackMessageId");
+
+                    b.HasIndex("SentAtUtc");
+
+                    b.ToTable("feedback_message_replies", (string)null);
+                });
+
             modelBuilder.Entity("FuelFlow.Features.Notifications.SharedModels.Notification", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3279,6 +3472,17 @@ namespace FuelFlow.API.Migrations
                     b.Navigation("Contract");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Feedback.SharedModels.FeedbackMessageReply", b =>
+                {
+                    b.HasOne("FuelFlow.Features.Feedback.SharedModels.FeedbackMessage", "FeedbackMessage")
+                        .WithMany()
+                        .HasForeignKey("FeedbackMessageId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("FeedbackMessage");
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Notifications.SharedModels.Notification", b =>

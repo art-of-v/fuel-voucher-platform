@@ -1,6 +1,7 @@
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Company.SharedModels;
 using FuelFlow.Features.Contracts.SharedModels;
+using FuelFlow.Features.Feedback.SharedModels;
 using FuelFlow.Features.Notifications.SharedModels;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Settings.SharedModels;
@@ -70,6 +71,9 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
     public DbSet<ProviderEventOutbox> ProviderEventOutbox => Set<ProviderEventOutbox>();
     public DbSet<SupportMessage> SupportMessages => Set<SupportMessage>();
     public DbSet<ErrorLog> ErrorLogs => Set<ErrorLog>();
+    public DbSet<FeedbackMessage> FeedbackMessages => Set<FeedbackMessage>();
+    public DbSet<FeedbackMessageReply> FeedbackMessageReplies => Set<FeedbackMessageReply>();
+    public DbSet<FeedbackChatBinding> FeedbackChatBindings => Set<FeedbackChatBinding>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Pressable, StyleSheet, ViewStyle } from 'react-native';
-import { Home, ShoppingCart, QrCode, User, MapPin } from 'lucide-react-native';
+import { Home, ShoppingCart, QrCode, User, MapPin, MessageSquare } from 'lucide-react-native';
 import { Link, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStore } from '../core/state/appStore';
@@ -11,6 +11,7 @@ import { useDesignTokens } from '../core/hooks/useTheme';
 import { useI18n } from '../core/i18n';
 import { useIsTabBarVisible } from '../core/navigation/tabBar';
 import { useAccountContext } from '../features/company/hooks/useAccountContext';
+import { useFeedbackChannel } from '../features/feedback/hooks/useFeedbackChannel';
 import { Haptics } from '../core/utils/haptics';
 import { Text } from '../core/ui';
 
@@ -111,6 +112,9 @@ export function BottomTabs() {
   const unreadCount = useUnreadNotificationCount();
   const isWorkerContext = useAccountContext().kind === 'worker';
   const [pressedTab, setPressedTab] = useState<string | null>(null);
+  // Server-decided, and hidden until the server has answered - see useFeedbackChannel. The tab
+  // is absent rather than disabled so a switched-off channel costs the bar no width.
+  const feedbackChannel = useFeedbackChannel();
 
   if (!isAuthenticated) return null;
   if (!tabBarVisible) return null;
@@ -130,6 +134,9 @@ export function BottomTabs() {
           },
         ]),
     { name: 'my-codes', icon: QrCode, path: '/my-codes', label: t('nav.codes') },
+    ...(feedbackChannel.available
+      ? [{ name: 'feedback', icon: MessageSquare, path: '/feedback', label: t('nav.feedback') }]
+      : []),
     {
       name: 'profile',
       icon: User,

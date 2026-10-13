@@ -23,6 +23,7 @@ internal static class RateLimiterSetup
     internal const string CompanyInvitePolicy = "company-invite";
     internal const string MonobankWebhookPolicy = "monobank-webhook";
     internal const string SupportMessagePolicy = "support-message";
+    internal const string TelegramFeedbackWebhookPolicy = "telegram-feedback-webhook";
 
     /// <summary>Ceiling applied to every request, per client IP, per minute. Generous enough that
     /// no legitimate client or provider callback approaches it; low enough that a single host
@@ -266,6 +267,25 @@ internal static class RateLimiterSetup
                     factory: _ => new FixedWindowRateLimiterOptions
                     {
                         PermitLimit = 120,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = 0
+                    }));
+
+            // The feedback bot's webhook. Anonymous, authenticated only by a secret header, and the
+            // only endpoint where the caller legitimately arrives from thousands of distinct source
+            // addresses (every Telegram server) - so a per-IP ceiling has to be generous enough not
+            // to drop real feedback, and the endpoint's own defence is the secret plus the
+            // per-chat hourly message cap the router applies.
+            //
+            // A fixed window is still worth having here: without one, a stolen or guessed URL is a
+            // free way to make the API bind and decrypt JSON as fast as the network allows.
+            options.AddPolicy(TelegramFeedbackWebhookPolicy, context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: $"telegram-feedback-webhook:{GetIp(context)}",
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 300,
                         Window = TimeSpan.FromMinutes(1),
                         QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                         QueueLimit = 0
