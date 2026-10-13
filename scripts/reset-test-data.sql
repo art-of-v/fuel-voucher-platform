@@ -14,11 +14,13 @@
 --     -f - < scripts/reset-test-data.sql
 --
 -- Change `test_phones` to the accounts your session uses. Vouchers that carry a paper voucher
--- number (numeric `external_id`/`voucher_number`, e.g. the real customer's 999996...) are never
--- matched: they belong to a real customer, not to a campaign.
+-- number (numeric `voucher_number`, e.g. the real customer's 999996...) are never matched: they
+-- belong to a real customer, not to a campaign.
 --
 -- Delete order matters, and it is not stylistic:
 --   * `fuel_vouchers.order_id` restricts, so a held voucher blocks its order from being deleted.
+--   * `refunds.order_id` restricts and does NOT cascade, so a refunded test order blocks its own
+--     deletion until the refund row is removed first.
 --   * `fulfillments` now cascades from its order (FK added in AddFulfillmentOrderForeignKey), but
 --     its `voucher_id` restricts, so vouchers have to go too.
 --   * every row an operator renewal writes -- `operator_voucher_renewals.voucher_id`,
@@ -44,9 +46,7 @@ WHERE u.phone_number IN (
 CREATE TEMP TABLE reset_vouchers ON COMMIT DROP AS
 SELECT v.id
 FROM fuel_vouchers v
-WHERE v.external_id LIKE 'EMU%'
-   OR v.external_id LIKE 'TEST%'
-   OR v.voucher_number LIKE 'EMU%'
+WHERE v.voucher_number LIKE 'EMU%'
    OR v.voucher_number LIKE 'TEST%'
    OR v.qr_payload LIKE 'EMU%'
    OR v.qr_payload LIKE 'TEST%'
@@ -89,6 +89,11 @@ DELETE FROM fulfillments
 WHERE order_id IN (SELECT id FROM reset_orders)
    OR voucher_id IN (SELECT id FROM reset_vouchers);
 
+-- `refunds.order_id` restricts and does not cascade, so a refunded test order cannot be deleted
+-- until its refund row is gone. Deleting it here is correct for a test reset: the money movement is
+-- part of what the session produced.
+DELETE FROM refunds WHERE order_id IN (SELECT id FROM reset_orders);
+
 DELETE FROM order_line_items WHERE order_id IN (SELECT id FROM reset_orders);
 DELETE FROM fuel_vouchers WHERE id IN (SELECT id FROM reset_vouchers);
 DELETE FROM orders WHERE id IN (SELECT id FROM reset_orders);
@@ -99,8 +104,7 @@ DELETE FROM fulfillments WHERE voucher_id NOT IN (SELECT id FROM fuel_vouchers);
 \echo '--- after ---'
 SELECT 'campaign_vouchers_left' AS check, count(*) AS value
 FROM fuel_vouchers
-WHERE coalesce(external_id, '') LIKE 'EMU%' OR coalesce(external_id, '') LIKE 'TEST%'
-   OR coalesce(voucher_number, '') LIKE 'EMU%' OR coalesce(voucher_number, '') LIKE 'TEST%'
+WHERE coalesce(voucher_number, '') LIKE 'EMU%' OR coalesce(voucher_number, '') LIKE 'TEST%'
    OR coalesce(qr_payload, '') LIKE 'EMU%' OR coalesce(qr_payload, '') LIKE 'TEST%';
 
 SELECT 'test_phone_orders_left' AS check, count(*) AS value
