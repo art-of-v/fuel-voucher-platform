@@ -94,9 +94,21 @@ internal sealed class OperatorVoucherRenewalConfiguration : IEntityTypeConfigura
 
         // customer_user_id and acting_user_id stay unconstrained on purpose. They are written
         // from the acting account's claim, and a renewal must never be refused because of an
-        // id the audit row carries - the same reasoning as error_logs and provider_event_outbox.
+        // id the audit row carries - the same reasoning as error_logs and provider_event_outbox,
+        // and as feedback_messages.user_id, which makes the same argument for the same reason.
         // The cost is a dangling id; the benefit is that the settlement record can always be
-        // written. See the review's F-14 for the trade-off this leaves on the table.
+        // written.
+        //
+        // The distinction from the two voucher columns above is the whole point: those point at
+        // domain objects that must exist for the row to mean anything, so they are constrained
+        // Restrict. These two point at who was acting. A claim can name an account that is since
+        // gone, and a settlement record that refuses to be written over that is worse than a row
+        // carrying an id nobody can resolve.
+        //
+        // This comment used to end by deferring to "the review's F-14". F-14 in the security audit
+        // is "backup restore never exercised" and says nothing about referential integrity, so the
+        // reference sent a reader to the wrong document to find a decision that is fully argued
+        // here. The trade-off is stated in the four lines above instead.
 
         builder.ToTable(t =>
         {
