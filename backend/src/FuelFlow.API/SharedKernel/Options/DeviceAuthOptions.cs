@@ -16,10 +16,14 @@ public sealed class DeviceAuthOptions
 
     public int ChallengeExpirySeconds { get; set; } = 30;
 
-    // Nonce TTL must be >= TimestampToleranceMs/1000, otherwise a consumed
-    // signed request can be replayed once its nonce expires from cache but
-    // its timestamp is still inside the tolerance window.
-    public int SignatureNonceTtlSeconds { get; set; } = 300;
+// Operator FLOOR for the device-signature nonce lifetime, not the value the middleware uses.
+// The middleware computes max(this, 2 x TimestampToleranceMs/1000) and the factor is load-bearing:
+// the tolerance check is symmetric, so a device whose clock runs up to a full tolerance fast is
+// accepted, which anchors its timestamp as late as (arrival + tolerance) while the nonce's TTL
+// starts on arrival. One tolerance therefore expired the nonce while the signed timestamp was
+// still acceptable - a replay window of up to TimestampToleranceMs on /api/purchases{,/bulk,/renew}.
+// See DeviceSignatureMiddleware and DeviceSignatureReplayIntegrationTests.
+public int SignatureNonceTtlSeconds { get; set; } = 300;
 
     public int TimestampToleranceMs { get; set; } = 300000;
 
