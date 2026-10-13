@@ -93,16 +93,21 @@ export const en: Record<string, string> = {
   'nav.feedback': 'Feedback',
   'feedback.subtitle': 'Tell us what is broken or missing',
   'feedback.whatTitle': 'How this works',
-  'feedback.whatBody': 'Tap "Write to us" and a private Telegram chat with our bot opens. Describe the problem: what you did, what you expected, what happened.',
-  'feedback.privateBody': 'This is a private chat — other customers cannot see it. Only the development team reads your messages.',
-  'feedback.triageBody': 'Greetings, jokes and empty test messages are not forwarded to the team; only what actually says something reaches them.',
+  'feedback.whatBody':
+    'Tap "Write to us" and a private Telegram chat with our bot opens. Describe the problem: what you did, what you expected, what happened.',
+  'feedback.privateBody':
+    'This is a private chat — other customers cannot see it. Only the development team reads your messages.',
+  'feedback.triageBody':
+    'Greetings, jokes and empty test messages are not forwarded to the team; only what actually says something reaches them.',
   'feedback.writeToUs': 'Write to us',
   'feedback.openWebForm': 'Email us instead',
   'feedback.tips': 'The more concrete, the faster. Screen name, when it happened, what you tapped.',
   'feedback.noTelegramTitle': 'Telegram did not open',
-  'feedback.noTelegramBody': 'It looks like Telegram is not installed. Email us instead — it reaches us just the same.',
+  'feedback.noTelegramBody':
+    'It looks like Telegram is not installed. Email us instead — it reaches us just the same.',
   'feedback.unavailableTitle': 'The feedback channel is switched off',
-  'feedback.unavailableBody': 'It is off at the moment. Email us instead — it reaches us just the same.',
+  'feedback.unavailableBody':
+    'It is off at the moment. Email us instead — it reaches us just the same.',
   'feedback.loadFailed': 'Could not load the feedback channel. Try again.',
 
   'stations.title': 'SELECT',

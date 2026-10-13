@@ -2,7 +2,15 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, StyleSheet, Linking } from 'react-native';
 import { MessageSquare, ShieldCheck, MessagesSquare, ArrowRight } from 'lucide-react-native';
 
-import { PageLayout, ScreenHeader, Card, Text, Button, LoadingState, ErrorState } from '../src/core/ui';
+import {
+  PageLayout,
+  ScreenHeader,
+  Card,
+  Text,
+  Button,
+  LoadingState,
+  ErrorState,
+} from '../src/core/ui';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useI18n } from '../src/core/i18n';
 import {

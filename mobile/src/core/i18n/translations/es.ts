@@ -94,14 +94,18 @@ export const es: Record<string, string> = {
   'nav.feedback': 'Comentarios',
   'feedback.subtitle': 'Cuéntanos qué falla o qué falta',
   'feedback.whatTitle': 'Cómo funciona',
-  'feedback.whatBody': 'Toca "Escríbenos" y se abre un chat privado de Telegram con nuestro bot. Describe el problema: qué hiciste, qué esperabas, qué pasó.',
-  'feedback.privateBody': 'Es un chat privado: otros clientes no lo ven. Solo el equipo de desarrollo lee tus mensajes.',
-  'feedback.triageBody': 'Los saludos, las bromas y los mensajes de prueba vacíos no se reenvían; al equipo solo llega lo que realmente dice algo.',
+  'feedback.whatBody':
+    'Toca "Escríbenos" y se abre un chat privado de Telegram con nuestro bot. Describe el problema: qué hiciste, qué esperabas, qué pasó.',
+  'feedback.privateBody':
+    'Es un chat privado: otros clientes no lo ven. Solo el equipo de desarrollo lee tus mensajes.',
+  'feedback.triageBody':
+    'Los saludos, las bromas y los mensajes de prueba vacíos no se reenvían; al equipo solo llega lo que realmente dice algo.',
   'feedback.writeToUs': 'Escríbenos',
   'feedback.openWebForm': 'Escríbenos por correo',
   'feedback.tips': 'Cuanto más concreto, más rápido. Nombre de la pantalla, momento y qué tocaste.',
   'feedback.noTelegramTitle': 'Telegram no se abrió',
-  'feedback.noTelegramBody': 'Parece que Telegram no está instalado. Escríbenos por correo: llega igual.',
+  'feedback.noTelegramBody':
+    'Parece que Telegram no está instalado. Escríbenos por correo: llega igual.',
   'feedback.unavailableTitle': 'El canal de comentarios está desactivado',
   'feedback.unavailableBody': 'Ahora mismo está desactivado. Escríbenos por correo: llega igual.',
   'feedback.loadFailed': 'No se pudo cargar el canal de comentarios. Inténtalo de nuevo.',
