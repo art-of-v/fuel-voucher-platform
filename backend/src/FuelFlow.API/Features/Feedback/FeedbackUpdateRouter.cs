@@ -217,6 +217,16 @@ public class FeedbackUpdateRouter
 
     private async Task BindChatAsync(long chatId, string? payload, CancellationToken ct)
     {
+        // Who this chat belongs to *before* this /start does anything. Without it every press of
+        // "Написати нам" re-sent the full onboarding copy, and a hand-typed /start told an
+        // already-linked customer to go and link their account - advice that is wrong precisely
+        // because they already did.
+        var alreadyBoundTo = await _context.FeedbackChatBindings
+            .AsNoTracking()
+            .Where(b => b.TelegramChatId == chatId)
+            .Select(b => (Guid?)b.UserId)
+            .FirstOrDefaultAsync(ct);
+
         var userId = FeedbackDeepLink.VerifyPayload(
             payload,
             _options.SigningKey,
@@ -235,12 +245,21 @@ public class FeedbackUpdateRouter
             if (exists)
             {
                 await BindChatToUserAsync(chatId, userId.Value, ct);
-                await SafeSendAsync(chatId, FeedbackBotTexts.WelcomeBound, ct);
+
+                // Same account: nothing changed, so say so in one line. A *different* account is a
+                // real event and gets the full onboarding, because the chat just changed hands.
+                await SafeSendAsync(
+                    chatId,
+                    alreadyBoundTo == userId ? FeedbackBotTexts.AlreadyLinked : FeedbackBotTexts.WelcomeBound,
+                    ct);
                 return;
             }
         }
 
-        await SafeSendAsync(chatId, FeedbackBotTexts.WelcomeUnbound, ct);
+        await SafeSendAsync(
+            chatId,
+            alreadyBoundTo is null ? FeedbackBotTexts.WelcomeUnbound : FeedbackBotTexts.AlreadyLinked,
+            ct);
     }
 
     private async Task BindChatToUserAsync(long chatId, Guid userId, CancellationToken ct)
