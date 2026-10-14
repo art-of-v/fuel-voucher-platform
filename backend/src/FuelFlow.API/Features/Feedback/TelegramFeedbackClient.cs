@@ -25,6 +25,10 @@ public interface ITelegramFeedbackClient
     /// a customer chat. Turning HTML on for those would make Telegram reject the send with an opaque
     /// 400 over an ampersand in "Ціна & доставка".
     /// </para>
+    /// <para>
+    /// A null <paramref name="parseMode"/> means the property is <b>omitted from the JSON</b>, not sent
+    /// as null — see the implementation for why that distinction is load-bearing.
+    /// </para>
     /// </summary>
     Task<long?> SendMessageAsync(long chatId, string text, string? parseMode = null, CancellationToken ct = default);
 
@@ -90,19 +94,27 @@ public sealed class TelegramFeedbackClient : ITelegramFeedbackClient
 
         try
         {
+            // Built as a dictionary, not an anonymous object, because `parse_mode` must be **absent**
+            // rather than null. System.Text.Json writes a null string property as `"parse_mode": null`,
+            // and Telegram answers that with 400 "unsupported parse_mode" — so a plain `parseMode = parseMode`
+            // anonymous property silences every message that is *not* the staff post: the welcome, the
+            // acknowledgement, a staff reply relayed to a customer. The staff post kept working (its value
+            // is a valid "HTML"), which is exactly what made the breakage look like a Telegram problem.
+            var payload = new Dictionary<string, object?>
+            {
+                ["chat_id"] = chatId,
+                ["text"] = body,
+                ["disable_web_page_preview"] = true
+            };
+
+            if (!string.IsNullOrWhiteSpace(parseMode))
+            {
+                payload["parse_mode"] = parseMode;
+            }
+
             using var response = await _http.PostAsJsonAsync(
                 $"/bot{_options.BotToken}/sendMessage",
-                new
-                {
-                    chat_id = chatId,
-                    text = body,
-                    // Set per call, never globally. The staff post is the one HTML message and its
-                    // content is escaped; the acknowledgements, the welcome texts and a staff
-                    // member's own reply are prose that may contain "&" or "<", and HTML mode would
-                    // make Telegram reject those with an opaque 400.
-                    parse_mode = parseMode,
-                    disable_web_page_preview = true
-                },
+                payload,
                 ct);
 
             if (!response.IsSuccessStatusCode)
