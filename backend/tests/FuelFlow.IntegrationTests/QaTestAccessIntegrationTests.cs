@@ -26,17 +26,79 @@ namespace FuelFlow.IntegrationTests;
 /// hash via PostConfigure (a throwaway value, never the production code).
 /// </summary>
 [Collection("Integration Tests")]
-public class QaTestAccessIntegrationTests : WebApplicationFactory<Program>, IClassFixture<TestDatabaseFixture>
+public class QaTestAccessIntegrationTests : WebApplicationFactory<Program>, IClassFixture<TestDatabaseFixture>,
+    IAsyncLifetime
 {
     private const string TestQaCode = "525252"; // distinct from the dev-bypass "000000"
     private static readonly string TestQaCodeHash = SecretsHasher.Hash(TestQaCode);
     private const string QaPhone = AuthOptions.QaTestAccountPhoneNumber;
+
+    /// <summary>Fixed id the seeding migration writes, so cleanup can tell the seeded row from the
+    /// ones the delete-then-re-register tests mint.</summary>
+    private static readonly Guid SeededQaUserIdValue = AuthOptions.QaTestAccountUserId;
+
+    /// <summary>Stand-in for "some ordinary customer" in the negative-twin tests. A fixed value so
+    /// cleanup can remove it and the test stays idempotent across re-runs.</summary>
+    private const string OrdinaryPhone = "+380501112233";
 
     /// <summary>Captured before the seeded account is soft-deleted, so the test can prove the
     /// re-registration minted a different row.</summary>
     private Guid SeededQaUserId;
 
     public QaTestAccessIntegrationTests(TestDatabaseFixture fixture) => _ = fixture;
+
+    /// <summary>
+    /// Restores the migration's starting state after every test in this class.
+    /// </summary>
+    /// <remarks>
+    /// The container is shared, and xUnit runs the tests in an arbitrary order, so a test that
+    /// soft-deletes the seeded QA row and leaves it that way poisons whichever test runs next -
+    /// <c>MigrationSeedsQaAccount</c> failed exactly that way when this was first written. Restoring
+    /// here rather than at the end of each test means correctness no longer depends on ordering.
+    ///
+    /// The delete-then-re-register tests mint a second, live row for the same phone, so cleanup
+    /// removes rows by id rather than trying to spot "the" QA account. Only this class's phone is
+    /// touched - other classes share the container and own their own rows.
+    /// </remarks>
+    public async Task DisposeAsync()
+    {
+        using var scope = Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var strays = await context.Users
+            .IgnoreQueryFilters()
+            .Where(u => (u.PhoneNumber == QaPhone && u.Id != SeededQaUserIdValue)
+                     || u.PhoneNumber == OrdinaryPhone)
+            .ToListAsync();
+
+        // orders.user_id is Restrict, so a hard delete of a stray that somehow picked up an order
+        // would throw - and a throw here fails EVERY test in the class with a teardown error,
+        // which is a far worse failure mode than the leftover row it avoids. Skip those instead.
+        var deletable = new List<User>();
+        foreach (var stray in strays)
+        {
+            if (!await context.Orders.IgnoreQueryFilters().AnyAsync(o => o.UserId == stray.Id))
+                deletable.Add(stray);
+            else
+                stray.IsDeleted = true;
+        }
+        context.Users.RemoveRange(deletable);
+
+        var seeded = await context.Users
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.Id == SeededQaUserIdValue);
+        if (seeded is not null)
+        {
+            seeded.IsDeleted = false;
+            seeded.IsBanned = false;
+            seeded.IsActive = true;
+            seeded.IsQaAccount = true;
+        }
+
+        await context.SaveChangesAsync();
+    }
+
+    public Task InitializeAsync() => Task.CompletedTask;
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -198,7 +260,7 @@ public class QaTestAccessIntegrationTests : WebApplicationFactory<Program>, ICla
     {
         var client = CreateClient();
 
-        var phone = "+380501112233";
+        var phone = OrdinaryPhone;
         (await client.PostAsJsonAsync("/api/auth/send-code", new SendCodeCommand(phone)))
             .StatusCode.Should().Be(HttpStatusCode.OK);
         (await client.PostAsJsonAsync("/api/auth/verify",
@@ -214,13 +276,18 @@ public class QaTestAccessIntegrationTests : WebApplicationFactory<Program>, ICla
     }
 
     /// <summary>
-    /// Turning QA access off has to stop the QA phone from being re-granted QA identity, not merely
-    /// stop it authenticating. Otherwise a reviewer arriving mid-review silently becomes an ordinary
-    /// active customer again - and with it regains the real-stock catalogue, which is the whole
-    /// point of the segregation.
+    /// Turning QA access off has to stop the QA identity being granted again, not merely stop it
+    /// authenticating. Otherwise a reviewer arriving mid-review silently becomes an ordinary
+    /// customer and regains the real-stock catalogue, which is the whole point of the segregation.
+    ///
+    /// The guarantee is stronger than "comes back ordinary": with the switch off the QA phone cannot
+    /// register <em>at all</em>. The verify handler rejects the QA phone before it even looks at the
+    /// code, so there is no code - QA or dev-bypass - that mints an account for it. That is worth
+    /// pinning explicitly, because the weaker version of this test (expect an ordinary inactive
+    /// account) passed for the wrong reason once already.
     /// </summary>
     [Fact]
-    public async Task QaPhone_Registering_WithSwitchOff_ComesBackOrdinaryAndInactive()
+    public async Task QaPhone_CannotRegisterAtAll_WhenSwitchOff()
     {
         await SetSwitchAsync(false);
         var client = CreateClient();
@@ -233,20 +300,24 @@ public class QaTestAccessIntegrationTests : WebApplicationFactory<Program>, ICla
             await context.SaveChangesAsync();
         }
 
-        // With the switch off the QA phone cannot authenticate at all, so register it the way any
-        // unknown number registers: a real code through the ordinary path.
         (await client.PostAsJsonAsync("/api/auth/send-code", new SendCodeCommand(QaPhone)))
             .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Neither the QA code nor the dev-bypass code gets through: the QA gate runs before the
+        // code is compared, so the response is indistinguishable from any wrong guess.
+        (await client.PostAsJsonAsync("/api/auth/verify", new VerifyCodeCommand(QaPhone, TestQaCode)))
+            .StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         (await client.PostAsJsonAsync("/api/auth/verify", new VerifyCodeCommand(QaPhone, "000000")))
-            .StatusCode.Should().Be(HttpStatusCode.OK);
+            .StatusCode.Should().Be(HttpStatusCode.Unauthorized,
+                "the dev-bypass code must not become a way around the QA gate");
 
         using (var scope = Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            var user = await context.Users.SingleAsync(u => u.PhoneNumber == QaPhone && !u.IsDeleted);
-
-            user.IsQaAccount.Should().BeFalse("QA status may only be granted while the switch is on");
-            user.IsActive.Should().BeFalse("and the activation carve-out is scoped to that same grant");
+            var live = await context.Users
+                .Where(u => u.PhoneNumber == QaPhone && !u.IsDeleted)
+                .ToListAsync();
+            live.Should().BeEmpty("no account may be resurrected or minted for the QA phone");
         }
     }
 
