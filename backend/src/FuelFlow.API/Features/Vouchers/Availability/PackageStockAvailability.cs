@@ -1,3 +1,4 @@
+using FuelFlow.Features.Auth.QaTestAccess;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -37,15 +38,27 @@ public sealed class PackageStockAvailability
     private readonly ApplicationDbContext _context;
 
     /// <summary>
+    /// The configured QA phone, already normalized, or <see langword="null"/> when QA test access is
+    /// not wired into this host. Read once per call so the comparison below stays translatable -
+    /// the alternative, calling a helper inside the <c>Where</c>, is a C# delegate the provider
+    /// cannot translate.
+    /// </summary>
+    private readonly QaTestAccessService? _qaTestAccess;
+
+    /// <summary>
     /// Whether the supplier term gates sellability. Read once, because every screen must agree with the
     /// worker: flipping it between the shop and fulfilment would make the shop advertise stock the worker
     /// then refuses, or hide stock the worker would have sold.
     /// </summary>
     private readonly bool _expiryEnabled;
 
-    public PackageStockAvailability(ApplicationDbContext context, IConfiguration configuration)
+    public PackageStockAvailability(
+        ApplicationDbContext context,
+        IConfiguration configuration,
+        QaTestAccessService? qaTestAccess = null)
     {
         _context = context;
+        _qaTestAccess = qaTestAccess;
         _expiryEnabled = configuration.GetValue("VoucherExpiration:Enabled", true);
     }
 
@@ -64,9 +77,22 @@ public sealed class PackageStockAvailability
         if (callerUserId is null || callerUserId.Value == Guid.Empty)
             return false;
 
+        // QA is an OR, the same shape MonobankMerchantResolver.IsQa uses: flagged, or the
+        // configured QA number.
+        //
+        // The flag alone was not enough. Deleting the QA account and signing up again mints a
+        // fresh row for the same phone, and the flag was only ever set by the seeding migration -
+        // so the re-registered account had none. Its QA code still worked and its token was
+        // valid, and the tester saw an empty store: every screen said the catalogue was simply
+        // empty, which reads as a broken app rather than as a missing flag. That is the exact
+        // path App Review is told to perform on the demo account, so the phone arm has to carry
+        // it on its own.
+        var qaPhone = _qaTestAccess?.QaPhoneNumber;
+
         return await _context.Users
             .AsNoTracking()
-            .AnyAsync(u => u.Id == callerUserId.Value && u.IsQaAccount, cancellationToken);
+            .AnyAsync(u => u.Id == callerUserId.Value
+                       && (u.IsQaAccount || u.PhoneNumber == qaPhone), cancellationToken);
     }
 
     /// <summary>

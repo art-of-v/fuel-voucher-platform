@@ -182,6 +182,19 @@ public sealed class VerifyCodeCommandHandler
                 // role. Admins are created/maintained by promoting an account to "Admin".
                 RoleId = SeedRoles.UserRoleId,
                 IsActive = false, // Activated only by staff, never by OTP verify (see below)
+                // Deleting an account and signing up again mints a brand-new row, and the QA
+                // flag did not come with it - it had only ever been set by the seeding
+                // migration. So the QA phone re-registering itself came back as an ordinary
+                // account: the QA code still worked, but PackageStockAvailability gates the
+                // QA catalogue on this flag, and the tester got an empty store. That is
+                // precisely the path App Review is told to perform, so restore the flag on
+                // every registration rather than leaving it to a one-off migration.
+                //
+                // Gated on the same switch the code path above already checked, so QA status
+                // can only ever be granted while QA access is actually enabled.
+                IsQaAccount = _qaTestAccess is not null
+                              && _qaTestAccess.IsQaPhone(phoneNumber)
+                              && await _qaTestAccess.IsActiveAsync(cancellationToken),
                 CreatedAtUtc = DateTime.UtcNow
             };
             _context.Users.Add(user);

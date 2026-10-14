@@ -5,6 +5,7 @@ using FuelFlow.Features.Auth.QaTestAccess;
 using FuelFlow.Features.Auth.Refresh;
 using FuelFlow.Features.Auth.SendCode;
 using FuelFlow.Features.Auth.Verify;
+using FuelFlow.Features.Vouchers.Availability;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
@@ -30,6 +31,10 @@ public class QaTestAccessIntegrationTests : WebApplicationFactory<Program>, ICla
     private const string TestQaCode = "525252"; // distinct from the dev-bypass "000000"
     private static readonly string TestQaCodeHash = SecretsHasher.Hash(TestQaCode);
     private const string QaPhone = AuthOptions.QaTestAccountPhoneNumber;
+
+    /// <summary>Captured before the seeded account is soft-deleted, so the test can prove the
+    /// re-registration minted a different row.</summary>
+    private Guid SeededQaUserId;
 
     public QaTestAccessIntegrationTests(TestDatabaseFixture fixture) => _ = fixture;
 
@@ -102,6 +107,67 @@ public class QaTestAccessIntegrationTests : WebApplicationFactory<Program>, ICla
         result!.AccessToken.Should().NotBeNullOrEmpty();
 
         // Clean up so re-runs start fresh.
+        await SetSwitchAsync(false);
+    }
+
+    /// <summary>
+    /// Deleting the QA account and signing up again has to land on a QA account again.
+    ///
+    /// The delete is a soft delete - the row survives so the history stays visible to staff -
+    /// and signing up mints a <em>new</em> row for the same phone. The QA code kept working
+    /// there, which is what made this easy to miss: the tester got a token, the token was
+    /// valid, and every screen said the store was simply empty. The catalogue gate in
+    /// <c>PackageStockAvailability</c> reads <c>User.IsQaAccount</c>, and nothing in the
+    /// registration path had ever set it - only the seeding migration did, once.
+    ///
+    /// This is exactly the path App Review is instructed to perform on the demo account, so it
+    /// is not an edge case: it is the one guaranteed to run.
+    /// </summary>
+    [Fact]
+    public async Task QaPhone_ReRegistering_AfterDeletion_ComesBackAsAQaAccount()
+    {
+        await SetSwitchAsync(true);
+        var client = CreateClient();
+
+        // Soft-delete the seeded account, exactly as the app's "Delete Account" does.
+        using (var scope = Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var qa = await context.Users.FirstAsync(u => u.PhoneNumber == QaPhone);
+            SeededQaUserId = qa.Id;
+            qa.IsDeleted = true;
+            await context.SaveChangesAsync();
+            (await context.Users.CountAsync(u => u.PhoneNumber == QaPhone && !u.IsDeleted))
+                .Should().Be(0, "the seeded account is now soft-deleted");
+        }
+
+        // Sign up again with the QA code.
+        (await client.PostAsJsonAsync("/api/auth/send-code", new SendCodeCommand(QaPhone)))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var verify = await client.PostAsJsonAsync("/api/auth/verify", new VerifyCodeCommand(QaPhone, TestQaCode));
+        verify.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using (var scope = Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+            // A fresh row - the history lives on the deleted one, and must not be carried over.
+            var active = await context.Users
+                .Where(u => u.PhoneNumber == QaPhone && !u.IsDeleted)
+                .SingleAsync();
+            active.Id.Should().NotBeEmpty();
+            active.Id.Should().NotBe(SeededQaUserId, "signing up again mints a new account");
+            (await context.Orders.CountAsync(o => o.UserId == active.Id)).Should().Be(0,
+                "history stays on the deleted account and is not carried over");
+
+            // ...but QA access has to come back, or the tester sees an empty store.
+            var availability = scope.ServiceProvider
+                .GetRequiredService<PackageStockAvailability>();
+            (await availability.IsTestAccountAsync(active.Id)).Should().BeTrue(
+                "the QA phone re-registering must still see the QA catalogue");
+        }
+
         await SetSwitchAsync(false);
     }
 
