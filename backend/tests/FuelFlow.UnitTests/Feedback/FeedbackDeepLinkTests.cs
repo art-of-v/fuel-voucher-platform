@@ -17,6 +17,73 @@ public class FeedbackDeepLinkTests
 
     private static readonly DateTime Now = new(2026, 10, 13, 12, 0, 0, DateTimeKind.Utc);
 
+    /// <summary>
+    /// The payload must consist only of characters Telegram accepts in a <c>/start</c> parameter.
+    /// <para>
+    /// This is the test that would have caught the production failure. The format originally used
+    /// '.' as its field separator; Telegram's spec allows only <c>A-Z a-z 0-9 _ -</c>, and rather
+    /// than reject a payload with a dot it **silently drops the whole parameter** and delivers a bare
+    /// <c>/start</c>. Every link therefore bound nothing, the bot greeted every customer as anonymous,
+    /// the webhook answered 200 the whole time and <c>getWebhookInfo</c> showed no error - a failure
+    /// with no symptom anywhere except a binding table that stayed empty.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void ThePayloadUsesOnlyCharactersTelegramAccepts()
+    {
+        // A handful of user ids and instants, because a single sample can produce a signature that
+        // happens to avoid the awkward base64url characters and hide a broken separator.
+        foreach (var seed in Enumerable.Range(0, 25))
+        {
+            var userId = Guid.CreateVersion7();
+            var now = Now.AddSeconds(seed * 37);
+
+            var payload = FeedbackDeepLink.CreatePayload(userId, Key, Ttl, now);
+
+            var illegal = payload.Where(c => !char.IsAsciiLetterOrDigit(c) && c is not ('_' or '-')).ToArray();
+            illegal.Should().BeEmpty(
+                "Telegram drops a /start payload containing anything else, and reports nothing");
+            payload.Length.Should().BeLessThanOrEqualTo(64, "Telegram's own cap on a /start payload");
+        }
+    }
+
+    /// <summary>
+    /// The signature is base64url and can itself contain '_', so the verifier cannot split on the
+    /// separator. It anchors on the fixed-width GUID and the all-digit timestamp instead.
+    /// </summary>
+    [Fact]
+    public void VerificationSurvivesASignatureThatContainsTheSeparator()
+    {
+        var verified = 0;
+
+        // Enough samples that at least one signature carries '_', which is the case that would break a
+        // naive split. Asserted rather than assumed, so the test cannot quietly stop testing anything.
+        for (var i = 0; i < 200 && verified == 0; i++)
+        {
+            var userId = Guid.CreateVersion7();
+            var payload = FeedbackDeepLink.CreatePayload(userId, Key, Ttl, Now.AddSeconds(i * 61));
+
+            if (!payload.AsSpan(33).Contains('_'))
+                continue;
+
+            FeedbackDeepLink.VerifyPayload(payload, Key, Ttl, Now.AddSeconds(i * 61)).Should().Be(userId);
+            verified++;
+        }
+
+        verified.Should().BeGreaterThan(0, "the sample set never exercised a separator inside the signature");
+    }
+
+    /// <summary>A dot-separated payload from the old format must not verify - silently accepting one
+    /// would mean a legacy link binding an account against a signature this build no longer produces.</summary>
+    [Fact]
+    public void TheOldDotSeparatedFormatIsRejected()
+    {
+        var userId = Guid.CreateVersion7();
+        var payload = FeedbackDeepLink.CreatePayload(userId, Key, Ttl, Now);
+
+        FeedbackDeepLink.VerifyPayload(payload.Replace('_', '.'), Key, Ttl, Now).Should().BeNull();
+    }
+
     [Fact]
     public void ASignedPayloadVerifiesBackToTheSameUser()
     {
@@ -42,10 +109,10 @@ public class FeedbackDeepLinkTests
     public void ATamperedUserIdIsRejected()
     {
         var payload = FeedbackDeepLink.CreatePayload(Guid.CreateVersion7(), Key, Ttl, Now);
-        var parts = payload.Split('.');
+        var parts = payload.Split('_');
 
         // Swap in a different account while keeping the original signature.
-        var forged = $"{Guid.CreateVersion7():N}.{parts[1]}.{parts[2]}";
+        var forged = $"{Guid.CreateVersion7():N}_{parts[1]}_{parts[2]}";
 
         FeedbackDeepLink.VerifyPayload(forged, Key, Ttl, Now).Should().BeNull();
     }
@@ -54,13 +121,13 @@ public class FeedbackDeepLinkTests
     public void ATamperedTimestampIsRejected()
     {
         var payload = FeedbackDeepLink.CreatePayload(Guid.CreateVersion7(), Key, Ttl, Now);
-        var parts = payload.Split('.');
+        var parts = payload.Split('_');
 
         // A timestamp that would otherwise pass every other check: still inside the TTL, not in the
         // future. Only the MAC can reject it, which is the point - the signature covers the time,
         // so a link cannot be kept alive by editing the date on it.
         var edited = new DateTimeOffset(Now.AddSeconds(-600)).ToUnixTimeSeconds();
-        var refreshed = $"{parts[0]}.{edited}.{parts[2]}";
+        var refreshed = $"{parts[0]}_{edited}_{parts[2]}";
 
         FeedbackDeepLink.VerifyPayload(refreshed, Key, Ttl, Now).Should().BeNull();
     }

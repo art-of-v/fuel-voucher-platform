@@ -15,10 +15,16 @@ namespace FuelFlow.Features.Feedback;
 /// retires.
 /// </para>
 /// <para>
-/// Format: <c>{userId:N}.{unixSeconds}.{base64url(hmac-sha256)}</c>, where the MAC covers the first
+/// Format: <c>{userId:N}_{unixSeconds}_{base64url(hmac-sha256)}</c>, where the MAC covers the first
 /// two fields. Telegram's deep-linking accepts only <c>A-Za-z0-9_-</c> in the payload and caps it
-/// at 64 characters, which base64url satisfies by construction - and which is why the GUID is
-/// written in "N" form (32, not 36) and the signature truncated: see <see cref="SignatureBytes"/>.
+/// at 64 characters, which base64url and an underscore separator satisfy by construction - and which
+/// is why the GUID is written in "N" form (32, not 36) and the signature truncated: see
+/// <see cref="SignatureBytes"/>.
+/// <para>
+/// The character set is not a style preference. A payload containing anything else - a dot, which the
+/// first version used - is not rejected by Telegram: the client silently drops it and delivers a bare
+/// <c>/start</c>, so the chat binds to nothing and nothing anywhere reports a failure.
+/// </para>
 /// </para>
 /// </summary>
 public static class FeedbackDeepLink
@@ -32,6 +38,23 @@ public static class FeedbackDeepLink
     /// is not a bearer secret, it is an assertion that survives a leaked link for its TTL.
     /// </summary>
     private const int SignatureBytes = 12;
+
+    /// <summary>
+    /// Telegram's hard cap on a <c>/start</c> payload. Exceeding it is not an error on Telegram's side
+    /// either - the parameter is dropped - so the budget is enforced here, where it can still be thrown.
+    /// </summary>
+    private const int MaxPayloadLength = 64;
+
+    /// <summary>
+    /// Field separator inside the payload. Underscore rather than a dot, because Telegram allows
+    /// <c>_</c> and <c>-</c> but **not** <c>.</c>. Note the signature is base64url and may itself
+    /// contain <c>_</c>, so parsing anchors on the fixed-width GUID and the all-digit timestamp rather
+    /// than splitting the string on the separator.
+    /// </summary>
+    private const char Separator = '_';
+
+    /// <summary>Length of a GUID in "N" form - the only format that fits the payload budget.</summary>
+    private const int GuidNLength = 32;
 
     /// <summary>
     /// Signs a payload for <paramref name="userId"/>, valid until
@@ -50,19 +73,39 @@ public static class FeedbackDeepLink
                 "The feedback deep-link signing key must be at least 16 bytes.", nameof(signingKey));
         }
 
-        var body = $"{userId:N}.{ToUnixSeconds(nowUtc)}";
+        var body = $"{userId:N}{Separator}{ToUnixSeconds(nowUtc)}";
         var signature = Sign(body, signingKey);
 
-        var payload = $"{body}.{Base64UrlEncode(signature)}";
+        var payload = $"{body}{Separator}{Base64UrlEncode(signature)}";
 
-        if (payload.Length > 64)
+        if (payload.Length > MaxPayloadLength)
         {
             throw new InvalidOperationException(
-                $"The signed deep-link payload is {payload.Length} characters; Telegram accepts at most 64.");
+                $"The signed deep-link payload is {payload.Length} characters; Telegram accepts at most {MaxPayloadLength}.");
+        }
+
+        // The single most important assertion in this file. Telegram's deep-linking spec allows only
+        // A-Z, a-z, 0-9, "_" and "-" in a /start payload, and it does not reject a violation - it drops
+        // the payload and delivers a bare "/start". The first version of this format used '.' as the
+        // separator, which is not in that set, so every link bound nothing and the chat stayed anonymous
+        // with no error anywhere: the bot saw a start command without arguments, the webhook answered 200,
+        // and getWebhookInfo stayed clean. See PayloadIsTelegramLegal for the regression test.
+        if (!IsTelegramLegal(payload))
+        {
+            throw new InvalidOperationException(
+                "The signed deep-link payload contains characters Telegram does not accept in a /start payload.");
         }
 
         return payload;
     }
+
+    /// <summary>
+    /// Telegram's own <c>/start</c> payload grammar: 1-64 characters, only <c>A-Z a-z 0-9 _ -</c>.
+    /// A payload outside it is not rejected - it is silently discarded by the client.
+    /// </summary>
+    private static bool IsTelegramLegal(string payload) =>
+        payload.Length is > 0 and <= MaxPayloadLength
+        && payload.All(c => char.IsAsciiLetterOrDigit(c) || c is '_' or '-');
 
     /// <summary>
     /// The deep link the mobile app opens: <c>https://t.me/{bot}?start={payload}</c>. Returns null
@@ -98,20 +141,26 @@ public static class FeedbackDeepLink
         if (string.IsNullOrWhiteSpace(payload) || string.IsNullOrWhiteSpace(signingKey))
             return null;
 
-        // userId(32) + '.' + unix(<=11) + '.' + signature(22)
-        if (payload.Length > 64)
+        if (payload.Length > MaxPayloadLength)
             return null;
 
-        var lastDot = payload.LastIndexOf('.');
-        if (lastDot <= 0 || lastDot == payload.Length - 1)
+        // Splitting on the separator is not safe: the signature is base64url and can contain '_'
+        // itself. The layout is fixed-width at the front instead - a 32-character "N" GUID, then a
+        // separator, then an all-digit timestamp - which makes the two separators unambiguous.
+        if (payload.Length <= GuidNLength + 2)
             return null;
 
-        var body = payload[..lastDot];
-        var presented = payload[(lastDot + 1)..];
-
-        var bodyParts = body.Split('.');
-        if (bodyParts.Length != 2)
+        var guidPart = payload[..GuidNLength];
+        if (payload[GuidNLength] != Separator)
             return null;
+
+        var timestampStart = GuidNLength + 1;
+        var separatorIndex = payload.IndexOf(Separator, timestampStart);
+        if (separatorIndex <= timestampStart)
+            return null;
+
+        var timestampPart = payload[timestampStart..separatorIndex];
+        var presented = payload[(separatorIndex + 1)..];
 
         byte[] presentedBytes;
         try
@@ -123,17 +172,17 @@ public static class FeedbackDeepLink
             return null;
         }
 
-        var expected = Sign(body, signingKey);
+        var expected = Sign($"{guidPart}{Separator}{timestampPart}", signingKey);
 
         // FixedTimeEquals rather than == : the comparison happens on attacker-chosen input, and a
         // short-circuiting compare leaks how many leading bytes matched.
         if (!CryptographicOperations.FixedTimeEquals(presentedBytes, expected))
             return null;
 
-        if (!Guid.TryParseExact(bodyParts[0], "N", out var userId))
+        if (!Guid.TryParseExact(guidPart, "N", out var userId))
             return null;
 
-        if (!long.TryParse(bodyParts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var issuedAt))
+        if (!long.TryParse(timestampPart, NumberStyles.None, CultureInfo.InvariantCulture, out var issuedAt))
             return null;
 
         // Accept a small amount of clock skew in the other direction, so a phone a few minutes fast
