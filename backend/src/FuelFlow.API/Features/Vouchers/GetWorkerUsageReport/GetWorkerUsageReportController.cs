@@ -110,7 +110,16 @@ public sealed record WorkerUsageListItem(
     DateOnly ExpirationDate,
     DateTime? IssuedAtUtc,
     DateTime? UsedAtUtc,
-    bool IsUsed);
+    bool IsUsed)
+{
+    /// <summary>
+    /// Transitional alias for <see cref="Brand"/>, serialised under the field's old name, like every
+    /// other mobile-facing shape here; see <see cref="FuelFlow.SharedKernel.DTOs.VoucherDto.Provider"/>
+    /// for why both ship for one release.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("provider")]
+    public string Provider => Brand;
+}
 
 public sealed record WorkerUsageTotals(
     int Count,
