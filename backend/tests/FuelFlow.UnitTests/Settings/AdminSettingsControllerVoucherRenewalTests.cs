@@ -1,13 +1,31 @@
 using FluentAssertions;
+using FuelFlow.Features.Feedback;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Options;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace FuelFlow.UnitTests.Settings;
+
+/// <summary>
+/// The settings controller takes the bot client purely to report webhook state and to register it;
+/// these tests never assert on bot behaviour, only that the wiring does not throw.
+/// </summary>
+internal sealed class SettingsTestTelegramFeedbackClient : ITelegramFeedbackClient
+{
+    public Task<long?> SendMessageAsync(long chatId, string text, string? parseMode = null, CancellationToken ct = default)
+        => Task.FromResult<long?>(null);
+
+    public Task SetWebhookAsync(string url, CancellationToken ct = default) => Task.CompletedTask;
+
+    public Task<TelegramWebhookStatus> GetWebhookStatusAsync(CancellationToken ct = default)
+        => Task.FromResult(new TelegramWebhookStatus("https://example.test/api/telegram/feedback/webhook", false, 0, null, null));
+}
 
 /// <summary>
 /// Covers the admin surface of the voucher-renewal config (Slice 2): the PUT clamps/validation and
@@ -28,7 +46,11 @@ public sealed class AdminSettingsControllerVoucherRenewalTests : IDisposable
 
         _context = new ApplicationDbContext(options);
         _settings = new RuntimeSettingsService(_context);
-        _controller = new AdminSettingsController(_settings, _context)
+        _controller = new AdminSettingsController(
+            _settings,
+            _context,
+            new SettingsTestTelegramFeedbackClient(),
+            Options.Create(new TelegramFeedbackOptions()))
         {
             // No authenticated user — GetUserId/GetUserName resolve to null, which is fine here.
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }

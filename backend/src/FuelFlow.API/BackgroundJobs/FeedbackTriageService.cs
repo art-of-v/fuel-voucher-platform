@@ -135,15 +135,17 @@ public sealed class FeedbackTriageService
         var author = await DescribeAuthorAsync(row.UserId, ct);
 
         var post = FeedbackBotTexts.StaffPost(
-            classification?.Category?.ToString() ?? "?",
-            classification?.Severity?.ToString() ?? "?",
+            classification?.Category?.ToString(),
+            classification?.Severity?.ToString(),
             author,
             classification?.Summary ?? row.Text,
             row.Text,
             row.AppVersion,
             row.Platform);
 
-        var postedId = await _bot.SendMessageAsync(_options.StaffChatId, post, ct);
+        // The one HTML message in the feature: the only tags in it are ours, every interpolated
+        // value is escaped by StaffPost. Without parse_mode Telegram ships staff the raw markup.
+        var postedId = await _bot.SendMessageAsync(_options.StaffChatId, post, "HTML", ct);
         if (postedId is null)
         {
             _logger.LogWarning(

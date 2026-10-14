@@ -50,24 +50,33 @@ internal static class FeedbackBotTexts
     public const string TooLong =
         "Повідомлення задовге. Напишіть, будь ласка, головне — ми прочитаємо.";
 
-    /// <summary>Header the staff group sees above each triage-passing message.</summary>
+    /// <summary>Header the staff group sees above each triage-passing message. Sent with
+    /// parse_mode HTML, so every interpolated value is escaped - see <see cref="Escape"/>.</summary>
+    /// <param name="categoryLabel">Null while the classifier is disabled, in which case the
+    /// bracket block is dropped rather than filled with a placeholder: a staff member reading
+    /// "[без категорії]" learns nothing, whereas a bare "…0203" reads as "no triage yet" and is
+    /// exactly what the post genuinely knows.</param>
     public static string StaffPost(
-        string categoryLabel,
-        string severityLabel,
+        string? categoryLabel,
+        string? severityLabel,
         string author,
         string summary,
         string originalText,
         string? appVersion,
         string? platform)
     {
-        var head = $"🟡 [<b>{Escape(categoryLabel)}</b> · <b>{Escape(severityLabel)}</b>] {Escape(author)}";
+        var head = categoryLabel is null || severityLabel is null
+            ? $"🟡 {Escape(author)}"
+            : $"🟡 [<b>{Escape(categoryLabel)}</b> · <b>{Escape(severityLabel)}</b>] {Escape(author)}";
 
         var lines = new List<string> { head, string.Empty, $"<i>{Escape(summary)}</i>" };
 
         if (appVersion is not null || platform is not null)
         {
+            // An em dash for the unknown half, not "?": a question mark reads as a value Telegram
+            // could not render, an em dash reads as "we did not collect it".
             lines.Add(string.Empty);
-            lines.Add($"Застосунок: {Escape(platform ?? "?")} {Escape(appVersion ?? "?")}");
+            lines.Add($"Застосунок: {Escape(platform ?? "—")} {Escape(appVersion ?? "—")}");
         }
 
         lines.Add(string.Empty);

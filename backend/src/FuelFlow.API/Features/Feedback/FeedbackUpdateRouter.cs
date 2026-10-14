@@ -187,7 +187,9 @@ public class FeedbackUpdateRouter
             SentAtUtc = DateTime.UtcNow
         };
 
-        var deliveredId = await _bot.SendMessageAsync(target.TelegramChatId, reply.Text, ct);
+        // Plain text on purpose: a staff member's reply is prose they typed, and "Ціна & доставка"
+        // under parse_mode HTML would be rejected by Telegram with an opaque 400.
+        var deliveredId = await _bot.SendMessageAsync(target.TelegramChatId, reply.Text, ct: ct);
         if (deliveredId is not null)
         {
             reply.DeliveredMessageId = deliveredId;
@@ -360,7 +362,7 @@ public class FeedbackUpdateRouter
         if (!_options.IsConfigured)
             return;
 
-        await _bot.SendMessageAsync(chatId, text, ct);
+        await _bot.SendMessageAsync(chatId, text, ct: ct);
     }
 
     /// <summary>

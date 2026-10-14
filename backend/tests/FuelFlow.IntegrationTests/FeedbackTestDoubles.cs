@@ -26,7 +26,7 @@ public sealed class RecordingTelegramFeedbackClient : ITelegramFeedbackClient
 
     private long _nextMessageId = Interlocked.Add(ref _sharedMessageId, 1_000);
 
-    public List<(long ChatId, string Text)> Sent { get; } = [];
+    public List<(long ChatId, string Text, string? ParseMode)> Sent { get; } = [];
 
     /// <summary>Chat id whose delivery fails, so the "stored but undelivered" paths are reachable.</summary>
     public long? FailForChatId { get; set; }
@@ -39,9 +39,9 @@ public sealed class RecordingTelegramFeedbackClient : ITelegramFeedbackClient
         set => _nextMessageId = value;
     }
 
-    public Task<long?> SendMessageAsync(long chatId, string text, CancellationToken ct = default)
+    public Task<long?> SendMessageAsync(long chatId, string text, string? parseMode = null, CancellationToken ct = default)
     {
-        Sent.Add((chatId, text));
+        Sent.Add((chatId, text, parseMode));
 
         if (FailForChatId == chatId)
             return Task.FromResult<long?>(null);
@@ -49,10 +49,24 @@ public sealed class RecordingTelegramFeedbackClient : ITelegramFeedbackClient
         return Task.FromResult<long?>(Interlocked.Increment(ref _nextMessageId));
     }
 
-    public Task SetWebhookAsync(string url, CancellationToken ct = default) => Task.CompletedTask;
+    /// <summary>URLs passed to SetWebhookAsync, so the admin registration path can be asserted on.</summary>
+    public List<string> RegisteredWebhooks { get; } = [];
+
+    public Task SetWebhookAsync(string url, CancellationToken ct = default)
+    {
+        RegisteredWebhooks.Add(url);
+        return Task.CompletedTask;
+    }
+
+    public Task<TelegramWebhookStatus> GetWebhookStatusAsync(CancellationToken ct = default) =>
+        Task.FromResult(new TelegramWebhookStatus("https://example.test/api/telegram/feedback/webhook", false, 0, null, null));
 
     public IEnumerable<string> SentTo(long chatId) =>
         Sent.Where(s => s.ChatId == chatId).Select(s => s.Text);
+
+    /// <summary>Parse mode used for the messages sent to a chat, so HTML/plain can be asserted per destination.</summary>
+    public IEnumerable<string?> ParseModesFor(long chatId) =>
+        Sent.Where(s => s.ChatId == chatId).Select(s => s.ParseMode);
 }
 
 /// <summary>

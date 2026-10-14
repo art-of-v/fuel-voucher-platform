@@ -1,10 +1,14 @@
 using System.Globalization;
+using System.Text.Json;
 using FuelFlow.Features.Settings.SharedModels;
+using FuelFlow.Features.Feedback;
 using FuelFlow.Features.Vouchers.Renewal;
+using FuelFlow.SharedKernel.Options;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using FuelFlow.Persistence;
+using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Settings;
@@ -16,11 +20,19 @@ public sealed class AdminSettingsController : ControllerBase
 {
     private readonly RuntimeSettingsService _settings;
     private readonly ApplicationDbContext _context;
+    private readonly ITelegramFeedbackClient _feedbackBot;
+    private readonly TelegramFeedbackOptions _feedbackOptions;
 
-    public AdminSettingsController(RuntimeSettingsService settings, ApplicationDbContext context)
+    public AdminSettingsController(
+        RuntimeSettingsService settings,
+        ApplicationDbContext context,
+        ITelegramFeedbackClient feedbackBot,
+        IOptions<TelegramFeedbackOptions> feedbackOptions)
     {
         _settings = settings;
         _context = context;
+        _feedbackBot = feedbackBot;
+        _feedbackOptions = feedbackOptions.Value;
     }
 
     [HttpGet]
@@ -58,6 +70,12 @@ public sealed class AdminSettingsController : ControllerBase
             ExpiredVoucherLoss = new ExpiredVoucherLossSettingsDto
             {
                 Enabled = expiredVoucherLossEnabled
+            },
+            FeedbackBot = new FeedbackBotSettingsDto
+            {
+                Enabled = await _settings.IsFeedbackBotEnabledAsync(cancellationToken),
+                TelegramConfigured = _feedbackOptions.IsConfigured,
+                Webhook = await ReadWebhookStatusAsync(cancellationToken)
             },
             VoucherRenewal = new VoucherRenewalSettingsDto
             {
@@ -148,7 +166,8 @@ public sealed class AdminSettingsController : ControllerBase
         if (request?.AutoRefund is null && request?.DeletedUnpaidOrderCleanup is null
             && request?.DataRetention is null && request?.ExpiredVoucherLoss is null
             && request?.VoucherRenewal is null
-            && request?.VoucherTerm is null)
+            && request?.VoucherTerm is null
+            && request?.FeedbackBot is null)
         {
             return BadRequest(new { success = false, error = "No settings supplied" });
         }
@@ -159,6 +178,22 @@ public sealed class AdminSettingsController : ControllerBase
         object? expiredVoucherLossResult = null;
         object? voucherRenewalResult = null;
         object? voucherTermResult = null;
+        object? feedbackBotResult = null;
+
+        if (request.FeedbackBot is not null)
+        {
+            // The toggle is honoured even while Telegram is unprovisioned, so a manager can stage
+            // the decision before the env change. The app will simply keep hiding the tab until
+            // both halves are true - the deep-link endpoint checks IsConfigured as well.
+            await _settings.UpsertAsync(
+                AppSettingKeys.FeedbackBotEnabled,
+                request.FeedbackBot.Enabled.ToString(),
+                GetUserId(),
+                GetUserName(),
+                cancellationToken);
+
+            feedbackBotResult = new { enabled = request.FeedbackBot.Enabled };
+        }
 
         if (request.AutoRefund is not null)
         {
@@ -342,8 +377,77 @@ public sealed class AdminSettingsController : ControllerBase
             dataRetention = dataRetentionResult,
             expiredVoucherLoss = expiredVoucherLossResult,
             voucherRenewal = voucherRenewalResult,
-            voucherTerm = voucherTermResult
+            voucherTerm = voucherTermResult,
+            feedbackBot = feedbackBotResult
         });
+    }
+
+    /// <summary>
+    /// Registers the feedback webhook against this deployment's own public address, so an operator
+    /// does not have to hand-assemble the URL and paste it into a terminal. The public origin is
+    /// read off the incoming request rather than configured, because it differs per environment
+    /// (localhost tunnel in development, the API domain behind the proxy in production) and a
+    /// misconfigured value would point Telegram at a host that answers 404 for every update.
+    /// </summary>
+    [HttpPost("feedback/webhook")]
+    public async Task<IActionResult> RegisterFeedbackWebhook(CancellationToken cancellationToken)
+    {
+        if (!_feedbackOptions.IsConfigured)
+        {
+            return BadRequest(new
+            {
+                success = false,
+                error = "Telegram:Feedback is not configured. Set the bot token, staff chat, webhook " +
+                        "secret and signing key, then restart the API."
+            });
+        }
+
+        var url = $"{Request.Scheme}://{Request.Host}{Request.PathBase}/api/telegram/feedback/webhook";
+
+        try
+        {
+            await _feedbackBot.SetWebhookAsync(url, cancellationToken);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or HttpRequestException)
+        {
+            // Telegram's own error text is the useful part ("Bad webhook: ..."), so it reaches the
+            // admin screen verbatim instead of being flattened into a 500.
+            return BadRequest(new { success = false, error = ex.Message });
+        }
+
+        return Ok(new { success = true, url, webhook = await ReadWebhookStatusAsync(cancellationToken) });
+    }
+
+    /// <summary>
+    /// Current webhook state for the settings screen, or null when Telegram cannot be reached or the
+    /// feature is unprovisioned. Null rather than a fabricated "not registered": an unreadable
+    /// status and a confirmed-unregistered webhook are different situations and an operator must be
+    /// able to tell them apart.
+    /// </summary>
+    private async Task<FeedbackWebhookStatusDto?> ReadWebhookStatusAsync(CancellationToken cancellationToken)
+    {
+        if (!_feedbackOptions.IsConfigured)
+        {
+            return null;
+        }
+
+        try
+        {
+            var status = await _feedbackBot.GetWebhookStatusAsync(cancellationToken);
+
+            return new FeedbackWebhookStatusDto
+            {
+                Url = status.Url,
+                Registered = !string.IsNullOrWhiteSpace(status.Url),
+                PendingUpdateCount = status.PendingUpdateCount,
+                LastErrorMessage = status.LastErrorMessage,
+                LastErrorDate = status.LastErrorDate
+            };
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
+        {
+            return new FeedbackWebhookStatusDto { LastErrorMessage = ex.Message };
+        }
     }
 
     private Guid? GetUserId()
@@ -373,6 +477,7 @@ public sealed class SettingsDto
     public ExpiredVoucherLossSettingsDto ExpiredVoucherLoss { get; set; } = new();
     public VoucherRenewalSettingsDto VoucherRenewal { get; set; } = new();
     public VoucherTermSettingsDto VoucherTerm { get; set; } = new();
+    public FeedbackBotSettingsDto FeedbackBot { get; set; } = new();
 }
 
 public sealed class AutoRefundSettingsDto
@@ -395,6 +500,35 @@ public sealed class DataRetentionSettingsDto
 public sealed class ExpiredVoucherLossSettingsDto
 {
     public bool Enabled { get; set; }
+}
+
+/// <summary>
+/// The in-app feedback channel: the runtime toggle plus whether the Telegram integration behind it is
+/// actually provisioned. Both halves are reported because a toggle that reads "on" while
+/// <c>Configured</c> is false would send a manager to debug a bot that was never created.
+/// </summary>
+public sealed class FeedbackBotSettingsDto
+{
+    public bool Enabled { get; set; }
+
+    /// <summary>
+    /// Read-only: whether bot token, staff chat and webhook secret are all present in configuration.
+    /// Turning this on is an env change plus a restart, which is why it is reported and not editable.
+    /// </summary>
+    public bool TelegramConfigured { get; set; }
+
+    /// <summary>Read-only echo of Telegram's own view of the webhook. Null when never checked.</summary>
+    public FeedbackWebhookStatusDto? Webhook { get; set; }
+}
+
+/// <summary>What Telegram reports about the registered feedback webhook, or the error explaining why not.</summary>
+public sealed class FeedbackWebhookStatusDto
+{
+    public string Url { get; set; } = string.Empty;
+    public bool Registered { get; set; }
+    public int PendingUpdateCount { get; set; }
+    public string? LastErrorMessage { get; set; }
+    public string? LastErrorDate { get; set; }
 }
 
 public sealed class VoucherRenewalSettingsDto
@@ -457,4 +591,5 @@ public sealed class UpdateSettingsRequest
     public DataRetentionSettingsDto? DataRetention { get; set; }
     public ExpiredVoucherLossSettingsDto? ExpiredVoucherLoss { get; set; }
     public VoucherRenewalSettingsDto? VoucherRenewal { get; set; }
+    public FeedbackBotSettingsDto? FeedbackBot { get; set; }
 }
