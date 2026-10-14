@@ -1,0 +1,18 @@
+fix(admin): the feedback banner said "needs attention" on a healthy channel
+
+StateBanner accepts "on" | "off" | "danger". The feedback card passed "ok", which matches none
+of them, so the component's ternary fell through to the warning colour: an enabled, fully wired
+channel rendered in amber, next to cards that genuinely were broken. It did not crash and
+nothing was logged - the toggle beside it was correctly blue and the webhook URL was shown, so
+only the banner was lying.
+
+The same commit makes the class impossible to ship again. admin had no typecheck anywhere: its CI
+ran vitest and vite build, and esbuild strips types without checking them, so TS2322 on this exact
+line was invisible. "npm run typecheck" now exists in admin and runs in the CI job ahead of the
+tests, matching what mobile already does. Running it against main first showed this was the only
+error, so enabling it costs nothing today.
+
+The tone decision moves into an exported pure function so it is assertable at all - a colour
+computed inline inside a card is not something a test can reach. The four cases: on, off,
+not-configured outranking the toggle in both directions, and a sweep asserting that only tones
+StateBanner accepts are ever returned.

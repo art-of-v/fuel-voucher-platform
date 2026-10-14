@@ -742,6 +742,27 @@ function ExpiredVoucherLossCard({
 }
 
 /**
+ * Which StateBanner tone the feedback card shows.
+ *
+ * Exported and pure so it can be asserted directly. The first version inlined a ternary that ended
+ * in `"ok"` — a tone StateBanner does not have, so an enabled channel rendered in the warning colour
+ * and a manager reading the settings screen could not tell "on" from "needs attention". TypeScript
+ * would have caught it, but `vite build` (esbuild) does not type-check, so it shipped. The unit test
+ * next to this file is the cheap guard; the `typecheck` script added to the admin CI job is the one
+ * that catches the whole class.
+ *
+ * Order matters: "configured but off" is a deliberate setting and reads as the neutral tone, while
+ * "not configured at all" is a fault and outranks the toggle, whatever the toggle says.
+ */
+export function feedbackBotTone(
+  telegramConfigured: boolean,
+  enabled: boolean,
+): "on" | "off" | "danger" {
+  if (!telegramConfigured) return "danger";
+  return enabled ? "on" : "off";
+}
+
+/**
  * In-app feedback channel: the runtime toggle plus one-shot webhook registration against this
  * deployment's own public URL.
  *
@@ -772,7 +793,7 @@ function FeedbackBotCard({
   // An operator's two questions differ: "is it on?" and "is it wired?". The banner answers the
   // first, the status block the second; collapsing them into one green light is what makes a
   // half-configured channel look fine.
-  const tone = !telegramConfigured ? "danger" : enabled ? "ok" : "off";
+  const tone = feedbackBotTone(telegramConfigured, enabled);
   const note = !telegramConfigured
     ? t("settings.feedbackBotUnconfiguredNote")
     : enabled
