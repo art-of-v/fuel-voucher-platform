@@ -13,6 +13,8 @@ const REFRESH_TIMEOUT_MS = 8_000;
 // still perfectly valid, so ride the window out before giving up. The ladder spans ~7s
 // of waiting, which covers an observed restart (backend start -> listening) with room
 // to spare. Only "unavailable" is retried - a real rejection is final on the first try.
+//
+// A 429 is the exception, and retrying it is actively harmful: see RefreshAttempt.
 const REFRESH_RETRY_DELAYS_MS = [700, 2000, 4500];
 
 /**
@@ -122,7 +124,23 @@ export async function fetchCurrentUser(): Promise<CurrentUser> {
   return res.json();
 }
 
-async function attemptRefresh(): Promise<RefreshStatus> {
+/**
+ * One attempt's outcome, with a rate limit called out separately from the verdict.
+ *
+ * To callers a 429 is plain "unavailable" - the session is untouched and nothing is lost - but it is
+ * the one failure the retry ladder must not walk into, and it needs its own flag to say so.
+ *
+ * Why it must not be retried: the backend allows three refreshes per client IP per minute, and this
+ * ladder fires four requests in about seven seconds. One transient failure - a 502 while the API
+ * restarts, say - therefore spends the entire per-minute budget inside the retry itself, and the
+ * next attempt starts into an empty bucket and spends it again. The loop is self-sustaining: the
+ * retries are what keep the bucket empty, so an admin who hit one blip could not sign in again at
+ * all until they closed every tab and left the page alone for a minute. Retrying a rate limit is
+ * how you stay rate-limited.
+ */
+type RefreshAttempt = { status: RefreshStatus; rateLimited: boolean };
+
+async function attemptRefresh(): Promise<RefreshAttempt> {
   try {
     const res = await fetchWithTimeout(getApiUrl("/api/auth/refresh"), {
       method: "POST",
@@ -132,16 +150,18 @@ async function attemptRefresh(): Promise<RefreshStatus> {
 
     // Only the server rejecting the token itself proves the session is over: 400 when
     // no usable refresh token arrived, 401 when the presented one is dead or revoked.
-    if (res.status === 400 || res.status === 401) return "expired";
+    if (res.status === 400 || res.status === 401) return { status: "expired", rateLimited: false };
+    // A rate limit is a verdict of "not now", not "try harder".
+    if (res.status === 429) return { status: "unavailable", rateLimited: true };
     // Everything else is the backend's problem, not the session's: a 502 from the proxy
-    // while the API restarts, a 500 on a fault, a 429 from the refresh rate limiter.
-    if (!res.ok) return "unavailable";
+    // while the API restarts, a 500 on a fault.
+    if (!res.ok) return { status: "unavailable", rateLimited: false };
 
     const data = await res.json();
     storeTokens(data.accessToken);
-    return "refreshed";
+    return { status: "refreshed", rateLimited: false };
   } catch {
-    return "unavailable";
+    return { status: "unavailable", rateLimited: false };
   }
 }
 
@@ -152,13 +172,15 @@ export async function refreshAccessToken(): Promise<RefreshStatus> {
 
   const promise = (async (): Promise<RefreshStatus> => {
     try {
-      let status = await attemptRefresh();
+      let attempt = await attemptRefresh();
       for (const delay of REFRESH_RETRY_DELAYS_MS) {
-        if (status !== "unavailable") break;
+        // A rate limit ends the ladder. Retrying cannot help - it spends the very budget
+        // the next attempt needs - and the bucket refills on its own within the minute.
+        if (attempt.status !== "unavailable" || attempt.rateLimited) break;
         await new Promise((resolve) => setTimeout(resolve, delay));
-        status = await attemptRefresh();
+        attempt = await attemptRefresh();
       }
-      return status;
+      return attempt.status;
     } finally {
       pendingRefreshPromise = null;
     }

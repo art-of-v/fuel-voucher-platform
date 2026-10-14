@@ -60,6 +60,23 @@ describe("refreshAccessToken", () => {
     expect(fetch).toHaveBeenCalledOnce();
   });
 
+  it('reports "unavailable" on a 429 and does NOT retry', async () => {
+    // The backend allows three refreshes per IP per minute; this ladder fires four in about
+    // seven seconds. Retrying a 429 therefore spends the whole budget from inside the retry,
+    // and every later attempt starts into an empty bucket - the admin ends up locked out
+    // entirely. Found on 2026-10-14: one 502 during a deploy tripped this and the operator
+    // could not sign back in until they closed every tab and left the page alone for a minute.
+    vi.useFakeTimers();
+    vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 429 }));
+
+    const pending = refreshAccessToken();
+    await flushTimers();
+    await expect(pending).resolves.toBe("unavailable");
+
+    // One request. The 3-retry ladder must not have run - that is the whole fix.
+    expect(fetch).toHaveBeenCalledOnce();
+  });
+
   it("retries a 502 and recovers when the backend finishes restarting", async () => {
     // The deploy-restart shape: the first attempt hits the proxy's 502, then the backend
     // binds its port and the retry succeeds. The session must survive the window.
