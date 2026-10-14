@@ -111,7 +111,8 @@ public class QaTestAccessIntegrationTests : WebApplicationFactory<Program>, ICla
     }
 
     /// <summary>
-    /// Deleting the QA account and signing up again has to land on a QA account again.
+    /// Deleting the QA account and signing up again has to land on a QA account again - flagged
+    /// <em>and</em> active.
     ///
     /// The delete is a soft delete - the row survives so the history stays visible to staff -
     /// and signing up mints a <em>new</em> row for the same phone. The QA code kept working
@@ -119,6 +120,11 @@ public class QaTestAccessIntegrationTests : WebApplicationFactory<Program>, ICla
     /// valid, and every screen said the store was simply empty. The catalogue gate in
     /// <c>PackageStockAvailability</c> reads <c>User.IsQaAccount</c>, and nothing in the
     /// registration path had ever set it - only the seeding migration did, once.
+    ///
+    /// <c>IsActive</c> failed the same way for the same reason and is the harder half to spot,
+    /// because it has no visible symptom until checkout: an inactive account may browse, renew
+    /// and chat, and is refused only by the payment endpoints. The seeded QA row is
+    /// <c>is_active = true</c> for exactly that reason.
     ///
     /// This is exactly the path App Review is instructed to perform on the demo account, so it
     /// is not an edge case: it is the one guaranteed to run.
@@ -166,9 +172,82 @@ public class QaTestAccessIntegrationTests : WebApplicationFactory<Program>, ICla
                 .GetRequiredService<PackageStockAvailability>();
             (await availability.IsTestAccountAsync(active.Id)).Should().BeTrue(
                 "the QA phone re-registering must still see the QA catalogue");
+
+            // ...and active, or the tester sees the catalogue and then cannot buy anything. The
+            // seeded account is is_active=true for exactly that reason; the flag alone was not
+            // enough, so this assertion exists separately to keep the two from being conflated -
+            // an inactive QA account looks healthy right up until checkout 403s.
+            active.IsActive.Should().BeTrue(
+                "the QA phone re-registering must come back active, like the seeded account it replaces");
         }
 
         await SetSwitchAsync(false);
+    }
+
+    /// <summary>
+    /// The negative twin of <see cref="QaPhone_ReRegistering_AfterDeletion_ComesBackAsAQaAccount"/>:
+    /// the activation carve-out must not leak to ordinary phone numbers.
+    ///
+    /// Registration normally mints a dormant account that staff activate later, and that default is
+    /// load-bearing business logic. A QA fix that set IsActive=true unconditionally would make every
+    /// self-signup instantly able to spend, which is exactly the kind of change that reads as
+    /// harmless and ships silently.
+    /// </summary>
+    [Fact]
+    public async Task OrdinaryPhone_Registering_StaysInactive()
+    {
+        var client = CreateClient();
+
+        var phone = "+380501112233";
+        (await client.PostAsJsonAsync("/api/auth/send-code", new SendCodeCommand(phone)))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+        (await client.PostAsJsonAsync("/api/auth/verify",
+                new VerifyCodeCommand(phone, "000000")))
+            .StatusCode.Should().Be(HttpStatusCode.OK, "the dev bypass code applies to an ordinary phone");
+
+        using var scope = Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var user = await context.Users.SingleAsync(u => u.PhoneNumber == phone);
+
+        user.IsActive.Should().BeFalse("only staff activate ordinary accounts");
+        user.IsQaAccount.Should().BeFalse("the QA grant is scoped to the configured QA phone");
+    }
+
+    /// <summary>
+    /// Turning QA access off has to stop the QA phone from being re-granted QA identity, not merely
+    /// stop it authenticating. Otherwise a reviewer arriving mid-review silently becomes an ordinary
+    /// active customer again - and with it regains the real-stock catalogue, which is the whole
+    /// point of the segregation.
+    /// </summary>
+    [Fact]
+    public async Task QaPhone_Registering_WithSwitchOff_ComesBackOrdinaryAndInactive()
+    {
+        await SetSwitchAsync(false);
+        var client = CreateClient();
+
+        using (var scope = Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var qa = await context.Users.FirstAsync(u => u.PhoneNumber == QaPhone);
+            qa.IsDeleted = true;
+            await context.SaveChangesAsync();
+        }
+
+        // With the switch off the QA phone cannot authenticate at all, so register it the way any
+        // unknown number registers: a real code through the ordinary path.
+        (await client.PostAsJsonAsync("/api/auth/send-code", new SendCodeCommand(QaPhone)))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+        (await client.PostAsJsonAsync("/api/auth/verify", new VerifyCodeCommand(QaPhone, "000000")))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using (var scope = Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var user = await context.Users.SingleAsync(u => u.PhoneNumber == QaPhone && !u.IsDeleted);
+
+            user.IsQaAccount.Should().BeFalse("QA status may only be granted while the switch is on");
+            user.IsActive.Should().BeFalse("and the activation carve-out is scoped to that same grant");
+        }
     }
 
     [Fact]

@@ -158,7 +158,12 @@ FuelFlow/
 2. `POST /api/auth/verify` validates the code and returns a JWT **access** token + a
    rotating **refresh** token (also set as an `HttpOnly` cookie scoped to `/api/auth/refresh`).
    Access tokens live **15 min** in production (200 min in dev); refresh tokens live **14 days**.
-   New phone numbers auto-create a user; deactivated/soft-deleted users are rejected.
+   New phone numbers auto-create a user with `is_active = false` — activation is a separate
+   staff action, and an inactive account may browse/renew but is refused at checkout. Deleting
+   an account is a **soft** delete, so the phone is released (`users.phone_number` is unique only
+   `WHERE is_deleted = false`) and verifying a new code mints a **fresh** row with no history
+   carried over. The one exception is the QA phone, which re-registers already flagged
+   `is_qa_account` and active — see the planning repo's `docs/QA_TEST_ACCESS.md`.
 3. Clients refresh transparently via `POST /api/auth/refresh` (refresh-token rotation with
    family reuse detection).
 4. The mobile app registers a device keypair and answers a server **challenge** with a
@@ -299,7 +304,7 @@ The primary tables:
 
 | Table | Purpose |
 |---|---|
-| `users` | Accounts (UUID, unique phone, email, role); `is_active`, `token_version`, `is_deleted` drive session revocation & soft-delete |
+| `users` | Accounts (UUID, email, role); `is_active` (activation gate — checkout only), `token_version`, `is_deleted` (soft delete) drive session revocation. `phone_number` is unique only `WHERE is_deleted = false`, so deleting an account releases the number for re-registration. `is_qa_account` marks the App-Review QA identity and gates the test-voucher catalogue and stock pool |
 | `roles` | Role definitions with a level (`User` 0, `QA` 5, `Manager` 10, `Admin` 50, `ProductOwner` 100) |
 | `verification_codes` | OTP records (stored hashed) |
 | `devices` | Registered device public keys for challenge/signature auth |

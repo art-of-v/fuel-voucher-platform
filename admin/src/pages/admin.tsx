@@ -361,6 +361,10 @@ voucherNumber: string;
     isDeleted: boolean;
     isActive: boolean;
     isBanned: boolean;
+    // Read-only: the backend grants this by migration or by the QA-gated registration path,
+    // never from this panel. Surfaced so staff can tell the QA account apart from an ordinary
+    // customer instead of guessing from the phone number.
+    isQaAccount: boolean;
     role: string | null;
     createdAt: string;
   }
@@ -1040,7 +1044,19 @@ voucherNumber: string;
                       <td className="p-4 font-bold text-foreground">
                         {user.firstName || user.lastName ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : <span className="text-muted-foreground italic">No Name</span>}
                       </td>
-                      <td className="p-4">{user.phone || <span className="text-muted-foreground italic">N/A</span>}</td>
+                      <td className="p-4">
+                        <span className="inline-flex items-center gap-1.5">
+                          {user.phone || <span className="text-muted-foreground italic">N/A</span>}
+                          {user.isQaAccount && (
+                            <span
+                              title={t('users.qaBadgeTitle')}
+                              className="inline-flex items-center px-1.5 py-0.5 rounded bg-primary/10 text-primary text-xs font-semibold"
+                            >
+                              {t('users.qaBadge')}
+                            </span>
+                          )}
+                        </span>
+                      </td>
                       <td className="p-4">{user.email || <span className="text-muted-foreground italic">N/A</span>}</td>
                       <td className="p-4">{user.birthdate ? formatDate(user.birthdate) : <span className="text-muted-foreground italic">N/A</span>}</td>
                       <td className="p-4 text-primary font-bold">{user.bonusBalance || 0} UAH</td>
