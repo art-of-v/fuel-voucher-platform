@@ -26,7 +26,7 @@
 -- something already theirs to renew.
 --
 -- Terms, on both halves. Stock runs customer +180d, so it never drifts near expiry on its own. Wallet
--- vouchers run customer +7d against a provider term of +180d, which is inside the 14-day renewal
+-- vouchers run customer +7d against a supplier term of +180d, which is inside the 14-day renewal
 -- window, so the near-expiry banner and the renewal entry point are both reachable - and it is the
 -- Extend branch, because the customer term is well short of the supplier's.
 --
@@ -162,7 +162,7 @@ ON CONFLICT (id) DO NOTHING;
 -- the brand and not the nominal, so a catalogue that lists 10 L, 20 L and 50 L of the same fuel
 -- shares one batch, and the query has to collapse to it rather than emit one row per package.
 INSERT INTO purchase_batches
-    (id, import_job_id, fuel_type_id, provider, supplier_id, created_at_utc, updated_at_utc)
+    (id, import_job_id, fuel_type_id, brand, supplier_id, created_at_utc, updated_at_utc)
 SELECT DISTINCT ON (imp.id, pkg.fuel_type_id)
     gen_random_uuid(),
     imp.id,
@@ -183,8 +183,8 @@ ORDER BY imp.id, pkg.fuel_type_id;
 -- would reject the alternative. Inserted as the shortfall against the target depth, so re-running
 -- tops a drained pool back up instead of multiplying it.
 INSERT INTO fuel_vouchers
-    (id, provider, fuel_type_id, liters, cost_per_liter, supplier_id, import_job_id,
-     provider_expiration_date, customer_expiration_date, voucher_number, qr_payload,
+(id, brand, fuel_type_id, liters, cost_per_liter, supplier_id, import_job_id,
+ supplier_expiration_date, customer_expiration_date, voucher_number, qr_payload,
      status, is_test_data, is_deleted, created_at_utc, updated_at_utc)
 SELECT
     gen_random_uuid(),
@@ -210,7 +210,7 @@ CROSS JOIN LATERAL (
             WHERE v.is_test_data
               AND v.fuel_type_id = pkg.fuel_type_id
               AND v.liters = pkg.liters
-              AND lower(v.provider) = lower(pkg.station_id)
+              AND lower(v.brand) = lower(pkg.station_id)
               AND v.status = 'Available'
         ))
     ) AS n
@@ -249,7 +249,7 @@ ON CONFLICT (id) DO NOTHING;
 -- against line items every cycle and releases the excess back to `Available`, so a line that
 -- overstates its count loses vouchers within about a minute - and reads as silent data loss.
 INSERT INTO order_line_items
-    (id, order_id, fuel_type_id, liters, quantity, unit_price, line_total, provider, term_code)
+    (id, order_id, fuel_type_id, liters, quantity, unit_price, line_total, brand, term_code)
 SELECT
     md5('qa-line-' || pkg.id)::uuid,
     md5('qa-order-' || pkg.id)::uuid,
@@ -267,8 +267,8 @@ WHERE pkg.id LIKE 'qa-pkg-%'
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO fuel_vouchers
-    (id, provider, fuel_type_id, liters, cost_per_liter, supplier_id, import_job_id,
-     provider_expiration_date, customer_expiration_date, voucher_number, qr_payload,
+(id, brand, fuel_type_id, liters, cost_per_liter, supplier_id, import_job_id,
+ supplier_expiration_date, customer_expiration_date, voucher_number, qr_payload,
      status, is_test_data, is_deleted, order_id, assigned_to_user_id, issued_at_utc,
      created_at_utc, updated_at_utc)
 SELECT
@@ -314,7 +314,7 @@ WHERE v.id IN (
 \echo 'QA pool emulated. Verify:'
 \echo '  select p.station_id, p.fuel_name, p.liters,'
 \echo '    (select count(*) from fuel_vouchers v where v.is_test_data and v.fuel_type_id = p.fuel_type_id'
-\echo '       and v.liters = p.liters and lower(v.provider) = lower(p.station_id) and v.status = ''Available'') as stock'
+\echo '       and v.liters = p.liters and lower(v.brand) = lower(p.station_id) and v.status = ''Available'') as stock'
 \echo '  from fuel_packages p where p.id like ''qa-pkg-%'' order by 1,2,3;'
 \echo '  select status, count(*) from fuel_vouchers where is_test_data group by 1;'
 \echo '  select count(*) as wallet_orders from orders o join order_line_items li on li.order_id = o.id where li.id like ''qa-line-%'';'
