@@ -88,11 +88,20 @@ public sealed class CreateCheckoutCommandHandler
             throw new ArgumentException($"Invalid fuel type ID: {command.FuelTypeId} for station {command.StationId}");
         }
 
-        var package = await _context.FuelPackages
-            .FirstOrDefaultAsync(p =>
-                p.StationId == command.StationId &&
-                p.FuelTypeId == command.FuelTypeId &&
-                p.Liters == command.Liters, cancellationToken);
+        // Pool membership is resolved once, by the same helper the storefront uses, and reused for the
+        // package pick and the stock check below. Reading user.IsQaAccount directly - which is what
+        // this did - is a THIRD definition of "is this a QA account": the storefront ORs in the
+        // configured QA phone, and MonobankMerchantResolver ORs in an allowlist. So a QA account
+        // deleted and re-signed-up (a fresh row for the same phone, no flag) saw the QA catalogue on
+        // the shopfront and was then stock-checked against the real pool, on a catalogue the app had
+        // just told it was available.
+        var isTestAccount = await _stock.IsTestAccountAsync(user.Id, cancellationToken);
+
+        // Resolved through the shared helper, not by a local FirstOrDefaultAsync: a triple is not
+        // unique, because every real package has a QA mirror on the same station/fuel/nominal, so an
+        // unordered pick returns whichever row Postgres produced first. See PackageStockAvailability.
+        var package = await _stock.FindPackageAsync(
+            isTestAccount, command.StationId, command.FuelTypeId, command.Liters, cancellationToken);
 
         if (package == null)
         {
@@ -102,8 +111,9 @@ public sealed class CreateCheckoutCommandHandler
 
         // Same gate as the bulk path, and for the same reason: never mint an invoice for fuel there is no
         // stock to deliver. Checked before the below-cost block so an empty shelf does not fire an
-        // operator alert about a sale that was never going to happen.
-        if (!await _stock.IsInStockAsync(user.IsQaAccount, command.StationId, command.FuelTypeId, command.Liters, cancellationToken))
+        // operator alert about a sale that was never going to happen. Answers about the same pool
+        // the package above was taken from.
+        if (!await _stock.IsInStockAsync(isTestAccount, command.StationId, command.FuelTypeId, command.Liters, cancellationToken))
         {
             throw new PackageOutOfStockException(command.StationId, command.FuelTypeId, command.Liters);
         }

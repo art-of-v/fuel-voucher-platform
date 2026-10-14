@@ -3,6 +3,7 @@ using FuelFlow.Features.Vouchers.Availability;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Xunit;
@@ -115,6 +116,140 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
 
         keys.Should().BeEmpty();
     }
+
+    // ── FindPackageAsync: a triple is NOT a unique key ─────────────────────────────────────
+
+    /// <summary>
+    /// The condition measured on production 2026-10-14: every sellable triple carries two live
+    /// rows, because <c>seed-qa-catalogue.sql</c> mirrors each real package into the QA pool on
+    /// the same station, fuel and nominal (13 offers, 58 real rows, 58 QA rows, no duplicates
+    /// inside either pool).
+    ///
+    /// Checkout resolved that key with a bare <c>FirstOrDefaultAsync</c> - no pool filter, no
+    /// ordering - so the customer was charged off whichever row Postgres produced first. The two
+    /// rows carry the same price today only because the seed copies it, which is luck rather than
+    /// a property. Here the QA row is priced differently on purpose, so the old code fails and the
+    /// new code cannot.
+    /// </summary>
+    [Fact]
+    public async Task FindPackage_IgnoresTheOtherPoolsRow_EvenWhenItsPriceDiffers()
+    {
+        using var seed = CreateContext();
+        await TruncatePackagesAsync(seed);
+
+        seed.FuelPackages.AddRange(
+            Package("real-10l", isTestData: false, liters: 10m, price: 890.60m, updatedMinutesAgo: 60),
+            // Deliberately a different price. If the real row were ever repriced independently the
+            // old unordered pick would charge this one.
+            Package("qa-mirror-10l", isTestData: true, liters: 10m, price: 1m, updatedMinutesAgo: 0));
+        await seed.SaveChangesAsync();
+
+        var availability = CreateAvailability();
+
+        (await availability.FindPackageAsync(false, "okko", "okko-a95", 10m))!.Id.Should().Be("real-10l");
+        (await availability.FindPackageAsync(true, "okko", "okko-a95", 10m))!.Id.Should().Be("qa-mirror-10l");
+    }
+
+    /// <summary>
+    /// Two rows in the <em>same</em> pool on one key. A QA mirror is not the only way to get here -
+    /// <c>BrandsController</c> adds a nominal through a read-then-write with no lock, so two
+    /// concurrent PUTs can both insert. Ordering is what makes the answer stable rather than
+    /// dependent on a plan choice, and it must be the same order in both the single and bulk path.
+    /// </summary>
+    [Fact]
+    public async Task FindPackage_PicksDeterministically_WhenTheKeyHasTwoRowsInOnePool()
+    {
+        using var seed = CreateContext();
+        await TruncatePackagesAsync(seed);
+
+        seed.FuelPackages.AddRange(
+            Package("older", isTestData: false, liters: 20m, price: 1780m, updatedMinutesAgo: 120),
+            Package("newer", isTestData: false, liters: 20m, price: 1781m, updatedMinutesAgo: 1));
+        await seed.SaveChangesAsync();
+
+        var availability = CreateAvailability();
+
+        var chosen = await availability.FindPackageAsync(false, "okko", "okko-a95", 20m);
+        chosen!.Id.Should().Be("newer");
+
+        // And the bulk resolver has to agree with the single one, or a line prices off a different
+        // row depending on whether it was bought alone or in a cart.
+        var bulk = await availability.FindPackagesAsync(
+            false, new[] { StockKey.For("okko", "okko-a95", 20m) });
+        bulk[StockKey.For("okko", "okko-a95", 20m)].Id.Should().Be(chosen.Id);
+    }
+
+    /// <summary>
+    /// A key that exists only in the other pool must read as "no pricing", so checkout refuses the
+    /// line rather than silently charging a QA price to a real customer.
+    /// </summary>
+    [Fact]
+    public async Task FindPackage_ReturnsNull_WhenOnlyTheOtherPoolHasTheTriple()
+    {
+        using var seed = CreateContext();
+        await TruncatePackagesAsync(seed);
+
+        seed.FuelPackages.Add(Package("qa-only", isTestData: true, liters: 5m, price: 100m, updatedMinutesAgo: 0));
+        await seed.SaveChangesAsync();
+
+        var availability = CreateAvailability();
+
+        (await availability.FindPackageAsync(false, "okko", "okko-a95", 5m)).Should().BeNull(
+            "a real customer must not be priced off a rehearsal package");
+    }
+
+    /// <summary>
+    /// The cart path returns one entry per wanted key, so bulk checkout cannot fall through to a
+    /// null and 500 on a line that exists.
+    /// </summary>
+    [Fact]
+    public async Task FindPackages_ReturnsAnEntryForEveryWantedKey_AndNothingElse()
+    {
+        using var seed = CreateContext();
+        await TruncatePackagesAsync(seed);
+
+        seed.FuelPackages.AddRange(
+            Package("real-2l", isTestData: false, liters: 2m, price: 178.12m, updatedMinutesAgo: 5),
+            Package("real-5l", isTestData: false, liters: 5m, price: 445.30m, updatedMinutesAgo: 5),
+            // In the catalogue, but not in the cart - must not come back.
+            Package("real-50l", isTestData: false, liters: 50m, price: 4453m, updatedMinutesAgo: 5));
+
+        var wanted = new[]
+        {
+            StockKey.For("okko", "okko-a95", 2m),
+            StockKey.For("okko", "okko-a95", 5m),
+            StockKey.For("wog", "wog-95", 10m),   // nothing at all behind this one
+        };
+        await seed.SaveChangesAsync();
+
+        var resolved = await CreateAvailability().FindPackagesAsync(false, wanted);
+
+        resolved.Keys.Should().BeEquivalentTo(
+            new[] { StockKey.For("okko", "okko-a95", 2m), StockKey.For("okko", "okko-a95", 5m) });
+        resolved.Should().NotContainKey(StockKey.For("wog", "wog-95", 10m),
+            "an absent key is what makes the line refuse rather than fall through");
+    }
+
+    private static async Task TruncatePackagesAsync(ApplicationDbContext context)
+        => await context.Database.ExecuteSqlRawAsync(
+            """TRUNCATE TABLE "fuel_packages", "fuel_vouchers", "orders", "order_line_items", "fulfillments" RESTART IDENTITY CASCADE""");
+
+    private static FuelPackage Package(string id, bool isTestData, decimal liters, decimal price, int updatedMinutesAgo)
+        => new()
+        {
+            Id = id,
+            StationId = "okko",
+            FuelTypeId = "okko-a95",
+            FuelName = "A-95",
+            Liters = liters,
+            Price = price,
+            OriginalPrice = price,
+            FinalPricePerLiter = price / liters,
+            SupplierPricePerLiter = 30m,
+            IsTestData = isTestData,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow.AddMinutes(-updatedMinutesAgo),
+        };
 
     private PackageStockAvailability CreateAvailability()
         => new(CreateContext(), new ConfigurationBuilder()

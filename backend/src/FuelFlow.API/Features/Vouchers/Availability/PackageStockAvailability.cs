@@ -1,6 +1,7 @@
 using FuelFlow.Features.Auth.QaTestAccess;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Vouchers.Availability;
@@ -93,6 +94,101 @@ public sealed class PackageStockAvailability
             .AsNoTracking()
             .AnyAsync(u => u.Id == callerUserId.Value
                        && (u.IsQaAccount || u.PhoneNumber == qaPhone), cancellationToken);
+    }
+
+    /// <summary>
+    /// The <see cref="FuelPackage"/> that will actually be charged for one (station, fuel, litres)
+    /// line, or <see langword="null"/> when this caller's pool has no package for that triple.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is the single implementation shared with the storefront, and it exists because the two
+    /// sides had drifted into reading different rows for the same key. Checkout used to resolve the
+    /// package with a bare <c>FirstOrDefaultAsync</c> on <c>(station, fuel, liters)</c>: no
+    /// <c>IsTestData</c> filter and no <c>OrderBy</c>.
+    /// </para>
+    /// <para>
+    /// Both omissions matter because a triple is not unique. <c>scripts/seed-qa-catalogue.sql</c> gives
+    /// every real package a QA mirror on the <em>same</em> station, fuel and nominal, so as shipped every
+    /// sellable triple has exactly two live rows — measured on production 2026-10-14: 13 offers producing
+    /// 58 rows, 58 flagged real and 58 flagged QA, with no duplicates inside either pool. An unordered
+    /// <c>FirstOrDefaultAsync</c> over two rows returns whichever one Postgres happens to produce first.
+    /// </para>
+    /// <para>
+    /// The price happens to be identical today only because the seed copies it, which is luck rather
+    /// than a property. The moment a QA mirror is repriced independently, or an admin adds a second
+    /// real package for a nominal, the customer is charged off an arbitrary row while the shop showed
+    /// the other. Filtering on the caller's own pool and ordering deterministically makes that
+    /// impossible instead of merely unlikely.
+    /// </para>
+    /// </remarks>
+    public async Task<FuelPackage?> FindPackageAsync(
+        bool isTestAccount,
+        string stationId,
+        string fuelTypeId,
+        decimal liters,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.FuelPackages
+            .AsNoTracking()
+            .Where(p => p.StationId == stationId
+                     && p.FuelTypeId == fuelTypeId
+                     && p.Liters == liters
+                     && p.IsTestData == isTestAccount)
+            // Not decorative: with two rows on the key an unordered pick is arbitrary, and "which
+            // one" would then be at the mercy of a plan change or an autovacuum.
+            .OrderByDescending(p => p.UpdatedAtUtc)
+            .ThenBy(p => p.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// The same resolution for a whole cart, so bulk checkout does not repeat the query per line.
+    /// Keyed by the same <see cref="StockKey"/> the stock gate uses, which is what lets a line be
+    /// priced off exactly the package its stock was checked against.
+    /// </summary>
+    public async Task<Dictionary<StockKey, FuelPackage>> FindPackagesAsync(
+        bool isTestAccount,
+        IReadOnlyCollection<StockKey> wanted,
+        CancellationToken cancellationToken = default)
+    {
+        if (wanted.Count == 0)
+            return [];
+
+        // Narrowed with separate IN-lists on the entity rather than with
+        // `wanted.Contains(StockKey.For(p.StationId, p.FuelTypeId, p.Liters))`, which cannot be
+        // translated - the same wall SellableKeys documents below, hit for the same reason. Separate
+        // lists hand back a cross product the cart never asked about, so the resolved dictionary is
+        // filtered back down to `wanted` after materialisation.
+        var brands = wanted.Select(k => k.Brand).Distinct().ToArray();
+        var fuelTypeIds = wanted.Select(k => k.FuelTypeId).Distinct().ToArray();
+        var literSizes = wanted.Select(k => k.Liters).Distinct().ToArray();
+
+        var rows = await _context.FuelPackages
+            .AsNoTracking()
+            .Where(p => p.IsTestData == isTestAccount
+                     && brands.Contains(p.StationId.ToLower())
+                     && fuelTypeIds.Contains(p.FuelTypeId)
+                     && literSizes.Contains(p.Liters))
+            // Same precedence as the single-line path, so one line of a cart cannot resolve to a
+            // different row than the same line ordered on its own.
+            .OrderByDescending(p => p.UpdatedAtUtc)
+            .ThenBy(p => p.Id)
+            .ToListAsync(cancellationToken);
+
+        var resolved = new Dictionary<StockKey, FuelPackage>(wanted.Count);
+        foreach (var row in rows)
+        {
+            var key = StockKey.For(row.StationId, row.FuelTypeId, row.Liters);
+            if (!wanted.Contains(key))
+                continue;
+
+            // First write wins, and the ordering above means "first" is the same row the single-line
+            // path would have taken.
+            resolved.TryAdd(key, row);
+        }
+
+        return resolved;
     }
 
     /// <summary>

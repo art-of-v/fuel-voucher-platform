@@ -60,7 +60,12 @@ public class QaTestAccessIntegrationTests : WebApplicationFactory<Program>, ICla
     /// removes rows by id rather than trying to spot "the" QA account. Only this class's phone is
     /// touched - other classes share the container and own their own rows.
     /// </remarks>
-    public async Task DisposeAsync()
+    /// Explicit interface implementation. WebApplicationFactory&lt;Program&gt; already has a
+    /// DisposeAsync() from IAsyncDisposable, and a public one here silently hides it - so xUnit's
+    /// IAsyncLifetime.DisposeAsync() ran the state restore while anything disposing the factory as an
+    /// IAsyncDisposable got the base implementation. Two different teardown paths for one object, and
+    /// the compiler flagged it.
+    async Task IAsyncLifetime.DisposeAsync()
     {
         using var scope = Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();

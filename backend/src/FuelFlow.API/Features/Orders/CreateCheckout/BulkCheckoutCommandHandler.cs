@@ -97,17 +97,20 @@ private readonly RuntimeSettingsService _runtimeSettings;
             .Where(f => stationIds.Contains(f.StationId) && fuelTypeIds.Contains(f.Id))
             .ToListAsync(cancellationToken);
 
-        var packages = await _context.FuelPackages
-            .Where(p => stationIds.Contains(p.StationId) && fuelTypeIds.Contains(p.FuelTypeId))
-            .ToListAsync(cancellationToken);
-
-        // Inactive accounts keep a read-only session but cannot pay.
+// Inactive accounts keep a read-only session but cannot pay.
         var user = await _context.Users
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(u => u.Id == command.UserId.Value, cancellationToken);
 
         if (user == null || !user.IsActive || user.IsDeleted)
             throw new AccountInactiveException();
+
+        // Resolved once, through the same helper the storefront uses, and reused for both the package
+        // pick and the stock gate below. This used to read user.IsQaAccount, which is a third
+        // definition of "is this a QA account" alongside the storefront's phone arm and
+        // MonobankMerchantResolver's allowlist - so a QA account deleted and re-signed-up saw the QA
+        // catalogue and was then stock-checked against the real pool. See CreateCheckoutCommandHandler.
+        var isTestAccount = await _stock.IsTestAccountAsync(user.Id, cancellationToken);
 
         var itemPricing = new List<(CheckoutItem Item, decimal UnitPrice, decimal LineTotal, decimal OriginalLineTotal, string? TermCode)>();
         var totalPrice = 0m;
@@ -122,7 +125,14 @@ private readonly RuntimeSettingsService _runtimeSettings;
         var wantedStock = command.Items
             .Select(i => StockKey.For(i.StationId!, i.FuelTypeId, i.Liters))
             .ToHashSet();
-        var inStock = await _stock.AvailableKeysAsync(wantedStock, user.IsQaAccount, cancellationToken);
+        var inStock = await _stock.AvailableKeysAsync(wantedStock, isTestAccount, cancellationToken);
+
+        // Same resolution the single-line path uses, so a cart can never price a line off a different
+        // row than that line would have priced off on its own. Previously this read the whole
+        // catalogue and picked with a local FirstOrDefault, which is arbitrary when the key has two
+        // rows - and it has two rows for every sellable triple, because seed-qa-catalogue.sql mirrors
+        // each real package into the QA pool. See PackageStockAvailability.FindPackagesAsync.
+        var packages = await _stock.FindPackagesAsync(isTestAccount, wantedStock, cancellationToken);
 
         foreach (var item in command.Items)
         {
@@ -133,10 +143,7 @@ private readonly RuntimeSettingsService _runtimeSettings;
                 throw new ArgumentException(
                     $"Invalid fuel type ID: {item.FuelTypeId} for station {item.StationId}");
 
-            var package = packages.FirstOrDefault(p =>
-                p.StationId == item.StationId &&
-                p.FuelTypeId == item.FuelTypeId &&
-                p.Liters == item.Liters);
+            var package = packages.GetValueOrDefault(StockKey.For(item.StationId!, item.FuelTypeId, item.Liters));
 
             if (package == null)
                 throw new ArgumentException(
