@@ -57,6 +57,10 @@ internal sealed class OrderLineItemConfiguration : IEntityTypeConfiguration<Orde
             .HasColumnName("term_code")
             .HasMaxLength(8);
 
+        builder.Property(e => e.PricingBasis)
+            .HasColumnName("pricing_basis")
+            .HasColumnType("jsonb");
+
         builder.HasOne(e => e.Order)
             .WithMany(o => o.LineItems)
             .HasForeignKey(e => e.OrderId)

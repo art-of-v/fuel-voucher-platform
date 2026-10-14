@@ -112,7 +112,10 @@ private readonly RuntimeSettingsService _runtimeSettings;
         // catalogue and was then stock-checked against the real pool. See CreateCheckoutCommandHandler.
         var isTestAccount = await _stock.IsTestAccountAsync(user.Id, cancellationToken);
 
-        var itemPricing = new List<(CheckoutItem Item, decimal UnitPrice, decimal LineTotal, decimal OriginalLineTotal, string? TermCode)>();
+        // The resolved package rides along so the line can record what priced it. The order line stores the
+        // resulting price; pricing_basis stores the inputs behind it, which is the only thing that
+        // still answers "why was this 89.06?" once the contract and the fuel's pricing have moved on.
+        var itemPricing = new List<(CheckoutItem Item, FuelPackage Package, decimal DiscountPerLiter, decimal UnitPrice, decimal LineTotal, decimal OriginalLineTotal, string? TermCode)>();
         var totalPrice = 0m;
 
         // Term-sale ladder, loaded once. Off by default, in which case every line below keeps the
@@ -214,7 +217,7 @@ private readonly RuntimeSettingsService _runtimeSettings;
                     item.Price, lineTotal, command.UserId, item.FuelTypeId);
             }
 
-            itemPricing.Add((item, unitPrice, lineTotal,
+            itemPricing.Add((item, package, discountPerLiter, unitPrice, lineTotal,
                 ServerPricing.OriginalLineTotal(package, item.Liters, unitPrice, item.Quantity), termCode));
         }
 
@@ -306,7 +309,7 @@ private readonly RuntimeSettingsService _runtimeSettings;
             UpdatedAtUtc = DateTime.UtcNow
         };
 
-        foreach (var (item, unitPrice, lineTotal, originalLineTotal, termCode) in itemPricing)
+        foreach (var (item, package, discountPerLiter, unitPrice, lineTotal, originalLineTotal, termCode) in itemPricing)
         {
             order.LineItems.Add(new OrderLineItem
             {
@@ -319,7 +322,8 @@ private readonly RuntimeSettingsService _runtimeSettings;
                 UnitPrice = unitPrice,
                 LineTotal = lineTotal,
                 OriginalLineTotal = originalLineTotal,
-                TermCode = termCode
+                TermCode = termCode,
+                PricingBasis = OrderLinePricing.For(package, termCode, discountPerLiter)
             });
         }
 

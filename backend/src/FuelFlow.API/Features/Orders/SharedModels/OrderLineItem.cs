@@ -27,5 +27,23 @@ public class OrderLineItem
     /// </summary>
     public string? TermCode { get; set; }
 
+    /// <summary>
+    /// The inputs that produced <see cref="UnitPrice"/>, frozen at checkout, as a JSON object:
+    /// the per-litre cost, the margin, the pump price, the minimum discount and the terms id this
+    /// line was priced under.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="UnitPrice"/> records what the customer paid; this records <em>why</em>. Without it
+    /// the answer to "why was this order 89.06?" is only available at the moment of checkout, and
+    /// after a contract changes it is gone — the live contract is not the one that was in force when
+    /// the order was placed, so it cannot be used to reconstruct the basis.
+    /// <para>
+    /// <b>Null for every order placed before this column existed, and deliberately not backfilled.</b>
+    /// Backfilling from today's contract or today's fuel configuration would manufacture a history
+    /// that never happened, which is worse than an honest gap: it looks like evidence.
+    /// </para>
+    /// </remarks>
+    public string? PricingBasis { get; set; }
+
     public Order Order { get; set; } = null!;
 }

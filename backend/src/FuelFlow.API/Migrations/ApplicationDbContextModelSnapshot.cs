@@ -1032,6 +1032,10 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("numeric(12,2)")
                         .HasColumnName("original_line_total");
 
+                    b.Property<string>("PricingBasis")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("pricing_basis");
+
                     b.Property<int>("Quantity")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
@@ -2861,6 +2865,65 @@ namespace FuelFlow.API.Migrations
                         });
                 });
 
+            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.OrderEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_user_id");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("event_type");
+
+                    b.Property<string>("ExternalRef")
+                        .HasColumnType("text")
+                        .HasColumnName("external_ref");
+
+                    b.Property<string>("FromStatus")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("from_status");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at_utc");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<string>("Payload")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("payload");
+
+                    b.Property<string>("ToStatus")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("to_status");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExternalRef");
+
+                    b.HasIndex("OccurredAtUtc");
+
+                    b.HasIndex("OrderId", "OccurredAtUtc");
+
+                    b.ToTable("order_events", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_order_events_event_type", "event_type IN ('Created', 'StatusChanged', 'InvoiceCreated', 'PaymentCaptured', 'Fulfilled', 'PartiallyFulfilled', 'Refunded', 'Cancelled')");
+
+                            t.HasCheckConstraint("ck_order_events_from_to", "(event_type = 'Created' AND from_status IS NULL) OR (event_type <> 'Created' AND to_status IS NOT NULL)");
+                        });
+                });
+
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.PurchaseBatch", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3720,6 +3783,17 @@ namespace FuelFlow.API.Migrations
                         .HasForeignKey("ImportId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.OrderEvent", b =>
+                {
+                    b.HasOne("FuelFlow.Features.Orders.SharedModels.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Order");
                 });
 
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.PurchaseBatch", b =>

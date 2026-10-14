@@ -51,6 +51,7 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<Device> Devices => Set<Device>();
     public DbSet<Order> Orders => Set<Order>();
+    public DbSet<OrderEvent> OrderEvents => Set<OrderEvent>();
     public DbSet<Fulfillment> Fulfillments => Set<Fulfillment>();
     public DbSet<OrderLineItem> OrderLineItems => Set<OrderLineItem>();
     public DbSet<Refund> Refunds => Set<Refund>();
@@ -98,9 +99,20 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
 
     private async Task<int> SaveChangesGuardedAsync(CancellationToken cancellationToken)
     {
+        // Captured before the save: a Modified order's original value is still readable here and
+        // stops being comparable afterwards.
+        var transitions = CaptureOrderTransitions();
+
         try
         {
-            return await base.SaveChangesAsync(cancellationToken);
+            var affected = await base.SaveChangesAsync(cancellationToken);
+
+            if (transitions.Count > 0)
+            {
+                await RecordOrderEventsAsync(transitions, cancellationToken);
+            }
+
+            return affected;
         }
         catch (DbUpdateConcurrencyException ex)
         {
@@ -136,6 +148,75 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
             throw;
         }
     }
+
+    /// <summary>
+    /// The order status changes staged in this unit of work, paired with what they came from.
+    /// </summary>
+    private List<OrderTransition> CaptureOrderTransitions()
+    {
+        var transitions = new List<OrderTransition>();
+
+        foreach (var entry in ChangeTracker.Entries<Order>())
+        {
+            if (entry.State is not (EntityState.Modified or EntityState.Added))
+                continue;
+
+            // Added counts as a creation: an order's first row is its own history, and a table that
+            // is silently empty until the second status change is not much of a record.
+            if (entry.State == EntityState.Added)
+            {
+                transitions.Add(new OrderTransition(entry.Entity.Id, (OrderStatus?)null, entry.Entity.Status, true));
+                continue;
+            }
+
+            // Order.Status is an enum with a string conversion applied at the provider level, so
+            // OriginalValue is already OrderStatus here - not the stored string.
+            var before = entry.Property(o => o.Status).OriginalValue as OrderStatus?;
+
+            if (before != entry.Entity.Status)
+            {
+                transitions.Add(new OrderTransition(entry.Entity.Id, before, entry.Entity.Status, false));
+            }
+        }
+
+        return transitions;
+    }
+
+    private async Task RecordOrderEventsAsync(
+        IReadOnlyList<OrderTransition> transitions, CancellationToken cancellationToken)
+    {
+        foreach (var transition in transitions)
+        {
+            OrderEvents.Add(new OrderEvent
+            {
+                Id = Guid.CreateVersion7(),
+                OrderId = transition.OrderId,
+                EventType = transition.IsCreation ? "Created" : "StatusChanged",
+                FromStatus = transition.FromStatus?.ToString(),
+                ToStatus = transition.ToStatus.ToString(),
+                // The invoice id the order carries is the external reference a webhook delivering
+                // twice would repeat, so it is what makes a duplicate findable later.
+                ExternalRef = await CurrentInvoiceIdAsync(transition.OrderId, cancellationToken),
+                OccurredAtUtc = DateTime.UtcNow
+            });
+        }
+
+        await base.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<string?> CurrentInvoiceIdAsync(Guid orderId, CancellationToken cancellationToken)
+    {
+        // Read from the database rather than the change tracker: the order may have been saved in an
+        // earlier SaveChanges within the same request, and an entry the tracker already released has
+        // no value left to give.
+        return await Orders
+            .Where(o => o.Id == orderId)
+            .Select(o => o.MonobankInvoiceId)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private readonly record struct OrderTransition(
+        Guid OrderId, OrderStatus? FromStatus, OrderStatus ToStatus, bool IsCreation);
 }
 
 
