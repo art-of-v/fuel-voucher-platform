@@ -92,11 +92,13 @@ public sealed class PackageStockAvailability
             return [];
 
         // Narrowed by IN-lists so Postgres can still walk the
-        // (brand, fuel_type_id, liters, status) index instead of grouping the whole table.
-        var rows = await SellableKeys(isTestAccount)
-            .Where(k => wanted.Select(w => w.Brand).Contains(k.Brand)
-                     && wanted.Select(w => w.FuelTypeId).Contains(k.FuelTypeId)
-                     && wanted.Select(w => w.Liters).Contains(k.Liters))
+        // (brand, fuel_type_id, liters, status) index instead of grouping the whole table - but
+        // narrowed inside SellableKeys, on the entity, ahead of the projection. See there for why.
+        var rows = await SellableKeys(
+                isTestAccount,
+                wanted.Select(w => w.Brand).ToArray(),
+                wanted.Select(w => w.FuelTypeId).ToArray(),
+                wanted.Select(w => w.Liters).ToArray())
             .ToListAsync(cancellationToken);
 
         var available = rows.Select(k => new StockKey(k.Brand, k.FuelTypeId, k.Liters)).ToHashSet();
@@ -132,15 +134,50 @@ public sealed class PackageStockAvailability
                 cancellationToken);
     }
 
-    private IQueryable<StockKey> SellableKeys(bool isTestAccount)
+    /// <summary>
+    /// The distinct sellable <see cref="StockKey"/>s, optionally narrowed to a cart.
+    /// </summary>
+    /// <param name="brands">
+    /// <see langword="null"/> means "no cart", i.e. the whole catalogue. Otherwise the brands,
+    /// fuel types and nominals the cart asked for.
+    /// </param>
+    /// <remarks>
+    /// The narrowing happens here, on the entity, and deliberately BEFORE the projection into
+    /// <see cref="StockKey"/>. Filtering after it cannot be translated at all: EF reports
+    /// <c>The LINQ expression 'brands.Contains(new StockKey(...).Brand)' could not be translated</c>,
+    /// and that is the only error it raises - there is no compile-time warning and no unit test that
+    /// catches it, because an in-memory provider evaluates the whole thing client-side and gets it
+    /// right. Ahead of the projection the same predicate is ordinary column matching, which is what
+    /// the IN-lists are for: Postgres answers it through the
+    /// <c>(brand, fuel_type_id, liters, status)</c> index instead of grouping the whole table.
+    /// <para>
+    /// Shipped broken in 1.1.0 and caught by hand on the first real checkout:
+    /// <c>POST /api/purchases/bulk</c> answered 500 for every customer from the moment the feature
+    /// deployed, so nobody could buy fuel at all. Keep this parameter inside the entity query.
+    /// </para>
+    /// </remarks>
+    private IQueryable<StockKey> SellableKeys(
+        bool isTestAccount,
+        string[]? brands = null,
+        string[]? fuelTypeIds = null,
+        decimal[]? literSizes = null)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
-        return _context.FuelVouchers
+        var query = _context.FuelVouchers
             .AsNoTracking()
             .Where(v => v.Status == VoucherStatus.Available
                      && v.IsTestData == isTestAccount
-                     && (!_expiryEnabled || v.SupplierExpirationDate >= today))
+                     && (!_expiryEnabled || v.SupplierExpirationDate >= today));
+
+        if (brands is not null)
+        {
+            query = query.Where(v => brands.Contains(v.Brand.ToLower())
+                                  && fuelTypeIds!.Contains(v.FuelTypeId)
+                                  && literSizes!.Contains(v.Liters));
+        }
+
+        return query
             .Select(v => new StockKey(v.Brand.ToLower(), v.FuelTypeId, v.Liters))
             .Distinct();
     }
