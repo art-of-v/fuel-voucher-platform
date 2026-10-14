@@ -195,7 +195,11 @@ public sealed class CreateCheckoutCommandHandler
             Quantity = command.Quantity,
             UnitPrice = unitPrice,
             LineTotal = lineTotal,
-            OriginalLineTotal = ServerPricing.OriginalLineTotal(package, command.Liters, unitPrice, command.Quantity)
+            OriginalLineTotal = ServerPricing.OriginalLineTotal(package, command.Liters, unitPrice, command.Quantity),
+            // Same freeze as the bulk path, so a single-line order can explain its price too. This
+            // path has no term ladder - it sells the full remaining supplier term - so termCode and
+            // the term discount are null and the per-litre columns are the whole basis.
+            PricingBasis = OrderLinePricing.For(package, termCode: null, discountPerLiter: null)
         });
 
         _context.Orders.Add(order);
