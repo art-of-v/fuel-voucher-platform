@@ -14,7 +14,7 @@ vi.mock("./admin-auth", () => ({
   clearTokens: () => clearTokens(),
 }));
 
-import { apiRequest, ApiError } from "./api-client";
+import { apiRequest, ApiError, __resetSessionEndedForTests } from "./api-client";
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -25,6 +25,9 @@ function jsonResponse(status: number, body: unknown): Response {
 
 describe("apiRequest response parsing", () => {
   beforeEach(() => {
+    // api-client remembers that a session ended, so later 401s stop attempting a refresh.
+    // That is module state and survives between tests, so each one starts without the verdict.
+    __resetSessionEndedForTests();
     refreshAccessToken.mockReset();
     clearTokens.mockReset();
     vi.stubGlobal("fetch", vi.fn());
@@ -277,7 +280,45 @@ describe("apiRequest response parsing", () => {
       apiRequest("GET", "/api/admin/vouchers", undefined, undefined, undefined, 0),
     ).rejects.toThrow("Session expired");
 
-    expect(clearTokens).toHaveBeenCalledOnce();
-    expect(location.href).toBe("/admin");
+      expect(clearTokens).toHaveBeenCalledOnce();
+      expect(location.href).toBe("/admin");
+    });
+
+    /**
+     * Regression for the endless admin loop seen on 2026-10-14: `suppliers 401` and
+     * `refresh 429/400` repeating every few seconds, with the operator stuck on a retry screen for
+     * a session that had already ended. The dashboard polls every 15s and a tab like SuppliersTab
+     * mounts two queries, so a dead session produced a 401-refresh pair each time round.
+     *
+     * The backend allows three refreshes per IP per minute, which such a loop exhausts several
+     * times over.
+     */
+    it("stops attempting a refresh once the session has ended", async () => {
+      refreshAccessToken.mockResolvedValue("expired");
+      // A fresh Response per call. A Response body is single-use, so one shared instance would
+      // make every request after the first fail somewhere other than the 401 path - and the test
+      // would pass without ever reaching the guard it exists to test.
+      vi.mocked(fetch).mockImplementation(async () => new Response(null, { status: 401 }));
+
+      // First 401: a refresh is genuinely worth one attempt, and it reports the session as over.
+      await expect(
+        apiRequest("GET", "/api/admin/suppliers", undefined, undefined, 0, 0),
+      ).rejects.toThrow("Session expired");
+      expect(refreshAccessToken).toHaveBeenCalledOnce();
+
+      // Every later 401 is the same answer. No further refresh may be attempted.
+      for (let i = 0; i < 10; i++) {
+        await expect(
+          apiRequest("GET", "/api/admin/suppliers", undefined, undefined, 0, 0),
+        ).rejects.toThrow("Session expired");
+      }
+
+      // One refresh in total, against eleven identical 401s.
+      expect(refreshAccessToken).toHaveBeenCalledOnce();
+      expect(vi.mocked(fetch).mock.calls.length).toBe(11);
+
+      // Recovery is not another 401: endSession() navigates to /admin, which reloads the page and
+      // drops the module state. There is no in-page path back, and asserting one would be
+      // asserting dead code.
+    });
   });
-});
