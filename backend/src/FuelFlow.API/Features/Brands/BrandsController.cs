@@ -459,6 +459,21 @@ public sealed class BrandsController : ControllerBase
     [HttpPut("{id}/nominals")]
     public async Task<IActionResult> UpdateNominals([FromRoute] string id, [FromBody] List<int> nominals, CancellationToken ct)
     {
+        // Rejected here rather than left to ck_fuel_packages_liters_positive. The request body binds
+        // List<int> straight off the wire, so -10 used to create a package priced at -10 x the
+        // per-litre rate and the storefront listed it. A 23514 from the database would be correct but
+        // opaque - it names neither the offending nominal nor this endpoint - so the caller gets a
+        // message that says which value and why.
+        var invalid = nominals.Where(n => n <= 0).Distinct().OrderBy(n => n).ToList();
+        if (invalid.Count > 0)
+        {
+            return BadRequest(new
+            {
+                message = "A nominal volume must be a positive number of litres.",
+                invalid
+            });
+        }
+
         var station = await _context.Stations.FirstOrDefaultAsync(s => s.Id == id, ct);
         if (station is null) return NotFound();
 

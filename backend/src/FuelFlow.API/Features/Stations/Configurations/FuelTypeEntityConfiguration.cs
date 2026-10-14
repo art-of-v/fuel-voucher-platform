@@ -71,6 +71,12 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
             t.HasCheckConstraint("ck_fuel_types_id_length", "length(id) <= 100");
             t.HasCheckConstraint("ck_fuel_types_name_length", "length(name) <= 200");
             t.HasCheckConstraint("ck_fuel_types_station_id_length", "length(station_id) <= 100");
+
+            // A negative discount price means the customer is paid to take the fuel, which is not a
+            // discount policy anyone has agreed to. The only guard today is the application-level
+            // below-cost opt-in (BrandsController), which is a business decision rather than a
+            // constraint, so a hand-written PUT or a future code path can still land here.
+            t.HasCheckConstraint("ck_fuel_types_prices_non_negative", "base_price >= 0 AND discount_price >= 0");
         });
     }
 }

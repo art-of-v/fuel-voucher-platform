@@ -83,6 +83,22 @@ public sealed class RefundOrderCommandHandler
             // "PartiallyRefunded + Refund pending" combination.
             if (existing.Status == RefundStatus.Completed)
             {
+                // Deliberately does NOT opt out of FulfillmentConfiguration's global
+                // `HasQueryFilter(e => e.ReleasedAtUtc == null)`. A delivery the reconciliation job
+                // released - FulfillmentService writes ReleasedAtUtc with reason
+                // "quantity_mismatch" - is not a delivery the customer received, so it must not
+                // count here either: an order whose every fulfillment was released delivered
+                // nothing, and Refunded is the honest status for it.
+                //
+                // ComputeUnfulfilledLines below reaches the same rule the other way round, by
+                // filtering ReleasedAtUtc by hand, because it reads the navigation off an order
+                // loaded with IgnoreQueryFilters() and that load also switches this filter off.
+                // Two mechanisms for one rule is fragile, and worth collapsing into a named
+                // predicate - but NOT by adding IgnoreQueryFilters here, which is what an audit
+                // reading the missing opt-out suggests. That was tried: it reinstates the S9 bug
+                // pinned by HandleAsync_ShouldNotCountReleasedFulfillmentsAsDelivered, where a
+                // customer who paid for two units and received one was told nothing remained to be
+                // returned.
                 var deliveredCount = await _context.Fulfillments
                     .CountAsync(f => f.OrderId == order.Id, cancellationToken);
 

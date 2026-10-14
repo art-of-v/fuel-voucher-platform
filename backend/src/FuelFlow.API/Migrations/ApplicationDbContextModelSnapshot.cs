@@ -2119,6 +2119,10 @@ namespace FuelFlow.API.Migrations
 
                             t.HasCheckConstraint("ck_fuel_packages_id_length", "length(id) <= 100");
 
+                            t.HasCheckConstraint("ck_fuel_packages_liters_positive", "liters > 0");
+
+                            t.HasCheckConstraint("ck_fuel_packages_price_non_negative", "price >= 0");
+
                             t.HasCheckConstraint("ck_fuel_packages_station_id_length", "length(station_id) <= 100");
                         });
 
@@ -2728,6 +2732,8 @@ namespace FuelFlow.API.Migrations
                             t.HasCheckConstraint("ck_fuel_types_id_length", "length(id) <= 100");
 
                             t.HasCheckConstraint("ck_fuel_types_name_length", "length(name) <= 200");
+
+                            t.HasCheckConstraint("ck_fuel_types_prices_non_negative", "base_price >= 0 AND discount_price >= 0");
 
                             t.HasCheckConstraint("ck_fuel_types_station_id_length", "length(station_id) <= 100");
                         });

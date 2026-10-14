@@ -112,6 +112,17 @@ internal sealed class FuelPackageConfiguration : IEntityTypeConfiguration<FuelPa
             t.HasCheckConstraint("ck_fuel_packages_id_length", "length(id) <= 100");
             t.HasCheckConstraint("ck_fuel_packages_station_id_length", "length(station_id) <= 100");
             t.HasCheckConstraint("ck_fuel_packages_fuel_type_id_length", "length(fuel_type_id) <= 100");
+
+            // The only two sign constraints this table had were missing entirely, which made it the
+            // sole sellable-money table in the schema without them - fuel_vouchers, orders,
+            // order_line_items, refunds, voucher_exchanges and operator_voucher_renewals all pin
+            // theirs, and DatabaseIntegrityTests asserts each one. Reachable, too:
+            // PUT /api/admin/brands/fuels/{fuelId}/nominals binds List<int> off the request body, so
+            // a nominal of -10 produced a negative-price package that the storefront then listed.
+            // The order line's own ck_order_line_positive_liters turned that into a checkout failure
+            // rather than a corrupt order, but the catalogue advertised it first.
+            t.HasCheckConstraint("ck_fuel_packages_liters_positive", "liters > 0");
+            t.HasCheckConstraint("ck_fuel_packages_price_non_negative", "price >= 0");
         });
     }
 }

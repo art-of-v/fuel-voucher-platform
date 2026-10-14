@@ -6,6 +6,7 @@ using FuelFlow.Features.Brands.GetProviderHistory;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -155,5 +156,33 @@ public sealed class UpdateNominalsReuseTests : IDisposable
         // each price edit.
         afterSecond.Should().BeEquivalentTo(afterFirst, "re-applying the same nominal set is a no-op");
         afterSecond.Should().HaveCount(2);
+    }
+
+    /// <summary>
+    /// The body binds <c>List&lt;int&gt;</c> straight off the wire, so a nominal of <c>-10</c> used
+    /// to create a package priced at <c>-10 ×</c> the per-litre rate and the storefront listed it.
+    /// <c>ck_fuel_packages_liters_positive</c> now stops it at the database, but a bare 23514 names
+    /// neither the offending value nor this endpoint - so the rejection happens here, where the
+    /// answer can say which nominal and why.
+    /// </summary>
+    [Theory]
+    [InlineData(new[] { 10, 0 })]
+    [InlineData(new[] { 10, -10 })]
+    [InlineData(new[] { -5 })]
+    public async Task A_NonPositive_Nominal_Is_Rejected_Without_Touching_The_Catalogue(int[] nominals)
+    {
+        await SeedAsync(10, 20);
+        var before = await _context.FuelPackages.IgnoreQueryFilters().CountAsync();
+
+        var result = await CreateController().UpdateNominals("okko", nominals.ToList(), default);
+
+        var bad = result as BadRequestObjectResult;
+        bad.Should().NotBeNull("a negative volume is not a product");
+        bad!.Value.Should().NotBeNull();
+
+        // The strongest part: the rejection happens before any of the archive-then-add logic runs,
+        // so a single bad value in the list cannot archive the surviving volumes on its way out.
+        (await _context.FuelPackages.IgnoreQueryFilters().CountAsync()).Should().Be(before,
+            "a rejected request must not archive anything");
     }
 }

@@ -342,6 +342,111 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         updatedOrder!.Status.Should().Be(OrderStatus.PartiallyRefunded);
     }
 
+    /// <summary>
+    /// The status branch and the amount branch apply the same rule by two different mechanisms, and
+    /// only one of them looks like it needs an explicit filter. This pins the status branch.
+    ///
+    /// A delivery the reconciliation job released is not a delivery the customer received - that is
+    /// what <c>FulfillmentConfiguration</c>'s global filter is <em>for</em>. So when every
+    /// fulfillment on an order was released, nothing was delivered and the honest status is
+    /// <c>Refunded</c>, not <c>PartiallyRefunded</c>.
+    ///
+    /// This was filed as a bug first (the count is missing an <c>IgnoreQueryFilters()</c>, which is
+    /// what an audit notices) and it is not one - adding that call here reinstates the S9 bug pinned
+    /// by <see cref="HandleAsync_ShouldNotCountReleasedFulfillmentsAsDelivered"/>. The test exists so
+    /// the next audit does not "fix" it again.
+    /// </summary>
+    [Fact]
+    public async Task HandleAsync_ShouldReportFullyRefunded_WhenEveryFulfillmentWasReleased()
+    {
+        var order = BuildOrder();
+        order.Fulfillments.Add(new Fulfillment
+        {
+            Id = 1,
+            OrderId = order.Id,
+            VoucherId = Guid.NewGuid(),
+            FulfilledAtUtc = DateTime.UtcNow.AddMinutes(-5),
+            ReleasedAtUtc = DateTime.UtcNow,
+            ReleaseReason = "stock exhausted",
+            Voucher = BuildVoucher("okko", "okko-95", 50)
+        });
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        _context.Refunds.Add(new Refund
+        {
+            Id = Guid.NewGuid(),
+            OrderId = order.Id,
+            UserId = order.UserId,
+            Amount = 500000,
+            InvoiceId = "INV-ALL-RELEASED",
+            ExtRef = "idem-key-released",
+            Status = RefundStatus.Completed,
+            IsAutomatic = false,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        await _context.SaveChangesAsync();
+
+        var result = await _handler.HandleAsync(new RefundOrderCommand { OrderId = order.Id });
+
+        result.Status.Should().Be("Completed");
+        var updatedOrder = await _context.Orders.FindAsync(order.Id);
+        updatedOrder!.Status.Should().Be(OrderStatus.Refunded,
+            "a released delivery is not a delivery, so nothing was delivered");
+    }
+
+    /// <summary>
+    /// The boundary between the two statuses: one released and one live means fuel did leave the
+    /// building for part of the order, which is exactly what PartiallyRefunded means.
+    /// </summary>
+    [Fact]
+    public async Task HandleAsync_ShouldReportPartiallyRefunded_WhenSomeFulfillmentsWereReleased()
+    {
+        var order = BuildOrder();
+        order.Fulfillments.Add(new Fulfillment
+        {
+            Id = 1,
+            OrderId = order.Id,
+            VoucherId = Guid.NewGuid(),
+            FulfilledAtUtc = DateTime.UtcNow,
+            Voucher = BuildVoucher("okko", "okko-95", 50)
+        });
+        order.Fulfillments.Add(new Fulfillment
+        {
+            Id = 2,
+            OrderId = order.Id,
+            VoucherId = Guid.NewGuid(),
+            FulfilledAtUtc = DateTime.UtcNow.AddMinutes(-5),
+            ReleasedAtUtc = DateTime.UtcNow,
+            ReleaseReason = "quantity_mismatch",
+            Voucher = BuildVoucher("okko", "okko-95", 50)
+        });
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        _context.Refunds.Add(new Refund
+        {
+            Id = Guid.NewGuid(),
+            OrderId = order.Id,
+            UserId = order.UserId,
+            Amount = 250000,
+            InvoiceId = "INV-SOME-RELEASED",
+            ExtRef = "idem-key-some-released",
+            Status = RefundStatus.Completed,
+            IsAutomatic = false,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        await _context.SaveChangesAsync();
+
+        await _handler.HandleAsync(new RefundOrderCommand { OrderId = order.Id });
+
+        var updatedOrder = await _context.Orders.FindAsync(order.Id);
+        updatedOrder!.Status.Should().Be(OrderStatus.PartiallyRefunded,
+            "one live delivery means part of the order did reach the customer");
+    }
+
     [Fact]
     public async Task HandleAsync_ShouldCountFulfilledVouchers_WhenProviderCaseDiffers()
     {
