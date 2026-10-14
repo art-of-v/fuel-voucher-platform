@@ -101,30 +101,30 @@ ON CONFLICT (id) DO NOTHING;
 
 -- Stock behind each QA package.
 --
--- On the `provider` column, because the name lies. A supplier and a station are different things
--- here: `fuel_vouchers.supplier_id` is a uuid FK holding who actually supplied the paper, and a
--- supplier is deliberately not tied to one brand - it may hold OKKO, WOG and KLO vouchers at once.
--- That column is what cost and the audit trail join on, and it is left NULL here because a test
--- fixture is not a purchase.
+-- On the `brand` column, because the name still only half describes it. A supplier and a station are
+-- different things here: `fuel_vouchers.supplier_id` is a uuid FK holding who actually supplied the
+-- paper, and a supplier is deliberately not tied to one brand - it may hold OKKO, WOG and KLO
+-- vouchers at once. That column is what cost and the audit trail join on, and it is left NULL here
+-- because a test fixture is not a purchase.
 --
--- `provider` is the older varchar, and both the storefront key (StockKey) and the fulfilment claim
--- match it against `fuel_packages.station_id` - lower-cased, case-insensitive. So whatever is put
--- here has to be the station id for the package to find its own stock. A row keyed to a supplier
--- name or a network name would silently never match, leaving a visible package that cannot be
--- bought, which reads as an out-of-stock bug rather than as a mismatched key.
---
--- Renaming that column is its own piece of work: it is a match key on the money path, not a label.
+-- `brand` is a varchar, and both the storefront key (StockKey) and the fulfilment claim match it
+-- against `fuel_packages.station_id` - lower-cased, case-insensitive. So whatever is put here has to
+-- be the station id for the package to find its own stock. A row keyed to a supplier name or a
+-- network name would silently never match, leaving a visible package that cannot be bought, which
+-- reads as an out-of-stock bug rather than as a mismatched key. It was `provider` until #1107
+-- renamed it; the rename moved the column without moving what goes in it, which is the whole reason
+-- the match key has to be written out here rather than assumed.
 --
 -- The terms are what make renewal reachable at all: a reviewer who buys a QA voucher sees the
 -- near-expiry banner and the renewal entry point only while the customer term sits inside the
 -- 14-day trigger window, and a full-term voucher shows neither. Hence customer +7d against a
--- provider term of +180d - the same shape as the live stock.
+-- supplier term of +180d - the same shape as the live stock.
 --
 -- `vouchers_per_package` of them, and only the shortfall: the series is bounded by what is already
 -- behind the package, so re-running tops the pool back up and stops, instead of multiplying it.
 INSERT INTO fuel_vouchers
-    (id, provider, fuel_type_id, liters, cost_per_liter,
-     provider_expiration_date, customer_expiration_date, voucher_number, qr_payload,
+(id, brand, fuel_type_id, liters, cost_per_liter,
+ supplier_expiration_date, customer_expiration_date, voucher_number, qr_payload,
      status, is_test_data, is_deleted, created_at_utc, updated_at_utc)
 SELECT
     gen_random_uuid(),
@@ -150,7 +150,7 @@ CROSS JOIN LATERAL (
             WHERE v.is_test_data
               AND v.fuel_type_id = pkg.fuel_type_id
               AND v.liters = pkg.liters
-              AND lower(v.provider) = lower(pkg.station_id)
+              AND lower(v.brand) = lower(pkg.station_id)
         ))
     ) AS n
 ) AS shortfall
@@ -168,7 +168,7 @@ ON CONFLICT DO NOTHING;
 \echo ''
 \echo 'QA catalogue seeded. Verify, as the QA account:'
 \echo '  select fuel_name, liters, is_test_data from fuel_packages where id like ''qa-pkg-%'' order by fuel_name;'
-\echo '  select provider, fuel_type_id, liters, customer_expiration_date, status'
+\echo '  select brand, fuel_type_id, liters, customer_expiration_date, status'
 \echo '    from fuel_vouchers where is_test_data order by customer_expiration_date;'
 \echo ''
 \echo 'Anonymous readers must see none of it - check from outside a signed-in session:'
