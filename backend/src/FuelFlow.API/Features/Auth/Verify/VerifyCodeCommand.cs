@@ -188,9 +188,11 @@ public sealed class VerifyCodeCommandHandler
             //
             // Gated on the same switch the code path above already checked, so QA status can only
             // ever be granted while QA access is actually enabled. A reviewer arriving after the
-            // switch was flipped OFF gets an ordinary inactive account, which is the fail-safe we
-            // want. This is unreachable via the Auth:DevBypass 000000 code: DevBypass only
-            // substitutes the SMS code, it does not grant QA status.
+            // switch was flipped OFF cannot register at all - the gate above rejects the QA phone
+            // before the code is even compared - so a late sign-in can neither mint an ordinary
+            // active customer nor recover the real-stock catalogue. This is unreachable via the
+            // Auth:DevBypass 000000 code: DevBypass only substitutes the SMS code, and it does not
+            // get past that gate either.
             var isQaRegistration = _qaTestAccess is not null
                                    && _qaTestAccess.IsQaPhone(phoneNumber)
                                    && await _qaTestAccess.IsActiveAsync(cancellationToken);
