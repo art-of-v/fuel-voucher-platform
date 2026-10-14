@@ -210,7 +210,10 @@ level stored in `roles.level` and the authority matrix enforced in
 
 1. The bottom bar carries a **Feedback** tab, visible only when `GET /api/feedback/deep-link`
    answers — the tab is *absent*, not disabled, so switching `FeedbackBot:Enabled` off in the
-   admin takes it out of every installed app without a release.
+   admin takes it out of every installed app without a release. The gate is re-checked on every
+   foreground transition (throttled to once a minute), so flipping it either way takes effect
+   without the user relaunching; a network failure leaves the previous answer alone rather than
+   hiding the tab or flashing it.
 2. That endpoint returns a **server-signed** `https://t.me/<bot>?start=<payload>` link. The app
    never signs anything: a key inside a shipped binary is a public key, and would let anyone start
    a chat as any account.
@@ -220,9 +223,11 @@ level stored in `roles.level` and the authority matrix enforced in
    would make Telegram redeliver the same update forever).
 4. `FeedbackTriageService` (Hangfire) asks an LLM (`Llm:*`, Gemini by default) whether the
    message carries information — greetings and jokes are dropped — and posts the rest, with a
-   category, a severity and a one-sentence restatement, to a **private staff group**. Dropped
-   messages are still stored, so a classifier that starts eating real complaints is visible in
-   the admin's "unsure drops" filter instead of vanishing.
+   category, a severity and a one-sentence restatement, to a **private staff group**. With the
+   classifier off (the default) nothing is filtered and every message is posted untriaged: the
+   post then carries the author and the raw text, with no category/severity header, because there
+   is nothing to say. Dropped messages are still stored, so a classifier that starts eating real
+   complaints is visible in the admin's "unsure drops" filter instead of vanishing.
 5. A staff member answers by **quoting the bot's post** in that group. Two independent gates
    relay it to the customer: the sender must be in `Telegram:Feedback:StaffUserIds`, and the
    quoted message must be one the bot posted. Every answer is recorded in
@@ -231,8 +236,12 @@ level stored in `roles.level` and the authority matrix enforced in
    is where the team works, the admin tab is the durable backlog.
 
 Configured entirely off by default (`Telegram:Feedback:Enabled`, `Llm:Enabled`,
-`app_settings.FeedbackBot:Enabled`). Design and rationale:
-`docs/FEEDBACK_BOT.md` in the private planning repo.
+`app_settings.FeedbackBot:Enabled`). The last of those is the operational switch: the admin
+**Settings** tab owns it alongside read-only `TelegramConfigured` (are the bot credentials
+present at all?) and the live webhook state, and
+`POST /api/admin/settings/feedback/webhook` re-registers the webhook against the address the
+admin panel is being served on — so a redeploy or a domain change is a button rather than a
+terminal. Design and rationale: `docs/FEEDBACK_BOT.md` in the private planning repo.
 
 ### 5. Reconciliation, refunds & reports (admin)
 
@@ -406,6 +415,10 @@ Admin: `GET /api/admin/feedback` (filters + paging), `GET /api/admin/feedback/fa
 `GET /api/admin/feedback/{id}`, `POST /api/admin/feedback/status`,
 `DELETE /api/admin/feedback?id=|verdict=` (deletes the replies first — the FK is `Restrict`).
 
+Feedback channel configuration rides along on `GET/PUT /api/admin/settings` under `feedbackBot`
+(`enabled` writable; `telegramConfigured` and `webhook` read-only), plus
+`POST /api/admin/settings/feedback/webhook` to register the webhook at the calling origin.
+
 ### Admin
 
 Admin CRUD/reporting lives under `/api/admin/*` (all `Admin`-role): `stations`, `fuel-types`,
@@ -532,7 +545,7 @@ Backend (`appsettings.json` / environment overrides — use `__` for nested keys
 
 - **`Jwt:Secret`** — required (≥32 chars) in non-development environments; the app fails fast otherwise.
 - **`Auth:DevBypass`** — `true` enables the `000000` OTP + fake SMS; keep `false` in production.
-- **`Telegram:Feedback:*`** - the feedback bot (own token, own staff group, own `WebhookSecret`, `SigningKey`, `StaffUserIds`); off by default. `Telegram:*` beside it is the unrelated **alerting** bot - two tokens on purpose, because Telegram allows one webhook per token.
+- **`Telegram:Feedback:*`** - the feedback bot (own token, own staff group, own `WebhookSecret`, `SigningKey`, `StaffUserIds`); off by default, and the admin Settings screen reports whether it is actually configured rather than assuming. The webhook is registered from there (`POST /api/admin/settings/feedback/webhook`), which is what you re-run after a redeploy or a domain change. `Telegram:*` beside it is the unrelated **alerting** bot - two tokens on purpose, because Telegram allows one webhook per token.
 - **`Llm:*`** - the feedback triage classifier (API key + model); off by default, and with it off every message is stored and shown unfiltered rather than lost.
 - **`Monobank:PublicKey`** — PEM (or base64-of-PEM) used to verify webhook signatures; production fails fast if `Monobank:Enabled=true` with a placeholder key.
 

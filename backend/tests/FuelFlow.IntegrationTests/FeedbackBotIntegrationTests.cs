@@ -418,6 +418,71 @@ public sealed class FeedbackBotIntegrationTests : IClassFixture<TestDatabaseFixt
     }
 
     [Fact]
+    public async Task TheStaffPostIsSentAsHtmlWithTheCustomersMarkupEscaped()
+    {
+        // The staff post is the only message in the feature authored as HTML. It used to be sent
+        // with no parse_mode at all, so the team read literal "<blockquote>" and "[b]Idea[/b]"
+        // instead of a formatted post - while the escaping in FeedbackBotTexts went unused.
+        var client = new RecordingTelegramFeedbackClient();
+        var jobs = new RecordingJobClient();
+        var classifier = new StubFeedbackClassifier();
+
+        var messageId = await IngestAsync(client, jobs, "<b>не працює</b> & ламає", 306);
+        await RunTriageAsync(classifier, client, messageId, kept: true);
+
+        client.ParseModesFor(FeedbackTestFactory.StaffChatId)
+            .Should().ContainSingle()
+            .Which.Should().Be("HTML", "without parse_mode Telegram ships the team our raw markup");
+
+        var post = client.SentTo(FeedbackTestFactory.StaffChatId).Single();
+        post.Should().Contain("<blockquote>", "our own tags must survive");
+        post.Should().Contain("&lt;b&gt;не працює&lt;/b&gt; &amp; ламає", "customer markup must not");
+    }
+
+    [Fact]
+    public async Task AStaffReplyIsRelayedAsPlainText()
+    {
+        // The mirror image: a staff member's own words may contain "&" or "<", and HTML mode
+        // would have Telegram reject the delivery with an opaque 400 over "Ціна & доставка".
+        var client = new RecordingTelegramFeedbackClient();
+        var jobs = new RecordingJobClient();
+
+        var messageId = await IngestAsync(client, jobs, "скарга", 307);
+        var staffPostId = await RunTriageAsync(new StubFeedbackClassifier(), client, messageId, kept: true);
+
+        await using (var context = CreateContext())
+        {
+            await FeedbackTestFactory.Router(context, client, jobs).HandleAsync(
+                FeedbackTestFactory.CustomerMessage(
+                    chatId: FeedbackTestFactory.StaffChatId,
+                    messageId: 401,
+                    text: "Ціна & доставка — уточніть",
+                    fromId: FeedbackTestFactory.StaffUserId,
+                    replyToMessageId: staffPostId,
+                    replyToChatId: FeedbackTestFactory.StaffChatId));
+        }
+
+        client.ParseModesFor(CustomerChatId).Should().OnlyContain(mode => mode == null);
+    }
+
+    [Fact]
+    public async Task AnUnclassifiedPostCarriesNoPlaceholderLabels()
+    {
+        // "[?] · [?]" told the team nothing; a bare author line reads as "not triaged yet", which
+        // is what it actually is.
+        var client = new RecordingTelegramFeedbackClient();
+        var jobs = new RecordingJobClient();
+
+        var messageId = await IngestAsync(client, jobs, "оплата не працює", 308);
+        await RunTriageAsync(new StubFeedbackClassifier { IsConfigured = false }, client, messageId, kept: true);
+
+        var post = client.SentTo(FeedbackTestFactory.StaffChatId).Single();
+        post.Should().NotContain("?");
+        post.Should().NotContain("<b>"); // no classification block at all
+        post.Should().StartWith("🟡");
+    }
+
+    [Fact]
     public async Task AFailedStaffDeliveryLeavesTheMessageStoredForALaterRetry()
     {
         var client = new RecordingTelegramFeedbackClient { FailForChatId = FeedbackTestFactory.StaffChatId };

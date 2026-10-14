@@ -16,15 +16,34 @@ public interface ITelegramFeedbackClient
     /// refused it. Never throws for a delivery failure: the caller has already persisted the row,
     /// and an exception here would surface as a 500 on the webhook, which makes Telegram redeliver
     /// an update that was in fact received.
+    /// <para>
+    /// <paramref name="parseMode"/> is per call, not global, and that is load-bearing. Exactly one
+    /// message in this feature is authored as HTML - the staff post, whose every interpolated value
+    /// is escaped by <see cref="FeedbackBotTexts.StaffPost"/>, so the only tags in the final string
+    /// are ours. Everything else is prose that may legitimately contain <c>&amp;</c> and <c>&lt;</c>:
+    /// the welcome texts, the acknowledgement, and above all a staff member's own reply relayed into
+    /// a customer chat. Turning HTML on for those would make Telegram reject the send with an opaque
+    /// 400 over an ampersand in "Ціна & доставка".
+    /// </para>
     /// </summary>
-    Task<long?> SendMessageAsync(long chatId, string text, CancellationToken ct = default);
+    Task<long?> SendMessageAsync(long chatId, string text, string? parseMode = null, CancellationToken ct = default);
 
     /// <summary>
     /// Registers (or refreshes) the webhook. Used by an operator when the public URL changes;
     /// throws on failure so a misconfiguration is loud rather than silent.
     /// </summary>
     Task SetWebhookAsync(string url, CancellationToken ct = default);
+
+    /// <summary>
+    /// Telegram's current view of the webhook: where it points, how many updates are waiting, and
+    /// the last error. An operator wiring this up needs it - a webhook that silently 401s looks
+    /// exactly like a webhook that works.
+    /// </summary>
+    Task<TelegramWebhookStatus> GetWebhookStatusAsync(CancellationToken ct = default);
 }
+
+/// <summary>What Telegram reports about the registered webhook.</summary>
+public sealed record TelegramWebhookStatus(string Url, bool HasCustomCertificate, int PendingUpdateCount, string? LastErrorMessage, string? LastErrorDate);
 
 /// <summary>
 /// Bot API client for the feedback bot.
@@ -56,7 +75,11 @@ public sealed class TelegramFeedbackClient : ITelegramFeedbackClient
         _logger = logger;
     }
 
-    public async Task<long?> SendMessageAsync(long chatId, string text, CancellationToken ct = default)
+    public async Task<long?> SendMessageAsync(
+        long chatId,
+        string text,
+        string? parseMode = null,
+        CancellationToken ct = default)
     {
         if (!_options.IsConfigured || string.IsNullOrWhiteSpace(text))
             return null;
@@ -73,8 +96,11 @@ public sealed class TelegramFeedbackClient : ITelegramFeedbackClient
                 {
                     chat_id = chatId,
                     text = body,
-                    // No parse_mode: the text contains customer-written content, and HTML/Markdown
-                    // in it would either break the send or let a customer style our own messages.
+                    // Set per call, never globally. The staff post is the one HTML message and its
+                    // content is escaped; the acknowledgements, the welcome texts and a staff
+                    // member's own reply are prose that may contain "&" or "<", and HTML mode would
+                    // make Telegram reject those with an opaque 400.
+                    parse_mode = parseMode,
                     disable_web_page_preview = true
                 },
                 ct);
@@ -127,4 +153,51 @@ public sealed class TelegramFeedbackClient : ITelegramFeedbackClient
                 $"setWebhook failed: HTTP {(int)response.StatusCode} {response.ReasonPhrase} — {error}");
         }
     }
+
+    public async Task<TelegramWebhookStatus> GetWebhookStatusAsync(CancellationToken ct = default)
+    {
+        if (!_options.IsConfigured)
+            return new TelegramWebhookStatus(string.Empty, false, 0, "Telegram:Feedback is not configured", null);
+
+        using var response = await _http.GetAsync($"/bot{_options.BotToken}/getWebhookInfo", ct);
+        var payload = await response.Content.ReadAsStringAsync(ct);
+
+        using var document = JsonDocument.Parse(payload);
+        var root = document.RootElement;
+
+        // Telegram answers 200 with {"ok":false,"description":...} for a bot that never had a
+        // webhook set, so the envelope - not the status code - is what says whether to read a
+        // result. Returning the description as the error is what puts it on the admin screen.
+        if (!root.TryGetProperty("ok", out var ok) || !ok.GetBoolean())
+        {
+            var description = root.TryGetProperty("description", out var d) ? d.GetString() : null;
+            return new TelegramWebhookStatus(string.Empty, false, 0, description ?? "Telegram returned ok:false", null);
+        }
+
+        var result = root.GetProperty("result");
+
+        return new TelegramWebhookStatus(
+            ReadString(result, "url") ?? string.Empty,
+            ReadBool(result, "has_custom_certificate") ?? false,
+            ReadInt(result, "pending_update_count") ?? 0,
+            ReadString(result, "last_error_message"),
+            ReadString(result, "last_error_date") is { } unix
+                ? DateTimeOffset.FromUnixTimeSeconds(long.Parse(unix)).UtcDateTime.ToString("u")
+                : null);
+    }
+
+    private static string? ReadString(JsonElement element, string property) =>
+        element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
+
+    private static bool? ReadBool(JsonElement element, string property) =>
+        element.TryGetProperty(property, out var value) && value.ValueKind is JsonValueKind.True or JsonValueKind.False
+            ? value.GetBoolean()
+            : null;
+
+    private static int? ReadInt(JsonElement element, string property) =>
+        element.TryGetProperty(property, out var value) && value.TryGetInt32(out var parsed)
+            ? parsed
+            : null;
 }

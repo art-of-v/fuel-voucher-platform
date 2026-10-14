@@ -268,7 +268,10 @@ services:
       # token, so sharing them would mean routing both by update type at one endpoint and
       # letting feedback traffic interfere with alerting.
       # Unset => IsConfigured is false, the webhook 401s every delivery, and the mobile tab
-      # stays hidden. Also needs the app_settings row FeedbackBot:Enabled=true.
+      # stays hidden whatever the app_setting says - the deep-link endpoint needs both. The
+      # admin Settings screen reports the two halves separately ("Telegram configured" vs the
+      # toggle), so a half-configured channel reads as broken instead of half-working. The
+      # webhook itself is registered from there, per deploy, or after a domain change.
       Telegram__Feedback__Enabled: ${TELEGRAM_FEEDBACK_ENABLED:-false}
       Telegram__Feedback__BotToken: ${TELEGRAM_FEEDBACK_BOT_TOKEN:-}
       Telegram__Feedback__BotUsername: ${TELEGRAM_FEEDBACK_BOT_USERNAME:-}

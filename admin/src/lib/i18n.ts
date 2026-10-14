@@ -261,6 +261,30 @@ export const translations: Record<Language, Record<string, string>> = {
       "Expired-loss booking is currently OFF. The nightly job only logs the loss it would book (dry-run) and never changes voucher status.",
     "settings.expiredLossEnabledNote":
       "Expired-loss booking is ON. Unsold vouchers past their expiration date are retired to Expired every night and their cost is booked as a realised loss. Sold, customer-owned vouchers are never affected.",
+    "settings.feedbackBotTitle": "In-app feedback",
+    "settings.feedbackBotWhat":
+      "Shows the Feedback tab in the customer app, which opens a private Telegram chat with a support bot. Messages land in the staff group and a reply typed there goes back to the customer. The bot itself is created with @BotFather and supplied through environment variables — this switch only turns the tab on.",
+    "settings.enableFeedbackBot": "Enable the feedback channel",
+    "settings.enableFeedbackBotHint":
+      "When enabled, the Feedback tab appears in the customer app. Take it out of service by turning this off — no redeploy needed.",
+    "settings.feedbackBotDisabledNote":
+      "The feedback channel is OFF. The Feedback tab is hidden in the customer app.",
+    "settings.feedbackBotEnabledNote":
+      "The feedback channel is ON. The Feedback tab is visible in the customer app.",
+    "settings.feedbackBotUnconfiguredNote":
+      "The feedback channel cannot work yet: the Telegram bot token, staff group, webhook secret or signing key is missing from configuration. Add them to the API environment and restart it — until then the tab stays hidden whatever this switch says.",
+    "settings.feedbackBotWebhookTitle": "Webhook",
+    "settings.feedbackBotWebhookWhat":
+      "Telegram delivers messages to this API. Register it after a deploy or a domain change; the URL is taken from the address you are browsing the admin panel on.",
+    "settings.feedbackBotWebhookRegister": "Register webhook",
+    "settings.feedbackBotWebhookRegistering": "Registering…",
+    "settings.feedbackBotWebhookRegistered": "Webhook registered.",
+    "settings.feedbackBotWebhookUrl": "URL",
+    "settings.feedbackBotWebhookUnset": "not registered",
+    "settings.feedbackBotWebhookPending": "Updates waiting",
+    "settings.feedbackBotWebhookError": "Last error",
+    "settings.feedbackBotWebhookUnknown":
+      "Status unavailable — Telegram could not be reached.",
     "settings.voucherRenewalTitle": "Voucher renewal",
     "settings.voucherTermSaleTitle": "Short-term fuel selling",
     "settings.voucherTermSaleWhat":
@@ -1206,6 +1230,30 @@ export const translations: Record<Language, Record<string, string>> = {
       "Списання протермінованих ВИМКНЕНО. Нічне завдання лише занотовує збиток, який було б списано (пробний запуск), і ніколи не змінює стан талонів.",
     "settings.expiredLossEnabledNote":
       "Списання протермінованих УВІМКНЕНО. Непродані талони після завершення терміну дії щоночі переводяться в стан «Протерміновано», а їхня вартість списується як реалізований збиток. Продані талони, що належать клієнтам, ніколи не зачіпаються.",
+    "settings.feedbackBotTitle": "Зворотний зв'язок у застосунку",
+    "settings.feedbackBotWhat":
+      "Показує вкладку «Зворотний зв'язок» у застосунку клієнта, яка відкриває приватний чат у Telegram із ботом підтримки. Повідомлення потрапляють у групу команди, а відповідь, написана там, повертається клієнту. самого бота створюєте через @BotFather і передаєте через змінні середовища — цей перемикач лише вмикає вкладку.",
+    "settings.enableFeedbackBot": "Увімкнути канал зворотного зв'язку",
+    "settings.enableFeedbackBotHint":
+      "Коли увімкнено, вкладка «Зворотний зв'язок» з'являється в застосунку клієнта. Щоб вивести канал з експлуатації, вимкніть перемикач — redeploy не потрібен.",
+    "settings.feedbackBotDisabledNote":
+      "Канал зворотного зв'язку ВИМКНЕНО. Вкладка «Зворотний зв'язок» прихована в застосунку клієнта.",
+    "settings.feedbackBotEnabledNote":
+      "Канал зворотного зв'язку УВІМКНЕНО. Вкладка «Зворотний зв'язок» видима в застосунку клієнта.",
+    "settings.feedbackBotUnconfiguredNote":
+      "Канал зворотного зв'язку ще не може працювати: у конфігурації бракує токена бота Telegram, групи команди, секрету webhook або ключа підпису. Додайте їх у середовище API та перезапустіть його — до того вкладка лишатиметься прихованою, байдуже до стану цього перемикача.",
+    "settings.feedbackBotWebhookTitle": "Webhook",
+    "settings.feedbackBotWebhookWhat":
+      "Telegram надсилає повідомлення на цей API. Зареєструйте його після деплою або зміни домену; URL береться з адреси, за якою ви відкрили адмінпанель.",
+    "settings.feedbackBotWebhookRegister": "Зареєструвати webhook",
+    "settings.feedbackBotWebhookRegistering": "Реєстрація…",
+    "settings.feedbackBotWebhookRegistered": "Webhook зареєстровано.",
+    "settings.feedbackBotWebhookUrl": "URL",
+    "settings.feedbackBotWebhookUnset": "не зареєстровано",
+    "settings.feedbackBotWebhookPending": "Очікують оновлень",
+    "settings.feedbackBotWebhookError": "Остання помилка",
+    "settings.feedbackBotWebhookUnknown":
+      "Статус недоступний — Telegram не вдалося досягти.",
     "settings.voucherRenewalTitle": "Продовження талонів",
     "settings.voucherTermSaleTitle": "Продаж пального на короткий термін",
     "settings.voucherTermSaleWhat":
@@ -2146,6 +2194,30 @@ export const translations: Record<Language, Record<string, string>> = {
       "Die Verlustbuchung für abgelaufene Gutscheine ist AUS. Der nächtliche Job protokolliert nur den Verlust, der gebucht würde (Probelauf), und ändert nie den Gutscheinstatus.",
     "settings.expiredLossEnabledNote":
       "Die Verlustbuchung für abgelaufene Gutscheine ist AN. Unverkaufte Gutscheine nach ihrem Ablaufdatum werden jede Nacht auf Abgelaufen gesetzt und ihre Kosten als realisierter Verlust gebucht. Verkaufte, kundeneigene Gutscheine sind nie betroffen.",
+    "settings.feedbackBotTitle": "Feedback in der App",
+    "settings.feedbackBotWhat":
+      "Zeigt in der Kunden-App den Tab „Feedback“, der einen privaten Telegram-Chat mit einem Support-Bot öffnet. Nachrichten landen in der Team-Gruppe, und eine dort getippte Antwort geht zurück an die Kundin oder den Kunden. Den Bot selbst legst du über @BotFather an und lieferst ihn über Umgebungsvariablen — dieser Schalter blendet nur den Tab ein.",
+    "settings.enableFeedbackBot": "Feedback-Kanal aktivieren",
+    "settings.enableFeedbackBotHint":
+      "Wenn aktiv, erscheint der Tab „Feedback“ in der Kunden-App. Zum Außerbetriebnehmen einfach diesen Schalter aus — kein Redeploy nötig.",
+    "settings.feedbackBotDisabledNote":
+      "Der Feedback-Kanal ist AUS. Der Tab „Feedback“ ist in der Kunden-App ausgeblendet.",
+    "settings.feedbackBotEnabledNote":
+      "Der Feedback-Kanal ist AN. Der Tab „Feedback“ ist in der Kunden-App sichtbar.",
+    "settings.feedbackBotUnconfiguredNote":
+      "Der Feedback-Kanal kann noch nicht funktionieren: Es fehlt mindestens einer von Bot-Token, Team-Gruppe, Webhook-Secret oder Signaturschlüssel. Trage sie in der API-Umgebung ein und starte sie neu — bis dahin bleibt der Tab ausgeblendet, was dieser Schalter auch zeigt.",
+    "settings.feedbackBotWebhookTitle": "Webhook",
+    "settings.feedbackBotWebhookWhat":
+      "Telegram stellt Nachrichten an diese API zu. Registriere ihn nach einem Deployment oder Domainwechsel; die URL wird aus der Adresse übernommen, unter der du das Admin-Panel geöffnet hast.",
+    "settings.feedbackBotWebhookRegister": "Webhook registrieren",
+    "settings.feedbackBotWebhookRegistering": "Wird registriert…",
+    "settings.feedbackBotWebhookRegistered": "Webhook registriert.",
+    "settings.feedbackBotWebhookUrl": "URL",
+    "settings.feedbackBotWebhookUnset": "nicht registriert",
+    "settings.feedbackBotWebhookPending": "Wartende Updates",
+    "settings.feedbackBotWebhookError": "Letzter Fehler",
+    "settings.feedbackBotWebhookUnknown":
+      "Status nicht verfügbar — Telegram war nicht erreichbar.",
     "settings.voucherRenewalTitle": "Gutschein-Verlängerung",
     "settings.voucherTermSaleTitle": "Kurzzeitiger Kraftstoffverkauf",
     "settings.voucherTermSaleWhat":
@@ -3089,6 +3161,30 @@ export const translations: Record<Language, Record<string, string>> = {
       "El registro de pérdida por vencimiento está DESACTIVADO. La tarea nocturna solo anota la pérdida que registraría (simulación) y nunca cambia el estado de los vales.",
     "settings.expiredLossEnabledNote":
       "El registro de pérdida por vencimiento está ACTIVADO. Los vales sin vender vencidos pasan a Vencido cada noche y su coste se registra como pérdida realizada. Los vales vendidos, propiedad de clientes, nunca se ven afectados.",
+    "settings.feedbackBotTitle": "Comentarios en la app",
+    "settings.feedbackBotWhat":
+      "Muestra en la app del cliente la pestaña «Comentarios», que abre un chat privado de Telegram con un bot de soporte. Los mensajes llegan al grupo del equipo y una respuesta escrita allí vuelve al cliente. El bot se crea con @BotFather y se configura por variables de entorno; este interruptor solo muestra la pestaña.",
+    "settings.enableFeedbackBot": "Activar el canal de comentarios",
+    "settings.enableFeedbackBotHint":
+      "Cuando está activo, la pestaña «Comentarios» aparece en la app del cliente. Para sacarlo de servicio, desactiva este interruptor: no hace falta redesplegar.",
+    "settings.feedbackBotDisabledNote":
+      "El canal de comentarios está DESACTIVADO. La pestaña «Comentarios» está oculta en la app del cliente.",
+    "settings.feedbackBotEnabledNote":
+      "El canal de comentarios está ACTIVADO. La pestaña «Comentarios» está visible en la app del cliente.",
+    "settings.feedbackBotUnconfiguredNote":
+      "El canal de comentarios aún no puede funcionar: falta el token del bot, el grupo del equipo, el secreto del webhook o la clave de firma en la configuración. Añádelos al entorno de la API y reiníciala; hasta entonces la pestaña seguirá oculta diga lo que diga este interruptor.",
+    "settings.feedbackBotWebhookTitle": "Webhook",
+    "settings.feedbackBotWebhookWhat":
+      "Telegram entrega los mensajes a esta API. Regístralo tras un despliegue o un cambio de dominio; la URL se toma de la dirección con la que abriste el panel de administración.",
+    "settings.feedbackBotWebhookRegister": "Registrar webhook",
+    "settings.feedbackBotWebhookRegistering": "Registrando…",
+    "settings.feedbackBotWebhookRegistered": "Webhook registrado.",
+    "settings.feedbackBotWebhookUrl": "URL",
+    "settings.feedbackBotWebhookUnset": "sin registrar",
+    "settings.feedbackBotWebhookPending": "Actualizaciones pendientes",
+    "settings.feedbackBotWebhookError": "Último error",
+    "settings.feedbackBotWebhookUnknown":
+      "Estado no disponible: no se pudo contactar con Telegram.",
     "settings.voucherRenewalTitle": "Renovación de vales",
     "settings.voucherTermSaleTitle": "Venta de combustible a corto plazo",
     "settings.voucherTermSaleWhat":

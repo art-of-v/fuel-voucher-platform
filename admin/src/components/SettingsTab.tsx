@@ -12,6 +12,7 @@ import {
   RefreshCw,
   CalendarX,
   Clock,
+  MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/api-client";
@@ -41,6 +42,22 @@ interface DataRetentionDto {
 
 interface ExpiredVoucherLossDto {
   enabled: boolean;
+}
+
+/** What Telegram itself reports about the feedback webhook, or null when it could not be reached. */
+interface FeedbackWebhookStatusDto {
+  url: string;
+  registered: boolean;
+  pendingUpdateCount: number;
+  lastErrorMessage: string | null;
+  lastErrorDate: string | null;
+}
+
+interface FeedbackBotDto {
+  enabled: boolean;
+  /** Read-only: whether the bot token, staff chat and signing key are present in configuration. */
+  telegramConfigured: boolean;
+  webhook: FeedbackWebhookStatusDto | null;
 }
 
 interface VoucherTermTierDto {
@@ -79,6 +96,7 @@ interface SettingsDto {
   expiredVoucherLoss: ExpiredVoucherLossDto;
   voucherRenewal: VoucherRenewalDto;
   voucherTerm: VoucherTermDto;
+  feedbackBot: FeedbackBotDto;
 }
 
 /**
@@ -115,6 +133,11 @@ export default function SettingsTab() {
   });
   const [dataRetention, setDataRetention] = useState(false);
   const [expiredVoucherLoss, setExpiredVoucherLoss] = useState(false);
+  const [feedbackBot, setFeedbackBot] = useState({
+    enabled: false,
+    telegramConfigured: false,
+    webhook: null as FeedbackWebhookStatusDto | null,
+  });
   const [renewal, setRenewal] = useState<{
     enabled: boolean;
     thresholdDays: number;
@@ -151,6 +174,11 @@ export default function SettingsTab() {
     });
     setDataRetention(data.dataRetention.enabled);
     setExpiredVoucherLoss(data.expiredVoucherLoss.enabled);
+    setFeedbackBot({
+      enabled: data.feedbackBot.enabled,
+      telegramConfigured: data.feedbackBot.telegramConfigured,
+      webhook: data.feedbackBot.webhook ?? null,
+    });
     setRenewal({
       enabled: data.voucherRenewal.enabled,
       thresholdDays: data.voucherRenewal.triggerThresholdDays,
@@ -175,6 +203,7 @@ export default function SettingsTab() {
       expiredVoucherLoss,
       renewal,
       termSale,
+      feedbackBot,
     });
 
   const saveMutation = useMutation({
@@ -193,6 +222,7 @@ export default function SettingsTab() {
         },
         dataRetention: { enabled: dataRetention },
         expiredVoucherLoss: { enabled: expiredVoucherLoss },
+        feedbackBot: { enabled: feedbackBot.enabled },
         voucherRenewal: {
           enabled: renewal.enabled,
           triggerThresholdDays: Math.max(
@@ -286,6 +316,14 @@ export default function SettingsTab() {
           onChange={(enabled) => setExpiredVoucherLoss(enabled)}
         />
 
+        <FeedbackBotCard
+          enabled={feedbackBot.enabled}
+          telegramConfigured={feedbackBot.telegramConfigured}
+          webhook={feedbackBot.webhook}
+          onChange={(enabled) => setFeedbackBot((prev) => ({ ...prev, enabled }))}
+          onRegistered={() => queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] })}
+        />
+
         <VoucherRenewalCard
           enabled={renewal.enabled}
           thresholdDays={renewal.thresholdDays}
@@ -324,6 +362,7 @@ type LocalSettings = {
     tiers: VoucherRenewalTierDto[];
   };
   termSale: { enabled: boolean; tiers: VoucherTermTierDto[] };
+  feedbackBot: { enabled: boolean };
 };
 
 function sectionsDiffer(server: SettingsDto, local: LocalSettings): boolean {
@@ -335,6 +374,7 @@ function sectionsDiffer(server: SettingsDto, local: LocalSettings): boolean {
   if (server.dataRetention.enabled !== local.dataRetention) return true;
   if (server.expiredVoucherLoss.enabled !== local.expiredVoucherLoss)
     return true;
+  if (server.feedbackBot.enabled !== local.feedbackBot.enabled) return true;
   if (server.voucherRenewal.enabled !== local.renewal.enabled) return true;
   if (
     server.voucherRenewal.triggerThresholdDays !== local.renewal.thresholdDays
@@ -695,6 +735,153 @@ function ExpiredVoucherLossCard({
             </p>
           </div>
           <Toggle checked={enabled} onChange={() => onChange(!enabled)} />
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+/**
+ * In-app feedback channel: the runtime toggle plus one-shot webhook registration against this
+ * deployment's own public URL.
+ *
+ * The two halves are reported separately on purpose. The toggle alone cannot tell a manager whether
+ * the feature actually works, because it only turns the mobile tab on — the bot itself lives in
+ * environment variables and a restart. A webhook silently 401ing looks exactly like a healthy one,
+ * so the status line shows what Telegram itself thinks, including its last error.
+ */
+function FeedbackBotCard({
+  enabled,
+  telegramConfigured,
+  webhook,
+  onChange,
+  onRegistered,
+}: {
+  enabled: boolean;
+  telegramConfigured: boolean;
+  webhook: FeedbackWebhookStatusDto | null;
+  onChange: (enabled: boolean) => void;
+  /** Re-reads the status from the server after a registration. */
+  onRegistered: () => void;
+}) {
+  const { t } = useI18n();
+  const [registering, setRegistering] = useState(false);
+  const [registerError, setRegisterError] = useState<string | null>(null);
+  const [registerOk, setRegisterOk] = useState(false);
+
+  // An operator's two questions differ: "is it on?" and "is it wired?". The banner answers the
+  // first, the status block the second; collapsing them into one green light is what makes a
+  // half-configured channel look fine.
+  const tone = !telegramConfigured ? "danger" : enabled ? "ok" : "off";
+  const note = !telegramConfigured
+    ? t("settings.feedbackBotUnconfiguredNote")
+    : enabled
+      ? t("settings.feedbackBotEnabledNote")
+      : t("settings.feedbackBotDisabledNote");
+
+  const register = async () => {
+    setRegistering(true);
+    setRegisterError(null);
+    setRegisterOk(false);
+    try {
+      // Refetch afterwards rather than trusting the POST's own echo: registration is asynchronous on
+      // Telegram's side, so a 200 from setWebhook only means the request was accepted.
+      await apiRequest<any, { success: boolean }>(
+        "POST",
+        "/api/admin/settings/feedback/webhook",
+      );
+      setRegisterOk(true);
+      onRegistered();
+    } catch (e) {
+      setRegisterError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRegistering(false);
+    }
+  };
+
+  return (
+    <Card
+      icon={<MessageSquare className="w-5 h-5 text-primary" />}
+      title={t("settings.feedbackBotTitle")}
+    >
+      <p className="text-xs text-muted-foreground mb-5">
+        {t("settings.feedbackBotWhat")}
+      </p>
+
+      <StateBanner tone={tone}>{note}</StateBanner>
+
+      <div className="space-y-6">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="font-medium text-sm">{t("settings.enableFeedbackBot")}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {t("settings.enableFeedbackBotHint")}
+            </p>
+          </div>
+          <Toggle
+            checked={enabled}
+            onChange={() => {
+              setRegisterOk(false);
+              setRegisterError(null);
+              onChange(!enabled);
+            }}
+          />
+        </div>
+
+        <div className="border-t border-border pt-4">
+          <p className="font-medium text-sm mb-1">
+            {t("settings.feedbackBotWebhookTitle")}
+          </p>
+          <p className="text-xs text-muted-foreground mb-3">
+            {t("settings.feedbackBotWebhookWhat")}
+          </p>
+
+          {webhook ? (
+            <div className="text-xs space-y-1">
+              <p className="text-muted-foreground">
+                {t("settings.feedbackBotWebhookUrl")}:{" "}
+                <span className="font-mono text-foreground break-all">
+                  {webhook.url || t("settings.feedbackBotWebhookUnset")}
+                </span>
+              </p>
+              {webhook.pendingUpdateCount > 0 && (
+                <p className="text-muted-foreground">
+                  {t("settings.feedbackBotWebhookPending")}:{" "}
+                  {webhook.pendingUpdateCount}
+                </p>
+              )}
+              {webhook.lastErrorMessage && (
+                <p className="text-destructive">
+                  {t("settings.feedbackBotWebhookError")}: {webhook.lastErrorMessage}
+                  {webhook.lastErrorDate ? ` (${webhook.lastErrorDate})` : ""}
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              {t("settings.feedbackBotWebhookUnknown")}
+            </p>
+          )}
+
+          {registerError && (
+            <p className="text-xs text-destructive mt-2">{registerError}</p>
+          )}
+          {registerOk && (
+            <p className="text-xs text-success mt-2">
+              {t("settings.feedbackBotWebhookRegistered")}
+            </p>
+          )}
+
+          <button
+            type="button"
+            onClick={register}
+            disabled={registering || !telegramConfigured}
+            className="mt-3 px-3 py-1.5 text-xs font-medium rounded-md border border-border hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {registering
+              ? t("settings.feedbackBotWebhookRegistering")
+              : t("settings.feedbackBotWebhookRegister")}
+          </button>
         </div>
       </div>
     </Card>
