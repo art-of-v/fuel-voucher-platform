@@ -18,7 +18,10 @@ import { LionMark } from "@/components/LionMark";
 import { useTheme } from "@/lib/theme-store";
 import { themes } from "@/lib/themes";
 import { useI18n } from "@/lib/i18n";
-import { isLoggedIn, sendCode, verifyCode, clearTokens, fetchCurrentUser, refreshAccessToken, isSessionRejected, logout, type CurrentUser, type RefreshStatus } from "@/lib/admin-auth";
+import { sendCode } from "@/lib/session";
+import { bootSession, signInWithCode, signOut as endSession } from "@/lib/session";
+import { hasSessionMarker, useSession } from "@/lib/session-store";
+import { type CurrentUser } from "@/lib/admin-auth";
 import { STAFF_ROLES, assignableRoles } from "@/lib/roles";
 import { formatMoney } from "@/lib/money";
 import BrandsTab from "@/components/BrandsTab";
@@ -54,20 +57,18 @@ export default function AdminScreen() {
   const queryClient = useQueryClient();
   const { t } = useI18n();
   const theme = useTheme((s) => s.theme);
-  const [loggedIn, setLoggedIn] = useState(isLoggedIn());
-  const [checkingAuth, setCheckingAuth] = useState(true);
-  const [user, setUser] = useState<CurrentUser | null>(null);
+  // One owner for all of it. The four booleans this replaced could disagree with each other
+  // and with the token, and the browser paid for every disagreement with a refresh it did
+  // not need - see `session-store.ts`.
+  const status = useSession((s) => s.status);
+  const blocker = useSession((s) => s.blocker);
+  const user = useSession((s) => s.user);
   const [loginPhone, setLoginPhone] = useState(UA_DIAL_PREFIX);
   const [loginCode, setLoginCode] = useState("");
   const [loginStep, setLoginStep] = useState<"phone" | "code">("phone");
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState("");
   const [unauthorized, setUnauthorized] = useState(false);
-  // The API gave no verdict on the session (a deploy restart, a network blip). The
-  // operator is still signed in, so we show a "retry" screen instead of the login form -
-  // bumping authCheckNonce re-runs the mount check.
-  const [authUnreachable, setAuthUnreachable] = useState(false);
-  const [authCheckNonce, setAuthCheckNonce] = useState(0);
 
   const handleSendCode = async () => {
     setLoginLoading(true);
@@ -85,44 +86,12 @@ export default function AdminScreen() {
   // token for any other role is discarded here and the login screen explains why.
   const acceptUser = (u: CurrentUser) => {
     if (!u.role || !STAFF_ROLES.includes(u.role)) {
-      clearTokens();
-      setUser(null);
-      setLoggedIn(false);
+      useSession.getState().signOut();
       setUnauthorized(true);
       return;
     }
     setUnauthorized(false);
-    setUser(u);
-    setLoggedIn(true);
-  };
-
-  // After a refresh succeeds, load the operator. A failure here is only a logout when
-  // /user/me itself answers 401 (the session really ended); a 502/timeout from a
-  // restarting API must leave the login intact and fall back to the "retry" screen.
-  const loadUserOrFlagUnreachable = async () => {
-    try {
-      acceptUser(await fetchCurrentUser());
-    } catch (err) {
-      if (isSessionRejected(err)) {
-        clearTokens();
-        setLoggedIn(false);
-      } else {
-        setAuthUnreachable(true);
-      }
-    }
-  };
-
-  // Map a refresh outcome onto session state. "refreshed" loads the user; "expired" is a
-  // real sign-out; "unavailable" keeps the session and shows the retry screen.
-  const applyRefreshStatus = async (status: RefreshStatus) => {
-    if (status === "refreshed") {
-      await loadUserOrFlagUnreachable();
-    } else if (status === "expired") {
-      clearTokens();
-      setLoggedIn(false);
-    } else {
-      setAuthUnreachable(true);
-    }
+    useSession.getState().authenticate(u);
   };
 
   const handleVerifyCode = async () => {
@@ -130,8 +99,8 @@ export default function AdminScreen() {
     setLoginError("");
     setUnauthorized(false);
     try {
-      await verifyCode(loginPhone, loginCode);
-      acceptUser(await fetchCurrentUser());
+      const u = await signInWithCode(loginPhone, loginCode);
+      acceptUser(u);
     } catch (e: any) {
       setLoginError(e.message || "Failed to verify code");
     }
@@ -139,30 +108,28 @@ export default function AdminScreen() {
   };
 
   useEffect(() => {
-    if (loggedIn && !user) {
-      fetchCurrentUser()
-        .then(acceptUser)
-        .catch(async (err) => {
-          // The stored access token was rejected. Try one refresh; a success reloads the
-          // user, while "unavailable" leaves the session alone rather than logging out. A
-          // non-401 failure (a 502/timeout from a restarting API) is not a logout either.
-          if (isSessionRejected(err)) {
-            await applyRefreshStatus(await refreshAccessToken());
-          } else {
-            setAuthUnreachable(true);
-          }
-        });
-    }
-  }, [loggedIn, user]);
+    // The single place the app decides what a session is worth. With no session marker this
+    // settles on "anonymous" without touching the network, which is what guarantees the login
+    // form can always spend its own share of the per-minute refresh budget.
+    bootSession();
+  }, []);
 
   useEffect(() => {
-    setCheckingAuth(true);
-    setAuthUnreachable(false);
-    refreshAccessToken().then(async (status) => {
-      await applyRefreshStatus(status);
-      setCheckingAuth(false);
-    });
-  }, [authCheckNonce]);
+    if (status === "anonymous" && unauthorized) {
+      const id = setTimeout(() => setUnauthorized(false), 5000);
+      return () => clearTimeout(id);
+    }
+  }, [status, unauthorized]);
+
+  useEffect(() => {
+    if (!unauthorized) return;
+    if (blocker) return;
+    if (!hasSessionMarker()) return;
+    // A session marker that the API refuses is a genuinely unknown state, not a sign-out:
+    // show the login form rather than silently clearing a cookie we cannot see (it is
+    // HttpOnly) and stranding the operator with no way back in.
+    useSession.getState().signOut();
+  }, [unauthorized, blocker]);
 
   const [activeTab, setActiveTab] = useState(() => {
     // Guard against stale stored tabs (e.g. the removed 'stations' view).
@@ -846,7 +813,7 @@ voucherNumber: string;
     setSelectedVoucherIds(newSet);
   };
 
-  if (checkingAuth) {
+if (status === "booting") {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4 relative">
         <div className="aurora-bg" aria-hidden="true">
@@ -858,28 +825,53 @@ voucherNumber: string;
     );
   }
 
-  if (authUnreachable) {
+  if (blocker) {
+    // A rate limit is not an outage, and the difference matters: the old screen said "you are
+    // still signed in" over a self-inflicted 429, and its retry button spent another unit of
+    // the very budget that produced the 429. So: name it, wait it out, and only re-check once
+    // the server's own `Retry-After` has elapsed.
+    const retryAt = blocker.reason === "rate_limited" ? blocker.retryAt : 0;
+    const remaining = Math.max(0, Math.ceil((retryAt - Date.now()) / 1000));
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4 relative">
         <div className="aurora-bg" aria-hidden="true">
           <div className="aurora-blob aurora-blob--green" />
           <div className="aurora-blob aurora-blob--cyan" />
         </div>
-        <div className="glass-panel p-8 w-full max-w-sm relative z-10 text-center">
-          <h1 className="text-2xl font-bold mb-4"><span className="glass-text-gradient">Server unavailable</span></h1>
+        <div className="glass-panel p-8 w-full max-sm relative z-10 text-center">
+          <h1 className="text-2xl font-bold mb-4">
+            <span className="glass-text-gradient">
+              {blocker.reason === "rate_limited" ? "Too many attempts" : "Server unavailable"}
+            </span>
+          </h1>
           <p className="text-sm mb-6 text-muted-foreground">
-            Can't reach the server right now. You are still signed in - nothing has been
-            logged out. This usually clears up in a few seconds after a deploy.
+            {blocker.reason === "rate_limited" ? (
+              <>
+                You have tried to restore this session several times in a row. Wait{" "}
+                <span className="text-primary font-semibold">{remaining}s</span> and it will
+                clear on its own - nothing is wrong with your account.
+              </>
+            ) : (
+              <>Can't reach the server right now. This usually clears up in a few seconds after a
+              deploy.</>
+            )}
           </p>
-          <Button onClick={() => setAuthCheckNonce((n) => n + 1)} className="w-full">
-            Try again
+          <Button
+            onClick={() => {
+              useSession.getState().unblock();
+              bootSession();
+            }}
+            disabled={remaining > 0}
+            className="w-full"
+          >
+            {remaining > 0 ? `Try again in ${remaining}s` : "Try again"}
           </Button>
         </div>
       </div>
     );
   }
 
-  if (!loggedIn) {
+  if (status !== "authenticated") {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4 relative">
         <div className="aurora-bg" aria-hidden="true">
@@ -960,7 +952,7 @@ voucherNumber: string;
   }
 
   return (
-    <Layout activeTab={activeTab} onTabChange={handleTabChange} onLogout={async () => { await logout(); setUser(null); setLoggedIn(false); }} user={user} badges={{ voucherExchange: exchangeAttentionCount }}>
+    <Layout activeTab={activeTab} onTabChange={handleTabChange} onLogout={async () => { await endSession(); }} user={user} badges={{ voucherExchange: exchangeAttentionCount }}>
       <div className="space-y-6">
         {/* Brands Tab (new consolidated view) */}
         {activeTab === 'brands' && (
