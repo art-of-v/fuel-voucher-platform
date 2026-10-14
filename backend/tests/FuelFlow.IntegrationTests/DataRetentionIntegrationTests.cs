@@ -1,14 +1,17 @@
 using FluentAssertions;
 using FuelFlow.API.BackgroundJobs;
 using FuelFlow.Features.Auth.SharedModels;
+using FuelFlow.Features.Feedback.SharedModels;
 using FuelFlow.Features.Notifications.SharedModels;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Support.SharedModels;
+using FuelFlow.Features.Vouchers;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -181,6 +184,156 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
         (await verify.SupportMessages.CountAsync()).Should().Be(2);
     }
 
+    /// <summary>
+    /// The wedge. <c>purchase_batches.import_job_id</c> is Restrict and purchase batches are never
+    /// purged - they are costing records - so the first import that had a cost entered against it
+    /// made <c>DELETE FROM voucher_imports</c> raise 23503. Because the purge saved per table and
+    /// threw on the first failure, every table listed after it was silently skipped on that run and
+    /// on every run after, while the job still logged the tables it had reached.
+    /// </summary>
+    [Fact]
+    public async Task Cleanup_KeepsAnImportThatAPurchaseBatchStillReferences_AndPurgesTheRest()
+    {
+        var costed = Guid.NewGuid();
+        var free = Guid.NewGuid();
+
+        await SeedAsync(seed =>
+        {
+            Enable(seed);
+            seed.Users.Add(CreateUser(UserId));
+            SeedFixture(seed);
+            SeedImportTail(seed, costed, free);
+        });
+
+        await RunAsync();
+
+        using var verify = CreateContext();
+        (await verify.VoucherImports.IgnoreQueryFilters().CountAsync(i => i.Id == costed))
+            .Should().Be(1, "the batch holding this import's cost still points at it");
+        (await verify.VoucherImports.IgnoreQueryFilters().CountAsync(i => i.Id == free))
+            .Should().Be(0, "an import nothing references is still eligible");
+    }
+
+    /// <summary>
+    /// The whole point of the fix, stated as an absence: with a costed import in the way the run
+    /// still finishes <em>clean</em>, and still purges everything scheduled after
+    /// <c>voucher_imports</c>.
+    ///
+    /// Before, the first import with a cost entered against it raised 23503, the exception ended
+    /// the run, and <c>qr_parameters</c>, <c>support_messages</c>, <c>feedback_message_replies</c> and
+    /// <c>feedback_messages</c> were silently skipped every night - while the log showed a tidy
+    /// total for the tables it had reached. An earlier draft of this test tried to force the failure
+    /// and assert the partial-run report; it cannot, because the reference guard means the delete
+    /// no longer fails. That is the bug being fixed rather than a gap in the test.
+    /// </summary>
+    [Fact]
+    public async Task Cleanup_FinishesCleanly_AndStillPurgesTheTablesAfterVoucherImports()
+    {
+        await SeedAsync(seed =>
+        {
+            Enable(seed);
+            seed.Users.Add(CreateUser(UserId));
+            SeedFixture(seed);
+            SeedImportTail(seed, costed: null, free: null);
+
+            // Listed AFTER voucher_imports in the purge order.
+            seed.FeedbackMessages.Add(new FeedbackMessage
+            {
+                Id = Guid.NewGuid(),
+                TelegramChatId = 4242,
+                TelegramMessageId = 1,
+                Text = "old feedback",
+                CreatedAtUtc = Old()
+            });
+        });
+
+        var logger = new RecordingLogger();
+        using (var context = CreateContext())
+        {
+            await new DataRetentionService(
+                context, new RuntimeSettingsService(context), logger).CleanupAsync();
+        }
+
+        using var verify = CreateContext();
+        (await verify.FeedbackMessages.IgnoreQueryFilters().CountAsync())
+            .Should().Be(0, "a blocked table must not stop the ones after it");
+
+        logger.Entries.Should().NotContain(e => e.Level == LogLevel.Error,
+            "the reference guard means nothing was blocked, so a clean total is the correct report");
+        logger.Entries.Should().Contain(e =>
+            e.Level == LogLevel.Information
+            && e.Message.Contains("purge complete", StringComparison.Ordinal)
+            && e.Message.Contains("feedback_messages=1", StringComparison.Ordinal));
+    }
+
+    private static DateTime Old() => DateTime.UtcNow.AddDays(-400);
+
+    /// <summary>
+    /// Two finished imports past the window, one of them held by a purchase batch. Also clears the
+    /// tail tables so a previous test in this shared container cannot decide the outcome.
+    /// </summary>
+    private static void SeedImportTail(
+        ApplicationDbContext seed, Guid? costed, Guid? free)
+    {
+        seed.FeedbackMessages.RemoveRange(seed.FeedbackMessages);
+
+        if (costed is { } costedId)
+        {
+            seed.VoucherImports.Add(NewImport(costedId, "costed.pdf"));
+
+            // purchase_batches.supplier_id is a required FK, and nothing else in this fixture
+            // creates a supplier - the rows below are the first ones to need one.
+            var supplierId = Guid.NewGuid();
+            seed.Suppliers.Add(new Supplier
+            {
+                Id = supplierId,
+                Name = $"Retention Test Supplier {supplierId:N}"[..40],
+                CreatedAtUtc = Old(),
+                UpdatedAtUtc = Old()
+            });
+
+            seed.PurchaseBatches.Add(new PurchaseBatch
+            {
+                Id = Guid.NewGuid(),
+                ImportJobId = costedId,
+                FuelTypeId = "okko-95",
+                Brand = "okko",
+                SupplierId = supplierId,
+                CreatedAtUtc = Old(),
+                UpdatedAtUtc = Old()
+            });
+        }
+
+        if (free is { } freeId)
+            seed.VoucherImports.Add(NewImport(freeId, "uncosted.pdf"));
+    }
+
+    private static VoucherImport NewImport(Guid id, string fileName) => new()
+    {
+        Id = id,
+        FileName = fileName,
+        PageCount = 1,
+        StartedAtUtc = Old(),
+        CompletedAtUtc = Old(),
+        Status = "Completed",
+        ImportedCount = 10,
+    };
+
+    /// <summary>Captures what the job said, so "it reported a partial run" is assertable.</summary>
+    private sealed class RecordingLogger : ILogger<DataRetentionService>
+    {
+        public List<(LogLevel Level, string Message)> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state,
+            Exception? exception, Func<TState, Exception?, string> formatter)
+            => Entries.Add((logLevel, formatter(state, exception)));
+
+        public void AddProvider(ILoggerProvider provider) { }
+    }
+
     private static void Enable(ApplicationDbContext seed) => seed.AppSettings.Add(new AppSetting
     {
         Key = AppSettingKeys.DataRetentionEnabled,
@@ -351,7 +504,7 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
         using var context = CreateContext();
         await context.Database.MigrateAsync();
         await context.Database.ExecuteSqlRawAsync(
-            """TRUNCATE TABLE "verification_codes", "refresh_tokens", "outbox_events", "error_logs", "notifications", "push_tokens", "provider_event_outbox", "devices", "support_messages", "app_settings", "users" RESTART IDENTITY CASCADE""");
+            """TRUNCATE TABLE "verification_codes", "refresh_tokens", "outbox_events", "error_logs", "notifications", "push_tokens", "provider_event_outbox", "devices", "support_messages", "app_settings", "users", "feedback_message_replies", "feedback_messages", "qr_parameters", "purchase_batches", "voucher_imports", "voucher_import_errors" RESTART IDENTITY CASCADE""");
         seed(context);
         await context.SaveChangesAsync();
     }
