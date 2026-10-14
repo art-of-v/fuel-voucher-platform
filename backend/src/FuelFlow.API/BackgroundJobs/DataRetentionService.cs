@@ -107,6 +107,14 @@ public class DataRetentionService
     private readonly RuntimeSettingsService _settings;
     private readonly ILogger<DataRetentionService> _logger;
 
+    /// <summary>
+    /// Tables whose purge failed this run, so the summary can say so instead of reporting a clean
+    /// number. Safe as an instance field because the service is scoped (ServiceSetup.cs:447) and
+    /// Hangfire resolves one scope per execution - but it is cleared at the start of every run
+    /// anyway, so a second call on the same instance cannot inherit the previous run's failures.
+    /// </summary>
+    private readonly List<(string Table, string Reason)> _failures = [];
+
     public DataRetentionService(
         ApplicationDbContext context,
         RuntimeSettingsService settings,
@@ -119,6 +127,8 @@ public class DataRetentionService
 
     public virtual async Task CleanupAsync(CancellationToken cancellationToken = default)
     {
+        _failures.Clear();
+
         var enabled = await _settings.IsDataRetentionEnabledAsync(cancellationToken);
         var dryRun = !enabled;
 
@@ -146,11 +156,11 @@ public class DataRetentionService
         // The two sets are disjoint (the second excludes Revoked) and together they match exactly
         // what the OR matched, so the summed count is unchanged - verified by test against the OR.
         var revokedDeviceCount = await PurgeAsync(
-            _context.Devices.Where(d => d.Status == DeviceStatus.Revoked),
+            "devices", _context.Devices.Where(d => d.Status == DeviceStatus.Revoked),
             dryRun, cancellationToken);
 
         var staleDeviceCount = await PurgeAsync(
-            _context.Devices.Where(d => d.Status != DeviceStatus.Revoked && d.LastSeenAt < deviceCutoff),
+            "devices", _context.Devices.Where(d => d.Status != DeviceStatus.Revoked && d.LastSeenAt < deviceCutoff),
             dryRun, cancellationToken);
 
         // __RESULTS__
@@ -158,47 +168,47 @@ public class DataRetentionService
         {
             // Spent (used) or expired OTPs, aged past the window. A still-valid code — unused and
             // unexpired — is never matched, whatever its age.
-            ("verification_codes", await PurgeAsync(
+            ("verification_codes", await PurgeAsync("verification_codes", 
                 _context.VerificationCodes.Where(c =>
                     (c.IsUsed || c.ExpiresAtUtc < now) && c.CreatedAtUtc < verificationCutoff),
                 dryRun, cancellationToken)),
 
             // Revoked or expired refresh tokens, aged past the window. An active session's token
             // (unrevoked and unexpired) is excluded regardless of age.
-            ("refresh_tokens", await PurgeAsync(
+            ("refresh_tokens", await PurgeAsync("refresh_tokens", 
                 _context.RefreshTokens.Where(t =>
                     (t.IsRevoked || t.ExpiresAtUtc < now) && t.CreatedAtUtc < refreshTokenCutoff),
                 dryRun, cancellationToken)),
 
             // Only already-processed outbox events, aged by when they were processed. Unprocessed
             // work is never touched.
-            ("outbox_events", await PurgeAsync(
+            ("outbox_events", await PurgeAsync("outbox_events", 
                 _context.OutboxEvents.Where(o =>
                     o.Processed && o.ProcessedAtUtc != null && o.ProcessedAtUtc < outboxCutoff),
                 dryRun, cancellationToken)),
 
             // Read notifications only; unread ones are kept indefinitely so a user never loses an
             // unseen message to retention.
-            ("notifications", await PurgeAsync(
+            ("notifications", await PurgeAsync("notifications", 
                 _context.Notifications.Where(n =>
                     n.IsRead && n.CreatedAtUtc < notificationCutoff),
                 dryRun, cancellationToken)),
 
             // Error logs are pure diagnostics; prune purely by age.
-            ("error_logs", await PurgeAsync(
+            ("error_logs", await PurgeAsync("error_logs", 
                 _context.ErrorLogs.Where(e => e.LoggedAtUtc < errorLogCutoff),
                 dryRun, cancellationToken)),
 
             // Push tokens not seen in the window: a live device refreshes LastSeenAtUtc regularly,
             // so a long-silent token is unreachable and safe to drop (a reinstall mints a new one).
-            ("push_tokens", await PurgeAsync(
+            ("push_tokens", await PurgeAsync("push_tokens", 
                 _context.PushTokens.Where(p => p.LastSeenAtUtc < pushTokenCutoff),
                 dryRun, cancellationToken)),
 
             // The admin change audit trail, aged purely by when the change happened. There is no
             // processed state to exclude here: a row is a record of something a person did, so the
             // only question is how far back it is still worth answering for.
-            ("provider_event_outbox", await PurgeAsync(
+            ("provider_event_outbox", await PurgeAsync("provider_event_outbox", 
                 _context.AuditEventOutbox.Where(e => e.ChangedAtUtc < providerEventCutoff),
                 dryRun, cancellationToken)),
 
@@ -211,15 +221,28 @@ public class DataRetentionService
             // A finished import and its error rows, aged by completion. An in-flight import
             // (CompletedAtUtc null) is never matched however old it started. Ordered last so the
             // import errors cascade to their batch in the same run.
+            //
+            // The reference check is what makes this safe, and it is the same shape as the
+            // qr_parameters purge below: purchase_batches.import_job_id is Restrict and purchase
+            // batches are never purged (they are costing records - the import's price history).
+            // Without the check, the first import that had a cost entered against it made
+            // DELETE FROM voucher_imports raise 23503, and because PurgeAsync saves per table and
+            // throws on the first failure, every table listed after this one - qr_parameters,
+            // support_messages, feedback_message_replies, feedback_messages - was silently skipped
+            // on that run and on every run after. DeletedUnpaidOrderCleanupService guards refunds
+            // and renewal items for exactly this reason; purchase_batches was missed here.
             ("voucher_imports", await PurgeAsync(
+                "voucher_imports",
                 _context.VoucherImports.Where(i =>
-                    i.CompletedAtUtc != null && i.CompletedAtUtc < voucherImportCutoff),
+                    i.CompletedAtUtc != null && i.CompletedAtUtc < voucherImportCutoff &&
+                    !_context.PurchaseBatches.IgnoreQueryFilters()
+                        .Any(b => b.ImportJobId == i.Id)),
                 dryRun, cancellationToken)),
 
             // A QR config nothing points at any more. The reference check is what makes this safe:
             // a row still referenced by a fuel_vouchers row is a live voucher's provenance and is
             // never matched, however old it is.
-            ("qr_parameters", await PurgeAsync(
+            ("qr_parameters", await PurgeAsync("qr_parameters", 
                 _context.QrParameters.Where(q =>
                     q.CreatedAtUtc < qrParametersCutoff &&
                     !_context.FuelVouchers.IgnoreQueryFilters()
@@ -229,17 +252,17 @@ public class DataRetentionService
             // Contact-form submissions past the window. Ordered last so it is the newest policy in the
             // list, and nothing cascades into it - it references no user, so no other table depends on
             // the row surviving.
-            ("support_messages", await PurgeAsync(
+            ("support_messages", await PurgeAsync("support_messages", 
                 _context.SupportMessages.Where(m => m.CreatedAtUtc < supportMessageCutoff),
                 dryRun, cancellationToken)),
 
             // Bot feedback: replies first, because the FK from replies to messages is Restrict and
             // the two tables share one window - deleting the message first would fail the job.
-            ("feedback_message_replies", await PurgeAsync(
+            ("feedback_message_replies", await PurgeAsync("feedback_message_replies", 
                 _context.FeedbackMessageReplies.Where(r => r.SentAtUtc < feedbackMessageCutoff),
                 dryRun, cancellationToken)),
 
-            ("feedback_messages", await PurgeAsync(
+            ("feedback_messages", await PurgeAsync("feedback_messages", 
                 _context.FeedbackMessages.Where(m => m.CreatedAtUtc < feedbackMessageCutoff),
                 dryRun, cancellationToken)),
         };
@@ -247,6 +270,21 @@ public class DataRetentionService
         // __TAIL__
         var total = results.Sum(r => r.Count);
         var breakdown = string.Join(", ", results.Select(r => $"{r.Table}={r.Count}"));
+
+        // A partial run has to say it is partial. The alternative - reporting the tables that were
+        // reached and staying quiet about the ones that were not - is how a job that deletes
+        // nothing at all can look identical to a healthy one in the log.
+        if (_failures.Count > 0)
+        {
+            var failed = string.Join("; ", _failures.Select(f => $"{f.Table} ({f.Reason})"));
+            _logger.LogError(
+                "Data retention ran INCOMPLETELY: {FailedCount} table(s) could not be purged and were "
+                + "skipped, while {Total} row(s) in the others were deleted [{Breakdown}]. "
+                + "Blocked: {Failed}",
+                _failures.Count, total, breakdown, failed);
+
+            return;
+        }
 
         if (dryRun)
         {
@@ -269,7 +307,26 @@ public class DataRetentionService
     /// tracking explicitly - the context tracks by default (see DatabaseSetup.cs on why that
     /// default is load-bearing), and saying it here keeps the delete honest if that ever flips.
     /// </summary>
+    /// <remarks>
+    /// A failure is contained to the table it happened in. Every delete here is a real constraint the
+    /// schema is free to reject - a Restrict edge nobody remembered - and letting that escape
+    /// aborted every table listed after it while the job still reported the tables it *had*
+    /// reached. That is the worst shape a background job can have: it looks like it ran.
+    /// <para>
+    /// Not covered by a test, deliberately. Every Restrict edge the purge can currently hit is
+    /// excluded by a predicate instead - <c>voucher_imports</c> against <c>purchase_batches</c> and
+    /// <c>qr_parameters</c> against <c>fuel_vouchers</c> - so manufacturing a failure would mean
+    /// breaking the schema on purpose to assert the handler's own reaction. When a new Restrict edge
+    /// appears, add the predicate <em>and</em> a test for it; this block is what stops the first
+    /// occurrence from taking the rest of the run with it.
+    /// </para>
+    /// <para>
+    /// Rows already deleted before the failure stay deleted - each batch is its own transaction -
+    /// so the table reports what it actually removed rather than rolling back to a tidy zero.
+    /// </para>
+    /// </remarks>
     private async Task<int> PurgeAsync<T>(
+        string table,
         IQueryable<T> filtered,
         bool dryRun,
         CancellationToken cancellationToken) where T : class
@@ -288,8 +345,28 @@ public class DataRetentionService
                 break;
             }
 
-            _context.Set<T>().RemoveRange(batch);
-            await _context.SaveChangesAsync(cancellationToken);
+            try
+            {
+                _context.Set<T>().RemoveRange(batch);
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException ex)
+            {
+                // Almost always a Restrict edge the purge predicate did not account for. Detach the
+                // batch so the tracked rows cannot resurface as an insert on some later SaveChanges.
+                _context.ChangeTracker.Clear();
+
+                var reason = ex.InnerException?.Message ?? ex.Message;
+                _failures.Add((table, reason));
+                _logger.LogError(ex,
+                    "Data retention could not purge {Table}: {Count} row(s) blocked, and the rest of "
+                    + "that batch was skipped. The table stays until the referencing rows are dealt "
+                    + "with. {Reason}",
+                    table, batch.Count, reason);
+
+                return total;
+            }
+
             total += batch.Count;
 
             if (batch.Count < BatchSize)
