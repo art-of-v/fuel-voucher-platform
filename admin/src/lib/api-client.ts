@@ -61,7 +61,31 @@ async function parseJsonBody<R>(response: Response): Promise<R> {
 const TRANSIENT_FAILURE_MESSAGE =
   "Can't reach the server. Your session is still active - it will resume automatically.";
 
+/**
+ * Set once the session is known to be over. Deliberately module state and not derived from the
+ * stored token: {@link endSession} navigates to `/admin`, which reloads the page, so the only way
+ * back is a fresh load - and this flag dies with the old one.
+ *
+ * Every 401 used to open a full refresh attempt. That is right for the *first* one - the access
+ * token may simply have expired while the refresh cookie is still good - and useless for every one
+ * after it. The dashboard polls (`refetchInterval: 15_000`) and a tab like SuppliersTab mounts two
+ * queries, so a session that had ended still produced a 401-refresh pair every few seconds. The
+ * backend allows three refreshes per IP per minute, so the storm turned into 429s; a 429 reads as
+ * "server unreachable", and the operator was shown a retry screen for a session that had been over
+ * for minutes. Refreshing cannot help once the session is known dead, so it must not be attempted.
+ */
+let sessionEnded = false;
+
+/**
+ * Test seam. This flag outlives a single test, so without an explicit reset every later test in
+ * the file would answer its 401s from a verdict that belonged to an earlier one.
+ */
+export function __resetSessionEndedForTests(): void {
+  sessionEnded = false;
+}
+
 function endSession(): void {
+  sessionEnded = true;
   clearTokens();
   if (typeof window !== "undefined") {
     window.location.href = "/admin";
@@ -143,6 +167,10 @@ async function readError(response: Response): Promise<{ message: string; code?: 
 }
 
 async function handle401(method: string, url: string, headers: Record<string, string>, body?: BodyInit, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
+  // The session already ended on an earlier 401. Another refresh cannot resurrect it, and each
+  // attempt spends a slice of the per-minute budget the next one needs - so answer at once.
+  if (sessionEnded) throw new Error("Session expired");
+
   const status = await refreshAccessToken();
 
   if (status === "refreshed") {
