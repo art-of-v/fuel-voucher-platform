@@ -483,6 +483,129 @@ public sealed class FeedbackBotIntegrationTests : IClassFixture<TestDatabaseFixt
     }
 
     [Fact]
+    public async Task StartingAnAlreadyLinkedChatDoesNotRepeatTheOnboardingCopy()
+    {
+        // Every press of "Написати нам" re-sends /start through the deep link, so the onboarding text
+        // used to land in the chat again on every visit, burying the conversation under identical
+        // copies. A repeat must be one line.
+        var userId = await SeedUserAsync();
+        var client = new RecordingTelegramFeedbackClient();
+        var jobs = new RecordingJobClient();
+
+        var payload = FeedbackDeepLink.CreatePayload(
+            userId, FeedbackTestFactory.SigningKey, TimeSpan.FromDays(30), DateTime.UtcNow);
+
+        await using (var context = CreateContext())
+        {
+            await FeedbackTestFactory.Router(context, client, jobs)
+                .HandleAsync(FeedbackTestFactory.StartCommand(CustomerChatId, payload));
+        }
+
+        client.SentTo(CustomerChatId).Should().ContainSingle()
+            .Which.Should().Be(FeedbackBotTexts.WelcomeBound, "the first contact is the onboarding");
+
+        await using (var context = CreateContext())
+        {
+            await FeedbackTestFactory.Router(context, client, jobs)
+                .HandleAsync(FeedbackTestFactory.StartCommand(CustomerChatId, payload));
+        }
+
+        var sent = client.SentTo(CustomerChatId).ToList();
+        sent.Should().HaveCount(2);
+        sent[0].Should().Be(FeedbackBotTexts.WelcomeBound, "the first contact is the onboarding");
+        sent[1].Should().Be(FeedbackBotTexts.AlreadyLinked, "a second visit is not a first contact");
+    }
+
+    [Fact]
+    public async Task AHandTypedStartOnALinkedChatDoesNotTellThemToLinkItAgain()
+    {
+        // The advice "open it in the app so the chat links to your account" is false for someone who
+        // already is linked, and sending it to them is how you teach customers to distrust the bot.
+        var userId = await SeedUserAsync();
+        var client = new RecordingTelegramFeedbackClient();
+        var jobs = new RecordingJobClient();
+
+        var payload = FeedbackDeepLink.CreatePayload(
+            userId, FeedbackTestFactory.SigningKey, TimeSpan.FromDays(30), DateTime.UtcNow);
+
+        await using (var context = CreateContext())
+        {
+            await FeedbackTestFactory.Router(context, client, jobs)
+                .HandleAsync(FeedbackTestFactory.StartCommand(CustomerChatId, payload));
+        }
+
+        client.Sent.Clear();
+
+        await using (var context = CreateContext())
+        {
+            await FeedbackTestFactory.Router(context, client, jobs)
+                .HandleAsync(FeedbackTestFactory.StartCommand(CustomerChatId, null));
+        }
+
+        client.SentTo(CustomerChatId).Should().ContainSingle()
+            .Which.Should().NotBe(FeedbackBotTexts.WelcomeUnbound)
+            .And.Be(FeedbackBotTexts.AlreadyLinked);
+    }
+
+    [Fact]
+    public async Task SwitchingAccountsOnTheSameChatGetsTheFullOnboardingAgain()
+    {
+        // The one case where repeating the long copy is right: the chat genuinely changed hands, and
+        // the customer should be told which account it now belongs to.
+        var firstUser = await SeedUserAsync();
+        var client = new RecordingTelegramFeedbackClient();
+        var jobs = new RecordingJobClient();
+
+        var firstPayload = FeedbackDeepLink.CreatePayload(
+            firstUser, FeedbackTestFactory.SigningKey, TimeSpan.FromDays(30), DateTime.UtcNow);
+
+        await using (var context = CreateContext())
+        {
+            await FeedbackTestFactory.Router(context, client, jobs)
+                .HandleAsync(FeedbackTestFactory.StartCommand(CustomerChatId, firstPayload));
+        }
+
+        var secondUser = await SeedUserAsync();
+        var secondPayload = FeedbackDeepLink.CreatePayload(
+            secondUser, FeedbackTestFactory.SigningKey, TimeSpan.FromDays(30), DateTime.UtcNow);
+
+        client.Sent.Clear();
+
+        await using (var context = CreateContext())
+        {
+            await FeedbackTestFactory.Router(context, client, jobs)
+                .HandleAsync(FeedbackTestFactory.StartCommand(CustomerChatId, secondPayload));
+        }
+
+        client.SentTo(CustomerChatId).Should().ContainSingle()
+            .Which.Should().Be(FeedbackBotTexts.WelcomeBound);
+
+        await using var verify = CreateContext();
+        var binding = await verify.FeedbackChatBindings
+            .AsNoTracking()
+            .SingleAsync(b => b.TelegramChatId == CustomerChatId);
+        binding.UserId.Should().Be(secondUser);
+    }
+
+    [Fact]
+    public async Task AFirstStartWithoutAPayloadStillGetsTheLinkingInstructions()
+    {
+        // The counterpart: an unlinked chat must still be told how to link, or the channel is
+        // unreachable for anyone who finds the bot by name.
+        var client = new RecordingTelegramFeedbackClient();
+        var jobs = new RecordingJobClient();
+
+        await using (var context = CreateContext())
+        {
+            await FeedbackTestFactory.Router(context, client, jobs)
+                .HandleAsync(FeedbackTestFactory.StartCommand(CustomerChatId, null));
+        }
+
+        client.SentTo(CustomerChatId).Should().ContainSingle()
+            .Which.Should().Be(FeedbackBotTexts.WelcomeUnbound);
+    }
+
+    [Fact]
     public async Task AFailedStaffDeliveryLeavesTheMessageStoredForALaterRetry()
     {
         var client = new RecordingTelegramFeedbackClient { FailForChatId = FeedbackTestFactory.StaffChatId };

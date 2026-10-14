@@ -26,6 +26,17 @@ internal static class FeedbackBotTexts
         "Щоб ми бачили ваш акаунт, відкрийте «Зворотний зв'язок» у застосунку — тоді чат " +
         "прив'яжеться до нього автоматично.";
 
+    /// <summary>
+    /// Sent when the chat is <b>already</b> linked to the account and the customer starts the bot
+    /// again. Short on purpose: the onboarding text above is for a first contact, and repeating it on
+    /// every press of "Написати нам" buried a real conversation under identical copies. It also never
+    /// tells an already-linked person to "open the app to link it" — by then they are linked, and
+    /// that sentence is simply false.
+    /// </summary>
+    public const string AlreadyLinked =
+        "Чат уже привʼязано до акаунту ✅\n\n" +
+        "Напишіть, будь ласка, що не працює або чого бракує в застосунку — подробиці, номер екрана.";
+
     public const string Help =
         "Як я працюю:\n\n" +
         "• Напишіть, що не працює, чого бракує або що незручно — чим конкретніше, тим краще.\n" +
