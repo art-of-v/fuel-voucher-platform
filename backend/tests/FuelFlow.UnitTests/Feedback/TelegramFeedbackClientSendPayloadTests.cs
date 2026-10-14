@@ -27,6 +27,13 @@ public sealed class TelegramFeedbackClientSendPayloadTests
 {
     private const string Token = "123456:TESTTOKEN";
 
+    /// <summary>
+    /// Long enough to satisfy IsConfigured's minimum, and worded so it cannot be mistaken for a real
+    /// key - gitleaks flags any high-entropy `SigningKey = "..."` literal, which is the correct
+    /// instinct even for a fixture.
+    /// </summary>
+    private const string SigningKey = "unit-test-signing-key-not-a-secret";
+
     /// <summary>Captures the request body the client produced, and answers with a Telegram-shaped ok.</summary>
     private sealed class CapturingHandler : HttpMessageHandler
     {
@@ -63,7 +70,7 @@ public sealed class TelegramFeedbackClientSendPayloadTests
             BotUsername = "palne_feedback_bot",
             WebhookSecret = "secret",
             StaffChatId = -1001234567890,
-            SigningKey = "0123456789abcdef0123456789abcdef"
+            SigningKey = SigningKey
         });
 
         return (new TelegramFeedbackClient(http, options, NullLogger<TelegramFeedbackClient>.Instance), handler);
