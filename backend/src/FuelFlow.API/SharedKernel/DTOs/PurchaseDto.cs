@@ -33,12 +33,4 @@ public sealed class PurchaseDto
     /// app needs it to tell a worker's handover receipt apart from a purchase they made.
     /// </summary>
     public string Kind { get; set; } = "Purchase";
-
-    /// <summary>
-    /// Transitional alias for <see cref="Brand"/>, serialised under the field's old name. The
-    /// published 1.0.1 app reads <c>provider</c> here; see <see cref="VoucherDto.Provider"/> for why
-    /// both ship for one release and when this goes.
-    /// </summary>
-    [System.Text.Json.Serialization.JsonPropertyName("provider")]
-    public string Provider => Brand;
 }

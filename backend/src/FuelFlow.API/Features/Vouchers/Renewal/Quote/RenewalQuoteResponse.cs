@@ -40,14 +40,6 @@ public sealed class RenewalVoucherQuote
 
     /// <summary>The eight tiers with per-voucher price and availability; empty when not eligible.</summary>
     public List<RenewalTermQuote> Terms { get; set; } = new();
-
-    /// <summary>
-    /// Transitional alias for <see cref="Brand"/>, serialised under the field's old name. The renewal
-    /// quote is rendered by the published 1.0.1 renewal screen; see
-    /// <see cref="FuelFlow.SharedKernel.DTOs.VoucherDto.Provider"/> for why both ship for one release.
-    /// </summary>
-    [System.Text.Json.Serialization.JsonPropertyName("provider")]
-    public string Provider => Brand;
 }
 
 /// <summary>One tier for one voucher: the price the customer would pay and whether it can be bought.</summary>

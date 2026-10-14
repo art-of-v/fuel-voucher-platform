@@ -25,16 +25,6 @@ public sealed record VoucherDto(
     DateTime CreatedAtUtc,
     DateTime UpdatedAtUtc,
     string? FuelName = null
-)
-{
-    /// <summary>
-    /// Transitional alias for <see cref="Brand"/>, serialised under the field's old name. This is
-    /// the shape behind <c>GET /api/vouchers/my</c>, which is what the published 1.0.1 wallet reads;
-    /// see <see cref="FuelFlow.SharedKernel.DTOs.VoucherDto.Provider"/> for why both ship for one
-    /// release and when this goes.
-    /// </summary>
-    [System.Text.Json.Serialization.JsonPropertyName("provider")]
-    public string Provider => Brand;
-}
+);
 
 public sealed record GetUserVouchersResponse(List<VoucherDto> Vouchers);
