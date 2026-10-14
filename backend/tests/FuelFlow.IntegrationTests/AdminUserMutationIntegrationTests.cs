@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
+using FuelFlow.Features.Auth.AdminUser.GetAdminUsers;
 using FuelFlow.Features.Auth.AdminUser.SetUserActive;
 using FuelFlow.Features.Auth.AdminUser.SetUserBanned;
 using FuelFlow.Features.Auth.Refresh;
@@ -276,6 +277,39 @@ public class AdminUserMutationIntegrationTests : WebApplicationFactory<Program>,
             reloaded.LastName.Should().Be("Person");
             reloaded.Birthdate.Should().Be(new DateOnly(1985, 6, 15));
             reloaded.ProfileImageUrl.Should().Be("https://cdn.example/pic.png");
+        }
+    }
+
+    // ---- GetAdminUsersQueryHandler -------------------------------------------------------------
+
+    [Fact]
+    public async Task GetAdminUsers_SurfacesTheQaFlag_PerUser()
+    {
+        // The QA account used to be indistinguishable from an ordinary customer in the users grid,
+        // so a tester reporting "the QA account is broken" gave staff nothing to look at. The flag
+        // is read-only here on purpose - it is granted by the seeding migration or by the QA-gated
+        // registration path, never from the admin UI - so assert it is projected for exactly the
+        // flagged rows and does not leak onto everyone.
+        var qaPhone = "+15550010007";
+        await SeedUserAsync(SeedRoles.UserName, qaPhone);
+
+        using (var scope = Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var qa = await context.Users.FirstAsync(u => u.PhoneNumber == qaPhone);
+            qa.IsQaAccount = true;
+            await context.SaveChangesAsync();
+        }
+
+        using (var scope = Services.CreateScope())
+        {
+            var handler = scope.ServiceProvider.GetRequiredService<GetAdminUsersQueryHandler>();
+            var items = await handler.HandleAsync(new GetAdminUsersQuery());
+
+            var flagged = items.Single(u => u.Phone == qaPhone);
+            flagged.IsQaAccount.Should().BeTrue();
+            items.Should().Contain(u => u.IsQaAccount == false,
+                "an ordinary customer must not be reported as a QA account");
         }
     }
 }

@@ -174,6 +174,27 @@ public sealed class VerifyCodeCommandHandler
                 throw new UnauthorizedAccessException("Invalid or expired verification code");
             }
 
+            // Deleting an account and signing up again mints a brand-new row, and nothing about
+            // the QA identity came with it: the flag and the active state had only ever been set
+            // by the seeding migration. So the QA phone re-registering itself came back as an
+            // ordinary dormant account - the QA code still worked and the tester got a valid
+            // token, so the failure was silent and looked like an empty store
+            // (PackageStockAvailability gates the QA catalogue on IsQaAccount) and a checkout that
+            // 403s (is_active=false users can use everything EXCEPT payments). That is precisely
+            // the path App Review is told to perform, so derive both properties from the same
+            // switch-gated condition on every registration rather than leaving them to a one-off
+            // migration that cannot run again - the old row is soft-deleted, so it matches
+            // "phone_number AND NOT is_deleted" no more.
+            //
+            // Gated on the same switch the code path above already checked, so QA status can only
+            // ever be granted while QA access is actually enabled. A reviewer arriving after the
+            // switch was flipped OFF gets an ordinary inactive account, which is the fail-safe we
+            // want. This is unreachable via the Auth:DevBypass 000000 code: DevBypass only
+            // substitutes the SMS code, it does not grant QA status.
+            var isQaRegistration = _qaTestAccess is not null
+                                   && _qaTestAccess.IsQaPhone(phoneNumber)
+                                   && await _qaTestAccess.IsActiveAsync(cancellationToken);
+
             user = new User
             {
                 Id = Guid.CreateVersion7(),
@@ -181,20 +202,13 @@ public sealed class VerifyCodeCommandHandler
                 // Self-registration is the mobile-app path: stamp the built-in "User"
                 // role. Admins are created/maintained by promoting an account to "Admin".
                 RoleId = SeedRoles.UserRoleId,
-                IsActive = false, // Activated only by staff, never by OTP verify (see below)
-                // Deleting an account and signing up again mints a brand-new row, and the QA
-                // flag did not come with it - it had only ever been set by the seeding
-                // migration. So the QA phone re-registering itself came back as an ordinary
-                // account: the QA code still worked, but PackageStockAvailability gates the
-                // QA catalogue on this flag, and the tester got an empty store. That is
-                // precisely the path App Review is told to perform, so restore the flag on
-                // every registration rather than leaving it to a one-off migration.
-                //
-                // Gated on the same switch the code path above already checked, so QA status
-                // can only ever be granted while QA access is actually enabled.
-                IsQaAccount = _qaTestAccess is not null
-                              && _qaTestAccess.IsQaPhone(phoneNumber)
-                              && await _qaTestAccess.IsActiveAsync(cancellationToken),
+                // Staff activate ordinary accounts as a separate admin/business operation, and
+                // OTP verify never does that. The QA account is the one documented exception: it
+                // is seeded is_active=true precisely so a reviewer can exercise the full workflow
+                // including a test purchase, so a re-registered QA account has to come back the
+                // same way the seeded one did.
+                IsActive = isQaRegistration,
+                IsQaAccount = isQaRegistration,
                 CreatedAtUtc = DateTime.UtcNow
             };
             _context.Users.Add(user);
@@ -203,8 +217,9 @@ public sealed class VerifyCodeCommandHandler
 
         // OTP verification registers/logs in the user but does NOT activate them.
         // is_active=false users can use all features EXCEPT payments.
-        // Activation (is_active=true) is a separate admin/business operation.
-        // No change to user.IsActive here.
+        // Activation (is_active=true) is a separate admin/business operation, with the QA
+        // account granted at creation above as the single exception.
+        // No change to user.IsActive for an account that already existed.
 
         user.LastLoginAtUtc = DateTime.UtcNow;
         if (!isNewUser)

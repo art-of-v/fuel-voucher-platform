@@ -49,6 +49,13 @@ public sealed class GetAdminUsersQueryHandler
             IsActive = u.IsActive,
             IsBanned = u.IsBanned,
             IsDeleted = u.IsDeleted,
+            // Read-only visibility for staff. Without it the QA account is indistinguishable
+            // from an ordinary customer in the users grid, so a tester reporting "the QA account
+            // is broken" gives staff nothing to look at - the only QA surface in the panel was
+            // the test-access switch, which says nothing about the account's own state. There is
+            // deliberately no setter: the flag is granted by the seeding migration and by the
+            // QA-gated registration path, never from the admin UI.
+            IsQaAccount = u.IsQaAccount,
             CreatedAt = u.CreatedAtUtc.ToString("o")
         }).ToList();
     }
@@ -70,5 +77,6 @@ public sealed class AdminUserDto
     public bool IsActive { get; set; }
     public bool IsBanned { get; set; }
     public bool IsDeleted { get; set; }
+    public bool IsQaAccount { get; set; }
     public string CreatedAt { get; set; } = null!;
 }
