@@ -112,4 +112,36 @@ public sealed class RateLimitIntegrationTests : IClassFixture<TestDatabaseFixtur
         var thirteenth = await client.PostAsJsonAsync("/api/auth/send-code", new SendCodeCommand("+380995559999"));
         thirteenth.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
     }
+
+    /// <summary>
+    /// A 429 must say when to come back.
+    ///
+    /// Without <c>Retry-After</c> the response carries no timing at all, so a client can only
+    /// invent a backoff - and the admin panel, the one client that does retry, invents it by
+    /// guessing and immediately draws another 429. This locks an operator out of the dashboard
+    /// behind a "Server unavailable" screen whose retry button spends the rest of the budget.
+    /// The countdown in that screen is read straight from this header.
+    /// </summary>
+    [Fact]
+    public async Task SendCode_429_ShouldCarryRetryAfter_SoClientsDoNotGuess()
+    {
+        await using var factory = new NoBypassFactory();
+        var client = factory.CreateClient();
+        const string phone = "+380995557777";
+
+        for (var i = 1; i <= 3; i++)
+        {
+            var ok = await client.PostAsJsonAsync("/api/auth/send-code", new SendCodeCommand(phone));
+            ok.StatusCode.Should().Be(HttpStatusCode.OK, $"attempt {i} should spend a permit");
+        }
+
+        var limited = await client.PostAsJsonAsync("/api/auth/send-code", new SendCodeCommand(phone));
+        limited.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+
+        limited.Headers.Should().ContainKey("Retry-After");
+        var seconds = int.Parse(limited.Headers.GetValues("Retry-After").Single());
+        // The send-code window is one minute, so a value of 1..60 is the only sensible answer.
+        // Zero or negative would tell a client to come back instantly and burn another permit.
+        seconds.Should().BeInRange(1, 60);
+    }
 }
