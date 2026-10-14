@@ -143,14 +143,14 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
     private static FuelVoucher SellableVoucher(decimal liters, bool isTestData) => new()
     {
         Id = Guid.CreateVersion7(),
-        // Provider is the station id, compared case-insensitively - StockKey is
+        // Brand is the station id, compared case-insensitively - StockKey is
         // (station, fuel type, nominal), so a row keyed to the network name instead of the station
         // would never match its own package.
-        Provider = Station,
+        Brand = Station,
         FuelTypeId = FuelType,
         Liters = liters,
         CostPerLiter = 45m,
-        ProviderExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6)),
+        SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6)),
         CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6)),
         VoucherNumber = $"QA-POOL-{isTestData}-{liters:0.##}",
         QrPayload = Guid.NewGuid().ToString(),
