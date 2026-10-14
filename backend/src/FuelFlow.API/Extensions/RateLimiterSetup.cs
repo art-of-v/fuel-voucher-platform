@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -137,6 +138,24 @@ internal static class RateLimiterSetup
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+            // Tell the caller when to come back instead of letting them guess.
+            //
+            // Without this a 429 carries no timing at all, so every client invents its own
+            // backoff - and the admin panel, which is the one client that retries, simply
+            // retries into the same exhausted bucket. `Retry-After` is the standard answer,
+            // and it is what the "Too many attempts" countdown reads.
+            options.OnRejected = async (context, token) =>
+            {
+                if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+                {
+                    var seconds = Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds));
+                    context.HttpContext.Response.Headers.RetryAfter = seconds.ToString(
+                        CultureInfo.InvariantCulture);
+                }
+
+                await Task.CompletedTask;
+            };
 
             options.AddPolicy(SendCodePolicy, context =>
                 RateLimitPartition.GetFixedWindowLimiter(
