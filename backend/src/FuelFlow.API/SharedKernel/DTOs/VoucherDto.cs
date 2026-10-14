@@ -39,22 +39,4 @@ public sealed class VoucherDto
     /// no purchase order backs the lineage (e.g. operator-issued stock).
     /// </summary>
     public Guid? OriginOrderId { get; set; }
-
-    /// <summary>
-    /// Transitional alias for <see cref="Brand"/>, serialised under the field's old name.
-    /// </summary>
-    /// <remarks>
-    /// The published 1.0.1 app reads <c>provider</c> off this shape and cannot be made to read
-    /// <c>brand</c> - the bundle that reads it is already in the App Store and only a new build can
-    /// change it. Dropping the old name before that build is out would leave every current user's
-    /// wallet with no brand at all: <c>resolveBrand(undefined)</c> returns null, the cards lose their
-    /// network colour, and the filter bar builds its provider list from an empty set.
-    ///
-    /// So both names ship for one release. Remove this property once 1.1.0 is live and the fleet has
-    /// had time to take the OTA - OTA applies on the *second* launch, so "released" is not the same as
-    /// "in use". <c>TransitionalBrandAliasTests</c> fails if this is removed while the alias is still
-    /// declared and passes once it is gone.
-    /// </remarks>
-    [System.Text.Json.Serialization.JsonPropertyName("provider")]
-    public string Provider => Brand;
 }
