@@ -513,16 +513,28 @@ const styles = StyleSheet.create({
   specRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
+    // A cart can hold many line items, and the composition ("10л×1, 50л×22, 3л×1, …") grows with
+    // every one of them. Without this the row lays itself out at its max-content width instead of
+    // its parent's, and the text paints straight over the amount and the status pill in the column
+    // to its right - which is exactly what a 6-line order looked like.
+    flexWrap: 'wrap',
     gap: 10,
   },
   fuelSpec: {
     fontSize: 11,
     letterSpacing: 1.5,
     textTransform: 'uppercase',
+    // The fuel name is two words and always fits; it must not be the half that gets squeezed when
+    // the composition next to it needs the room.
+    flexShrink: 0,
   },
   amountSpec: {
     fontSize: 15,
     letterSpacing: 0.5,
+    // The half that has to give. Yoga will not shrink a flex child below its content width on its
+    // own, so without both of these the text stays one line wide no matter how little room it has.
+    flexShrink: 1,
+    minWidth: 0,
   },
   metaRow: {
     flexDirection: 'row',
@@ -544,6 +556,10 @@ const styles = StyleSheet.create({
   headerRight: {
     gap: 8,
     alignItems: 'flex-end',
+    // The price and the status pill are the two things on this card a customer reads first. If the
+    // composition beside them grows, they must be the ones that hold their width - a price trimmed
+    // to "100 38…" is worse than a composition that wraps.
+    flexShrink: 0,
   },
   orderAmount: {
     // Sits above the status pill, so the amount reads first: the pill says what state the order

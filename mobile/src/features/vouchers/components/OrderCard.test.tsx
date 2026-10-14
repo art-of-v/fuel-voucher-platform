@@ -1,5 +1,6 @@
 import React from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 
 import { OrderCard } from './OrderCard';
 import type { Order, Voucher } from '../../../core/types/api';
@@ -94,6 +95,42 @@ function renderCard(
 }
 
 describe('OrderCard - the vouchers it lists', () => {
+  /**
+   * A cart can hold many line items, and the header prints every one of them in a
+   * single "10л×1, 50л×22, …" line. That line sits in a row beside the price and the
+   * status pill, and on a six-line order it laid itself out at its max-content width:
+   * the text painted straight over both of them, and the pill came out looking struck
+   * through. Found by hand on a 100 388,40 ₴ order, after it was already in the store.
+   *
+   * The fix is layout-only and the assertion is on layout, because that is the whole
+   * behaviour: the composition has to be allowed to wrap, it has to be the part that
+   * gives up width, and the price and pill must not be.
+   */
+  it('keeps a long line-item composition inside its own column', () => {
+    const lineItems = [10, 50, 3, 20, 5, 2].map((liters, i) => ({
+      id: `l${i}`,
+      brand: 'OKKO',
+      fuelTypeId: 'a95',
+      liters,
+      quantity: i === 1 ? 22 : 1,
+    }));
+
+    renderCard([], { order: mkOrder({ price: 100388.4, lineItems }) });
+
+    // t() is mocked to echo its key, so the separator is the literal string below.
+    const composition = screen.getByText(
+      lineItems.map((li) => `${li.liters}common.liter×${li.quantity}`).join(', '),
+    );
+    const style = StyleSheet.flatten(composition.props.style);
+
+    // The part that must give way.
+    expect(style.flexShrink).toBe(1);
+    expect(style.minWidth).toBe(0);
+
+    // And the fuel name next to it must not be the half that gets squeezed.
+    expect(StyleSheet.flatten(screen.getByText('a95').props.style).flexShrink).toBe(0);
+  });
+
   it('renders one card per voucher in the order', () => {
     renderCard([mkVoucher({ id: 'v1' }), mkVoucher({ id: 'v2', brand: 'Shell' })]);
 
