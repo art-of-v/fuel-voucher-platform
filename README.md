@@ -165,7 +165,11 @@ FuelFlow/
    carried over. The one exception is the QA phone, which re-registers already flagged
    `is_qa_account` and active — see the planning repo's `docs/QA_TEST_ACCESS.md`.
 3. Clients refresh transparently via `POST /api/auth/refresh` (refresh-token rotation with
-   family reuse detection).
+   family reuse detection). The admin panel restores a session on load only when
+   `localStorage["fuelflow.session"]` is set — a non-secret hint, not a credential. Without it
+   the app resolves to "signed out" **without any network call**, so an operator who is not
+   signed in never spends from the refresh limiter's three-per-minute budget. See
+   `admin/src/lib/session.ts`.
 4. The mobile app registers a device keypair and answers a server **challenge** with a
    signature (`/api/auth/device/*`); biometric/PIN unlock is a local gate. The device
    signature protects money-moving endpoints (checkout).

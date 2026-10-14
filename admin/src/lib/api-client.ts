@@ -1,5 +1,7 @@
 import { getApiUrl } from "./utils";
-import { getStoredAccessToken, refreshAccessToken, clearTokens } from "./admin-auth";
+import { getStoredAccessToken } from "./admin-auth";
+import { ensureAccessToken } from "./session";
+import { useSession } from "./session-store";
 
 const FETCH_TIMEOUT_MS = 15_000;
 
@@ -55,41 +57,14 @@ async function parseJsonBody<R>(response: Response): Promise<R> {
     return JSON.parse(text) as R;
 }
 
-// Shown when the session could not be refreshed because the API never gave a verdict.
-// Distinct from "Session expired" on purpose: the operator is still signed in and must
-// not be pushed to re-enter an OTP because a deploy restarted the API mid-poll.
-const TRANSIENT_FAILURE_MESSAGE =
-  "Can't reach the server. Your session is still active - it will resume automatically.";
-
 /**
- * Set once the session is known to be over. Deliberately module state and not derived from the
- * stored token: {@link endSession} navigates to `/admin`, which reloads the page, so the only way
- * back is a fresh load - and this flag dies with the old one.
- *
- * Every 401 used to open a full refresh attempt. That is right for the *first* one - the access
- * token may simply have expired while the refresh cookie is still good - and useless for every one
- * after it. The dashboard polls (`refetchInterval: 15_000`) and a tab like SuppliersTab mounts two
- * queries, so a session that had ended still produced a 401-refresh pair every few seconds. The
- * backend allows three refreshes per IP per minute, so the storm turned into 429s; a 429 reads as
- * "server unreachable", and the operator was shown a retry screen for a session that had been over
- * for minutes. Refreshing cannot help once the session is known dead, so it must not be attempted.
+ * Records that the backend is rate limiting us, so the UI can say exactly that and stop
+ * offering a retry that would only draw another 429.
  */
-let sessionEnded = false;
-
-/**
- * Test seam. This flag outlives a single test, so without an explicit reset every later test in
- * the file would answer its 401s from a verdict that belonged to an earlier one.
- */
-export function __resetSessionEndedForTests(): void {
-  sessionEnded = false;
-}
-
-function endSession(): void {
-  sessionEnded = true;
-  clearTokens();
-  if (typeof window !== "undefined") {
-    window.location.href = "/admin";
-  }
+function noteRateLimited(res: Response): void {
+  const retryAfter = Number(res.headers.get("Retry-After"));
+  const seconds = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : 60;
+  useSession.getState().block({ reason: "rate_limited", retryAt: Date.now() + seconds * 1000 });
 }
 
 // A failure whose body carried a stable machine code (e.g. "below_cost", "no_stock") alongside the
@@ -167,39 +142,30 @@ async function readError(response: Response): Promise<{ message: string; code?: 
 }
 
 async function handle401(method: string, url: string, headers: Record<string, string>, body?: BodyInit, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
-  // The session already ended on an earlier 401. Another refresh cannot resurrect it, and each
-  // attempt spends a slice of the per-minute budget the next one needs - so answer at once.
-  if (sessionEnded) throw new Error("Session expired");
+  // `ensureAccessToken` is the only thing allowed to spend refresh budget, and it declines
+  // outright when the session is already known to be signed out. A second 401 after that
+  // carries no new information - the old code refreshed again anyway, which both looped and
+  // drained the per-minute budget the login form needs.
+  const newToken = await ensureAccessToken();
+  if (!newToken) throw new Error("Session expired");
 
-  const status = await refreshAccessToken();
+  const newHeaders = { ...headers, Authorization: `Bearer ${newToken}` };
+  const response = await fetchWithTimeout(url, { method, headers: newHeaders, body }, timeoutMs);
+  if (response.ok) return response;
 
-  if (status === "refreshed") {
-    const newToken = getStoredAccessToken();
-    const newHeaders = { ...headers, ...(newToken ? { Authorization: `Bearer ${newToken}` } : {}) };
-    const response = await fetchWithTimeout(url, { method, headers: newHeaders, body }, timeoutMs);
-    if (response.ok) return response;
-
-    // The retry ran on a token the server had just minted, so only another 401 means the
-    // session is genuinely gone. A 403 is a permission answer and a 5xx is the backend's
-    // problem — neither invalidates a working session, and logging out on either cost the
-    // operator their login over a single flaky response.
-    if (response.status === 401) {
-      endSession();
-      throw new Error("Session expired");
-    }
-    throw new Error(await readErrorMessage(response));
-  }
-
-  if (status === "expired") {
-    endSession();
+  // The retry ran on a token the server had just minted, so only another 401 means the
+  // session is genuinely gone. A 403 is a permission answer and a 5xx is a backend fault -
+  // neither invalidates a working session, and logging out on either cost the operator
+  // their login over a single flaky response.
+  if (response.status === 401) {
+    useSession.getState().signOut();
     throw new Error("Session expired");
   }
-
-  // The refresh never reached a verdict. Keep the tokens and let the caller surface the
-  // problem: the cookie is untouched, so the next poll recovers on its own once the API
-  // is back. Signing out here is what threw operators to the login screen every time a
-  // deploy replaced the backend while the panel was open.
-  throw new Error(TRANSIENT_FAILURE_MESSAGE);
+  if (response.status === 429) {
+    noteRateLimited(response);
+    throw new Error("Too many requests");
+  }
+  throw new Error(await readErrorMessage(response));
 }
 
 export const apiRequest = async <T, R = unknown>(
@@ -314,3 +280,5 @@ async function toBlob(response: Response, fallbackFileName: string): Promise<{ b
 
     return { blob: await response.blob(), fileName: serverName || fallbackFileName };
 }
+
+// MARKER

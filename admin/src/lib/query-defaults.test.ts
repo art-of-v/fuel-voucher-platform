@@ -7,13 +7,20 @@ vi.mock("./utils", () => ({
   getApiUrl: (path: string) => `http://test.local${path}`,
 }));
 
-const refreshAccessToken = vi.fn();
-const clearTokens = vi.fn();
+const ensureAccessToken = vi.fn();
+const signOut = vi.fn();
+const block = vi.fn();
+vi.mock("./session", () => ({
+  ensureAccessToken: () => ensureAccessToken(),
+}));
+
+vi.mock("./session-store", () => ({
+  useSession: { getState: () => ({ signOut, block }) },
+}));
+
 let storedToken: string | null = "test-token";
 vi.mock("./admin-auth", () => ({
   getStoredAccessToken: () => storedToken,
-  refreshAccessToken: () => refreshAccessToken(),
-  clearTokens: () => clearTokens(),
 }));
 
 import { defaultQueryFn } from "./query-defaults";
@@ -31,10 +38,7 @@ const run = (path: string) =>
 describe("defaultQueryFn", () => {
   beforeEach(() => {
     storedToken = "test-token";
-    refreshAccessToken.mockReset();
-    clearTokens.mockReset();
     vi.stubGlobal("fetch", vi.fn());
-    vi.stubGlobal("location", { href: "" } as Location);
   });
 
   afterEach(() => {
@@ -55,15 +59,15 @@ describe("defaultQueryFn", () => {
     fetchMock
       .mockResolvedValueOnce(jsonResponse(401, { message: "expired" }))
       .mockResolvedValueOnce(jsonResponse(200, { total: 7 }));
-    refreshAccessToken.mockResolvedValueOnce("refreshed");
+    ensureAccessToken.mockResolvedValueOnce("fresh-token");
 
     await expect(run("/api/admin/vouchers")).resolves.toEqual({ total: 7 });
 
-    expect(refreshAccessToken).toHaveBeenCalledTimes(1);
+    expect(ensureAccessToken).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledTimes(2);
     // The retry must carry the token the refresh just minted, not the stale one.
     const retryHeaders = fetchMock.mock.calls[1][1].headers as Record<string, string>;
-    expect(retryHeaders.Authorization).toBe("Bearer test-token");
+    expect(retryHeaders.Authorization).toBe("Bearer fresh-token");
   });
 
   it("retries a 500 instead of failing the query outright", async () => {
@@ -94,6 +98,6 @@ describe("defaultQueryFn", () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue(jsonResponse(403, { message: "No" }));
 
     await expect(run("/api/admin/vouchers")).rejects.toThrow();
-    expect(clearTokens).not.toHaveBeenCalled();
+    expect(signOut).not.toHaveBeenCalled();
   });
 });

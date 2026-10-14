@@ -41,7 +41,7 @@ describe("refreshAccessToken", () => {
   it('stores the new access token and reports "refreshed" on success', async () => {
     vi.mocked(fetch).mockResolvedValue(jsonResponse(200, { accessToken: "fresh" }));
 
-    await expect(refreshAccessToken()).resolves.toBe("refreshed");
+    await expect(refreshAccessToken()).resolves.toMatchObject({ status: "refreshed" });
     expect(getStoredAccessToken()).toBe("fresh");
     expect(fetch).toHaveBeenCalledOnce();
   });
@@ -49,29 +49,33 @@ describe("refreshAccessToken", () => {
   it('reports "expired" on a 401 and does not retry', async () => {
     vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 401 }));
 
-    await expect(refreshAccessToken()).resolves.toBe("expired");
+    await expect(refreshAccessToken()).resolves.toMatchObject({ status: "expired" });
     expect(fetch).toHaveBeenCalledOnce();
   });
 
   it('reports "expired" on a 400 (no usable refresh cookie)', async () => {
     vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 400 }));
 
-    await expect(refreshAccessToken()).resolves.toBe("expired");
+    await expect(refreshAccessToken()).resolves.toMatchObject({ status: "expired" });
     expect(fetch).toHaveBeenCalledOnce();
   });
 
-  it('reports "unavailable" on a 429 and does NOT retry', async () => {
+  it("reports \"rate_limited\" on a 429 and does NOT retry", async () => {
     // The backend allows three refreshes per IP per minute; this ladder fires four in about
     // seven seconds. Retrying a 429 therefore spends the whole budget from inside the retry,
     // and every later attempt starts into an empty bucket - the admin ends up locked out
     // entirely. Found on 2026-10-14: one 502 during a deploy tripped this and the operator
     // could not sign back in until they closed every tab and left the page alone for a minute.
     vi.useFakeTimers();
-    vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 429 }));
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(null, { status: 429, headers: { "Retry-After": "45" } }),
+    );
 
     const pending = refreshAccessToken();
     await flushTimers();
-    await expect(pending).resolves.toBe("unavailable");
+    // A rate limit is its own verdict, not an outage and not an expired session: folding it
+    // into "unavailable" is what rendered "server unreachable" for a self-inflicted 429.
+    await expect(pending).resolves.toEqual({ status: "rate_limited", retryAfterSeconds: 45 });
 
     // One request. The 3-retry ladder must not have run - that is the whole fix.
     expect(fetch).toHaveBeenCalledOnce();
@@ -88,7 +92,7 @@ describe("refreshAccessToken", () => {
     const pending = refreshAccessToken();
     await flushTimers();
 
-    await expect(pending).resolves.toBe("refreshed");
+    await expect(pending).resolves.toMatchObject({ status: "refreshed" });
     expect(getStoredAccessToken()).toBe("fresh");
     expect(fetch).toHaveBeenCalledTimes(2);
   });
@@ -102,7 +106,7 @@ describe("refreshAccessToken", () => {
     const pending = refreshAccessToken();
     await flushTimers();
 
-    await expect(pending).resolves.toBe("unavailable");
+    await expect(pending).resolves.toMatchObject({ status: "unavailable" });
     // One initial attempt plus the three-rung retry ladder.
     expect(fetch).toHaveBeenCalledTimes(4);
   });
@@ -114,7 +118,7 @@ describe("refreshAccessToken", () => {
     const pending = refreshAccessToken();
     await flushTimers();
 
-    await expect(pending).resolves.toBe("unavailable");
+    await expect(pending).resolves.toMatchObject({ status: "unavailable" });
   });
 
   it("single-flights concurrent callers onto one in-flight refresh", async () => {
@@ -122,8 +126,8 @@ describe("refreshAccessToken", () => {
 
     const [a, b] = await Promise.all([refreshAccessToken(), refreshAccessToken()]);
 
-    expect(a).toBe("refreshed");
-    expect(b).toBe("refreshed");
+    expect(a).toEqual({ status: "refreshed", retryAfterSeconds: 0 });
+    expect(b).toEqual({ status: "refreshed", retryAfterSeconds: 0 });
     expect(fetch).toHaveBeenCalledOnce();
   });
 });

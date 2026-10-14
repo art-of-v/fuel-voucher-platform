@@ -6,15 +6,22 @@ vi.mock("./utils", () => ({
   getApiUrl: (path: string) => `http://test.local${path}`,
 }));
 
-const refreshAccessToken = vi.fn();
-const clearTokens = vi.fn();
-vi.mock("./admin-auth", () => ({
-  getStoredAccessToken: () => "test-token",
-  refreshAccessToken: () => refreshAccessToken(),
-  clearTokens: () => clearTokens(),
+const ensureAccessToken = vi.fn();
+vi.mock("./session", () => ({
+  ensureAccessToken: () => ensureAccessToken(),
 }));
 
-import { apiRequest, ApiError, __resetSessionEndedForTests } from "./api-client";
+const signOut = vi.fn();
+const block = vi.fn();
+vi.mock("./session-store", () => ({
+  useSession: { getState: () => ({ signOut, block }) },
+}));
+
+vi.mock("./admin-auth", () => ({
+  getStoredAccessToken: () => "test-token",
+}));
+
+import { apiRequest, ApiError } from "./api-client";
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -25,15 +32,10 @@ function jsonResponse(status: number, body: unknown): Response {
 
 describe("apiRequest response parsing", () => {
   beforeEach(() => {
-    // api-client remembers that a session ended, so later 401s stop attempting a refresh.
-    // That is module state and survives between tests, so each one starts without the verdict.
-    __resetSessionEndedForTests();
-    refreshAccessToken.mockReset();
-    clearTokens.mockReset();
+    ensureAccessToken.mockReset();
+    signOut.mockReset();
+    block.mockReset();
     vi.stubGlobal("fetch", vi.fn());
-    // handle401's logout path assigns window.location.href; a plain object keeps that
-    // assignment from throwing in jsdom and lets the test assert it was (not) touched.
-    vi.stubGlobal("location", { href: "" } as Location);
   });
 
   afterEach(() => {
@@ -212,113 +214,94 @@ describe("apiRequest response parsing", () => {
     ).rejects.toThrow(/Something went wrong on the server.*trace-abc/);
   });
 
-  it("returns undefined after a 401 refresh that yields a 204 retry", async () => {
-    // The refreshed retry path also must tolerate an empty body.
-    vi.mocked(fetch)
-      .mockResolvedValueOnce(new Response(null, { status: 401 }))
-      .mockResolvedValueOnce(new Response(null, { status: 204 }));
-    refreshAccessToken.mockResolvedValue("refreshed");
+  describe("401 recovery", () => {
+    it("retries the request with the token ensureAccessToken returns", async () => {
+      vi.mocked(fetch)
+        .mockResolvedValueOnce(new Response(null, { status: 401 }))
+        .mockImplementation(async () => jsonResponse(200, { ok: true }));
+      ensureAccessToken.mockResolvedValue("fresh-token");
 
-    const result = await apiRequest("POST", "/api/admin/users/abc/activate");
-
-    expect(result).toBeUndefined();
-    expect(refreshAccessToken).toHaveBeenCalledOnce();
-  });
-
-  it("does NOT log out when the refresh can't reach the server (the deploy-502 bug)", async () => {
-    // Regression: a 401 whose refresh comes back "unavailable" (a 502 while the API
-    // restarts mid-deploy, a timeout, a network blip) used to hit clearTokens() +
-    // window.location = "/admin", throwing the operator to the login screen even though
-    // the httpOnly refresh cookie was still perfectly valid. It must now keep the session
-    // and surface a transient error the next poll can recover from.
-    vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 401 }));
-    refreshAccessToken.mockResolvedValue("unavailable");
-
-    await expect(
-      apiRequest("GET", "/api/admin/vouchers", undefined, undefined, undefined, 0),
-    ).rejects.toThrow(/still active/i);
-
-    expect(clearTokens).not.toHaveBeenCalled();
-    expect(location.href).toBe("");
-  });
-
-  it("logs out when the server rejects the session for good (refresh \"expired\")", async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 401 }));
-    refreshAccessToken.mockResolvedValue("expired");
-
-    await expect(
-      apiRequest("GET", "/api/admin/vouchers", undefined, undefined, undefined, 0),
-    ).rejects.toThrow("Session expired");
-
-    expect(clearTokens).toHaveBeenCalledOnce();
-    expect(location.href).toBe("/admin");
-  });
-
-  it("does NOT log out when the retried request fails with 500 after a good refresh", async () => {
-    // A fresh token was just minted, so a 5xx on the retry is the backend's problem, not a
-    // dead session. Logging out here cost the operator their login over one flaky response.
-    vi.mocked(fetch)
-      .mockResolvedValueOnce(new Response(null, { status: 401 }))
-      .mockResolvedValueOnce(jsonResponse(500, { title: "An unexpected error occurred", traceId: "t-1" }));
-    refreshAccessToken.mockResolvedValue("refreshed");
-
-    await expect(
-      apiRequest("GET", "/api/admin/vouchers", undefined, undefined, undefined, 0),
-    ).rejects.toThrow(/Something went wrong on the server.*t-1/);
-
-    expect(clearTokens).not.toHaveBeenCalled();
-    expect(location.href).toBe("");
-  });
-
-  it("still logs out when the retried request is itself a 401 after a good refresh", async () => {
-    vi.mocked(fetch)
-      .mockResolvedValueOnce(new Response(null, { status: 401 }))
-      .mockResolvedValueOnce(new Response(null, { status: 401 }));
-    refreshAccessToken.mockResolvedValue("refreshed");
-
-    await expect(
-      apiRequest("GET", "/api/admin/vouchers", undefined, undefined, undefined, 0),
-    ).rejects.toThrow("Session expired");
-
-      expect(clearTokens).toHaveBeenCalledOnce();
-      expect(location.href).toBe("/admin");
+      await expect(apiRequest("GET", "/api/admin/suppliers", undefined, undefined, 0, 0)).resolves.toEqual({
+        ok: true,
+      });
+      expect(ensureAccessToken).toHaveBeenCalledOnce();
     });
 
     /**
-     * Regression for the endless admin loop seen on 2026-10-14: `suppliers 401` and
-     * `refresh 429/400` repeating every few seconds, with the operator stuck on a retry screen for
-     * a session that had already ended. The dashboard polls every 15s and a tab like SuppliersTab
-     * mounts two queries, so a dead session produced a 401-refresh pair each time round.
-     *
-     * The backend allows three refreshes per IP per minute, which such a loop exhausts several
-     * times over.
+     * The lockout that shipped on 2026-10-14: every 401 opened its own refresh, the dashboard
+     * polls every 15s, and the backend allows three refreshes per IP per minute - so a dead
+     * session produced far more refreshes than the budget and buried itself under 429s, behind
+     * a retry screen whose button spent one more unit of that same budget.
      */
-    it("stops attempting a refresh once the session has ended", async () => {
-      refreshAccessToken.mockResolvedValue("expired");
-      // A fresh Response per call. A Response body is single-use, so one shared instance would
-      // make every request after the first fail somewhere other than the 401 path - and the test
-      // would pass without ever reaching the guard it exists to test.
+    it("stops recovering once the session is signed out, however many 401s follow", async () => {
+      // A fresh Response per call: a Response body is single-use, so one shared instance makes
+      // every request after the first fail somewhere other than the 401 path, and this test
+      // would pass without ever reaching the code it exists to cover.
       vi.mocked(fetch).mockImplementation(async () => new Response(null, { status: 401 }));
+      ensureAccessToken.mockResolvedValue(null);
 
-      // First 401: a refresh is genuinely worth one attempt, and it reports the session as over.
-      await expect(
-        apiRequest("GET", "/api/admin/suppliers", undefined, undefined, 0, 0),
-      ).rejects.toThrow("Session expired");
-      expect(refreshAccessToken).toHaveBeenCalledOnce();
-
-      // Every later 401 is the same answer. No further refresh may be attempted.
       for (let i = 0; i < 10; i++) {
         await expect(
           apiRequest("GET", "/api/admin/suppliers", undefined, undefined, 0, 0),
         ).rejects.toThrow("Session expired");
       }
 
-      // One refresh in total, against eleven identical 401s.
-      expect(refreshAccessToken).toHaveBeenCalledOnce();
-      expect(vi.mocked(fetch).mock.calls.length).toBe(11);
+      // ensureAccessToken is the only thing permitted to spend refresh budget. When it declines,
+      // api-client surfaces the rejection and leaves the decision alone - signing out here too
+      // would duplicate the session layer's verdict. The budget guard itself is tested in
+      // session.test.ts, where that decision actually lives.
+      expect(ensureAccessToken).toHaveBeenCalledTimes(10);
+      expect(signOut).not.toHaveBeenCalled();
+    });
 
-      // Recovery is not another 401: endSession() navigates to /admin, which reloads the page and
-      // drops the module state. There is no in-page path back, and asserting one would be
-      // asserting dead code.
+    it("signs the session out when the retried request comes back 401 as well", async () => {
+      vi.mocked(fetch).mockImplementation(async () => new Response(null, { status: 401 }));
+      ensureAccessToken.mockResolvedValue("fresh-token");
+
+      await expect(
+        apiRequest("GET", "/api/admin/suppliers", undefined, undefined, 0, 0),
+      ).rejects.toThrow("Session expired");
+      expect(signOut).toHaveBeenCalledOnce();
+    });
+
+    it("does NOT sign out when the retried request fails with 500 after a good refresh", async () => {
+      vi.mocked(fetch)
+        .mockResolvedValueOnce(new Response(null, { status: 401 }))
+        .mockImplementation(async () => jsonResponse(500, { title: "boom" }));
+      ensureAccessToken.mockResolvedValue("fresh-token");
+
+      await expect(
+        apiRequest("GET", "/api/admin/vouchers", undefined, undefined, 0, 0),
+      ).rejects.toThrow();
+      expect(signOut).not.toHaveBeenCalled();
+    });
+
+    it("records a rate limit instead of signing the operator out", async () => {
+      vi.mocked(fetch)
+        .mockResolvedValueOnce(new Response(null, { status: 401 }))
+        .mockImplementation(
+          async () =>
+            new Response(null, { status: 429, headers: { "Retry-After": "30" } }),
+        );
+      ensureAccessToken.mockResolvedValue("fresh-token");
+
+      await expect(
+        apiRequest("GET", "/api/admin/vouchers", undefined, undefined, 0, 0),
+      ).rejects.toThrow();
+
+      expect(block).toHaveBeenCalledWith(expect.objectContaining({ reason: "rate_limited" }));
+      expect(signOut).not.toHaveBeenCalled();
+    });
+
+    it("returns undefined after a 401 recovery that yields a 204 retry", async () => {
+      vi.mocked(fetch)
+        .mockResolvedValueOnce(new Response(null, { status: 401 }))
+        .mockImplementation(async () => new Response(null, { status: 204 }));
+      ensureAccessToken.mockResolvedValue("fresh-token");
+
+      await expect(
+        apiRequest("GET", "/api/admin/ping", undefined, undefined, 0, 0),
+      ).resolves.toBeUndefined();
     });
   });
+});
