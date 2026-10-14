@@ -165,6 +165,103 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
         UpdatedAtUtc = DateTime.UtcNow
     };
 
+    // ── F-29: the two sign constraints the catalogue was missing ──────────────────────────
+
+    /// <summary>
+    /// <c>fuel_packages</c> was the only sellable-money table in the schema with no sign
+    /// constraint, while every sibling one (<c>fuel_vouchers</c>, <c>orders</c>,
+    /// <c>order_line_items</c>, <c>refunds</c>, …) has one and is asserted above.
+    /// <c>PUT /api/admin/brands/fuels/{id}/nominals</c> binds <c>List&lt;int&gt;</c> off the request
+    /// body, so a nominal of <c>-10</c> produced a package priced at <c>-10 ×</c> the per-litre
+    /// rate and the storefront listed it.
+    /// </summary>
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-10)]
+    public async Task A_NonPositive_Liters_Package_Is_Refused(double liters)
+    {
+        await using var context = CreateContext();
+        context.FuelPackages.Add(NewPackage($"pkg-liters-{liters}", liters));
+
+        var act = async () => await context.SaveChangesAsync();
+        await act.Should().ThrowAsync<DbUpdateException>();
+    }
+
+    [Fact]
+    public async Task A_Negative_Price_Package_Is_Refused()
+    {
+        await using var context = CreateContext();
+        var package = NewPackage("pkg-negative-price", 10);
+        package.Price = -100m;
+        context.FuelPackages.Add(package);
+
+        var act = async () => await context.SaveChangesAsync();
+        await act.Should().ThrowAsync<DbUpdateException>();
+    }
+
+    /// <summary>
+    /// A negative discount price means the customer is paid to take the fuel. The only guard was
+    /// the application-level below-cost opt-in, which is a business decision rather than a
+    /// constraint - so a hand-written PUT or a future code path could still land one.
+    /// </summary>
+    [Theory]
+    [InlineData(-1, 10)]
+    [InlineData(10, -1)]
+    public async Task A_Negative_Fuel_Type_Price_Is_Refused(double basePrice, double discountPrice)
+    {
+        await using var context = CreateContext();
+        context.FuelTypes.Add(new FuelTypeEntity
+        {
+            Id = $"ft-neg-{basePrice}-{discountPrice}",
+            StationId = "okko",
+            Name = $"Negative {basePrice}/{discountPrice}",
+            BasePrice = (decimal)basePrice,
+            DiscountPrice = (decimal)discountPrice,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+
+        var act = async () => await context.SaveChangesAsync();
+        await act.Should().ThrowAsync<DbUpdateException>();
+    }
+
+    /// <summary>
+    /// A zero-litre package is the boundary case, not a theoretical one: <c>List&lt;int&gt;</c>
+    /// would have accepted it before, and "0 litres for 0 UAH" is a package the storefront would
+    /// have listed as free fuel.
+    /// </summary>
+    [Fact]
+    public async Task A_Zero_Price_Package_Is_Allowed_But_Zero_Liters_Is_Not()
+    {
+        await using (var seed = CreateContext())
+        {
+            seed.FuelPackages.Add(NewPackage("pkg-free-giveaway", 5, price: 0m));
+            await seed.SaveChangesAsync();
+        }
+
+        await using var context = CreateContext();
+        context.FuelPackages.Add(NewPackage("pkg-zero-litres", 0));
+
+        var act = async () => await context.SaveChangesAsync();
+        await act.Should().ThrowAsync<DbUpdateException>();
+    }
+
+    private static FuelPackage NewPackage(string id, double liters, decimal price = 100m) => new()
+    {
+        Id = id,
+        StationId = "okko",
+        FuelTypeId = "okko-a95",
+        FuelName = "A-95",
+        Liters = (decimal)liters,
+        Price = price,
+        // Set outright rather than derived from liters - the zero-litre case divides by zero, and
+        // the point of that test is that the row is rejected by the database, not that the test
+        // helper survived building it.
+        FinalPricePerLiter = price,
+        CreatedAtUtc = DateTime.UtcNow,
+        UpdatedAtUtc = DateTime.UtcNow
+    };
+
     // ── F-01: the cascades that could destroy paid-for paper ───────────────────────────────
 
     /// <summary>
