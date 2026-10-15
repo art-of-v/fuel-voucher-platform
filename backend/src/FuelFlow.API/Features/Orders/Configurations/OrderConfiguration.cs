@@ -143,17 +143,7 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         // explicit and matches the sibling constraint.
         builder.HasIndex(e => e.MonobankInvoiceId)
             .IsUnique()
-            .HasFilter("monobank_invoice_id IS NOT NULL")
-            // The database name is not decoration - it is the only thing that makes the model agree
-            // with the database. UniqueMonobankInvoiceId created the index as
-            // IX_orders_monobank_invoice_id (snake_case, as migrationBuilder names things), while EF's
-            // convention for HasIndex("MonobankInvoiceId") would be IX_orders_MonobankInvoiceId
-            // (PascalCase). Without this line the model and the database described two different
-            // indexes, so the *next* migration added for any reason would scaffold a CREATE for the
-            // PascalCase one and every fresh database would fail to migrate with
-            // 42P07 "relation IX_orders_monobank_invoice_id already exists".
-            // HasDatabaseName is what closes it; see the note in SplitFuelPackagesIntoOffers.
-            .HasDatabaseName("IX_orders_monobank_invoice_id");
+            .HasFilter("monobank_invoice_id IS NOT NULL");
         builder.HasIndex(e => new { e.UserId, e.Status });
         builder.HasIndex(e => new { e.UserId, e.CreatedAtUtc })
             .IsDescending(false, true);
