@@ -143,12 +143,15 @@ export async function fetchCurrentUser(): Promise<CurrentUser> {
 /**
  * One attempt's outcome.
  *
- * Why a rate limit must not be retried: the backend allows three refreshes per client IP per
- * minute. This ladder fires four requests in about seven seconds, so a single transient failure
- * - a 502 while the API restarts, say - spends the entire per-minute budget inside the retry
- * itself, and the next attempt starts into an empty bucket and spends it again. The loop is
- * self-sustaining: the retries are what keep the bucket empty. Retrying a rate limit is how you
- * stay rate-limited.
+ * Why a rate limit must not be retried: a 429 is a verdict of "not now", not "try harder", and the
+ * bucket refills on its own within the minute. A retry issued immediately after draws the same 429
+ * and, worse, spends another permit - so the ladder would keep a bucket empty that would otherwise
+ * have recovered on its own. Retrying a rate limit is how you stay rate-limited.
+ *
+ * (The budget is 30 refreshes per client IP per minute - `RefreshPolicy` in RateLimiterSetup, which
+ * is the only auth policy still keyed on IP. It is a backstop against a pathological client, not
+ * the control that normally protects this path: a signed-in panel spends about one refresh per page
+ * load, and a signed-out one spends none at all, because `bootSession` never asks.)
  */
 async function attemptRefresh(): Promise<RefreshResult> {
   try {

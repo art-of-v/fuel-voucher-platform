@@ -46,9 +46,8 @@ export type SessionBlocker =
  * The refresh cookie is `HttpOnly`, so JavaScript cannot see it - which means the
  * page cannot tell "signed out" from "signed in but I cannot prove it". The old
  * code resolved that by calling `/api/auth/refresh` on <em>every</em> mount,
- * signed in or not. The backend allows three refreshes per IP per minute, so an
- * operator who reloaded, retried, or reopened a couple of tabs burned the whole
- * budget and locked themselves out of their own dashboard, with no route back.
+ * signed in or not. That is a refresh per page load from a shared per-IP budget,
+ * spent by people who had no session to restore in the first place.
  * </p>
  *
  * <p>

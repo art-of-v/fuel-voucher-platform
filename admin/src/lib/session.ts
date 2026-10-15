@@ -72,9 +72,8 @@ function isRejected(err: unknown): boolean {
  *
  * <p>
  * With no session marker this resolves to "anonymous" <em>without any network
- * call</em>. That is the entire fix for the lockout: a signed-out operator
- * reloading the page no longer spends any of the three-per-minute budget, so
- * signing in is always possible.
+ * call</em>. That is the entire fix for the lockout: signing in no longer has to
+ * compete with page loads by people who were never signed in, so it always works.
  * </p>
  */
 export async function bootSession(): Promise<void> {

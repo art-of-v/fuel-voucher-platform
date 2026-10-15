@@ -34,9 +34,9 @@ describe("session lifecycle", () => {
 
   /**
    * The lockout that shipped on 2026-10-14. Boot used to call /api/auth/refresh unconditionally,
-   * so every page load - signed in or not - spent from a budget of three per minute. Reload,
-   * click "Try again", reload: the bucket was empty and the app rendered "Server unavailable"
-   * with no route back to the login form.
+   * so every page load - signed in or not - spent from a shared per-IP budget. Reload, click
+   * "Try again", reload: the app rendered "Server unavailable" with no route back to the login
+   * form, and the only way out was to leave every tab alone long enough for the bucket to refill.
    */
   describe("bootSession", () => {
     it("never touches the network when there is no session to restore", async () => {
@@ -90,8 +90,8 @@ describe("session lifecycle", () => {
   describe("ensureAccessToken", () => {
     /**
      * The actual loop-breaker. N concurrent or sequential 401s on a session that is already
-     * known to be over must produce zero refresh calls - the rate limiter budget of three per
-     * minute has to survive a dashboard that polls every 15 seconds.
+     * known to be over must produce zero refresh calls - a dashboard that polls every 15 seconds
+     * must not turn a dead session into refresh traffic.
      */
     it("spends no refresh budget once the session is signed out", async () => {
       useSession.setState({ status: "anonymous", user: null, blocker: null });

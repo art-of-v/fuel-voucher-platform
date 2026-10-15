@@ -61,11 +61,10 @@ describe("refreshAccessToken", () => {
   });
 
   it("reports \"rate_limited\" on a 429 and does NOT retry", async () => {
-    // The backend allows three refreshes per IP per minute; this ladder fires four in about
-    // seven seconds. Retrying a 429 therefore spends the whole budget from inside the retry,
-    // and every later attempt starts into an empty bucket - the admin ends up locked out
-    // entirely. Found on 2026-10-14: one 502 during a deploy tripped this and the operator
-    // could not sign back in until they closed every tab and left the page alone for a minute.
+    // A 429 means "not now", and the bucket refills on its own within the minute. Retrying it
+    // spends another permit to earn another 429, which is how a client stays rate-limited.
+    // Found on 2026-10-14: a 502 during a deploy tripped the ladder and the operator could not
+    // sign back in until they closed every tab and left the page alone for a minute.
     vi.useFakeTimers();
     vi.mocked(fetch).mockResolvedValue(
       new Response(null, { status: 429, headers: { "Retry-After": "45" } }),

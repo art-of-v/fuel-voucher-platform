@@ -229,9 +229,8 @@ describe("apiRequest response parsing", () => {
 
     /**
      * The lockout that shipped on 2026-10-14: every 401 opened its own refresh, the dashboard
-     * polls every 15s, and the backend allows three refreshes per IP per minute - so a dead
-     * session produced far more refreshes than the budget and buried itself under 429s, behind
-     * a retry screen whose button spent one more unit of that same budget.
+     * polls every 15s, and a dead session kept draining a shared per-IP budget until the API
+     * answered 429 - behind a retry screen whose button spent one more unit of that same budget.
      */
     it("stops recovering once the session is signed out, however many 401s follow", async () => {
       // A fresh Response per call: a Response body is single-use, so one shared instance makes
