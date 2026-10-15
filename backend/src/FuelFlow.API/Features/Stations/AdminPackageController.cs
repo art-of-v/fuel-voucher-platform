@@ -50,13 +50,96 @@ public sealed class AdminPackageController : ControllerBase
     // to remove an endpoint; commenting the attribute out is not.
 
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] FuelPackage request, CancellationToken ct)
+    public async Task<IActionResult> Create([FromBody] CreatePackageRequest request, CancellationToken ct)
     {
-        var result = await _create.HandleAsync(new CreatePackageCommand(request), ct);
+        // Nullable so that "omitted" is distinguishable from "false". It used to bind the raw entity,
+        // where a missing isTestData deserialised to false - which means "sell this" - so a package
+        // created for a rehearsal with the field forgotten went live. That is how
+        // "А95 ЄВРО (ТЕСТ 1ГРН)" reached the public price radar at 1 UAH/liter.
+        if (!request.IsTestData.HasValue)
+        {
+            return BadRequest(new
+            {
+                message = "isTestData is required. Set it to true for rehearsal data, or false if this "
+                          + "is a real product. It defaults to nothing rather than guessing, because "
+                          + "guessing wrong publishes rehearsal stock to the storefront.",
+                field = nameof(request.IsTestData)
+            });
+        }
+
+        // The flag is now always stated, so the second half is to make a stated "false" believable:
+        // a name that reads as rehearsal cannot be published as live. Not a substitute for the flag -
+        // an operator naming a rehearsal fuel innocently ("Test-A95" as a grade name) can still set
+        // the flag - but it stops the silent case, which is the one that reached customers.
+        if (!request.IsTestData.Value)
+        {
+            var token = RehearsalMarkers.MatchedToken(request.Id, request.FuelName);
+            if (token is not null)
+            {
+                return BadRequest(new
+                {
+                    message = $"The name contains \"{token}\", which reads as rehearsal data, but "
+                              + "isTestData is false. Set isTestData to true, or rename it if this is "
+                              + "a real product.",
+                    field = nameof(request.IsTestData)
+                });
+            }
+        }
+
+        var result = await _create.HandleAsync(new CreatePackageCommand(request.ToPackage()), ct);
         if (result.Error != null && !result.Conflict)
             return BadRequest(result.Error);
         if (result.Conflict)
             return Conflict(result.Error);
         return CreatedAtAction(nameof(GetAll), new { id = result.Package!.Id }, result.Package);
     }
+}
+
+/// <summary>
+/// The package fields a caller may set, with the rehearsal flag made explicit.
+/// </summary>
+/// <remarks>
+/// Exists because the endpoint used to bind <see cref="FuelPackage"/> itself, which handed every
+/// column - including the ones that must never be caller-chosen - to the request body. Only the
+/// fields an operator actually fills in are writable here now.
+/// </remarks>
+public sealed record CreatePackageRequest
+{
+    public string Id { get; init; } = null!;
+    public string StationId { get; init; } = null!;
+    public string FuelTypeId { get; init; } = null!;
+    public string FuelName { get; init; } = null!;
+    public decimal Liters { get; init; }
+    public decimal Price { get; init; }
+    public decimal? SupplierPricePerLiter { get; init; }
+    public decimal? MarginUahPerLiter { get; init; }
+    public decimal? MarginPercent { get; init; }
+    public decimal? FinalPricePerLiter { get; init; }
+    public decimal? PumpPricePerLiter { get; init; }
+    public decimal? MinDiscountPerLiter { get; init; }
+
+    /// <summary>
+    /// Required. Null means the caller did not say, which is answered with 400 rather than treated
+    /// as <c>false</c>.
+    /// </summary>
+    public bool? IsTestData { get; init; }
+
+    public FuelPackage ToPackage() => new()
+    {
+        Id = Id,
+        StationId = StationId,
+        FuelTypeId = FuelTypeId,
+        FuelName = FuelName,
+        Liters = Liters,
+        Price = Price,
+        SupplierPricePerLiter = SupplierPricePerLiter,
+        MarginUahPerLiter = MarginUahPerLiter,
+        MarginPercent = MarginPercent,
+        FinalPricePerLiter = FinalPricePerLiter,
+        PumpPricePerLiter = PumpPricePerLiter,
+        MinDiscountPerLiter = MinDiscountPerLiter,
+        IsTestData = IsTestData ?? false,
+        CreatedAtUtc = DateTime.UtcNow,
+        UpdatedAtUtc = DateTime.UtcNow
+    };
 }

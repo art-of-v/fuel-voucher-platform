@@ -51,11 +51,19 @@ public sealed record BrandFuelDto
     public List<int> PackageLiters { get; init; } = [];
 
     /// <summary>
-    /// Rehearsal flag for this fuel's packages. Set it when adding or editing a fuel that exists
-    /// only to rehearse a flow - a QA grade, a dry run against a real station. Flagged packages are
-    /// never served to the storefront, so they cannot be bought, but they stay in the admin.
+    /// Rehearsal flag for this fuel's packages, propagated to every package on save. Set it when
+    /// adding or editing a fuel that exists only to rehearse a flow - a QA grade, a dry run against
+    /// a real station. Flagged packages are never served to the storefront, so they cannot be bought,
+    /// but they stay in the admin.
     /// </summary>
-    public bool IsTestData { get; init; }
+    /// <remarks>
+    /// <b>Nullable and required, deliberately.</b> It used to be a plain <c>bool</c>, which made
+    /// "the caller did not say" indistinguishable from "false" - and false means sell this. Since
+    /// this field is written to <em>every</em> package of the fuel on every save, a client that
+    /// omitted it while editing a QA fuel's margin published that fuel, with nothing saying so.
+    /// A null now means the caller did not answer, and is a 400.
+    /// </remarks>
+    public bool? IsTestData { get; init; }
 
     /// <summary>
     /// Set only when this fuel's packages disagree on cost or on the customer price. The write path
@@ -96,7 +104,12 @@ public sealed record CreateFuelRequest
     /// Rehearsal flag, propagated to every package created for this fuel. Read back on
     /// <see cref="BrandFuelDto.IsTestData"/> so the screen can show what it set.
     /// </summary>
-    public bool IsTestData { get; init; }
+    /// <remarks>
+    /// Nullable for the same reason as <see cref="BrandFuelDto.IsTestData"/>: a plain <c>bool</c>
+    /// turned an omitted field into "publish this", which is the wrong default for the one field
+    /// that decides whether rehearsal stock is sellable.
+    /// </remarks>
+    public bool? IsTestData { get; init; }
 }
 
 public sealed record AuditEventDto
