@@ -18,8 +18,12 @@
 // Id scheme: `upg-<UPG id>` rather than the importer's coordinate-derived fallback. UPG's own
 // id is stable across re-runs, so a station whose pin moves a few metres is still updated in
 // place; deriving from coordinates would mint a second row and leave a ghost behind.
+//
+// Name scheme: UPG's `FullName` is not used verbatim — see {@link toName}.
 
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { collapse, writeStationCsv } from "./lib/station-csv.mjs";
 
 
@@ -103,6 +107,28 @@ function splitAddress(rawAddress) {
   return { address, city };
 }
 
+/**
+ * UPG's own `FullName` is unusable as a station name: it is `АЗК №100 цілодобово` /
+ * `АЗС №150 (🍽 07:00 – 21:00)` — 494 of 500 sites end in the bare word «цілодобово» and the
+ * other 6 carry their café's opening hours. Neither tail says anything the driver cannot already
+ * see, so 500 rows of «АЗК №NNN цілодобово» was a wall of near-identical text in the admin list
+ * and the useless title on every map callout.
+ *
+ * The site number IS worth keeping: it is what UPG calls the place, it is the one part of the
+ * string that differs, and all 500 numbers are unique. So the name is rebuilt as brand + number —
+ * `UPG №100` — which also drops UPG's own АЗК/АЗС inconsistency (82 sites say АЗК, 418 say АЗС).
+ *
+ * The café-hours tail is dropped, not relocated: hours go stale and nothing would ever re-import
+ * them, so a stale opening time is worse than no opening time.
+ *
+ * Returns "" when the number cannot be found, which {@link main} reports as a skipped row rather
+ * than importing a nameless point.
+ */
+export function toName(fullName) {
+  const match = /^АЗ[СК]\s*№?\s*(\d+)/i.exec(collapse(fullName));
+  return match ? `UPG №${match[1]}` : "";
+}
+
 function toCsvCells(station) {
   return [
     `upg-${station.id}`,
@@ -151,12 +177,12 @@ async function main() {
   for (const raw of stations) {
     const lat = Number.parseFloat(raw.Latitude);
     const lng = Number.parseFloat(raw.Longitude);
-    const name = collapse(raw.FullName);
+    const name = toName(raw.FullName);
     const id = raw.id;
 
     if (id == null) skipped.push({ id: "<none>", reason: "no UPG id" });
     else if (seenIds.has(id)) skipped.push({ id, reason: "duplicate id" });
-    else if (!name) skipped.push({ id, reason: "empty name" });
+    else if (!name) skipped.push({ id, reason: `no site number in "${collapse(raw.FullName)}"` });
     else if (!Number.isFinite(lat) || lat < -90 || lat > 90 ||
              !Number.isFinite(lng) || lng < -180 || lng > 180) {
       skipped.push({ id, reason: `bad coordinates ${raw.Latitude}/${raw.Longitude}` });
@@ -180,11 +206,15 @@ async function main() {
   for (const { id, reason } of skipped) console.error(`skipped #${id}: ${reason}`);
 }
 
-try {
-  await main();
-} catch (error) {
-  // UPG rebuilds the page from time to time; a layout change should read as one clear line,
-  // not a stack trace that buries the reason.
-  console.error(`fetch-upg-stations: ${error instanceof Error ? error.message : error}`);
-  process.exit(1);
+// Only when invoked directly: fetch-upg-stations.test.mjs imports {@link toName}, and an
+// unconditional `main()` would fire a live network fetch and drop a CSV on the test run.
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  try {
+    await main();
+  } catch (error) {
+    // UPG rebuilds the page from time to time; a layout change should read as one clear line,
+    // not a stack trace that buries the reason.
+    console.error(`fetch-upg-stations: ${error instanceof Error ? error.message : error}`);
+    process.exit(1);
+  }
 }
