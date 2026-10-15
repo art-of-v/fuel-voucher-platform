@@ -19,7 +19,7 @@ module.exports = {
   // on purpose — on Windows `<rootDir>` expands to a backslash path that does not
   // match a forward-slash glob, so an embedded-rootDir testMatch silently finds 0
   // tests. Scoping via `roots` + a relative glob is separator-agnostic.
-  roots: ['<rootDir>/src', '<rootDir>/app'],
+  roots: ['<rootDir>/src', '<rootDir>/app', '<rootDir>/plugins'],
   testMatch: ['**/*.test.{ts,tsx}'],
   // Coverage is opt-in (`--coverage`); when collected, measure only app code.
   collectCoverageFrom: [

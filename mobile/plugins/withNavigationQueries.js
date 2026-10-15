@@ -11,28 +11,54 @@ const { withAndroidManifest } = require('expo/config-plugins');
 const SCHEMES = ['waze', 'com.google.android.apps.maps', 'here-wego', 'osmand', 'osmandplus', 'org.organicmaps'];
 
 const intentForScheme = (scheme) => ({
-  intent: [
-    { $: { 'android:name': 'android.intent.action.VIEW' } },
-    { $: { 'android:scheme': scheme } },
-  ],
+  action: [{ $: { 'android:name': 'android.intent.action.VIEW' } }],
+  data: [{ $: { 'android:scheme': scheme } }],
 });
 
+/**
+ * `modResults.manifest` is a plain object (Expo's xml2js post-processing unwraps the root
+ * element), so every child is a keyed collection — `manifest.queries`, never an array to
+ * `find`/`splice` into. Manifest entries are also not one-per-array-slot: the single `<queries>`
+ * element xml2js hands back as `queries[0]` holds every `<intent>` in its own `intent` array,
+ * because that is the only shape the builder serialises back into one `<queries>` — spreading the
+ * schemes over `queries` instead emits a repeated `<queries>` element per scheme, which AAPT
+ * rejects as a duplicate.
+ */
 module.exports = function withNavigationQueries(config) {
   return withAndroidManifest(config, (config) => {
     const manifest = config.modResults.manifest;
-    manifest.$ = manifest.$ || {};
+    const queries = Array.isArray(manifest.queries) ? manifest.queries : [];
 
-    const declared = manifest.$['queries'] || [];
-    const existing = declared.flatMap((query) =>
-      (query.intent || []).map((entry) => entry?.$?.['android:scheme']).filter(Boolean),
+    const declaredSchemes = queries.flatMap((query) =>
+      (query.intent || [])
+        .flatMap((intent) => (intent.data || []).map((datum) => datum?.$?.['android:scheme']))
+        .filter(Boolean),
     );
-    manifest.$['queries'] = [...declared, ...SCHEMES.filter((scheme) => !existing.includes(scheme)).map(intentForScheme)];
 
-    // `<queries>` is validated by AAPT before `<application>`, so it cannot simply be appended.
-    const application = manifest.find((element) => element.application);
-    const applicationIndex = application ? manifest.indexOf(application) : manifest.length;
-    manifest.splice(applicationIndex, 0, { queries: manifest.$['queries'] });
-    delete manifest.$['queries'];
+    const added = SCHEMES.filter((scheme) => !declaredSchemes.includes(scheme)).map(intentForScheme);
+    if (added.length === 0) return config;
+
+    const [host] = queries;
+    if (host) {
+      host.intent = [...(host.intent || []), ...added];
+    } else {
+      queries.push({ intent: added });
+    }
+
+    if (Array.isArray(manifest.queries)) {
+      manifest.queries = queries;
+    } else {
+      // AAPT validates `<queries>` ahead of `<application>`, so when the generated manifest has no
+      // `<queries>` at all the key has to be inserted rather than appended to the end.
+      const reordered = {};
+      for (const [key, value] of Object.entries(manifest)) {
+        if (key === 'application') reordered.queries = queries;
+        reordered[key] = value;
+      }
+      if (!('queries' in reordered)) reordered.queries = queries;
+      for (const key of Object.keys(manifest)) delete manifest[key];
+      Object.assign(manifest, reordered);
+    }
 
     return config;
   });

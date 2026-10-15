@@ -22,9 +22,12 @@ const config = getDefaultConfig(__dirname);
  *
  * Scoped to `/app/` and `/src/` rather than matching every `*.test.*` anywhere: some
  * published packages ship files named `.test.js` as fixtures, and blocking those would
- * break them. Metro normalises to forward slashes, so one separator is enough.
+ * break them. Both separators are matched because Metro's `require.context` hands the
+ * blockList the ABSOLUTE file path, which is backslash-separated on Windows — a
+ * forward-slash-only pattern silently matches nothing there and the test file ends up
+ * in the release bundle.
  */
-const TEST_FILES = /(^|\/)(app|src)\/.*\.test\.[jt]sx?$/;
+const TEST_FILES = /(^|[\\/])(app|src)[\\/].*\.test\.[jt]sx?$/;
 
 // Whatever Expo already excludes, kept — this replaces nothing.
 const existing = config.resolver.blockList;
