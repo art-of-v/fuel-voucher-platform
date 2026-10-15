@@ -115,7 +115,7 @@ private readonly RuntimeSettingsService _runtimeSettings;
         // The resolved package rides along so the line can record what priced it. The order line stores the
         // resulting price; pricing_basis stores the inputs behind it, which is the only thing that
         // still answers "why was this 89.06?" once the contract and the fuel's pricing have moved on.
-        var itemPricing = new List<(CheckoutItem Item, FuelPackage Package, decimal DiscountPerLiter, decimal UnitPrice, decimal LineTotal, decimal OriginalLineTotal, string? TermCode)>();
+        var itemPricing = new List<(CheckoutItem Item, SellablePackage Package, decimal DiscountPerLiter, decimal UnitPrice, decimal LineTotal, decimal OriginalLineTotal, string? TermCode)>();
         var totalPrice = 0m;
 
         // Term-sale ladder, loaded once. Off by default, in which case every line below keeps the

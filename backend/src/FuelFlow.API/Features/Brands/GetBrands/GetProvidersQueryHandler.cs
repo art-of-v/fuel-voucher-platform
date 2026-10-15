@@ -15,7 +15,9 @@ public sealed class GetBrandsQueryHandler
             .OrderBy(s => s.SortOrder).ThenBy(s => s.Name)
             .ToListAsync(ct);
         var fuels = await _context.FuelTypes.AsNoTracking().ToListAsync(ct);
-        var packages = await _context.FuelPackages.AsNoTracking().ToListAsync(ct);
+        // Volumes joined to their offers: the brand card reads a per-litre figure per package, and that
+        // figure belongs to the offer. Projected in one query so the card is not assembled N times.
+        var packages = await _context.FuelOfferVolumes.Project().ToListAsync(ct);
 
         return stations.Select(station =>
         {

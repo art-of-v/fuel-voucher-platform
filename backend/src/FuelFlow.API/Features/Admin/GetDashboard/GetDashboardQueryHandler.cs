@@ -33,13 +33,21 @@ public sealed class GetDashboardQueryHandler
         var pendingOrders = await _context.Orders.CountAsync(o => o.Kind != OrderKind.ReceivedFromCompany && (o.Status == OrderStatus.PendingFulfillment || o.Status == OrderStatus.PartiallyFulfilled), cancellationToken);
         var fulfilledOrders = await _context.Orders.CountAsync(o => o.Kind != OrderKind.ReceivedFromCompany && o.Status == OrderStatus.Fulfilled, cancellationToken);
 
-        var fuelPackages = await _context.FuelPackages
+        // Margin is a property of the offer, so the lookup is volumes joined to offers, pinned to the
+        // real pool: these are operator counters over real business, and the old lookup had no pool
+        // filter, so a QA rehearsal row could shadow a real one by being newer.
+        //
+        // The GroupBy(...).First() this replaces existed only to break ties the schema already
+        // forbids - UNIQUE (station_id, fuel_type_id, data_kind) on fuel_offers times
+        // UNIQUE (offer_id, liters) on fuel_offer_volumes makes the triple unique inside a pool. A
+        // duplicate now throws rather than silently resolving to one arbitrary price.
+        var fpLookup = await _context.FuelOfferVolumes
             .AsNoTracking()
-            .ToListAsync(cancellationToken);
-
-        var fpLookup = fuelPackages
-            .GroupBy(fp => (fp.StationId, fp.FuelTypeId, fp.Liters))
-            .ToDictionary(g => g.Key, g => g.OrderByDescending(fp => fp.PriceUpdatedAt ?? fp.CreatedAtUtc).First());
+            .Where(v => v.Offer.DataKind == DataKinds.Real)
+            .ToDictionaryAsync(
+                v => (v.Offer.StationId, v.Offer.FuelTypeId, v.Liters),
+                v => v.Offer,
+                cancellationToken);
 
         var fulfilledOrdersList = await _context.Orders
             .AsNoTracking()

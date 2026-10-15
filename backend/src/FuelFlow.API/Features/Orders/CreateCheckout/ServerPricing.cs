@@ -4,15 +4,15 @@ namespace FuelFlow.Features.Orders.CreateCheckout;
 
 /// <summary>
 /// Server-authoritative pricing for checkout. The client never dictates order prices;
-/// every amount is derived from the persisted <see cref="FuelPackage"/> catalog.
-/// Recomputes the per-liter price fresh from the stored pricing knobs via
+/// every amount is derived from the persisted catalogue - the offer's per-litre facts, joined to the
+/// volume being sold (<see cref="SellablePackage"/>). Recomputes the per-litre price fresh from the knobs via
 /// <see cref="FuelPricing.FinalPerLiter"/> so a checkout always reflects the current
 /// formula, then Price = round(final * liters, 2 dp) — decimal UAH to the kopeck
 /// (spec §12, #90; rounds half away from zero).
 /// </summary>
 public static class ServerPricing
 {
-    public static decimal PackagePrice(FuelPackage package, decimal liters)
+    public static decimal PackagePrice(SellablePackage package, decimal liters)
     {
         return PackagePrice(package, liters, 0m);
     }
@@ -27,7 +27,7 @@ public static class ServerPricing
     /// below-cost guard in the checkout handlers still runs on top, so a discount large enough to sell
     /// under cost is rejected there rather than silently accepted.
     /// </param>
-    public static decimal PackagePrice(FuelPackage package, decimal liters, decimal discountPerLiter)
+    public static decimal PackagePrice(SellablePackage package, decimal liters, decimal discountPerLiter)
     {
         var perLiter = EffectivePricePerLiter(package);
         if (perLiter.HasValue)
@@ -38,13 +38,13 @@ public static class ServerPricing
 
         if (discountPerLiter <= 0m)
         {
-            return package.Price;
+            return package.PackagePrice;
         }
 
         // No per-liter price to discount against: scale the frozen package price by the same ratio the
         // discount represents on the nominal, so a term still costs less. Rows this old are rare and the
         // below-cost guard still applies.
-        var nominalPerLiter = liters > 0m ? package.Price / liters : package.Price;
+        var nominalPerLiter = liters > 0m ? package.PackagePrice / liters : package.PackagePrice;
         var reduced = Math.Max(0m, nominalPerLiter - Math.Max(0m, discountPerLiter));
         return Math.Round(reduced * liters, 2, MidpointRounding.AwayFromZero);
     }
@@ -55,15 +55,15 @@ public static class ServerPricing
     /// no pump price this equals the amount charged (<paramref name="unitPrice"/> × quantity), i.e.
     /// zero saving. See <see cref="FuelPricing.OriginalPackagePrice"/>.
     /// </summary>
-    public static decimal OriginalLineTotal(FuelPackage package, decimal liters, decimal unitPrice, int quantity)
+    public static decimal OriginalLineTotal(SellablePackage package, decimal liters, decimal unitPrice, int quantity)
         => FuelPricing.OriginalPackagePrice(package.PumpPricePerLiter, liters, unitPrice) * quantity;
 
     /// <summary>
     /// Per-liter customer price recomputed from the stored knobs. Falls back to the
-    /// stored <see cref="FuelPackage.FinalPricePerLiter"/>, then null (caller uses the
-    /// frozen <see cref="FuelPackage.Price"/>) for rows predating the per-liter columns.
+    /// stored <see cref="SellablePackage.FinalPricePerLiter"/>, then null (caller uses the
+    /// frozen <see cref="SellablePackage.PackagePrice"/>) for rows predating the per-litre columns.
     /// </summary>
-    private static decimal? EffectivePricePerLiter(FuelPackage package)
+    private static decimal? EffectivePricePerLiter(SellablePackage package)
     {
         if (package.SupplierPricePerLiter is { } cost && package.MarginUahPerLiter is { } profit)
         {
@@ -83,7 +83,7 @@ public static class ServerPricing
     /// price from cost + margin and would never see a term discount — so a generous tier would have been
     /// able to sell under cost while the guard reported the line was fine.
     /// </remarks>
-    public static decimal? DiscountedPricePerLiter(FuelPackage package, decimal discountPerLiter)
+    public static decimal? DiscountedPricePerLiter(SellablePackage package, decimal discountPerLiter)
     {
         var perLiter = EffectivePricePerLiter(package);
         if (perLiter is not { } price)
@@ -107,7 +107,7 @@ public static class ServerPricing
     /// guessing in the direction that loses money.
     /// </para>
     /// </summary>
-    public static bool IsBelowCost(FuelPackage package, decimal discountPerLiter)
+    public static bool IsBelowCost(SellablePackage package, decimal discountPerLiter)
         => TryGetBelowCostVerdict(package, discountPerLiter) == BelowCostVerdict.BelowCost;
 
     /// <summary>Outcome of the below-cost check: whether the line sells under cost, or "cannot tell".</summary>
@@ -127,7 +127,7 @@ public static class ServerPricing
     /// The below-cost check with its ignorance made explicit, so a caller that is about to sell
     /// without a recorded cost can log it instead of treating silence as permission.
     /// </summary>
-    public static BelowCostVerdict TryGetBelowCostVerdict(FuelPackage package, decimal discountPerLiter)
+    public static BelowCostVerdict TryGetBelowCostVerdict(SellablePackage package, decimal discountPerLiter)
     {
         // Zero and negative costs are "not recorded", not "free": a package carrying 0 was never
         // priced, and treating it as free would make every line look loss-making and block the sale.

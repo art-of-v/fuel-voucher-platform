@@ -122,7 +122,7 @@ public sealed class PackageStockAvailability
     /// impossible instead of merely unlikely.
     /// </para>
     /// </remarks>
-    public async Task<FuelPackage?> FindPackageAsync(
+    public async Task<SellablePackage?> FindPackageAsync(
         bool isTestAccount,
         string stationId,
         string fuelTypeId,
@@ -131,17 +131,23 @@ public sealed class PackageStockAvailability
     {
         var pool = DataKinds.ForPool(isTestAccount);
 
-        return await _context.FuelPackages
+        var row = await _context.FuelOfferVolumes
             .AsNoTracking()
-            .Where(p => p.StationId == stationId
-                     && p.FuelTypeId == fuelTypeId
-                     && p.Liters == liters
-                     && p.DataKind == pool)
-            // Not decorative: with two rows on the key an unordered pick is arbitrary, and "which
-            // one" would then be at the mercy of a plan change or an autovacuum.
-            .OrderByDescending(p => p.UpdatedAtUtc)
-            .ThenBy(p => p.Id)
+            .Where(v => v.Offer.StationId == stationId
+                     && v.Offer.FuelTypeId == fuelTypeId
+                     && v.Liters == liters
+                     && v.Offer.DataKind == pool)
+            // Not decorative, and no longer merely a tie-break: `UNIQUE (offer_id, liters)` on
+            // fuel_offer_volumes plus `UNIQUE (station_id, fuel_type_id, data_kind)` on fuel_offers
+            // make this key unique, so exactly one row can match. The ordering is kept because it is
+            // free and because the uniqueness is a property of the schema rather than of this query -
+            // if the constraint is ever dropped, the order is what keeps the pick stable.
+            .OrderByDescending(v => v.UpdatedAtUtc)
+            .ThenBy(v => v.Id)
+            .Select(v => new { Volume = v, Offer = v.Offer })
             .FirstOrDefaultAsync(cancellationToken);
+
+        return row is null ? null : SellablePackage.From(row.Offer, row.Volume);
     }
 
     /// <summary>
@@ -149,7 +155,7 @@ public sealed class PackageStockAvailability
     /// Keyed by the same <see cref="StockKey"/> the stock gate uses, which is what lets a line be
     /// priced off exactly the package its stock was checked against.
     /// </summary>
-    public async Task<Dictionary<StockKey, FuelPackage>> FindPackagesAsync(
+    public async Task<Dictionary<StockKey, SellablePackage>> FindPackagesAsync(
         bool isTestAccount,
         IReadOnlyCollection<StockKey> wanted,
         CancellationToken cancellationToken = default)
@@ -158,37 +164,38 @@ public sealed class PackageStockAvailability
             return [];
 
         // Narrowed with separate IN-lists on the entity rather than with
-        // `wanted.Contains(StockKey.For(p.StationId, p.FuelTypeId, p.Liters))`, which cannot be
-        // translated - the same wall SellableKeys documents below, hit for the same reason. Separate
-        // lists hand back a cross product the cart never asked about, so the resolved dictionary is
-        // filtered back down to `wanted` after materialisation.
+        // `wanted.Contains(StockKey.For(v.Offer.StationId, v.Offer.FuelTypeId, v.Liters))`, which
+        // cannot be translated - the same wall SellableKeys documents below, hit for the same reason.
+        // Separate lists hand back a cross product the cart never asked about, so the resolved
+        // dictionary is filtered back down to `wanted` after materialisation.
         var brands = wanted.Select(k => k.Brand).Distinct().ToArray();
         var fuelTypeIds = wanted.Select(k => k.FuelTypeId).Distinct().ToArray();
         var literSizes = wanted.Select(k => k.Liters).Distinct().ToArray();
         var pool = DataKinds.ForPool(isTestAccount);
 
-        var rows = await _context.FuelPackages
+        var rows = await _context.FuelOfferVolumes
             .AsNoTracking()
-            .Where(p => p.DataKind == pool
-                     && brands.Contains(p.StationId.ToLower())
-                     && fuelTypeIds.Contains(p.FuelTypeId)
-                     && literSizes.Contains(p.Liters))
+            .Where(v => v.Offer.DataKind == pool
+                     && brands.Contains(v.Offer.StationId.ToLower())
+                     && fuelTypeIds.Contains(v.Offer.FuelTypeId)
+                     && literSizes.Contains(v.Liters))
             // Same precedence as the single-line path, so one line of a cart cannot resolve to a
             // different row than the same line ordered on its own.
-            .OrderByDescending(p => p.UpdatedAtUtc)
-            .ThenBy(p => p.Id)
+            .OrderByDescending(v => v.UpdatedAtUtc)
+            .ThenBy(v => v.Id)
+            .Select(v => new { Volume = v, Offer = v.Offer })
             .ToListAsync(cancellationToken);
 
-        var resolved = new Dictionary<StockKey, FuelPackage>(wanted.Count);
+        var resolved = new Dictionary<StockKey, SellablePackage>(wanted.Count);
         foreach (var row in rows)
         {
-            var key = StockKey.For(row.StationId, row.FuelTypeId, row.Liters);
+            var key = StockKey.For(row.Offer.StationId, row.Offer.FuelTypeId, row.Volume.Liters);
             if (!wanted.Contains(key))
                 continue;
 
             // First write wins, and the ordering above means "first" is the same row the single-line
             // path would have taken.
-            resolved.TryAdd(key, row);
+            resolved.TryAdd(key, SellablePackage.From(row.Offer, row.Volume));
         }
 
         return resolved;
