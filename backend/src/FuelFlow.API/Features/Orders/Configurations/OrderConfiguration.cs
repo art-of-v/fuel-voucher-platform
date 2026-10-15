@@ -145,19 +145,14 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
             .IsUnique()
             .HasFilter("monobank_invoice_id IS NOT NULL")
             // The database name is not decoration - it is the only thing that makes the model agree
-            // with the database, and getting it wrong breaks the next migration rather than this one.
-            //
-            // UniqueMonobankInvoiceId created the index as IX_orders_monobank_invoice_id (snake_case,
-            // as migrationBuilder names things), while EF's convention for HasIndex("MonobankInvoiceId")
-            // is IX_orders_MonobankInvoiceId (PascalCase). With no HasDatabaseName the model therefore
-            // described an index the database did not have, and the NEXT migration added for any reason
-            // scaffolded a CreateIndex for it. Every fresh database then failed to migrate with
+            // with the database. UniqueMonobankInvoiceId created the index as
+            // IX_orders_monobank_invoice_id (snake_case, as migrationBuilder names things), while EF's
+            // convention for HasIndex("MonobankInvoiceId") would be IX_orders_MonobankInvoiceId
+            // (PascalCase). Without this line the model and the database described two different
+            // indexes, so the *next* migration added for any reason would scaffold a CREATE for the
+            // PascalCase one and every fresh database would fail to migrate with
             // 42P07 "relation IX_orders_monobank_invoice_id already exists".
-            //
-            // Found the hard way: the offer split (#1137) was the first migration after #1133 and its
-            // scaffold produced exactly that duplicate. Reverted because the migration itself refused
-            // to apply on production for an unrelated reason, so the index fix is landed here on its
-            // own - it needs no migration and is safe without the offer tables.
+            // HasDatabaseName is what closes it; see the note in SplitFuelPackagesIntoOffers.
             .HasDatabaseName("IX_orders_monobank_invoice_id");
         builder.HasIndex(e => new { e.UserId, e.Status });
         builder.HasIndex(e => new { e.UserId, e.CreatedAtUtc })
