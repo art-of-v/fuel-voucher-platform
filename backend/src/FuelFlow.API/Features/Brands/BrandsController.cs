@@ -453,16 +453,20 @@ public sealed class BrandsController : ControllerBase
         var station = await _context.Stations.FirstOrDefaultAsync(s => s.Id == fuel.StationId, ct);
         var stationName = station?.Name ?? "?";
 
-        var oldOffer = otherOffer;
-        var oldSupplierPrice = oldOffer?.SupplierPricePerLiter;
-        var oldMarginPrice = oldOffer?.MarginUahPerLiter;
-        var oldFinalPrice = oldOffer?.FinalPricePerLiter;
+        // Snapshot BEFORE anything is written below. Reading "old" from `otherOffer` looks right when the
+        // edit is flipping a fuel between pools - the other pool's offer is what it had - and silently
+        // records nothing at all otherwise, because on an ordinary reprice `otherOffer` is null. The
+        // audit then reads "supplier  -> 100.00" and the operator has no record of what they changed.
+        var previousOffer = offer ?? otherOffer;
+        var oldSupplierPrice = previousOffer?.SupplierPricePerLiter;
+        var oldMarginPrice = previousOffer?.MarginUahPerLiter;
+        var oldFinalPrice = previousOffer?.FinalPricePerLiter;
         var oldValue = JsonSerializer.Serialize(new
         {
             fuel.Name,
             SupplierPricePerLiter = oldSupplierPrice,
             MarginUahPerLiter = oldMarginPrice,
-            MarginPercent = oldOffer?.MarginPercent,
+            MarginPercent = previousOffer?.MarginPercent,
             FinalPricePerLiter = oldFinalPrice,
             fuel.BasePrice,
             fuel.DiscountPrice
