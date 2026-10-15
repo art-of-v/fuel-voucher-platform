@@ -44,10 +44,22 @@ if [[ "$1" == "ps" ]]; then
 fi
 if [[ "$1" == "exec" ]]; then
   # The preflight calls psql twice: once with -t -A to count rows, once plain to show them.
+  #
+  # psql writes its own output to stdout regardless of -t -A: BEGIN, the SET, and COMMIT each print a
+  # line, and "(0 rows)" is printed for the result too. The first version of this stub modelled none
+  # of that, so the counting bug below shipped: `grep -c .` counted BEGIN/SET/COMMIT and the check
+  # reported "VIOLATED - 3 row(s)" against a clean database, then printed "(0 rows)" as the detail.
+  # It fired on the first real deploy, which is how it was found.
   if [[ "$*" == *"-t -A"* ]]; then
+    printf 'BEGIN\nSET\n'
     [[ -n "${DOCKER_STUB_ROWS:-}" ]] && printf '%s\n' "$DOCKER_STUB_ROWS"
+    printf '(0 rows)\nCOMMIT\n'
   else
-    [[ -n "${DOCKER_STUB_ROWS:-}" ]] && printf '  station|fuel|real|2|final_price_per_liter|2\n'
+    printf '  BEGIN\n  SET\n'
+    printf '   station_id | fuel_type_id | data_kind | volumes | column_name | distinct_values\n'
+    printf '  ------------+--------------+-----------+---------+-------------+-----------------\n'
+    [[ -n "${DOCKER_STUB_ROWS:-}" ]] && printf '   %s\n' "$DOCKER_STUB_ROWS"
+    printf '  (0 rows)\n  COMMIT\n'
   fi
   exit 0
 fi
@@ -67,6 +79,11 @@ out="$(run DOCKER_STUB_RUNNING=1 DOCKER_STUB_ROWS= DOCKER_STUB_STRICT_UNUSED=1)"
 check "a clean database exits 0" "0" "$?"
 contains "the file is reported ok" "010-fuel-package-single-price.sql: ok" "$out"
 contains "and satisfaction is stated with a count" "all data preconditions satisfied (1 checked)" "$out"
+# The regression, stated on its own. psql prints BEGIN, SET and COMMIT to stdout whatever -t -A
+# says, so counting non-empty lines calls those three a violation on a database that is fine — which
+# is exactly what this check did on production on its first real run, printing
+# "VIOLATED - 3 row(s)" above a detail of "(0 rows)".
+lacks "psql's own chatter is not counted as a violation" "VIOLATED" "$out"
 
 # ------------------------------------------------------------------------------
 # A violated precondition
@@ -75,7 +92,7 @@ out="$(run DOCKER_STUB_RUNNING=1 DOCKER_STUB_ROWS='a|b|real|2|final_price_per_li
 check "a violation is a WARNING, not a failure, by default" "0" "$?"
 contains "the violation is named" "VIOLATED" "$out"
 contains "the offending file is named" "010-fuel-package-single-price.sql: VIOLATED" "$out"
-contains "the rows are shown, indented under the warning" "station|fuel|real|2|final_price_per_liter|2" "$out"
+contains "the rows are shown, indented under the warning" "a|b|real|2|final_price_per_liter|2" "$out"
 lacks "and it does not claim the preconditions were satisfied" "all data preconditions satisfied" "$out"
 
 # ------------------------------------------------------------------------------

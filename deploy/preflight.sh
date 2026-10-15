@@ -111,7 +111,15 @@ check_data_preconditions() {
     fi
 
     checked=$((checked + 1))
-    rows="$(docker exec -i fuelflow-postgres psql -U fuelflow -d fuelflow -X -t -A -F'|' -f - < "$sql" 2>/dev/null | grep -c . || true)"
+    # Count lines carrying the field separator, NOT non-empty lines. psql writes its own output to
+    # stdout — "BEGIN", "SET", "(0 rows)", "COMMIT" — and counting those made this report
+    # "VIOLATED - 3 row(s)" against a completely clean production database, then print "(0 rows)"
+    # as the detail underneath. It shipped that way and fired on the first real deploy.
+    #
+    # A gate that fires on a healthy system is worse than no gate, because it is a gate people
+    # learn to skip. Every row this query emits is pipe-separated, because the runner asks psql for
+    # -F'|'; psql's own chatter contains no pipe.
+    rows="$(docker exec -i fuelflow-postgres psql -U fuelflow -d fuelflow -X -t -A -F'|' -f - < "$sql" 2>/dev/null | grep -c '|' || true)"
     if [[ "${rows:-0}" -eq 0 ]]; then
       echo "  $name: ok"
     else
@@ -327,7 +335,7 @@ else
         owners="$owners $c"
       fi
     done
-    count=$(printf '%s\n' $owners | grep -c . || true)
+    count=$(printf '%s\n' $owners | grep -c '|' || true)
     if [[ "$count" -gt 1 ]]; then
       fail "upstream '$name' is claimed by ${count} containers:${owners//$/,}. Caddy would pick one by DNS ordering - this is exactly the prod-serves-staging bug (planning#220). Rename one side so the name is unique."
     elif [[ "$count" -eq 1 ]]; then
@@ -407,7 +415,7 @@ if [[ -d preflight-db ]]; then
       continue
     fi
 
-    rows="$(docker exec -i fuelflow-postgres psql -U fuelflow -d fuelflow -X -t -A -F'|' -f - < "$sql" 2>/dev/null | grep -c . || true)"
+    rows="$(docker exec -i fuelflow-postgres psql -U fuelflow -d fuelflow -X -t -A -F'|' -f - < "$sql" 2>/dev/null | grep -c '|' || true)"
     if [[ "${rows:-0}" -eq 0 ]]; then
       echo "  $name: ok"
     else
