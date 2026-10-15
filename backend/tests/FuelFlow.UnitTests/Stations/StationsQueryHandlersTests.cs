@@ -146,7 +146,7 @@ public sealed class StationsQueryHandlersTests : IDisposable
     [Fact]
     public async Task GetPublicPackages_ShouldReturnAllPackages()
     {
-        _context.FuelPackages.AddRange(
+        _context.FuelOfferVolumes.AddRange(
             CreatePackage("pkg-1", "station-a", "ft-a", "A-95", 10m),
             CreatePackage("pkg-2", "station-b", "ft-b", "Diesel", 20m));
         await _context.SaveChangesAsync();
@@ -165,7 +165,7 @@ public sealed class StationsQueryHandlersTests : IDisposable
     [Fact]
     public async Task GetPublicPackages_ShouldNotServeAFlaggedTestPackage()
     {
-        _context.FuelPackages.AddRange(
+        _context.FuelOfferVolumes.AddRange(
             CreatePackage("pkg-real", "station-a", "ft-a", "A-95", 10m),
             CreatePackage("pkg-qa", "station-a", "ft-qa", "QA-CHECK-95", 5m, isTestData: true));
         await _context.SaveChangesAsync();
@@ -185,7 +185,7 @@ public sealed class StationsQueryHandlersTests : IDisposable
     [Fact]
     public async Task GetPublicPackagesByStation_ShouldNotServeAFlaggedTestPackage()
     {
-        _context.FuelPackages.AddRange(
+        _context.FuelOfferVolumes.AddRange(
             CreatePackage("pkg-real", "station-a", "ft-a", "A-95", 10m),
             CreatePackage("pkg-qa", "station-a", "ft-qa", "QA-CHECK-95", 5m, isTestData: true));
         await _context.SaveChangesAsync();
@@ -206,7 +206,7 @@ public sealed class StationsQueryHandlersTests : IDisposable
     [Fact]
     public async Task AdminPackages_ShouldStillListAFlaggedTestPackage()
     {
-        _context.FuelPackages.AddRange(
+        _context.FuelOfferVolumes.AddRange(
             CreatePackage("pkg-real", "station-a", "ft-a", "A-95", 10m),
             CreatePackage("pkg-qa", "station-a", "ft-qa", "QA-CHECK-95", 5m, isTestData: true));
         await _context.SaveChangesAsync();
@@ -221,7 +221,7 @@ public sealed class StationsQueryHandlersTests : IDisposable
     [Fact]
     public async Task GetPublicPackagesByStation_ShouldFilterByStationId()
     {
-        _context.FuelPackages.AddRange(
+        _context.FuelOfferVolumes.AddRange(
             CreatePackage("pkg-1", "station-a", "ft-a", "A-95", 10m),
             CreatePackage("pkg-2", "station-a", "ft-a", "A-95", 20m),
             CreatePackage("pkg-3", "station-b", "ft-b", "Diesel", 20m));
@@ -242,21 +242,15 @@ public sealed class StationsQueryHandlersTests : IDisposable
         // endpoint must project only the store-front fields and never these (planning #52). The
         // struck-through "before" price is recomputed fresh from the pump price, so the stale
         // cost-derived OriginalPrice column is ignored and the supplier cost can never leak (#73).
-        _context.FuelPackages.Add(new FuelPackage
-        {
-            Id = "pkg-1",
-            StationId = "station-a",
-            FuelTypeId = "ft-a",
-            FuelName = "A-95",
-            Liters = 10m,
-            Price = 500,
-            OriginalPrice = 420,          // stale cost-derived value (42 × 10) — must be ignored
-            PumpPricePerLiter = 60m,      // public list price → fresh "before" = 600
-            FinalPricePerLiter = 50m,
-            SupplierPricePerLiter = 42m,
-            MarginUahPerLiter = 8m,
-            MarginPercent = 19m,
-        });
+// No stored "before" price any more: it was never authoritative, and the storefront recomputes it
+        // from the pump price - which is what stops a stale cost-derived value reaching anonymous callers.
+        _context.FuelOfferVolumes.Add(CreatePackage("pkg-1", "station-a", "ft-a", "A-95", 10m));
+        _context.SeedOffer("station-a", "ft-a",
+            pumpPricePerLiter: 60m,      // public list price -> fresh "before" = 600
+            finalPricePerLiter: 50m,
+            supplierPricePerLiter: 42m,
+            marginUahPerLiter: 8m,
+            marginPercent: 19m);
         await _context.SaveChangesAsync();
 
         var handler = new GetPublicPackagesQueryHandler(_context, Stock());
@@ -281,20 +275,14 @@ public sealed class StationsQueryHandlersTests : IDisposable
         // Legacy fuel priced before any pump was recorded: with no pump ceiling the "before" price is
         // just the sale price, so the store-front shows no fabricated saving — and still never the
         // stored cost-derived OriginalPrice (planning #73).
-        _context.FuelPackages.Add(new FuelPackage
-        {
-            Id = "pkg-legacy",
-            StationId = "station-a",
-            FuelTypeId = "ft-a",
-            FuelName = "A-95",
-            Liters = 10m,
-            Price = 500,
-            OriginalPrice = 420,          // stale cost-derived value — must not surface
-            PumpPricePerLiter = null,
-            FinalPricePerLiter = 50m,
-            SupplierPricePerLiter = 42m,
-            MarginUahPerLiter = 8m,
-        });
+// The legacy case: a package with no pump price at all. There is nothing to recompute the struck
+        // price from, so the storefront falls back to the sale price and shows no fabricated saving.
+        _context.FuelOfferVolumes.Add(CreatePackage("pkg-legacy", "station-a", "ft-a", "A-95", 10m));
+        _context.SeedOffer("station-a", "ft-a",
+            pumpPricePerLiter: null,
+            finalPricePerLiter: 50m,
+            supplierPricePerLiter: 42m,
+            marginUahPerLiter: 8m);
         await _context.SaveChangesAsync();
 
         var handler = new GetPublicPackagesQueryHandler(_context, Stock());
@@ -313,7 +301,7 @@ public sealed class StationsQueryHandlersTests : IDisposable
     [Fact]
     public async Task GetPublicPackages_ShouldFlagAvailability_PromotingNothingAndHidingNothing()
     {
-        _context.FuelPackages.AddRange(
+        _context.FuelOfferVolumes.AddRange(
             CreatePackage("pkg-in-stock", "station-a", "ft-a", "A-95", 10m),
             CreatePackage("pkg-empty", "station-a", "ft-a", "A-95", 20m));
         _context.FuelVouchers.Add(CreateVoucher("station-a", "ft-a", 10m));
@@ -336,7 +324,7 @@ public sealed class StationsQueryHandlersTests : IDisposable
     [Fact]
     public async Task GetPublicPackages_ShouldNotCountUnactivatedImportedStockAsAvailable()
     {
-        _context.FuelPackages.Add(CreatePackage("pkg-1", "station-a", "ft-a", "A-95", 10m));
+        _context.FuelOfferVolumes.Add(CreatePackage("pkg-1", "station-a", "ft-a", "A-95", 10m));
         _context.FuelVouchers.Add(CreateVoucher("station-a", "ft-a", 10m, status: VoucherStatus.Imported));
         await _context.SaveChangesAsync();
 
@@ -355,7 +343,7 @@ public sealed class StationsQueryHandlersTests : IDisposable
     [Fact]
     public async Task GetPublicPackages_ShouldNotShowTestStockToARegularCustomer()
     {
-        _context.FuelPackages.Add(CreatePackage("pkg-1", "station-a", "ft-a", "A-95", 10m));
+        _context.FuelOfferVolumes.Add(CreatePackage("pkg-1", "station-a", "ft-a", "A-95", 10m));
         _context.FuelVouchers.Add(CreateVoucher("station-a", "ft-a", 10m, isTestData: true));
         await _context.SaveChangesAsync();
 
@@ -371,7 +359,7 @@ public sealed class StationsQueryHandlersTests : IDisposable
     {
         // The catalog carries "station-a"; imported stock carries whatever the supplier printed.
         // Fulfilment compares case-insensitively, so a case difference must not read as "no stock".
-        _context.FuelPackages.Add(CreatePackage("pkg-1", "station-a", "ft-a", "A-95", 10m));
+        _context.FuelOfferVolumes.Add(CreatePackage("pkg-1", "station-a", "ft-a", "A-95", 10m));
         _context.FuelVouchers.Add(CreateVoucher("STATION-A", "ft-a", 10m));
         await _context.SaveChangesAsync();
 
@@ -385,7 +373,7 @@ public sealed class StationsQueryHandlersTests : IDisposable
     [Fact]
     public async Task GetPublicPackages_ShouldIgnoreExpiredStock_WhileExpiryIsEnforced()
     {
-        _context.FuelPackages.Add(CreatePackage("pkg-1", "station-a", "ft-a", "A-95", 10m));
+        _context.FuelOfferVolumes.Add(CreatePackage("pkg-1", "station-a", "ft-a", "A-95", 10m));
         _context.FuelVouchers.Add(CreateVoucher(
             "station-a", "ft-a", 10m, providerExpiration: DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1))));
         await _context.SaveChangesAsync();
@@ -405,7 +393,7 @@ public sealed class StationsQueryHandlersTests : IDisposable
     [Fact]
     public async Task GetPublicPackages_ShouldCountExpiredStock_WhileExpiryIsDisabled()
     {
-        _context.FuelPackages.Add(CreatePackage("pkg-1", "station-a", "ft-a", "A-95", 10m));
+        _context.FuelOfferVolumes.Add(CreatePackage("pkg-1", "station-a", "ft-a", "A-95", 10m));
         _context.FuelVouchers.Add(CreateVoucher(
             "station-a", "ft-a", 10m, providerExpiration: DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1))));
         await _context.SaveChangesAsync();
@@ -425,7 +413,7 @@ public sealed class StationsQueryHandlersTests : IDisposable
     [Fact]
     public async Task GetPublicPackagesByStation_ShouldFlagAvailabilityToo()
     {
-        _context.FuelPackages.AddRange(
+        _context.FuelOfferVolumes.AddRange(
             CreatePackage("pkg-in-stock", "station-a", "ft-a", "A-95", 10m),
             CreatePackage("pkg-empty", "station-a", "ft-a", "A-95", 20m));
         _context.FuelVouchers.Add(CreateVoucher("station-a", "ft-a", 10m));
@@ -498,7 +486,7 @@ public sealed class StationsQueryHandlersTests : IDisposable
     [Fact]
     public async Task GetAdminPackages_ShouldOrderByStationIdThenFuelNameThenLiters()
     {
-        _context.FuelPackages.AddRange(
+        _context.FuelOfferVolumes.AddRange(
             CreatePackage("pkg-1", "station-b", "ft-b", "B Fuel", 50m),
             CreatePackage("pkg-2", "station-a", "ft-a", "A Fuel", 20m),
             CreatePackage("pkg-3", "station-a", "ft-a", "A Fuel", 10m));
@@ -514,7 +502,7 @@ public sealed class StationsQueryHandlersTests : IDisposable
     [Fact]
     public async Task GetAdminPackagesByStation_ShouldFilterByStationId()
     {
-        _context.FuelPackages.AddRange(
+        _context.FuelOfferVolumes.AddRange(
             CreatePackage("pkg-1", "station-a", "ft-a", "A-95", 10m),
             CreatePackage("pkg-2", "station-a", "ft-a", "A-95", 20m),
             CreatePackage("pkg-3", "station-b", "ft-b", "Diesel", 20m));
@@ -593,7 +581,7 @@ public sealed class StationsQueryHandlersTests : IDisposable
     {
         _context.Stations.Add(CreateStation("okko", "OKKO"));
         _context.FuelTypes.Add(CreateFuelType("okko-95", "A-95", "okko"));
-        _context.FuelPackages.Add(CreatePackage("pkg-1", "okko", "okko-95", "A-95", 50m));
+        _context.FuelOfferVolumes.Add(CreatePackage("pkg-1", "okko", "okko-95", "A-95", 50m));
         _context.FuelVouchers.Add(CreateVoucher("OKKO", "okko-95", 50m));
         await _context.SaveChangesAsync();
 
@@ -678,18 +666,42 @@ public sealed class StationsQueryHandlersTests : IDisposable
         };
     }
 
-    private static FuelPackage CreatePackage(string id, string stationId, string fuelTypeId, string fuelName, decimal liters, bool isTestData = false)
+    /// <summary>
+    /// Builds one volume and seeds the offer behind it.
+    /// </summary>
+    /// <remarks>
+    /// Returns the volume rather than adding it, so every <c>AddRange(CreatePackage(...), ...)</c> in
+    /// this file keeps working with only the DbSet renamed. The offer is added here because EF will
+    /// cascade the volumes in, but will not invent the parent they point at.
+    /// </remarks>
+    private FuelOfferVolume CreatePackage(string id, string stationId, string fuelTypeId, string fuelName, decimal liters, bool isTestData = false)
     {
-        return new FuelPackage
+        // The storefront joins volumes -> offers -> fuel_types for the display name. On the in-memory
+        // provider that join is executed for real, so a fixture that seeds a package without seeding its
+        // fuel now returns an EMPTY catalogue rather than one with a blank label - and the test fails
+        // as "found 0" with nothing pointing at the cause. Seed the fuel alongside the package.
+        if (!_context.FuelTypes.Local.Any(f => f.Id == fuelTypeId) && !_context.FuelTypes.Any(f => f.Id == fuelTypeId))
+        {
+            _context.FuelTypes.Add(new FuelTypeEntity
+            {
+                Id = fuelTypeId,
+                Name = fuelName,
+                StationId = stationId,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow,
+            });
+        }
+
+        var offer = _context.SeedOffer(stationId, fuelTypeId, isTestData);
+
+        return new FuelOfferVolume
         {
             Id = id,
-            StationId = stationId,
-            FuelTypeId = fuelTypeId,
-            FuelName = fuelName,
+            OfferId = offer.Id,
             Liters = liters,
-            Price = 500,
-            OriginalPrice = 480,
-            IsTestData = isTestData
+            PackagePrice = 500m,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
         };
     }
 

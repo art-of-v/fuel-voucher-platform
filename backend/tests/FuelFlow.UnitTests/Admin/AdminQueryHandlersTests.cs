@@ -35,27 +35,13 @@ public sealed class AdminQueryHandlersTests : IDisposable
 
     private void SeedFuelPackages()
     {
-        _context.FuelPackages.AddRange(
-            CreateFuelPackage("okko-95-50", "okko", "okko-95", "A-95", 50m, 2.0m),
-            CreateFuelPackage("wog-dp-20", "wog", "wog-dp", "ДП Mustang", 20m, 2.0m));
+        // Margin lives on the offer now, so that is what gets seeded. The reports resolve
+        // (station, fuel, litres) -> offer, so a fixture left in fuel_packages leaves every margin
+        // lookup empty and every margin assertion reading zero - which looks like a broken report
+        // rather than a broken fixture.
+        _context.SeedPackage("okko-95-50", "okko", "okko-95", 50m, 1000m, marginUahPerLiter: 2.0m);
+        _context.SeedPackage("wog-dp-20", "wog", "wog-dp", 20m, 1000m, marginUahPerLiter: 2.0m);
         _context.SaveChanges();
-    }
-
-    private static FuelPackage CreateFuelPackage(string id, string stationId, string fuelTypeId, string fuelName, decimal liters, decimal marginUahPerLiter)
-    {
-        return new FuelPackage
-        {
-            Id = id,
-            StationId = stationId,
-            FuelTypeId = fuelTypeId,
-            FuelName = fuelName,
-            Liters = liters,
-            Price = 1000,
-            OriginalPrice = 800,
-            MarginUahPerLiter = marginUahPerLiter,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
-        };
     }
 
     private static FuelVoucher CreateVoucher(string brand, string fuelTypeId, VoucherStatus status)

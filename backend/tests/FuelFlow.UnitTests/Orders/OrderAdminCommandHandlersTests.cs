@@ -94,40 +94,11 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
 
     private void SeedFuelPackages()
     {
-        var packages = new[]
-        {
-            new FuelPackage
-            {
-                Id = "pkg-okko-95-50",
-                StationId = "okko",
-                FuelTypeId = "okko-95",
-                FuelName = "A-95",
-                Liters = 50m,
-                Price = 2500,
-                OriginalPrice = 2450,
-                SupplierPricePerLiter = 49m,
-                MarginUahPerLiter = 1m,
-                FinalPricePerLiter = 50m,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
-            },
-            new FuelPackage
-            {
-                Id = "pkg-okko-p95-50",
-                StationId = "okko",
-                FuelTypeId = "okko-p95",
-                FuelName = "Pulls 95",
-                Liters = 50m,
-                Price = 2900,
-                OriginalPrice = 2850,
-                SupplierPricePerLiter = 57m,
-                MarginUahPerLiter = 1m,
-                FinalPricePerLiter = 58m,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
-            }
-        };
-        _context.FuelPackages.AddRange(packages);
+        // Seeded as offers plus volumes: the order handlers price and resolve against the offer.
+        _context.SeedPackage("pkg-okko-95-50", "okko", "okko-95", 50m, 2500m,
+            supplierPricePerLiter: 49m, marginUahPerLiter: 1m, finalPricePerLiter: 50m);
+        _context.SeedPackage("pkg-okko-p95-50", "okko", "okko-p95", 50m, 2900m,
+            supplierPricePerLiter: 57m, marginUahPerLiter: 1m, finalPricePerLiter: 58m);
         _context.SaveChanges();
     }
 

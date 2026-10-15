@@ -36,7 +36,7 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
 
         // okko-dp fuel with two nominals; margin 2 UAH/L, no pump (so final = blended cost + 2).
         _context.FuelTypes.Add(new FuelTypeEntity { Id = "okko-dp", Name = "ДП ЄВРО", StationId = "okko", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
-        _context.FuelPackages.AddRange(
+        _context.FuelOfferVolumes.AddRange(
             NewPackage("okko-dp", 10m),
             NewPackage("okko-dp", 20m));
         _context.Suppliers.Add(new Supplier
@@ -55,19 +55,27 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         _getHandler = new GetImportBatchCostsQueryHandler(_context, _recalculator);
     }
 
-    private static FuelPackage NewPackage(string fuelTypeId, decimal liters) => new()
+    /// <summary>
+    /// Seeds a volume plus the offer behind it. Returns the volume rather than adding it, so the
+    /// <c>AddRange</c> in the constructor keeps working.
+    /// </summary>
+    /// <remarks>
+    /// The blended-cost recalculator reprices OFFERS now, so a fixture left in fuel_packages would let
+    /// every repricing assertion read a zero cost and the fuel card report it healthy.
+    /// </remarks>
+    private FuelOfferVolume NewPackage(string fuelTypeId, decimal liters)
     {
-        Id = Guid.NewGuid().ToString(),
-        StationId = "okko",
-        FuelTypeId = fuelTypeId,
-        FuelName = "ДП ЄВРО",
-        Liters = liters,
-        Price = 0,
-        OriginalPrice = 0,
-        MarginUahPerLiter = 2m,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
-    };
+        var offer = _context.SeedOffer("okko", fuelTypeId, marginUahPerLiter: 2m);
+        return new FuelOfferVolume
+        {
+            Id = Guid.NewGuid().ToString(),
+            OfferId = offer.Id,
+            Liters = liters,
+            PackagePrice = 0m,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+        };
+    }
 
     private Guid SeedImport()
     {
@@ -167,11 +175,17 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         costed.Should().AllBeEquivalentTo(25m);
         result.VouchersCosted.Should().Be(2);
 
-        var packages = await _context.FuelPackages.Where(p => p.FuelTypeId == "okko-dp").OrderBy(p => p.Liters).ToListAsync();
-        packages.Should().OnlyContain(p => p.SupplierPricePerLiter == 25m);
-        packages.Should().OnlyContain(p => p.FinalPricePerLiter == 27m);   // 25 cost + 2 margin
-        packages[0].Price.Should().Be(270);   // 27 × 10
-        packages[1].Price.Should().Be(540);   // 27 × 20
+        // Cost and final price are the OFFER's, written once; the per-package totals are the volumes'.
+        // Asserting on the volumes alone would pass even if every per-litre figure stayed at zero,
+        // which is precisely what this test exists to catch.
+        var offer = await _context.FuelOffers.FirstAsync(o => o.FuelTypeId == "okko-dp");
+        offer.SupplierPricePerLiter.Should().Be(25m);
+        offer.FinalPricePerLiter.Should().Be(27m);   // 25 cost + 2 margin
+
+        var volumes = await _context.FuelOfferVolumes
+            .Where(v => v.OfferId == offer.Id).OrderBy(v => v.Liters).ToListAsync();
+        volumes[0].PackagePrice.Should().Be(270);   // 27 × 10
+        volumes[1].PackagePrice.Should().Be(540);   // 27 × 20
 
         var fuel = await _context.FuelTypes.FirstAsync(f => f.Id == "okko-dp");
         fuel.DiscountPrice.Should().Be(27);   // final/L rounded
@@ -271,9 +285,9 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         var result = await _setHandler.HandleAsync(Cmd(import2, "okko-dp", 30m));
 
         result.BlendedCostPerLiter.Should().Be(25m);   // (100×20 + 100×30) / 200
-        var package = await _context.FuelPackages.FirstAsync(p => p.FuelTypeId == "okko-dp");
-        package.SupplierPricePerLiter.Should().Be(25m); // priced off blended, not the just-entered 30
-        package.FinalPricePerLiter.Should().Be(27m);
+        var offer = await _context.FuelOffers.FirstAsync(o => o.FuelTypeId == "okko-dp");
+        offer.SupplierPricePerLiter.Should().Be(25m); // priced off blended, not the just-entered 30
+        offer.FinalPricePerLiter.Should().Be(27m);
     }
 
     [Fact]
@@ -337,13 +351,10 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         // A pump ceiling of 49 − 0.5 = 48.5 binds below the entered cost 50, and the fuel is
         // NOT opted in → the reprice pushes it below cost, so an emergent (Critical) alert fires.
         _context.FuelTypes.Add(new FuelTypeEntity { Id = "okko-loss", Name = "ДП збиток", StationId = "okko", BasePrice = 49, DiscountPrice = 49, AllowBelowCost = false, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
-        _context.FuelPackages.Add(new FuelPackage
-        {
-            Id = Guid.NewGuid().ToString(), StationId = "okko", FuelTypeId = "okko-loss", FuelName = "ДП збиток",
-            Liters = 10m, Price = 0, OriginalPrice = 0,
-            MarginUahPerLiter = 2m, PumpPricePerLiter = 49m, MinDiscountPerLiter = 0.5m,
-            CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
-        });
+        _context.SeedPackage(
+            id: Guid.NewGuid().ToString(), stationId: "okko", fuelTypeId: "okko-loss",
+            liters: 10m, price: 0m,
+            marginUahPerLiter: 2m, pumpPricePerLiter: 49m, minDiscountPerLiter: 0.5m);
         _context.SaveChanges();
 
         var import = SeedImport();
