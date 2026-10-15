@@ -2124,6 +2124,138 @@ namespace FuelFlow.API.Migrations
 
                             t.HasCheckConstraint("ck_fuel_offers_station_id_length", "length(station_id) <= 100");
                         });
+
+                    b.HasData(
+                        new
+                        {
+                            Id = "okko-okko-dp",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
+                            FinalPricePerLiter = 52m,
+                            FuelTypeId = "okko-dp",
+                            IsDeleted = false,
+                            MarginUahPerLiter = 2.0m,
+                            StationId = "okko",
+                            SupplierPricePerLiter = 50.0m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "okko-okko-95",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
+                            FinalPricePerLiter = 51m,
+                            FuelTypeId = "okko-95",
+                            IsDeleted = false,
+                            MarginUahPerLiter = 2.0m,
+                            StationId = "okko",
+                            SupplierPricePerLiter = 49.0m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "okko-okko-p95",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
+                            FinalPricePerLiter = 56m,
+                            FuelTypeId = "okko-p95",
+                            IsDeleted = false,
+                            MarginUahPerLiter = 3.0m,
+                            StationId = "okko",
+                            SupplierPricePerLiter = 53.0m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "okko-okko-pulls-dp",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
+                            FinalPricePerLiter = 55m,
+                            FuelTypeId = "okko-pulls-dp",
+                            IsDeleted = false,
+                            MarginUahPerLiter = 2.5m,
+                            StationId = "okko",
+                            SupplierPricePerLiter = 52.5m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "okko-okko-gas",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
+                            FinalPricePerLiter = 27m,
+                            FuelTypeId = "okko-gas",
+                            IsDeleted = false,
+                            MarginUahPerLiter = 1.5m,
+                            StationId = "okko",
+                            SupplierPricePerLiter = 25.5m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "wog-wog-dp",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
+                            FinalPricePerLiter = 53m,
+                            FuelTypeId = "wog-dp",
+                            IsDeleted = false,
+                            MarginUahPerLiter = 2.0m,
+                            StationId = "wog",
+                            SupplierPricePerLiter = 51.0m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "wog-wog-95",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
+                            FinalPricePerLiter = 52m,
+                            FuelTypeId = "wog-95",
+                            IsDeleted = false,
+                            MarginUahPerLiter = 2.0m,
+                            StationId = "wog",
+                            SupplierPricePerLiter = 50.0m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "wog-wog-95-euro",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
+                            FinalPricePerLiter = 53m,
+                            FuelTypeId = "wog-95-euro",
+                            IsDeleted = false,
+                            MarginUahPerLiter = 2.5m,
+                            StationId = "wog",
+                            SupplierPricePerLiter = 50.5m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "wog-wog-100",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
+                            FinalPricePerLiter = 61m,
+                            FuelTypeId = "wog-100",
+                            IsDeleted = false,
+                            MarginUahPerLiter = 3.0m,
+                            StationId = "wog",
+                            SupplierPricePerLiter = 58.0m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "wog-wog-gas",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
+                            FinalPricePerLiter = 27m,
+                            FuelTypeId = "wog-gas",
+                            IsDeleted = false,
+                            MarginUahPerLiter = 1.5m,
+                            StationId = "wog",
+                            SupplierPricePerLiter = 25.5m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        });
                 });
 
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.FuelOfferVolume", b =>
@@ -2178,6 +2310,328 @@ namespace FuelFlow.API.Migrations
                             t.HasCheckConstraint("ck_fuel_offer_volumes_offer_id_length", "length(offer_id) <= 204");
 
                             t.HasCheckConstraint("ck_fuel_offer_volumes_package_price_non_negative", "package_price >= 0");
+                        });
+
+                    b.HasData(
+                        new
+                        {
+                            Id = "okko-dp-10",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Liters = 10m,
+                            OfferId = "okko-okko-dp",
+                            PackagePrice = 520m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "okko-dp-20",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Liters = 20m,
+                            OfferId = "okko-okko-dp",
+                            PackagePrice = 1040m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "okko-dp-50",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Liters = 50m,
+                            OfferId = "okko-okko-dp",
+                            PackagePrice = 2600m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "okko-95-10",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Liters = 10m,
+                            OfferId = "okko-okko-95",
+                            PackagePrice = 510m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "okko-95-20",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Liters = 20m,
+                            OfferId = "okko-okko-95",
+                            PackagePrice = 1020m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "okko-95-50",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Liters = 50m,
+                            OfferId = "okko-okko-95",
+                            PackagePrice = 2550m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "okko-p95-10",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Liters = 10m,
+                            OfferId = "okko-okko-p95",
+                            PackagePrice = 560m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "okko-p95-20",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Liters = 20m,
+                            OfferId = "okko-okko-p95",
+                            PackagePrice = 1120m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "okko-p95-50",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Liters = 50m,
+                            OfferId = "okko-okko-p95",
+                            PackagePrice = 2800m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "okko-pulls-dp-10",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Liters = 10m,
+                            OfferId = "okko-okko-pulls-dp",
+                            PackagePrice = 550m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "okko-pulls-dp-20",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Liters = 20m,
+                            OfferId = "okko-okko-pulls-dp",
+                            PackagePrice = 1100m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "okko-pulls-dp-50",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Liters = 50m,
+                            OfferId = "okko-okko-pulls-dp",
+                            PackagePrice = 2750m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "okko-gas-10",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Liters = 10m,
+                            OfferId = "okko-okko-gas",
+                            PackagePrice = 270m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "okko-gas-20",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Liters = 20m,
+                            OfferId = "okko-okko-gas",
+                            PackagePrice = 540m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "okko-gas-50",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Liters = 50m,
+                            OfferId = "okko-okko-gas",
+                            PackagePrice = 1350m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "wog-dp-10",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Liters = 10m,
+                            OfferId = "wog-wog-dp",
+                            PackagePrice = 530m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "wog-dp-20",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Liters = 20m,
+                            OfferId = "wog-wog-dp",
+                            PackagePrice = 1060m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "wog-dp-50",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Liters = 50m,
+                            OfferId = "wog-wog-dp",
+                            PackagePrice = 2650m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "wog-95-10",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Liters = 10m,
+                            OfferId = "wog-wog-95",
+                            PackagePrice = 520m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "wog-95-20",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Liters = 20m,
+                            OfferId = "wog-wog-95",
+                            PackagePrice = 1040m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "wog-95-50",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Liters = 50m,
+                            OfferId = "wog-wog-95",
+                            PackagePrice = 2600m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "wog-95-euro-10",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Liters = 10m,
+                            OfferId = "wog-wog-95-euro",
+                            PackagePrice = 530m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "wog-95-euro-20",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Liters = 20m,
+                            OfferId = "wog-wog-95-euro",
+                            PackagePrice = 1060m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "wog-95-euro-50",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Liters = 50m,
+                            OfferId = "wog-wog-95-euro",
+                            PackagePrice = 2650m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "wog-100-10",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Liters = 10m,
+                            OfferId = "wog-wog-100",
+                            PackagePrice = 610m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "wog-100-20",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Liters = 20m,
+                            OfferId = "wog-wog-100",
+                            PackagePrice = 1220m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "wog-100-50",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Liters = 50m,
+                            OfferId = "wog-wog-100",
+                            PackagePrice = 3050m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "wog-gas-10",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Liters = 10m,
+                            OfferId = "wog-wog-gas",
+                            PackagePrice = 270m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "wog-gas-20",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Liters = 20m,
+                            OfferId = "wog-wog-gas",
+                            PackagePrice = 540m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "wog-gas-50",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Liters = 50m,
+                            OfferId = "wog-wog-gas",
+                            PackagePrice = 1350m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "okko-dp-2",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Liters = 2m,
+                            OfferId = "okko-okko-dp",
+                            PackagePrice = 104m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "okko-dp-3",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Liters = 3m,
+                            OfferId = "okko-okko-dp",
+                            PackagePrice = 156m,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         });
                 });
 
@@ -2292,552 +2746,6 @@ namespace FuelFlow.API.Migrations
                             t.HasCheckConstraint("ck_fuel_packages_price_non_negative", "price >= 0");
 
                             t.HasCheckConstraint("ck_fuel_packages_station_id_length", "length(station_id) <= 100");
-                        });
-
-                    b.HasData(
-                        new
-                        {
-                            Id = "okko-dp-10",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DataKind = "real",
-                            FinalPricePerLiter = 52m,
-                            FuelName = "ДП ЄВРО",
-                            FuelTypeId = "okko-dp",
-                            IsDeleted = false,
-                            Liters = 10m,
-                            MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 520m,
-                            Price = 520m,
-                            StationId = "okko",
-                            SupplierPricePerLiter = 50.0m,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "okko-dp-20",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DataKind = "real",
-                            FinalPricePerLiter = 52m,
-                            FuelName = "ДП ЄВРО",
-                            FuelTypeId = "okko-dp",
-                            IsDeleted = false,
-                            Liters = 20m,
-                            MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 1040m,
-                            Price = 1040m,
-                            StationId = "okko",
-                            SupplierPricePerLiter = 50.0m,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "okko-dp-50",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DataKind = "real",
-                            FinalPricePerLiter = 52m,
-                            FuelName = "ДП ЄВРО",
-                            FuelTypeId = "okko-dp",
-                            IsDeleted = false,
-                            Liters = 50m,
-                            MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 2600m,
-                            Price = 2600m,
-                            StationId = "okko",
-                            SupplierPricePerLiter = 50.0m,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "okko-95-10",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DataKind = "real",
-                            FinalPricePerLiter = 51m,
-                            FuelName = "A-95",
-                            FuelTypeId = "okko-95",
-                            IsDeleted = false,
-                            Liters = 10m,
-                            MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 510m,
-                            Price = 510m,
-                            StationId = "okko",
-                            SupplierPricePerLiter = 49.0m,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "okko-95-20",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DataKind = "real",
-                            FinalPricePerLiter = 51m,
-                            FuelName = "A-95",
-                            FuelTypeId = "okko-95",
-                            IsDeleted = false,
-                            Liters = 20m,
-                            MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 1020m,
-                            Price = 1020m,
-                            StationId = "okko",
-                            SupplierPricePerLiter = 49.0m,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "okko-95-50",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DataKind = "real",
-                            FinalPricePerLiter = 51m,
-                            FuelName = "A-95",
-                            FuelTypeId = "okko-95",
-                            IsDeleted = false,
-                            Liters = 50m,
-                            MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 2550m,
-                            Price = 2550m,
-                            StationId = "okko",
-                            SupplierPricePerLiter = 49.0m,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "okko-p95-10",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DataKind = "real",
-                            FinalPricePerLiter = 56m,
-                            FuelName = "Pulls 95",
-                            FuelTypeId = "okko-p95",
-                            IsDeleted = false,
-                            Liters = 10m,
-                            MarginUahPerLiter = 3.0m,
-                            OriginalPrice = 560m,
-                            Price = 560m,
-                            StationId = "okko",
-                            SupplierPricePerLiter = 53.0m,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "okko-p95-20",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DataKind = "real",
-                            FinalPricePerLiter = 56m,
-                            FuelName = "Pulls 95",
-                            FuelTypeId = "okko-p95",
-                            IsDeleted = false,
-                            Liters = 20m,
-                            MarginUahPerLiter = 3.0m,
-                            OriginalPrice = 1120m,
-                            Price = 1120m,
-                            StationId = "okko",
-                            SupplierPricePerLiter = 53.0m,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "okko-p95-50",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DataKind = "real",
-                            FinalPricePerLiter = 56m,
-                            FuelName = "Pulls 95",
-                            FuelTypeId = "okko-p95",
-                            IsDeleted = false,
-                            Liters = 50m,
-                            MarginUahPerLiter = 3.0m,
-                            OriginalPrice = 2800m,
-                            Price = 2800m,
-                            StationId = "okko",
-                            SupplierPricePerLiter = 53.0m,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "okko-pulls-dp-10",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DataKind = "real",
-                            FinalPricePerLiter = 55m,
-                            FuelName = "ДП PULLS",
-                            FuelTypeId = "okko-pulls-dp",
-                            IsDeleted = false,
-                            Liters = 10m,
-                            MarginUahPerLiter = 2.5m,
-                            OriginalPrice = 550m,
-                            Price = 550m,
-                            StationId = "okko",
-                            SupplierPricePerLiter = 52.5m,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "okko-pulls-dp-20",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DataKind = "real",
-                            FinalPricePerLiter = 55m,
-                            FuelName = "ДП PULLS",
-                            FuelTypeId = "okko-pulls-dp",
-                            IsDeleted = false,
-                            Liters = 20m,
-                            MarginUahPerLiter = 2.5m,
-                            OriginalPrice = 1100m,
-                            Price = 1100m,
-                            StationId = "okko",
-                            SupplierPricePerLiter = 52.5m,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "okko-pulls-dp-50",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DataKind = "real",
-                            FinalPricePerLiter = 55m,
-                            FuelName = "ДП PULLS",
-                            FuelTypeId = "okko-pulls-dp",
-                            IsDeleted = false,
-                            Liters = 50m,
-                            MarginUahPerLiter = 2.5m,
-                            OriginalPrice = 2750m,
-                            Price = 2750m,
-                            StationId = "okko",
-                            SupplierPricePerLiter = 52.5m,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "okko-gas-10",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DataKind = "real",
-                            FinalPricePerLiter = 27m,
-                            FuelName = "ГАЗ",
-                            FuelTypeId = "okko-gas",
-                            IsDeleted = false,
-                            Liters = 10m,
-                            MarginUahPerLiter = 1.5m,
-                            OriginalPrice = 270m,
-                            Price = 270m,
-                            StationId = "okko",
-                            SupplierPricePerLiter = 25.5m,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "okko-gas-20",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DataKind = "real",
-                            FinalPricePerLiter = 27m,
-                            FuelName = "ГАЗ",
-                            FuelTypeId = "okko-gas",
-                            IsDeleted = false,
-                            Liters = 20m,
-                            MarginUahPerLiter = 1.5m,
-                            OriginalPrice = 540m,
-                            Price = 540m,
-                            StationId = "okko",
-                            SupplierPricePerLiter = 25.5m,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "okko-gas-50",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DataKind = "real",
-                            FinalPricePerLiter = 27m,
-                            FuelName = "ГАЗ",
-                            FuelTypeId = "okko-gas",
-                            IsDeleted = false,
-                            Liters = 50m,
-                            MarginUahPerLiter = 1.5m,
-                            OriginalPrice = 1350m,
-                            Price = 1350m,
-                            StationId = "okko",
-                            SupplierPricePerLiter = 25.5m,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "wog-dp-10",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DataKind = "real",
-                            FinalPricePerLiter = 53m,
-                            FuelName = "ДП Mustang",
-                            FuelTypeId = "wog-dp",
-                            IsDeleted = false,
-                            Liters = 10m,
-                            MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 530m,
-                            Price = 530m,
-                            StationId = "wog",
-                            SupplierPricePerLiter = 51.0m,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "wog-dp-20",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DataKind = "real",
-                            FinalPricePerLiter = 53m,
-                            FuelName = "ДП Mustang",
-                            FuelTypeId = "wog-dp",
-                            IsDeleted = false,
-                            Liters = 20m,
-                            MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 1060m,
-                            Price = 1060m,
-                            StationId = "wog",
-                            SupplierPricePerLiter = 51.0m,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "wog-dp-50",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DataKind = "real",
-                            FinalPricePerLiter = 53m,
-                            FuelName = "ДП Mustang",
-                            FuelTypeId = "wog-dp",
-                            IsDeleted = false,
-                            Liters = 50m,
-                            MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 2650m,
-                            Price = 2650m,
-                            StationId = "wog",
-                            SupplierPricePerLiter = 51.0m,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "wog-95-10",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DataKind = "real",
-                            FinalPricePerLiter = 52m,
-                            FuelName = "A-95 Mustang",
-                            FuelTypeId = "wog-95",
-                            IsDeleted = false,
-                            Liters = 10m,
-                            MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 520m,
-                            Price = 520m,
-                            StationId = "wog",
-                            SupplierPricePerLiter = 50.0m,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "wog-95-20",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DataKind = "real",
-                            FinalPricePerLiter = 52m,
-                            FuelName = "A-95 Mustang",
-                            FuelTypeId = "wog-95",
-                            IsDeleted = false,
-                            Liters = 20m,
-                            MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 1040m,
-                            Price = 1040m,
-                            StationId = "wog",
-                            SupplierPricePerLiter = 50.0m,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "wog-95-50",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DataKind = "real",
-                            FinalPricePerLiter = 52m,
-                            FuelName = "A-95 Mustang",
-                            FuelTypeId = "wog-95",
-                            IsDeleted = false,
-                            Liters = 50m,
-                            MarginUahPerLiter = 2.0m,
-                            OriginalPrice = 2600m,
-                            Price = 2600m,
-                            StationId = "wog",
-                            SupplierPricePerLiter = 50.0m,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "wog-95-euro-10",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DataKind = "real",
-                            FinalPricePerLiter = 53m,
-                            FuelName = "A 95 EURO",
-                            FuelTypeId = "wog-95-euro",
-                            IsDeleted = false,
-                            Liters = 10m,
-                            MarginUahPerLiter = 2.5m,
-                            OriginalPrice = 530m,
-                            Price = 530m,
-                            StationId = "wog",
-                            SupplierPricePerLiter = 50.5m,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "wog-95-euro-20",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DataKind = "real",
-                            FinalPricePerLiter = 53m,
-                            FuelName = "A 95 EURO",
-                            FuelTypeId = "wog-95-euro",
-                            IsDeleted = false,
-                            Liters = 20m,
-                            MarginUahPerLiter = 2.5m,
-                            OriginalPrice = 1060m,
-                            Price = 1060m,
-                            StationId = "wog",
-                            SupplierPricePerLiter = 50.5m,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "wog-95-euro-50",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DataKind = "real",
-                            FinalPricePerLiter = 53m,
-                            FuelName = "A 95 EURO",
-                            FuelTypeId = "wog-95-euro",
-                            IsDeleted = false,
-                            Liters = 50m,
-                            MarginUahPerLiter = 2.5m,
-                            OriginalPrice = 2650m,
-                            Price = 2650m,
-                            StationId = "wog",
-                            SupplierPricePerLiter = 50.5m,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "wog-100-10",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DataKind = "real",
-                            FinalPricePerLiter = 61m,
-                            FuelName = "Mustang 100",
-                            FuelTypeId = "wog-100",
-                            IsDeleted = false,
-                            Liters = 10m,
-                            MarginUahPerLiter = 3.0m,
-                            OriginalPrice = 610m,
-                            Price = 610m,
-                            StationId = "wog",
-                            SupplierPricePerLiter = 58.0m,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "wog-100-20",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DataKind = "real",
-                            FinalPricePerLiter = 61m,
-                            FuelName = "Mustang 100",
-                            FuelTypeId = "wog-100",
-                            IsDeleted = false,
-                            Liters = 20m,
-                            MarginUahPerLiter = 3.0m,
-                            OriginalPrice = 1220m,
-                            Price = 1220m,
-                            StationId = "wog",
-                            SupplierPricePerLiter = 58.0m,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "wog-100-50",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DataKind = "real",
-                            FinalPricePerLiter = 61m,
-                            FuelName = "Mustang 100",
-                            FuelTypeId = "wog-100",
-                            IsDeleted = false,
-                            Liters = 50m,
-                            MarginUahPerLiter = 3.0m,
-                            OriginalPrice = 3050m,
-                            Price = 3050m,
-                            StationId = "wog",
-                            SupplierPricePerLiter = 58.0m,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "wog-gas-10",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DataKind = "real",
-                            FinalPricePerLiter = 27m,
-                            FuelName = "ГАЗ",
-                            FuelTypeId = "wog-gas",
-                            IsDeleted = false,
-                            Liters = 10m,
-                            MarginUahPerLiter = 1.5m,
-                            OriginalPrice = 270m,
-                            Price = 270m,
-                            StationId = "wog",
-                            SupplierPricePerLiter = 25.5m,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "wog-gas-20",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DataKind = "real",
-                            FinalPricePerLiter = 27m,
-                            FuelName = "ГАЗ",
-                            FuelTypeId = "wog-gas",
-                            IsDeleted = false,
-                            Liters = 20m,
-                            MarginUahPerLiter = 1.5m,
-                            OriginalPrice = 540m,
-                            Price = 540m,
-                            StationId = "wog",
-                            SupplierPricePerLiter = 25.5m,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "wog-gas-50",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DataKind = "real",
-                            FinalPricePerLiter = 27m,
-                            FuelName = "ГАЗ",
-                            FuelTypeId = "wog-gas",
-                            IsDeleted = false,
-                            Liters = 50m,
-                            MarginUahPerLiter = 1.5m,
-                            OriginalPrice = 1350m,
-                            Price = 1350m,
-                            StationId = "wog",
-                            SupplierPricePerLiter = 25.5m,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "okko-dp-2",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DataKind = "real",
-                            FinalPricePerLiter = 52m,
-                            FuelName = "ДП ЄВРО",
-                            FuelTypeId = "okko-dp",
-                            IsDeleted = false,
-                            Liters = 2m,
-                            MarginUahPerLiter = 2m,
-                            OriginalPrice = 104m,
-                            Price = 104m,
-                            StationId = "okko",
-                            SupplierPricePerLiter = 50m,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "okko-dp-3",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            DataKind = "real",
-                            FinalPricePerLiter = 52m,
-                            FuelName = "ДП ЄВРО",
-                            FuelTypeId = "okko-dp",
-                            IsDeleted = false,
-                            Liters = 3m,
-                            MarginUahPerLiter = 2m,
-                            OriginalPrice = 156m,
-                            Price = 156m,
-                            StationId = "okko",
-                            SupplierPricePerLiter = 50m,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         });
                 });
 
