@@ -796,6 +796,13 @@ jobs:
       - name: Test the deploy preflight
         run: bash /root/FuelFlow/deploy/preflight.test.sh
 
+      # The data preconditions added after the 2026-10-15 outage: a step-5 test with its own
+      # docker stub, so "it reported success" is distinguishable from "it never ran". Runs in
+      # the same place as the preflight test because a gate nobody exercises is a gate nobody
+      # reads.
+      - name: Test the deploy data preconditions
+        run: bash /root/FuelFlow/deploy/preflight-db.test.sh
+
       # ...and then run the whole preflight against the live box, so a bad .env, a bad
       # Caddyfile, an ambiguous upstream or a stale :main tag stops THIS deploy rather
       # than the next person who restarts something by hand.
