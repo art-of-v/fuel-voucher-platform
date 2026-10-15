@@ -2,25 +2,27 @@
 -- can browse and buy fuel under names that cannot be confused with the real thing.
 --
 -- What this creates, for every live package at every station:
---   * a `fuel_packages` row whose `fuel_name` is the live name plus a `(QA)` suffix, flagged
---     `is_test_data = true`, reusing the live `station_id` and `fuel_type_id`;
---   * `vouchers_per_package` sellable `fuel_vouchers` rows behind it, also `is_test_data = true`.
+--   * a `fuel_packages` row whose `fuel_name` is the live name plus a `(QA)` suffix, carrying
+--     `data_kind = 'qa'`, reusing the live `station_id` and `fuel_type_id`;
+--   * `vouchers_per_package` sellable `fuel_vouchers` rows behind it, also `data_kind = 'qa'`.
+--     The column was `is_test_data = true` until EnforceDataKind; the value set is pinned by a
+--     CHECK constraint, so the literals below cannot drift into anything the database accepts.
 --
 -- Why the names are mirrored here rather than listed: they stay 1:1 with whatever the catalogue
 -- actually sells today. Add a brand in admin and re-run this, and its QA twin appears too. A
 -- hand-maintained list would drift the first time someone renamed a brand, and the drift would be
 -- invisible - a QA package nobody notices is missing.
 --
--- Why no new `fuel_types` or `stations` rows: neither table has a test flag and neither endpoint
+-- Why no new `fuel_types` or `stations` rows: neither table has a pool column and neither endpoint
 -- filters on one, so a `QA`-named brand or station would reach every anonymous visitor of the public
--- catalogue. The test flag lives on `fuel_packages`, and the anonymous storefront routes now resolve
+-- catalogue. The pool lives on `fuel_packages`, and the anonymous storefront routes now resolve
 -- the caller's pool before they filter. That is the whole isolation story, and it is why this script
 -- creates two kinds of row and not a third.
 --
 -- The live nominal is mirrored as-is. Availability keys on (station, fuel type, nominal) and carries
 -- no package id, so a QA package at the same nominal is backed by the same key - meaning a QA session
 -- sees the live package lit as well as its `(QA)` twin. That is cosmetic, not a leak: the fulfilment
--- claim is gated on `is_test_data` (QaTestPoolSegregationIntegrationTests), so a QA order still only
+-- claim is gated on `data_kind` (QaTestPoolSegregationIntegrationTests), so a QA order still only
 -- ever consumes test stock and a real order only ever real stock. Give the QA rows a different
 -- nominal if that confusion is worse than a per-row constant to maintain.
 --
@@ -75,7 +77,7 @@ BEGIN;
 INSERT INTO fuel_packages
     (id, station_id, fuel_type_id, fuel_name, liters, price, original_price,
      supplier_price_per_liter, margin_uah_per_liter, final_price_per_liter,
-     is_test_data, is_deleted, created_at_utc, updated_at_utc)
+     data_kind, is_deleted, created_at_utc, updated_at_utc)
 SELECT
     'qa-pkg-' || live.id,
     live.station_id,
@@ -87,11 +89,11 @@ SELECT
     live.supplier_price_per_liter,
     live.margin_uah_per_liter,
     live.final_price_per_liter,
-    true,
+    'qa',
     false,
     now(), now()
 FROM fuel_packages live
-WHERE NOT live.is_test_data
+WHERE live.data_kind = 'real'
   AND NOT live.is_deleted
   AND (
       :'seed_all_stations'::boolean
@@ -125,7 +127,7 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO fuel_vouchers
 (id, brand, fuel_type_id, liters, cost_per_liter,
  supplier_expiration_date, customer_expiration_date, voucher_number, qr_payload,
-     status, is_test_data, is_deleted, created_at_utc, updated_at_utc)
+     status, data_kind, is_deleted, created_at_utc, updated_at_utc)
 SELECT
     gen_random_uuid(),
     lower(pkg.station_id),
@@ -137,7 +139,7 @@ SELECT
     'QA-CAT-' || substr(md5(pkg.id), 1, 8) || '-' || lpad(n::text, 2, '0'),
     'QA-QR-' || substr(md5(pkg.id), 1, 8) || '-' || lpad(n::text, 2, '0'),
     'Available',
-    true,
+    'qa',
     false,
     now(), now()
 FROM fuel_packages pkg
@@ -147,7 +149,7 @@ CROSS JOIN LATERAL (
         GREATEST(0, :vouchers_per_package::int - (
             SELECT count(*)
             FROM fuel_vouchers v
-            WHERE v.is_test_data
+            WHERE v.data_kind = 'qa'
               AND v.fuel_type_id = pkg.fuel_type_id
               AND v.liters = pkg.liters
               AND lower(v.brand) = lower(pkg.station_id)
@@ -167,9 +169,9 @@ ON CONFLICT DO NOTHING;
 
 \echo ''
 \echo 'QA catalogue seeded. Verify, as the QA account:'
-\echo '  select fuel_name, liters, is_test_data from fuel_packages where id like ''qa-pkg-%'' order by fuel_name;'
+\echo '  select fuel_name, liters, data_kind from fuel_packages where id like ''qa-pkg-%'' order by fuel_name;'
 \echo '  select brand, fuel_type_id, liters, customer_expiration_date, status'
-\echo '    from fuel_vouchers where is_test_data order by customer_expiration_date;'
+\echo '    from fuel_vouchers where data_kind = ''qa'' order by customer_expiration_date;'
 \echo ''
 \echo 'Anonymous readers must see none of it - check from outside a signed-in session:'
 \echo '  curl -s https://api.palne.shop/api/packages | grep -c ''(QA)'''   # expect 0

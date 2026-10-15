@@ -18,7 +18,7 @@ using Xunit;
 namespace FuelFlow.IntegrationTests;
 
 /// <summary>
-/// The QA⇄test segregation that makes <c>is_test_data</c> safe to run in production: a QA account
+/// The QA⇄real segregation that makes <c>data_kind = 'qa'</c> safe to run in production: a QA account
 /// (<see cref="User.IsQaAccount"/>) is only ever handed emulated test stock, and every real account
 /// is only ever handed real stock. Without it a seeded test voucher could be assigned to a paying
 /// customer, or a QA run could quietly burn real inventory a customer had paid for.

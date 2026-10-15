@@ -1,5 +1,6 @@
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Vouchers.GetAdminVoucherById;
@@ -65,7 +66,7 @@ public sealed class GetAdminVoucherByIdQueryHandler
             // Was declared on the DTO and never assigned, so every detail response reported
             // isTestData: false. An emulated voucher then looked like paid-for stock on the one
             // screen where someone checks a single voucher before acting on it.
-            IsTestData = item.IsTestData
+            IsTestData = item.DataKind == DataKinds.Qa
         };
     }
 }

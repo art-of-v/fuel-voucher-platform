@@ -157,9 +157,9 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
             .HasColumnName("cost_per_liter")
             .HasColumnType("numeric(10,4)");
 
-        builder.Property(e => e.IsTestData)
-            .HasColumnName("is_test_data")
-            .HasDefaultValue(false)
+        builder.Property(e => e.DataKind)
+            .HasColumnName("data_kind")
+            .HasMaxLength(10)
             .IsRequired();
 
         builder.Property(e => e.IsDeleted)
@@ -179,6 +179,8 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
                 "status NOT IN ('Assigned', 'Used', 'Blocked') OR order_id IS NOT NULL");
             t.HasCheckConstraint("ck_voucher_liters_positive", "liters > 0");
             t.HasCheckConstraint("ck_voucher_cost_non_negative", "cost_per_liter IS NULL OR cost_per_liter >= 0");
+            // The value set DataKinds.All documents - see DataKinds.
+            t.HasCheckConstraint("ck_fuel_vouchers_data_kind", "data_kind IN ('real', 'qa')");
 
             // The value set VoucherStatus defines. varchar(20) was exactly the length of
             // VerifiedWithWarnings, so the column had zero headroom and the next member added to
@@ -247,7 +249,7 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
         builder.HasIndex(e => e.SupplierId);
 
         // Cleanup and "is this stock real?" queries filter on it, so it is indexed alongside status.
-        builder.HasIndex(e => new { e.Status, e.IsTestData, e.IsDeleted });
+        builder.HasIndex(e => new { e.Status, e.DataKind, e.IsDeleted });
         builder.HasIndex(e => new { e.Brand, e.FuelTypeId, e.Liters, e.Status });
         // The blended-cost recompute reads this pool filtered by fuel and status.
         builder.HasIndex(e => new { e.FuelTypeId, e.Status, e.IsDeleted });

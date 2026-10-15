@@ -126,13 +126,13 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
         // One sellable voucher per pool, seeded once. Without both, "QA can see the QA package" would
         // pass on a row that is merely visible but dark, which is not what the reviewer needs.
         if (!await context.FuelVouchers.AnyAsync(
-                v => v.FuelTypeId == FuelType && v.Liters == RealLiters && !v.IsTestData, CancellationToken.None))
+                v => v.FuelTypeId == FuelType && v.Liters == RealLiters && v.DataKind == DataKinds.Real, CancellationToken.None))
         {
             context.FuelVouchers.Add(SellableVoucher(RealLiters, isTestData: false));
         }
 
         if (!await context.FuelVouchers.AnyAsync(
-                v => v.FuelTypeId == FuelType && v.Liters == QaLiters && v.IsTestData, CancellationToken.None))
+                v => v.FuelTypeId == FuelType && v.Liters == QaLiters && v.DataKind == DataKinds.Qa, CancellationToken.None))
         {
             context.FuelVouchers.Add(SellableVoucher(QaLiters, isTestData: true));
         }

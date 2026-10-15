@@ -91,12 +91,18 @@ internal sealed class FuelPackageConfiguration : IEntityTypeConfiguration<FuelPa
         builder.Property(e => e.IsDeleted).HasColumnName("is_deleted").IsRequired();
         builder.Property(e => e.DeletedAtUtc).HasColumnName("deleted_at_utc");
 
-        // NOT folded into the query filter below on purpose - see FuelPackage.IsTestData. A global
+        // NOT folded into the query filter below on purpose - see FuelPackage.DataKind. A global
         // filter would hide rehearsal rows from the admin screens that have to manage them.
-        builder.Property(e => e.IsTestData).HasColumnName("is_test_data").IsRequired();
+        //
+        // NOT NULL with no default: the point of the named value is that "nobody said" is not
+        // expressible. A default would put one back, and the default is the dangerous end.
+        builder.Property(e => e.DataKind)
+            .HasColumnName("data_kind")
+            .HasMaxLength(10)
+            .IsRequired();
 
         // The storefront query filters on it, so it carries the filter columns in front.
-        builder.HasIndex(e => new { e.IsDeleted, e.IsTestData });
+        builder.HasIndex(e => new { e.IsDeleted, e.DataKind });
 
         // A package is the thing an order line points at; archiving keeps that line readable.
         builder.HasQueryFilter(e => !e.IsDeleted);
@@ -123,6 +129,11 @@ internal sealed class FuelPackageConfiguration : IEntityTypeConfiguration<FuelPa
             // rather than a corrupt order, but the catalogue advertised it first.
             t.HasCheckConstraint("ck_fuel_packages_liters_positive", "liters > 0");
             t.HasCheckConstraint("ck_fuel_packages_price_non_negative", "price >= 0");
+
+            // The value set DataKinds.All documents. This is the constraint that makes a rehearsal
+            // package identifiable as one in a psql session, and it is why the column is a name
+            // rather than a boolean - see DataKinds for the two production incidents.
+            t.HasCheckConstraint("ck_fuel_packages_data_kind", "data_kind IN ('real', 'qa')");
         });
     }
 }

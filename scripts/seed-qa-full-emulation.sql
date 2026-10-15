@@ -52,7 +52,7 @@
 --   -v vouchers_per_package 25
 --   -v wallet_per_fuel_type 5    vouchers held per fuel type in the wallet
 --
--- Every row is `is_test_data = true`, which is the only thing keeping it away from a paying customer:
+-- Every row is `data_kind = 'qa'`, which is the only thing keeping it away from a paying customer:
 -- both the storefront filter and the fulfilment claim resolve the caller's pool, and neither this
 -- script nor the storefront creates a test-flagged row the other pool can see.
 
@@ -125,10 +125,10 @@ SELECT
     now() - interval '2 days',
     'Completed',
     (SELECT count(*) FROM fuel_packages p
-      WHERE p.station_id = s.id AND NOT p.is_test_data AND NOT p.is_deleted),
+      WHERE p.station_id = s.id AND p.data_kind = 'real' AND NOT p.is_deleted),
     0, 0, 0, 0
 FROM stations s
-WHERE EXISTS (SELECT 1 FROM fuel_packages p WHERE p.station_id = s.id AND NOT p.is_test_data AND NOT p.is_deleted)
+WHERE EXISTS (SELECT 1 FROM fuel_packages p WHERE p.station_id = s.id AND p.data_kind = 'real' AND NOT p.is_deleted)
   AND (:'seed_all_stations'::boolean OR s.id = :'station_id')
   AND NOT EXISTS (SELECT 1 FROM voucher_imports i WHERE i.file_name = 'QA-EMULATED-' || s.id || '.pdf');
 
@@ -138,7 +138,7 @@ WHERE EXISTS (SELECT 1 FROM fuel_packages p WHERE p.station_id = s.id AND NOT p.
 INSERT INTO fuel_packages
     (id, station_id, fuel_type_id, fuel_name, liters, price, original_price,
      supplier_price_per_liter, margin_uah_per_liter, final_price_per_liter,
-     is_test_data, is_deleted, created_at_utc, updated_at_utc)
+     data_kind, is_deleted, created_at_utc, updated_at_utc)
 SELECT
     'qa-pkg-' || live.id,
     live.station_id,
@@ -150,9 +150,9 @@ SELECT
     live.supplier_price_per_liter,
     live.margin_uah_per_liter,
     live.final_price_per_liter,
-    true, false, now(), now()
+    'qa', false, now(), now()
 FROM fuel_packages live
-WHERE NOT live.is_test_data
+WHERE live.data_kind = 'real'
   AND NOT live.is_deleted
   AND (:'seed_all_stations'::boolean OR live.station_id = :'station_id')
 ON CONFLICT (id) DO NOTHING;
@@ -185,7 +185,7 @@ ORDER BY imp.id, pkg.fuel_type_id;
 INSERT INTO fuel_vouchers
 (id, brand, fuel_type_id, liters, cost_per_liter, supplier_id, import_job_id,
  supplier_expiration_date, customer_expiration_date, voucher_number, qr_payload,
-     status, is_test_data, is_deleted, created_at_utc, updated_at_utc)
+     status, data_kind, is_deleted, created_at_utc, updated_at_utc)
 SELECT
     gen_random_uuid(),
     lower(pkg.station_id),
@@ -198,7 +198,7 @@ SELECT
     current_date + 180,
     'QA-STK-' || substr(md5(pkg.id), 1, 8) || '-' || lpad(n::text, 2, '0'),
     'QA-QR-' || substr(md5(pkg.id), 1, 8) || '-' || lpad(n::text, 2, '0'),
-    'Available', true, false, now() - interval '2 days', now() - interval '2 days'
+    'Available', 'qa', false, now() - interval '2 days', now() - interval '2 days'
 FROM fuel_packages pkg
 JOIN voucher_imports imp ON imp.file_name = 'QA-EMULATED-' || pkg.station_id || '.pdf'
 CROSS JOIN (SELECT id FROM suppliers WHERE name = 'QA Supplier (emulated)' LIMIT 1) sup
@@ -207,7 +207,7 @@ CROSS JOIN LATERAL (
         1,
         GREATEST(0, :vouchers_per_package::int - (
             SELECT count(*) FROM fuel_vouchers v
-            WHERE v.is_test_data
+            WHERE v.data_kind = 'qa'
               AND v.fuel_type_id = pkg.fuel_type_id
               AND v.liters = pkg.liters
               AND lower(v.brand) = lower(pkg.station_id)
@@ -269,7 +269,7 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO fuel_vouchers
 (id, brand, fuel_type_id, liters, cost_per_liter, supplier_id, import_job_id,
  supplier_expiration_date, customer_expiration_date, voucher_number, qr_payload,
-     status, is_test_data, is_deleted, order_id, assigned_to_user_id, issued_at_utc,
+     status, data_kind, is_deleted, order_id, assigned_to_user_id, issued_at_utc,
      created_at_utc, updated_at_utc)
 SELECT
     md5('qa-held-' || pkg.id || '-' || lpad(n::text, 2, '0'))::uuid,
@@ -283,7 +283,7 @@ SELECT
     current_date + 7,
     'QA-HELD-' || substr(md5(pkg.id), 1, 8) || '-' || lpad(n::text, 2, '0'),
     'QA-QRH-' || substr(md5(pkg.id), 1, 8) || '-' || lpad(n::text, 2, '0'),
-    'Assigned', true, false,
+    'Assigned', 'qa', false,
     md5('qa-order-' || pkg.id)::uuid,
     u.id,
     now() - interval '3 days', now() - interval '3 days', now() - interval '3 days'
@@ -313,10 +313,10 @@ WHERE v.id IN (
 \echo ''
 \echo 'QA pool emulated. Verify:'
 \echo '  select p.station_id, p.fuel_name, p.liters,'
-\echo '    (select count(*) from fuel_vouchers v where v.is_test_data and v.fuel_type_id = p.fuel_type_id'
+\echo '    (select count(*) from fuel_vouchers v where v.data_kind = ''qa'' and v.fuel_type_id = p.fuel_type_id'
 \echo '       and v.liters = p.liters and lower(v.brand) = lower(p.station_id) and v.status = ''Available'') as stock'
 \echo '  from fuel_packages p where p.id like ''qa-pkg-%'' order by 1,2,3;'
-\echo '  select status, count(*) from fuel_vouchers where is_test_data group by 1;'
+\echo '  select status, count(*) from fuel_vouchers where data_kind = ''qa'' group by 1;'
 \echo '  select count(*) as wallet_orders from orders o join order_line_items li on li.order_id = o.id where li.id like ''qa-line-%'';'
 \echo ''
 \echo 'Anonymous readers must see no (QA) row:'

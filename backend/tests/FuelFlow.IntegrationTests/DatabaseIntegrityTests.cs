@@ -657,9 +657,9 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
             """
             INSERT INTO fuel_vouchers (id, brand, fuel_type_id, liters, supplier_expiration_date,
                                        customer_expiration_date, voucher_number, qr_payload,
-                                       created_at_utc, updated_at_utc, status, is_test_data, is_deleted)
+                                       created_at_utc, updated_at_utc, status, data_kind, is_deleted)
             VALUES ({0}, 'okko', 'okko-dp', 10, '2027-01-01', '2027-01-01', 'bad-status', 'bad-status-qr',
-                    now(), now(), 'Availble', false, false)
+                    now(), now(), 'Availble', 'real', false)
             """, Guid.NewGuid());
 
         await act.Should().ThrowAsync<PostgresException>();
@@ -694,9 +694,9 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
             """
             INSERT INTO fuel_vouchers (id, brand, fuel_type_id, liters, supplier_expiration_date,
                                        customer_expiration_date, voucher_number, qr_payload,
-                                       created_at_utc, updated_at_utc, status, is_test_data, is_deleted)
+                                       created_at_utc, updated_at_utc, status, data_kind, is_deleted)
             VALUES ({0}, 'okko', 'okko-dp', 10, '2027-01-01', '2027-01-01', 'longest-status', 'longest-status-qr',
-                    now(), now(), 'VerifiedWithWarnings', false, false)
+                    now(), now(), 'VerifiedWithWarnings', 'real', false)
             """, Guid.NewGuid());
 
         await act.Should().NotThrowAsync("the longest member is 20 chars and the column is wider");

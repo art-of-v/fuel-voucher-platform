@@ -1,5 +1,6 @@
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Vouchers.GetAdminVouchers;
@@ -45,11 +46,13 @@ public sealed class GetAdminVouchersQueryHandler
         if (query.WorkerUserId.HasValue)
             q = q.Where(v => v.WorkerUserId == query.WorkerUserId.Value);
 
-        // Unset means both, so an operator sees exactly what they saw before the flag existed.
+        // Unset means both, so an operator sees exactly what they saw before the flag existed. Both arms
+        // compare the mapped column, not the IsTestData shim: a [NotMapped] getter is not
+        // translatable, so the boolean form of this filter threw at run time.
         q = query.TestData?.Trim().ToLowerInvariant() switch
         {
-            "only" => q.Where(v => v.IsTestData),
-            "exclude" => q.Where(v => !v.IsTestData),
+            "only" => q.Where(v => v.DataKind == DataKinds.Qa),
+            "exclude" => q.Where(v => v.DataKind == DataKinds.Real),
             _ => q
         };
 
@@ -127,12 +130,12 @@ public sealed class GetAdminVouchersQueryHandler
             WorkerLastName = v.WorkerUser?.LastName,
             CreatedAtUtc = v.CreatedAtUtc,
             ImageUrl = v.ImageUrl,
-            IsTestData = v.IsTestData,
+            IsTestData = v.DataKind == DataKinds.Qa,
             IsDeleted = v.IsDeleted
         }).ToList();
 
         var globalTotal = await _context.FuelVouchers.IgnoreQueryFilters().CountAsync(cancellationToken);
-        var testDataTotal = await _context.FuelVouchers.CountAsync(v => v.IsTestData, cancellationToken);
+        var testDataTotal = await _context.FuelVouchers.CountAsync(v => v.DataKind == DataKinds.Qa, cancellationToken);
         var fuelTypeOptions = await _context.FuelVouchers
             .IgnoreQueryFilters()
             .AsNoTracking()

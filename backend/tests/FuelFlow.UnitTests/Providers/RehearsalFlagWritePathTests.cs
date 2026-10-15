@@ -18,7 +18,7 @@ using Xunit;
 namespace FuelFlow.UnitTests.Providers;
 
 /// <summary>
-/// <c>is_test_data</c> decides whether a package is sellable, and it used to be optional: a plain
+/// <c>data_kind</c> decides whether a package is sellable, and it used to be optional: a plain
 /// <c>bool</c> on the request DTOs, so a client that omitted it got <c>false</c> — which means "put it
 /// on sale".
 /// <para>
