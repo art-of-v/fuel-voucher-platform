@@ -626,12 +626,24 @@ jobs:
       - name: Install EF Core tools
         run: dotnet tool install --global dotnet-ef --version 10.0.12
 
+      # `name` was absent, so this downloaded EVERY artifact in the run - a dozen from unrelated
+      # jobs - straight into the workspace root, and the restore step then failed on a missing
+      # schema.sql that had in fact been written under some other artifact's folder. Naming the
+      # artifact is what makes the next step's relative paths mean anything.
       - name: Download the dump
         uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: migration-dryrun-dump
+          path: dryrun
 
       - name: Restore the dump
         run: |
           set -euo pipefail
+          # The download above writes into ./dryrun, so every relative path below is resolved from
+          # here rather than from the workspace root. Without this the `for f in *.csv` glob silently
+          # matches the repository's own CSVs - and a restore that quietly loaded nothing while
+          # printing "restored" would be worse than the failure it replaced.
+          cd dryrun
           export PGPASSWORD=postgres
           db() { psql "postgres://postgres:$PGPASSWORD@localhost:5432/fuelflow" "$@"; }
           db -q -v ON_ERROR_STOP=1 -f schema.sql > /dev/null

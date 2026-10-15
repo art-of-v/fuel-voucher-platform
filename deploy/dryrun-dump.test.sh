@@ -1,18 +1,24 @@
 #!/usr/bin/env bash
-# Tests the `Migration dry run: dump` shell block in .github/workflows/ci.yml.
+# Tests the migration dry run in .github/workflows/ci.yml - both halves, the dump on the production
+# box and the restore on the hosted runner.
 #
 # WHY THIS NEEDS A TEST
-# This block runs only on the self-hosted production box, only when a PR touches a migration, and
-# it has never been green: it failed the first time it ever ran (PR #1149, 2026-10-15) with
-#     psql: unrecognized option: schema-only
-# so the gate has been reporting red for every migration PR while proving nothing about migrations.
-# Nothing about it is observable from a laptop - it needs a shell, a `docker` and a live psql.
+# The dry run landed in #1149 and had never been green. It was not one bug but a chain of six, each
+# one hiding the next because a failing step ends the job before the following step can also be
+# wrong:
+#   1. `psql --schema-only` is not a psql flag                -> the dump never produced a file
+#   2. the restore job had no setup-dotnet and no dotnet-ef   -> masked by 1
+#   3. the leak guard scanned the schema dump and matched the column name -> masked by 1
+#   4. upload-artifact declared no `path`                    -> surfaced once 1-3 were fixed
+#   5. download-artifact declared no `name`, so it pulled every artifact in the run -> masked by 4
+#   6. the restore step resolved its paths from the workspace root, not the download directory
+# Fixing any one of them in isolation would have looked like progress and still been red.
 #
-# As with changes-detector.test.sh, the block is EXTRACTED from ci.yml rather than copied here, and
-# run against a stub `docker` that records the argv it was handed. A pasted copy would keep passing
-# after ci.yml changed, which is the whole failure mode. The stub is what turns "psql rejected an
-# option" into "here is exactly the argv psql received", which is the only way to tell a quoting
-# bug from a client too old to know the flag.
+# None of it is observable from a laptop - the dump half needs the production box and a live
+# postgres, the restore half needs a service container. So the blocks are EXTRACTED from ci.yml and
+# run here against stubs, rather than copied: a pasted copy keeps passing after ci.yml changes, which
+# is the entire failure mode. The `docker` stub records its argv, which is the only way to tell a
+# quoting bug from a client too old to know a flag.
 #
 # Run: bash deploy/dryrun-dump.test.sh
 set -uo pipefail
@@ -173,10 +179,86 @@ else
   bad "the upload path is the guarded dump directory" "$(printf '%s\n' "$upload_block" | grep '^ *path:' || echo none)" "a path under dryrun"
 fi
 
+# ---- the restore half -------------------------------------------------------------------
+# download-artifact with no `name` pulls every artifact in the run into the workspace root, so the
+# restore's relative paths resolve against the repository instead of the dump.
+dl_block="$(awk '/^      - name: Download the dump$/ { f = 1 } f && /^  [a-z]/ && !/Download the dump/ { exit } f' "$CI_YML")"
+if printf '%s\n' "$dl_block" | grep -q '^ *name:'; then
+  ok "the download step names the artifact"
+else
+  bad "the download step names the artifact" "no name: key - pulls every artifact in the run" "a name: key"
+fi
+# The upload and download must name the SAME artifact; a rename on one side alone silently
+# restores nothing.
+up_name="$(printf '%s\n' "$upload_block" | grep '^ *name:' | head -1 | sed 's/^ *name: *//')"
+dl_name="$(printf '%s\n' "$dl_block"   | grep '^ *name:' | head -1 | sed 's/^ *name: *//')"
+eq "upload and download name the same artifact" "$up_name" "$dl_name"
+
+# The restore block, extracted and run for real against a stub psql in a throwaway tree laid out
+# the way the workflow lays it out. This is what pins defect 6: without the `cd`, the csv glob
+# matches the repository's own files and the restore prints "restored" having loaded nothing.
+awk '
+  /^      - name: Restore the dump$/ { in_step = 1; next }
+  in_step && /^        run: \|$/   { in_run = 1; next }
+  in_run {
+    if ($0 ~ /^[[:space:]]*$/) { print ""; next }
+    if ($0 !~ /^          /) exit
+    sub(/^ {10}/, "")
+    print
+  }
+' "$CI_YML" > "$WORK/restore.raw"
+
+if ! grep -q 'copy' "$WORK/restore.raw"; then
+  echo "::error::could not extract the restore step from $CI_YML"
+  exit 1
+fi
+
+cat > "$WORK/bin/psql" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$PSQL_LOG"
+case " $* " in
+  *-f\ schema.sql*) echo "-- schema applied" ;;
+  *copy*)            echo "COPY 1" ;;
+  *count*)           echo "42" ;;
+esac
+exit 0
+STUB
+chmod +x "$WORK/bin/psql"
+
+# Builds a tree shaped like the runner's: a workspace root holding a decoy CSV (what the repository
+# itself contains) and the artifact under ./dryrun.
+: > "$WORK/psql.log"
+mkdir -p "$WORK/restore-tree/dryrun"
+echo "decoy,not,ours" > "$WORK/restore-tree/decoy.csv"
+echo "MigrationId,ProductVersion" > "$WORK/restore-tree/dryrun/history.csv"
+echo "id,name" > "$WORK/restore-tree/dryrun/fuel_types.csv"
+echo "-- schema" > "$WORK/restore-tree/dryrun/schema.sql"
+( cd "$WORK/restore-tree" && PATH="$WORK/bin:$PATH" PSQL_LOG="$WORK/psql.log" PGPASSWORD=postgres \
+    bash "$WORK/restore.raw" ) > "$WORK/restore.out" 2>&1
+rc=$?
+
+if [ "$rc" -ne 0 ]; then
+  bad "the restore step runs against the downloaded dump" "exit $rc: $(tail -2 "$WORK/restore.out" | tr '\n' ' ')" "exit 0"
+else
+  ok "the restore step runs against the downloaded dump"
+fi
+# The decoy sits in the workspace root on purpose. If the block never changes directory, `*.csv`
+# picks it up and a table named "decoy" is restored - the silent-wrong-answer failure mode.
+if grep -q 'decoy' "$WORK/psql.log"; then
+  bad "the restore never reads CSVs from outside the dump directory" "restored decoy.csv" "dump dir only"
+else
+  ok "the restore never reads CSVs from outside the dump directory"
+fi
+if grep -q 'fuel_types' "$WORK/psql.log"; then
+  ok "the restore loads the tables it was given"
+else
+  bad "the restore loads the tables it was given" "no fuel_types" "fuel_types restored"
+fi
+
 echo
 if [ "$fail" -eq 0 ]; then
-  echo "all $pass dump case(s) pass"
+  echo "all $pass dry-run case(s) pass"
 else
-  echo "$fail of $((pass + fail)) dump case(s) FAILED"
+  echo "$fail of $((pass + fail)) dry-run case(s) FAILED"
 fi
 exit "$fail"
