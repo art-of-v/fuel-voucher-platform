@@ -137,23 +137,25 @@ public sealed class BrandsControllerTests : IDisposable
         _context.ChangeTracker.Clear();
     }
 
+    /// <summary>
+    /// Seeds an offer plus one volume, which is what the brand controller now writes and reads.
+    /// </summary>
+    /// <remarks>
+    /// The per-litre figures live on the offer; the volume carries the frozen package total. Seeded the
+    /// old way, every assertion below would read a table no handler touches and fail as "the fuel was
+    /// not priced" rather than as a broken fixture.
+    /// </remarks>
     private async Task AddPackageAsync(string fuelId, string stationId, decimal liters, decimal final, decimal supplier, decimal margin)
     {
-        _context.FuelPackages.Add(new FuelPackage
-        {
-            Id = $"{fuelId}-{liters}",
-            StationId = stationId,
-            FuelTypeId = fuelId,
-            FuelName = "fuel",
-            Liters = liters,
-            Price = (int)Math.Round(final * liters),
-            OriginalPrice = (int)Math.Round(supplier * liters),
-            SupplierPricePerLiter = supplier,
-            MarginUahPerLiter = margin,
-            FinalPricePerLiter = final,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
-        });
+        _context.SeedPackage(
+            id: $"{fuelId}-{liters}",
+            stationId: stationId,
+            fuelTypeId: fuelId,
+            liters: liters,
+            price: Math.Round(final * liters, 2),
+            supplierPricePerLiter: supplier,
+            marginUahPerLiter: margin,
+            finalPricePerLiter: final);
         await _context.SaveChangesAsync();
         _context.ChangeTracker.Clear();
     }
@@ -197,16 +199,16 @@ public sealed class BrandsControllerTests : IDisposable
         result.Should().BeOfType<CreatedAtActionResult>();
 
         var fuel = await _context.FuelTypes.SingleAsync(f => f.StationId == "test-klo");
-        var liters = await _context.FuelPackages
-            .Where(p => p.FuelTypeId == fuel.Id)
+        var liters = await _context.FuelOfferVolumes
+            .Where(p => p.Offer.FuelTypeId == fuel.Id)
             .Select(p => (int)p.Liters)
             .OrderBy(l => l)
             .ToListAsync();
 
         liters.Should().Equal(2, 3, 5, 10, 20, 50);
 
-        var packages = await _context.FuelPackages.Where(p => p.FuelTypeId == fuel.Id).ToListAsync();
-        packages.Should().OnlyContain(p => p.FinalPricePerLiter == 100.5m);
+        var offer = await _context.FuelOffers.SingleAsync(o => o.FuelTypeId == fuel.Id);
+        offer.FinalPricePerLiter.Should().Be(100.5m);
     }
 
     [Fact]
@@ -225,8 +227,8 @@ public sealed class BrandsControllerTests : IDisposable
         result.Should().BeOfType<CreatedAtActionResult>();
 
         var newFuel = await _context.FuelTypes.SingleAsync(f => f.StationId == "test-okko" && f.Id != "test-fuel-a");
-        var liters = await _context.FuelPackages
-            .Where(p => p.FuelTypeId == newFuel.Id)
+        var liters = await _context.FuelOfferVolumes
+            .Where(p => p.Offer.FuelTypeId == newFuel.Id)
             .Select(p => (int)p.Liters)
             .OrderBy(l => l)
             .ToListAsync();
@@ -263,8 +265,8 @@ public sealed class BrandsControllerTests : IDisposable
         fuel.BasePrice.Should().Be(97.86m);
         fuel.DiscountPrice.Should().Be(97.86m);
 
-        var pkg = await _context.FuelPackages.SingleAsync(p => p.FuelTypeId == fuel.Id);
-        pkg.Price.Should().Be(978.60m);
+        var volume = await _context.FuelOfferVolumes.SingleAsync(v => v.Offer.FuelTypeId == fuel.Id);
+        volume.PackagePrice.Should().Be(978.60m);
     }
 
     [Fact]
@@ -280,15 +282,15 @@ public sealed class BrandsControllerTests : IDisposable
 
         result.Should().BeOfType<OkObjectResult>();
 
-        var liters = await _context.FuelPackages
-            .Where(p => p.FuelTypeId == "test-fuel-ttt")
+        var liters = await _context.FuelOfferVolumes
+            .Where(p => p.Offer.FuelTypeId == "test-fuel-ttt")
             .Select(p => (int)p.Liters)
             .OrderBy(l => l)
             .ToListAsync();
         liters.Should().Equal(2, 3, 5, 10, 20, 50);
 
-        var packages = await _context.FuelPackages.Where(p => p.FuelTypeId == "test-fuel-ttt").ToListAsync();
-        packages.Should().OnlyContain(p => p.FinalPricePerLiter == 100.5m);
+        var offer = await _context.FuelOffers.SingleAsync(o => o.FuelTypeId == "test-fuel-ttt");
+        offer.FinalPricePerLiter.Should().Be(100.5m);
     }
 
     [Fact]
@@ -306,10 +308,16 @@ public sealed class BrandsControllerTests : IDisposable
 
         result.Should().BeOfType<OkObjectResult>();
 
-        var packages = await _context.FuelPackages.Where(p => p.FuelTypeId == "test-fuel-a").ToListAsync();
-        packages.Should().OnlyContain(p => p.FinalPricePerLiter == 63m);
-        packages.Should().OnlyContain(p => p.Price == Math.Round(63m * p.Liters, 2, MidpointRounding.AwayFromZero));
-        packages.Should().OnlyContain(p => p.SupplierPricePerLiter == 60m);
+        var offer = await _context.FuelOffers.SingleAsync(o => o.FuelTypeId == "test-fuel-a");
+        offer.FinalPricePerLiter.Should().Be(63m);
+        offer.SupplierPricePerLiter.Should().Be(60m);
+
+        // The frozen package total is restated on every volume from the new per-litre price. Asserting
+        // this separately from the offer is the point: it is what stops a stale package total from
+        // surviving a reprice, which is the failure the old per-package columns allowed.
+        var volumes = await _context.FuelOfferVolumes
+            .Where(v => v.OfferId == offer.Id).ToListAsync();
+        volumes.Should().OnlyContain(v => v.PackagePrice == Math.Round(63m * v.Liters, 2, MidpointRounding.AwayFromZero));
     }
 
     [Fact]
@@ -366,8 +374,8 @@ public sealed class BrandsControllerTests : IDisposable
 
         foreach (var fuelId in new[] { "test-fuel-a", "test-fuel-b" })
         {
-            var liters = await _context.FuelPackages
-                .Where(p => p.FuelTypeId == fuelId)
+            var liters = await _context.FuelOfferVolumes
+                .Where(p => p.Offer.FuelTypeId == fuelId)
                 .Select(p => (int)p.Liters)
                 .OrderBy(l => l)
                 .ToListAsync();
@@ -389,12 +397,14 @@ public sealed class BrandsControllerTests : IDisposable
 
         result.Should().BeOfType<OkObjectResult>();
 
-        var pkg = await _context.FuelPackages.SingleAsync(p => p.FuelTypeId == "test-fuel-a");
-        pkg.Liters.Should().Be(20m);
-        pkg.FinalPricePerLiter.Should().Be(51m);
-        pkg.SupplierPricePerLiter.Should().Be(49m);
-        pkg.MarginUahPerLiter.Should().Be(2m);
-        pkg.Price.Should().Be(Math.Round(51m * 20m, 2, MidpointRounding.AwayFromZero));
+        var offer = await _context.FuelOffers.SingleAsync(o => o.FuelTypeId == "test-fuel-a");
+        offer.FinalPricePerLiter.Should().Be(51m);
+        offer.SupplierPricePerLiter.Should().Be(49m);
+        offer.MarginUahPerLiter.Should().Be(2m);
+
+        var volume = await _context.FuelOfferVolumes.SingleAsync(v => v.OfferId == offer.Id);
+        volume.Liters.Should().Be(20m);
+        volume.PackagePrice.Should().Be(Math.Round(51m * 20m, 2, MidpointRounding.AwayFromZero));
     }
 
     [Fact]
@@ -424,7 +434,11 @@ public sealed class BrandsControllerTests : IDisposable
         JsonSerializer.Serialize(bad.Value).Should().Contain("below_cost");
 
         (await _context.FuelTypes.AnyAsync(f => f.StationId == "test-okko")).Should().BeFalse();
-        (await _context.FuelPackages.AnyAsync(p => p.StationId == "test-okko")).Should().BeFalse();
+        // Deleting a brand archives its offers AND their volumes now, so "no live package at this
+        // station" has to be asked of the volumes behind them - the offer alone would still answer.
+        (await _context.FuelOfferVolumes.AnyAsync(v => v.Offer.StationId == "test-okko")).Should().BeFalse();
+        (await _context.FuelOffers.IgnoreQueryFilters().AnyAsync(o => o.StationId == "test-okko" && !o.IsDeleted))
+            .Should().BeFalse();
     }
 
     [Fact]
@@ -443,8 +457,8 @@ public sealed class BrandsControllerTests : IDisposable
 
         var fuel = await _context.FuelTypes.SingleAsync(f => f.StationId == "test-okko");
         fuel.AllowBelowCost.Should().BeTrue();
-        var pkg = await _context.FuelPackages.SingleAsync(p => p.FuelTypeId == fuel.Id);
-        pkg.FinalPricePerLiter.Should().Be(48.5m);   // min(cost 50 + margin 2, pump 49 − minDisc 0.5)
+        var pricedOffer = await _context.FuelOffers.SingleAsync(o => o.FuelTypeId == fuel.Id);
+        pricedOffer.FinalPricePerLiter.Should().Be(48.5m);   // min(cost 50 + margin 2, pump 49 − minDisc 0.5)
 
         alerts.Verify(a => a.SendAsync(
             AlertSeverity.Warning, It.IsAny<string>(), It.IsAny<string>(),
@@ -467,8 +481,8 @@ public sealed class BrandsControllerTests : IDisposable
         var bad = result.Should().BeOfType<BadRequestObjectResult>().Subject;
         JsonSerializer.Serialize(bad.Value).Should().Contain("below_cost");
 
-        var pkg = await _context.FuelPackages.SingleAsync(p => p.FuelTypeId == "test-fuel-a");
-        pkg.FinalPricePerLiter.Should().Be(51m);
+        var offer = await _context.FuelOffers.SingleAsync(o => o.FuelTypeId == "test-fuel-a");
+        offer.FinalPricePerLiter.Should().Be(51m);
         var fuel = await _context.FuelTypes.SingleAsync(f => f.Id == "test-fuel-a");
         fuel.AllowBelowCost.Should().BeFalse();
     }
@@ -489,8 +503,8 @@ public sealed class BrandsControllerTests : IDisposable
 
         result.Should().BeOfType<OkObjectResult>();
 
-        var pkg = await _context.FuelPackages.SingleAsync(p => p.FuelTypeId == "test-fuel-a");
-        pkg.FinalPricePerLiter.Should().Be(48.5m);
+        var offer = await _context.FuelOffers.SingleAsync(o => o.FuelTypeId == "test-fuel-a");
+        offer.FinalPricePerLiter.Should().Be(48.5m);
         var fuel = await _context.FuelTypes.SingleAsync(f => f.Id == "test-fuel-a");
         fuel.AllowBelowCost.Should().BeTrue();
 
