@@ -64,6 +64,11 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
     public DbSet<StationNode> StationNodes => Set<StationNode>();
     public DbSet<FuelTypeEntity> FuelTypes => Set<FuelTypeEntity>();
     public DbSet<FuelPackage> FuelPackages => Set<FuelPackage>();
+
+    // The split target of #318. Nothing reads these yet in this PR: they are created, backfilled and
+    // constrained so the migration can be proved against a real database before any read path moves.
+    public DbSet<FuelOffer> FuelOffers => Set<FuelOffer>();
+    public DbSet<FuelOfferVolume> FuelOfferVolumes => Set<FuelOfferVolume>();
     public DbSet<Contract> Contracts => Set<Contract>();
     public DbSet<UserContract> UserContracts => Set<UserContract>();
     public DbSet<LegalEntity> LegalEntities => Set<LegalEntity>();
