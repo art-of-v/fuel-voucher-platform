@@ -156,6 +156,23 @@ else
   bad "dumping the vouchers table still refuses the upload" "exit $rc" "non-zero, file present"
 fi
 
+# The upload step. It shipped with no `path:` at all, so upload-artifact exited "Input required and
+# not supplied: path" - invisible until the dump block above started succeeding. Asserted here as
+# text because the failure is a missing key in this file, not anything the shell block can reach.
+upload_block="$(awk '/^      - name: Upload the dump$/ { f = 1 } f && /^  [a-z]/ && !/Upload the dump/ { exit } f' "$CI_YML")"
+if printf '%s\n' "$upload_block" | grep -q '^ *path:'; then
+  ok "the upload step declares a path"
+else
+  bad "the upload step declares a path" "no path: key" "a path: key"
+fi
+# It has to point at the directory the guard scans, not a hand-listed set of files - a file list
+# here is a second place the dump contents are named, outside the guard's reach.
+if printf '%s\n' "$upload_block" | grep -qE '^ *path:.*dryrun'; then
+  ok "the upload path is the guarded dump directory"
+else
+  bad "the upload path is the guarded dump directory" "$(printf '%s\n' "$upload_block" | grep '^ *path:' || echo none)" "a path under dryrun"
+fi
+
 echo
 if [ "$fail" -eq 0 ]; then
   echo "all $pass dump case(s) pass"
