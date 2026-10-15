@@ -40,7 +40,8 @@ jobs:
   # Fails OPEN: if the base commit or the diff is unavailable, every component is marked
   # changed so nothing is silently skipped. Any change OUTSIDE the four app dirs (repo-root
   # files, deploy/, docs/, .github/**) also runs everything — a shared or CI change can affect
-  # any component, so the safe default there is the full matrix.
+  # any component, so the safe default there is the full matrix. scripts/ is the one exception:
+  # nothing outside it imports those fetchers, so it runs the scripts job and nothing else.
   changes:
     name: Detect changed components
     runs-on: ubuntu-latest
@@ -51,6 +52,7 @@ jobs:
       website: ${{ steps.filter.outputs.website }}
       deploy: ${{ steps.filter.outputs.deploy }}
       migrations: ${{ steps.filter.outputs.migrations }}
+      scripts: ${{ steps.filter.outputs.scripts }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -73,7 +75,7 @@ jobs:
             changed="$(git diff --name-only "$base" "${{ github.sha }}")" || { echo "diff failed — running all suites."; allchanged=1; changed=""; }
           fi
           echo "Changed files:"; echo "$changed"
-          backend=false; admin=false; mobile=false; website=false; deploy=false; other=false
+          backend=false; admin=false; mobile=false; website=false; deploy=false; scripts=false; other=false
           # A migration is a data-shaped change, not a backend code change: it can pass every backend
           # test, pass staging, and still be wrong against production's rows. On 2026-10-15 that is
           # what happened twice - the offer split took the API down, then came back and took it down
@@ -89,14 +91,18 @@ jobs:
             mobile/*)  mobile=true ;;
             website/*) website=true ;;
             deploy/*)  deploy=true; other=true ;;
+            # The repo-root fetchers (scripts/fetch-*-stations.mjs and friends). Nothing outside
+            # scripts/ imports them, so a change here cannot break a component's suite — what it
+            # needs is the scripts job below. Used to fall through to `*)` and run the full matrix.
+            scripts/*) scripts=true ;;
             *)         other=true ;;
             esac
           done <<< "$changed"
           # A change to shared/root/CI/deploy files, or an unreadable diff, exercises everything.
           if [ "$allchanged" = "1" ] || [ "$other" = "true" ]; then
-            backend=true; admin=true; mobile=true; website=true; migrations=true
+            backend=true; admin=true; mobile=true; website=true; migrations=true; scripts=true
           fi
-          for kv in "backend=$backend" "admin=$admin" "mobile=$mobile" "website=$website" "deploy=$deploy" "migrations=$migrations"; do
+          for kv in "backend=$backend" "admin=$admin" "mobile=$mobile" "website=$website" "deploy=$deploy" "migrations=$migrations" "scripts=$scripts"; do
             echo "$kv" >> "$GITHUB_OUTPUT"; echo "$kv"
           done
 
@@ -481,10 +487,38 @@ jobs:
       - name: Test the disk pressure check
         run: bash deploy/disk-check.test.sh
 
-      # The migration dry run's dump step, which lives in this same file and runs only on the
+# The migration dry run's dump step, which lives in this same file and runs only on the
       # production box. It had been red since it first shipped and nothing here could see it.
       - name: Test the migration dry-run dump
         run: bash deploy/dryrun-dump.test.sh
+
+  # The repo-root fetchers in scripts/ — the only write path into `station_nodes`. They parse a
+  # third-party site nobody here controls (UPG rebuilds its map page periodically, KLO renders its
+  # pins through a WordPress plugin), and a silent parse change would import a few hundred rows with
+  # mangled names or addresses that nobody notices until the map is already wrong.
+  #
+  # This job is also where the change detector that gates it gets tested — see below.
+  #
+  # node:test is in the standard library, so the fetcher tests are a bare checkout + one command —
+  # no npm ci, no package.json, no lockfile. That is why scripts/ gets its own job rather than
+  # being folded into a component suite: it shares no dependencies with any of them.
+  scripts:
+    name: Station fetchers (node:test)
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.scripts == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Test the station fetchers
+        run: node --test scripts/
+
+      # Runs the detector block out of THIS file rather than a copy of it - a pasted copy would
+      # keep passing after ci.yml changed, which is the whole failure mode. Needs bash + git, both
+      # on the runner already.
+      - name: Test the change detector
+        run: bash scripts/changes-detector.test.sh
 
   # ------------------------------------------------------------------------------
   # Migration dry run against production's DATA, on the production BOX.
@@ -691,7 +725,7 @@ jobs:
   ci-required:
     name: CI required
     if: always()
-    needs: [changes, backend, backend-integration, admin, mobile, website, deploy-scripts, dryrun-dump, dryrun-migrate]
+    needs: [changes, backend, backend-integration, admin, mobile, website, deploy-scripts, scripts, dryrun-dump, dryrun-migrate]
     runs-on: ubuntu-latest
     steps:
       - name: Verify no required job failed
