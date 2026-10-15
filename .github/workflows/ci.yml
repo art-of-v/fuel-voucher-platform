@@ -563,7 +563,14 @@ jobs:
 
           # Refuse to ship customer data even if the list above is edited carelessly. A build
           # artifact is not a safe place for voucher numbers or QR payloads.
-          if [ -e "$out/fuel_vouchers.csv" ] || grep -rlq 'qr_payload' "$out" 2>/dev/null; then
+          #
+          # Scans the CSV data files, NOT schema.sql, and that distinction is load-bearing. The
+          # schema dump legitimately contains the string "qr_payload": it is a real column on
+          # fuel_vouchers, so pg_dump emits "COMMENT ON COLUMN fuel_vouchers.qr_payload ...". That
+          # is a column NAME in DDL, not a customer's QR payload, and scanning the schema tripped
+          # this guard on every run (2026-10-15) - refusing a dump that held nothing but DDL. Only
+          # the COPY output can carry row values, so only that is scanned.
+          if [ -e "$out/fuel_vouchers.csv" ] || grep -lq 'qr_payload' "$out"/*.csv 2>/dev/null; then
             echo "::error::the dump contains voucher data; refusing to upload it"
             exit 1
           fi
