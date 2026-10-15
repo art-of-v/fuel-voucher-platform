@@ -124,6 +124,26 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.HasIndex(e => e.IdempotencyKey)
             .IsUnique()
             .HasFilter("idempotency_key IS NOT NULL");
+
+        // Unique as well as indexed, and both halves matter:
+        //
+        // Indexed - ProcessMonobankWebhookCommandHandler resolves the order by this column on the
+        // ANONYMOUS webhook path, with no index at all it was a sequential scan of orders per
+        // delivery. Reconciliation matches on it too (GetStatementReconciliationQueryHandler,
+        // StatementMatcher).
+        //
+        // Unique - that handler reads it with FirstOrDefaultAsync, so two orders sharing an
+        // invoice id would let a payment fulfil whichever row the plan happened to return, with no
+        // error anywhere. An order is what Monobank actually charged against, so allowing two to
+        // claim the same invoice is a money correctness bug, not a tidy-up.
+        //
+        // Partial, like idempotency_key above: an order that has not reached the payment provider
+        // yet has no invoice, and thousands of nulls must not collide with each other. Postgres
+        // treats nulls as distinct in a unique index anyway, but the filter keeps the intent
+        // explicit and matches the sibling constraint.
+        builder.HasIndex(e => e.MonobankInvoiceId)
+            .IsUnique()
+            .HasFilter("monobank_invoice_id IS NOT NULL");
         builder.HasIndex(e => new { e.UserId, e.Status });
         builder.HasIndex(e => new { e.UserId, e.CreatedAtUtc })
             .IsDescending(false, true);

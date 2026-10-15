@@ -980,6 +980,10 @@ namespace FuelFlow.API.Migrations
 
                     b.HasIndex("LegalEntityId");
 
+                    b.HasIndex("MonobankInvoiceId")
+                        .IsUnique()
+                        .HasFilter("monobank_invoice_id IS NOT NULL");
+
                     b.HasIndex("SourceOrderId");
 
                     b.HasIndex("UserId", "CreatedAtUtc")
