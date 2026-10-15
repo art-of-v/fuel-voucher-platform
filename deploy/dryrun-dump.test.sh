@@ -12,6 +12,7 @@
 #   4. upload-artifact declared no `path`                    -> surfaced once 1-3 were fixed
 #   5. download-artifact declared no `name`, so it pulled every artifact in the run -> masked by 4
 #   6. the restore step resolved its paths from the workspace root, not the download directory
+#   7. the apply step called `dotnet ef` with no `dotnet restore` before it -> NETSDK1004
 # Fixing any one of them in isolation would have looked like progress and still been red.
 #
 # None of it is observable from a laptop - the dump half needs the production box and a live
@@ -253,6 +254,22 @@ if grep -q 'fuel_types' "$WORK/psql.log"; then
   ok "the restore loads the tables it was given"
 else
   bad "the restore loads the tables it was given" "no fuel_types" "fuel_types restored"
+fi
+
+# The migration step. `dotnet ef` builds the project it targets, so a step that does not restore
+# first dies on a fresh runner with NETSDK1004 and never reaches a migration at all. Asserted as
+# text: whether restore actually succeeds needs the network, which this harness deliberately has no
+# stake in.
+migrate_block="$(awk '/^      - name: Apply pending migrations$/ { f = 1 } f && /^  [a-z]/ && !/Apply pending migrations/ { exit } f' "$CI_YML")"
+if printf '%s\n' "$migrate_block" | grep -q 'dotnet restore'; then
+  ok "the apply step restores before calling dotnet ef"
+else
+  bad "the apply step restores before calling dotnet ef" "no dotnet restore - dies on NETSDK1004" "a dotnet restore"
+fi
+if printf '%s\n' "$migrate_block" | grep -q 'dotnet ef database update'; then
+  ok "the apply step still runs dotnet ef database update"
+else
+  bad "the apply step still runs dotnet ef database update" "missing" "dotnet ef database update"
 fi
 
 echo

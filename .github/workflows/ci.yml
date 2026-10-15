@@ -659,6 +659,12 @@ jobs:
       # The whole point. On the production dump this is where the offer split failed twice.
       - name: Apply pending migrations
         run: |
+          set -euo pipefail
+          # Restore first: `dotnet ef` builds the project it is pointed at, and a fresh runner has no
+          # obj/project.assets.json, so without this the step dies with NETSDK1004 rather than
+          # reaching the migration. --no-build is deliberately NOT used - the migrations come from the
+          # PR's own source, so the project under test must be compiled here, not inherited.
+          dotnet restore backend/src/FuelFlow.API/FuelFlow.API.csproj
           dotnet ef database update --project backend/src/FuelFlow.API \
             --connection "Host=localhost;Port=5432;Database=fuelflow;Username=postgres;Password=postgres"
 
