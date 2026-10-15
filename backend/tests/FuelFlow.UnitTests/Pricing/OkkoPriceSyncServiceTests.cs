@@ -90,20 +90,16 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
         {
             foreach (var liters in new[] { 10m, 50m })
             {
-                _context.FuelPackages.Add(new FuelPackage
-                {
-                    Id = $"{fuelTypeId}-{liters}",
-                    StationId = "okko",
-                    FuelTypeId = fuelTypeId,
-                    FuelName = fuelName,
-                    Liters = liters,
-                    SupplierPricePerLiter = 40m,
-                    MarginUahPerLiter = 3m,
-                    PumpPricePerLiter = pump,
-                    MinDiscountPerLiter = 1m,
-                    CreatedAtUtc = DateTime.UtcNow,
-                    UpdatedAtUtc = DateTime.UtcNow,
-                });
+                _context.SeedPackage(
+                    id: $"{fuelTypeId}-{liters}",
+                    stationId: "okko",
+                    fuelTypeId: fuelTypeId,
+                    liters: liters,
+                    price: Math.Round((40m + 3m) * liters, 2, MidpointRounding.AwayFromZero),
+                    supplierPricePerLiter: 40m,
+                    marginUahPerLiter: 3m,
+                    pumpPricePerLiter: pump,
+                    minDiscountPerLiter: 1m);
             }
         }
 
@@ -119,12 +115,10 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
         await Service(new StubClient(() => Sheet), enabled: true).SyncPricesAsync();
         _context.ChangeTracker.Clear();
 
-        var gas = await _context.FuelPackages.AsNoTracking()
-            .FirstAsync(p => p.Id == "okko-gas-50");
+        var gas = await OfferOfAsync("okko-gas-50");
         gas.PumpPricePerLiter.Should().Be(47.90m);
 
-        var diesel = await _context.FuelPackages.AsNoTracking()
-            .FirstAsync(p => p.Id == "okko-dp-50");
+        var diesel = await OfferOfAsync("okko-dp-50");
         diesel.PumpPricePerLiter.Should().Be(99.90m);
     }
 
@@ -151,7 +145,7 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
 
         // The important one: an outage must leave yesterday's prices intact, not blank them. Blanking
         // would flip pricing back to cost-plus and hide the "до" price from customers.
-        var pkg = await _context.FuelPackages.AsNoTracking().FirstAsync(p => p.Id == "okko-95-50");
+        var pkg = await OfferOfAsync("okko-95-50");
         pkg.PumpPricePerLiter.Should().Be(50m);
     }
 
@@ -164,8 +158,7 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
         await Service(client, enabled: true).SyncPricesAsync();
         _context.ChangeTracker.Clear();
 
-        (await _context.FuelPackages.AsNoTracking().FirstAsync(p => p.Id == "okko-95-50"))
-            .PumpPricePerLiter.Should().Be(50m);
+        (await OfferOfAsync("okko-95-50"))            .PumpPricePerLiter.Should().Be(50m);
     }
 
     [Fact]
@@ -183,8 +176,7 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
         result.BelowCostSkipped.Should().ContainSingle().Which.Should().Be("A-95");
         result.FuelsChanged.Should().Be(0);
         _context.ChangeTracker.Clear();
-        (await _context.FuelPackages.AsNoTracking().FirstAsync(p => p.Id == "okko-95-50"))
-            .PumpPricePerLiter.Should().Be(50m);
+        (await OfferOfAsync("okko-95-50"))            .PumpPricePerLiter.Should().Be(50m);
     }
 
     // The refusal is a guard doing its job, not a fault - and this runs every 15 minutes. At Error it
@@ -240,8 +232,7 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
         result.BelowCostSkipped.Should().BeEmpty();
         result.FuelsChanged.Should().Be(1);
         _context.ChangeTracker.Clear();
-        (await _context.FuelPackages.AsNoTracking().FirstAsync(p => p.Id == "okko-95-50"))
-            .PumpPricePerLiter.Should().Be(40.50m);
+        (await OfferOfAsync("okko-95-50"))            .PumpPricePerLiter.Should().Be(40.50m);
     }
 
     [Fact]
@@ -260,8 +251,7 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
         result.BelowCostSkipped.Should().ContainSingle();
         result.FuelsChanged.Should().Be(1);
         _context.ChangeTracker.Clear();
-        (await _context.FuelPackages.AsNoTracking().FirstAsync(p => p.Id == "okko-gas-50"))
-            .PumpPricePerLiter.Should().Be(47.90m);
+        (await OfferOfAsync("okko-gas-50"))            .PumpPricePerLiter.Should().Be(47.90m);
     }
 
     [Fact]
@@ -273,7 +263,7 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
         _context.ChangeTracker.Clear();
 
         // A pump change is not a purchase-cost event.
-        var pkg = await _context.FuelPackages.AsNoTracking().FirstAsync(p => p.Id == "okko-95-50");
+        var pkg = await OfferOfAsync("okko-95-50");
         pkg.SupplierPricePerLiter.Should().Be(40m);
         pkg.MarginUahPerLiter.Should().Be(3m);
     }
@@ -313,4 +303,13 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
         // no-ops that say "nothing changed" every morning.
         (await _context.AuditEventOutbox.AsNoTracking().CountAsync()).Should().Be(5);
     }
+    /// <summary>
+    /// The offer behind a seeded package. Every figure these tests assert on - pump, cost, margin - is
+    /// an offer's, and the volume it hangs off is the only thing that identifies "the package".
+    /// </summary>
+    private Task<FuelOffer> OfferOfAsync(string volumeId)
+        => _context.FuelOfferVolumes.AsNoTracking()
+            .Where(v => v.Id == volumeId)
+            .Select(v => v.Offer)
+            .FirstAsync();
 }

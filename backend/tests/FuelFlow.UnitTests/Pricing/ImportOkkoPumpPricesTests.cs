@@ -65,24 +65,18 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
     {
         foreach (var nominal in new[] { 10m, 20m, 50m })
         {
-            _context.FuelPackages.Add(new FuelPackage
-            {
-                Id = $"{fuelTypeId}-{nominal}",
-                StationId = fuelTypeId.StartsWith("okko") ? "okko" : "wog",
-                FuelTypeId = fuelTypeId,
-                FuelName = fuelName,
-                Liters = nominal,
-                SupplierPricePerLiter = cost,
-                MarginUahPerLiter = profit,
-                MarginPercent = 10m,
-                PumpPricePerLiter = pump,
-                MinDiscountPerLiter = 1m,
-                FinalPricePerLiter = cost + profit,
-                Price = Math.Round((cost + profit) * nominal, 2, MidpointRounding.AwayFromZero),
-                OriginalPrice = Math.Round(pump * nominal, 2, MidpointRounding.AwayFromZero),
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow,
-            });
+            _context.SeedPackage(
+                id: $"{fuelTypeId}-{nominal}",
+                stationId: fuelTypeId.StartsWith("okko") ? "okko" : "wog",
+                fuelTypeId: fuelTypeId,
+                liters: nominal,
+                price: Math.Round((cost + profit) * nominal, 2, MidpointRounding.AwayFromZero),
+                supplierPricePerLiter: cost,
+                marginUahPerLiter: profit,
+                marginPercent: 10m,
+                pumpPricePerLiter: pump,
+                minDiscountPerLiter: 1m,
+                finalPricePerLiter: cost + profit);
         }
     }
 
@@ -125,25 +119,33 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
         await SeedCatalogAsync();
 
         await Handler().HandleAsync(Import(ScrapedSheet), Guid.Empty, "tester");
+// The per-litre figures now live on the offer, once, and the volumes carry only the frozen package
+        // total - so the import is asserted at that grain. Asserting it per package is what let the
+        // copies drift apart unnoticed.
         _context.ChangeTracker.Clear();
 
-        var a95 = await _context.FuelPackages
-            .Where(p => p.FuelTypeId == "okko-95")
-            .OrderBy(p => p.Liters)
+        var offer = await _context.FuelOffers
+            .FirstAsync(o => o.FuelTypeId == "okko-95" && o.DataKind == DataKinds.Real);
+
+        var a95 = await _context.FuelOfferVolumes
+            .Where(v => v.OfferId == offer.Id)
+            .OrderBy(v => v.Liters)
             .ToListAsync();
 
         a95.Should().HaveCount(3);
-        foreach (var pkg in a95)
+        offer.PumpPricePerLiter.Should().Be(92.90m);
+        // cost 54 + profit 5 = 59, under the 92.90 - 1 = 91.90 ceiling.
+        offer.FinalPricePerLiter.Should().Be(59m);
+        foreach (var volume in a95)
         {
-            pkg.PumpPricePerLiter.Should().Be(92.90m);
-            // cost 54 + profit 5 = 59, under the 92.90 - 1 = 91.90 ceiling.
-            pkg.FinalPricePerLiter.Should().Be(59m);
-            pkg.Price.Should().Be(Math.Round(59m * pkg.Liters, 2, MidpointRounding.AwayFromZero));
-            // The struck "до" price is the pump price × liters.
-            pkg.OriginalPrice.Should().Be(Math.Round(92.90m * pkg.Liters, 2, MidpointRounding.AwayFromZero));
+            volume.PackagePrice.Should().Be(Math.Round(59m * volume.Liters, 2, MidpointRounding.AwayFromZero));
+            // The struck "??" price is the pump price x litres, recomputed from the offer rather than
+            // stored - it was never authoritative, and a stale stored copy could leak a supplier cost.
+            FuelPricing.OriginalPackagePrice(offer.PumpPricePerLiter, volume.Liters, volume.PackagePrice)
+                .Should().Be(Math.Round(92.90m * volume.Liters, 2, MidpointRounding.AwayFromZero));
         }
 
-        a95[0].PriceUpdatedAt.Should().NotBeNull();
+        offer.PriceUpdatedAt.Should().NotBeNull();
     }
 
     [Fact]
@@ -154,12 +156,13 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
         await Handler().HandleAsync(Import(ScrapedSheet), Guid.Empty, "tester");
         _context.ChangeTracker.Clear();
 
-        var pkg = await _context.FuelPackages.FirstAsync(p => p.Id == "okko-95-20");
+        var (_, offer) = await ReadAsync("okko-95-20");
 
-        // A pump change is not a cost event: cost and margin must be untouched.
-        pkg.SupplierPricePerLiter.Should().Be(54m);
-        pkg.MarginUahPerLiter.Should().Be(5m);
-        pkg.MinDiscountPerLiter.Should().Be(1m);
+        // A pump change is not a cost event: cost and margin must be untouched. These live on the offer
+        // now, so one read covers every volume of the fuel - there is no per-package copy left to miss.
+        offer.SupplierPricePerLiter.Should().Be(54m);
+        offer.MarginUahPerLiter.Should().Be(5m);
+        offer.MinDiscountPerLiter.Should().Be(1m);
     }
 
     [Fact]
@@ -186,11 +189,14 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
         await Handler().HandleAsync(Import("fuelCode,pricePerLiter\r\nA-95,57.00\r\n"), Guid.Empty, "tester");
         _context.ChangeTracker.Clear();
 
-        var pkg = await _context.FuelPackages.FirstAsync(p => p.Id == "okko-95-20");
-        pkg.PumpPricePerLiter.Should().Be(57m);
-        pkg.FinalPricePerLiter.Should().Be(56m);
-        pkg.Price.Should().Be(1120m);
-        pkg.OriginalPrice.Should().Be(1140m); // the struck "до" price is pump × liters
+var (volume, offer) = await ReadAsync("okko-95-20");
+        offer.PumpPricePerLiter.Should().Be(57m);
+        offer.FinalPricePerLiter.Should().Be(56m);
+        volume.PackagePrice.Should().Be(1120m);
+        // The struck "??" price is pump x litres, recomputed from the offer rather than read from a
+        // stored column - which is what stops a stale copy from leaking a supplier cost.
+        FuelPricing.OriginalPackagePrice(offer.PumpPricePerLiter, volume.Liters, volume.PackagePrice)
+            .Should().Be(1140m);
     }
 
     [Fact]
@@ -208,8 +214,8 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
         result.BelowCostSkipped.Should().ContainSingle().Which.Should().Be("A-95");
         result.FuelsChanged.Should().Be(0);
 
-        var pkg = await _context.FuelPackages.AsNoTracking().FirstAsync(p => p.Id == "okko-95-20");
-        pkg.PumpPricePerLiter.Should().Be(56m); // unchanged from the seed
+        var (_, offer) = await ReadAsync("okko-95-20");
+        offer.PumpPricePerLiter.Should().Be(56m); // unchanged from the seed
     }
 
     [Fact]
@@ -227,15 +233,15 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
         result.BelowCostSkipped.Should().BeEmpty();
         result.FuelsChanged.Should().Be(1);
         _context.ChangeTracker.Clear();
-        (await _context.FuelPackages.AsNoTracking().FirstAsync(p => p.Id == "okko-95-20"))
-            .PumpPricePerLiter.Should().Be(50m);
+        (await ReadAsync("okko-95-20")).Offer.PumpPricePerLiter.Should().Be(50m);
     }
 
     [Fact]
     public async Task Import_DryRun_ShouldNotMutateAnything()
     {
         await SeedCatalogAsync();
-        var before = await _context.FuelPackages.AsNoTracking().FirstAsync(p => p.Id == "okko-95-20");
+        var (_, beforeOffer) = await ReadAsync("okko-95-20");
+        var beforePrice = (await _context.FuelOfferVolumes.AsNoTracking().FirstAsync(v => v.Id == "okko-95-20")).PackagePrice;
 
         var result = await Handler().HandleAsync(Import(ScrapedSheet, dryRun: true), Guid.Empty, "tester");
 
@@ -243,9 +249,9 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
         result.FuelsMatched.Should().Be(5);
         result.FuelsChanged.Should().Be(5);
         _context.ChangeTracker.Clear();
-        var after = await _context.FuelPackages.AsNoTracking().FirstAsync(p => p.Id == "okko-95-20");
-        after.PumpPricePerLiter.Should().Be(before.PumpPricePerLiter);
-        after.Price.Should().Be(before.Price);
+        var (afterVolume, afterOffer) = await ReadAsync("okko-95-20");
+        afterOffer.PumpPricePerLiter.Should().Be(beforeOffer.PumpPricePerLiter);
+        afterVolume.PackagePrice.Should().Be(beforePrice);
         _context.AuditEventOutbox.Should().BeEmpty();
     }
 
@@ -257,9 +263,9 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
         await Handler().HandleAsync(Import(ScrapedSheet), Guid.Empty, "tester");
         _context.ChangeTracker.Clear();
 
-        var wog = await _context.FuelPackages.AsNoTracking().FirstAsync(p => p.Id == "wog-95-20");
-        wog.PumpPricePerLiter.Should().Be(58m);
-        wog.Price.Should().Be(1220m); // untouched: (56 + 5) per liter × 20
+var (wogVolume, wogOffer) = await ReadAsync("wog-95-20");
+        wogOffer.PumpPricePerLiter.Should().Be(58m);
+        wogVolume.PackagePrice.Should().Be(1220m); // untouched: (56 + 5) per litre x 20
     }
 
     [Fact]
@@ -335,8 +341,8 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
         await Handler().HandleAsync(Import(ScrapedSheet), actor, "tester");
         _context.ChangeTracker.Clear();
 
-        var pkg = await _context.FuelPackages.AsNoTracking().FirstAsync(p => p.Id == "okko-95-20");
-        pkg.PriceUpdatedByUserId.Should().Be(actor);
+        var (_, offer) = await ReadAsync("okko-95-20");
+        offer.PriceUpdatedByUserId.Should().Be(actor);
     }
 
     [Fact]
@@ -346,7 +352,17 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
 
         // No packages at all for a matched fuel: the price still applies to the fuel-type headline
         // and the import reports zero packages rather than throwing.
-        _context.FuelPackages.RemoveRange(_context.FuelPackages.Where(p => p.FuelTypeId == "okko-gas"));
+        //
+        // "No packages" now means no VOLUMES, and the offer has to go with them - an offer with zero
+        // volumes is still an offer the import would reprice, so leaving it would test the wrong thing.
+        // Volumes first: the relation is RESTRICT, so the offer cannot be deleted while they point at it.
+        var gasOfferId = await _context.FuelOffers
+            .Where(o => o.FuelTypeId == "okko-gas")
+            .Select(o => o.Id)
+            .FirstAsync();
+        _context.FuelOfferVolumes.RemoveRange(_context.FuelOfferVolumes.Where(v => v.OfferId == gasOfferId));
+        await _context.SaveChangesAsync();
+        _context.FuelOffers.RemoveRange(_context.FuelOffers.Where(o => o.Id == gasOfferId));
         await _context.SaveChangesAsync();
         _context.ChangeTracker.Clear();
 
@@ -422,5 +438,17 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
         using var doc = JsonDocument.Parse(ev.NewValue!);
         doc.RootElement.GetProperty("SiteFuelCode").GetString().Should().Be("Pulls Diesel");
         doc.RootElement.GetProperty("PumpPricePerLiter").GetDecimal().Should().Be(102.90m);
+    }
+    /// <summary>
+    /// Reads a package the way the application does: the volume, plus the offer that carries the
+    /// per-litre figures. Tests that assert on a single package almost always want both halves.
+    /// </summary>
+    private async Task<(FuelOfferVolume Volume, FuelOffer Offer)> ReadAsync(string volumeId)
+    {
+        var row = await _context.FuelOfferVolumes.AsNoTracking()
+            .Where(v => v.Id == volumeId)
+            .Select(v => new { Volume = v, Offer = v.Offer })
+            .FirstAsync();
+        return (row.Volume, row.Offer);
     }
 }
