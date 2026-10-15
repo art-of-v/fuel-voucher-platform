@@ -80,6 +80,9 @@ public sealed class BrandsControllerTests : IDisposable
             PumpPricePerLiter = 49m,
             MinDiscountPerLiter = 0.5m,
             AllowBelowCost = allowBelowCost,
+            // Stated, not defaulted: the flag is required on both fuel write paths, and
+            // these tests are about pricing rather than rehearsal data.
+            IsTestData = false,
             PackageLiters = new List<int> { 10 }
         };
 
@@ -92,7 +95,9 @@ public sealed class BrandsControllerTests : IDisposable
             MarginUahPerLiter = 2m,
             PumpPricePerLiter = 49m,
             MinDiscountPerLiter = 0.5m,
-            AllowBelowCost = allowBelowCost
+            AllowBelowCost = allowBelowCost,
+            // Stated, not defaulted - see BelowCostCreate.
+            IsTestData = false
         };
 
     public void Dispose()
@@ -160,7 +165,9 @@ public sealed class BrandsControllerTests : IDisposable
             SupplierPricePerLiter = supplier,
             MarginUahPerLiter = margin,
             FinalPricePerLiter = final,
-            PackageLiters = packageLiters.ToList()
+            PackageLiters = packageLiters.ToList(),
+            // Stated, not defaulted - see BelowCostCreate.
+            IsTestData = false,
         };
 
     private static BrandFuelDto FuelDto(string id, string name, decimal supplier, decimal margin, decimal final) =>
@@ -170,7 +177,9 @@ public sealed class BrandsControllerTests : IDisposable
             Name = name,
             SupplierPricePerLiter = supplier,
             MarginUahPerLiter = margin,
-            FinalPricePerLiter = final
+            FinalPricePerLiter = final,
+            // Stated, not defaulted - see BelowCostCreate.
+            IsTestData = false
         };
 
     // --- AddFuel ----------------------------------------------------------

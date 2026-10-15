@@ -326,12 +326,17 @@ public sealed class BrandsController : ControllerBase
         var packages = await _context.FuelPackages.Where(p => p.FuelTypeId == fuelId).ToListAsync(ct);
         var seededPackages = packages.Count == 0;
 
-        // A fuel whose name reads as rehearsal cannot be flipped to live by an edit. The flag is the
+// A fuel whose name reads as rehearsal cannot be flipped to live by an edit. The flag is the
         // real control - an operator may innocently name a grade "Test-A95" - but the silent case,
         // where the name says rehearsal and the flag says sell, is what reached the public storefront.
+        //
+        // The NAME only, deliberately: a fuel's id is generated here (Guid.CreateVersion7), so an
+        // operator never chooses it and matching on it would fire on ids nobody picked. The package
+        // endpoint is the opposite - it takes a caller-supplied id, which is where
+        // "test-1uah-okko-a95eu" came from - so there the id is checked too.
         if (!request.IsTestData.Value)
         {
-            var token = RehearsalMarkers.MatchedToken(fuelId, request.Name ?? fuel.Name);
+            var token = RehearsalMarkers.MatchedToken(null, request.Name ?? fuel.Name);
             if (token is not null)
             {
                 return BadRequest(new
