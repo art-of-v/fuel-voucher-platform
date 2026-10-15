@@ -575,8 +575,16 @@ jobs:
             exit 1
           fi
 
+      # `path` was simply absent, so upload-artifact exited "Input required and not supplied: path".
+      # The step above builds everything under $RUNNER_TEMP/dryrun, and the block is what guards that
+      # directory, so point the upload at the directory rather than re-listing the files - a list here
+      # would be a second, unguarded place where the contents are named.
       - name: Upload the dump
         uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: migration-dryrun-dump
+          path: ${{ runner.temp }}/dryrun
+          if-no-files-found: error
 
   dryrun-migrate:
     name: 'Migration dry run: apply'
