@@ -83,44 +83,21 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
             });
         }
 
-        if (!await context.FuelPackages.AnyAsync(p => p.Id == "qa-pool-real-10", CancellationToken.None))
+        // Seeded as an offer plus a volume per pool. The storefront joins volumes to offers to read the
+        // price, so a package left in fuel_packages would leave the catalogue empty and these tests
+        // would assert against nothing.
+        if (!await context.FuelOfferVolumes.AnyAsync(p => p.Id == "qa-pool-real-10", CancellationToken.None))
         {
-            context.FuelPackages.Add(new FuelPackage
-            {
-                Id = "qa-pool-real-10",
-                StationId = Station,
-                FuelTypeId = FuelType,
-                FuelName = RealName,
-                Liters = RealLiters,
-                Price = 470m * RealLiters,
-                OriginalPrice = 470m * RealLiters,
-                SupplierPricePerLiter = 45m,
-                MarginUahPerLiter = 2m,
-                FinalPricePerLiter = 47m,
-                IsTestData = false,
-                CreatedAtUtc = now,
-                UpdatedAtUtc = now
-            });
+            context.SeedPackage("qa-pool-real-10", Station, FuelType, RealLiters, 470m * RealLiters,
+                supplierPricePerLiter: 45m, marginUahPerLiter: 2m, finalPricePerLiter: 47m,
+                isTestData: false, createdAtUtc: now, updatedAtUtc: now);
         }
 
-        if (!await context.FuelPackages.AnyAsync(p => p.Id == "qa-pool-qa-7", CancellationToken.None))
+        if (!await context.FuelOfferVolumes.AnyAsync(p => p.Id == "qa-pool-qa-7", CancellationToken.None))
         {
-            context.FuelPackages.Add(new FuelPackage
-            {
-                Id = "qa-pool-qa-7",
-                StationId = Station,
-                FuelTypeId = FuelType,
-                FuelName = QaName,
-                Liters = QaLiters,
-                Price = 470m * QaLiters,
-                OriginalPrice = 470m * QaLiters,
-                SupplierPricePerLiter = 45m,
-                MarginUahPerLiter = 2m,
-                FinalPricePerLiter = 47m,
-                IsTestData = true,
-                CreatedAtUtc = now,
-                UpdatedAtUtc = now
-            });
+            context.SeedPackage("qa-pool-qa-7", Station, FuelType, QaLiters, 470m * QaLiters,
+                supplierPricePerLiter: 45m, marginUahPerLiter: 2m, finalPricePerLiter: 47m,
+                isTestData: true, createdAtUtc: now, updatedAtUtc: now);
         }
 
         // One sellable voucher per pool, seeded once. Without both, "QA can see the QA package" would
@@ -213,8 +190,8 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
 
         var packages = await PackagesAsync(client, byStation);
 
-        Assert.Contains(packages, p => p.FuelName == RealName);
-        Assert.DoesNotContain(packages, p => p.FuelName == QaName);
+        Assert.Contains(packages, p => p.Liters == RealLiters);
+        Assert.DoesNotContain(packages, p => p.Liters == QaLiters);
     }
 
     /// <summary>
@@ -231,8 +208,8 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
 
         var packages = await PackagesAsync(client, byStation);
 
-        Assert.Contains(packages, p => p.FuelName == RealName);
-        Assert.DoesNotContain(packages, p => p.FuelName == QaName);
+        Assert.Contains(packages, p => p.Liters == RealLiters);
+        Assert.DoesNotContain(packages, p => p.Liters == QaLiters);
     }
 
     /// <summary>
@@ -249,11 +226,11 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
 
         var packages = await PackagesAsync(client, byStation);
 
-        var qaPackage = Assert.Single(packages, p => p.FuelName == QaName);
+        var qaPackage = Assert.Single(packages, p => p.Liters == QaLiters);
         Assert.True(qaPackage.IsAvailable,
             "the QA package is visible and its stock is sellable, which is the whole point — a QA run " +
             "that could see the catalogue but not buy from it would be no better than reusing the live one");
-        Assert.DoesNotContain(packages, p => p.FuelName == RealName);
+        Assert.DoesNotContain(packages, p => p.Liters == RealLiters);
     }
 
     /// <summary>
@@ -286,7 +263,14 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
         var anonymous = await PackagesAsync(_fixture.CreateClient(), byStation: true);
         var qa = await PackagesAsync(await ClientForAsync("+380991007005", isQaAccount: true), byStation: true);
 
+        // The display name is the fuel's, and the fuel is shared by both pools - it comes from
+        // fuel_types now, not from a string each package row carried and could contradict. So the QA
+        // catalogue no longer renders its own "(QA)" label; the two pools are told apart by their
+        // nominal, which is what actually differs. Anything identifying a pool by name here would have
+        // been asserting the old duplicated column.
         Assert.Equal(RealName, Assert.Single(anonymous).FuelName);
-        Assert.Equal(QaName, Assert.Single(qa).FuelName);
+        Assert.Equal(RealName, Assert.Single(qa).FuelName);
+        Assert.Equal(RealLiters, Assert.Single(anonymous).Liters);
+        Assert.Equal(QaLiters, Assert.Single(qa).Liters);
     }
 }
