@@ -105,7 +105,7 @@ public sealed class PackageStockAvailability
     /// This is the single implementation shared with the storefront, and it exists because the two
     /// sides had drifted into reading different rows for the same key. Checkout used to resolve the
     /// package with a bare <c>FirstOrDefaultAsync</c> on <c>(station, fuel, liters)</c>: no
-    /// <c>IsTestData</c> filter and no <c>OrderBy</c>.
+    /// <c>DataKind</c> filter and no <c>OrderBy</c>.
     /// </para>
     /// <para>
     /// Both omissions matter because a triple is not unique. <c>scripts/seed-qa-catalogue.sql</c> gives
@@ -129,12 +129,14 @@ public sealed class PackageStockAvailability
         decimal liters,
         CancellationToken cancellationToken = default)
     {
+        var pool = DataKinds.ForPool(isTestAccount);
+
         return await _context.FuelPackages
             .AsNoTracking()
             .Where(p => p.StationId == stationId
                      && p.FuelTypeId == fuelTypeId
                      && p.Liters == liters
-                     && p.IsTestData == isTestAccount)
+                     && p.DataKind == pool)
             // Not decorative: with two rows on the key an unordered pick is arbitrary, and "which
             // one" would then be at the mercy of a plan change or an autovacuum.
             .OrderByDescending(p => p.UpdatedAtUtc)
@@ -163,10 +165,11 @@ public sealed class PackageStockAvailability
         var brands = wanted.Select(k => k.Brand).Distinct().ToArray();
         var fuelTypeIds = wanted.Select(k => k.FuelTypeId).Distinct().ToArray();
         var literSizes = wanted.Select(k => k.Liters).Distinct().ToArray();
+        var pool = DataKinds.ForPool(isTestAccount);
 
         var rows = await _context.FuelPackages
             .AsNoTracking()
-            .Where(p => p.IsTestData == isTestAccount
+            .Where(p => p.DataKind == pool
                      && brands.Contains(p.StationId.ToLower())
                      && fuelTypeIds.Contains(p.FuelTypeId)
                      && literSizes.Contains(p.Liters))
@@ -243,6 +246,7 @@ public sealed class PackageStockAvailability
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var brand = stationId.ToLower();
+        var pool = DataKinds.ForPool(isTestAccount);
 
         return _context.FuelVouchers
             .AsNoTracking()
@@ -251,7 +255,7 @@ public sealed class PackageStockAvailability
                   && v.Brand.ToLower() == brand
                   && v.FuelTypeId == fuelTypeId
                   && v.Liters == liters
-                  && v.IsTestData == isTestAccount
+                  && v.DataKind == pool
                   && (!_expiryEnabled || v.SupplierExpirationDate >= today),
                 cancellationToken);
     }
@@ -285,11 +289,12 @@ public sealed class PackageStockAvailability
         decimal[]? literSizes = null)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var pool = DataKinds.ForPool(isTestAccount);
 
         var query = _context.FuelVouchers
             .AsNoTracking()
             .Where(v => v.Status == VoucherStatus.Available
-                     && v.IsTestData == isTestAccount
+                     && v.DataKind == pool
                      && (!_expiryEnabled || v.SupplierExpirationDate >= today));
 
         if (brands is not null)

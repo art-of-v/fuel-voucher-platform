@@ -41,11 +41,11 @@ public sealed class GetPublicPackagesQueryHandler
             // up on sale in production. Filtered here rather than by a global query filter so the
             // admin can still see and fix the row.
             //
-            // The predicate is pool-aware rather than a flat "!IsTestData" because hiding them from
+            // The predicate is pool-aware rather than a flat "data_kind = 'real'" because hiding them from
             // everyone also hid them from the one caller they exist for. QA fixtures had no choice
             // but to reuse the live catalogue, which meant a test run exercised real package ids
             // against real prices. A QA caller now sees the QA pool and nobody else sees it at all.
-            .Where(x => x.IsTestData == isTestAccount)
+            .Where(x => x.DataKind == DataKinds.ForPool(isTestAccount))
             .OrderBy(x => x.StationId)
             .ThenBy(x => x.FuelName)
             .ThenBy(x => x.Liters)

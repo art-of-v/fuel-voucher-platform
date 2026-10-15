@@ -781,6 +781,7 @@ public class FulfillmentService
         // needs to run against expired test stock. Only ever flip it in a disposable/staging
         // environment; turning it off in production hands the most-expired stock to customers.
         var expiryEnabled = _configuration.GetValue<bool>("VoucherExpiration:Enabled", true);
+        var pool = DataKinds.ForPool(isTestAccount);
 
         // A QA account draws only from test stock and a real account only from real stock, so a seeded
         // test voucher never reaches a paying customer and a QA run never burns real inventory.
@@ -795,7 +796,7 @@ public class FulfillmentService
                      && v.Brand.ToLower() == lineItem.Brand.ToLower()
                      && v.FuelTypeId == lineItem.FuelTypeId
                      && v.Liters == lineItem.Liters
-                     && v.IsTestData == isTestAccount
+                     && v.DataKind == pool
                      && (!expiryEnabled || v.SupplierExpirationDate >= today)
                      && !usedVoucherIds.Contains(v.Id))
             .OrderBy(v => v.SupplierExpirationDate)
@@ -855,10 +856,10 @@ public class FulfillmentService
         // and this statement can never hand stock across the pools.
         var rowsAffected = customerExpiration is null
             ? await _context.Database.ExecuteSqlInterpolatedAsync(
-                $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND supplier_expiration_date >= {expiryCutoff} AND is_test_data = (SELECT u.is_qa_account FROM "users" u WHERE u.id = {userId})""",
+                $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND supplier_expiration_date >= {expiryCutoff} AND data_kind = (SELECT CASE WHEN u.is_qa_account THEN 'qa' ELSE 'real' END FROM "users" u WHERE u.id = {userId})""",
                 cancellationToken)
             : await _context.Database.ExecuteSqlInterpolatedAsync(
-                $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, customer_expiration_date = LEAST({customerExpiration.Value}, supplier_expiration_date), updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND supplier_expiration_date >= {expiryCutoff} AND is_test_data = (SELECT u.is_qa_account FROM "users" u WHERE u.id = {userId})""",
+                $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, customer_expiration_date = LEAST({customerExpiration.Value}, supplier_expiration_date), updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND supplier_expiration_date >= {expiryCutoff} AND data_kind = (SELECT CASE WHEN u.is_qa_account THEN 'qa' ELSE 'real' END FROM "users" u WHERE u.id = {userId})""",
                 cancellationToken);
 
         return rowsAffected;
@@ -1321,13 +1322,15 @@ public class FulfillmentService
         // account only from real stock, re-asserted atomically at the claim (TryAssignReplacementVoucherAsync).
         // AsNoTracking for the same reason as FindMatchingVoucherAsync (#246): a decision whose row is
         // claimed by a raw UPDATE two lines later, never a write in its own right.
+        var pool = DataKinds.ForPool(isTestAccount);
+
         return await _context.FuelVouchers
             .AsNoTracking()
             .Where(v => v.Status == VoucherStatus.Available
                      && v.Brand.ToLower() == source.Brand.ToLower()
                      && v.FuelTypeId == source.FuelTypeId
                      && v.Liters == source.Liters
-                     && v.IsTestData == isTestAccount
+                     && v.DataKind == pool
                      && v.SupplierExpirationDate >= promisedExpiration
                      && !usedStockIds.Contains(v.Id))
             .OrderBy(v => v.SupplierExpirationDate)
@@ -1372,7 +1375,7 @@ public class FulfillmentService
         // Same QA/test segregation as the buy claim: the replacement must come from the owner's pool
         // (test for a QA account, real otherwise), re-asserted atomically here against the owning user.
         return await _context.Database.ExecuteSqlInterpolatedAsync(
-            $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, customer_expiration_date = {promisedExpiration}, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND supplier_expiration_date >= {promisedExpiration} AND is_test_data = (SELECT u.is_qa_account FROM "users" u WHERE u.id = {userId})""",
+            $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, customer_expiration_date = {promisedExpiration}, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND supplier_expiration_date >= {promisedExpiration} AND data_kind = (SELECT CASE WHEN u.is_qa_account THEN 'qa' ELSE 'real' END FROM "users" u WHERE u.id = {userId})""",
             cancellationToken);
     }
 

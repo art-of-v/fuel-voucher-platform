@@ -34,7 +34,7 @@ public sealed class GetPublicPackagesByStationQueryHandler
             // second anonymous storefront route, so a filter on one of the two would leave the
             // rehearsal package purchasable through the other. Pool-aware there and here, because a
             // filter that hid the QA catalogue from everyone also hid it from QA.
-            .Where(x => x.StationId == query.StationId && x.IsTestData == isTestAccount)
+            .Where(x => x.StationId == query.StationId && x.DataKind == DataKinds.ForPool(isTestAccount))
             .OrderBy(x => x.FuelName)
             .ThenBy(x => x.Liters)
             .Select(x => new

@@ -2,20 +2,23 @@ using FluentAssertions;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace FuelFlow.IntegrationTests;
 
 /// <summary>
-/// <c>is_test_data</c> marks a voucher as emulated: a seeded row whose code does not exist at the
+/// <c>data_kind = 'qa'</c> marks a voucher as emulated: a seeded row whose code does not exist at the
 /// station. It is the thing that lets a QA account be handed test fuel without that fuel ever being
 /// sellable to a paying customer, and it is the thing a cleanup runs on.
-///
-/// The default matters most of all. It is <c>false</c>, so every voucher that already existed and
-/// every voucher a supplier import ever creates is real fuel unless somebody deliberately says
-/// otherwise — a seed that forgets the flag is visible as a bug, whereas a flag that defaulted to
-/// true would quietly mark real fuel as fake.
+/// <para>
+/// The default matters most of all. It is <see cref="DataKinds.Real"/>, so every voucher that
+/// already existed and every voucher a supplier import ever creates is real fuel unless somebody
+/// deliberately says otherwise — a seed that forgets the kind is visible as a bug, whereas a default
+/// of QA would quietly mark real fuel as fake. See <c>EnforceDataKind</c> for the migration and
+/// <c>DataKindMigrationTests</c> for why the value is named and pinned.
+/// </para>
 /// </summary>
 [Collection("Integration Tests")]
 public sealed class TestDataFlagIntegrationTests : IClassFixture<TestDatabaseFixture>
@@ -73,10 +76,12 @@ public sealed class TestDataFlagIntegrationTests : IClassFixture<TestDatabaseFix
         var asStored = await verify.FuelVouchers.AsNoTracking().SingleAsync(v => v.Id == flagged);
         asStored.IsTestData.Should().BeTrue();
 
-        // What a cleanup and the admin list both filter on.
-        (await verify.FuelVouchers.AsNoTracking().CountAsync(v => v.IsTestData && v.Id == flagged))
+        // What a cleanup and the admin list both filter on. Against the mapped column, not the
+        // IsTestData shim: the shim is [NotMapped] and EF cannot translate a getter on an unmapped
+        // property, so the boolean predicate throws only once the query is actually executed.
+        (await verify.FuelVouchers.AsNoTracking().CountAsync(v => v.DataKind == DataKinds.Qa && v.Id == flagged))
             .Should().Be(1);
-        (await verify.FuelVouchers.AsNoTracking().CountAsync(v => !v.IsTestData && v.Id == plain))
+        (await verify.FuelVouchers.AsNoTracking().CountAsync(v => v.DataKind == DataKinds.Real && v.Id == plain))
             .Should().Be(1);
     }
 

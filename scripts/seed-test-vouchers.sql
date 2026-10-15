@@ -1,4 +1,4 @@
--- Seeds emulated test vouchers for a QA account and flags them `is_test_data`, so a QA run can never
+-- Seeds emulated test vouchers for a QA account and gives them `data_kind = 'qa'`, so a QA run can never
 -- touch real fuel and real fuel can never reach a QA tester.
 --
 -- The flag is what makes this safe to leave in a database that also holds real stock: the admin list
@@ -57,31 +57,31 @@ VALUES (
     :'fuel_type_id', 10.00, 3, 96.90, 2907.00, '1w')
 ON CONFLICT (id) DO NOTHING;
 
--- Held by the QA account (is_test_data true), plus operator stock for the replace branch. The stock
+-- Held by the QA account (data_kind qa), plus operator stock for the replace branch. The stock
 -- rows are flagged too: a QA account may only draw on test fuel, and unflagged test stock would be
 -- indistinguishable from the real batch.
 INSERT INTO fuel_vouchers
     (id, brand, fuel_type_id, liters, supplier_expiration_date, customer_expiration_date,
      voucher_number, qr_payload, created_at_utc, updated_at_utc, status, order_id,
-     assigned_to_user_id, legal_entity_id, worker_user_id, is_test_data, is_deleted)
+     assigned_to_user_id, legal_entity_id, worker_user_id, data_kind, is_deleted)
 VALUES
     -- room to extend: customer +7d, brand +90d
     ('22222222-2222-4222-8222-000000000001', 'OKKO', :'fuel_type_id', 10.00, current_date + 90, current_date + 7,
      'EMU-VCH-EXT', 'EMU-QR-EXT', now() - interval '3 days', now(), 'Assigned',
-     '11111111-1111-4111-8111-000000000001', :'qa_user_id', NULL, NULL, true, false),
+     '11111111-1111-4111-8111-000000000001', :'qa_user_id', NULL, NULL, 'qa', false),
     -- ceiling reached while still valid: must refuse to extend and replace instead
     ('22222222-2222-4222-8222-000000000002', 'OKKO', :'fuel_type_id', 10.00, current_date + 7, current_date + 7,
      'EMU-VCH-FULL', 'EMU-QR-FULL', now() - interval '3 days', now(), 'Assigned',
-     '11111111-1111-4111-8111-000000000001', :'qa_user_id', NULL, NULL, true, false),
+     '11111111-1111-4111-8111-000000000001', :'qa_user_id', NULL, NULL, 'qa', false),
     -- already lapsed: the replace branch on entry
     ('22222222-2222-4222-8222-000000000003', 'OKKO', :'fuel_type_id', 10.00, current_date + 90, current_date - 2,
      'EMU-VCH-LAPSED', 'EMU-QR-LAPSED', now() - interval '20 days', now(), 'Expired',
-     '11111111-1111-4111-8111-000000000001', NULL, NULL, NULL, true, false),
+     '11111111-1111-4111-8111-000000000001', NULL, NULL, NULL, 'qa', false),
     -- stock for a replacement, long enough for any tier up to 6 months
     ('33333333-3333-4333-8333-000000000001', 'OKKO', :'fuel_type_id', 10.00, current_date + 180, current_date + 180,
-     'EMU-STK-A', 'EMU-QR-STK-A', now(), now(), 'Available', NULL, NULL, NULL, NULL, true, false),
+     'EMU-STK-A', 'EMU-QR-STK-A', now(), now(), 'Available', NULL, NULL, NULL, NULL, 'qa', false),
     ('33333333-3333-4333-8333-000000000002', 'OKKO', :'fuel_type_id', 10.00, current_date + 180, current_date + 180,
-     'EMU-STK-B', 'EMU-QR-STK-B', now(), now(), 'Available', NULL, NULL, NULL, NULL, true, false),
+     'EMU-STK-B', 'EMU-QR-STK-B', now(), now(), 'Available', NULL, NULL, NULL, NULL, 'qa', false),
     -- short paper term: buying a longer tier must clamp to this date, never past it
     ('33333333-3333-4333-8333-000000000003', 'OKKO', :'fuel_type_id', 10.00, current_date + 20, current_date + 20,
      'EMU-STK-SHORT', 'EMU-QR-STK-SHORT', now(), now(), 'Available', NULL, NULL, NULL, NULL, true, false)
@@ -101,10 +101,10 @@ VALUES
 ON CONFLICT DO NOTHING;
 
 \echo '--- seeded ---'
-SELECT voucher_number, status, customer_expiration_date AS customer, supplier_expiration_date AS brand, is_test_data
-FROM fuel_vouchers WHERE is_test_data ORDER BY voucher_number;
+SELECT voucher_number, status, customer_expiration_date AS customer, supplier_expiration_date AS brand, data_kind
+FROM fuel_vouchers WHERE data_kind = 'qa' ORDER BY voucher_number;
 
-SELECT 'test_vouchers_total' AS check, count(*) FROM fuel_vouchers WHERE is_test_data;
-SELECT 'real_vouchers_total' AS check, count(*) FROM fuel_vouchers WHERE NOT is_test_data AND NOT is_deleted;
+SELECT 'test_vouchers_total' AS check, count(*) FROM fuel_vouchers WHERE data_kind = 'qa';
+SELECT 'real_vouchers_total' AS check, count(*) FROM fuel_vouchers WHERE data_kind = 'real' AND NOT is_deleted;
 
 COMMIT;

@@ -1407,6 +1407,12 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("date")
                         .HasColumnName("customer_expiration_date");
 
+                    b.Property<string>("DataKind")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("data_kind");
+
                     b.Property<string>("FuelSubtype")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
@@ -1432,12 +1438,6 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false)
                         .HasColumnName("is_deleted");
-
-                    b.Property<bool>("IsTestData")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("is_test_data");
 
                     b.Property<DateTime?>("IssuedAtUtc")
                         .HasColumnType("timestamp with time zone")
@@ -1547,7 +1547,7 @@ namespace FuelFlow.API.Migrations
 
                     b.HasIndex("FuelTypeId", "Status", "IsDeleted");
 
-                    b.HasIndex("Status", "IsTestData", "IsDeleted");
+                    b.HasIndex("Status", "DataKind", "IsDeleted");
 
                     b.HasIndex("Brand", "FuelTypeId", "Liters", "Status");
 
@@ -1555,6 +1555,8 @@ namespace FuelFlow.API.Migrations
 
                     b.ToTable("fuel_vouchers", null, t =>
                         {
+                            t.HasCheckConstraint("ck_fuel_vouchers_data_kind", "data_kind IN ('real', 'qa')");
+
                             t.HasCheckConstraint("ck_fuel_vouchers_fuel_type_id_length", "length(fuel_type_id) <= 100");
 
                             t.HasCheckConstraint("ck_voucher_cost_non_negative", "cost_per_liter IS NULL OR cost_per_liter >= 0");
@@ -2035,6 +2037,12 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
 
+                    b.Property<string>("DataKind")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("data_kind");
+
                     b.Property<DateTime?>("DeletedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_at_utc");
@@ -2057,10 +2065,6 @@ namespace FuelFlow.API.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
-
-                    b.Property<bool>("IsTestData")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_test_data");
 
                     b.Property<decimal>("Liters")
                         .HasColumnType("numeric(10,2)")
@@ -2117,12 +2121,14 @@ namespace FuelFlow.API.Migrations
 
                     b.HasIndex("StationId");
 
-                    b.HasIndex("IsDeleted", "IsTestData");
+                    b.HasIndex("IsDeleted", "DataKind");
 
                     b.HasIndex("StationId", "FuelTypeId");
 
                     b.ToTable("fuel_packages", null, t =>
                         {
+                            t.HasCheckConstraint("ck_fuel_packages_data_kind", "data_kind IN ('real', 'qa')");
+
                             t.HasCheckConstraint("ck_fuel_packages_fuel_type_id_length", "length(fuel_type_id) <= 100");
 
                             t.HasCheckConstraint("ck_fuel_packages_id_length", "length(id) <= 100");
@@ -2139,11 +2145,11 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = "okko-dp-10",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
                             FinalPricePerLiter = 52m,
                             FuelName = "ДП ЄВРО",
                             FuelTypeId = "okko-dp",
                             IsDeleted = false,
-                            IsTestData = false,
                             Liters = 10m,
                             MarginUahPerLiter = 2.0m,
                             OriginalPrice = 520m,
@@ -2156,11 +2162,11 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = "okko-dp-20",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
                             FinalPricePerLiter = 52m,
                             FuelName = "ДП ЄВРО",
                             FuelTypeId = "okko-dp",
                             IsDeleted = false,
-                            IsTestData = false,
                             Liters = 20m,
                             MarginUahPerLiter = 2.0m,
                             OriginalPrice = 1040m,
@@ -2173,11 +2179,11 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = "okko-dp-50",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
                             FinalPricePerLiter = 52m,
                             FuelName = "ДП ЄВРО",
                             FuelTypeId = "okko-dp",
                             IsDeleted = false,
-                            IsTestData = false,
                             Liters = 50m,
                             MarginUahPerLiter = 2.0m,
                             OriginalPrice = 2600m,
@@ -2190,11 +2196,11 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = "okko-95-10",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
                             FinalPricePerLiter = 51m,
                             FuelName = "A-95",
                             FuelTypeId = "okko-95",
                             IsDeleted = false,
-                            IsTestData = false,
                             Liters = 10m,
                             MarginUahPerLiter = 2.0m,
                             OriginalPrice = 510m,
@@ -2207,11 +2213,11 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = "okko-95-20",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
                             FinalPricePerLiter = 51m,
                             FuelName = "A-95",
                             FuelTypeId = "okko-95",
                             IsDeleted = false,
-                            IsTestData = false,
                             Liters = 20m,
                             MarginUahPerLiter = 2.0m,
                             OriginalPrice = 1020m,
@@ -2224,11 +2230,11 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = "okko-95-50",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
                             FinalPricePerLiter = 51m,
                             FuelName = "A-95",
                             FuelTypeId = "okko-95",
                             IsDeleted = false,
-                            IsTestData = false,
                             Liters = 50m,
                             MarginUahPerLiter = 2.0m,
                             OriginalPrice = 2550m,
@@ -2241,11 +2247,11 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = "okko-p95-10",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
                             FinalPricePerLiter = 56m,
                             FuelName = "Pulls 95",
                             FuelTypeId = "okko-p95",
                             IsDeleted = false,
-                            IsTestData = false,
                             Liters = 10m,
                             MarginUahPerLiter = 3.0m,
                             OriginalPrice = 560m,
@@ -2258,11 +2264,11 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = "okko-p95-20",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
                             FinalPricePerLiter = 56m,
                             FuelName = "Pulls 95",
                             FuelTypeId = "okko-p95",
                             IsDeleted = false,
-                            IsTestData = false,
                             Liters = 20m,
                             MarginUahPerLiter = 3.0m,
                             OriginalPrice = 1120m,
@@ -2275,11 +2281,11 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = "okko-p95-50",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
                             FinalPricePerLiter = 56m,
                             FuelName = "Pulls 95",
                             FuelTypeId = "okko-p95",
                             IsDeleted = false,
-                            IsTestData = false,
                             Liters = 50m,
                             MarginUahPerLiter = 3.0m,
                             OriginalPrice = 2800m,
@@ -2292,11 +2298,11 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = "okko-pulls-dp-10",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
                             FinalPricePerLiter = 55m,
                             FuelName = "ДП PULLS",
                             FuelTypeId = "okko-pulls-dp",
                             IsDeleted = false,
-                            IsTestData = false,
                             Liters = 10m,
                             MarginUahPerLiter = 2.5m,
                             OriginalPrice = 550m,
@@ -2309,11 +2315,11 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = "okko-pulls-dp-20",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
                             FinalPricePerLiter = 55m,
                             FuelName = "ДП PULLS",
                             FuelTypeId = "okko-pulls-dp",
                             IsDeleted = false,
-                            IsTestData = false,
                             Liters = 20m,
                             MarginUahPerLiter = 2.5m,
                             OriginalPrice = 1100m,
@@ -2326,11 +2332,11 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = "okko-pulls-dp-50",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
                             FinalPricePerLiter = 55m,
                             FuelName = "ДП PULLS",
                             FuelTypeId = "okko-pulls-dp",
                             IsDeleted = false,
-                            IsTestData = false,
                             Liters = 50m,
                             MarginUahPerLiter = 2.5m,
                             OriginalPrice = 2750m,
@@ -2343,11 +2349,11 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = "okko-gas-10",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
                             FinalPricePerLiter = 27m,
                             FuelName = "ГАЗ",
                             FuelTypeId = "okko-gas",
                             IsDeleted = false,
-                            IsTestData = false,
                             Liters = 10m,
                             MarginUahPerLiter = 1.5m,
                             OriginalPrice = 270m,
@@ -2360,11 +2366,11 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = "okko-gas-20",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
                             FinalPricePerLiter = 27m,
                             FuelName = "ГАЗ",
                             FuelTypeId = "okko-gas",
                             IsDeleted = false,
-                            IsTestData = false,
                             Liters = 20m,
                             MarginUahPerLiter = 1.5m,
                             OriginalPrice = 540m,
@@ -2377,11 +2383,11 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = "okko-gas-50",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
                             FinalPricePerLiter = 27m,
                             FuelName = "ГАЗ",
                             FuelTypeId = "okko-gas",
                             IsDeleted = false,
-                            IsTestData = false,
                             Liters = 50m,
                             MarginUahPerLiter = 1.5m,
                             OriginalPrice = 1350m,
@@ -2394,11 +2400,11 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = "wog-dp-10",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
                             FinalPricePerLiter = 53m,
                             FuelName = "ДП Mustang",
                             FuelTypeId = "wog-dp",
                             IsDeleted = false,
-                            IsTestData = false,
                             Liters = 10m,
                             MarginUahPerLiter = 2.0m,
                             OriginalPrice = 530m,
@@ -2411,11 +2417,11 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = "wog-dp-20",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
                             FinalPricePerLiter = 53m,
                             FuelName = "ДП Mustang",
                             FuelTypeId = "wog-dp",
                             IsDeleted = false,
-                            IsTestData = false,
                             Liters = 20m,
                             MarginUahPerLiter = 2.0m,
                             OriginalPrice = 1060m,
@@ -2428,11 +2434,11 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = "wog-dp-50",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
                             FinalPricePerLiter = 53m,
                             FuelName = "ДП Mustang",
                             FuelTypeId = "wog-dp",
                             IsDeleted = false,
-                            IsTestData = false,
                             Liters = 50m,
                             MarginUahPerLiter = 2.0m,
                             OriginalPrice = 2650m,
@@ -2445,11 +2451,11 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = "wog-95-10",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
                             FinalPricePerLiter = 52m,
                             FuelName = "A-95 Mustang",
                             FuelTypeId = "wog-95",
                             IsDeleted = false,
-                            IsTestData = false,
                             Liters = 10m,
                             MarginUahPerLiter = 2.0m,
                             OriginalPrice = 520m,
@@ -2462,11 +2468,11 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = "wog-95-20",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
                             FinalPricePerLiter = 52m,
                             FuelName = "A-95 Mustang",
                             FuelTypeId = "wog-95",
                             IsDeleted = false,
-                            IsTestData = false,
                             Liters = 20m,
                             MarginUahPerLiter = 2.0m,
                             OriginalPrice = 1040m,
@@ -2479,11 +2485,11 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = "wog-95-50",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
                             FinalPricePerLiter = 52m,
                             FuelName = "A-95 Mustang",
                             FuelTypeId = "wog-95",
                             IsDeleted = false,
-                            IsTestData = false,
                             Liters = 50m,
                             MarginUahPerLiter = 2.0m,
                             OriginalPrice = 2600m,
@@ -2496,11 +2502,11 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = "wog-95-euro-10",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
                             FinalPricePerLiter = 53m,
                             FuelName = "A 95 EURO",
                             FuelTypeId = "wog-95-euro",
                             IsDeleted = false,
-                            IsTestData = false,
                             Liters = 10m,
                             MarginUahPerLiter = 2.5m,
                             OriginalPrice = 530m,
@@ -2513,11 +2519,11 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = "wog-95-euro-20",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
                             FinalPricePerLiter = 53m,
                             FuelName = "A 95 EURO",
                             FuelTypeId = "wog-95-euro",
                             IsDeleted = false,
-                            IsTestData = false,
                             Liters = 20m,
                             MarginUahPerLiter = 2.5m,
                             OriginalPrice = 1060m,
@@ -2530,11 +2536,11 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = "wog-95-euro-50",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
                             FinalPricePerLiter = 53m,
                             FuelName = "A 95 EURO",
                             FuelTypeId = "wog-95-euro",
                             IsDeleted = false,
-                            IsTestData = false,
                             Liters = 50m,
                             MarginUahPerLiter = 2.5m,
                             OriginalPrice = 2650m,
@@ -2547,11 +2553,11 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = "wog-100-10",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
                             FinalPricePerLiter = 61m,
                             FuelName = "Mustang 100",
                             FuelTypeId = "wog-100",
                             IsDeleted = false,
-                            IsTestData = false,
                             Liters = 10m,
                             MarginUahPerLiter = 3.0m,
                             OriginalPrice = 610m,
@@ -2564,11 +2570,11 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = "wog-100-20",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
                             FinalPricePerLiter = 61m,
                             FuelName = "Mustang 100",
                             FuelTypeId = "wog-100",
                             IsDeleted = false,
-                            IsTestData = false,
                             Liters = 20m,
                             MarginUahPerLiter = 3.0m,
                             OriginalPrice = 1220m,
@@ -2581,11 +2587,11 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = "wog-100-50",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
                             FinalPricePerLiter = 61m,
                             FuelName = "Mustang 100",
                             FuelTypeId = "wog-100",
                             IsDeleted = false,
-                            IsTestData = false,
                             Liters = 50m,
                             MarginUahPerLiter = 3.0m,
                             OriginalPrice = 3050m,
@@ -2598,11 +2604,11 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = "wog-gas-10",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
                             FinalPricePerLiter = 27m,
                             FuelName = "ГАЗ",
                             FuelTypeId = "wog-gas",
                             IsDeleted = false,
-                            IsTestData = false,
                             Liters = 10m,
                             MarginUahPerLiter = 1.5m,
                             OriginalPrice = 270m,
@@ -2615,11 +2621,11 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = "wog-gas-20",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
                             FinalPricePerLiter = 27m,
                             FuelName = "ГАЗ",
                             FuelTypeId = "wog-gas",
                             IsDeleted = false,
-                            IsTestData = false,
                             Liters = 20m,
                             MarginUahPerLiter = 1.5m,
                             OriginalPrice = 540m,
@@ -2632,11 +2638,11 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = "wog-gas-50",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
                             FinalPricePerLiter = 27m,
                             FuelName = "ГАЗ",
                             FuelTypeId = "wog-gas",
                             IsDeleted = false,
-                            IsTestData = false,
                             Liters = 50m,
                             MarginUahPerLiter = 1.5m,
                             OriginalPrice = 1350m,
@@ -2649,11 +2655,11 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = "okko-dp-2",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
                             FinalPricePerLiter = 52m,
                             FuelName = "ДП ЄВРО",
                             FuelTypeId = "okko-dp",
                             IsDeleted = false,
-                            IsTestData = false,
                             Liters = 2m,
                             MarginUahPerLiter = 2m,
                             OriginalPrice = 104m,
@@ -2666,11 +2672,11 @@ namespace FuelFlow.API.Migrations
                         {
                             Id = "okko-dp-3",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DataKind = "real",
                             FinalPricePerLiter = 52m,
                             FuelName = "ДП ЄВРО",
                             FuelTypeId = "okko-dp",
                             IsDeleted = false,
-                            IsTestData = false,
                             Liters = 3m,
                             MarginUahPerLiter = 2m,
                             OriginalPrice = 156m,

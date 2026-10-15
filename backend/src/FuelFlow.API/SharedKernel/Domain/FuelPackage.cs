@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations.Schema;
 namespace FuelFlow.SharedKernel.Domain;
 
 public sealed class FuelPackage
@@ -39,21 +40,40 @@ public sealed class FuelPackage
     public DateTime? DeletedAtUtc { get; set; }
 
     /// <summary>
-    /// This package is not real stock: it exists so someone can rehearse a flow without spending
-    /// money, and it must never reach the storefront.
-    ///
-    /// Added after production served a QA fuel type as a live package - a 5 L "QA-CHECK-95" at
-    /// 1 UAH, purchasable through the same anonymous endpoint the app reads. The cleanup deleted
-    /// the rows; this flag is what stops the next one from being sellable.
-    ///
-    /// Not the same thing as <see cref="FuelVoucher.IsTestData"/>. On a voucher the flag means
+    /// Which pool this package belongs to: <see cref="DataKinds.Real"/> or <see cref="DataKinds.Qa"/>.
+    /// </summary>
+    /// <remarks>
+    /// Replaces the <c>is_test_data boolean</c> this used to be. The story of that flag is in
+    /// <see cref="DataKinds"/>: production absorbed two rehearsal packages published as live, and
+    /// nothing in the schema could object, because a boolean cannot express "nobody said".
+    /// <para>
+    /// Not the same thing as <see cref="FuelVoucher.DataKind"/>. On a voucher the value means
     /// "emulated: this code does not exist at the station". Here it means "do not sell this". A
-    /// package is a catalogue entry, not paper, so it needs its own name for its own rule.
-    ///
+    /// package is a catalogue entry, not paper, so it needs its own name for its own rule - but both
+    /// now draw the line in the same place.
+    /// </para>
+    /// <para>
     /// Deliberately not a global query filter. A filter would also hide the row from the admin
     /// screens and from anything that resolves an order line to the package it was bought against,
     /// which would turn a rehearsal into an invisible dangling reference. Only the public handler
-    /// filters on it.
+    /// filters on the pool.
+    /// </para>
+    /// </remarks>
+    public string DataKind { get; set; } = DataKinds.Real;
+
+    /// <summary>
+    /// Whether this package is rehearsal data and must never reach the storefront.
     /// </summary>
-    public bool IsTestData { get; set; }
+    /// <remarks>
+    /// A view over <see cref="DataKind"/>, not a column. It exists so the ~20 read sites that ask
+    /// "is this the QA pool?" keep reading as a question about a pool rather than about storage,
+    /// while the column itself is a named value the database can constrain. Assigning it still works
+    /// and is how the admin write paths state their intent.
+    /// </remarks>
+    [NotMapped]
+    public bool IsTestData
+    {
+        get => DataKind == DataKinds.Qa;
+        set => DataKind = value ? DataKinds.Qa : DataKinds.Real;
+    }
 }

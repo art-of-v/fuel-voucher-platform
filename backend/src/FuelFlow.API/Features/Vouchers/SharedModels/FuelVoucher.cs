@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations.Schema;
 using FuelFlow.Features.Contracts.SharedModels;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.Features.Vouchers.Import;
@@ -93,12 +94,32 @@ public class FuelVoucher
     public VoucherImport? ImportJob { get; set; }
 
     /// <summary>
-    /// Marks a voucher as emulated test data rather than fuel the operator actually paid a supplier
-    /// for. Never set on imported stock: an emulated voucher's code does not exist at the station, so
-    /// one that reaches a customer is fuel nobody can redeem. The flag exists so test runs can be
-    /// found, cleaned up and kept out of the numbers a real batch produces.
+    /// Which pool this voucher belongs to: <see cref="DataKinds.Real"/> or
+    /// <see cref="DataKinds.Qa"/>.
     /// </summary>
-    public bool IsTestData { get; set; }
+    /// <remarks>
+    /// <see cref="DataKinds.Qa"/> marks an emulated voucher rather than fuel the operator actually
+    /// paid a supplier for. Never set on imported stock: an emulated voucher's code does not exist
+    /// at the station, so one that reaches a customer is fuel nobody can redeem. The value exists so
+    /// test runs can be found, cleaned up and kept out of the numbers a real batch produces.
+    /// <para>
+    /// Replaces the <c>is_test_data boolean</c> this used to be; see <see cref="DataKinds"/> for why
+    /// a bare boolean on a money row was the wrong shape.
+    /// </para>
+    /// </remarks>
+    public string DataKind { get; set; } = DataKinds.Real;
+
+    /// <summary>
+    /// Whether this voucher is emulated rehearsal data. A view over <see cref="DataKind"/> so the
+    /// pool reads as a pool at the call site; assigning it still works and is how the admin write
+    /// paths state their intent.
+    /// </summary>
+    [NotMapped]
+    public bool IsTestData
+    {
+        get => DataKind == DataKinds.Qa;
+        set => DataKind = value ? DataKinds.Qa : DataKinds.Real;
+    }
 
     public bool IsDeleted { get; set; }
 
