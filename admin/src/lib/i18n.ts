@@ -454,6 +454,10 @@ export const translations: Record<Language, Record<string, string>> = {
       "This fuel's packages do not all carry the same cost or customer price. Saving this row rewrites every package to what is shown here.",
     "price.spreadCost": "cost across packages: {0} – {1}",
     "price.allowBelowCost": "Allow below cost",
+    "price.isTestData": "QA / rehearsal",
+    "price.live": "Live",
+    "price.isTestDataHint":
+      "Rehearsal data: hidden from the storefront and never sellable. Required on every save, because it decides whether these packages can be bought at all.",
     "price.allowBelowCostHint":
       "Standing manager opt-in: permit selling this fuel below cost (deliberate loss-leader). Without it, below-cost pricing and sales are blocked.",
     "price.margin": "Margin",
@@ -1425,6 +1429,10 @@ export const translations: Record<Language, Record<string, string>> = {
       "Пакети цього пального мають різну собівартість або ціну для клієнта. Збереження цього рядка перезапише всі пакети тими значеннями, що показані тут.",
     "price.spreadCost": "собівартість по пакетах: {0} – {1}",
     "price.allowBelowCost": "Дозволити нижче собівартості",
+    "price.isTestData": "QA / репетиція",
+    "price.live": "Бойове",
+    "price.isTestDataHint":
+      "Тестові дані: приховані від вітрини й ніколи не продаються. Обов'язкове поле при кожному збереженні — саме воно вирішує, чи можна ці позиції купити взагалі.",
     "price.allowBelowCostHint":
       "Постійний дозвіл менеджера: продавати це пальне нижче собівартості (свідомий збитковий лідер). Без нього ціноутворення та продаж нижче собівартості блокуються.",
     "price.margin": "Маржа",
@@ -2320,6 +2328,10 @@ export const translations: Record<Language, Record<string, string>> = {
       "Die Pakete dieses Kraftstoffs haben nicht alle dieselben Kosten oder Verkaufspreise. Das Speichern dieser Zeile schreibt alle Pakete auf die hier angezeigten Werte um.",
     "price.spreadCost": "Kosten über Pakete: {0} – {1}",
     "price.allowBelowCost": "Unter EK erlauben",
+    "price.isTestData": "QA / Probelauf",
+    "price.live": "Live",
+    "price.isTestDataHint":
+      "Testdaten: im Shop ausgeblendet und nie verkäuflich. Bei jedem Speichern Pflicht – es entscheidet, ob diese Positionen überhaupt kaufbar sind.",
     "price.allowBelowCostHint":
       "Dauerhafte Freigabe des Managers: Verkauf dieses Kraftstoffs unter Einkaufspreis erlauben (bewusster Verlustbringer). Ohne sie werden Preise und Verkäufe unter EK blockiert.",
     "price.margin": "Marge",
@@ -3290,6 +3302,10 @@ export const translations: Record<Language, Record<string, string>> = {
       "Los paquetes de este combustible no tienen todos el mismo costo ni el mismo precio de venta. Guardar esta fila reescribe todos los paquetes con los valores mostrados aquí.",
     "price.spreadCost": "costo entre paquetes: {0} – {1}",
     "price.allowBelowCost": "Permitir bajo costo",
+    "price.isTestData": "QA / ensayo",
+    "price.live": "Real",
+    "price.isTestDataHint":
+      "Datos de ensayo: ocultos del escaparate y nunca vendibles. Obligatorio en cada guardado: decide si estas posiciones se pueden comprar.",
     "price.allowBelowCostHint":
       "Autorización permanente del gerente: permitir vender este combustible por debajo del costo (pérdida deliberada como gancho). Sin ella, se bloquean los precios y ventas por debajo del costo.",
     "price.margin": "Margen",

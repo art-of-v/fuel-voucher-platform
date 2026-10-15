@@ -37,6 +37,8 @@ interface BrandFuelDto {
   discountPerLiter: number;
   allowBelowCost: boolean;
   packageLiters: number[];
+  /** Whether this fuel exists only to rehearse a flow. Decides whether its packages are sellable. */
+  isTestData: boolean;
   /** Set only when this fuel's packages disagree; see BrandFuelPriceSpreadDto on the API. */
   priceSpread: {
     minSupplierPricePerLiter: number;
@@ -109,6 +111,16 @@ export default function BrandsTab({
   const [newFuelPump, setNewFuelPump] = useState("");
   const [newFuelMinDiscount, setNewFuelMinDiscount] = useState("0.50");
   const [newFuelAllowBelowCost, setNewFuelAllowBelowCost] = useState(false);
+  const [newFuelIsTestData, setNewFuelIsTestData] = useState(false);
+
+  /**
+   * The QA flag, with the same "edited value wins, otherwise the saved value" rule the
+   * below-cost checkbox uses. `vals?.isTestData` is null until the operator touches it, and a
+   * plain `??` would be indistinguishable from "the API sent nothing" - which is the bug this
+   * control exists to end.
+   */
+  const isQaFuel = (edited: boolean | undefined, saved: boolean | undefined) =>
+    edited ?? saved ?? false;
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const [isAddingBrand, setIsAddingBrand] = useState(false);
@@ -320,6 +332,7 @@ export default function BrandsTab({
       setNewFuelPump("");
       setNewFuelMinDiscount("0.50");
       setNewFuelAllowBelowCost(false);
+      setNewFuelIsTestData(false);
       toast.success(t("common.created"));
     },
     onError: (e: Error) => toast.error(e.message),
@@ -358,6 +371,7 @@ export default function BrandsTab({
         pumpPricePerLiter: fuel.pumpPricePerLiter ?? null,
         minDiscountPerLiter: fuel.minDiscountPerLiter ?? DEFAULT_MIN_DISCOUNT,
         allowBelowCost: fuel.allowBelowCost ?? false,
+        isTestData: fuel.isTestData ?? false,
       },
     });
   };
@@ -391,6 +405,7 @@ export default function BrandsTab({
         pumpPricePerLiter: pump,
         minDiscountPerLiter: minDiscount,
         allowBelowCost: vals.allowBelowCost ?? fuel.allowBelowCost ?? false,
+        isTestData: vals.isTestData ?? fuel.isTestData ?? false,
       },
     });
   };
@@ -406,8 +421,8 @@ export default function BrandsTab({
         finalPricePerLiter: newFuelFinalPrice,
         pumpPricePerLiter: newFuelPumpNum,
         minDiscountPerLiter: parseFloat(newFuelMinDiscount) || 0,
-        allowBelowCost: newFuelAllowBelowCost,
-        packageLiters: [],
+    allowBelowCost: newFuelAllowBelowCost,
+    isTestData: newFuelIsTestData,
       },
     });
   };
@@ -1110,6 +1125,42 @@ className="w-24 h-8 text-right text-xs"
                     {t("price.allowBelowCost")}
                                   </label>
                                 )}
+
+                                {/* The rehearsal flag decides whether these packages are sellable,
+                                    and until now the panel had no control for it at all: a fuel
+                                    added here landed with the API's default (not a rehearsal),
+                                    and an edit rewrote the flag on every package of the fuel from
+                                    whatever the client happened to send. Shown always, not only
+                                    while editing - a fuel that is silently flagged is exactly
+                                    what an operator needs to be able to see. */}
+                                <label
+                                  className={`mt-1.5 flex items-center justify-end gap-1.5 text-[10px] font-medium cursor-pointer ${isQaFuel(vals?.isTestData, fuel.isTestData) ? "text-primary" : "text-muted-foreground"}`}
+                                  title={t("price.isTestDataHint")}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isQaFuel(
+                                      vals?.isTestData,
+                                      fuel.isTestData,
+                                    )}
+                                    onChange={(e) =>
+                                      setEditValues((prev) => ({
+                                        ...prev,
+                                        [fuel.id]: {
+                                          ...prev[fuel.id],
+                                          isTestData: e.target.checked,
+                                        },
+                                      }))
+                                    }
+                                    className="h-3 w-3 accent-primary"
+                                  />
+                                  {isQaFuel(
+                                    vals?.isTestData,
+                                    fuel.isTestData,
+                                  )
+                                    ? t("price.isTestData")
+                                    : t("price.live")}
+                                </label>
                               </td>
                               <td className="p-3 text-center">
                                 <span className="text-xs text-muted-foreground">
@@ -1345,6 +1396,23 @@ className="w-24 h-8 text-right text-xs"
                                       className="h-3.5 w-3.5 accent-destructive"
                                     />
                                     {t("price.allowBelowCost")}
+                                  </label>
+                                  {/* Same control as on the edit row, and present for the same
+                                      reason: a fuel added from here used to land with the API's
+                                      default, which is "not a rehearsal" - i.e. on sale. */}
+                                  <label
+                                    className="flex items-center gap-1.5 text-[10px] font-medium cursor-pointer text-muted-foreground"
+                                    title={t("price.isTestDataHint")}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={newFuelIsTestData}
+                                      onChange={(e) =>
+                                        setNewFuelIsTestData(e.target.checked)
+                                      }
+                                      className="h-3.5 w-3.5 accent-primary"
+                                    />
+                                    {t("price.isTestData")}
                                   </label>
                                 </div>
                                 <div className="flex flex-col gap-1">

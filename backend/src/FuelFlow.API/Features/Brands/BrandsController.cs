@@ -11,6 +11,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
+using FuelFlow.Features.Stations;
+
 namespace FuelFlow.Features.Brands;
 
 [ApiController]
@@ -181,8 +183,33 @@ public sealed class BrandsController : ControllerBase
     [HttpPost("{id}/fuels")]
     public async Task<IActionResult> AddFuel([FromRoute] string id, [FromBody] CreateFuelRequest request, CancellationToken ct)
     {
+        // Required for the same reason as on UpdateFuel: every package created below inherits it,
+        // so an unstated flag would default to "sell this".
+        if (!request.IsTestData.HasValue)
+            return BadRequest(new
+            {
+                message = "isTestData is required. Set it to true for rehearsal data, or false if this "
+                          + "is a real product.",
+                field = nameof(request.IsTestData)
+            });
+
         var station = await _context.Stations.FirstOrDefaultAsync(s => s.Id == id, ct);
         if (station is null) return NotFound();
+
+        if (!request.IsTestData.Value)
+        {
+            var token = RehearsalMarkers.MatchedToken(null, request.Name);
+            if (token is not null)
+            {
+                return BadRequest(new
+                {
+                    message = $"The name contains \"{token}\", which reads as rehearsal data, but "
+                              + "isTestData is false. Set it to true, or rename the fuel if this is "
+                              + "a real product.",
+                    field = nameof(request.IsTestData)
+                });
+            }
+        }
 
         var finalPerLiter = FuelPricing.FinalPerLiter(
             request.SupplierPricePerLiter, request.MarginUahPerLiter,
@@ -254,7 +281,7 @@ public sealed class BrandsController : ControllerBase
                 FinalPricePerLiter = finalPerLiter,
                 PumpPricePerLiter = request.PumpPricePerLiter,
                 MinDiscountPerLiter = request.MinDiscountPerLiter,
-                IsTestData = request.IsTestData,
+                IsTestData = request.IsTestData.Value,
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow
             });
@@ -277,14 +304,45 @@ public sealed class BrandsController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id }, new { id = fuel.Id });
     }
 
-    [HttpPut("fuels/{fuelId}")]
+[HttpPut("fuels/{fuelId}")]
     public async Task<IActionResult> UpdateFuel([FromRoute] string fuelId, [FromBody] BrandFuelDto request, CancellationToken ct)
     {
+        // Required, because the flag is written to every package of this fuel below. Answering with
+        // a null would mean "the caller did not say", and the old non-nullable bool resolved that to
+        // false - which publishes a rehearsal fuel when someone edits its margin from a client that
+        // omits the field. There is no safe default for the one field that decides sellability, so
+        // there is no default.
+        if (!request.IsTestData.HasValue)
+            return BadRequest(new
+            {
+                message = "isTestData is required. This edit rewrites the rehearsal flag on every "
+                          + "package of the fuel, so it cannot be left unstated.",
+                field = nameof(request.IsTestData)
+            });
+
         var fuel = await _context.FuelTypes.FirstOrDefaultAsync(f => f.Id == fuelId, ct);
         if (fuel is null) return NotFound();
 
         var packages = await _context.FuelPackages.Where(p => p.FuelTypeId == fuelId).ToListAsync(ct);
         var seededPackages = packages.Count == 0;
+
+        // A fuel whose name reads as rehearsal cannot be flipped to live by an edit. The flag is the
+        // real control - an operator may innocently name a grade "Test-A95" - but the silent case,
+        // where the name says rehearsal and the flag says sell, is what reached the public storefront.
+        if (!request.IsTestData.Value)
+        {
+            var token = RehearsalMarkers.MatchedToken(fuelId, request.Name ?? fuel.Name);
+            if (token is not null)
+            {
+                return BadRequest(new
+                {
+                    message = $"The name contains \"{token}\", which reads as rehearsal data, but "
+                              + "isTestData is false. Set it to true, or rename the fuel if this is "
+                              + "a real product.",
+                    field = nameof(request.IsTestData)
+                });
+            }
+        }
 
         var finalPerLiter = FuelPricing.FinalPerLiter(
             request.SupplierPricePerLiter, request.MarginUahPerLiter,
@@ -319,7 +377,7 @@ public sealed class BrandsController : ControllerBase
                     FinalPricePerLiter = finalPerLiter,
                     PumpPricePerLiter = request.PumpPricePerLiter,
                     MinDiscountPerLiter = request.MinDiscountPerLiter,
-                    IsTestData = request.IsTestData,
+                    IsTestData = request.IsTestData.Value,
                     CreatedAtUtc = DateTime.UtcNow,
                     UpdatedAtUtc = DateTime.UtcNow
                 };
@@ -360,7 +418,7 @@ public sealed class BrandsController : ControllerBase
             pkg.OriginalPrice = FuelPricing.OriginalPackagePrice(request.PumpPricePerLiter, pkg.Liters, Math.Round(finalPerLiter * pkg.Liters, 2, MidpointRounding.AwayFromZero));
             // Written on every edit, not only when it changes, so clearing the flag on a fuel
             // actually puts its packages back on sale instead of silently leaving them hidden.
-            pkg.IsTestData = request.IsTestData;
+            pkg.IsTestData = request.IsTestData.Value;
             pkg.UpdatedAtUtc = DateTime.UtcNow;
         }
 
