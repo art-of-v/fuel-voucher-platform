@@ -376,5 +376,13 @@ for svc in dotnet-backend admin-frontend website-frontend; do
     fi
   fi
 done
-[[ $stale -eq 1 ]] && echo "  (restart.sh pins the running tags, so a tagless up -d is not a risk once it is used)"
+if [[ $stale -eq 1 ]]; then
+  echo "  (restart.sh pins the running tags, so a tagless up -d is not a risk once it is used)"
+fi
+
+# Step 5, on the normal path. This call was deleted along with the duplicate block in #1143 and
+# nothing caught it, because the only other call sits inside --data-only — so every deploy skipped
+# the data preconditions entirely and the log simply stopped after step 4. Restored here rather than
+# by un-duplicating the old inline copy: the function is the version with the safety in it.
+check_data_preconditions
 
