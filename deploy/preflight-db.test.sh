@@ -163,10 +163,33 @@ done
 script="$(cat "$PREFLIGHT")"
 banners="$(grep -c '== data preconditions ==' <<<"$script" || true)"
 check "the data-preconditions step is defined exactly once" "1" "$banners"
-check "and it is the function, called once" "1" "$(grep -cE '^[[:space:]]*check_data_preconditions$' <<<"$script" || true)"
 lacks "no stale copy of the first version survives" "db_preconditions" "$script"
 contains "the running version distinguishes 'clean' from 'did not run'" "NO precondition was checked" "$script"
 contains "the running version says how many were checked" "satisfied (\${checked} checked)" "$script"
+
+# #1143 deleted the duplicate block and took the only call on the NORMAL path with it, because the
+# remaining call sits inside the --data-only branch. Every test here drives --data-only, so all 23
+# passed while every deploy skipped the check, and the log simply ended after step 4. Counting calls
+# cannot see that — one call existed and it was the wrong one. What matters is REACHABILITY: that
+# step 5 is invoked from the ordinary flow, after the images step, and not only under a flag.
+calls="$(grep -nE '^[[:space:]]*check_data_preconditions$' <<<"$script" | cut -d: -f1 | tr '\n' ' ')"
+total="$(wc -l <<<"$script")"
+# Two call sites: the --data-only branch, and the tail of the normal run. Both must exist.
+check "the normal path reaches the data preconditions" "2" "$(wc -w <<<"$calls")"
+last_call="$(grep -nE '^[[:space:]]*check_data_preconditions$' <<<"$script" | tail -1 | cut -d: -f1)"
+if [[ -n "$last_call" && "$last_call" -gt $((total / 2)) ]]; then
+  echo "  PASS  and the one on the normal path is the tail of the script"; pass=$((pass+1))
+else
+  echo "  FAIL  the normal-path call should sit at the end (found at line ${last_call:-none} of ${total})"; fail=$((fail+1))
+fi
+# Guard the tail so a failing [[ ]] there cannot become the script's exit status. That turned every
+# deploy red on 2026-10-15 with no message: `set -e` plus a bare `[[ cond ]] && echo` as the final
+# line exits 1 whenever the condition is false, which is the ordinary case.
+if tail -5 "$PREFLIGHT" | grep -qE '^[[:space:]]*\[\[ .* \]\] && '; then
+  echo "  FAIL  the script ends in a bare '[[ ]] && ...', whose exit status becomes the script's"; fail=$((fail+1))
+else
+  echo "  PASS  the script does not end in a bare '[[ ]] && ...'"; pass=$((pass+1))
+fi
 
 echo
 echo "  ${pass} passed, ${fail} failed"
