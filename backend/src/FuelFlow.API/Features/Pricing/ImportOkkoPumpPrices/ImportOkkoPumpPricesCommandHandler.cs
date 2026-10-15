@@ -221,6 +221,32 @@ var poolOffers = offersByFuel.TryGetValue(ft.Id, out var found) ? found : new Li
                 ft.UpdatedAtUtc = now;
             }
 
+            // A fuel with no offer at all still gets reported, with zero packages. The per-offer loop above
+            // cannot produce that row on its own - there is no offer to iterate - and silently dropping
+            // the fuel from the receipt would be a behaviour change: the caller used to learn "this
+            // fuel matched, it simply has nothing to price", which is how an empty catalogue is
+            // distinguished from an unmatched one.
+            if (poolOffers.Count == 0)
+            {
+                matchedCategories.Add(category.Value);
+
+                // No offer means no cost and no margin to hold, so these are the figures the old
+                // per-package loop produced off an empty list: zero cost, zero margin, and a final price
+                // the ceiling drives to zero.
+                var emptyFinal = FuelPricing.FinalPerLiter(0m, 0m, pump, 0m);
+
+                if (!dryRun)
+                {
+                    ft.BasePrice = Math.Round(pump, 2, MidpointRounding.AwayFromZero);
+                    ft.DiscountPrice = Math.Round(emptyFinal, 2, MidpointRounding.AwayFromZero);
+                    ft.UpdatedAtUtc = now;
+                }
+
+                changedCount++;
+                applied.Add(new OkkoPumpApplied(
+                    ft.Id, ft.Name, siteCode, pump, emptyFinal, PreviousPumpPricePerLiter: null, Changed: true, PackagesRepriced: 0));
+            }
+
             packagesRepriced += repriced;
         }
 
