@@ -46,10 +46,15 @@ public sealed class GetProviderByIdAndHistoryTests : IDisposable
         _context.FuelTypes.AddRange(
             new FuelTypeEntity { Id = "test-fuel-a", Name = "A-95", StationId = "test-okko", BasePrice = 100, DiscountPrice = 100, CreatedAtUtc = now, UpdatedAtUtc = now },
             new FuelTypeEntity { Id = "test-fuel-b", Name = "DP", StationId = "test-okko", BasePrice = 100, DiscountPrice = 100, CreatedAtUtc = now, UpdatedAtUtc = now });
-        _context.FuelPackages.AddRange(
-            new FuelPackage { Id = "test-fuel-a-10", StationId = "test-okko", FuelTypeId = "test-fuel-a", FuelName = "A-95", Liters = 10m, Price = 510, OriginalPrice = 490, SupplierPricePerLiter = 49m, MarginUahPerLiter = 2m, FinalPricePerLiter = 51m, CreatedAtUtc = now, UpdatedAtUtc = now },
-            new FuelPackage { Id = "test-fuel-a-20", StationId = "test-okko", FuelTypeId = "test-fuel-a", FuelName = "A-95", Liters = 20m, Price = 1020, OriginalPrice = 980, SupplierPricePerLiter = 49m, MarginUahPerLiter = 2m, FinalPricePerLiter = 51m, CreatedAtUtc = now, UpdatedAtUtc = now },
-            new FuelPackage { Id = "test-fuel-b-50", StationId = "test-okko", FuelTypeId = "test-fuel-b", FuelName = "DP", Liters = 50m, Price = 2600, OriginalPrice = 2500, SupplierPricePerLiter = 50m, MarginUahPerLiter = 2m, FinalPricePerLiter = 52m, CreatedAtUtc = now, UpdatedAtUtc = now });
+        _context.SeedPackage("test-fuel-a-10", "test-okko", "test-fuel-a", 10m, 510m,
+            supplierPricePerLiter: 49m, marginUahPerLiter: 2m, finalPricePerLiter: 51m,
+            createdAtUtc: now, updatedAtUtc: now);
+        _context.SeedPackage("test-fuel-a-20", "test-okko", "test-fuel-a", 20m, 1020m,
+            supplierPricePerLiter: 49m, marginUahPerLiter: 2m, finalPricePerLiter: 51m,
+            createdAtUtc: now, updatedAtUtc: now);
+        _context.SeedPackage("test-fuel-b-50", "test-okko", "test-fuel-b", 50m, 2600m,
+            supplierPricePerLiter: 50m, marginUahPerLiter: 2m, finalPricePerLiter: 52m,
+            createdAtUtc: now, updatedAtUtc: now);
         await _context.SaveChangesAsync();
 
         var handler = new GetBrandByIdQueryHandler(_context);
