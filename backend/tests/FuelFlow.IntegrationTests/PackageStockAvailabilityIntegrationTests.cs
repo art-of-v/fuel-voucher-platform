@@ -150,28 +150,47 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
     }
 
     /// <summary>
-    /// Two rows in the <em>same</em> pool on one key. A QA mirror is not the only way to get here -
-    /// <c>BrandsController</c> adds a nominal through a read-then-write with no lock, so two
-    /// concurrent PUTs can both insert. Ordering is what makes the answer stable rather than
-    /// dependent on a plan choice, and it must be the same order in both the single and bulk path.
+    /// Two volumes on one key cannot coexist any more, and the database is what says so.
     /// </summary>
+    /// <remarks>
+    /// This test used to seed two rows for the same (station, fuel, litres) in the same pool and assert
+    /// that the resolver picked the newer one deterministically. That was guarding against a real defect
+    /// - <c>BrandsController</c> added a nominal through a read-then-write with no lock, so two
+    /// concurrent PUTs could both insert - and the ordering was the mitigation.
+    /// <para>
+    /// The split removed the possibility rather than the symptom. <c>UNIQUE (station_id, fuel_type_id,
+    /// data_kind)</c> on fuel_offers times <c>UNIQUE (offer_id, liters)</c> on fuel_offer_volumes makes
+    /// the triple unique inside a pool, so the race that produced two rows now fails at the constraint.
+    /// Asserting "the newer one wins" would be asserting a tie-break that can never be reached, and it
+    /// would quietly invite someone to reintroduce the ambiguity by ordering the query.
+    /// </para>
+    /// <para>
+    /// So the test asserts the guarantee instead: the duplicate is refused. If this ever passes, the
+    /// constraint is gone and every resolver in the app is back to picking arbitrarily.
+    /// </para>
+    /// </remarks>
     [Fact]
-    public async Task FindPackage_PicksDeterministically_WhenTheKeyHasTwoRowsInOnePool()
+    public async Task A_DuplicateVolumeOnOneKey_IsRefusedByTheDatabase()
     {
         using var seed = CreateContext();
         await TruncatePackagesAsync(seed);
 
-        SeedPackage(seed, "older", isTestData: false, liters: 20m, price: 1780m, updatedMinutesAgo: 120);
-        SeedPackage(seed, "newer", isTestData: false, liters: 20m, price: 1781m, updatedMinutesAgo: 1);
+        SeedPackage(seed, "first", isTestData: false, liters: 20m, price: 1780m, updatedMinutesAgo: 120);
         await seed.SaveChangesAsync();
 
+        // Same offer (same station, fuel and pool) and the same nominal - the exact row the old
+        // read-then-write race produced.
+        SeedPackage(seed, "second", isTestData: false, liters: 20m, price: 1781m, updatedMinutesAgo: 1);
+
+        var act = async () => await seed.SaveChangesAsync();
+        await act.Should().ThrowAsync<DbUpdateException>();
+
+        // And with the duplicate refused, the key resolves to the one row that exists - no ordering
+        // involved, because there is nothing to order.
         var availability = CreateAvailability();
-
         var chosen = await availability.FindPackageAsync(false, "okko", "okko-a95", 20m);
-        chosen!.PackageId.Should().Be("newer");
+        chosen!.PackageId.Should().Be("first");
 
-        // And the bulk resolver has to agree with the single one, or a line prices off a different
-        // row depending on whether it was bought alone or in a cart.
         var bulk = await availability.FindPackagesAsync(
             false, new[] { StockKey.For("okko", "okko-a95", 20m) });
         bulk[StockKey.For("okko", "okko-a95", 20m)].PackageId.Should().Be(chosen.PackageId);

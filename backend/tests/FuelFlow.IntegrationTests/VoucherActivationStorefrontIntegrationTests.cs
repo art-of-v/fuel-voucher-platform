@@ -115,24 +115,24 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
             });
         }
 
-        if (!await context.FuelPackages.AnyAsync(
-                p => p.StationId == stationId && p.FuelTypeId == fuelTypeId && p.Liters == liters, CancellationToken.None))
+        // Seeded as an offer plus a volume: the storefront resolves its package through the offer, so a
+        // row in fuel_packages would leave the shop dark and every "activating turns it on" assertion
+        // would pass against a package the app cannot see.
+        if (!await context.FuelOfferVolumes.AnyAsync(
+                v => v.Offer.StationId == stationId && v.Offer.FuelTypeId == fuelTypeId && v.Liters == liters,
+                CancellationToken.None))
         {
-            context.FuelPackages.Add(new FuelPackage
-            {
-                Id = $"{fuelTypeId}-{liters:0.##}".Replace('.', '_'),
-                StationId = stationId,
-                FuelTypeId = fuelTypeId,
-                FuelName = fuelTypeId,
-                Liters = liters,
-                Price = 470m * liters,
-                OriginalPrice = 470m * liters,
-                SupplierPricePerLiter = 45m,
-                MarginUahPerLiter = 2m,
-                FinalPricePerLiter = 47m,
-                CreatedAtUtc = now,
-                UpdatedAtUtc = now
-            });
+            context.SeedPackage(
+                id: $"{fuelTypeId}-{liters:0.##}".Replace('.', '_'),
+                stationId: stationId,
+                fuelTypeId: fuelTypeId,
+                liters: liters,
+                price: 470m * liters,
+                supplierPricePerLiter: 45m,
+                marginUahPerLiter: 2m,
+                finalPricePerLiter: 47m,
+                createdAtUtc: now,
+                updatedAtUtc: now);
         }
 
         await context.SaveChangesAsync();
