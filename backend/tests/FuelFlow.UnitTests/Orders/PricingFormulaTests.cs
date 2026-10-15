@@ -103,11 +103,11 @@ public sealed class PricingFormulaTests
     [Fact]
     public void PackagePrice_RecomputesFromKnobs_WhenCeilingBinds()
     {
-        var pkg = new FuelPackage
+        var pkg = new SellablePackage
         {
-            Id = "p", StationId = "okko", FuelTypeId = "okko-95", FuelName = "A-95",
+
             Liters = 10m,
-            Price = 9999,                    // stale frozen price must be ignored
+            PackagePrice = 9999,                    // stale frozen price must be ignored
             SupplierPricePerLiter = 49m,     // cost
             MarginUahPerLiter = 7m,          // profit → cost-plus 56
             PumpPricePerLiter = 55m,
@@ -122,10 +122,10 @@ public sealed class PricingFormulaTests
     [Fact]
     public void PackagePrice_NullKnobs_FallsBackToStoredFinal()
     {
-        var pkg = new FuelPackage
+        var pkg = new SellablePackage
         {
-            Id = "p", StationId = "okko", FuelTypeId = "okko-95", FuelName = "A-95",
-            Liters = 10m, Price = 9999,
+
+            Liters = 10m, PackagePrice = 9999,
             SupplierPricePerLiter = null,
             MarginUahPerLiter = null,
             FinalPricePerLiter = 51m,
@@ -137,10 +137,10 @@ public sealed class PricingFormulaTests
     [Fact]
     public void PackagePrice_NoPerLiterData_UsesFrozenPrice()
     {
-        var pkg = new FuelPackage
+        var pkg = new SellablePackage
         {
-            Id = "p", StationId = "okko", FuelTypeId = "okko-95", FuelName = "A-95",
-            Liters = 10m, Price = 510,
+
+            Liters = 10m, PackagePrice = 510,
             SupplierPricePerLiter = null,
             MarginUahPerLiter = null,
             FinalPricePerLiter = null,
@@ -160,11 +160,11 @@ public sealed class PricingFormulaTests
     [Fact]
     public void IsBelowCost_NeverComparesThePackageTotalAgainstAPerLiterCost()
     {
-        var pkg = new FuelPackage
+        var pkg = new SellablePackage
         {
-            Id = "p", StationId = "okko", FuelTypeId = "okko-95", FuelName = "A-95",
+
             Liters = 50m,
-            Price = 590m,                    // package TOTAL — a different unit entirely
+            PackagePrice = 590m,                    // package TOTAL — a different unit entirely
             SupplierPricePerLiter = 54m,     // per-litre cost
             MarginUahPerLiter = null,        // ...and no per-litre price to be derived from
             FinalPricePerLiter = null,
@@ -184,9 +184,9 @@ public sealed class PricingFormulaTests
     [Fact]
     public void TryGetBelowCostVerdict_ShouldReportBelowCost_WhenTheChargeIsUnderTheCost()
     {
-        var pkg = new FuelPackage
+        var pkg = new SellablePackage
         {
-            Id = "p", StationId = "okko", FuelTypeId = "okko-95", FuelName = "A-95",
+
             Liters = 10m,
             SupplierPricePerLiter = 50m,
             MarginUahPerLiter = 2m,
@@ -207,9 +207,9 @@ public sealed class PricingFormulaTests
     [InlineData(-5.0)]
     public void TryGetBelowCostVerdict_ShouldReportUnknown_WhenNoRealCostIsRecorded(double? cost)
     {
-        var pkg = new FuelPackage
+        var pkg = new SellablePackage
         {
-            Id = "p", StationId = "okko", FuelTypeId = "okko-95", FuelName = "A-95",
+
             Liters = 10m,
             SupplierPricePerLiter = cost is null ? null : (decimal)cost.Value,
             MarginUahPerLiter = 2m,
@@ -224,9 +224,9 @@ public sealed class PricingFormulaTests
     [Fact]
     public void TryGetBelowCostVerdict_ShouldReportAboveCost_ForASoundlyPricedLine()
     {
-        var pkg = new FuelPackage
+        var pkg = new SellablePackage
         {
-            Id = "p", StationId = "okko", FuelTypeId = "okko-95", FuelName = "A-95",
+
             Liters = 10m,
             SupplierPricePerLiter = 40m,
             MarginUahPerLiter = 5m,
@@ -243,9 +243,9 @@ public sealed class PricingFormulaTests
     {
         // 59/litre over a 50 cost is fine; a 10/litre term discount takes it to 49 and under. The guard
         // has to judge the figure actually charged or a generous tier sells under cost unnoticed.
-        var pkg = new FuelPackage
+        var pkg = new SellablePackage
         {
-            Id = "p", StationId = "okko", FuelTypeId = "okko-95", FuelName = "A-95",
+
             Liters = 10m,
             SupplierPricePerLiter = 50m,
             MarginUahPerLiter = 9m,

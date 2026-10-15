@@ -26,13 +26,21 @@ public sealed class GetReconciliationQueryHandler
         var paidUnfulfilled = await _context.Orders.CountAsync(o => o.Status == OrderStatus.PendingFulfillment, cancellationToken);
         var partiallyFulfilled = await _context.Orders.CountAsync(o => o.Status == OrderStatus.PartiallyFulfilled, cancellationToken);
 
-        var fuelPackages = await _context.FuelPackages
+        // Margin is a property of the offer, so the lookup is volumes joined to offers, pinned to the
+        // real pool: these are operator counters over real business, and the old lookup had no pool
+        // filter, so a QA rehearsal row could shadow a real one by being newer.
+        //
+        // The GroupBy(...).First() this replaces existed only to break ties the schema already
+        // forbids - UNIQUE (station_id, fuel_type_id, data_kind) on fuel_offers times
+        // UNIQUE (offer_id, liters) on fuel_offer_volumes makes the triple unique inside a pool. A
+        // duplicate now throws rather than silently resolving to one arbitrary price.
+        var fpLookup = await _context.FuelOfferVolumes
             .AsNoTracking()
-            .ToListAsync(cancellationToken);
-
-        var fpLookup = fuelPackages
-            .GroupBy(fp => (fp.StationId, fp.FuelTypeId, fp.Liters))
-            .ToDictionary(g => g.Key, g => g.OrderByDescending(fp => fp.PriceUpdatedAt ?? fp.CreatedAtUtc).First());
+            .Where(v => v.Offer.DataKind == DataKinds.Real)
+            .ToDictionaryAsync(
+                v => (v.Offer.StationId, v.Offer.FuelTypeId, v.Liters),
+                v => v.Offer,
+                cancellationToken);
 
         // Closed orders (incl. refunded) form the revenue set; margin is earned only on
         // delivered liters, so refunded liters drop out of revenue automatically. A company

@@ -73,13 +73,24 @@ public sealed class GetReportQueryHandler
             .Where(ft => allFuelTypeIds.Contains(ft.Id))
             .ToDictionaryAsync(ft => ft.Id, ft => ft.Name, cancellationToken);
 
-        var fuelPackages = await _context.FuelPackages
+        // Margin comes from the offer, so this reads volumes joined to their offer. The real pool is chosen
+        // deliberately: this is an operator report over real business, and the old lookup had no pool
+        // filter at all, so a QA rehearsal row could shadow a real one purely by being newer.
+        var fpLookup = await _context.FuelOfferVolumes
             .AsNoTracking()
-            .ToListAsync(cancellationToken);
+            .Where(v => v.Offer.DataKind == DataKinds.Real)
+            .ToDictionaryAsync(
+                v => (v.Offer.StationId, v.Offer.FuelTypeId, v.Liters),
+                v => v.Offer,
+                cancellationToken);
 
-        var fpLookup = fuelPackages
-            .GroupBy(fp => (fp.StationId, fp.FuelTypeId, fp.Liters))
-            .ToDictionary(g => g.Key, g => g.OrderByDescending(fp => fp.PriceUpdatedAt ?? fp.CreatedAtUtc).First());
+        // No GroupBy(...).First() any more, and that is the point of the split. The triple used to have
+        // several candidate rows and this picked one "most recently priced" - which, across the real and
+        // QA pools, silently read the rehearsal price for a real order. It is now a genuine key:
+        // `UNIQUE (station_id, fuel_type_id, data_kind)` on fuel_offers times
+        // `UNIQUE (offer_id, liters)` on fuel_offer_volumes, with the pool pinned above. Two rows cannot
+        // collide, so there is nothing left to arbitrate - and a duplicate here would now throw instead
+        // of quietly picking a price.
 
         var period = new ReportPeriod(
             query.FromDate,

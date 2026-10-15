@@ -2,6 +2,7 @@ using FuelFlow.API.Features.Orders;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Orders.CreateCheckout;
@@ -27,18 +28,27 @@ public sealed class TermQuoteQueryHandler
     }
 
     public async Task<TermQuoteResponse> HandleAsync(
+        bool isTestAccount,
         string stationId, string fuelTypeId, decimal liters, CancellationToken cancellationToken = default)
     {
         var config = await _settings.GetVoucherTermConfigAsync(cancellationToken);
+        var pool = DataKinds.ForPool(isTestAccount);
 
         // A missing package is not an error: the catalog can change between browsing and checkout, and the
         // line gets rejected properly at checkout. Returning the bare ladder lets the picker render without
         // prices rather than failing the whole screen.
-        var package = await _context.FuelPackages
+        var row = await _context.FuelOfferVolumes
             .AsNoTracking()
-            .FirstOrDefaultAsync(
-                p => p.StationId == stationId && p.FuelTypeId == fuelTypeId && p.Liters == liters,
-                cancellationToken);
+            .Where(v => v.Offer.StationId == stationId
+                     && v.Offer.FuelTypeId == fuelTypeId
+                     && v.Liters == liters
+                     && v.Offer.DataKind == pool)
+            .OrderByDescending(v => v.UpdatedAtUtc)
+            .ThenBy(v => v.Id)
+            .Select(v => new { Volume = v, Offer = v.Offer })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var package = row is null ? null : SellablePackage.From(row.Offer, row.Volume);
 
         // The below-cost guard needs the fuel's opt-in flag, so read it once with the package. A fuel that
         // is allowed to sell under cost can still offer the tier.

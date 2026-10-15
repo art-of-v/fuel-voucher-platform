@@ -48,7 +48,7 @@ public static class OrderLinePricing
     /// and reconstructing it later from a changed cost column would not be reconstruction, it would
     /// be a guess.
     /// </remarks>
-    public static string? For(FuelPackage package, string? termCode, decimal? discountPerLiter = null)
+    public static string? For(SellablePackage package, string? termCode, decimal? discountPerLiter = null)
     {
         ArgumentNullException.ThrowIfNull(package);
 

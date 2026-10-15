@@ -24,7 +24,7 @@ internal static class BrandFuelCard
     /// below-cost decision is about, and it matches how the pool's blended cost is computed, so the
     /// card describes what will be enforced rather than one nominal's share of it.
     /// </summary>
-    public static decimal WeightedCostPerLiter(IReadOnlyList<FuelPackage> packages)
+    public static decimal WeightedCostPerLiter(IReadOnlyList<SellablePackage> packages)
     {
         if (packages.Count == 0) return 0m;
         var weighted = packages.Where(p => p.SupplierPricePerLiter is not null).ToList();
@@ -45,13 +45,13 @@ var litres = weighted.Sum(p => p.Liters);
     /// cost") is the smallest one. When packages disagree, <see cref="BrandFuelDto.PriceSpread"/>
     /// is what makes that visible.
     /// </summary>
-    private static FuelPackage? Reference(IReadOnlyList<FuelPackage> packages) =>
+    private static SellablePackage? Reference(IReadOnlyList<SellablePackage> packages) =>
         packages
             .OrderBy(p => p.Liters)
-            .ThenBy(p => p.Id, StringComparer.Ordinal)
+            .ThenBy(p => p.PackageId, StringComparer.Ordinal)
             .FirstOrDefault();
 
-    public static BrandFuelDto Build(FuelTypeEntity fuel, IReadOnlyList<FuelPackage> packages)
+    public static BrandFuelDto Build(FuelTypeEntity fuel, IReadOnlyList<SellablePackage> packages)
     {
         var reference = Reference(packages);
 
@@ -85,7 +85,7 @@ var litres = weighted.Sum(p => p.Liters);
             // lives on the package - that is the row the storefront filters. Any=true when the fuel
             // has packages and they are all flagged; a mixed fuel shows flagged, since the operator
             // needs to look at it either way.
-            IsTestData = packages.Count > 0 && packages.All(p => p.IsTestData),
+            IsTestData = packages.Count > 0 && packages.All(p => p.DataKind == DataKinds.Qa),
             PriceSpread = BuildSpread(supplierCosts, finals)
         };
     }

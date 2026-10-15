@@ -9,6 +9,7 @@ using FuelFlow.SharedKernel.DTOs;
 using FuelFlow.Features.Orders.SimulatePayment;
 using FuelFlow.Features.Vouchers.Renewal.Checkout;
 using FuelFlow.Features.Vouchers.Renewal.Quote;
+using FuelFlow.Features.Vouchers.Availability;
 using FuelFlow.Features.Settings;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -32,6 +33,7 @@ public sealed class PurchaseController : ControllerBase
     private readonly RenewalCheckoutCommandHandler _renewalCheckoutHandler;
     private readonly RenewalQuoteCommandHandler _renewalQuoteHandler;
     private readonly TermQuoteQueryHandler _termQuoteHandler;
+    private readonly PackageStockAvailability _stock;
     private readonly RuntimeSettingsService _settings;
     private readonly GetUserPurchasesCommandHandler _getUserPurchasesHandler;
     private readonly GetSavingsReportQueryHandler _getSavingsReportHandler;
@@ -45,6 +47,7 @@ public sealed class PurchaseController : ControllerBase
         RenewalCheckoutCommandHandler renewalCheckoutHandler,
 RenewalQuoteCommandHandler renewalQuoteHandler,
     TermQuoteQueryHandler termQuoteHandler,
+        PackageStockAvailability stock,
     RuntimeSettingsService settings,
         GetUserPurchasesCommandHandler getUserPurchasesHandler,
         GetSavingsReportQueryHandler getSavingsReportHandler,
@@ -56,7 +59,8 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
         _bulkCheckoutHandler = bulkCheckoutHandler;
         _renewalCheckoutHandler = renewalCheckoutHandler;
         _renewalQuoteHandler = renewalQuoteHandler;
-    _termQuoteHandler = termQuoteHandler;
+        _termQuoteHandler = termQuoteHandler;
+        _stock = stock;
         _settings = settings;
         _getUserPurchasesHandler = getUserPurchasesHandler;
         _getSavingsReportHandler = getSavingsReportHandler;
@@ -181,7 +185,17 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
         if (string.IsNullOrWhiteSpace(stationId) || string.IsNullOrWhiteSpace(fuelTypeId) || liters <= 0m)
             return BadRequest("stationId, fuelTypeId and a positive liters are required.");
 
-        var quote = await _termQuoteHandler.HandleAsync(stationId, fuelTypeId, liters, cancellationToken);
+        // The ladder is priced off a catalogue package, so the quote has to be priced off the SAME
+        // pool the checkout will sell from. This endpoint used to resolve its package without a pool
+        // at all, so a QA account could be quoted the real pool's price (and vice versa) and the
+        // figure shown in the term picker did not match the one charged. Same resolution as checkout.
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? User.FindFirst("sub")?.Value
+            ?? User.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")?.Value;
+        var isTestAccount = await _stock.IsTestAccountAsync(
+            Guid.TryParse(userId, out var parsedUserId) ? parsedUserId : null, cancellationToken);
+
+        var quote = await _termQuoteHandler.HandleAsync(isTestAccount, stationId, fuelTypeId, liters, cancellationToken);
         return Ok(quote);
     }
 
