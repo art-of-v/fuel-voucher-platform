@@ -149,7 +149,17 @@ public sealed class BrandsController : ControllerBase
         var name = station.Name;
         var fuelTypes = await _context.FuelTypes.Where(f => f.StationId == id).ToListAsync(ct);
         var fuelIds = fuelTypes.Select(f => f.Id).ToList();
-        var packages = await _context.FuelPackages.Where(p => fuelIds.Contains(p.FuelTypeId)).ToListAsync(ct);
+        // Archive-the-offers view of the same question as the brand list above: this deletion path needs
+        // the rows to mutate, not the read projection the card is built from.
+        var offerIdsToArchive = await _context.FuelOffers
+            .Where(o => fuelIds.Contains(o.FuelTypeId))
+            .Select(o => o.Id).ToListAsync(ct);
+        var packages = await _context.FuelOfferVolumes
+            .Where(v => offerIdsToArchive.Contains(v.OfferId))
+            .ToListAsync(ct);
+        var offersToArchive = await _context.FuelOffers
+            .Where(o => offerIdsToArchive.Contains(o.Id))
+            .ToListAsync(ct);
 
         // Archive the whole branch instead of removing it. fuel_vouchers.fuel_type_id CASCADEs from
         // here, so the old RemoveRange cascade could take paid-for vouchers with it; #217 keeps
@@ -160,6 +170,16 @@ public sealed class BrandsController : ControllerBase
             package.IsDeleted = true;
             package.DeletedAtUtc = archivedAt;
         }
+        // The offers go too. Archiving only their volumes would leave a live offer behind with no
+        // sellable volume, and the next nominals edit would happily add volumes back to a brand that was
+        // deleted - the offer is the row that says "this fuel is on sale here", so it is the row that has
+        // to say no.
+        foreach (var offer in offersToArchive)
+        {
+            offer.IsDeleted = true;
+            offer.DeletedAtUtc = archivedAt;
+        }
+
         foreach (var fuelType in fuelTypes)
         {
             fuelType.IsDeleted = true;
@@ -249,9 +269,9 @@ public sealed class BrandsController : ControllerBase
             var existingFuelIds = await _context.FuelTypes
                 .Where(f => f.StationId == id && f.Id != fuel.Id)
                 .Select(f => f.Id).ToListAsync(ct);
-            litersToCreate = await _context.FuelPackages
-                .Where(p => existingFuelIds.Contains(p.FuelTypeId))
-                .Select(p => (int)p.Liters)
+            litersToCreate = await _context.FuelOfferVolumes
+                .Where(v => existingFuelIds.Contains(v.Offer.FuelTypeId))
+                .Select(v => (int)v.Liters)
                 .Distinct()
                 .OrderBy(l => l)
                 .ToListAsync(ct);
@@ -262,28 +282,43 @@ public sealed class BrandsController : ControllerBase
             litersToCreate = DefaultNominals;
         }
 
+        // One offer and N volumes, not N packages. Every per-litre knob the request carries is a
+        // property of WHAT IS BEING SOLD, not of how much of it: a 5 L bottle and a 50 L canister of
+        // the same fuel at the same station have one price per litre and therefore one offer. The old
+        // row-per-volume shape wrote that same price N times and could not stop the copies drifting -
+        // which is what the backfill had to reconcile when the split landed.
+        var pool = DataKinds.ForPool(request.IsTestData.Value);
+        var offer = new FuelOffer
+        {
+            Id = OfferKeys.For(id, fuel.Id, pool),
+            StationId = id,
+            FuelTypeId = fuel.Id,
+            SupplierPricePerLiter = request.SupplierPricePerLiter,
+            MarginUahPerLiter = request.MarginUahPerLiter,
+            MarginPercent = request.MarginPercent,
+            FinalPricePerLiter = finalPerLiter,
+            PumpPricePerLiter = request.PumpPricePerLiter,
+            MinDiscountPerLiter = request.MinDiscountPerLiter,
+            DataKind = pool,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+        };
+        _context.FuelOffers.Add(offer);
+
         foreach (var liters in litersToCreate)
         {
-            _context.FuelPackages.Add(new FuelPackage
+            _context.FuelOfferVolumes.Add(new FuelOfferVolume
             {
                 Id = Guid.CreateVersion7().ToString(),
-                StationId = id,
-                FuelTypeId = fuel.Id,
-                FuelName = fuel.Name,
+                OfferId = offer.Id,
                 Liters = liters,
-                Price = Math.Round(finalPerLiter * liters, 2, MidpointRounding.AwayFromZero),
-                // Public "before" price = pump × liters (falls back to the sale price when no pump);
-                // never the supplier cost, which must not leak to anonymous callers (planning #73).
-                OriginalPrice = FuelPricing.OriginalPackagePrice(request.PumpPricePerLiter, liters, Math.Round(finalPerLiter * liters, 2, MidpointRounding.AwayFromZero)),
-                SupplierPricePerLiter = request.SupplierPricePerLiter,
-                MarginUahPerLiter = request.MarginUahPerLiter,
-                MarginPercent = request.MarginPercent,
-                FinalPricePerLiter = finalPerLiter,
-                PumpPricePerLiter = request.PumpPricePerLiter,
-                MinDiscountPerLiter = request.MinDiscountPerLiter,
-                IsTestData = request.IsTestData.Value,
+                // Frozen package total: what the customer pays for this package, not necessarily
+                // finalPerLiter × litres. The storefront's struck-through "before" price is recomputed
+                // from the pump price via FuelPricing.OriginalPackagePrice (planning #73), so it is
+                // never the supplier cost, which must not leak to anonymous callers.
+                PackagePrice = Math.Round(finalPerLiter * liters, 2, MidpointRounding.AwayFromZero),
                 CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                UpdatedAtUtc = DateTime.UtcNow,
             });
         }
         await _context.SaveChangesAsync(ct);
@@ -323,8 +358,11 @@ public sealed class BrandsController : ControllerBase
         var fuel = await _context.FuelTypes.FirstOrDefaultAsync(f => f.Id == fuelId, ct);
         if (fuel is null) return NotFound();
 
-        var packages = await _context.FuelPackages.Where(p => p.FuelTypeId == fuelId).ToListAsync(ct);
-        var seededPackages = packages.Count == 0;
+        // Offer existence - not package existence - is what decides whether this edit seeds defaults,
+        // and the pool is read off the incoming request because that is the pool the fuel is moving
+        // INTO. A fuel with a rehearsal offer and no live one is being created live here, and must be
+        // seeded like one.
+        var pool = DataKinds.ForPool(request.IsTestData.Value);
 
 // A fuel whose name reads as rehearsal cannot be flipped to live by an edit. The flag is the
         // real control - an operator may innocently name a grade "Test-A95" - but the silent case,
@@ -363,68 +401,98 @@ public sealed class BrandsController : ControllerBase
         // base = pump/reference (колонка) when known, else legacy final + min discount.
         var baseUahPerLiter = request.PumpPricePerLiter ?? (finalPerLiter + request.MinDiscountPerLiter);
 
-        if (seededPackages)
+        var offerId = OfferKeys.For(fuel.StationId, fuel.Id, pool);
+        var offer = await _context.FuelOffers.FirstOrDefaultAsync(o => o.Id == offerId, ct);
+
+        // Flipping isTestData is not an update any more, and pretending otherwise is the bug this shape
+        // removes. `data_kind` is part of the offer's identity - UNIQUE (station_id, fuel_type_id,
+        // data_kind) - so the same fuel at the same station has TWO offers, one per pool, and they are
+        // different rows rather than one row with a flag. Moving a fuel from real to rehearsal
+        // therefore means moving its volumes onto the rehearsal offer and archiving the real one.
+        var otherPool = pool == DataKinds.Real ? DataKinds.Qa : DataKinds.Real;
+        var otherOfferId = OfferKeys.For(fuel.StationId, fuel.Id, otherPool);
+        var otherOffer = await _context.FuelOffers.FirstOrDefaultAsync(o => o.Id == otherOfferId, ct);
+
+        if (offer is null)
         {
-            foreach (var liters in DefaultNominals)
+            offer = new FuelOffer
             {
-                var pkg = new FuelPackage
-                {
-                    Id = Guid.CreateVersion7().ToString(),
-                    StationId = fuel.StationId,
-                    FuelTypeId = fuel.Id,
-                    FuelName = fuel.Name,
-                    Liters = liters,
-                    Price = Math.Round(finalPerLiter * liters, 2, MidpointRounding.AwayFromZero),
-                    OriginalPrice = FuelPricing.OriginalPackagePrice(request.PumpPricePerLiter, liters, Math.Round(finalPerLiter * liters, 2, MidpointRounding.AwayFromZero)),
-                    SupplierPricePerLiter = request.SupplierPricePerLiter,
-                    MarginUahPerLiter = request.MarginUahPerLiter,
-                    MarginPercent = request.MarginPercent,
-                    FinalPricePerLiter = finalPerLiter,
-                    PumpPricePerLiter = request.PumpPricePerLiter,
-                    MinDiscountPerLiter = request.MinDiscountPerLiter,
-                    IsTestData = request.IsTestData.Value,
-                    CreatedAtUtc = DateTime.UtcNow,
-                    UpdatedAtUtc = DateTime.UtcNow
-                };
-                _context.FuelPackages.Add(pkg);
-                packages.Add(pkg);
-            }
+                Id = offerId,
+                StationId = fuel.StationId,
+                FuelTypeId = fuel.Id,
+                DataKind = pool,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow,
+            };
+            _context.FuelOffers.Add(offer);
+        }
+
+        var volumes = await _context.FuelOfferVolumes
+            .Where(v => v.OfferId == offerId || v.OfferId == otherOfferId)
+            .ToListAsync(ct);
+
+        var seededVolumes = volumes.Count == 0;
+        if (seededVolumes)
+        {
+            volumes = DefaultNominals.Select(liters => new FuelOfferVolume
+            {
+                Id = Guid.CreateVersion7().ToString(),
+                OfferId = offerId,
+                Liters = liters,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow,
+            }).ToList();
+            _context.FuelOfferVolumes.AddRange(volumes);
+        }
+        else if (offerId != otherOfferId)
+        {
+            // Re-keying: the volumes belonged to the other pool's offer and now belong to this one.
+            foreach (var volume in volumes) volume.OfferId = offerId;
         }
 
         var station = await _context.Stations.FirstOrDefaultAsync(s => s.Id == fuel.StationId, ct);
         var stationName = station?.Name ?? "?";
 
-        var firstPkg = packages.First();
-        var oldFuelName = fuel.Name;
-        var oldSupplierPrice = firstPkg.SupplierPricePerLiter;
-        var oldMarginPrice = firstPkg.MarginUahPerLiter;
-        var oldFinalPrice = firstPkg.FinalPricePerLiter;
+        var oldOffer = otherOffer;
+        var oldSupplierPrice = oldOffer?.SupplierPricePerLiter;
+        var oldMarginPrice = oldOffer?.MarginUahPerLiter;
+        var oldFinalPrice = oldOffer?.FinalPricePerLiter;
         var oldValue = JsonSerializer.Serialize(new
         {
             fuel.Name,
             SupplierPricePerLiter = oldSupplierPrice,
             MarginUahPerLiter = oldMarginPrice,
-            firstPkg.MarginPercent,
+            MarginPercent = oldOffer?.MarginPercent,
             FinalPricePerLiter = oldFinalPrice,
             fuel.BasePrice,
             fuel.DiscountPrice
         });
 
-        foreach (var pkg in packages)
+        // The per-litre knobs are written to the offer, once, instead of to every package row. The
+        // volume only carries the frozen package total, which is a function of litres - and litres
+        // never change when the price does, so this recomputes cleanly.
+        offer.SupplierPricePerLiter = request.SupplierPricePerLiter;
+        offer.MarginUahPerLiter = request.MarginUahPerLiter;
+        offer.MarginPercent = request.MarginPercent;
+        offer.PumpPricePerLiter = request.PumpPricePerLiter;
+        offer.MinDiscountPerLiter = request.MinDiscountPerLiter;
+        offer.FinalPricePerLiter = finalPerLiter;
+        offer.UpdatedAtUtc = DateTime.UtcNow;
+
+        foreach (var volume in volumes)
         {
-            pkg.FuelName = request.Name;
-            pkg.SupplierPricePerLiter = request.SupplierPricePerLiter;
-            pkg.MarginUahPerLiter = request.MarginUahPerLiter;
-            pkg.MarginPercent = request.MarginPercent;
-            pkg.PumpPricePerLiter = request.PumpPricePerLiter;
-            pkg.MinDiscountPerLiter = request.MinDiscountPerLiter;
-            pkg.FinalPricePerLiter = finalPerLiter;
-            pkg.Price = Math.Round(finalPerLiter * pkg.Liters, 2, MidpointRounding.AwayFromZero);
-            pkg.OriginalPrice = FuelPricing.OriginalPackagePrice(request.PumpPricePerLiter, pkg.Liters, Math.Round(finalPerLiter * pkg.Liters, 2, MidpointRounding.AwayFromZero));
-            // Written on every edit, not only when it changes, so clearing the flag on a fuel
-            // actually puts its packages back on sale instead of silently leaving them hidden.
-            pkg.IsTestData = request.IsTestData.Value;
-            pkg.UpdatedAtUtc = DateTime.UtcNow;
+            volume.PackagePrice = Math.Round(finalPerLiter * volume.Liters, 2, MidpointRounding.AwayFromZero);
+            volume.UpdatedAtUtc = DateTime.UtcNow;
+        }
+
+        // Archive rather than delete the offer we just emptied: it carries the pricing history that
+        // `fuel_packages.is_deleted` rows carried before the split, and a delete here would take the
+        // volumes' old home with it.
+        if (otherOffer is not null && otherOffer.Id != offer.Id)
+        {
+            otherOffer.IsDeleted = true;
+            otherOffer.DeletedAtUtc = DateTime.UtcNow;
+            otherOffer.UpdatedAtUtc = DateTime.UtcNow;
         }
 
         fuel.Name = request.Name;
@@ -435,10 +503,8 @@ public sealed class BrandsController : ControllerBase
         fuel.AllowBelowCost = request.AllowBelowCost;
         fuel.UpdatedAtUtc = DateTime.UtcNow;
 
-        if (!seededPackages)
-        {
-            _context.FuelPackages.UpdateRange(packages);
-        }
+        if (!seededVolumes) _context.FuelOfferVolumes.UpdateRange(volumes);
+        if (!seededVolumes) _context.FuelOffers.Update(offer);
         _context.FuelTypes.Update(fuel);
 
         await _context.SaveChangesAsync(ct);
@@ -456,6 +522,7 @@ public sealed class BrandsController : ControllerBase
         });
 
         var changes = new List<string>();
+        var oldFuelName = fuel.Name;
         if (oldFuelName != request.Name)
             changes.Add($"name {oldFuelName} → {request.Name}");
         if (oldSupplierPrice != request.SupplierPricePerLiter)
@@ -493,7 +560,16 @@ public sealed class BrandsController : ControllerBase
         var stationName = station?.Name ?? "?";
         var fuelName = fuel.Name;
 
-        var packages = await _context.FuelPackages.Where(p => p.FuelTypeId == fuelId).ToListAsync(ct);
+        // Same as the brand branch: this path archives rows rather than reading them.
+        var offerIdsToArchive = await _context.FuelOffers
+            .Where(o => o.FuelTypeId == fuelId)
+            .Select(o => o.Id).ToListAsync(ct);
+        var packages = await _context.FuelOfferVolumes
+            .Where(v => offerIdsToArchive.Contains(v.OfferId))
+            .ToListAsync(ct);
+        var offersToArchive = await _context.FuelOffers
+            .Where(o => offerIdsToArchive.Contains(o.Id))
+            .ToListAsync(ct);
 
         // Archive rather than remove - same reasoning as the brand branch above: the cascade from
         // fuel_types reaches fuel_vouchers (#217).
@@ -503,7 +579,15 @@ public sealed class BrandsController : ControllerBase
             package.IsDeleted = true;
             package.DeletedAtUtc = archivedAt;
         }
-        fuel.IsDeleted = true;
+        // The offers go too. Archiving only their volumes would leave a live offer behind with no
+        // sellable volume, and the next nominals edit would happily add volumes back to a brand that was
+        // deleted - the offer is the row that says "this fuel is on sale here", so it is the row that has
+        // to say no.
+        foreach (var offer in offersToArchive)
+        {
+            offer.IsDeleted = true;
+            offer.DeletedAtUtc = archivedAt;
+        }        fuel.IsDeleted = true;
         fuel.DeletedAtUtc = archivedAt;
         await _context.SaveChangesAsync(ct);
 
@@ -542,15 +626,26 @@ public sealed class BrandsController : ControllerBase
 
         var stationFuels = await _context.FuelTypes.Where(f => f.StationId == id).ToListAsync(ct);
         var fuelIds = stationFuels.Select(f => f.Id).ToList();
-        // AsTracking: the packages below are updated in place now, and the context defaults to
+        // AsTracking: the volumes below are updated in place now, and the context defaults to
         // NoTracking - without it the edit would persist nothing (NoTrackingMutationGuardTests).
-        var existingPackages = await _context.FuelPackages
+        //
+        // Offers are tracked alongside volumes because the per-litre knobs this used to read off "the
+        // fuel's first existing package" are the offer's, once. Reading them per package meant N copies
+        // of one price, and the copy that happened to sort first was the one the whole fuel was
+        // repriced from.
+        var offers = await _context.FuelOffers
             .AsTracking()
-            .Where(p => fuelIds.Contains(p.FuelTypeId))
+            .Where(o => fuelIds.Contains(o.FuelTypeId))
+            .ToListAsync(ct);
+
+        var offerIds = offers.Select(o => o.Id).ToList();
+        var existingVolumes = await _context.FuelOfferVolumes
+            .AsTracking()
+            .Where(v => offerIds.Contains(v.OfferId))
             .ToListAsync(ct);
 
         var oldValue = JsonSerializer.Serialize(
-            existingPackages.Select(p => (int)p.Liters).Distinct().OrderBy(l => l).ToList());
+            existingVolumes.Where(v => !v.IsDeleted).Select(v => (int)v.Liters).Distinct().OrderBy(l => l).ToList());
 
         // #217: keep what survives, archive what leaves, add what is new.
         //
@@ -560,67 +655,53 @@ public sealed class BrandsController : ControllerBase
         // package an order referenced was never the package in the catalog. Reusing a package that
         // stays keeps its id, so historical rows keep resolving to the thing they bought.
         //
-        // Pricing is unchanged: every package for a fuel is written with that fuel's per-litre knobs,
-        // taken from its first existing package exactly as before.
+        // Pricing is unchanged: the per-litre knobs come from the fuel's offer, and only the derived
+        // package total is rewritten on each volume.
         var wanted = nominals.Distinct().ToHashSet();
         var now = DateTime.UtcNow;
 
-        foreach (var existing in existingPackages.Where(p => !wanted.Contains((int)p.Liters)))
+        foreach (var leaving in existingVolumes.Where(v => !wanted.Contains((int)v.Liters)))
         {
-            existing.IsDeleted = true;
-            existing.DeletedAtUtc = now;
+            leaving.IsDeleted = true;
+            leaving.DeletedAtUtc = now;
         }
 
         foreach (var fuel in stationFuels)
         {
-            var pkg = existingPackages.FirstOrDefault(p => p.FuelTypeId == fuel.Id);
-            var supplierPrice = pkg?.SupplierPricePerLiter ?? 0;
-            var marginUah = pkg?.MarginUahPerLiter ?? 0;
-            var marginPct = pkg?.MarginPercent;
-            var pumpPrice = pkg?.PumpPricePerLiter;
-            var minDiscount = pkg?.MinDiscountPerLiter ?? 0;
-            var finalPrice = pkg is null
-                ? 0m
-                : FuelPricing.FinalPerLiter(supplierPrice, marginUah, pumpPrice, minDiscount);
-
-            foreach (var liters in wanted)
+            // A fuel can own an offer per pool now rather than one flagged set of packages, so the
+            // nominals are applied to each of its offers: both catalogues should offer the same sizes.
+            foreach (var offer in offers.Where(o => o.FuelTypeId == fuel.Id))
             {
-                var kept = existingPackages.FirstOrDefault(p => p.FuelTypeId == fuel.Id && (int)p.Liters == liters);
+                var supplierPrice = offer.SupplierPricePerLiter ?? 0;
+                var marginUah = offer.MarginUahPerLiter ?? 0;
+                var finalPrice = FuelPricing.FinalPerLiter(
+                    supplierPrice, marginUah, offer.PumpPricePerLiter, offer.MinDiscountPerLiter ?? 0);
 
-                if (kept is not null)
+                foreach (var liters in wanted)
                 {
-                    // Same row, same id, same CreatedAtUtc - only the derived price is refreshed.
-                    kept.FuelName = fuel.Name;
-                    kept.Price = Math.Round(finalPrice * liters, 2, MidpointRounding.AwayFromZero);
-                    kept.OriginalPrice = FuelPricing.OriginalPackagePrice(pumpPrice, liters, Math.Round(finalPrice * liters, 2, MidpointRounding.AwayFromZero));
-                    kept.SupplierPricePerLiter = supplierPrice;
-                    kept.MarginUahPerLiter = marginUah;
-                    kept.MarginPercent = marginPct;
-                    kept.FinalPricePerLiter = finalPrice;
-                    kept.PumpPricePerLiter = pumpPrice;
-                    kept.MinDiscountPerLiter = minDiscount;
-                    kept.UpdatedAtUtc = now;
-                    continue;
+                    var kept = existingVolumes.FirstOrDefault(
+                        v => v.OfferId == offer.Id && (int)v.Liters == liters);
+
+                    if (kept is not null)
+                    {
+                        // Same row, same id, same CreatedAtUtc - only the derived price is refreshed.
+                        // The per-litre columns are NOT rewritten here: they are the offer's, and
+                        // writing them per volume is the duplication this split removed.
+                        kept.PackagePrice = Math.Round(finalPrice * liters, 2, MidpointRounding.AwayFromZero);
+                        kept.UpdatedAtUtc = now;
+                        continue;
+                    }
+
+                    _context.FuelOfferVolumes.Add(new FuelOfferVolume
+                    {
+                        Id = Guid.CreateVersion7().ToString(),
+                        OfferId = offer.Id,
+                        Liters = liters,
+                        PackagePrice = Math.Round(finalPrice * liters, 2, MidpointRounding.AwayFromZero),
+                        CreatedAtUtc = now,
+                        UpdatedAtUtc = now,
+                    });
                 }
-
-                _context.FuelPackages.Add(new FuelPackage
-                {
-                    Id = Guid.CreateVersion7().ToString(),
-                    StationId = id,
-                    FuelTypeId = fuel.Id,
-                    FuelName = fuel.Name,
-                    Liters = liters,
-                    Price = Math.Round(finalPrice * liters, 2, MidpointRounding.AwayFromZero),
-                    OriginalPrice = FuelPricing.OriginalPackagePrice(pumpPrice, liters, Math.Round(finalPrice * liters, 2, MidpointRounding.AwayFromZero)),
-                    SupplierPricePerLiter = supplierPrice,
-                    MarginUahPerLiter = marginUah,
-                    MarginPercent = marginPct,
-                    FinalPricePerLiter = finalPrice,
-                    PumpPricePerLiter = pumpPrice,
-                    MinDiscountPerLiter = minDiscount,
-                    CreatedAtUtc = now,
-                    UpdatedAtUtc = now
-                });
             }
         }
         await _context.SaveChangesAsync(ct);

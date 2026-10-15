@@ -439,7 +439,7 @@ public sealed class VoucherTermSaleTests : IDisposable
     public async Task Quote_ReportsTheFeatureOffByDefault()
     {
         // The master switch drives whether the picker renders at all, so the quote has to carry it.
-        var quote = await QuoteHandler().HandleAsync("okko", "okko-95", 10m);
+        var quote = await QuoteHandler().HandleAsync(isTestAccount: false, "okko", "okko-95", 10m);
 
         quote.Enabled.Should().BeFalse();
     }
@@ -450,7 +450,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         EnableTermSale(("1w", 20m), ("1m", 5m));
         SeedStock(daysUntilPaperExpiry: 40);   // paper term past 1m, so both tiers are backed
 
-        var quote = await QuoteHandler().HandleAsync("okko", "okko-95", 10m);
+        var quote = await QuoteHandler().HandleAsync(isTestAccount: false, "okko", "okko-95", 10m);
 
         quote.Enabled.Should().BeTrue();
 
@@ -472,7 +472,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         // be unbuyable — a free 6-month term is exactly the kind of misconfiguration that must not sell.
         EnableTermSale(("1w", 20m));
 
-        var quote = await QuoteHandler().HandleAsync("okko", "okko-95", 10m);
+        var quote = await QuoteHandler().HandleAsync(isTestAccount: false, "okko", "okko-95", 10m);
 
         quote.Terms.Should().Contain(t => t.Term == "6m");
         var six = quote.Terms.Single(t => t.Term == "6m");
@@ -488,7 +488,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         EnableTermSale(("1w", 20m));
         SeedStock(daysUntilPaperExpiry: 8);
 
-        var quoted = (await QuoteHandler().HandleAsync("okko", "okko-95", 10m))
+        var quoted = (await QuoteHandler().HandleAsync(isTestAccount: false, "okko", "okko-95", 10m))
             .Terms.Single(t => t.Term == "1w");
         var checkout = await Handler().HandleAsync(Command("1w"));
         var order = await _context.Orders.AsNoTracking().FirstAsync(o => o.Id == checkout.OrderIds[0]);
@@ -504,7 +504,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         EnableTermSale(("1w", 25m));
         SeedStock(daysUntilPaperExpiry: 8);   // stock covers the 1w term, so below-cost is the only reason
 
-        var quote = await QuoteHandler().HandleAsync("okko", "okko-95", 10m);
+        var quote = await QuoteHandler().HandleAsync(isTestAccount: false, "okko", "okko-95", 10m);
 
         var week = quote.Terms.Single(t => t.Term == "1w");
         week.Available.Should().BeFalse();
@@ -520,7 +520,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         EnableTermSale(("1w", 25m));
         SeedStock(daysUntilPaperExpiry: 8);
 
-        var quote = await QuoteHandler().HandleAsync("okko", "okko-95", 10m);
+        var quote = await QuoteHandler().HandleAsync(isTestAccount: false, "okko", "okko-95", 10m);
 
         quote.Terms.Single(t => t.Term == "1w").Available.Should().BeTrue();
     }
@@ -532,7 +532,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         // anyway, so the quote must degrade to "nothing to buy here" instead of failing the screen.
         EnableTermSale(("1w", 20m));
 
-        var quote = await QuoteHandler().HandleAsync("okko", "okko-95", 999m);
+        var quote = await QuoteHandler().HandleAsync(isTestAccount: false, "okko", "okko-95", 999m);
 
         quote.Enabled.Should().BeTrue();
         quote.Terms.Should().OnlyContain(t => !t.Available);
@@ -550,7 +550,7 @@ public sealed class VoucherTermSaleTests : IDisposable
     {
         EnableTermSale(("1w", 20m), ("1m", 5m), ("6m", 1m));
 
-        var quote = await QuoteHandler().HandleAsync("okko", "okko-95", 10m);
+        var quote = await QuoteHandler().HandleAsync(isTestAccount: false, "okko", "okko-95", 10m);
 
         quote.Enabled.Should().BeTrue();
         quote.Terms.Should().OnlyContain(t => !t.Available, "nothing on the shelf can back any term");
@@ -565,7 +565,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         EnableTermSale(("1w", 20m), ("2w", 15m), ("1m", 5m), ("6m", 1m));
         SeedStock(daysUntilPaperExpiry: 21);
 
-        var quote = await QuoteHandler().HandleAsync("okko", "okko-95", 10m);
+        var quote = await QuoteHandler().HandleAsync(isTestAccount: false, "okko", "okko-95", 10m);
 
         quote.Terms.Single(t => t.Term == "1w").Available.Should().BeTrue();
         quote.Terms.Single(t => t.Term == "2w").Available.Should().BeTrue();
@@ -594,7 +594,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         });
         _context.SaveChanges();
 
-        var quote = await QuoteHandler().HandleAsync("okko", "okko-95", 10m);
+        var quote = await QuoteHandler().HandleAsync(isTestAccount: false, "okko", "okko-95", 10m);
 
         quote.Terms.Single(t => t.Term == "1w").Available.Should().BeFalse();
     }
@@ -607,7 +607,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         EnableTermSale(("1w", 20m));
         SeedStock(daysUntilPaperExpiry: 8, brand: "OKKO");
 
-        var quote = await QuoteHandler().HandleAsync("okko", "okko-95", 10m);
+        var quote = await QuoteHandler().HandleAsync(isTestAccount: false, "okko", "okko-95", 10m);
 
         quote.Terms.Single(t => t.Term == "1w").Available.Should().BeTrue();
     }

@@ -88,7 +88,13 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
 
         modelBuilder.Entity<Station>().HasData(SeedData.Stations);
         modelBuilder.Entity<FuelTypeEntity>().HasData(SeedData.FuelTypes);
-        modelBuilder.Entity<FuelPackage>().HasData(SeedData.FuelPackages);
+        // The catalogue is seeded as offers plus volumes, because that is what the application reads.
+        // fuel_packages is deliberately NOT seeded: it survives this release as the rollback target for
+        // a database that was migrated, but nothing reads it any more, and seeding it would create a
+        // second source of truth for prices in a fresh database. It goes when the table does (PR C).
+        var (seedOffers, seedVolumes) = SeedData.Catalogue;
+        modelBuilder.Entity<FuelOffer>().HasData(seedOffers);
+        modelBuilder.Entity<FuelOfferVolume>().HasData(seedVolumes);
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

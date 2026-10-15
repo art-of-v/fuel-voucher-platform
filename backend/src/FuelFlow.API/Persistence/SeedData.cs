@@ -33,7 +33,26 @@ internal static class SeedData
         new() { Id = "wog-gas", Name = "ГАЗ", StationId = "wog", BasePrice = 29, DiscountPrice = 27, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc }
     ];
 
-    internal static FuelPackage[] FuelPackages
+    /// <summary>
+    /// Seeded as an offer per fuel plus its volumes, because that is what the application reads.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The old shape seeded one row per package, which meant the per-litre figures were written N
+    /// identical times per fuel and the seed had to restate them on every row. Here they are written
+    /// once on the offer.
+    /// </para>
+    /// <para>
+    /// <b>Volume ids are the old package ids</b> - <c>{fuelTypeId}-{liters}</c> - deliberately. A fresh
+    /// database gets the same package identifiers it always had, so seeded fixtures, QA scripts and
+    /// anything that hard-codes a package id keep resolving after this change.
+    /// </para>
+    /// <para>
+    /// The live pool only. A rehearsal catalogue is seeded explicitly by the QA seed scripts, and
+    /// seeding both here would put QA rows into every fresh developer database.
+    /// </para>
+    /// </remarks>
+    internal static (FuelOffer[] Offers, FuelOfferVolume[] Volumes) Catalogue
     {
         get
         {
@@ -51,61 +70,67 @@ internal static class SeedData
                 ["wog-gas"] = (1.5m, 10),
             };
 
-            return FuelTypes
-                .SelectMany(ft =>
+            var offers = new List<FuelOffer>();
+            var volumes = new List<FuelOfferVolume>();
+
+            foreach (var ft in FuelTypes)
+            {
+                var margin = fuelPricing.TryGetValue(ft.Id, out var p) ? p.margin : 2.0m;
+                var finalPrice = ft.DiscountPrice;
+                var supplierPrice = finalPrice - margin;
+
+                var offer = new FuelOffer
                 {
-                    var margin = fuelPricing.TryGetValue(ft.Id, out var p) ? p.margin : 2.0m;
-                    var finalPrice = ft.DiscountPrice;
-                    var supplierPrice = finalPrice - margin;
-                    return new[] { 10m, 20m, 50m }.Select(liters => new FuelPackage
+                    Id = OfferKeys.For(ft.StationId, ft.Id, DataKinds.Real),
+                    StationId = ft.StationId,
+                    FuelTypeId = ft.Id,
+                    DataKind = DataKinds.Real,
+                    SupplierPricePerLiter = supplierPrice,
+                    MarginUahPerLiter = margin,
+                    FinalPricePerLiter = finalPrice,
+                    // No pump price is seeded, so the public "before" price is just the sale price:
+                    // the store-front shows no fabricated saving and never the supplier cost (planning #73).
+                    CreatedAtUtc = CreatedAtUtc,
+                    UpdatedAtUtc = CreatedAtUtc,
+                };
+                offers.Add(offer);
+
+                foreach (var liters in new[] { 10m, 20m, 50m })
+                {
+                    volumes.Add(new FuelOfferVolume
                     {
                         Id = $"{ft.Id}-{liters}",
-                        StationId = ft.StationId,
-                        FuelTypeId = ft.Id,
-                        FuelName = ft.Name,
+                        OfferId = offer.Id,
                         Liters = liters,
-                        Price = Math.Round(finalPrice * liters, 2, MidpointRounding.AwayFromZero),
-                        // No pump price is seeded, so the public "before" price is just the sale price:
-                        // the store-front shows no fabricated saving and never the supplier cost (planning #73).
-                        OriginalPrice = Math.Round(finalPrice * liters, 2, MidpointRounding.AwayFromZero),
-                        SupplierPricePerLiter = supplierPrice,
-                        MarginUahPerLiter = margin,
-                        FinalPricePerLiter = finalPrice,
+                        PackagePrice = Math.Round(finalPrice * liters, 2, MidpointRounding.AwayFromZero),
                         CreatedAtUtc = CreatedAtUtc,
-                        UpdatedAtUtc = CreatedAtUtc
+                        UpdatedAtUtc = CreatedAtUtc,
                     });
-                })
-                .Append(new FuelPackage
-                {
-                    Id = "okko-dp-2",
-                    StationId = "okko",
-                    FuelTypeId = "okko-dp",
-                    FuelName = "ДП ЄВРО",
-                    Liters = 2m,
-                    Price = 104,
-                    OriginalPrice = 104,
-                    SupplierPricePerLiter = 50m,
-                    MarginUahPerLiter = 2m,
-                    FinalPricePerLiter = 52m,
-                    CreatedAtUtc = CreatedAtUtc,
-                    UpdatedAtUtc = CreatedAtUtc
-                })
-                .Append(new FuelPackage
-                {
-                    Id = "okko-dp-3",
-                    StationId = "okko",
-                    FuelTypeId = "okko-dp",
-                    FuelName = "ДП ЄВРО",
-                    Liters = 3m,
-                    Price = 156,
-                    OriginalPrice = 156,
-                    SupplierPricePerLiter = 50m,
-                    MarginUahPerLiter = 2m,
-                    FinalPricePerLiter = 52m,
-                    CreatedAtUtc = CreatedAtUtc,
-                    UpdatedAtUtc = CreatedAtUtc
-                })
-                .ToArray();
+                }
+            }
+
+            // The two extra small nominals for ДП ЄВРО, carried over verbatim from the old seed.
+            var dp = offers.First(o => o.FuelTypeId == "okko-dp");
+            volumes.Add(new FuelOfferVolume
+            {
+                Id = "okko-dp-2",
+                OfferId = dp.Id,
+                Liters = 2m,
+                PackagePrice = 104,
+                CreatedAtUtc = CreatedAtUtc,
+                UpdatedAtUtc = CreatedAtUtc,
+            });
+            volumes.Add(new FuelOfferVolume
+            {
+                Id = "okko-dp-3",
+                OfferId = dp.Id,
+                Liters = 3m,
+                PackagePrice = 156,
+                CreatedAtUtc = CreatedAtUtc,
+                UpdatedAtUtc = CreatedAtUtc,
+            });
+
+            return (offers.ToArray(), volumes.ToArray());
         }
     }
 }
