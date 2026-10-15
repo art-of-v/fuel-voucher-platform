@@ -80,21 +80,18 @@ public sealed class VoucherTermSaleTests : IDisposable
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         });
-        _context.FuelPackages.Add(new FuelPackage
-        {
-            Id = "pkg-okko-95-10",
-            StationId = "okko",
-            FuelTypeId = "okko-95",
-            FuelName = "A-95",
-            Liters = 10m,
-            Price = 600,
-            OriginalPrice = 600,
-            SupplierPricePerLiter = 40m,
-            MarginUahPerLiter = 20m,   // cost-plus 60, no pump ceiling → 60 ₴/L
-            FinalPricePerLiter = 60m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
-        });
+// Seeded as an offer plus a volume: that is what checkout and the term quote resolve against. A
+        // fixture in fuel_packages would leave every test here exercising the "no package" path and
+        // failing on prices of zero - or, worse, passing for the wrong reason.
+        _context.SeedPackage(
+            id: "pkg-okko-95-10",
+            stationId: "okko",
+            fuelTypeId: "okko-95",
+            liters: 10m,
+            price: 600m,
+            supplierPricePerLiter: 40m,
+            marginUahPerLiter: 20m,   // cost-plus 60, no pump ceiling -> 60 UAH/L
+            finalPricePerLiter: 60m);
         _context.SaveChanges();
     }
 
