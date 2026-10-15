@@ -9,7 +9,7 @@
 // When UPG's page changes, the fetcher must fail on ONE line naming the station — not import a
 // few hundred rows with a mangled name that nobody notices until the map is already wrong.
 //
-// Run: node --test scripts/
+// Run: node --test scripts/*.test.mjs   (the glob, not `scripts/` — see the CI step)
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
