@@ -982,7 +982,6 @@ namespace FuelFlow.API.Migrations
 
                     b.HasIndex("MonobankInvoiceId")
                         .IsUnique()
-                        .HasDatabaseName("IX_orders_monobank_invoice_id")
                         .HasFilter("monobank_invoice_id IS NOT NULL");
 
                     b.HasIndex("SourceOrderId");
@@ -2026,159 +2025,6 @@ namespace FuelFlow.API.Migrations
                     b.HasIndex("ResolvedAtUtc", "LoggedAtUtc");
 
                     b.ToTable("error_logs", (string)null);
-                });
-
-            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.FuelOffer", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasColumnType("text")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamptz")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<string>("DataKind")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)")
-                        .HasColumnName("data_kind");
-
-                    b.Property<DateTime?>("DeletedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at_utc");
-
-                    b.Property<decimal?>("FinalPricePerLiter")
-                        .HasColumnType("numeric(10,4)")
-                        .HasColumnName("final_price_per_liter");
-
-                    b.Property<string>("FuelTypeId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("fuel_type_id");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
-
-                    b.Property<decimal?>("MarginPercent")
-                        .HasColumnType("numeric(10,4)")
-                        .HasColumnName("margin_percent");
-
-                    b.Property<decimal?>("MarginUahPerLiter")
-                        .HasColumnType("numeric(10,4)")
-                        .HasColumnName("margin_uah_per_liter");
-
-                    b.Property<decimal?>("MinDiscountPerLiter")
-                        .HasColumnType("numeric(10,4)")
-                        .HasColumnName("min_discount_per_liter");
-
-                    b.Property<DateTime?>("PriceUpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("price_updated_at");
-
-                    b.Property<Guid?>("PriceUpdatedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("price_updated_by_user_id");
-
-                    b.Property<decimal?>("PumpPricePerLiter")
-                        .HasColumnType("numeric(10,4)")
-                        .HasColumnName("pump_price_per_liter");
-
-                    b.Property<string>("StationId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("station_id");
-
-                    b.Property<decimal?>("SupplierPricePerLiter")
-                        .HasColumnType("numeric(10,4)")
-                        .HasColumnName("supplier_price_per_liter");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamptz")
-                        .HasColumnName("updated_at_utc");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("StationId");
-
-                    b.HasIndex("IsDeleted", "DataKind");
-
-                    b.HasIndex("StationId", "FuelTypeId");
-
-                    b.HasIndex("StationId", "FuelTypeId", "DataKind")
-                        .IsUnique()
-                        .HasDatabaseName("ix_fuel_offers_station_fuel_pool");
-
-                    b.ToTable("fuel_offers", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_fuel_offers_data_kind", "data_kind IN ('real', 'qa')");
-
-                            t.HasCheckConstraint("ck_fuel_offers_fuel_type_id_length", "length(fuel_type_id) <= 100");
-
-                            t.HasCheckConstraint("ck_fuel_offers_id_length", "length(id) <= 204");
-
-                            t.HasCheckConstraint("ck_fuel_offers_margin_signs", "margin_uah_per_liter IS NULL OR margin_uah_per_liter >= 0");
-
-                            t.HasCheckConstraint("ck_fuel_offers_prices_non_negative", "(final_price_per_liter IS NULL OR final_price_per_liter >= 0) AND (pump_price_per_liter IS NULL OR pump_price_per_liter >= 0) AND (min_discount_per_liter IS NULL OR min_discount_per_liter >= 0)");
-
-                            t.HasCheckConstraint("ck_fuel_offers_station_id_length", "length(station_id) <= 100");
-                        });
-                });
-
-            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.FuelOfferVolume", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasColumnType("text")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamptz")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<DateTime?>("DeletedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at_utc");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
-
-                    b.Property<decimal>("Liters")
-                        .HasColumnType("numeric(10,2)")
-                        .HasColumnName("liters");
-
-                    b.Property<string>("OfferId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("offer_id");
-
-                    b.Property<decimal>("PackagePrice")
-                        .HasColumnType("numeric(12,2)")
-                        .HasColumnName("package_price");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamptz")
-                        .HasColumnName("updated_at_utc");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("IsDeleted", "Liters");
-
-                    b.HasIndex("OfferId", "Liters")
-                        .IsUnique()
-                        .HasDatabaseName("ux_fuel_offer_volumes_offer_liters");
-
-                    b.ToTable("fuel_offer_volumes", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_fuel_offer_volumes_id_length", "length(id) <= 100");
-
-                            t.HasCheckConstraint("ck_fuel_offer_volumes_liters_positive", "liters > 0");
-
-                            t.HasCheckConstraint("ck_fuel_offer_volumes_offer_id_length", "length(offer_id) <= 204");
-
-                            t.HasCheckConstraint("ck_fuel_offer_volumes_package_price_non_negative", "package_price >= 0");
-                        });
                 });
 
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.FuelPackage", b =>
@@ -3949,17 +3795,6 @@ namespace FuelFlow.API.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.FuelOfferVolume", b =>
-                {
-                    b.HasOne("FuelFlow.SharedKernel.Domain.FuelOffer", "Offer")
-                        .WithMany("Volumes")
-                        .HasForeignKey("OfferId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Offer");
-                });
-
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.OrderEvent", b =>
                 {
                     b.HasOne("FuelFlow.Features.Orders.SharedModels.Order", "Order")
@@ -4012,11 +3847,6 @@ namespace FuelFlow.API.Migrations
                     b.Navigation("Fulfillments");
 
                     b.Navigation("LineItems");
-                });
-
-            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.FuelOffer", b =>
-                {
-                    b.Navigation("Volumes");
                 });
 #pragma warning restore 612, 618
         }
