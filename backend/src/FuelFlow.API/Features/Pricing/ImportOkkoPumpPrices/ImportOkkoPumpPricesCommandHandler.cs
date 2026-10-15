@@ -107,12 +107,27 @@ public sealed class ImportOkkoPumpPricesCommandHandler
             .ToList();
 
         var okkoFuelTypeIds = okkoFuelTypes.Select(ft => ft.Id).ToList();
-        var packagesByFuel = (await _context.FuelPackages
+
+        // A pump price is a property of WHAT IS SOLD, so it is written to the offer once rather than to
+        // every package row. The volumes are loaded alongside it only to restate their frozen package
+        // totals, because litres do not change when the pump does but the total derived from them does.
+        //
+        // Both pools are imported: the rehearsal catalogue is priced from the same public pump price, and
+        // restricting this to the live pool would silently freeze QA pricing on the last imported pump.
+        var offersByFuel = (await _context.FuelOffers
                 .AsTracking()
-                .Where(p => okkoFuelTypeIds.Contains(p.FuelTypeId))
+                .Where(o => okkoFuelTypeIds.Contains(o.FuelTypeId))
                 .ToListAsync(ct))
-            .GroupBy(p => p.FuelTypeId)
-            .ToDictionary(g => g.Key, g => g.OrderBy(p => p.Id, StringComparer.Ordinal).ToList());
+            .GroupBy(o => o.FuelTypeId)
+            .ToDictionary(g => g.Key, g => g.OrderBy(o => o.Id, StringComparer.Ordinal).ToList());
+
+        var offerIds = offersByFuel.Values.SelectMany(list => list).Select(o => o.Id).ToList();
+        var volumesByOffer = (await _context.FuelOfferVolumes
+                .AsTracking()
+                .Where(v => offerIds.Contains(v.OfferId) && !v.IsDeleted)
+                .ToListAsync(ct))
+            .GroupBy(v => v.OfferId)
+            .ToDictionary(g => g.Key, g => g.ToList());
 
         var now = DateTime.UtcNow;
         var actor = actingUserId == Guid.Empty ? (Guid?)null : actingUserId;
@@ -133,61 +148,80 @@ public sealed class ImportOkkoPumpPricesCommandHandler
                 continue;
             }
 
-            var pkgs = packagesByFuel.TryGetValue(ft.Id, out var found) ? found : new List<FuelPackage>();
+var poolOffers = offersByFuel.TryGetValue(ft.Id, out var found) ? found : new List<FuelOffer>();
             var siteCode = classified.First(c => c.Category == category).Price.SiteFuelCode;
 
-            var representative = pkgs.FirstOrDefault();
-            var cost = representative?.SupplierPricePerLiter ?? 0m; // held constant: a pump change is not a cost event
-            var profit = representative?.MarginUahPerLiter ?? 0m;
-            var minDiscount = representative?.MinDiscountPerLiter ?? 0m;
-            var finalPerLiter = FuelPricing.FinalPerLiter(cost, profit, pump, minDiscount);
+            // Cost and margin are the offer's, and a fuel with more than one offer here (one per pool)
+            // is priced per pool - each offer keeps its own cost, and only the imported pump is shared.
+            // The loop below therefore runs per offer rather than per package, which is what makes the
+            // "report the first and rewrite them all" branch unnecessary: there is nothing left to
+            // disagree once every package of an offer shares one row.
+            var repriced = 0;
 
-            // A pump low enough that the ceiling (pump − minDiscount) drops under our own cost would
-            // make every sale of this fuel below cost — and checkout then refuses to sell it at all
-            // (BelowCostSaleBlockedException), so the fuel becomes unbuyable until a human intervenes.
-            // The manual path refuses the same write unless the fuel is opted in via AllowBelowCost
-            // (BrandsController.UpdateFuel); the automatic path must behave identically, or a
-            // third party's price move could take a fuel off sale unattended.
-            if (!ft.AllowBelowCost && FuelPricing.IsBelowCost(cost, profit, pump, minDiscount))
+            foreach (var offer in poolOffers)
             {
-                belowCostSkipped.Add(ft.Name);
-                continue;
-            }
+                var vols = volumesByOffer.TryGetValue(offer.Id, out var vv) ? vv : new List<FuelOfferVolume>();
 
-            matchedCategories.Add(category.Value);
+                var cost = offer.SupplierPricePerLiter ?? 0m; // held constant: a pump change is not a cost event
+                var profit = offer.MarginUahPerLiter ?? 0m;
+                var minDiscount = offer.MinDiscountPerLiter ?? 0m;
+                var finalPerLiter = FuelPricing.FinalPerLiter(cost, profit, pump, minDiscount);
 
-            var previousPump = pkgs.Select(p => p.PumpPricePerLiter).FirstOrDefault(v => v is not null);
-            // Same fuel type in the catalog may hold packages with different pump values if they were
-            // edited out of band; report the first and rewrite them all, so the receipt is never a lie.
-            var changed = previousPump != pump;
+                // A pump low enough that the ceiling (pump - minDiscount) drops under our own cost would
+                // make every sale of this fuel below cost - and checkout then refuses to sell it at all
+                // (BelowCostSaleBlockedException), so the fuel becomes unbuyable until a human intervenes.
+                // The manual path refuses the same write unless the fuel is opted in via AllowBelowCost
+                // (BrandsController.UpdateFuel); the automatic path must behave identically, or a
+                // third party's price move could take a fuel off sale unattended.
+                if (!ft.AllowBelowCost && FuelPricing.IsBelowCost(cost, profit, pump, minDiscount))
+                {
+                    belowCostSkipped.Add(ft.Name);
+                    continue;
+                }
 
-            foreach (var pkg in pkgs)
-            {
-                var price = Math.Round(finalPerLiter * pkg.Liters, 2, MidpointRounding.AwayFromZero);
+                matchedCategories.Add(category.Value);
+
+                var previousPump = offer.PumpPricePerLiter;
+                var changed = previousPump != pump;
+
                 if (!dryRun)
                 {
-                    pkg.PumpPricePerLiter = pump;
-                    pkg.FinalPricePerLiter = finalPerLiter;
-                    pkg.Price = price;
-                    pkg.OriginalPrice = FuelPricing.OriginalPackagePrice(pump, pkg.Liters, price);
-                    pkg.UpdatedAtUtc = now;
-                    pkg.PriceUpdatedAt = now;
-                    pkg.PriceUpdatedByUserId = actor;
+                    offer.PumpPricePerLiter = pump;
+                    offer.FinalPricePerLiter = finalPerLiter;
+                    offer.UpdatedAtUtc = now;
+                    offer.PriceUpdatedAt = now;
+                    offer.PriceUpdatedByUserId = actor;
+
+                    foreach (var volume in vols)
+                    {
+                        volume.PackagePrice = Math.Round(finalPerLiter * volume.Liters, 2, MidpointRounding.AwayFromZero);
+                        volume.UpdatedAtUtc = now;
+                    }
                 }
+
+                if (changed) changedCount++;
+                repriced += vols.Count;
+                applied.Add(new OkkoPumpApplied(
+                    ft.Id, ft.Name, siteCode, pump, finalPerLiter, previousPump, changed, vols.Count));
             }
 
-            // Keep the fuel-type base/discount headline in step, as the operator write path does.
-            if (!dryRun && pkgs.Count > 0)
+            // Keep the fuel-type base/discount headline in step, as the operator write path does. It is
+            // a single figure per fuel, so it is written once rather than once per offer - the last
+            // pool's value wins, which is correct because both pools were priced from the same pump.
+            if (!dryRun && poolOffers.Count > 0)
             {
+                var headline = poolOffers[0];
+                var headlineFinal = FuelPricing.FinalPerLiter(
+                    headline.SupplierPricePerLiter ?? 0m,
+                    headline.MarginUahPerLiter ?? 0m,
+                    pump,
+                    headline.MinDiscountPerLiter ?? 0m);
                 ft.BasePrice = Math.Round(pump, 2, MidpointRounding.AwayFromZero);
-                ft.DiscountPrice = Math.Round(finalPerLiter, 2, MidpointRounding.AwayFromZero);
+                ft.DiscountPrice = Math.Round(headlineFinal, 2, MidpointRounding.AwayFromZero);
                 ft.UpdatedAtUtc = now;
             }
 
-            if (changed) changedCount++;
-            packagesRepriced += pkgs.Count;
-            applied.Add(new OkkoPumpApplied(
-                ft.Id, ft.Name, siteCode, pump, finalPerLiter, previousPump, changed, pkgs.Count));
+            packagesRepriced += repriced;
         }
 
         if (!dryRun && changedCount > 0)

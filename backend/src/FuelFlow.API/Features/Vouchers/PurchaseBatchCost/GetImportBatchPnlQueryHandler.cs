@@ -70,14 +70,16 @@ public sealed class GetImportBatchPnlQueryHandler
             .Where(f => fuelIds.Contains(f.Id))
             .ToDictionaryAsync(f => f.Id, f => f.Name, cancellationToken);
 
-        // Current sale price/L per fuel (packages of the same fuel share the per-liter final).
-        var currentPrices = (await _context.FuelPackages
+        // Current sale price/L per fuel. Read from the offer, so the "first" of a GroupBy is no longer an
+        // arbitrary pick between rows that are now guaranteed identical: one offer per fuel per pool,
+        // and the live pool is the one a P&L over real sales is about. The GroupBy().First() this
+        // replaces could previously pick up a QA rehearsal offer.
+        var currentPrices = await _context.FuelOffers
             .AsNoTracking()
-            .Where(p => fuelIds.Contains(p.FuelTypeId) && p.FinalPricePerLiter != null)
-            .Select(p => new { p.FuelTypeId, p.FinalPricePerLiter })
-            .ToListAsync(cancellationToken))
-            .GroupBy(p => p.FuelTypeId)
-            .ToDictionary(g => g.Key, g => g.First().FinalPricePerLiter);
+            .Where(o => fuelIds.Contains(o.FuelTypeId)
+                     && o.FinalPricePerLiter != null
+                     && o.DataKind == DataKinds.Real)
+            .ToDictionaryAsync(o => o.FuelTypeId, o => o.FinalPricePerLiter, cancellationToken);
 
         var voucherById = vouchers.ToDictionary(v => v.Id);
 

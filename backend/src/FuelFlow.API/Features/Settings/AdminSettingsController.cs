@@ -136,24 +136,29 @@ public sealed class AdminSettingsController : ControllerBase
     /// </remarks>
     private async Task<List<VoucherTermFuelMarginDto>> TermMarginsAsync(CancellationToken cancellationToken)
     {
-        // Joined to the fuel table explicitly rather than through a navigation: FuelPackage has no
-        // FuelType navigation to walk in a projection, and the fuel's station is what makes a name
-        // readable when several stations sell the same grade.
-        return await _context.FuelPackages
+        // Joined to the fuel table explicitly rather than through a navigation: an offer carries no FuelType
+        // navigation - station and fuel are natural keys in this schema - and the fuel's station is what
+        // makes a name readable when several stations sell the same grade.
+        //
+        // This reads the OFFER, not the volume: the margin shown against a term ladder is a per-litre
+        // figure, and it now exists once per fuel rather than once per package. The `Min(...)` over a
+        // group is kept deliberately - a fuel can still own an offer per pool, and the tightest margin
+        // across them is the one that actually binds.
+        return await _context.FuelOffers
             .AsNoTracking()
             .Join(_context.FuelTypes,
-                package => package.FuelTypeId,
+                offer => offer.FuelTypeId,
                 fuel => fuel.Id,
-                (package, fuel) => new { package, fuel.Name, fuel.StationId })
-            .Where(row => row.package.SupplierPricePerLiter != null && row.package.FinalPricePerLiter != null)
-            .GroupBy(row => new { row.package.FuelTypeId, row.Name, row.StationId })
+                (offer, fuel) => new { offer, fuel.Name, fuel.StationId })
+            .Where(row => row.offer.SupplierPricePerLiter != null && row.offer.FinalPricePerLiter != null)
+            .GroupBy(row => new { row.offer.FuelTypeId, row.Name, row.StationId })
             .Select(g => new VoucherTermFuelMarginDto
             {
                 FuelTypeId = g.Key.FuelTypeId,
                 Name = g.Key.Name,
                 StationId = g.Key.StationId,
                 MarginPerLiterUah = g.Min(row =>
-                    row.package.FinalPricePerLiter!.Value - row.package.SupplierPricePerLiter!.Value)
+                    row.offer.FinalPricePerLiter!.Value - row.offer.SupplierPricePerLiter!.Value)
             })
             .ToListAsync(cancellationToken);
     }

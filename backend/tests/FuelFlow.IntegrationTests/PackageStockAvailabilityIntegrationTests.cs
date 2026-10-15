@@ -137,17 +137,16 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
         using var seed = CreateContext();
         await TruncatePackagesAsync(seed);
 
-        seed.FuelPackages.AddRange(
-            Package("real-10l", isTestData: false, liters: 10m, price: 890.60m, updatedMinutesAgo: 60),
-            // Deliberately a different price. If the real row were ever repriced independently the
-            // old unordered pick would charge this one.
-            Package("qa-mirror-10l", isTestData: true, liters: 10m, price: 1m, updatedMinutesAgo: 0));
+        SeedPackage(seed, "real-10l", isTestData: false, liters: 10m, price: 890.60m, updatedMinutesAgo: 60);
+        // Deliberately a different price, in the OTHER pool. Two pools cannot collide on the offer key,
+        // so the pool filter is what decides - and the test fails if it stops doing so.
+        SeedPackage(seed, "qa-mirror-10l", isTestData: true, liters: 10m, price: 1m, updatedMinutesAgo: 0);
         await seed.SaveChangesAsync();
 
         var availability = CreateAvailability();
 
-        (await availability.FindPackageAsync(false, "okko", "okko-a95", 10m))!.Id.Should().Be("real-10l");
-        (await availability.FindPackageAsync(true, "okko", "okko-a95", 10m))!.Id.Should().Be("qa-mirror-10l");
+        (await availability.FindPackageAsync(false, "okko", "okko-a95", 10m))!.PackageId.Should().Be("real-10l");
+        (await availability.FindPackageAsync(true, "okko", "okko-a95", 10m))!.PackageId.Should().Be("qa-mirror-10l");
     }
 
     /// <summary>
@@ -162,21 +161,20 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
         using var seed = CreateContext();
         await TruncatePackagesAsync(seed);
 
-        seed.FuelPackages.AddRange(
-            Package("older", isTestData: false, liters: 20m, price: 1780m, updatedMinutesAgo: 120),
-            Package("newer", isTestData: false, liters: 20m, price: 1781m, updatedMinutesAgo: 1));
+        SeedPackage(seed, "older", isTestData: false, liters: 20m, price: 1780m, updatedMinutesAgo: 120);
+        SeedPackage(seed, "newer", isTestData: false, liters: 20m, price: 1781m, updatedMinutesAgo: 1);
         await seed.SaveChangesAsync();
 
         var availability = CreateAvailability();
 
         var chosen = await availability.FindPackageAsync(false, "okko", "okko-a95", 20m);
-        chosen!.Id.Should().Be("newer");
+        chosen!.PackageId.Should().Be("newer");
 
         // And the bulk resolver has to agree with the single one, or a line prices off a different
         // row depending on whether it was bought alone or in a cart.
         var bulk = await availability.FindPackagesAsync(
             false, new[] { StockKey.For("okko", "okko-a95", 20m) });
-        bulk[StockKey.For("okko", "okko-a95", 20m)].Id.Should().Be(chosen.Id);
+        bulk[StockKey.For("okko", "okko-a95", 20m)].PackageId.Should().Be(chosen.PackageId);
     }
 
     /// <summary>
@@ -189,7 +187,7 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
         using var seed = CreateContext();
         await TruncatePackagesAsync(seed);
 
-        seed.FuelPackages.Add(Package("qa-only", isTestData: true, liters: 5m, price: 100m, updatedMinutesAgo: 0));
+        SeedPackage(seed, "qa-only", isTestData: true, liters: 5m, price: 100m, updatedMinutesAgo: 0);
         await seed.SaveChangesAsync();
 
         var availability = CreateAvailability();
@@ -208,11 +206,10 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
         using var seed = CreateContext();
         await TruncatePackagesAsync(seed);
 
-        seed.FuelPackages.AddRange(
-            Package("real-2l", isTestData: false, liters: 2m, price: 178.12m, updatedMinutesAgo: 5),
-            Package("real-5l", isTestData: false, liters: 5m, price: 445.30m, updatedMinutesAgo: 5),
-            // In the catalogue, but not in the cart - must not come back.
-            Package("real-50l", isTestData: false, liters: 50m, price: 4453m, updatedMinutesAgo: 5));
+        SeedPackage(seed, "real-2l", isTestData: false, liters: 2m, price: 178.12m, updatedMinutesAgo: 5);
+        SeedPackage(seed, "real-5l", isTestData: false, liters: 5m, price: 445.30m, updatedMinutesAgo: 5);
+        // In the catalogue, but not in the cart - must not come back.
+        SeedPackage(seed, "real-50l", isTestData: false, liters: 50m, price: 4453m, updatedMinutesAgo: 5);
 
         var wanted = new[]
         {
@@ -232,24 +229,52 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
 
     private static async Task TruncatePackagesAsync(ApplicationDbContext context)
         => await context.Database.ExecuteSqlRawAsync(
-            """TRUNCATE TABLE "fuel_packages", "fuel_vouchers", "orders", "order_line_items", "fulfillments" RESTART IDENTITY CASCADE""");
+            """TRUNCATE TABLE "fuel_offer_volumes", "fuel_offers", "fuel_vouchers", "orders", "order_line_items", "fulfillments", "outbox_events" RESTART IDENTITY CASCADE""");
 
-    private static FuelPackage Package(string id, bool isTestData, decimal liters, decimal price, int updatedMinutesAgo)
-        => new()
+    /// <summary>
+    /// Seeds one sellable package as an offer plus a volume.
+    /// </summary>
+    /// <remarks>
+    /// The offer is found by its key rather than created blindly, because two packages in one pool are
+    /// two VOLUMES of one offer - that is the shape the uniqueness constraint demands, and seeding them
+    /// as two offers would test a database state the application can never produce.
+    /// </remarks>
+    private static void SeedPackage(
+        ApplicationDbContext seed,
+        string id,
+        bool isTestData,
+        decimal liters,
+        decimal price,
+        int updatedMinutesAgo)
+    {
+        var pool = DataKinds.ForPool(isTestData);
+        var offerId = OfferKeys.For("okko", "okko-a95", pool);
+
+        if (!seed.FuelOffers.Local.Any(o => o.Id == offerId) && !seed.FuelOffers.Any(o => o.Id == offerId))
+        {
+            seed.FuelOffers.Add(new FuelOffer
+            {
+                Id = offerId,
+                StationId = "okko",
+                FuelTypeId = "okko-a95",
+                DataKind = pool,
+                FinalPricePerLiter = price / liters,
+                SupplierPricePerLiter = 30m,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow.AddMinutes(-updatedMinutesAgo),
+            });
+        }
+
+        seed.FuelOfferVolumes.Add(new FuelOfferVolume
         {
             Id = id,
-            StationId = "okko",
-            FuelTypeId = "okko-a95",
-            FuelName = "A-95",
+            OfferId = offerId,
             Liters = liters,
-            Price = price,
-            OriginalPrice = price,
-            FinalPricePerLiter = price / liters,
-            SupplierPricePerLiter = 30m,
-            IsTestData = isTestData,
+            PackagePrice = price,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow.AddMinutes(-updatedMinutesAgo),
-        };
+        });
+    }
 
     private PackageStockAvailability CreateAvailability()
         => new(CreateContext(), new ConfigurationBuilder()

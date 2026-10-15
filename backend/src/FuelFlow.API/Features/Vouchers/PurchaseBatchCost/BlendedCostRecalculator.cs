@@ -51,48 +51,56 @@ public sealed class BlendedCostRecalculator
     }
 
     /// <summary>
-    /// Rewrites every fuel package for <paramref name="fuelTypeId"/> to price off
-    /// <paramref name="blendedCost"/>, preserving each package's profit/pump/min-discount knobs, and
-    /// syncs the fuel type's base/discount headline — mirroring <c>BrandsController.UpdateFuel</c>.
-    /// Does NOT call SaveChanges (the caller batches the save); returns the number of packages repriced.
+    /// Rewrites every offer for <paramref name="fuelTypeId"/> to price off <paramref name="blendedCost"/>,
+    /// preserving each offer's profit/pump/min-discount knobs, restating each volume's frozen package
+    /// total, and syncing the fuel type's base/discount headline — mirroring
+    /// <c>BrandsController.UpdateFuel</c>. Does NOT call SaveChanges (the caller batches the save);
+    /// returns the number of packages repriced.
     /// </summary>
     public async Task<int> RepriceAsync(string fuelTypeId, decimal blendedCost, Guid actingUserId, CancellationToken ct = default)
     {
-        var packages = await _context.FuelPackages.Where(p => p.FuelTypeId == fuelTypeId).ToListAsync(ct);
-        if (packages.Count == 0) return 0;
+        var offers = await _context.FuelOffers.Where(o => o.FuelTypeId == fuelTypeId).ToListAsync(ct);
+        if (offers.Count == 0) return 0;
+
+        // The volumes are loaded only to restate each package's frozen total from the new per-litre
+        // price. The cost and the margin belong to the offer, once.
+        var offerIds = offers.Select(o => o.Id).ToList();
+        var volumes = await _context.FuelOfferVolumes
+            .Where(v => offerIds.Contains(v.OfferId) && !v.IsDeleted)
+            .ToListAsync(ct);
 
         var now = DateTime.UtcNow;
         var actingUser = actingUserId == Guid.Empty ? (Guid?)null : actingUserId;
         decimal firstFinal = 0m, firstBase = 0m;
 
-        for (var i = 0; i < packages.Count; i++)
+        foreach (var offer in offers)
         {
-            var pkg = packages[i];
-            var profit = pkg.MarginUahPerLiter ?? 0m;
-            var pump = pkg.PumpPricePerLiter;
-            var minDiscount = pkg.MinDiscountPerLiter ?? 0m;
+            var profit = offer.MarginUahPerLiter ?? 0m;
+            var pump = offer.PumpPricePerLiter;
+            var minDiscount = offer.MinDiscountPerLiter ?? 0m;
 
             // Same shared formula the operator panel uses: final = min(cost + profit, pump − minDiscount);
             // pump null ⇒ cost + profit.
             var finalPerLiter = FuelPricing.FinalPerLiter(blendedCost, profit, pump, minDiscount);
-            var price = Math.Round(finalPerLiter * pkg.Liters, 2, MidpointRounding.AwayFromZero);
 
-            pkg.SupplierPricePerLiter = blendedCost;
-            pkg.FinalPricePerLiter = finalPerLiter;
-            pkg.Price = price;
-            pkg.OriginalPrice = FuelPricing.OriginalPackagePrice(pump, pkg.Liters, price);
-            pkg.UpdatedAtUtc = now;
-            pkg.PriceUpdatedAt = now;
-            pkg.PriceUpdatedByUserId = actingUser;
+            offer.SupplierPricePerLiter = blendedCost;
+            offer.FinalPricePerLiter = finalPerLiter;
+            offer.UpdatedAtUtc = now;
+            offer.PriceUpdatedAt = now;
+            offer.PriceUpdatedByUserId = actingUser;
 
-            if (i == 0)
+            foreach (var volume in volumes.Where(v => v.OfferId == offer.Id))
             {
-                firstFinal = finalPerLiter;
-                firstBase = pump ?? (finalPerLiter + minDiscount);
+                volume.PackagePrice = Math.Round(finalPerLiter * volume.Liters, 2, MidpointRounding.AwayFromZero);
+                volume.UpdatedAtUtc = now;
             }
+
+            firstFinal = finalPerLiter;
+            firstBase = pump ?? (finalPerLiter + minDiscount);
         }
 
-        _context.FuelPackages.UpdateRange(packages);
+        _context.FuelOffers.UpdateRange(offers);
+        if (volumes.Count > 0) _context.FuelOfferVolumes.UpdateRange(volumes);
 
         // Keep the fuel-type headline (base/discount UAH/L) in step, as UpdateFuel does.
         var fuelType = await _context.FuelTypes.FirstOrDefaultAsync(f => f.Id == fuelTypeId, ct);
@@ -104,6 +112,6 @@ public sealed class BlendedCostRecalculator
             _context.FuelTypes.Update(fuelType);
         }
 
-        return packages.Count;
+        return volumes.Count;
     }
 }

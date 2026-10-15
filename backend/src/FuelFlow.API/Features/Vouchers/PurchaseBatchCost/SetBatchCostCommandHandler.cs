@@ -167,15 +167,19 @@ public sealed class SetBatchCostCommandHandler
             // every sale/activation — surface that immediately so pricing can be fixed.
             var fuelType = await _context.FuelTypes.AsNoTracking()
                 .FirstOrDefaultAsync(f => f.Id == command.FuelTypeId, cancellationToken);
-            var pkg = await _context.FuelPackages.AsNoTracking()
-                .FirstOrDefaultAsync(p => p.FuelTypeId == command.FuelTypeId, cancellationToken);
-            if (fuelType is { AllowBelowCost: false } && pkg is not null)
+            // The margin that the new cost would be sold at belongs to the offer, once - reading it off
+            // "the first package of this fuel" was an arbitrary pick between rows that now cannot differ
+            // at all, which is the point of the split.
+            var offer = await _context.FuelOffers.AsNoTracking()
+                .Where(o => o.FuelTypeId == command.FuelTypeId && o.DataKind == DataKinds.Real)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (fuelType is { AllowBelowCost: false } && offer is not null)
             {
-                var profit = pkg.MarginUahPerLiter ?? 0m;
-                var minDiscount = pkg.MinDiscountPerLiter ?? 0m;
-                if (FuelPricing.IsBelowCost(b, profit, pkg.PumpPricePerLiter, minDiscount))
+                var profit = offer.MarginUahPerLiter ?? 0m;
+                var minDiscount = offer.MinDiscountPerLiter ?? 0m;
+                if (FuelPricing.IsBelowCost(b, profit, offer.PumpPricePerLiter, minDiscount))
                 {
-                    var finalPerLiter = FuelPricing.FinalPerLiter(b, profit, pkg.PumpPricePerLiter, minDiscount);
+                    var finalPerLiter = FuelPricing.FinalPerLiter(b, profit, offer.PumpPricePerLiter, minDiscount);
                     await _notifications.BelowCostAsync(brand, command.FuelTypeId, b, finalPerLiter, deliberate: false, cancellationToken);
                 }
             }

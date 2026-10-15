@@ -9,11 +9,19 @@ public sealed class GetAdminPackagesByStationQueryHandler
     private readonly ApplicationDbContext _context;
     public GetAdminPackagesByStationQueryHandler(ApplicationDbContext context) => _context = context;
 
-    public async Task<List<FuelPackage>> HandleAsync(GetAdminPackagesByStationQuery query, CancellationToken ct = default) =>
-        await _context.FuelPackages
+    public async Task<List<FuelPackage>> HandleAsync(GetAdminPackagesByStationQuery query, CancellationToken ct = default)
+    {
+        // Same join and same PackageProjection as GetAdminPackagesQueryHandler, narrowed to one station.
+        var fuelNames = await _context.FuelTypes.AsNoTracking()
+            .ToDictionaryAsync(f => f.Id, f => f.Name, ct);
+
+        var volumes = await _context.FuelOfferVolumes
             .AsNoTracking()
-            .Where(x => x.StationId == query.StationId)
-            .OrderBy(x => x.FuelName)
-            .ThenBy(x => x.Liters)
+            .Where(v => v.Offer.StationId == query.StationId)
+            .OrderBy(v => v.Offer.FuelTypeId)
+            .ThenBy(v => v.Liters)
             .ToListAsync(ct);
+
+        return volumes.ToPackages(fuelNames);
+    }
 }
