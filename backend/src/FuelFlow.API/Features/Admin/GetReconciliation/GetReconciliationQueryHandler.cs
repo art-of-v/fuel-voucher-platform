@@ -34,12 +34,26 @@ public sealed class GetReconciliationQueryHandler
         // forbids - UNIQUE (station_id, fuel_type_id, data_kind) on fuel_offers times
         // UNIQUE (offer_id, liters) on fuel_offer_volumes makes the triple unique inside a pool. A
         // duplicate now throws rather than silently resolving to one arbitrary price.
-        var fpLookup = await _context.FuelOfferVolumes
-            .AsNoTracking()
-            .Where(v => v.Offer.DataKind == DataKinds.Real)
+        // Projects the margin, not the offer entity. Handing back a whole tracked-free entity and then
+        // reading one column off it loads every offer column for every volume in the catalogue to
+        // answer one question, and - worse - depends on the provider materialising the navigation,
+        // which the in-memory provider does not and which would make this throw on a null rather than
+        // return a wrong number.
+        // An explicit join rather than `v.Offer.X`: relying on the navigation being materialised is a
+        // silent dependency on provider behaviour, and where it is not materialised this throws on a
+        // null instead of returning a wrong number - which is exactly the kind of failure that looks
+        // like a data problem and gets debugged as one.
+        //
+        // Projects the margin alone. Handing back the offer entity would load every offer column for
+        // every volume in the catalogue to answer one question.
+        var fpLookup = await (
+            from v in _context.FuelOfferVolumes.AsNoTracking()
+            join o in _context.FuelOffers.AsNoTracking() on v.OfferId equals o.Id
+            where o.DataKind == DataKinds.Real
+            select new { o.StationId, o.FuelTypeId, v.Liters, o.MarginUahPerLiter })
             .ToDictionaryAsync(
-                v => (v.Offer.StationId, v.Offer.FuelTypeId, v.Liters),
-                v => v.Offer,
+                x => (x.StationId, x.FuelTypeId, x.Liters),
+                x => x.MarginUahPerLiter,
                 cancellationToken);
 
         // Closed orders (incl. refunded) form the revenue set; margin is earned only on
@@ -63,7 +77,7 @@ public sealed class GetReconciliationQueryHandler
             decimal sum = 0m;
             foreach (var g in o.LineItems.GroupBy(li => (li.Brand, li.FuelTypeId, li.Liters)))
             {
-                if (!fpLookup.TryGetValue(g.Key, out var fp) || fp.MarginUahPerLiter is null)
+                if (!fpLookup.TryGetValue(g.Key, out var margin) || margin is null)
                 {
                     continue;
                 }
@@ -73,7 +87,10 @@ public sealed class GetReconciliationQueryHandler
                     && f.Voucher.FuelTypeId == g.Key.FuelTypeId
                     && f.Voucher.Liters == g.Key.Liters);
 
-                sum += fp.MarginUahPerLiter.Value * (decimal)g.Key.Liters * Math.Min(g.Sum(li => li.Quantity), delivered);
+                // No cast: `sum` is decimal now, and this figure is kopecks. A `(long)` here would
+                // truncate the half-kopecks a fractional margin per litre produces - the cast existed
+                // only because the column this reads from was an integer type.
+                sum += margin.Value * (decimal)g.Key.Liters * Math.Min(g.Sum(li => li.Quantity), delivered);
             }
 
             return sum;

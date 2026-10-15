@@ -62,7 +62,7 @@ public sealed class UpdateNominalsReuseTests : IDisposable
         return controller;
     }
 
-    private async Task<List<FuelPackage>> SeedAsync(params int[] nominals)
+    private async Task<List<FuelOfferVolume>> SeedAsync(params int[] nominals)
     {
         _context.Stations.Add(new Station
         {
@@ -86,24 +86,24 @@ public sealed class UpdateNominalsReuseTests : IDisposable
             UpdatedAtUtc = DateTime.UtcNow,
         });
 
-        var packages = nominals.Select(l => new FuelPackage
+// Seeded as one offer plus a volume per nominal, and returned so the tests can assert on volume ids -
+        // that is what the nominals edit now reuses instead of the package rows. The per-litre figures
+        // go on the offer: the edit restates each volume's total from them.
+        var volumes = nominals.Select(l => new FuelOfferVolume
         {
             Id = Guid.NewGuid().ToString(),
-            StationId = "okko",
-            FuelTypeId = "okko-a95",
-            FuelName = "А95",
+            OfferId = _context.SeedOffer(
+                "okko", "okko-a95",
+                supplierPricePerLiter: 90m, marginUahPerLiter: 10m, finalPricePerLiter: 100m).Id,
             Liters = l,
-            Price = 1000m,
-            SupplierPricePerLiter = 90m,
-            FinalPricePerLiter = 100m,
-            MarginUahPerLiter = 10m,
+            PackagePrice = 1000m,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
         }).ToList();
 
-        _context.FuelPackages.AddRange(packages);
+        _context.FuelOfferVolumes.AddRange(volumes);
         await _context.SaveChangesAsync();
-        return packages;
+        return volumes;
     }
 
     [Fact]
@@ -117,7 +117,7 @@ public sealed class UpdateNominalsReuseTests : IDisposable
 
         // The 10 L package must be the SAME row. If it were removed and recreated the id would
         // change, and every order_line_item pointing at it would stop resolving.
-        var after = await _context.FuelPackages.IgnoreQueryFilters().SingleAsync(p => p.Id == tenL.Id);
+        var after = await _context.FuelOfferVolumes.IgnoreQueryFilters().SingleAsync(p => p.Id == tenL.Id);
         after.Liters.Should().Be(10m);
         after.CreatedAtUtc.Should().Be(createdAt, "a package that stayed is the same package");
     }
@@ -130,11 +130,11 @@ public sealed class UpdateNominalsReuseTests : IDisposable
 
         await CreateController().UpdateNominals("okko", new List<int> { 10 }, default);
 
-        var archived = await _context.FuelPackages.IgnoreQueryFilters().SingleAsync(p => p.Id == twentyL.Id);
+        var archived = await _context.FuelOfferVolumes.IgnoreQueryFilters().SingleAsync(p => p.Id == twentyL.Id);
         archived.IsDeleted.Should().BeTrue("#217: the row an order may reference must survive");
         archived.DeletedAtUtc.Should().NotBeNull();
 
-        (await _context.FuelPackages.CountAsync()).Should().Be(1,
+        (await _context.FuelOfferVolumes.CountAsync()).Should().Be(1,
             "the global filter hides the archived one, so the catalog shows just the 10 L");
     }
 
@@ -145,11 +145,11 @@ public sealed class UpdateNominalsReuseTests : IDisposable
 
         var controller = CreateController();
         await controller.UpdateNominals("okko", new List<int> { 10, 20 }, default);
-        var afterFirst = await _context.FuelPackages.IgnoreQueryFilters()
+        var afterFirst = await _context.FuelOfferVolumes.IgnoreQueryFilters()
             .Select(p => new { p.Id, p.Liters }).ToListAsync();
 
         await controller.UpdateNominals("okko", new List<int> { 10, 20 }, default);
-        var afterSecond = await _context.FuelPackages.IgnoreQueryFilters()
+        var afterSecond = await _context.FuelOfferVolumes.IgnoreQueryFilters()
             .Select(p => new { p.Id, p.Liters }).ToListAsync();
 
         // Under the old code this grew by two rows on every save - archived duplicates piling up on
@@ -172,7 +172,7 @@ public sealed class UpdateNominalsReuseTests : IDisposable
     public async Task A_NonPositive_Nominal_Is_Rejected_Without_Touching_The_Catalogue(int[] nominals)
     {
         await SeedAsync(10, 20);
-        var before = await _context.FuelPackages.IgnoreQueryFilters().CountAsync();
+        var before = await _context.FuelOfferVolumes.IgnoreQueryFilters().CountAsync();
 
         var result = await CreateController().UpdateNominals("okko", nominals.ToList(), default);
 
@@ -182,7 +182,7 @@ public sealed class UpdateNominalsReuseTests : IDisposable
 
         // The strongest part: the rejection happens before any of the archive-then-add logic runs,
         // so a single bad value in the list cannot archive the surviving volumes on its way out.
-        (await _context.FuelPackages.IgnoreQueryFilters().CountAsync()).Should().Be(before,
+        (await _context.FuelOfferVolumes.IgnoreQueryFilters().CountAsync()).Should().Be(before,
             "a rejected request must not archive anything");
     }
 }

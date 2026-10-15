@@ -22,22 +22,18 @@ public sealed class PurchaseBatchPnlHandlerTests : IDisposable
         _context = new ApplicationDbContext(options);
 
         _context.FuelTypes.Add(new FuelTypeEntity { Id = "okko-dp", Name = "ДП ЄВРО", StationId = "okko", BasePrice = 22, DiscountPrice = 22, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
-        // Fuel priced at 22 UAH/L (cost 20 + margin 2, no pump).
-        _context.FuelPackages.Add(new FuelPackage
-        {
-            Id = Guid.NewGuid().ToString(),
-            StationId = "okko",
-            FuelTypeId = "okko-dp",
-            FuelName = "ДП ЄВРО",
-            Liters = 100m,
-            Price = 2200,
-            OriginalPrice = 2200,
-            SupplierPricePerLiter = 20m,
-            MarginUahPerLiter = 2m,
-            FinalPricePerLiter = 22m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
-        });
+        // Fuel priced at 22 UAH/L (cost 20 + margin 2, no pump). The P&L reads its "current sale price"
+        // off the offer, so the per-litre figures are seeded there and the volume carries only the
+        // package total.
+        _context.SeedPackage(
+            id: Guid.NewGuid().ToString(),
+            stationId: "okko",
+            fuelTypeId: "okko-dp",
+            liters: 100m,
+            price: 2200m,
+            supplierPricePerLiter: 20m,
+            marginUahPerLiter: 2m,
+            finalPricePerLiter: 22m);
         _context.SaveChanges();
 
         _handler = new GetImportBatchPnlQueryHandler(_context);

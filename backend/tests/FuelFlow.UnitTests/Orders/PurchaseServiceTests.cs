@@ -95,25 +95,10 @@ public OrderCommandHandlersTests()
 
     private void SeedFuelPackages()
     {
-        var packages = new[]
-        {
-            new FuelPackage
-            {
-                Id = "pkg-okko-95-50",
-                StationId = "okko",
-                FuelTypeId = "okko-95",
-                FuelName = "A-95",
-                Liters = 50m,
-                Price = 2500,
-                OriginalPrice = 2450,
-                SupplierPricePerLiter = 49m,
-                MarginUahPerLiter = 1m,
-                FinalPricePerLiter = 50m,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
-            }
-        };
-        _context.FuelPackages.AddRange(packages);
+        // Offers plus volumes: checkout resolves the line's package through the offer, so a fixture in
+        // fuel_packages would make every line unresolvable and the guard tests would assert nothing.
+        _context.SeedPackage("pkg-okko-95-50", "okko", "okko-95", 50m, 2500m,
+            supplierPricePerLiter: 49m, marginUahPerLiter: 1m, finalPricePerLiter: 50m);
         _context.SaveChanges();
     }
 
@@ -195,14 +180,9 @@ public OrderCommandHandlersTests()
             BasePrice = 49, DiscountPrice = 49, AllowBelowCost = allowBelowCost,
             CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
         });
-        _context.FuelPackages.Add(new FuelPackage
-        {
-            Id = "pkg-okko-loss-50", StationId = "okko", FuelTypeId = "okko-loss",
-            FuelName = "ДП збиток", Liters = 50m, Price = 2425, OriginalPrice = 2450,
-            SupplierPricePerLiter = 50m, MarginUahPerLiter = 2m,
-            PumpPricePerLiter = 49m, MinDiscountPerLiter = 0.5m, FinalPricePerLiter = 48.5m,
-            CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
-        });
+        _context.SeedPackage("pkg-okko-loss-50", "okko", "okko-loss", 50m, 2425m,
+            supplierPricePerLiter: 50m, marginUahPerLiter: 2m,
+            pumpPricePerLiter: 49m, minDiscountPerLiter: 0.5m, finalPricePerLiter: 48.5m);
         _context.SaveChanges();
         // Stock behind it, so these tests reach the PRICING guard they are about. The stock gate runs
         // first on purpose: without stock here they would all fail as out-of-stock and assert nothing
@@ -386,15 +366,9 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
             BasePrice = 50, DiscountPrice = 48,
             CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
         });
-        _context.FuelPackages.Add(new FuelPackage
-        {
-            Id = "pkg-okko-frac-10", StationId = "okko", FuelTypeId = "okko-frac",
-            FuelName = "ДП дробові", Liters = 10m,
-            Price = 4567, OriginalPrice = 4567,                     // stale frozen values, ignored by ServerPricing
-            SupplierPricePerLiter = 43m, MarginUahPerLiter = 2.67m, // cost-plus 45.67/л, ≥ cost → not below-cost
-            FinalPricePerLiter = 45.67m,
-            CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
-        });
+        _context.SeedPackage("pkg-okko-frac-10", "okko", "okko-frac", 10m, 4567m,
+            supplierPricePerLiter: 43m, marginUahPerLiter: 2.67m, // cost-plus 45.67/л, ≥ cost → not below-cost
+            finalPricePerLiter: 45.67m);
         await _context.SaveChangesAsync();
         // A 10 L line needs a 10 L voucher behind it; the constructor's stock is 50 L of a different fuel.
         SeedSellableStock("okko-frac", 10m);

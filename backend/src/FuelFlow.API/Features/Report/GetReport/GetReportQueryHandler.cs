@@ -76,12 +76,26 @@ public sealed class GetReportQueryHandler
         // Margin comes from the offer, so this reads volumes joined to their offer. The real pool is chosen
         // deliberately: this is an operator report over real business, and the old lookup had no pool
         // filter at all, so a QA rehearsal row could shadow a real one purely by being newer.
-        var fpLookup = await _context.FuelOfferVolumes
-            .AsNoTracking()
-            .Where(v => v.Offer.DataKind == DataKinds.Real)
+        // Projects the margin, not the offer entity. Handing back a whole tracked-free entity and then
+        // reading one column off it loads every offer column for every volume in the catalogue to
+        // answer one question, and - worse - depends on the provider materialising the navigation,
+        // which the in-memory provider does not and which would make this throw on a null rather than
+        // return a wrong number.
+        // An explicit join rather than `v.Offer.X`: relying on the navigation being materialised is a
+        // silent dependency on provider behaviour, and where it is not materialised this throws on a
+        // null instead of returning a wrong number - which is exactly the kind of failure that looks
+        // like a data problem and gets debugged as one.
+        //
+        // Projects the margin alone. Handing back the offer entity would load every offer column for
+        // every volume in the catalogue to answer one question.
+        var fpLookup = await (
+            from v in _context.FuelOfferVolumes.AsNoTracking()
+            join o in _context.FuelOffers.AsNoTracking() on v.OfferId equals o.Id
+            where o.DataKind == DataKinds.Real
+            select new { o.StationId, o.FuelTypeId, v.Liters, o.MarginUahPerLiter })
             .ToDictionaryAsync(
-                v => (v.Offer.StationId, v.Offer.FuelTypeId, v.Liters),
-                v => v.Offer,
+                x => (x.StationId, x.FuelTypeId, x.Liters),
+                x => x.MarginUahPerLiter,
                 cancellationToken);
 
         // No GroupBy(...).First() any more, and that is the point of the split. The triple used to have
@@ -139,7 +153,7 @@ public sealed class GetReportQueryHandler
 
             foreach (var g in groups)
             {
-                if (!fpLookup.TryGetValue(g.Key, out var fp) || fp.MarginUahPerLiter is null)
+                if (!fpLookup.TryGetValue(g.Key, out var margin) || margin is null)
                 {
                     continue;
                 }
@@ -150,7 +164,10 @@ public sealed class GetReportQueryHandler
                     && f.Voucher.Liters == g.Key.Liters);
 
                 var ordered = g.Sum(li => li.Quantity);
-                sum += fp.MarginUahPerLiter.Value * (decimal)g.Key.Liters * Math.Min(ordered, delivered);
+                // No cast: `sum` is decimal now, and this figure is kopecks. A `(long)` here would
+                // truncate the half-kopecks a fractional margin per litre produces - the cast existed
+                // only because the column this reads from was an integer type.
+                sum += margin.Value * (decimal)g.Key.Liters * Math.Min(ordered, delivered);
             }
 
             return sum;

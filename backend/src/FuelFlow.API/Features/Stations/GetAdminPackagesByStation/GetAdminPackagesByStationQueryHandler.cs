@@ -17,6 +17,8 @@ public sealed class GetAdminPackagesByStationQueryHandler
 
         var volumes = await _context.FuelOfferVolumes
             .AsNoTracking()
+            // Same reason as GetAdminPackagesQueryHandler: the projection needs the offer loaded.
+            .Include(v => v.Offer)
             .Where(v => v.Offer.StationId == query.StationId)
             .OrderBy(v => v.Offer.FuelTypeId)
             .ThenBy(v => v.Liters)

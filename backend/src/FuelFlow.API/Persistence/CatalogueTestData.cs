@@ -23,6 +23,61 @@ namespace FuelFlow.Persistence;
 internal static class CatalogueTestData
 {
     /// <summary>
+    /// Find-or-create the offer for <c>(station, fuel, pool)</c> and apply the per-litre knobs to it.
+    /// </summary>
+    /// <remarks>
+    /// Split from <see cref="SeedPackage"/> because a test fixture that builds its volumes as local
+    /// entities and hands them to <c>AddRange</c> needs the offer added without the volume being added
+    /// for it. Returning the volume and letting the caller's <c>AddRange</c> do the adding keeps every
+    /// such call site untouched - which matters, because rewriting a dozen <c>AddRange</c> blocks by
+    /// hand is how fixtures quietly lose an argument.
+    /// </remarks>
+    public static FuelOffer SeedOffer(
+        this ApplicationDbContext context,
+        string stationId,
+        string fuelTypeId,
+        bool isTestData = false,
+        decimal? supplierPricePerLiter = null,
+        decimal? marginUahPerLiter = null,
+        decimal? marginPercent = null,
+        decimal? finalPricePerLiter = null,
+        decimal? pumpPricePerLiter = null,
+        decimal? minDiscountPerLiter = null,
+        DateTime? createdAtUtc = null,
+        DateTime? updatedAtUtc = null)
+    {
+        var pool = DataKinds.ForPool(isTestData);
+        var offerId = OfferKeys.For(stationId, fuelTypeId, pool);
+        var now = DateTime.UtcNow;
+
+        var offer = context.FuelOffers.Local.FirstOrDefault(o => o.Id == offerId)
+                    ?? context.FuelOffers.FirstOrDefault(o => o.Id == offerId);
+
+        if (offer is null)
+        {
+            offer = new FuelOffer
+            {
+                Id = offerId,
+                StationId = stationId,
+                FuelTypeId = fuelTypeId,
+                DataKind = pool,
+                CreatedAtUtc = createdAtUtc ?? now,
+                UpdatedAtUtc = updatedAtUtc ?? now,
+            };
+            context.FuelOffers.Add(offer);
+        }
+
+        if (supplierPricePerLiter is not null) offer.SupplierPricePerLiter = supplierPricePerLiter;
+        if (marginUahPerLiter is not null) offer.MarginUahPerLiter = marginUahPerLiter;
+        if (marginPercent is not null) offer.MarginPercent = marginPercent;
+        if (finalPricePerLiter is not null) offer.FinalPricePerLiter = finalPricePerLiter;
+        if (pumpPricePerLiter is not null) offer.PumpPricePerLiter = pumpPricePerLiter;
+        if (minDiscountPerLiter is not null) offer.MinDiscountPerLiter = minDiscountPerLiter;
+
+        return offer;
+    }
+
+    /// <summary>
     /// Seed one sellable package: find-or-create the offer for
     /// <c>(station, fuel, pool)</c> and attach a volume carrying the package's id and frozen total.
     /// </summary>
@@ -55,44 +110,20 @@ internal static class CatalogueTestData
         DateTime? createdAtUtc = null,
         DateTime? updatedAtUtc = null)
     {
-        var pool = DataKinds.ForPool(isTestData);
-        var offerId = OfferKeys.For(stationId, fuelTypeId, pool);
-        var now = DateTime.UtcNow;
-        var created = createdAtUtc ?? now;
-        var updated = updatedAtUtc ?? now;
-
-        var offer = context.FuelOffers.Local.FirstOrDefault(o => o.Id == offerId)
-                    ?? context.FuelOffers.FirstOrDefault(o => o.Id == offerId);
-
-        if (offer is null)
-        {
-            offer = new FuelOffer
-            {
-                Id = offerId,
-                StationId = stationId,
-                FuelTypeId = fuelTypeId,
-                DataKind = pool,
-                CreatedAtUtc = created,
-                UpdatedAtUtc = updated,
-            };
-            context.FuelOffers.Add(offer);
-        }
-
-        if (supplierPricePerLiter is not null) offer.SupplierPricePerLiter = supplierPricePerLiter;
-        if (marginUahPerLiter is not null) offer.MarginUahPerLiter = marginUahPerLiter;
-        if (marginPercent is not null) offer.MarginPercent = marginPercent;
-        if (finalPricePerLiter is not null) offer.FinalPricePerLiter = finalPricePerLiter;
-        if (pumpPricePerLiter is not null) offer.PumpPricePerLiter = pumpPricePerLiter;
-        if (minDiscountPerLiter is not null) offer.MinDiscountPerLiter = minDiscountPerLiter;
+        var offer = context.SeedOffer(
+            stationId, fuelTypeId, isTestData,
+            supplierPricePerLiter, marginUahPerLiter, marginPercent,
+            finalPricePerLiter, pumpPricePerLiter, minDiscountPerLiter,
+            createdAtUtc, updatedAtUtc);
 
         var volume = new FuelOfferVolume
         {
             Id = id,
-            OfferId = offerId,
+            OfferId = offer.Id,
             Liters = liters,
             PackagePrice = price,
-            CreatedAtUtc = created,
-            UpdatedAtUtc = updated,
+            CreatedAtUtc = createdAtUtc ?? DateTime.UtcNow,
+            UpdatedAtUtc = updatedAtUtc ?? DateTime.UtcNow,
         };
         context.FuelOfferVolumes.Add(volume);
         return volume;

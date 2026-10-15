@@ -114,37 +114,14 @@ public sealed class GetReportQueryHandlerTests : IDisposable
             new FuelTypeEntity { Id = "okko-95", Name = "A-95", StationId = "okko", BasePrice = 100, DiscountPrice = 100, CreatedAtUtc = now, UpdatedAtUtc = now },
             new FuelTypeEntity { Id = "okko-dp", Name = "DP", StationId = "okko", BasePrice = 100, DiscountPrice = 100, CreatedAtUtc = now, UpdatedAtUtc = now });
 
-        _context.FuelPackages.AddRange(
-            new FuelPackage
-            {
-                Id = "okko-95-50",
-                StationId = "okko",
-                FuelTypeId = "okko-95",
-                FuelName = "A-95",
-                Liters = 50m,
-                Price = 5100,
-                OriginalPrice = 5000,
-                SupplierPricePerLiter = 100m,
-                MarginUahPerLiter = 2m,
-                FinalPricePerLiter = 102m,
-                CreatedAtUtc = now,
-                UpdatedAtUtc = now
-            },
-            new FuelPackage
-            {
-                Id = "okko-dp-20",
-                StationId = "okko",
-                FuelTypeId = "okko-dp",
-                FuelName = "DP",
-                Liters = 20m,
-                Price = 2000,
-                OriginalPrice = 1970,
-                SupplierPricePerLiter = 100m,
-                MarginUahPerLiter = 1.5m,
-                FinalPricePerLiter = 101.5m,
-                CreatedAtUtc = now,
-                UpdatedAtUtc = now
-            });
+        // Seeded as offers plus volumes: the report resolves its margin through
+        // (station, fuel, litres) -> fuel_offers, so per-litre figures belong on the offer.
+        _context.SeedPackage("okko-95-50", "okko", "okko-95", 50m, 5100m,
+            supplierPricePerLiter: 100m, marginUahPerLiter: 2m, finalPricePerLiter: 102m,
+            createdAtUtc: now, updatedAtUtc: now);
+        _context.SeedPackage("okko-dp-20", "okko", "okko-dp", 20m, 2000m,
+            supplierPricePerLiter: 100m, marginUahPerLiter: 1.5m, finalPricePerLiter: 101.5m,
+            createdAtUtc: now, updatedAtUtc: now);
 
         var voucher95 = new FuelVoucher
         {

@@ -20,6 +20,10 @@ public sealed class GetAdminPackagesQueryHandler
 
         var volumes = await _context.FuelOfferVolumes
             .AsNoTracking()
+            // The projection rebuilds the package view off the offer, so the offer has to come back with
+            // the row. Without this the navigation is null after materialisation - lazy loading is off -
+            // and the handler throws on the first package rather than returning a wrong answer.
+            .Include(v => v.Offer)
             .OrderBy(v => v.Offer.StationId)
             .ThenBy(v => v.Offer.FuelTypeId)
             .ThenBy(v => v.Liters)

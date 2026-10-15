@@ -280,9 +280,18 @@ public sealed class StationsCommandHandlersTests : IDisposable
         result.Success.Should().BeTrue();
         result.Conflict.Should().BeFalse();
         result.Error.Should().BeNull();
-        result.Package.Should().BeSameAs(package);
+        // Not the same instance any more, and that is the point: what the handler persists is a volume, so
+        // what it returns is the package VIEW of that volume rendered through PackageProjection. The
+        // endpoint's published JSON is unchanged; only the object identity differs, and nothing was
+        // entitled to rely on that - the volume never existed as a detached entity to be handed back.
+        result.Package.Should().NotBeNull();
+        result.Package!.Id.Should().Be("pkg-1");
+        result.Package.StationId.Should().Be("station-1");
+        result.Package.FuelTypeId.Should().Be("ft-1");
+        result.Package.Liters.Should().Be(20m);
+        result.Package.Price.Should().Be(1000);
 
-        var persisted = await _context.FuelPackages.FindAsync("pkg-1");
+        var persisted = await _context.FuelOfferVolumes.FindAsync("pkg-1");
         persisted.Should().NotBeNull();
         persisted!.CreatedAtUtc.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
     }
@@ -291,7 +300,7 @@ public sealed class StationsCommandHandlersTests : IDisposable
     public async Task CreatePackage_ShouldReturnConflict_WhenExists()
     {
         var package = CreatePackage("pkg-1", "station-1", "ft-1", "A-95", 20m, 1000, 980);
-        _context.FuelPackages.Add(package);
+        SeedFromPackage(package);
         await _context.SaveChangesAsync();
 
         var handler = new CreatePackageCommandHandler(_context);
@@ -325,8 +334,8 @@ public sealed class StationsCommandHandlersTests : IDisposable
     [Fact]
     public async Task CreatePackage_ShouldRefuse_WhenCostDisagreesWithTheFuel()
     {
-        _context.FuelPackages.Add(CreatePackage("existing", "station-1", "ft-1", "ДП ЄВРО", 10m, costPerLiter: 100m));
-        _context.FuelPackages.Add(CreatePackage("existing-2", "station-1", "ft-1", "ДП ЄВРО", 2m, costPerLiter: 100m));
+        SeedFromPackage(CreatePackage("existing", "station-1", "ft-1", "ДП ЄВРО", 10m, costPerLiter: 100m));
+        SeedFromPackage(CreatePackage("existing-2", "station-1", "ft-1", "ДП ЄВРО", 2m, costPerLiter: 100m));
         await _context.SaveChangesAsync();
 
         var handler = new CreatePackageCommandHandler(_context);
@@ -338,13 +347,13 @@ public sealed class StationsCommandHandlersTests : IDisposable
         result.Error.Should().Contain("100").And.Contain("5");
         result.Error.Should().Contain("own fuel type", "the fix has to be actionable, not just a refusal");
 
-        (await _context.FuelPackages.AnyAsync(p => p.Id == "qa-1kop")).Should().BeFalse();
+        (await _context.FuelOfferVolumes.AnyAsync(p => p.Id == "qa-1kop")).Should().BeFalse();
     }
 
     [Fact]
     public async Task CreatePackage_ShouldAdd_WhenCostMatchesTheFuel()
     {
-        _context.FuelPackages.Add(CreatePackage("existing", "station-1", "ft-1", "ДП ЄВРО", 10m, costPerLiter: 94.9m));
+        SeedFromPackage(CreatePackage("existing", "station-1", "ft-1", "ДП ЄВРО", 10m, costPerLiter: 94.9m));
         await _context.SaveChangesAsync();
 
         var handler = new CreatePackageCommandHandler(_context);
@@ -360,7 +369,7 @@ public sealed class StationsCommandHandlersTests : IDisposable
     [Fact]
     public async Task CreatePackage_ShouldAdd_WhenCostDiffersOnlyPastTheColumnScale()
     {
-        _context.FuelPackages.Add(CreatePackage("existing", "station-1", "ft-1", "A-95", 10m, costPerLiter: 94.9000m));
+        SeedFromPackage(CreatePackage("existing", "station-1", "ft-1", "A-95", 10m, costPerLiter: 94.9000m));
         await _context.SaveChangesAsync();
 
         var handler = new CreatePackageCommandHandler(_context);
@@ -373,7 +382,7 @@ public sealed class StationsCommandHandlersTests : IDisposable
     [Fact]
     public async Task CreatePackage_ShouldAdd_WhenItIsTheFirstPricedPackageOfTheFuel()
     {
-        _context.FuelPackages.Add(CreatePackage("existing", "station-1", "ft-1", "A-95", 10m));
+        SeedFromPackage(CreatePackage("existing", "station-1", "ft-1", "A-95", 10m));
         await _context.SaveChangesAsync();
 
         var handler = new CreatePackageCommandHandler(_context);
@@ -388,7 +397,7 @@ public sealed class StationsCommandHandlersTests : IDisposable
     [Fact]
     public async Task CreatePackage_ShouldAdd_WhenTheFuelHasCostsButTheNewOneHasNone()
     {
-        _context.FuelPackages.Add(CreatePackage("existing", "station-1", "ft-1", "A-95", 10m, costPerLiter: 87.9m));
+        SeedFromPackage(CreatePackage("existing", "station-1", "ft-1", "A-95", 10m, costPerLiter: 87.9m));
         await _context.SaveChangesAsync();
 
         var handler = new CreatePackageCommandHandler(_context);
@@ -401,7 +410,7 @@ public sealed class StationsCommandHandlersTests : IDisposable
     [Fact]
     public async Task CreatePackage_ShouldAdd_WhenItBelongsToADifferentFuel()
     {
-        _context.FuelPackages.Add(CreatePackage("existing", "station-1", "ft-1", "A-95", 10m, costPerLiter: 87.9m));
+        SeedFromPackage(CreatePackage("existing", "station-1", "ft-1", "A-95", 10m, costPerLiter: 87.9m));
         await _context.SaveChangesAsync();
 
         var handler = new CreatePackageCommandHandler(_context);
@@ -411,12 +420,30 @@ public sealed class StationsCommandHandlersTests : IDisposable
         result.Success.Should().BeTrue();
     }
 
+    /// <summary>
+    /// A package owns its litres and its frozen total; the offer owns everything else.
+    /// </summary>
+    /// <remarks>
+    /// This test used to assert that <c>PUT</c> re-keys a package onto a different station and fuel,
+    /// and that expectation was correct for the old schema. It is wrong now, and for a reason worth
+    /// stating: station and fuel are part of the OFFER's identity - <c>UNIQUE (station_id,
+    /// fuel_type_id, data_kind)</c> - so "update this package's station" is not an update, it is a move
+    /// to another offer, and it would drag that offer's other volumes with it. Re-keying a whole fuel
+    /// between stations is what the brand screen does; this endpoint cannot do it half-way.
+    /// <para>
+    /// So the handler applies the two facts a package genuinely owns and ignores the rest. Silently
+    /// ignoring beats corrupting the offer, but it is a behaviour change and this test is where it is
+    /// pinned down.
+    /// </para>
+    /// </remarks>
     [Fact]
-    public async Task UpdatePackage_ShouldUpdate()
+    public async Task UpdatePackage_ShouldUpdateLitersAndPrice_AndLeaveTheOfferAlone()
     {
         var package = CreatePackage("pkg-1", "station-1", "ft-1", "A-95", 20m, 1000, 980);
-        _context.FuelPackages.Add(package);
+        SeedFromPackage(package);
         await _context.SaveChangesAsync();
+
+        var offerIdBefore = (await _context.FuelOfferVolumes.FindAsync("pkg-1"))!.OfferId;
 
         var updated = CreatePackage("pkg-1", "station-2", "ft-2", "Diesel", 50m, 3000, 2900);
         var handler = new UpdatePackageCommandHandler(_context);
@@ -425,13 +452,17 @@ public sealed class StationsCommandHandlersTests : IDisposable
 
         result.Should().BeTrue();
 
-        var persisted = await _context.FuelPackages.FindAsync("pkg-1");
-        persisted!.StationId.Should().Be("station-2");
-        persisted.FuelTypeId.Should().Be("ft-2");
-        persisted.FuelName.Should().Be("Diesel");
-        persisted.Liters.Should().Be(50m);
-        persisted.Price.Should().Be(3000);
-        persisted.OriginalPrice.Should().Be(2900);
+        _context.ChangeTracker.Clear();
+        var persisted = await _context.FuelOfferVolumes.FindAsync("pkg-1");
+        persisted!.Liters.Should().Be(50m);
+        persisted.PackagePrice.Should().Be(3000);
+
+        // The volume still belongs to the offer it was created under.
+        persisted.OfferId.Should().Be(offerIdBefore);
+
+        var offer = await _context.FuelOffers.FindAsync(offerIdBefore);
+        offer!.StationId.Should().Be("station-1");
+        offer.FuelTypeId.Should().Be("ft-1");
     }
 
     [Fact]
@@ -448,7 +479,7 @@ public sealed class StationsCommandHandlersTests : IDisposable
     public async Task DeletePackage_ShouldRemove()
     {
         var package = CreatePackage("pkg-1", "station-1", "ft-1", "A-95", 20m);
-        _context.FuelPackages.Add(package);
+        SeedFromPackage(package);
         await _context.SaveChangesAsync();
 
         var handler = new DeletePackageCommandHandler(_context);
@@ -456,10 +487,10 @@ public sealed class StationsCommandHandlersTests : IDisposable
         var result = await handler.HandleAsync(new DeletePackageCommand("pkg-1"));
 
         result.Should().BeTrue();
-        var persisted = await _context.FuelPackages.IgnoreQueryFilters().SingleAsync(p => p.Id == "pkg-1");
+        var persisted = await _context.FuelOfferVolumes.IgnoreQueryFilters().SingleAsync(p => p.Id == "pkg-1");
         persisted.IsDeleted.Should().BeTrue();
         persisted.DeletedAtUtc.Should().NotBeNull();
-        (await _context.FuelPackages.CountAsync(p => p.Id == "pkg-1")).Should().Be(0,
+        (await _context.FuelOfferVolumes.CountAsync(p => p.Id == "pkg-1")).Should().Be(0,
             "#217: order_line_items point at packages, so the row is history rather than garbage");
     }
 
@@ -510,4 +541,22 @@ public sealed class StationsCommandHandlersTests : IDisposable
             SupplierPricePerLiter = costPerLiter
         };
     }
+
+    /// <summary>
+    /// Seeds the package described by a command DTO as an offer plus a volume.
+    /// </summary>
+    /// <remarks>
+    /// The DTO stays a <see cref="FuelPackage"/> because that is the published shape of the create and
+    /// update endpoints, and these tests are about the handlers, not the schema. Only the INSERT moves:
+    /// <c>fuel_packages</c> is no longer what any handler reads, so a fixture inserted there produces a
+    /// handler that correctly reports "nothing to update" - which looks like the handler being broken.
+    /// </remarks>
+    private FuelOfferVolume SeedFromPackage(FuelPackage package)
+        => _context.SeedPackage(
+            id: package.Id,
+            stationId: package.StationId,
+            fuelTypeId: package.FuelTypeId,
+            liters: package.Liters,
+            price: package.Price,
+            supplierPricePerLiter: package.SupplierPricePerLiter);
 }
