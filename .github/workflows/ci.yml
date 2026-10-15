@@ -51,7 +51,6 @@ jobs:
       website: ${{ steps.filter.outputs.website }}
       deploy: ${{ steps.filter.outputs.deploy }}
       migrations: ${{ steps.filter.outputs.migrations }}
-      migrations: ${{ steps.filter.outputs.migrations }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -482,6 +481,11 @@ jobs:
       - name: Test the disk pressure check
         run: bash deploy/disk-check.test.sh
 
+      # The migration dry run's dump step, which lives in this same file and runs only on the
+      # production box. It had been red since it first shipped and nothing here could see it.
+      - name: Test the migration dry-run dump
+        run: bash deploy/dryrun-dump.test.sh
+
   # ------------------------------------------------------------------------------
   # Migration dry run against production's DATA, on the production BOX.
   #
@@ -534,7 +538,15 @@ jobs:
 
           pg() { docker exec -i fuelflow-postgres psql -U fuelflow -d fuelflow -X "$@"; }
 
-          pg --schema-only --no-owner --no-privileges > "$out/schema.sql"
+          # pg_dump, NOT `psql --schema-only`. The step shipped that way and failed the first time it
+          # ever ran (PR #1149, 2026-10-15) with "psql: unrecognized option: schema-only", so the gate
+          # has been red for every migration PR while proving nothing about migrations. pg_dump is the
+          # spelling this same box already runs successfully every night in deploy/backup.sh:102
+          # (`pg_dump --no-owner --no-privileges`), which is why this is the known-good form rather
+          # than a guess. `--no-owner --no-privileges` stay: the artifact is replayed into a
+          # throwaway container as a different user.
+          docker exec -i fuelflow-postgres pg_dump -U fuelflow -d fuelflow \
+            --schema-only --no-owner --no-privileges > "$out/schema.sql"
           echo "schema.sql $(wc -c < "$out/schema.sql") bytes"
 
           # The history is what makes this a dry run of the PENDING migration rather than a replay of
@@ -584,6 +596,20 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Without this the "Apply pending migrations" step below dies with "dotnet: command not found"
+      # (or, on an image that happens to carry an older SDK, a confusing version mismatch). The
+      # ubuntu-latest image's preinstalled SDK is not the .NET 10 this solution targets, and this
+      # job is the one place the dry run actually executes the migrations.
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      # Same reason and same pin as the backend job: dotnet-ef is a global tool, not something the
+      # build pulls in, so it is absent from a fresh runner image.
+      - name: Install EF Core tools
+        run: dotnet tool install --global dotnet-ef --version 10.0.12
 
       - name: Download the dump
         uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
