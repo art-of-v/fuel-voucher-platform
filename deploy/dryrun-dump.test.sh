@@ -49,18 +49,29 @@ bad() { fail=$((fail + 1)); printf '  FAIL  %s\n        got:      %s\n        ex
 eq()  { if [ "$2" = "$3" ]; then ok "$1"; else bad "$1" "$2" "$3"; fi; }
 
 # A `docker` stub: records its argv one-per-line, and hands back plausible output so the block runs
-# to completion instead of dying on the first missing byte. `DOCKER_FAIL_ON` names a substring that
-# should be treated as "no such table", to drive the per-table warning branch.
+# to completion instead of dying on the first missing byte.
+# LEAK_INTO names a table whose COPY output should contain a qr_payload VALUE - i.e. someone widened
+# TABLES or a column mapping changed. That is what the guard exists to catch.
 mkdir -p "$WORK/bin"
 cat > "$WORK/bin/docker" <<'STUB'
 #!/usr/bin/env bash
 printf '%s\n' "$@" >> "$ARGV_LOG"
 case " $* " in
-  *--schema-only*|*pg_dump*) echo "-- stub schema" ;;
+  # A schema-only dump is DDL. It legitimately mentions qr_payload as a COLUMN NAME - that string
+  # being present is not a leak, and modelling it here is what keeps the guard honest: without it
+  # this harness cannot tell a real guard from one that refuses every run.
+  *--schema-only*) cat <<'SCHEMA'
+--
+-- Name: fuel_vouchers; Type: TABLE; Schema: public
+--
+COMMENT ON COLUMN fuel_vouchers.qr_payload IS 'the signed voucher payload';
+SCHEMA
+  ;;
   *COPY*__EFMigrationsHistory*) echo "MigrationId,ProductVersion"; echo "20240101_Initial,1.0.0" ;;
   *COPY*fuel_types*)            echo "id,name"; echo "1,A-95" ;;
   *COPY*stations*)              echo "id,name"; echo "1,OKKO" ;;
   *COPY*fuel_packages*)         echo "id,station_id"; echo "1,1" ;;
+  *COPY*)                       [ -n "${LEAK_INTO:-}" ] && printf 'number,qr_payload\n1234,eyJzaWduYXR1cmUiOiJ4In0=\n' ;;
 esac
 exit 0
 STUB
@@ -108,39 +119,42 @@ for want in -U fuelflow -d fuelflow; do
 done
 eq "every call carries -U fuelflow -d fuelflow" "$missing" ""
 
-# The guard that refuses to ship voucher data. `grep -rlq` over the output dir is what catches a
-# payload that landed in an unexpected file, and it has to keep firing.
-run_dump > /dev/null
-mkdir -p "$WORK/runner/dryrun"
-echo "payload,qr_payload" > "$WORK/runner/dryrun/leaked.csv"
-(
-  PATH="$WORK/bin:$PATH" ARGV_LOG=/dev/null RUNNER_TEMP="$WORK/runner" \
-    TABLES="fuel_types stations fuel_packages" bash -c '
-    set -euo pipefail
-    out="$RUNNER_TEMP/dryrun"
-    if [ -e "$out/fuel_vouchers.csv" ] || grep -rlq "qr_payload" "$out" 2>/dev/null; then
-      echo "REFUSED"
-    fi'
-) > "$WORK/guard" 2>&1
-grep -q REFUSED "$WORK/guard" \
-  && ok "a qr_payload in the dump dir still refuses the upload" \
-  || bad "a qr_payload in the dump dir still refuses the upload" "accepted" "REFUSED"
+# The voucher-data guard, exercised by running the WHOLE extracted block and reading its exit code.
+# The exit code is the assertion: 0 means the upload was allowed, non-zero means the block stopped.
+# These two cases bracket the bug that shipped - a guard that scans the schema dump refuses every
+# run, because "qr_payload" is a column name that pg_dump puts in the DDL.
+run_block() { : > "$WORK/argv"; ( PATH="$WORK/bin:$PATH" ARGV_LOG="$WORK/argv" RUNNER_TEMP="$WORK/runner" TABLES="fuel_types stations fuel_packages" bash "$WORK/dump.raw" ) >"$WORK/out" 2>&1; }
 
-# ...and a clean dump dir must NOT trip it, or the gate refuses every legitimate run.
-rm -f "$WORK/runner/dryrun/leaked.csv"
-(
-  PATH="$WORK/bin:$PATH" ARGV_LOG=/dev/null RUNNER_TEMP="$WORK/runner" \
-    TABLES="fuel_types stations fuel_packages" bash -c '
-    set -euo pipefail
-    out="$RUNNER_TEMP/dryrun"
-    if [ -e "$out/fuel_vouchers.csv" ] || grep -rlq "qr_payload" "$out" 2>/dev/null; then
-      echo "REFUSED"
-    fi
-    echo "ACCEPTED"'
-) > "$WORK/clean" 2>&1
-grep -q ACCEPTED "$WORK/clean" \
-  && ok "a clean dump dir is still accepted" \
-  || bad "a clean dump dir is still accepted" "refused" "accepted"
+# Baseline: the block as it stands, against a stub schema that mentions qr_payload as a column name.
+run_block; rc=$?
+eq "a schema-only dump naming qr_payload as a column still uploads" "$rc" "0"
+if [ "$rc" -ne 0 ]; then
+  echo "--- block output ---"; cat "$WORK/out"; echo "--- argv ---"; cat "$WORK/argv"; echo "----------------"
+fi
+
+# Now a real payload inside a dumped data file. The guard must fire, or the artifact is a data leak.
+# Injected through the stub rather than by planting a file, because the block opens with
+# `rm -rf "$out"` and would delete anything written before it ran - which is exactly how a guard
+# test can pass for the wrong reason.
+( PATH="$WORK/bin:$PATH" ARGV_LOG="$WORK/argv" RUNNER_TEMP="$WORK/runner" LEAK_INTO=1 \
+  TABLES="fuel_types stations fuel_packages fuel_offers" bash "$WORK/dump.raw" ) >"$WORK/leak" 2>&1
+rc=$?
+if [ "$rc" -ne 0 ] && grep -q "refusing to upload" "$WORK/leak"; then
+  ok "a qr_payload VALUE in a data file refuses the upload"
+else
+  bad "a qr_payload VALUE in a data file refuses the upload" "exit $rc, no refusal" "non-zero + refusal"
+fi
+
+# And the other arm: TABLES is widened to name the vouchers table outright, so a file with that name
+# lands in the artifact whatever its content.
+( PATH="$WORK/bin:$PATH" ARGV_LOG="$WORK/argv" RUNNER_TEMP="$WORK/runner" \
+  TABLES="fuel_types stations fuel_packages fuel_vouchers" bash "$WORK/dump.raw" ) >"$WORK/wide" 2>&1
+rc=$?
+if [ "$rc" -ne 0 ] && [ -e "$WORK/runner/dryrun/fuel_vouchers.csv" ]; then
+  ok "dumping the vouchers table still refuses the upload"
+else
+  bad "dumping the vouchers table still refuses the upload" "exit $rc" "non-zero, file present"
+fi
 
 echo
 if [ "$fail" -eq 0 ]; then
