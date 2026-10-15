@@ -80,7 +80,14 @@ export default function HomeScreen() {
           flex: 1,
           paddingTop: tokens.spacing.sm,
         },
-        lembergText: {
+        /*
+         * The wordmark sits next to a 64px logo in a row that is only as wide as
+         * the screen minus the page padding, so the tracking is what keeps it from
+         * wrapping: the wordmark is wide-tracked, the qualifier below less so —
+         * "MARKETPLACE" is the longest word in the lockup and was the one that
+         * had to give tracking back.
+         */
+        brandText: {
           fontFamily: 'Rajdhani-Bold',
           fontSize: tokens.type.title.fontSize,
           letterSpacing: 4,
@@ -90,7 +97,7 @@ export default function HomeScreen() {
         subtitleText: {
           fontFamily: 'Rajdhani',
           fontSize: tokens.type.caption.fontSize,
-          letterSpacing: 15,
+          letterSpacing: 8,
           opacity: 0.9,
           textAlign: 'left',
           marginBottom: tokens.spacing.xs,
@@ -142,7 +149,7 @@ export default function HomeScreen() {
      * centred in the physical screen rather than in the content area. Wrapping it
      * in the layout also means the backdrop matches the home screen that follows,
      * so the first frame does not flash a different canvas. No `header`: the
-     * LEMBERG banner needs data this branch does not have yet.
+     * brand banner needs data this branch does not have yet.
      */
     return (
       <GridPageLayout disableScroll>
@@ -213,15 +220,15 @@ export default function HomeScreen() {
               align="left"
               animation="pulse"
               animatedValue={pulseAnim}
-              style={styles.lembergText}
+              style={styles.brandText}
             >
-              LEMBERG
+              FUEL FLOW
             </GlowText>
             <Text
               allowFontScaling={false}
               style={[styles.subtitleText, { color: tokens.colors.text.primary }]}
             >
-              FUEL CORP.
+              MARKETPLACE
             </Text>
           </View>
         </View>
