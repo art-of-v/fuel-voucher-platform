@@ -53,6 +53,7 @@
       "expo-dev-client",
       "expo-notifications",
       "./plugins/withNavigationQueries.js",
+      "./plugins/withAndroidCxxStl.js",
       [
         "expo-location",
         {
