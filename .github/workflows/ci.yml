@@ -207,13 +207,27 @@ jobs:
             echo "== $proj =="
             dotnet list "$proj" package --vulnerable --include-transitive | tee -a "$report"
           done
-          # Known-vulnerable packages fail the build — EXCEPT advisories explicitly accepted here.
-          # Accepted risk (documented): all five below are SixLabors.ImageSharp 2.1.13 issues whose ONLY
-          # fix is 4.1.2 — a major jump (ImageSharp 3.0+ is the Six Labors split-license, and
-          # ZXing.Net.Bindings.ImageSharp.V2 pins us to the 2.x line). They are DoS / resource-exhaustion
-          # bugs in image DECODING; our only decode path is operator voucher import (authenticated staff),
-          # not public input. These started failing CI when the advisories were published (the audit hits
-          # the live GitHub Advisory DB each run), not because of any code change. Remove when migrated to 4.x.
+          # Known-vulnerable packages fail the build - EXCEPT advisories explicitly accepted here.
+          # Accepted risk (documented): all five below are SixLabors.ImageSharp 2.1.13 issues whose
+          # ONLY fix is 4.1.2 - a major jump (ImageSharp 3.0+ is the Six Labors split-license, and
+          # ZXing.Net.Bindings.ImageSharp.V2 pins us to the 2.x line). They are DoS /
+          # resource-exhaustion bugs in image DECODING.
+          #
+          # This comment used to say the only decode path was operator voucher import. That was
+          # wrong in a way that mattered, so here is the real one: voucher import never DECODES
+          # anything. PdfRenderer.cs calls Image.LoadPixelData - it wraps the raw BGRA bytes
+          # that Docnet native renderer already produced - and QrDecoder then does a CloneAs
+          # pixel conversion. No production path invokes an ImageSharp decoder at all; the only
+          # Image.Load calls in the solution are in QrServiceTests, against fixtures committed
+          # to this repository.
+          #
+          # So the exposure is narrower than an import path would be, and replacing ZXing to
+          # reach 4.1.2 would mean reimplementing QR version detection and format parsing
+          # through ZXing internals - on the voucher-import money path - to close advisories
+          # that cannot fire. That trade was rejected; see planning#323.
+          #
+          # These started failing CI when the advisories were published (the audit hits
+          # the live GitHub Advisory DB each run), not because of any code change.
           #   Moderate: GHSA-gwg2-r3hj-4w44, GHSA-wmxv-xphr-5c9g
           #   High:     GHSA-j3p4-wp97-rph4, GHSA-j9gm-c75j-xc9q, GHSA-jjfr-hcj7-qf5w
           # The report lists each advisory as a GHSA URL; fail only on ids NOT accepted above.
