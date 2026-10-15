@@ -10,12 +10,24 @@ namespace FuelFlow.UnitTests.SharedKernel;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The published 1.0.1 app reads <c>provider</c> off five response shapes and cannot be made to read
-/// <c>brand</c>: that bundle is already in the App Store, and only a new build changes what a client
-/// reads. Renaming the field outright left every current user's wallet with no brand - no network
-/// colour on the cards, and a filter bar whose provider list is built from an empty set - so the
-/// rename had to wait for 1.1.0. Shipping both names for one release removes that coupling: the
-/// rename merges whenever, and the old name goes afterwards.
+/// The published 1.0.0 and 1.0.1 apps read <c>provider</c> off five response shapes and cannot be
+/// made to read <c>brand</c>: those bundles are already in the stores, and only a new build changes
+/// what a client reads. Renaming the field outright left every current user's wallet with no brand -
+/// no network colour on the cards, and a filter bar whose provider list is built from an empty set -
+/// so the rename had to wait for 1.1.0. Shipping both names for one release removes that coupling:
+/// the rename merges whenever, and the old name goes afterwards.
+/// </para>
+/// <para>
+/// Both, not just 1.0.1. Measured on production on 2026-10-14, <c>devices.app_version</c> held rows
+/// for 1.0.0 as well as 1.0.1 - the mobile app reports its version on device registration, so the
+/// installed base is measurable rather than guessable:
+///
+/// <code>
+/// SELECT app_version, COUNT(*), MAX(last_seen_at) FROM devices GROUP BY app_version;
+/// </code>
+///
+/// That query is the gate. On that date it returned 1.0.0 and 1.0.1 rows alongside 1.1.0, so the
+/// fleet had not drained.
 /// </para>
 /// <para>
 /// The failure nobody would notice is the one this guards. Nothing breaks when the alias is removed
@@ -44,9 +56,9 @@ public class TransitionalBrandAliasTests
     }
 
     /// <summary>
-    /// The shapes the published 1.0.1 bundle reads <c>provider</c> from. Admin-facing DTOs are
-    /// deliberately absent: the admin panel deploys with the backend and is never a version behind.
-    /// </summary>
+/// The shapes the published 1.0.0 and 1.0.1 bundles read <c>provider</c> from. Admin-facing DTOs are
+/// deliberately absent: the admin panel deploys with the backend and is never a version behind.
+/// </summary>
     public static TheoryData<Type> MobileFacingShapes() => new()
     {
         typeof(VoucherDto),
@@ -72,7 +84,7 @@ public class TransitionalBrandAliasTests
         alias.Should().NotBeNull(
             $"{shape.Name} lost its transitional `provider` alias. If 1.1.0 is live and the fleet has "
             + "drained, that is deliberate - delete this test too. If not, deleting it now strips the "
-            + "brand from every 1.0.1 wallet, silently");
+            + "brand from every 1.0.0 and 1.0.1 wallet, silently");
 
         alias!.SetMethod.Should().BeNull("a settable `provider` could drift from `brand`");
         alias.PropertyType.Should().Be(typeof(string));
@@ -136,5 +148,54 @@ public class TransitionalBrandAliasTests
 
         Field(item, "provider").Should().Be("Socar");
         Field(item, "brand").Should().Be("Socar");
+    }
+
+    /// <summary>
+    /// The removal condition has to know every shape that carries the alias, not just the ones
+    /// someone remembered to list.
+    /// </summary>
+    /// <remarks>
+    /// A type holding both <c>Brand</c> and <c>Provider</c> is the alias signature - that pairing is
+    /// what the transitional rename added, and nothing else in these assemblies does it. So this
+    /// sweeps both assemblies for the pairing and demands it match <see cref="MobileFacingShapes"/>
+    /// exactly.
+    /// <para>
+    /// Without it a seventh response shape could get an alias, ship, and then be quietly forgotten:
+    /// the removal would strip it from an old fleet in exactly the same silent way, and the check
+    /// meant to prevent that would not so much as mention it.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void NoShapeCarriesTheAliasWithoutBeingListedForRemoval()
+    {
+        var expected = new HashSet<Type>();
+        foreach (var row in MobileFacingShapes())
+        {
+            expected.Add(row);
+        }
+
+        expected.Count.Should().Be(6,
+            "this list IS the removal checklist. If its size changed, re-read the fleet before "
+            + "deciding the alias is safe to drop.");
+
+        var found = new HashSet<Type>();
+        var assemblies = new[]
+        {
+            typeof(VoucherDto).Assembly,
+            typeof(FuelFlow.Features.Vouchers.GetUserVouchers.VoucherDto).Assembly,
+        };
+
+        foreach (var assembly in assemblies)
+        {
+            foreach (var type in assembly.GetTypes())
+            {
+                if (type.GetProperty("Brand") is not null && type.GetProperty("Provider") is not null)
+                {
+                    found.Add(type);
+                }
+            }
+        }
+
+        found.Should().BeEquivalentTo(expected);
     }
 }
