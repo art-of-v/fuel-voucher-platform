@@ -112,7 +112,7 @@ check_data_preconditions() {
 
     checked=$((checked + 1))
     # Count lines carrying the field separator, NOT non-empty lines. psql writes its own output to
-    # stdout — "BEGIN", "SET", "(0 rows)", "COMMIT" — and counting those made this report
+    # stdout ΓÇö "BEGIN", "SET", "(0 rows)", "COMMIT" ΓÇö and counting those made this report
     # "VIOLATED - 3 row(s)" against a completely clean production database, then print "(0 rows)"
     # as the detail underneath. It shipped that way and fired on the first real deploy.
     #
@@ -378,69 +378,3 @@ for svc in dotnet-backend admin-frontend website-frontend; do
 done
 [[ $stale -eq 1 ]] && echo "  (restart.sh pins the running tags, so a tagless up -d is not a risk once it is used)"
 
-# ------------------------------------------------------------------------------
-# 5. Data preconditions
-#
-# Everything above inspects configuration. This step is the first one that looks at
-# the DATA, and it exists because of what happened on 2026-10-15.
-#
-# The offer split's migration refused to apply because two OKKO fuel types carry
-# different per-litre prices across their volumes. Refusing was right - it cannot
-# know which copy is true, and picking one would have published an unverified price.
-# But the refusal happened at container start, so production was DOWN before the
-# message was read, and staging could not catch it first because staging has no
-# imported fuel types to drift.
-#
-# The same assertion asked here, read-only, before anything is pulled, is a
-# thirty-second answer instead of an outage. The migration's guard stays - data can
-# change between this check and the boot, and it must still refuse rather than guess.
-#
-# WARNINGS, not failures, and that is a deliberate temporary state: production
-# currently violates 010, so a blocking check would stop every deploy behind one
-# unresolved group. Flip PREFLIGHT_DB_STRICT=1 once planning #328 reconciles it.
-# ------------------------------------------------------------------------------
-echo "== data preconditions =="
-db_preconditions=0
-if [[ -d preflight-db ]]; then
-  for sql in preflight-db/*.sql; do
-    [[ -e "$sql" ]] || continue
-    name="$(basename "$sql")"
-
-    # The database container is not necessarily running during a CI --env-only run,
-    # and a preflight that cannot reach the database must say so rather than pass in
-    # silence: a check that reports nothing when it did not run is the same failure
-    # as the Caddy upstream check that "passed cleanly" while matching nothing.
-    if ! docker ps --format '{{.Names}}' | grep -qx 'fuelflow-postgres'; then
-      warn "$name: not checked - fuelflow-postgres is not running"
-      continue
-    fi
-
-    rows="$(docker exec -i fuelflow-postgres psql -U fuelflow -d fuelflow -X -t -A -F'|' -f - < "$sql" 2>/dev/null | grep -c '|' || true)"
-    if [[ "${rows:-0}" -eq 0 ]]; then
-      echo "  $name: ok"
-    else
-      db_preconditions=$((db_preconditions + 1))
-      warn "$name: VIOLATED - ${rows} row(s). Details:"
-      docker exec -i fuelflow-postgres psql -U fuelflow -d fuelflow -X -f - < "$sql" 2>&1 | sed 's/^/      /' >&2
-    fi
-  done
-  [[ $db_preconditions -eq 0 ]] && echo "  all data preconditions satisfied"
-else
-  echo "  no preflight-db directory (nothing to check)"
-fi
-
-echo
-# The strict switch, kept separate from the check itself so that making it blocking is
-# a deliberate one-line decision rather than a side effect of adding a file. Tested
-# BEFORE the summary, because "Preflight passed" followed by an exit 1 is a
-# contradiction on the same screen, and the reader's last impression of the run is the
-# line they saw last.
-if [[ "${PREFLIGHT_DB_STRICT:-0}" == "1" && "$db_preconditions" -gt 0 ]]; then
-  fail "PREFLIGHT_DB_STRICT=1 and ${db_preconditions} data precondition(s) are violated (details above). Nothing was pulled; reconcile the rows and re-run."
-fi
-
-if [[ ${#warnings[@]} -gt 0 ]]; then
-  echo "Preflight passed with ${#warnings[@]} warning(s). Review them before restarting."
-else
-  echo "Preflight passed."
-fi

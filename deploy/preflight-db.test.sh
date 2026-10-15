@@ -148,6 +148,26 @@ for sql in "$SCRIPT_DIR"/preflight-db/*.sql; do
   lacks "$name does not raise" "RAISE EXCEPTION" "$code"
 done
 
+# ------------------------------------------------------------------------------
+# Exactly one step-5, and it is the safe one
+# ------------------------------------------------------------------------------
+# This is the gap that shipped a duplicate. Every other assertion here drives the preflight through
+# --data-only, which calls check_data_preconditions() - so the inline copy that a botched refactor
+# left behind never ran under test, while the normal deploy path ran THAT one instead. The function
+# carrying all the safety was dead code, and its two distinguishing features never appeared in a
+# deploy log: the "(N checked)" count and the "NO precondition was checked" line.
+#
+# A duplicate definition is legal bash - the last one wins - so nothing errors. It just means the
+# thing being tested is not the thing that runs. Hence a structural assertion rather than a
+# behavioural one.
+script="$(cat "$PREFLIGHT")"
+banners="$(grep -c '== data preconditions ==' <<<"$script" || true)"
+check "the data-preconditions step is defined exactly once" "1" "$banners"
+check "and it is the function, called once" "1" "$(grep -cE '^[[:space:]]*check_data_preconditions$' <<<"$script" || true)"
+lacks "no stale copy of the first version survives" "db_preconditions" "$script"
+contains "the running version distinguishes 'clean' from 'did not run'" "NO precondition was checked" "$script"
+contains "the running version says how many were checked" "satisfied (\${checked} checked)" "$script"
+
 echo
 echo "  ${pass} passed, ${fail} failed"
 [[ $fail -eq 0 ]] || exit 1
