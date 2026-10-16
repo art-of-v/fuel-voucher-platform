@@ -368,6 +368,7 @@ private async Task SeedAsync()
         {
             Id = Guid.NewGuid(),
             FileName = "soft.pdf",
+            CompletedAtUtc = DateTime.UtcNow,
             Status = "Completed",
             StartedAtUtc = DateTime.UtcNow
         });

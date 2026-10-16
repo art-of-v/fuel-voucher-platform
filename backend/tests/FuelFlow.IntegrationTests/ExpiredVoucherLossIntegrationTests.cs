@@ -87,6 +87,7 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
             {
                 Id = ImportId,
                 FileName = "grace-window.pdf",
+                CompletedAtUtc = DateTime.UtcNow,
                 Status = "Completed",
                 StartedAtUtc = DateTime.UtcNow
             });
@@ -234,6 +235,7 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
         {
             Id = ImportId,
             FileName = "batch.pdf",
+            CompletedAtUtc = DateTime.UtcNow,
             Status = "Completed",
             StartedAtUtc = DateTime.UtcNow
         });

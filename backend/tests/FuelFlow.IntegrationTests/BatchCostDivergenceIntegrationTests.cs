@@ -187,6 +187,7 @@ var afterCosts = (await CostsAsync(context, importId)).Single(c => c.FuelTypeId 
         {
             Id = importId,
             FileName = "divergence.pdf",
+            CompletedAtUtc = DateTime.UtcNow,
             Status = "Completed",
             StartedAtUtc = DateTime.UtcNow
         });
