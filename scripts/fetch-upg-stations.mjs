@@ -71,13 +71,87 @@ function extractObjmap(html) {
   throw new Error("Unterminated objmap literal");
 }
 
-/** Settlement marker + optional dot, mirroring the mobile's SETTLEMENT_PREFIX. */
-const SETTLEMENT_PREFIX = /^(?:м|с|смт|с-ще|сел(?:о|ище)|пос)(?:\.\s*|\s+)/i;
+// A settlement marker anywhere in a segment, not only at its start: UPG routinely glues the
+// raion onto the same comma-less chunk — «Володимирський р-н. м. Нововолинськ». The lookahead
+// demands a dot or a space after the marker, which is what keeps «с» out of «с/рада Кисорицька».
+// Longest alternative first, so «селище» is not read as «с».
+//
+// Both spellings of the settlement word are listed on purpose. «селище» with U+0449 (щ) is the
+// standard one; UPG writes «селище» with U+0448 (ш) on two live stations, and a parser that knows
+// only the correct spelling leaves those two with an empty city while looking otherwise complete.
+// The optional tail is what lets bare «сел.» match, which is the common abbreviated form.
+const SETTLEMENT_MARKER = /(?:^|[\s.,])(смт|с-ще|сел(?:ище|ише|о)?|м|с|пос)(?=[.\s])/gi;
+/**
+ * The first word of a street, matched against ONE word and anchored with `$` rather than `\b`.
+ *
+ * `\b` is a trap here: JavaScript's `\w` is `[A-Za-z0-9_]` only, so a Cyrillic word contains no
+ * word-characters at all and the boundary never exists. `/^вул\b/.test("вул")` is FALSE. A `\b`
+ * version of this pattern therefore matches nothing at all, silently, and street detection just
+ * stops working while the parser still returns plausible output.
+ */
+const STREET_WORD = /^(?:вул(?:иця|\.)?|просп|проспект|пр-т|бул(?:ьвар)?|пров|провулок|шосе|площа|майдан|набережна|проїзд|переулок|пр-д)$/i;
+/** A street-type noun owns the word before it — «Хмельницьке шосе» — so that word is not the settlement. */
+const STREET_NOUN = /^(?:шосе|проспект|бульвар|провулок|площа|майдан|набережна|вулиця|проїзд|переулок)$/i;
+/** One word of a settlement name: letters, plus the hyphen and apostrophe inside compound names. */
+const NAME_WORD = /^[\p{L}\p{M}]+(?:[-'’ʼ][\p{L}\p{M}]+)*$/u;
 // Administrative segments the short address drops: oblast (incl. the abbreviated «обл.»),
 // raion (all three spellings) and the country — the mobile's ADDRESS_OBLAST /
 // ADDRESS_ADMIN_SEGMENT, plus the «... р.» abbreviation UPG uses on 12 sites.
+//
+// Every alternative is anchored to the END of the segment. They must be: an unanchored
+// `р-н\.?(?=\s|$)` also matches «Олександрівський р-н. вул. Українська» and would delete a whole
+// chunk that still holds the street. The old `р-н(?=\s|$)` never matched «... р-н.» because of the
+// dot, which is why the raion survived into the address; anchoring with `\.?$` fixes that without
+// widening the deletion.
 const OBLAST_SEGMENT = /(?:^|\s)обл(?:асть|асті|астю|сть|\.)?$/i;
-const ADMIN_SEGMENT = /(?:^|\s)район(?=\s|$)|(?:^|\s)р-н(?=\s|$)|(?:^|\s)р\.$|^україна$/i;
+const ADMIN_SEGMENT = /(?:^|\s)район\s*$|(?:^|\s)р-н\.?$|(?:^|\s)р\.$|^україна$/i;
+/**
+ * A raion glued to the front of the street, in the same comma-less chunk: «Хортицький р-н вул.
+ * Запорізького казацтва». Without this the raion is stripped when it is a chunk of its own and kept
+ * when it shares one, which is the inconsistency a reader would file as a bug.
+ *
+ * The word it matches (район / р-н / р.) is specific enough that eating it cannot lose a street.
+ */
+const ADMIN_PREFIX = /^[\p{L}][\p{L}-]*(?:[-'][\p{L}]+)?\s+(?:район|р-н\.?|р\.)\s*/iu;
+
+/**
+ * Pulls the settlement out of one comma-separated chunk, reporting the text before it (`prefix`)
+ * and after it (`suffix`) so the caller can keep whichever half is real.
+ *
+ * The name runs from the marker up to the first word that cannot belong to it: a street, a digit,
+ * or any punctuation («с/рада.», «а/д»). Words that turn out to name a street for a following
+ * STREET_NOUN are given back — «с. Зарванці Хмельницьке шоссе 14» is the village Зарванці, not
+ * «Зарванці Хмельницьке».
+ *
+ * Returns null when the chunk carries no settlement, which is the common case for a street-only
+ * chunk and for the council forms («с/рада Кисорицька») that are not a town.
+ *
+ * The suffix matters as much as the city: «м. Хмельницький вул. Прибузька 11\3» is one comma-less
+ * chunk, so a parser that only cut the prefix would import the station with an EMPTY address.
+ */
+function takeSettlement(segment) {
+  for (const match of segment.matchAll(SETTLEMENT_MARKER)) {
+    // «вул. С. Бандери», «вул. М. Грушевського» — an initial that follows a street word is a
+    // person's name, not a settlement. Without this the city becomes «С» and the address «вул., 2а».
+    const before = segment.slice(0, match.index).replace(/[\s.,]+$/, "");
+    if (before && STREET_WORD.test(before.split(/\s+/).pop())) continue;
+
+    const rest = segment.slice(match.index + match[0].length).replace(/^[.\s]+/, "");
+    const words = rest.split(/\s+/);
+    const taken = [];
+    for (const word of words) {
+      if (!NAME_WORD.test(word) || STREET_WORD.test(word)) break;
+      taken.push(word);
+    }
+    while (taken.length > 0 && STREET_NOUN.test(words[taken.length])) taken.pop();
+
+    const city = taken.join(" ");
+    if (!city) continue;
+    const suffix = words.slice(taken.length).join(" ");
+    return { city, prefix: segment.slice(0, match.index), suffix };
+  }
+  return null;
+}
 
 /**
  * Splits a UPG address into the pair the rest of the platform stores: `address` keeps only the
@@ -87,24 +161,29 @@ const ADMIN_SEGMENT = /(?:^|\s)район(?=\s|$)|(?:^|\s)р-н(?=\s|$)|(?:^|\s)
  *
  * Dropping oblast/raion is safe for display: `formatShortAddress` rebuilds the
  * «{city}, {street}» form from `city` + the remainder, so both stored shapes render the same.
+ *
+ * The settlement is cut out of the chunk it sits in rather than requiring a chunk of its own,
+ * because UPG usually writes it glued to its raion («Прилуцький р-н. с. Заїзд») or to the street
+ * («м. Шепетівка вул. Старокостянтинівське шосе 70»). Requiring a dedicated chunk is what left 56
+ * of 500 stations with an empty city.
  */
-function splitAddress(rawAddress) {
+export function splitAddress(rawAddress) {
   const segments = collapse(rawAddress).split(",").map((s) => s.trim()).filter(Boolean);
-  const kept = segments.filter((s) => !OBLAST_SEGMENT.test(s) && !ADMIN_SEGMENT.test(s));
 
-  const settlementAt = kept.findIndex((s) => SETTLEMENT_PREFIX.test(s));
-  // Only a settlement with a segment after it is the city. Seven sites glue the street onto it
-  // without a comma — «м. Корсунь-Шевченківський вул. Гіфхорнська 25» — and there the single
-  // segment is the whole address, so consuming it as a city would leave nothing behind.
-  if (settlementAt < 0 || settlementAt === kept.length - 1) {
-    return { address: kept.join(", "), city: "" };
+  let city = "";
+  const kept = [];
+  for (const segment of segments) {
+    const found = takeSettlement(segment);
+    // Both halves are filtered independently: a lone «Володимирський р-н.» is administrative and
+    // falls out, while the street after the settlement stays.
+    for (const piece of found ? [found.prefix, found.suffix] : [segment]) {
+      const text = collapse(piece).replace(ADMIN_PREFIX, "").trim();
+      if (text && !OBLAST_SEGMENT.test(text) && !ADMIN_SEGMENT.test(text)) kept.push(text);
+    }
+    if (found && !city) city = found.city;
   }
 
-  const city = kept[settlementAt].replace(SETTLEMENT_PREFIX, "").trim();
-  const address = kept
-    .filter((s, i) => i !== settlementAt && s.toLowerCase() !== city.toLowerCase())
-    .join(", ");
-  return { address, city };
+  return { address: collapse(kept.join(", ")), city };
 }
 
 /**
