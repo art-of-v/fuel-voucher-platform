@@ -12,7 +12,21 @@ export function parseVersion(version: string): number[] {
   return version.split('.').map(Number);
 }
 
-export function isVersionBelow(current: string, minimum: string): boolean {
+/**
+ * Whether `current` is genuinely older than `minimum`.
+ *
+ * `current` is null when the build could not read its own version — `Constants.expoConfig` is not
+ * reliably populated in a standalone App Store binary. That case returns FALSE on purpose.
+ *
+ * The previous fallback returned the literal '1.0.0', which is *below* the floor the API serves
+ * ('1.0.1'). So a build that could not read its own version was declared older than the minimum and
+ * shown a full-screen update wall, and the wall offered a store build that would fail the same check —
+ * the same brick the floor's own comment warns about, reached from the other side. Blocking on a value
+ * that was never read is not caution, it is refusing to serve.
+ */
+export function isVersionBelow(current: string | null, minimum: string): boolean {
+  if (!current) return false;
+
   const currentParts = parseVersion(current);
   const minimumParts = parseVersion(minimum);
   const maxLen = Math.max(currentParts.length, minimumParts.length);
@@ -43,6 +57,14 @@ export function getStoreUrl(info: AppVersionInfo): string {
   return '';
 }
 
-export function getCurrentAppVersion(): string {
-  return Constants.expoConfig?.version ?? '1.0.0';
+/**
+ * This build's version, or null when it cannot be determined.
+ *
+ * Null rather than a guessed literal. `expoConfig` is absent in some production builds, and any
+ * substitute we invent is a version we did not verify — and if the guess happens to be below the
+ * server's floor, the app walls itself off for a build that is current. Callers must handle null by
+ * NOT blocking; see {@link isVersionBelow}.
+ */
+export function getCurrentAppVersion(): string | null {
+  return Constants.expoConfig?.version ?? null;
 }
