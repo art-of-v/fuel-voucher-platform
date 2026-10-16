@@ -75,11 +75,6 @@
 \set wallet_per_fuel_type 3
 \endif
 
-\if :{?qa_suffix}
-\else
-\set qa_suffix '(QA)'
-\endif
-
 \if :{?qa_user_phone}
 \else
 \set qa_user_phone '+380110010203'
@@ -124,38 +119,77 @@ SELECT
     now() - interval '2 days',
     now() - interval '2 days',
     'Completed',
-    (SELECT count(*) FROM fuel_packages p
+    (SELECT count(*) FROM fuel_offers p
       WHERE p.station_id = s.id AND p.data_kind = 'real' AND NOT p.is_deleted),
     0, 0, 0, 0
 FROM stations s
-WHERE EXISTS (SELECT 1 FROM fuel_packages p WHERE p.station_id = s.id AND p.data_kind = 'real' AND NOT p.is_deleted)
+WHERE EXISTS (SELECT 1 FROM fuel_offers p WHERE p.station_id = s.id AND p.data_kind = 'real' AND NOT p.is_deleted)
   AND (:'seed_all_stations'::boolean OR s.id = :'station_id')
   AND NOT EXISTS (SELECT 1 FROM voucher_imports i WHERE i.file_name = 'QA-EMULATED-' || s.id || '.pdf');
 
--- The QA mirror of the live catalogue. Every QA package belongs to the network's import, and every
+-- The QA mirror of the live catalogue. Every QA volume belongs to the network's import, and every
 -- network's stock is one batch per fuel type carrying the supplier and the cost - the step that makes
 -- a batch activatable, and the reason a bare voucher insert leaves the operator screens unreadable.
-INSERT INTO fuel_packages
-    (id, station_id, fuel_type_id, fuel_name, liters, price, original_price,
-     supplier_price_per_liter, margin_uah_per_liter, final_price_per_liter,
-     data_kind, is_deleted, created_at_utc, updated_at_utc)
+--
+-- REWRITTEN 2026-10-16 against `fuel_offers` + `fuel_offer_volumes`. This used to write
+-- `fuel_packages`, which the split turned into two tables that nothing reads - so it had been
+-- succeeding while seeding nothing. See scripts/seed-qa-catalogue.sql for the full account, including
+-- why the `(QA)` name suffix cannot survive the split (the storefront takes the name from
+-- `fuel_types`, which has no pool column) and why the pools stay apart without it.
+INSERT INTO fuel_offers
+    (id, station_id, fuel_type_id,
+     supplier_price_per_liter, margin_uah_per_liter, margin_percent,
+     final_price_per_liter, pump_price_per_liter, min_discount_per_liter, price_updated_at,
+     created_at_utc, updated_at_utc, is_deleted, deleted_at_utc, data_kind)
 SELECT
-    'qa-pkg-' || live.id,
-    live.station_id,
-    live.fuel_type_id,
-    live.fuel_name || :'qa_suffix',
-    live.liters,
-    live.price,
-    live.original_price,
-    live.supplier_price_per_liter,
-    live.margin_uah_per_liter,
-    live.final_price_per_liter,
-    'qa', false, now(), now()
-FROM fuel_packages live
+    live.id || '-qa', live.station_id, live.fuel_type_id,
+    live.supplier_price_per_liter, live.margin_uah_per_liter, live.margin_percent,
+    live.final_price_per_liter, live.pump_price_per_liter, live.min_discount_per_liter,
+    live.price_updated_at,
+    now() - interval '2 days', now() - interval '2 days', false, NULL, 'qa'
+FROM fuel_offers live
 WHERE live.data_kind = 'real'
   AND NOT live.is_deleted
   AND (:'seed_all_stations'::boolean OR live.station_id = :'station_id')
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (station_id, fuel_type_id, data_kind) DO NOTHING;
+
+INSERT INTO fuel_offer_volumes
+    (id, offer_id, liters, package_price,
+     created_at_utc, updated_at_utc, is_deleted, deleted_at_utc)
+SELECT
+    'qa-' || live.id, live_offer.id || '-qa', live.liters, live.package_price,
+    now() - interval '2 days', now() - interval '2 days', false, NULL
+FROM fuel_offer_volumes live
+JOIN fuel_offers live_offer ON live_offer.id = live.offer_id
+WHERE live_offer.data_kind = 'real'
+  AND NOT live_offer.is_deleted
+  AND NOT live.is_deleted
+  AND (:'seed_all_stations'::boolean OR live_offer.station_id = :'station_id')
+ON CONFLICT (offer_id, liters) DO NOTHING;
+
+-- Everything below this point reasons about a "package" - a station, a fuel, a nominal, a price. That
+-- shape no longer exists as a row; it is an offer plus one of its volumes. Rather than rewrite every
+-- statement that way, the flat shape is reconstructed here once and the rest of the script is
+-- unchanged - which is also what keeps this diff reviewable against the version it replaces.
+--
+-- Scoped to the QA pool on purpose: after the split, "a fuel_packages row whose id starts with
+-- qa-pkg-" was the only thing separating the mirror from the live catalogue, and every statement below
+-- relied on that filter. Carrying the pool in the view means forgetting it is no longer possible.
+CREATE TEMP VIEW qa_pkg AS
+SELECT
+    volume.id                AS id,
+    offer.station_id         AS station_id,
+    offer.fuel_type_id       AS fuel_type_id,
+    volume.liters            AS liters,
+    volume.package_price     AS price,
+    offer.supplier_price_per_liter,
+    offer.final_price_per_liter
+FROM fuel_offer_volumes volume
+JOIN fuel_offers offer ON offer.id = volume.offer_id
+WHERE offer.data_kind = 'qa'
+  AND NOT offer.is_deleted
+  AND NOT volume.is_deleted
+  AND (:'seed_all_stations'::boolean OR offer.station_id = :'station_id');
 
 -- One batch per (import, fuel type) - and that is exactly the shape the unique index
 -- `IX_purchase_batches_import_job_id_fuel_type_id` demands. It is keyed on the fuel type alone, not
@@ -171,13 +205,11 @@ SELECT DISTINCT ON (imp.id, pkg.fuel_type_id)
     sup.id,
     now() - interval '2 days',
     now() - interval '2 days'
-FROM fuel_packages pkg
+FROM qa_pkg pkg
 JOIN voucher_imports imp ON imp.file_name = 'QA-EMULATED-' || pkg.station_id || '.pdf'
 CROSS JOIN (SELECT id FROM suppliers WHERE name = 'QA Supplier (emulated)' LIMIT 1) sup
-WHERE pkg.id LIKE 'qa-pkg-%'
-  AND NOT pkg.is_deleted
-  AND (:'seed_all_stations'::boolean OR pkg.station_id = :'station_id')
-ORDER BY imp.id, pkg.fuel_type_id;
+ORDER BY imp.id, pkg.fuel_type_id
+ON CONFLICT (import_job_id, fuel_type_id) DO NOTHING;
 
 -- Stock. `Available` carries no order - that is what the status means, and the held-voucher CHECK
 -- would reject the alternative. Inserted as the shortfall against the target depth, so re-running
@@ -199,7 +231,7 @@ SELECT
     'QA-STK-' || substr(md5(pkg.id), 1, 8) || '-' || lpad(n::text, 2, '0'),
     'QA-QR-' || substr(md5(pkg.id), 1, 8) || '-' || lpad(n::text, 2, '0'),
     'Available', 'qa', false, now() - interval '2 days', now() - interval '2 days'
-FROM fuel_packages pkg
+FROM qa_pkg pkg
 JOIN voucher_imports imp ON imp.file_name = 'QA-EMULATED-' || pkg.station_id || '.pdf'
 CROSS JOIN (SELECT id FROM suppliers WHERE name = 'QA Supplier (emulated)' LIMIT 1) sup
 CROSS JOIN LATERAL (
@@ -215,9 +247,6 @@ CROSS JOIN LATERAL (
         ))
     ) AS n
 ) AS shortfall
-WHERE pkg.id LIKE 'qa-pkg-%'
-  AND NOT pkg.is_deleted
-  AND (:'seed_all_stations'::boolean OR pkg.station_id = :'station_id')
 ON CONFLICT DO NOTHING;
 
 -- The wallet half. One fulfilled purchase per QA package, holding `wallet_per_fuel_type` vouchers
@@ -238,11 +267,8 @@ SELECT
     pkg.final_price_per_liter * pkg.liters * :'wallet_per_fuel_type'::int,
     'Fulfilled', 'Success', 'Purchase',
     now() - interval '3 days', now() - interval '3 days', now() - interval '3 days', false
-FROM fuel_packages pkg
+FROM qa_pkg pkg
 CROSS JOIN qa_user u
-WHERE pkg.id LIKE 'qa-pkg-%'
-  AND NOT pkg.is_deleted
-  AND (:'seed_all_stations'::boolean OR pkg.station_id = :'station_id')
 ON CONFLICT (id) DO NOTHING;
 
 -- `quantity` equals the vouchers this order actually holds. FulfillmentService reconciles fulfillments
@@ -260,10 +286,7 @@ SELECT
     pkg.final_price_per_liter * pkg.liters * :'wallet_per_fuel_type'::int,
     pkg.station_id,
     NULL
-FROM fuel_packages pkg
-WHERE pkg.id LIKE 'qa-pkg-%'
-  AND NOT pkg.is_deleted
-  AND (:'seed_all_stations'::boolean OR pkg.station_id = :'station_id')
+FROM qa_pkg pkg
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO fuel_vouchers
@@ -287,14 +310,11 @@ SELECT
     md5('qa-order-' || pkg.id)::uuid,
     u.id,
     now() - interval '3 days', now() - interval '3 days', now() - interval '3 days'
-FROM fuel_packages pkg
+FROM qa_pkg pkg
 JOIN voucher_imports imp ON imp.file_name = 'QA-EMULATED-' || pkg.station_id || '.pdf'
 CROSS JOIN (SELECT id FROM suppliers WHERE name = 'QA Supplier (emulated)' LIMIT 1) sup
 CROSS JOIN qa_user u
 CROSS JOIN LATERAL (SELECT generate_series(1, :'wallet_per_fuel_type'::int) AS n) AS g
-WHERE pkg.id LIKE 'qa-pkg-%'
-  AND NOT pkg.is_deleted
-  AND (:'seed_all_stations'::boolean OR pkg.station_id = :'station_id')
 ON CONFLICT (id) DO NOTHING;
 
 -- Without this row the wallet never renders the voucher: GetUserPurchases reads voucher ids from
@@ -304,22 +324,21 @@ SELECT v.order_id, v.id, now() - interval '3 days'
 FROM fuel_vouchers v
 WHERE v.id IN (
           SELECT md5('qa-held-' || p.id || '-' || lpad(n::text, 2, '0'))::uuid
-          FROM fuel_packages p
+          FROM qa_pkg p
           CROSS JOIN LATERAL (SELECT generate_series(1, :'wallet_per_fuel_type'::int) AS n) g
-          WHERE p.id LIKE 'qa-pkg-%' AND NOT p.is_deleted
       )
   AND NOT EXISTS (SELECT 1 FROM fulfillments f WHERE f.voucher_id = v.id);
 
 \echo ''
 \echo 'QA pool emulated. Verify:'
-\echo '  select p.station_id, p.fuel_name, p.liters,'
+\echo '  select p.station_id, p.fuel_type_id, p.liters, p.price,'
 \echo '    (select count(*) from fuel_vouchers v where v.data_kind = ''qa'' and v.fuel_type_id = p.fuel_type_id'
 \echo '       and v.liters = p.liters and lower(v.brand) = lower(p.station_id) and v.status = ''Available'') as stock'
-\echo '  from fuel_packages p where p.id like ''qa-pkg-%'' order by 1,2,3;'
+\echo '  from qa_pkg p order by 1,2,3;'
 \echo '  select status, count(*) from fuel_vouchers where data_kind = ''qa'' group by 1;'
 \echo '  select count(*) as wallet_orders from orders o join order_line_items li on li.order_id = o.id where li.id like ''qa-line-%'';'
 \echo ''
-\echo 'Anonymous readers must see no (QA) row:'
-\echo '  curl -s https://api.palne.shop/api/packages | grep -c ''(QA)'''   # expect 0
+\echo 'Anonymous readers must see no QA row:'
+\echo '  curl -s https://api.palne.shop/api/packages | grep -c ''qa-'''   # expect 0
 
 COMMIT;
