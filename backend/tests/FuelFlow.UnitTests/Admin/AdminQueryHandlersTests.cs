@@ -2,6 +2,7 @@ using FluentAssertions;
 using FuelFlow.Features.Admin.GetDashboard;
 using FuelFlow.Features.Admin.GetReconciliation;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Payments.SharedModels;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
@@ -91,15 +92,23 @@ public sealed class AdminQueryHandlersTests : IDisposable
         });
     }
 
-    private static Refund CreateRefund(Guid orderId, int amountKopecks) => new()
+    /// <summary>
+    /// A completed refund, as the report reads it: a refund *payment*. Since the stage-2
+    /// migration a refund and its payment share one identity, which is why this carries an id
+    /// rather than pointing at a separate refund row.
+    /// </summary>
+    private static Payment CreateRefund(Guid orderId, int amountKopecks) => new()
     {
         Id = Guid.NewGuid(),
         OrderId = orderId,
-        UserId = UserId,
+        Kind = PaymentKind.Refund,
+        Provider = "monobank",
+        ProviderInvoiceId = "INV-TEST",
+        AmountUah = amountKopecks / 100m,
         AmountKopecks = amountKopecks,
-        InvoiceId = "INV-TEST",
-        ExtRef = $"ext-{orderId}",
-        Status = RefundStatus.Completed,
+        Currency = "UAH",
+        Status = PaymentStatus.Succeeded,
+        PaidAtUtc = DateTime.UtcNow,
         CreatedAtUtc = DateTime.UtcNow,
         UpdatedAtUtc = DateTime.UtcNow
     };
@@ -264,7 +273,7 @@ public sealed class AdminQueryHandlersTests : IDisposable
         });
 
         _context.Orders.AddRange(refundedOrder, partialOrder);
-        _context.Refunds.AddRange(
+        _context.Payments.AddRange(
             CreateRefund(refundedOrder.Id, 100000),
             CreateRefund(partialOrder.Id, 100000));
         _context.SaveChanges();
