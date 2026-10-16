@@ -100,14 +100,14 @@ const html = `<!doctype html>
     </div>
     <nav class="flex-1 p-4 space-y-1">
       <div class="px-2 mb-2"><span class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Управління</span></div>
-      <button class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg bg-primary/15 text-primary glass-glow border border-primary/25"><span class="w-4 h-4 shrink-0"></span><span class="min-w-0 flex-1 truncate text-left">Постачальники</span></button>
-      <button class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg border border-transparent text-muted-foreground hover:bg-foreground/5 hover:text-foreground"><span class="w-4 h-4 shrink-0"></span><span class="min-w-0 flex-1 truncate text-left">Закупівлі</span><span class="ml-auto min-w-[1.25rem] shrink-0 px-1.5 py-0.5 text-[10px] font-bold leading-none text-center rounded-full bg-destructive text-destructive-foreground">12</span></button>
-      <button class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg border border-transparent text-muted-foreground hover:bg-foreground/5 hover:text-foreground"><span class="w-4 h-4 shrink-0"></span><span class="min-w-0 flex-1 truncate text-left">Користувачі</span></button>
-      <!-- The longest label the real shell renders. It is here on purpose: it is the one that
-           used to wrap onto two lines and make itself visibly taller than its neighbours, so a
-           preview that omits it cannot show whether that is fixed. Mirrors layout.tsx. -->
-      <button class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg border border-transparent text-muted-foreground hover:bg-foreground/5 hover:text-foreground"><span class="w-4 h-4 shrink-0"></span><span class="min-w-0 flex-1 truncate text-left">Продовження оператором</span></button>
-      <button class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg border border-transparent text-muted-foreground hover:bg-foreground/5 hover:text-foreground"><span class="w-4 h-4 shrink-0"></span><span class="min-w-0 flex-1 truncate text-left">Журнал помилок</span></button>
+      <button class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg bg-primary/15 text-primary glass-glow border border-primary/25"><span class="w-4 h-4 shrink-0"></span><span class="min-w-0 flex-1 text-left break-words">Постачальники</span></button>
+      <button class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg border border-transparent text-muted-foreground hover:bg-foreground/5 hover:text-foreground"><span class="w-4 h-4 shrink-0"></span><span class="min-w-0 flex-1 text-left break-words">Закупівлі</span><span class="ml-auto min-w-[1.25rem] shrink-0 px-1.5 py-0.5 text-[10px] font-bold leading-none text-center rounded-full bg-destructive text-destructive-foreground">12</span></button>
+      <button class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg border border-transparent text-muted-foreground hover:bg-foreground/5 hover:text-foreground"><span class="w-4 h-4 shrink-0"></span><span class="min-w-0 flex-1 text-left break-words">Користувачі</span></button>
+      <!-- The longest label the real shell renders, and the one that decides the default width.
+           It is here on purpose: a preview that omits it cannot show whether the sidebar is wide
+           enough, which is how a w-64 sidebar shipped a truncated menu item. Mirrors layout.tsx. -->
+      <button class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg border border-transparent text-muted-foreground hover:bg-foreground/5 hover:text-foreground"><span class="w-4 h-4 shrink-0"></span><span class="min-w-0 flex-1 text-left break-words">Продовження оператором</span></button>
+      <button class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg border border-transparent text-muted-foreground hover:bg-foreground/5 hover:text-foreground"><span class="w-4 h-4 shrink-0"></span><span class="min-w-0 flex-1 text-left break-words">Журнал помилок</span></button>
     </nav>
     <div class="p-4 border-t border-border mt-auto">
       <div class="flex items-center gap-3 px-3 py-2">
@@ -115,6 +115,9 @@ const html = `<!doctype html>
         <div class="overflow-hidden flex-1"><p class="text-sm font-medium text-foreground truncate">Андрей Артем</p><p class="text-xs text-muted-foreground truncate">SuperAdmin</p></div>
       </div>
     </div>
+    <!-- The drag handle. Present in the mock because the sidebar is now resizable, and a preview
+         that omitted the edge would not show the affordance that makes it discoverable. -->
+    <div class="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize z-20 hover:bg-primary/20"></div>
   </aside>
 
   <div class="flex flex-1 flex-col overflow-hidden min-w-0 relative z-10 md:py-3 md:pr-3 md:pl-0">

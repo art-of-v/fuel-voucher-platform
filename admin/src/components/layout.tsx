@@ -1,4 +1,4 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { Archive, BarChart3, Building, ShoppingCart, Users, Menu, Ticket, X, FileSignature, FileCheck, ScrollText, Bug, LogOut, Settings, MapPin, Replace, RefreshCw, Handshake, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
@@ -9,6 +9,26 @@ import { useTheme } from "@/lib/theme-store";
 import { themes } from "@/lib/themes";
 import type { CurrentUser } from "@/lib/admin-auth";
 
+// Sidebar width, in pixels. The default is sized so the longest label («Продовження оператором»)
+// fits on ONE line in the app's real font — it needs about 206px, and the chrome around the text
+// costs another 72, so anything under ~278px truncates it. The harness could not show this: its
+// fallback font is narrower, and at w-64 the label fit there while it does not here.
+const SIDEBAR_WIDTH_KEY = "fuelflow.sidebarWidth";
+const SIDEBAR_DEFAULT_PX = 296;
+const SIDEBAR_MIN_PX = 200;
+const SIDEBAR_MAX_PX = 440;
+
+const clampSidebarWidth = (px: number) =>
+  Math.min(SIDEBAR_MAX_PX, Math.max(SIDEBAR_MIN_PX, Math.round(px)));
+
+const readStoredSidebarWidth = () => {
+    if (typeof window === "undefined") return SIDEBAR_DEFAULT_PX;
+    const stored = Number(window.localStorage.getItem(SIDEBAR_WIDTH_KEY));
+    return Number.isFinite(stored) && stored >= SIDEBAR_MIN_PX && stored <= SIDEBAR_MAX_PX
+        ? stored
+        : SIDEBAR_DEFAULT_PX;
+};
+
 interface SidebarProps {
     activeTab: string;
     onTabChange: (tab: string) => void;
@@ -17,12 +37,51 @@ interface SidebarProps {
     onClose?: () => void;
     user?: CurrentUser | null;
     badges?: Record<string, number>;
+    /** Pixels. Undefined keeps the fixed width, which is what the mobile drawer wants. */
+    width?: number;
+    onWidthChange?: (px: number) => void;
 }
 
-const Sidebar = ({ activeTab, onTabChange, onLogout, className, onClose, user, badges }: SidebarProps) => {
+const Sidebar = ({ activeTab, onTabChange, onLogout, className, onClose, user, badges, width, onWidthChange }: SidebarProps) => {
     const { t } = useI18n();
     const theme = useTheme((s) => s.theme);
     const isForge = themes[theme].forge;
+
+    // Drag-to-resize. Pointer capture keeps the drag alive when the cursor outruns the 8px handle,
+    // which is the whole reason a mouse drag on a thin edge otherwise feels broken.
+    const asideRef = useRef<HTMLElement | null>(null);
+    const [isResizing, setIsResizing] = useState(false);
+    const resizable = typeof onWidthChange === "function";
+
+    const applyWidth = useCallback((px: number) => onWidthChange?.(clampSidebarWidth(px)), [onWidthChange]);
+
+    useEffect(() => {
+        if (!isResizing) return;
+        const onMove = (e: PointerEvent) => {
+            const left = asideRef.current?.getBoundingClientRect().left ?? 0;
+            applyWidth(e.clientX - left);
+        };
+        const stop = () => setIsResizing(false);
+        window.addEventListener("pointermove", onMove);
+        window.addEventListener("pointerup", stop);
+        window.addEventListener("pointercancel", stop);
+        // Otherwise the drag selects the whole page behind the cursor.
+        const previousUserSelect = document.body.style.userSelect;
+        document.body.style.userSelect = "none";
+        return () => {
+            window.removeEventListener("pointermove", onMove);
+            window.removeEventListener("pointerup", stop);
+            window.removeEventListener("pointercancel", stop);
+            document.body.style.userSelect = previousUserSelect;
+        };
+    }, [isResizing, applyWidth]);
+
+    // Persist on change rather than on drag end, so a reload mid-drag keeps what was on screen.
+    useEffect(() => {
+        if (typeof width === "number" && !isResizing) {
+            window.localStorage.setItem(SIDEBAR_WIDTH_KEY, String(clampSidebarWidth(width)));
+        }
+    }, [width, isResizing]);
 
     const navItems = [
         { id: "brands", label: t("nav.brands"), icon: Building },
@@ -44,7 +103,16 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, className, onClose, user, b
     ];
 
     return (
-        <aside className={cn("w-64 glass-chrome rounded-2xl flex flex-col h-full shrink-0 overflow-hidden relative z-10", className)}>
+        <aside
+            ref={asideRef}
+            style={typeof width === "number" ? { width } : undefined}
+            className={cn(
+                "glass-chrome rounded-2xl flex flex-col h-full shrink-0 overflow-hidden relative z-10",
+                typeof width === "number" ? "" : "w-64",
+                isResizing && "select-none",
+                className
+            )}
+        >
 {/* The brand lockup is the one element allowed to be loud. The band is tall
                     enough to seat the mark on its own plate, so the lion reads as a
                     logo rather than an icon squeezed beside a caption. */}
@@ -95,8 +163,7 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, className, onClose, user, b
                                 onTabChange(item.id);
                                 if (onClose) onClose();
                             }}
-                            // Full label on hover. The visible one is truncated to keep every row one
-                            // line tall - see the span below for why that needs saying at all.
+                            // Full label on hover, so a narrowed sidebar never hides a destination.
                             title={item.label}
                             className={cn(
                                 "w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200",
@@ -106,13 +173,13 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, className, onClose, user, b
                             )}
                         >
                             <item.icon className={cn("w-4 h-4 shrink-0", isActive ? "text-primary" : "text-muted-foreground")} />
-                            {/* Was a bare text node in a flex row, so it wrapped: «Продовження
-                                оператором» is 21 characters and the aside is w-64, which pushed that
-                                one item onto two lines and made it visibly taller than its
-                                neighbours. `min-w-0` lets the flex item actually shrink (default
-                                min-width:auto refuses to), and truncate draws the ellipsis. The
-                                same applies to the label whenever a locale's string is longer. */}
-                            <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>
+                            {/* `min-w-0` so the flex item may actually shrink (its default
+                                min-width:auto refuses to), and `break-words` so a word longer than
+                                a narrowed sidebar breaks instead of overflowing. Deliberately NOT
+                                truncated: the default width fits every label on one line, and if the
+                                reader narrows it themselves, wrapping to a second line is a better
+                                answer than a menu item that reads «Продовження операто…». */}
+                            <span className="min-w-0 flex-1 text-left break-words">{item.label}</span>
                             {badgeCount > 0 && (
                                 <span className="ml-auto min-w-[1.25rem] shrink-0 px-1.5 py-0.5 text-[10px] font-bold leading-none text-center rounded-full bg-destructive text-destructive-foreground tabular-nums">
                                     {badgeCount > 99 ? "99+" : badgeCount}
@@ -153,6 +220,37 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, className, onClose, user, b
                     )}
                 </div>
             </div>
+
+            {resizable && (
+                <div
+                    role="separator"
+                    aria-orientation="vertical"
+                    aria-label="Resize sidebar"
+                    aria-valuenow={typeof width === "number" ? width : undefined}
+                    aria-valuemin={SIDEBAR_MIN_PX}
+                    aria-valuemax={SIDEBAR_MAX_PX}
+                    tabIndex={0}
+                    onPointerDown={(e) => {
+                        // Only the primary button starts a resize, so a right-click on the edge
+                        // still opens the context menu.
+                        if (e.button !== 0) return;
+                        e.preventDefault();
+                        setIsResizing(true);
+                    }}
+                    // Keyboard resize, because a mouse-only handle is unreachable without one.
+                    onKeyDown={(e) => {
+                        const current = typeof width === "number" ? width : SIDEBAR_DEFAULT_PX;
+                        const step = e.shiftKey ? 32 : 8;
+                        if (e.key === "ArrowLeft") { applyWidth(current - step); e.preventDefault(); }
+                        if (e.key === "ArrowRight") { applyWidth(current + step); e.preventDefault(); }
+                    }}
+                    className={cn(
+                        "absolute right-0 top-0 bottom-0 w-2 cursor-col-resize z-20 touch-none",
+                        "hover:bg-primary/20 focus-visible:bg-primary/30 focus-visible:outline-none",
+                        isResizing && "bg-primary/30"
+                    )}
+                />
+            )}
         </aside>
     );
 };
@@ -169,6 +267,7 @@ interface LayoutProps {
 export const Layout = ({ children, activeTab, onTabChange, onLogout, user, badges }: LayoutProps) => {
     const { t } = useI18n();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [sidebarWidth, setSidebarWidth] = useState(readStoredSidebarWidth);
 
     const toggleMobileMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
 
@@ -182,7 +281,16 @@ export const Layout = ({ children, activeTab, onTabChange, onLogout, user, badge
             </div>
 
             {/* Desktop Sidebar */}
-            <Sidebar activeTab={activeTab} onTabChange={onTabChange} onLogout={onLogout} className="hidden md:flex my-3 ml-3" user={user} badges={badges} />
+            <Sidebar
+                activeTab={activeTab}
+                onTabChange={onTabChange}
+                onLogout={onLogout}
+                className="hidden md:flex my-3 ml-3"
+                user={user}
+                badges={badges}
+                width={sidebarWidth}
+                onWidthChange={setSidebarWidth}
+            />
 
             {/* Mobile Sidebar Overlay */}
             {isMobileMenuOpen && (
