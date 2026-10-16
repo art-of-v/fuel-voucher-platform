@@ -737,7 +737,8 @@ jobs:
           # where the migration created no offers table this step errors instead of reporting zero.
           # fuel_packages is gone from the schema, so it is no longer counted here. The offers and volumes
           # loop below reports both pools' worth of rows, and a migration that DROPS fuel_packages is exactly
-          # the case this step exists to show - its absence is the result, not a gap in the summary.          for t in fuel_offers fuel_offer_volumes; do
+          # the case this step exists to show - its absence is the result, not a gap in the summary.
+          for t in fuel_offers fuel_offer_volumes; do
             if db -X -t -A -c "SELECT to_regclass('public.$t') IS NOT NULL" | grep -q t; then
               db -X -t -A -F' | ' -c "SELECT '$t', count(*) FROM $t"
             else
