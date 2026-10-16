@@ -51,6 +51,22 @@ internal static class WebhookEventRecorder
             command.Status,
             command.ModifiedDate);
 
+        // Checked before the row is built rather than after it is added. WebhookEventIdentity returns
+        // null rather than inventing an id for an event it cannot identify, and
+        // ck_webhook_events_event_id_length rejects a row without one - so this is a hard failure by
+        // design, not a silent gap: a delivery with no invoice and no timestamp cannot be
+        // deduplicated and must not be pretended otherwise.
+        if (providerEventId is null)
+        {
+            logger.LogWarning(
+                "Monobank delivery for invoice {InvoiceId} has no derivable event id and cannot be stored",
+                command.InvoiceId);
+
+            throw new InvalidOperationException(
+                "A Monobank delivery with neither an invoice id nor a modified date cannot be identified, " +
+                "so it cannot be recorded without weakening ux_webhook_events_provider_event.");
+        }
+
         var stored = new WebhookEvent
         {
             Id = Guid.CreateVersion7(),
@@ -70,21 +86,6 @@ internal static class WebhookEventRecorder
         };
 
         context.WebhookEvents.Add(stored);
-
-        // WebhookEventIdentity returns null rather than inventing an id for an event it cannot
-        // identify. ck_webhook_events_event_id_length then rejects the row, so this is a hard failure
-        // rather than a silent gap - correct, because a delivery with no invoice and no timestamp
-        // cannot be deduplicated and must not be pretended otherwise.
-        if (providerEventId is null)
-        {
-            logger.LogWarning(
-                "Monobank delivery for invoice {InvoiceId} has no derivable event id and cannot be stored",
-                command.InvoiceId);
-
-            throw new InvalidOperationException(
-                "A Monobank delivery with neither an invoice id nor a modified date cannot be identified, " +
-                "so it cannot be recorded without weakening ux_webhook_events_provider_event.");
-        }
 
         try
         {

@@ -1,3 +1,4 @@
+using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -27,6 +28,9 @@ internal sealed class VoucherRenewalItemConfiguration : IEntityTypeConfiguration
         builder.Property(e => e.SourceVoucherId)
             .HasColumnName("source_voucher_id")
             .IsRequired();
+
+        builder.Property(e => e.LineItemId)
+            .HasColumnName("line_item_id");
 
         builder.Property(e => e.TermCode)
             .HasColumnName("term_code")
@@ -75,8 +79,20 @@ internal sealed class VoucherRenewalItemConfiguration : IEntityTypeConfiguration
             .HasForeignKey(e => e.FulfilledVoucherId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasIndex(e => e.OrderId);
-        builder.HasIndex(e => e.SourceVoucherId);
+builder.HasIndex(e => e.OrderId);
+builder.HasIndex(e => e.SourceVoucherId);
+
+        // Read by the fulfilment path when it links the renewal's voucher to the line it charged, and
+        // by the per-line reconciliation that now groups renewals the same way as purchases.
+        builder.HasIndex(e => e.LineItemId)
+            .HasDatabaseName("ix_voucher_renewal_items_line_item_id");
+
+        // Restrict, same reason as every other money-ish reference here: the pairing of a charge to
+        // the line that carried it is a fact about the transaction, not a convenience.
+        builder.HasOne<OrderLineItem>()
+            .WithMany()
+            .HasForeignKey(e => e.LineItemId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         // FulfilledVoucherId gets its index from the FK convention below - declaring one here as
         // well would emit a second index under the same generated name.

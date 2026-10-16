@@ -842,6 +842,10 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("fulfilled_at_utc");
 
+                    b.Property<Guid?>("LineItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("line_item_id");
+
                     b.Property<Guid>("OrderId")
                         .HasColumnType("uuid")
                         .HasColumnName("order_id");
@@ -860,6 +864,10 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("voucher_id");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("LineItemId")
+                        .HasDatabaseName("ix_fulfillments_line_item_id")
+                        .HasFilter("released_at_utc IS NULL");
 
                     b.HasIndex("OrderId")
                         .HasFilter("released_at_utc IS NULL");
@@ -1722,6 +1730,10 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("fulfilled_voucher_id");
 
+                    b.Property<Guid?>("LineItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("line_item_id");
+
                     b.Property<DateOnly?>("NewCustomerExpiration")
                         .HasColumnType("date")
                         .HasColumnName("new_customer_expiration");
@@ -1753,6 +1765,9 @@ namespace FuelFlow.API.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("FulfilledVoucherId");
+
+                    b.HasIndex("LineItemId")
+                        .HasDatabaseName("ix_voucher_renewal_items_line_item_id");
 
                     b.HasIndex("OrderId");
 
@@ -3895,6 +3910,11 @@ namespace FuelFlow.API.Migrations
 
             modelBuilder.Entity("FuelFlow.Features.Orders.SharedModels.Fulfillment", b =>
                 {
+                    b.HasOne("FuelFlow.Features.Orders.SharedModels.OrderLineItem", null)
+                        .WithMany()
+                        .HasForeignKey("LineItemId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("FuelFlow.Features.Orders.SharedModels.Order", "Order")
                         .WithMany("Fulfillments")
                         .HasForeignKey("OrderId")
@@ -4072,6 +4092,11 @@ namespace FuelFlow.API.Migrations
                     b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", "FulfilledVoucher")
                         .WithMany()
                         .HasForeignKey("FulfilledVoucherId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("FuelFlow.Features.Orders.SharedModels.OrderLineItem", null)
+                        .WithMany()
+                        .HasForeignKey("LineItemId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("FuelFlow.Features.Orders.SharedModels.Order", "Order")

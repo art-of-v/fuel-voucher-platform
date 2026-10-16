@@ -24,6 +24,16 @@ internal sealed class FulfillmentConfiguration : IEntityTypeConfiguration<Fulfil
             .HasColumnName("voucher_id")
             .IsRequired();
 
+        builder.Property(e => e.LineItemId)
+            .HasColumnName("line_item_id");
+
+        // The reconciliation compares what each line asked for against what it got, so it reads by
+        // line. Partial on the live rows for the same reason order_id is: a released fulfillment is
+        // not part of the count, and indexing those would only ever add write amplification.
+        builder.HasIndex(e => e.LineItemId)
+            .HasFilter("released_at_utc IS NULL")
+            .HasDatabaseName("ix_fulfillments_line_item_id");
+
         builder.Property(e => e.FulfilledAtUtc)
             .HasColumnName("fulfilled_at_utc")
             .IsRequired();
@@ -71,6 +81,15 @@ internal sealed class FulfillmentConfiguration : IEntityTypeConfiguration<Fulfil
         builder.HasOne(e => e.Voucher)
             .WithMany()
             .HasForeignKey(e => e.VoucherId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // The line, Restrict like the voucher: "this line was satisfied by this voucher" is a fact
+        // about a delivery, and it must not vanish because the line it satisfied was deleted. There is
+        // no code path that deletes a line item, so this never fires in normal operation - which is
+        // the point, the same reason refunds.order_id restricts.
+        builder.HasOne<OrderLineItem>()
+            .WithMany()
+            .HasForeignKey(e => e.LineItemId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }
