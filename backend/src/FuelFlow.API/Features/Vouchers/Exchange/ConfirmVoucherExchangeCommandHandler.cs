@@ -257,6 +257,26 @@ public sealed class ConfirmVoucherExchangeCommandHandler
         // exchange routinely cost different amounts per liter, so a batch-wide copy would misreport every
         // row but one during supplier reconciliation.
         var batchId = Guid.CreateVersion7();
+
+        // The settlement itself, written before its members so the pair lands in one transaction with
+        // its parent. Until #319 landed this header was reconstructed by every reader: MIN(created)
+        // for the time, the first non-null name for the operator, SUM for the money. Stating it once
+        // means the number the brand charged is the number stored - the shares below can sum higher
+        // than it when a voucher is returned without a replacement.
+        _context.MovementBatches.Add(new MovementBatch
+        {
+            Id = batchId,
+            Kind = MovementBatchKinds.VoucherExchange,
+            SupplierId = supplierId,
+            Status = MovementBatchStatuses.Confirmed,
+            SurchargeUah = command.SurchargeUah,
+            OpenedByUserId = command.ActingUserId,
+            OpenedByUserName = command.ActingUserName,
+            OpenedAtUtc = now,
+            ConfirmedAtUtc = now,
+            CreatedAtUtc = now
+        });
+
         foreach (var (oldId, newId) in pairing.Pairs)
         {
             var old = oldById[oldId];

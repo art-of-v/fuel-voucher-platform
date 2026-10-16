@@ -44,6 +44,9 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
     public DbSet<VoucherImportError> VoucherImportErrors => Set<VoucherImportError>();
     public DbSet<VoucherRenewalItem> VoucherRenewalItems => Set<VoucherRenewalItem>();
     public DbSet<VoucherExchange> VoucherExchanges => Set<VoucherExchange>();
+    // D-13 / #319: the parent voucher_exchanges.exchange_batch_id never had. Still additive - the
+    // three movement tables are folded into one ledger in later stages of D-13.
+    public DbSet<MovementBatch> MovementBatches => Set<MovementBatch>();
     public DbSet<MonobankStatementEntry> MonobankStatementEntries => Set<MonobankStatementEntry>();
     public DbSet<OperatorVoucherRenewal> OperatorVoucherRenewals => Set<OperatorVoucherRenewal>();
     public DbSet<User> Users => Set<User>();

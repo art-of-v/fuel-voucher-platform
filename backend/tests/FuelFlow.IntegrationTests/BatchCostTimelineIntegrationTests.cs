@@ -51,6 +51,11 @@ public sealed class BatchCostTimelineIntegrationTests : IClassFixture<TestDataba
             await SeedImportAndFuel(seed, importId);
             seed.FuelVouchers.AddRange(oldVouchers);
             seed.FuelVouchers.AddRange(newVouchers);
+            // The batch is a real row now (#319), and it carries what the brand charged for the
+            // settlement - 300 UAH, which the three per-pair shares below also add up to because every
+            // voucher here was paired.
+            MovementBatchSeeder.AddForExchange(seed, exchangeBatchId, SupplierId, 300m,
+                new DateTime(2026, 10, 1, 10, 0, 0, DateTimeKind.Utc));
             // One row per retired voucher. Each row carries ONLY its own share of the batch
             // surcharge - 300 UAH split three ways over three equal pairs - so the rows sum to
             // the total. Reading one row instead would report 100 for a 300 UAH exchange.
@@ -101,6 +106,7 @@ public sealed class BatchCostTimelineIntegrationTests : IClassFixture<TestDataba
             var mineVoucher = NewVoucher(mine, 10m, 40m);
             var theirVoucher = NewVoucher(theirs, 10m, 40m);
             seed.FuelVouchers.AddRange(mineVoucher, theirVoucher);
+            MovementBatchSeeder.AddForExchange(seed, exchangeBatchId, SupplierId, 300m, DateTime.UtcNow);
             seed.VoucherExchanges.Add(new VoucherExchange
             {
                 Id = Guid.NewGuid(),
@@ -133,6 +139,10 @@ public sealed class BatchCostTimelineIntegrationTests : IClassFixture<TestDataba
             var a = NewVoucher(importId, 10m, 40m);
             var b = NewVoucher(importId, 10m, 40m);
             seed.FuelVouchers.AddRange(a, b);
+            MovementBatchSeeder.AddForExchange(seed, second, SupplierId, 200m,
+                new DateTime(2026, 10, 5, 10, 0, 0, DateTimeKind.Utc));
+            MovementBatchSeeder.AddForExchange(seed, first, SupplierId, 100m,
+                new DateTime(2026, 10, 1, 10, 0, 0, DateTimeKind.Utc));
             seed.VoucherExchanges.Add(new VoucherExchange
             {
                 Id = Guid.NewGuid(),
@@ -205,7 +215,7 @@ public sealed class BatchCostTimelineIntegrationTests : IClassFixture<TestDataba
 
     private static async Task ResetAsync(ApplicationDbContext context)
         => await context.Database.ExecuteSqlRawAsync(
-            """TRUNCATE TABLE "payments", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "voucher_exchanges", "company_invitations", "company_members", "legal_entities", "verification_codes", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
+            """TRUNCATE TABLE "payments", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "voucher_exchanges", "movement_batches", "company_invitations", "company_members", "legal_entities", "verification_codes", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
 
     private static async Task SeedImportAndFuel(ApplicationDbContext seed, Guid importId)
     {

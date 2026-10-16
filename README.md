@@ -295,7 +295,7 @@ only at the Monobank boundary.**
 |---|---|---|
 | UAH | `numeric(12,2)` | `orders.price`, `order_line_items.unit_price` / `line_total`, `fuel_offer_volumes.package_price`, `fuel_types.base_price` / `discount_price`, `voucher_renewal_items.amount_paid` |
 | UAH per litre | `numeric(10,4)` | `fuel_vouchers.cost_per_liter`, `fuel_offers.*_per_liter`, `voucher_exchanges.cost_per_liter_applied` |
-| UAH surcharge | `numeric(10,2)` | `voucher_exchanges.surcharge_uah`, `operator_voucher_renewals.surcharge_uah` |
+| UAH surcharge | `numeric(10,2)` | `voucher_exchanges.surcharge_uah` (**per-pair share**), `operator_voucher_renewals.surcharge_uah`; `movement_batches.surcharge_uah` is `numeric(14,2)` because it is the **whole** settlement, not one voucher's share of it |
 | kopecks | `numeric(14,0)` | `monobank_statement_entries.amount_kopecks`, `payments.amount_kopecks`, `payments.provider_amount_kopecks`, `webhook_events.amount_kopecks`; every Monobank API call (`invoice/create`, `invoice/cancel`, webhooks) and any DTO field explicitly named `...Kopecks` |
 
 Monobank's merchant API mandates kopeck integers, so every conversion goes through
@@ -344,7 +344,8 @@ The primary tables:
 | `voucher_imports` / `voucher_import_errors` | Batch PDF import jobs + per-voucher failures. `voucher_imports.status` is pinned to `Started`/`Completed`/`Failed` by CHECK and a `Started` row cannot carry a `completed_at_utc` — it was the last status column in the schema left as free text, on the table whose status gates the whole intake |
 | `voucher_renewal_items` | What each renewal line cost and how the term moved |
 | `operator_voucher_renewals` | Operator-initiated renewals (extend vs replace, surcharge, invoice) |
-| `voucher_exchanges` | Per-voucher settlement record for an operator↔provider stock exchange |
+| `voucher_exchanges` | One row per retired voucher in an operator↔provider stock exchange — the per-pair evidence. `old_voucher_id` is UNIQUE, which is the database half of the confirm idempotency; `exchange_batch_id` is a RESTRICT foreign key onto `movement_batches` since #319 |
+| `movement_batches` | **The settlement itself** — an operator↔provider exchange as one agreed thing. `voucher_exchanges.exchange_batch_id` pointed at nothing from 2026-10-01 until #319, so the batch's lifecycle (who, when, how much, confirmed or rejected) had nowhere to live and every reader folded it back out of the member rows. Stated once here; the per-pair facts stay on the pairs |
 | `legal_entities` | Company profiles (owner = the user who created one) |
 | `company_invitations` / `company_members` | Owner↔worker invitations and membership |
 | `contracts` / `user_contracts` | Client contracts and the signatures on them |

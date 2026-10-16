@@ -1010,11 +1010,14 @@ var exchangedId = Guid.NewGuid();
             seed.FuelVouchers.Add(StockVoucher(exchangedId, "OKKO", "okko-95", 40m, today.AddDays(-10)));
             seed.FuelVouchers.Add(StockVoucher(stillOwedId, "OKKO", "okko-95", 40m, today.AddDays(-10)));
 
-            // One of them has already been exchanged with the supplier - the confirm handler wrote this row.
+            // One of them has already been exchanged with the supplier - the confirm handler wrote this row,
+            // and it wrote the settlement the row belongs to as well (#319).
+            var exchangeBatchId = Guid.NewGuid();
+            MovementBatchSeeder.AddForExchange(seed, exchangeBatchId, supplierId, 0m, DateTime.UtcNow);
             seed.VoucherExchanges.Add(new VoucherExchange
             {
                 Id = Guid.NewGuid(),
-                ExchangeBatchId = Guid.NewGuid(),
+                ExchangeBatchId = exchangeBatchId,
                 OldVoucherId = exchangedId,
                 FuelTypeId = "okko-95",
                 Brand = "OKKO",
@@ -1379,7 +1382,7 @@ var exchangedId = Guid.NewGuid();
     private static async Task ResetDataAsync(ApplicationDbContext context)
     {
         await context.Database.ExecuteSqlRawAsync(
-            """TRUNCATE TABLE "payments", "fulfillments", "voucher_renewal_items", "voucher_exchanges", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
+            """TRUNCATE TABLE "payments", "fulfillments", "voucher_renewal_items", "voucher_exchanges", "movement_batches", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
     }
 
     private ApplicationDbContext CreateContext()

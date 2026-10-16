@@ -80,22 +80,41 @@ public sealed class GetVoucherExchangeBatchQueryHandler
         if (rows.Count == 0)
             return null;
 
-        // A confirm is one event: it stamps one timestamp and one operator across its rows, so the
-        // batch's identity comes from the first row rather than four more round trips.
+        // The header comes from the batch row, which is what it is FOR (#319). It used to be
+        // reconstructed from the members: `rows.Min(r => r.CreatedAtUtc)` for the time, `rows[0]` for
+        // the supplier, "the first row with a name" for the operator. That was an assumption - that
+        // one confirm stamps one timestamp and one operator across its rows - and it happened to hold
+        // because the handler minted the batch id in-process. Stating the header once removes the
+        // assumption, and makes a batch whose members were written across two transactions say so.
+        //
+        // A missing header is a data defect rather than a reason to fail the screen, so the members
+        // still answer; that can only happen on a database migrated without the backfill.
+        var batch = await _context.MovementBatches
+            .AsNoTracking()
+            .FirstOrDefaultAsync(b => b.Id == query.ExchangeBatchId, cancellationToken);
+
         var head = rows[0];
+
+        // Hoisted: a null-propagating operator inside an EF predicate is an expression-tree error,
+        // and the value is needed twice anyway.
+        var supplierId = batch?.SupplierId ?? head.SupplierId;
 
         return new VoucherExchangeBatchDetailDto
         {
             ExchangeBatchId = query.ExchangeBatchId,
-            AtUtc = rows.Min(r => r.CreatedAtUtc),
-            SupplierId = head.SupplierId,
+            AtUtc = batch?.OpenedAtUtc ?? rows.Min(r => r.CreatedAtUtc),
+            Status = batch?.Status,
+            SupplierId = supplierId,
             SupplierName = await _context.Suppliers
                 .AsNoTracking()
-                .Where(s => s.Id == head.SupplierId)
+                .Where(s => s.Id == supplierId)
                 .Select(s => s.Name)
                 .FirstOrDefaultAsync(cancellationToken),
-            RecordedBy = rows.FirstOrDefault(r => r.ActingUserName is not null)?.ActingUserName,
-            TotalSurchargeUah = rows.Sum(r => r.SurchargeUah),
+            RecordedBy = batch?.OpenedByUserName
+                ?? rows.FirstOrDefault(r => r.ActingUserName is not null)?.ActingUserName,
+            // The batch total is the amount the brand charged, which the sum of shares only reproduces
+            // when every retired voucher was paired. See MovementBatch.SurchargeUah.
+            TotalSurchargeUah = batch?.SurchargeUah ?? rows.Sum(r => r.SurchargeUah),
             TotalLiters = rows.Sum(r => r.OldLiters ?? 0m),
             Pairs = rows
                 .OrderBy(r => r.OldNumber)
@@ -122,6 +141,13 @@ public sealed class VoucherExchangeBatchDetailDto
 {
     public Guid ExchangeBatchId { get; set; }
     public DateTime AtUtc { get; set; }
+
+    /// <summary>
+    /// The settlement's lifecycle state, from the batch row. Null only on a database migrated without
+    /// the backfill; the screen keeps working, because the pair evidence below is unaffected.
+    /// </summary>
+    public string? Status { get; set; }
+
     public Guid SupplierId { get; set; }
     public string? SupplierName { get; set; }
     public string? RecordedBy { get; set; }

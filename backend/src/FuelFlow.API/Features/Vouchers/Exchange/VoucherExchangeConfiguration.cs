@@ -23,6 +23,18 @@ internal sealed class VoucherExchangeConfiguration : IEntityTypeConfiguration<Vo
             .HasColumnName("exchange_batch_id")
             .IsRequired();
 
+        // #319 / D-13. This was an indexed uuid pointing at nothing: the batch's lifecycle had nowhere
+        // to live, so every reader reconstructed the header by folding over the member rows. Now that
+        // the parent exists, the reference is real.
+        //
+        // RESTRICT, matching both voucher sides below and for the same reason: a batch is the record
+        // of what was agreed with a supplier, and cascading would let deleting the last exchange row
+        // delete that record with it.
+        builder.HasOne(e => e.MovementBatch)
+            .WithMany()
+            .HasForeignKey(e => e.ExchangeBatchId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.Property(e => e.OldVoucherId)
             .HasColumnName("old_voucher_id")
             .IsRequired();
