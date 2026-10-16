@@ -1,33 +1,47 @@
 -- Seeds a QA-only mirror of the live fuel catalogue, so the App Store reviewer (and any QA session)
--- can browse and buy fuel under names that cannot be confused with the real thing.
+-- can browse and buy fuel without touching real stock.
 --
--- What this creates, for every live package at every station:
---   * a `fuel_packages` row whose `fuel_name` is the live name plus a `(QA)` suffix, carrying
---     `data_kind = 'qa'`, reusing the live `station_id` and `fuel_type_id`;
---   * `vouchers_per_package` sellable `fuel_vouchers` rows behind it, also `data_kind = 'qa'`.
---     The column was `is_test_data = true` until EnforceDataKind; the value set is pinned by a
---     CHECK constraint, so the literals below cannot drift into anything the database accepts.
+-- WHAT THIS CREATES, for every live offer and every volume it sells:
+--   * a `fuel_offers` twin carrying `data_kind = 'qa'`, mirroring the live offer's per-litre pricing;
+--   * a `fuel_offer_volumes` twin under it, mirroring the litres and the package price;
+--   * `vouchers_per_package` sellable `fuel_vouchers` rows behind each twin volume, also `data_kind = 'qa'`.
 --
--- Why the names are mirrored here rather than listed: they stay 1:1 with whatever the catalogue
--- actually sells today. Add a brand in admin and re-run this, and its QA twin appears too. A
--- hand-maintained list would drift the first time someone renamed a brand, and the drift would be
--- invisible - a QA package nobody notices is missing.
+-- REWRITTEN 2026-10-16. The previous version of this script wrote to `fuel_packages`, which
+-- `SplitFuelPackagesIntoOffers` (2026-10-15) turned into `fuel_offers` + `fuel_offer_volumes` with
+-- nothing reading the old table. It therefore succeeded while seeding nothing at all: the QA
+-- catalogue was empty and no error said so. Target #314's split is the cause and this is the
+-- repair; `seed-qa-full-emulation.sql` was left stale by the same split and is tracked separately.
 --
--- Why no new `fuel_types` or `stations` rows: neither table has a pool column and neither endpoint
--- filters on one, so a `QA`-named brand or station would reach every anonymous visitor of the public
--- catalogue. The pool lives on `fuel_packages`, and the anonymous storefront routes now resolve
--- the caller's pool before they filter. That is the whole isolation story, and it is why this script
--- creates two kinds of row and not a third.
+-- THE `(QA)` NAME SUFFIX IS GONE, and cannot come back without a schema change. The old script gave
+-- every QA package `fuel_name || '(QA)'` "so it cannot be confused with the real thing". After the
+-- split the offer no longer carries a name: the storefront joins it from `fuel_types`
+-- (`GetPublicPackagesByStationQueryHandler`: `FuelName = fuel.Name`), and `fuel_types` has no pool
+-- column. So a QA twin and its live counterpart are the same fuel and necessarily the same name.
+--
+-- The only two ways to mark them apart were both rejected then and are still:
+--   * a QA-named `fuel_types` or `stations` row - neither table has a pool column and neither
+--     endpoint filters on one, so a QA-named fuel would reach every anonymous visitor;
+--   * a name override on the offer - a column that exists only to make test data legible, which is
+--     the wrong direction for a schema whose next step (planning #321) is deleting the pool entirely.
+--
+-- What actually keeps the pools apart does not depend on the name. Both storefront routes resolve the
+-- caller's pool before they filter (`offer.DataKind == DataKinds.ForPool(isTestAccount)`), the
+-- fulfilment claim is gated on it as well, and `QaTestPoolSegregationIntegrationTests` pins that a QA
+-- order only ever consumes QA stock and a real order only ever real stock. An operator sees both
+-- pools in admin, where the distinction is legible. A reviewer sees the ordinary catalogue, which is
+-- what App Review needs: browse, buy, see a voucher in the wallet.
+--
+-- WHY NO NEW `fuel_types` OR `stations` ROWS: as above - neither has a pool column, so a QA row
+-- there reaches the public catalogue.
 --
 -- The live nominal is mirrored as-is. Availability keys on (station, fuel type, nominal) and carries
--- no package id, so a QA package at the same nominal is backed by the same key - meaning a QA session
--- sees the live package lit as well as its `(QA)` twin. That is cosmetic, not a leak: the fulfilment
--- claim is gated on `data_kind` (QaTestPoolSegregationIntegrationTests), so a QA order still only
--- ever consumes test stock and a real order only ever real stock. Give the QA rows a different
--- nominal if that confusion is worse than a per-row constant to maintain.
+-- no offer id, so a QA volume at the same nominal is backed by the same key - a QA session sees the
+-- live volume lit as well as its twin. That is cosmetic, not a leak, for the reason above.
 --
--- Idempotent: re-running tops the pool up to `vouchers_per_package` rather than failing, and never
--- exceeds it. A reviewer who burns through one package and re-runs gets the count back, not a double.
+-- Idempotent: re-running tops the stock back up to `vouchers_per_package` rather than failing, and
+-- never exceeds it. The twins are keyed on the natural keys the database already enforces -
+-- (station, fuel, pool) and (offer, litres) - not on the id, because the natural keys are what a
+-- second run would collide on.
 --
 -- Usage:
 --   docker exec -i fuelflow-postgres psql -U fuelflow -d fuelflow -v ON_ERROR_STOP=1 \
@@ -41,7 +55,7 @@
 --
 -- `station_id` is optional; with none given every network in the catalogue is mirrored, which is
 -- what an App Review run wants - the reviewer should be able to open any brand and find it stocked.
--- The live packages themselves already need `supplier_id`, batch costs and activation before this
+-- The live offers themselves already need a supplier, a batch cost and activation before this
 -- produces anything sellable - see scripts/seed-test-vouchers.sql and the operator side in
 -- docs/testing/voucher-renewal-80.md.
 
@@ -58,13 +72,7 @@
 
 BEGIN;
 
--- The suffix is what makes a QA package recognisable at a glance in the app and in a screenshot.
-\if :{?qa_suffix}
-\else
-\set qa_suffix '(QA)'
-\endif
-
--- Ten per package is deep enough that a reviewer cannot exhaust a brand by accident, and shallow
+-- Ten per volume is deep enough that a reviewer cannot exhaust a brand by accident, and shallow
 -- enough that the "one left" state - and the out-of-stock state, which renders the package disabled -
 -- are both still reachable during a session.
 \if :{?vouchers_per_package}
@@ -72,36 +80,66 @@ BEGIN;
 \set vouchers_per_package 10
 \endif
 
--- One QA package per live package. The id is derived from the live id, so re-running collides on the
--- primary key and does nothing rather than creating a second twin.
-INSERT INTO fuel_packages
-    (id, station_id, fuel_type_id, fuel_name, liters, price, original_price,
-     supplier_price_per_liter, margin_uah_per_liter, final_price_per_liter,
-     data_kind, is_deleted, created_at_utc, updated_at_utc)
+-- The QA offer twin. The id follows OfferKeys.For: `<station>-<fuel>` for the live offer and
+-- `<station>-<fuel>-qa` for this one, so the pair is recognisable in a listing and the column stays
+-- inside its 204-character bound.
+--
+-- Conflict target is (station_id, fuel_type_id, data_kind) rather than the id on purpose. That is
+-- the unique key the split added, and it is what a second run collides on - the id is derived from
+-- the same triple, but an id conflict would only be reported if the two had drifted apart, and a
+-- natural-key conflict is the one that would actually mean "already seeded".
+INSERT INTO fuel_offers
+    (id, station_id, fuel_type_id,
+     supplier_price_per_liter, margin_uah_per_liter, margin_percent,
+     final_price_per_liter, pump_price_per_liter, min_discount_per_liter, price_updated_at,
+     created_at_utc, updated_at_utc, is_deleted, deleted_at_utc, data_kind)
 SELECT
-    'qa-pkg-' || live.id,
+    live.id || '-qa',
     live.station_id,
     live.fuel_type_id,
-    live.fuel_name || :'qa_suffix',
-    live.liters,
-    live.price,
-    live.original_price,
     live.supplier_price_per_liter,
     live.margin_uah_per_liter,
+    live.margin_percent,
     live.final_price_per_liter,
-    'qa',
-    false,
-    now(), now()
-FROM fuel_packages live
+    live.pump_price_per_liter,
+    live.min_discount_per_liter,
+    live.price_updated_at,
+    now(), now(), false, NULL,
+    'qa'
+FROM fuel_offers live
 WHERE live.data_kind = 'real'
   AND NOT live.is_deleted
   AND (
       :'seed_all_stations'::boolean
       OR live.station_id = :'station_id'
   )
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (station_id, fuel_type_id, data_kind) DO NOTHING;
 
--- Stock behind each QA package.
+-- The QA volume twin, mirroring litres and price. The live volume kept its own id through the split
+-- (the migration copied `p.id` across), so this one prefixes rather than appends - and a volume id
+-- that would breach ck_fuel_offer_volumes_id_length is refused loudly by that CHECK rather than
+-- silently truncated into a collision.
+INSERT INTO fuel_offer_volumes
+    (id, offer_id, liters, package_price,
+     created_at_utc, updated_at_utc, is_deleted, deleted_at_utc)
+SELECT
+    'qa-' || live.id,
+    live_offer.id || '-qa',
+    live.liters,
+    live.package_price,
+    now(), now(), false, NULL
+FROM fuel_offer_volumes live
+JOIN fuel_offers live_offer ON live_offer.id = live.offer_id
+WHERE live_offer.data_kind = 'real'
+  AND NOT live_offer.is_deleted
+  AND NOT live.is_deleted
+  AND (
+      :'seed_all_stations'::boolean
+      OR live_offer.station_id = :'station_id'
+  )
+ON CONFLICT (offer_id, liters) DO NOTHING;
+
+-- Stock behind each QA volume.
 --
 -- On the `brand` column, because the name still only half describes it. A supplier and a station are
 -- different things here: `fuel_vouchers.supplier_id` is a uuid FK holding who actually supplied the
@@ -110,12 +148,10 @@ ON CONFLICT (id) DO NOTHING;
 -- because a test fixture is not a purchase.
 --
 -- `brand` is a varchar, and both the storefront key (StockKey) and the fulfilment claim match it
--- against `fuel_packages.station_id` - lower-cased, case-insensitive. So whatever is put here has to
--- be the station id for the package to find its own stock. A row keyed to a supplier name or a
+-- against `fuel_offers.station_id` - lower-cased, case-insensitive. So whatever is put here has to
+-- be the station id for the volume to find its own stock. A row keyed to a supplier name or a
 -- network name would silently never match, leaving a visible package that cannot be bought, which
--- reads as an out-of-stock bug rather than as a mismatched key. It was `provider` until #1107
--- renamed it; the rename moved the column without moving what goes in it, which is the whole reason
--- the match key has to be written out here rather than assumed.
+-- reads as an out-of-stock bug rather than as a mismatched key.
 --
 -- The terms are what make renewal reachable at all: a reviewer who buys a QA voucher sees the
 -- near-expiry banner and the renewal entry point only while the customer term sits inside the
@@ -123,26 +159,27 @@ ON CONFLICT (id) DO NOTHING;
 -- supplier term of +180d - the same shape as the live stock.
 --
 -- `vouchers_per_package` of them, and only the shortfall: the series is bounded by what is already
--- behind the package, so re-running tops the pool back up and stops, instead of multiplying it.
+-- behind the volume, so re-running tops the pool back up and stops, instead of multiplying it.
 INSERT INTO fuel_vouchers
-(id, brand, fuel_type_id, liters, cost_per_liter,
- supplier_expiration_date, customer_expiration_date, voucher_number, qr_payload,
+    (id, brand, fuel_type_id, liters, cost_per_liter,
+     supplier_expiration_date, customer_expiration_date, voucher_number, qr_payload,
      status, data_kind, is_deleted, created_at_utc, updated_at_utc)
 SELECT
     gen_random_uuid(),
-    lower(pkg.station_id),
-    pkg.fuel_type_id,
-    pkg.liters,
-    pkg.supplier_price_per_liter,
+    lower(offer.station_id),
+    offer.fuel_type_id,
+    volume.liters,
+    offer.supplier_price_per_liter,
     current_date + 180,
     current_date + 7,
-    'QA-CAT-' || substr(md5(pkg.id), 1, 8) || '-' || lpad(n::text, 2, '0'),
-    'QA-QR-' || substr(md5(pkg.id), 1, 8) || '-' || lpad(n::text, 2, '0'),
+    'QA-CAT-' || substr(md5(volume.id), 1, 8) || '-' || lpad(n::text, 2, '0'),
+    'QA-QR-' || substr(md5(volume.id), 1, 8) || '-' || lpad(n::text, 2, '0'),
     'Available',
     'qa',
     false,
     now(), now()
-FROM fuel_packages pkg
+FROM fuel_offer_volumes volume
+JOIN fuel_offers offer ON offer.id = volume.offer_id
 CROSS JOIN LATERAL (
     SELECT generate_series(
         1,
@@ -150,30 +187,36 @@ CROSS JOIN LATERAL (
             SELECT count(*)
             FROM fuel_vouchers v
             WHERE v.data_kind = 'qa'
-              AND v.fuel_type_id = pkg.fuel_type_id
-              AND v.liters = pkg.liters
-              AND lower(v.brand) = lower(pkg.station_id)
+              AND v.fuel_type_id = offer.fuel_type_id
+              AND v.liters = volume.liters
+              AND lower(v.brand) = lower(offer.station_id)
         ))
     ) AS n
 ) AS shortfall
-WHERE pkg.id LIKE 'qa-pkg-%'
-  AND NOT pkg.is_deleted
+WHERE offer.data_kind = 'qa'
+  AND NOT offer.is_deleted
+  AND NOT volume.is_deleted
   AND (
       :'seed_all_stations'::boolean
-      OR pkg.station_id = :'station_id'
+      OR offer.station_id = :'station_id'
   )
 ON CONFLICT DO NOTHING;
 
--- Nothing above is inserted twice: a re-run finds the twin package on the primary key and finds
--- stock already behind it, so this converges on one voucher per QA package instead of growing.
+-- Nothing above is inserted twice: a re-run finds the twin on the natural key and finds stock
+-- already behind it, so this converges on `vouchers_per_package` per volume instead of growing.
 
 \echo ''
 \echo 'QA catalogue seeded. Verify, as the QA account:'
-\echo '  select fuel_name, liters, data_kind from fuel_packages where id like ''qa-pkg-%'' order by fuel_name;'
+\echo '  select o.station_id, f.name, v.liters, v.package_price, o.data_kind'
+\echo '    from fuel_offers o'
+\echo '    join fuel_offer_volumes v on v.offer_id = o.id'
+\echo '    join fuel_types f on f.id = o.fuel_type_id'
+\echo '   where o.id like ''%-qa'' and not o.is_deleted order by 1, 2, 3;'
 \echo '  select brand, fuel_type_id, liters, customer_expiration_date, status'
 \echo '    from fuel_vouchers where data_kind = ''qa'' order by customer_expiration_date;'
 \echo ''
 \echo 'Anonymous readers must see none of it - check from outside a signed-in session:'
-\echo '  curl -s https://api.palne.shop/api/packages | grep -c ''(QA)'''   # expect 0
+\echo '  curl -s https://api.palne.shop/api/packages | grep -c ''qa-'''   # expect 0
+\echo ''
 
 COMMIT;

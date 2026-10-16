@@ -203,7 +203,9 @@ level stored in `roles.level` and the authority matrix enforced in
    shown but not buyable (`isAvailable: false`).
 2. `POST /api/purchases` (or `POST /api/purchases/bulk`), device-signed, creates an order
    (`PendingPayment`), a **`payments` row** and a Monobank invoice, returning a payment URL.
-   **Price is recomputed server-side from `FuelPackages`** — the client value is only a proposal.
+   **Price is recomputed server-side from the catalogue** (`ServerPricing` over the station's
+   `SellablePackage` — a `FuelOffer` joined with one of its `FuelOfferVolumes`) — the client value is
+   only a proposal.
 3. User pays in Monobank → Monobank calls `POST /api/monobank/webhook`. The signature
    (`X-Sign`, ECDSA over the raw body) is **verified and fail-closed (401)** and the amount is
    checked; on success the order → `PendingFulfillment` and an `OrderCreated` outbox event is queued.
@@ -291,8 +293,8 @@ only at the Monobank boundary.**
 
 | Unit | Type | Where |
 |---|---|---|
-| UAH | `numeric(12,2)` | `orders.price`, `order_line_items.unit_price` / `line_total`, `fuel_packages.price` / `original_price`, `fuel_types.base_price` / `discount_price`, `voucher_renewal_items.amount_paid` |
-| UAH per litre | `numeric(10,4)` | `fuel_vouchers.cost_per_liter`, `fuel_packages.*_per_liter`, `voucher_exchanges.cost_per_liter_applied` |
+| UAH | `numeric(12,2)` | `orders.price`, `order_line_items.unit_price` / `line_total`, `fuel_offer_volumes.package_price`, `fuel_types.base_price` / `discount_price`, `voucher_renewal_items.amount_paid` |
+| UAH per litre | `numeric(10,4)` | `fuel_vouchers.cost_per_liter`, `fuel_offers.*_per_liter`, `voucher_exchanges.cost_per_liter_applied` |
 | UAH surcharge | `numeric(10,2)` | `voucher_exchanges.surcharge_uah`, `operator_voucher_renewals.surcharge_uah` |
 | kopecks | `numeric(14,0)` | `refunds.amount_kopecks`, `monobank_statement_entries.amount_kopecks`, `payments.amount_kopecks`, `payments.provider_amount_kopecks`, `webhook_events.amount_kopecks`; every Monobank API call (`invoice/create`, `invoice/cancel`, webhooks) and any DTO field explicitly named `...Kopecks` |
 
@@ -328,7 +330,7 @@ The primary tables:
 | `push_tokens` | Per-device push registration |
 | `stations` / `station_nodes` | Fuel brands and individual physical locations (lat/lng) |
 | `fuel_types` | Fuel-type definitions per station with base/discount pricing (per liter, UAH) |
-| `fuel_packages` | Saleable packages (station + fuel type + liters + price, UAH); carry supplier/margin/final pricing |
+| `fuel_offers` / `fuel_offer_volumes` | The saleable catalogue, split in two: an **offer** is (station × fuel type) and carries the commercial terms — supplier/margin/final price, pump price, min discount; a **volume** is one nominal on that offer (`10 L`, `20 L`, `50 L`) with its own package price. Price per litre therefore lives on the offer and is shared by its volumes; a nominal whose price per litre disagrees with the offer is drift, and `deploy/preflight-db` checks for it before a pull |
 | `suppliers` | Third parties fuel is bought from (deactivated, never hard-deleted) |
 | `purchase_batches` | One row per (import × fuel): the batch's supplier and who entered it |
 | `fuel_vouchers` | Voucher inventory; QR rendered from `qr_parameters`; carries `legal_entity_id` + `worker_user_id`; `order_id` names the order that delivered it and is **required** for a held voucher (`Assigned`/`Used`/`Blocked`, DB CHECK `ck_voucher_held_has_order`), null while it is stock |
