@@ -100,10 +100,14 @@ const html = `<!doctype html>
     </div>
     <nav class="flex-1 p-4 space-y-1">
       <div class="px-2 mb-2"><span class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Управління</span></div>
-      <button class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg bg-primary/15 text-primary glass-glow border border-primary/25"><span class="w-4 h-4"></span>Постачальники</button>
-      <button class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg border border-transparent text-muted-foreground hover:bg-foreground/5 hover:text-foreground"><span class="w-4 h-4"></span>Закупівлі<span class="ml-auto min-w-[1.25rem] px-1.5 py-0.5 text-[10px] font-bold leading-none text-center rounded-full bg-destructive text-destructive-foreground">12</span></button>
-      <button class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg border border-transparent text-muted-foreground hover:bg-foreground/5 hover:text-foreground"><span class="w-4 h-4"></span>Користувачі</button>
-      <button class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg border border-transparent text-muted-foreground hover:bg-foreground/5 hover:text-foreground"><span class="w-4 h-4"></span>Журнал помилок</button>
+      <button class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg bg-primary/15 text-primary glass-glow border border-primary/25"><span class="w-4 h-4 shrink-0"></span><span class="min-w-0 flex-1 truncate text-left">Постачальники</span></button>
+      <button class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg border border-transparent text-muted-foreground hover:bg-foreground/5 hover:text-foreground"><span class="w-4 h-4 shrink-0"></span><span class="min-w-0 flex-1 truncate text-left">Закупівлі</span><span class="ml-auto min-w-[1.25rem] shrink-0 px-1.5 py-0.5 text-[10px] font-bold leading-none text-center rounded-full bg-destructive text-destructive-foreground">12</span></button>
+      <button class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg border border-transparent text-muted-foreground hover:bg-foreground/5 hover:text-foreground"><span class="w-4 h-4 shrink-0"></span><span class="min-w-0 flex-1 truncate text-left">Користувачі</span></button>
+      <!-- The longest label the real shell renders. It is here on purpose: it is the one that
+           used to wrap onto two lines and make itself visibly taller than its neighbours, so a
+           preview that omits it cannot show whether that is fixed. Mirrors layout.tsx. -->
+      <button class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg border border-transparent text-muted-foreground hover:bg-foreground/5 hover:text-foreground"><span class="w-4 h-4 shrink-0"></span><span class="min-w-0 flex-1 truncate text-left">Продовження оператором</span></button>
+      <button class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg border border-transparent text-muted-foreground hover:bg-foreground/5 hover:text-foreground"><span class="w-4 h-4 shrink-0"></span><span class="min-w-0 flex-1 truncate text-left">Журнал помилок</span></button>
     </nav>
     <div class="p-4 border-t border-border mt-auto">
       <div class="flex items-center gap-3 px-3 py-2">
