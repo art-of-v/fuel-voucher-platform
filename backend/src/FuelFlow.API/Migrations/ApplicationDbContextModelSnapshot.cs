@@ -1613,7 +1613,16 @@ namespace FuelFlow.API.Migrations
                     b.HasIndex("EccLevel", "Version", "MaskPattern", "EncodingMode")
                         .IsUnique();
 
-                    b.ToTable("qr_parameters", (string)null);
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("EccLevel", "Version", "MaskPattern", "EncodingMode"), false);
+
+                    b.ToTable("qr_parameters", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_qr_parameters_ecc_level", "ecc_level IN ('L','M','Q','H')");
+
+                            t.HasCheckConstraint("ck_qr_parameters_mask_pattern", "mask_pattern IS NULL OR mask_pattern BETWEEN 0 AND 7");
+
+                            t.HasCheckConstraint("ck_qr_parameters_version", "version IS NULL OR version BETWEEN 1 AND 40");
+                        });
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Vouchers.Renewal.Operator.OperatorVoucherRenewal", b =>
@@ -1837,7 +1846,12 @@ namespace FuelFlow.API.Migrations
 
                     b.HasIndex("Status");
 
-                    b.ToTable("voucher_imports", (string)null);
+                    b.ToTable("voucher_imports", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_voucher_imports_completed", "(status = 'Started') = (completed_at_utc IS NULL)");
+
+                            t.HasCheckConstraint("ck_voucher_imports_status", "status IN ('Started','Completed','Failed')");
+                        });
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Vouchers.VoucherImportError", b =>
