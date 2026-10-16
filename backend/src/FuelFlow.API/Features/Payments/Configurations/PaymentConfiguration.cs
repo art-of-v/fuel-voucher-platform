@@ -84,6 +84,23 @@ builder.Property(e => e.ProviderAmountKopecks)
         builder.Property(e => e.ProviderPayload)
             .HasColumnName("provider_payload");
 
+        builder.Property(e => e.CreatedByUserId)
+            .HasColumnName("created_by_user_id");
+
+        // 200 to match refunds.created_by_user_name, which this value replaced.
+        builder.Property(e => e.CreatedByUserName)
+            .HasColumnName("created_by_user_name")
+            .HasMaxLength(200);
+
+        builder.Property(e => e.IsAutomatic)
+            .HasColumnName("is_automatic")
+            .IsRequired();
+
+        // 500 to match refunds.error_message, which this value replaced.
+        builder.Property(e => e.ErrorMessage)
+            .HasColumnName("error_message")
+            .HasMaxLength(500);
+
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
             .IsRequired();
@@ -125,6 +142,14 @@ builder.Property(e => e.ProviderAmountKopecks)
         builder.HasOne<Payment>()
             .WithMany()
             .HasForeignKey(e => e.ParentPaymentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // The approver of a refund, carried over from refunds.created_by_user_id with the same
+        // Restrict: an audit row has to keep naming a real actor, so a user who has approved a refund
+        // cannot be hard-deleted out from under it.
+        builder.HasOne<FuelFlow.SharedKernel.Domain.User>()
+            .WithMany()
+            .HasForeignKey(e => e.CreatedByUserId)
             .OnDelete(DeleteBehavior.Restrict);
 
         // WebhookEventId deliberately carries no FK, and the index above is deliberately not unique.
@@ -174,6 +199,20 @@ builder.Property(e => e.ProviderAmountKopecks)
 
             t.HasCheckConstraint("ck_payments_parent_not_self", "parent_payment_id IS DISTINCT FROM id");
 
+            // The approval columns arrived here from the `refunds` table. Only a refund is approved
+            // by anyone, so a capture carrying an approver is a row that was written by the wrong
+            // code path - and it is exactly the kind of thing that is invisible until someone asks
+            // "who authorised this?" and gets two answers. is_automatic is included in the test
+            // because false is its default: a capture must assert its value is the default, not
+            // merely leave it unset.
+            t.HasCheckConstraint("ck_payments_refund_audit_only_on_refund",
+                "kind = 'Refund' OR (created_by_user_id IS NULL AND created_by_user_name IS NULL " +
+                "AND NOT is_automatic AND error_message IS NULL)");
+
+            // Deliberately NO constraint pairing created_by_user_name with created_by_user_id. An
+            // automatic refund has no approver at all, and a webhook-driven one carries a name the
+            // id was not captured for; demanding an id would refuse refunds that really happened.
+            // The FK does the work that matters: an id, when present, is a real user.
             t.HasCheckConstraint("ck_payments_provider_length", "length(provider) > 0 AND length(provider) <= 20");
         });
     }

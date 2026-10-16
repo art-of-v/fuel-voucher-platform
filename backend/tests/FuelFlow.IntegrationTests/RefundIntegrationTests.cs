@@ -8,7 +8,10 @@ using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.Payments.SharedModels;
+using FuelFlow.SharedKernel;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Options;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -42,8 +45,8 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
         await SeedAsync(seed =>
         {
             seed.Users.Add(CreateUser(userId));
-            seed.Orders.Add(CreateOrder(orderId, userId, invoiceId, OrderStatus.PendingFulfillment,
-                quantity: 2, unitPrice: 1000));
+            AddPaidOrder(seed, CreateOrder(orderId, userId, invoiceId, OrderStatus.PendingFulfillment,
+                quantity: 2, unitPrice: 1000), invoiceId);
         });
 
         var monobankMock = CreateMonobankMock(out var cancelledAmount);
@@ -135,6 +138,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
                 quantity: 2, unitPrice: 1000);
             order.IdempotencyKey = longIdempotencyKey;
             seed.Orders.Add(order);
+            seed.Payments.Add(SucceededCaptureFor(order, invoiceId));
         });
 
         var monobankMock = CreateMonobankMock(out _);
@@ -161,6 +165,56 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
         }
     }
 
+/// <summary>
+    /// An order that predates the payments table still gets refunded - and its capture is promoted.
+    /// </summary>
+/// <remarks>
+/// Such an order carries its payment in four columns of its own: invoice id, brand status, price.
+/// Those are real evidence, so the handler writes a proper capture row from them rather than
+/// refusing. Refusing would mean a genuinely paid customer could not be refunded, which is the worst
+/// answer available. Production holds no orders at all, so this path is defensive in practice; the
+/// test exists because the behaviour is not obvious from the code that takes it.
+/// </remarks>
+[Fact]
+    public async Task RefundOfAnOrderWithNoCaptureRow_ShouldPromoteItsColumnsIntoACapture()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var invoiceId = $"test-invoice-{orderId:N}";
+
+        await SeedAsync(seed =>
+        {
+            seed.Users.Add(CreateUser(userId));
+            // Deliberately no capture: the pre-payments-table shape.
+            seed.Orders.Add(CreateOrder(orderId, userId, invoiceId, OrderStatus.PendingFulfillment,
+                quantity: 2, unitPrice: 1000));
+        });
+
+        var monobankMock = CreateMonobankMock(out _);
+        var command = new RefundOrderCommand { OrderId = orderId, ChangedByUserName = "admin-test" };
+
+        using (var context = CreateContext())
+        {
+            var handler = new RefundOrderCommandHandler(
+                context, new StubMonobankClientFactory(monobankMock.Object), new AuditEventService(context));
+            var result = await handler.HandleAsync(command);
+            result.Status.Should().Be("Processing");
+        }
+
+        using (var verify = CreateContext())
+        {
+            // The capture now exists, is a real one, and carries the order's own amount.
+            var capture = verify.Payments.Single(p => p.OrderId == orderId && p.Kind == PaymentKind.Capture);
+            capture.Status.Should().Be(PaymentStatus.Succeeded);
+            capture.AmountUah.Should().Be(2000m);
+            capture.ProviderInvoiceId.Should().Be(invoiceId);
+
+            // And the refund points at it, which is the whole point of the exercise.
+            var refundPayment = verify.Payments.Single(p => p.OrderId == orderId && p.Kind == PaymentKind.Refund);
+            refundPayment.ParentPaymentId.Should().Be(capture.Id);
+        }
+    }
+
     [Fact]
     public async Task ManualRefund_WhenRequestedTwice_ShouldReuseSingleRefundAndCancelOnce()
     {
@@ -173,8 +227,8 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
         await SeedAsync(seed =>
         {
             seed.Users.Add(CreateUser(userId));
-            seed.Orders.Add(CreateOrder(orderId, userId, invoiceId, OrderStatus.PendingFulfillment,
-                quantity: 2, unitPrice: 1000));
+            AddPaidOrder(seed, CreateOrder(orderId, userId, invoiceId, OrderStatus.PendingFulfillment,
+                quantity: 2, unitPrice: 1000), invoiceId);
         });
 
         var monobankMock = CreateMonobankMock(out _);
@@ -223,8 +277,8 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
         await SeedAsync(seed =>
         {
             seed.Users.Add(CreateUser(userId));
-            seed.Orders.Add(CreateOrder(orderId, userId, invoiceId, OrderStatus.PendingFulfillment,
-                quantity: 2, unitPrice: 1000));
+            AddPaidOrder(seed, CreateOrder(orderId, userId, invoiceId, OrderStatus.PendingFulfillment,
+                quantity: 2, unitPrice: 1000), invoiceId);
 
             // A prior refund attempt Monobank (or the network) rejected.
             seed.Refunds.Add(new Refund
@@ -284,8 +338,8 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
             seed.Users.Add(CreateUser(userId));
 
             // 3 units at 520 UAH; 1 delivered -> only 2 * 520 UAH is refundable.
-            seed.Orders.Add(CreateOrder(orderId, userId, invoiceId, OrderStatus.PartiallyFulfilled,
-                quantity: 3, unitPrice: 520));
+            AddPaidOrder(seed, CreateOrder(orderId, userId, invoiceId, OrderStatus.PartiallyFulfilled,
+                quantity: 3, unitPrice: 520), invoiceId);
 
             var voucher = new FuelVoucher
             {
@@ -352,6 +406,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
             var order = CreateOrder(orderId, userId, invoiceId, OrderStatus.PartiallyFulfilled,
                 quantity: 3, unitPrice: 520);
             seed.Orders.Add(order);
+            seed.Payments.Add(SucceededCaptureFor(order, invoiceId));
 
             var voucher = new FuelVoucher
             {
@@ -433,8 +488,8 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
         await SeedAsync(seed =>
         {
             seed.Users.Add(CreateUser(userId));
-            seed.Orders.Add(CreateOrder(orderId, userId, invoiceId, OrderStatus.PendingFulfillment,
-                quantity: 1, unitPrice: 1000));
+            AddPaidOrder(seed, CreateOrder(orderId, userId, invoiceId, OrderStatus.PendingFulfillment,
+                quantity: 1, unitPrice: 1000), invoiceId);
         });
 
         var monobankMock = CreateMonobankMock(out _);
@@ -492,9 +547,9 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
 
             // Legacy inconsistent state: order already shows refunded while its
             // refund is still Processing (and has been for over a day).
-            var order = CreateOrder(orderId, userId, $"test-invoice-{orderId:N}", OrderStatus.PartiallyRefunded,
+var order = CreateOrder(orderId, userId, $"test-invoice-{orderId:N}", OrderStatus.PartiallyRefunded,
                 quantity: 2, unitPrice: 1000);
-            seed.Orders.Add(order);
+            AddPaidOrder(seed, order, $"test-invoice-{orderId:N}");
 
             var voucher = new FuelVoucher
             {
@@ -562,6 +617,45 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
         CreatedAtUtc = DateTime.UtcNow,
         UpdatedAtUtc = DateTime.UtcNow
     };
+
+    /// <summary>
+    /// The succeeded capture every paid order has.
+    /// </summary>
+/// <remarks>
+/// Both checkout paths add the order and its capture in one <c>SaveChangesAsync</c>, so an order
+/// carrying a Monobank invoice but no capture row is a state the system cannot reach. It used to be
+/// reachable here: these fixtures seeded a paid order directly and skipped the capture, and a refund
+/// only needed the order's own <c>MonobankStatus</c> to be told to go ahead. A refund now reverses a
+/// specific capture, which is the guarantee that makes it traceable, and the handler refuses an order
+/// that has none - so the fixture seeds what the database would really hold.
+/// </remarks>
+private static Payment SucceededCaptureFor(Order order, string invoiceId) => new()
+    {
+        Id = Guid.CreateVersion7(),
+        OrderId = order.Id,
+        Kind = PaymentKind.Capture,
+        Provider = WebhookEventIdentity.Monobank,
+        Merchant = MonobankMerchant.Live,
+        ProviderInvoiceId = invoiceId,
+        AmountUah = order.Price,
+        AmountKopecks = Money.ToKopecks(order.Price),
+        Currency = "UAH",
+        Status = PaymentStatus.Succeeded,
+        PaidAtUtc = order.CreatedAtUtc,
+        CreatedAtUtc = order.CreatedAtUtc,
+        UpdatedAtUtc = order.CreatedAtUtc
+    };
+
+/// <summary>Seeds a paid order together with the capture it was paid by.</summary>
+private static Order AddPaidOrder(
+        ApplicationDbContext seed,
+        Order order,
+        string invoiceId)
+    {
+        seed.Orders.Add(order);
+        seed.Payments.Add(SucceededCaptureFor(order, invoiceId));
+        return order;
+    }
 
     private static Order CreateOrder(
         Guid orderId,

@@ -2,6 +2,7 @@ using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.Payments.SharedModels;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
 using Microsoft.EntityFrameworkCore;
@@ -42,6 +43,60 @@ private readonly ApplicationDbContext _context;
            _notifications = notifications;
        }
 
+    /// <summary>
+    /// Moves the refund's payment to match the refund's own status.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Every status change on a <see cref="Refund"/> routes through here, rather than each site
+    /// remembering to update the payment as well. Three call sites already existed and a fourth
+    /// would have been written without it; the pair drifting is the failure this epic is removing,
+    /// and a helper that has to be remembered at every call site is exactly how that happens.
+    /// </para>
+    /// <para>
+    /// The two vocabularies are not the same. <see cref="RefundStatus"/> is about whether <em>the
+    /// bank has answered</em>; <see cref="PaymentStatus"/> is about whether <em>the money moved</em>.
+    /// Processing maps to Pending and the rest follow directly. No refund maps to Cancelled or
+    /// Expired - the acquirer reversing a refund is a Failed refund, not a payment that was
+    /// collected and returned, and encoding it as Cancelled would put the amount on the wrong side of
+    /// the reconciliation.
+    /// </para>
+    /// <para>
+    /// <paramref name="observedAtUtc"/> is required on completion because the database refuses
+    /// Succeeded without a paid-at, and the cancel-list entry's modification date is the best
+    /// evidence of when the money moved that this path has.
+    /// </para>
+    /// </remarks>
+    private async Task ApplyPaymentStatusAsync(
+        Refund refund,
+        DateTime? observedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        var payment = await _context.Payments
+            .FirstOrDefaultAsync(p => p.RefundId == refund.Id, cancellationToken);
+
+        if (payment is null)
+        {
+            // A refund predating this column, or one written by a path that has not been converted.
+            // Logged rather than thrown: refusing to sync a real refund over a missing audit twin
+            // would strand money in Processing, which is worse than a payment row lagging behind.
+            _logger.LogWarning(
+                "Refund {RefundId} has no payment row to sync; its payment record will lag", refund.Id);
+            return;
+        }
+
+        var status = refund.Status switch
+        {
+            RefundStatus.Processing => PaymentStatus.Pending,
+            RefundStatus.Completed => PaymentStatus.Succeeded,
+            RefundStatus.Failed => PaymentStatus.Failed,
+            _ => PaymentStatus.Pending
+        };
+
+        payment.ErrorMessage = refund.ErrorMessage;
+        PaymentFactory.ApplyStatus(payment, status, observedAtUtc, DateTime.UtcNow);
+    }
+
     public virtual async Task SyncPendingRefundsAsync(CancellationToken cancellationToken = default)
     {
         var cutoff = DateTime.UtcNow.AddHours(-24);
@@ -60,6 +115,7 @@ private readonly ApplicationDbContext _context;
                 staleRefund.ErrorMessage = "Timed out waiting for Monobank confirmation (refund abandoned)";
                 staleRefund.UpdatedAtUtc = DateTime.UtcNow;
                 await RevertPrematureRefundedOrderStatusAsync(staleRefund, cancellationToken);
+                await ApplyPaymentStatusAsync(staleRefund, observedAtUtc: null, cancellationToken);
                 _logger.LogWarning(
                     "Failed refund {RefundId} (invoice {InvoiceId}) timed out after 24h; status reset to Failed",
                     staleRefund.Id, staleRefund.InvoiceId);
@@ -209,6 +265,7 @@ private readonly ApplicationDbContext _context;
             refund.ErrorMessage = null;
             refund.UpdatedAtUtc = DateTime.UtcNow;
 
+            await ApplyPaymentStatusAsync(refund, matchingEntry.ModifiedDate, cancellationToken);
             await ApplyConfirmedRefundToOrderAsync(refund, cancellationToken);
         }
         else if (matchingEntry.Status.Equals("failure", StringComparison.OrdinalIgnoreCase))
@@ -218,6 +275,7 @@ private readonly ApplicationDbContext _context;
             refund.ErrorMessage = "Monobank reported refund failure";
             refund.UpdatedAtUtc = DateTime.UtcNow;
 
+            await ApplyPaymentStatusAsync(refund, observedAtUtc: null, cancellationToken);
             await RevertPrematureRefundedOrderStatusAsync(refund, cancellationToken);
         }
         else
