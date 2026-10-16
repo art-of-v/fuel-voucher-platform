@@ -1,6 +1,7 @@
 using FuelFlow.Features.Acquiring.Reconciliation;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.Payments.SharedModels;
 using FuelFlow.SharedKernel.Options;
 using Microsoft.EntityFrameworkCore;
 
@@ -58,11 +59,12 @@ public sealed class GetStatementReconciliationQueryHandler
                 .Where(o => o.MonobankInvoiceId != null && invoiceIds.Contains(o.MonobankInvoiceId))
                 .ToListAsync(cancellationToken);
 
-        var refunds = invoiceIds.Count == 0
-            ? new List<Refund>()
-            : await _context.Refunds
+var refunds = invoiceIds.Count == 0
+            ? new List<Payment>()
+            : await _context.Payments
                 .AsNoTracking()
-                .Where(r => invoiceIds.Contains(r.InvoiceId))
+                .Where(p => p.Kind == PaymentKind.Refund
+                         && invoiceIds.Contains(p.ProviderInvoiceId))
                 .ToListAsync(cancellationToken);
 
         var rows = StatementMatcher.Match(entries, orders, refunds);

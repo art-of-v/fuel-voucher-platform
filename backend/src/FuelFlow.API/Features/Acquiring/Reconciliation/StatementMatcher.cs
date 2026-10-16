@@ -1,5 +1,6 @@
 using System.Globalization;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Payments.SharedModels;
 
 namespace FuelFlow.Features.Acquiring.Reconciliation;
 
@@ -53,7 +54,7 @@ public static class StatementMatcher
     public static IReadOnlyList<StatementMatchRow> Match(
         IReadOnlyList<MonobankStatementEntry> entries,
         IReadOnlyList<Order> orders,
-        IReadOnlyList<Refund> refunds)
+        IReadOnlyList<Payment> refunds)
     {
         // Indexed by invoice id. Deliberately not by Reference: bulk checkouts all send
         // "FuelFlow Bundle" and every renewal sends "FuelFlow Voucher Renewal", so thousands of
@@ -66,9 +67,15 @@ public static class StatementMatcher
 
         // Same reasoning: a refund is identified by the invoice it reverses.
         var refundsByInvoice = refunds
-            .Where(r => !string.IsNullOrEmpty(r.InvoiceId))
-            .GroupBy(r => r.InvoiceId)
+            .Where(r => r.Kind == PaymentKind.Refund && !string.IsNullOrEmpty(r.ProviderInvoiceId))
+            .GroupBy(r => r.ProviderInvoiceId)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+
+        // For the human-readable note on a matched reversal. refunds.ext_ref was a copy of the
+        // order's idempotency key that could drift from it; reading the order directly is both the
+        // truth and one fewer place to fall out of sync.
+        var referenceByOrderId = orders
+            .ToDictionary(o => o.Id, o => o.IdempotencyKey ?? o.Id.ToString());
 
         var rows = new List<StatementMatchRow>(entries.Count);
 
@@ -80,11 +87,15 @@ public static class StatementMatcher
 
             if (invoiceId is not null && refundsByInvoice.TryGetValue(invoiceId, out var refund))
             {
+                var reference = referenceByOrderId.TryGetValue(refund.OrderId, out var known)
+                    ? known
+                    : refund.OrderId.ToString();
+
                 rows.Add(new StatementMatchRow(
                     entry.StatementId, StatementMatchStatus.RefundMatch, invoiceId, entry.Reference,
                     entry.AmountKopecks, amount, refund.OrderId, refund.AmountKopecks / 100m,
-                    refund.InvoiceId, null, entry.AcquirerCreatedAtUtc,
-                    $"Reversal of refund {refund.Id:N} on {refund.ExtRef}"));
+                    refund.ProviderInvoiceId, null, entry.AcquirerCreatedAtUtc,
+                    $"Reversal of refund {refund.Id:N} on {reference}"));
                 continue;
             }
 
