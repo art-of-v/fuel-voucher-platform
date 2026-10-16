@@ -685,11 +685,31 @@ jobs:
           db() { psql "postgres://postgres:$PGPASSWORD@localhost:5432/fuelflow" "$@"; }
           db -q -v ON_ERROR_STOP=1 -f schema.sql > /dev/null
           db -q -c "\\copy \"__EFMigrationsHistory\" FROM 'history.csv' WITH (FORMAT csv, HEADER true)"
+          # Order is EXPLICIT, and it must be, because the dump now contains a real foreign key:
+          # fuel_offer_volumes.offer_id -> fuel_offers.id. Alphabetically `fuel_offer_volumes`
+          # sorts BEFORE `fuel_offers` ('_' < 's'), so a glob-ordered restore loads the child first
+          # and dies on FK_fuel_offer_volumes_fuel_offers_offer_id. Nothing was wrong with the data;
+          # the restore was simply loading in an order the schema does not allow.
+          #
+          # Parent first, then child. Kept as a literal list rather than re-derived from the glob so
+          # that adding a table to TABLES is a deliberate act: a new CSV with no place in this order
+          # is skipped, not silently loaded in the wrong place - and the loop says so when it does.
+          order=(fuel_types stations fuel_offers fuel_offer_volumes)
+          for table in "${order[@]}"; do
+            f="$table.csv"
+            [ -f "$f" ] || { echo "  $table MISSING from the dump" >&2; continue; }
+            db -q -c "\\copy $table FROM '$f' WITH (FORMAT csv, HEADER true)"
+            echo "  $table restored"
+          done
+          # Anything the dump carries that this list does not name is a silent gap - the exact
+          # failure this list exists to make loud.
           for f in *.csv; do
             [ "$f" = history.csv ] && continue
             table="${f%.csv}"
-            db -q -c "\\copy $table FROM '$f' WITH (FORMAT csv, HEADER true)"
-            echo "  $table restored"
+            case " ${order[*]} " in
+              *" $table "*) ;;
+              *) echo "  $table IS IN THE DUMP BUT NOT IN THE RESTORE ORDER" >&2; exit 1 ;;
+            esac
           done
           db -t -A -c "SELECT count(*) FROM fuel_offers WHERE NOT is_deleted" | sed 's/^/live offers: /'
 

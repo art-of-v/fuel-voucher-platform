@@ -234,6 +234,8 @@ mkdir -p "$WORK/restore-tree/dryrun"
 echo "decoy,not,ours" > "$WORK/restore-tree/decoy.csv"
 echo "MigrationId,ProductVersion" > "$WORK/restore-tree/dryrun/history.csv"
 echo "id,name" > "$WORK/restore-tree/dryrun/fuel_types.csv"
+echo "id,station_id" > "$WORK/restore-tree/dryrun/fuel_offers.csv"
+echo "id,offer_id" > "$WORK/restore-tree/dryrun/fuel_offer_volumes.csv"
 echo "-- schema" > "$WORK/restore-tree/dryrun/schema.sql"
 ( cd "$WORK/restore-tree" && PATH="$WORK/bin:$PATH" PSQL_LOG="$WORK/psql.log" PGPASSWORD=postgres \
     bash "$WORK/restore.raw" ) > "$WORK/restore.out" 2>&1
@@ -256,6 +258,34 @@ if grep -q 'fuel_types' "$WORK/psql.log"; then
 else
   bad "the restore loads the tables it was given" "no fuel_types" "fuel_types restored"
 fi
+
+# The order the schema demands, asserted rather than assumed. fuel_offer_volumes.offer_id references
+# fuel_offers.id, and alphabetically "fuel_offer_volumes" sorts BEFORE "fuel_offers" ('_' < 's') -
+# so a glob-ordered restore loads the child first and the real dry run died on
+# FK_fuel_offer_volumes_fuel_offers_offer_id on 2026-10-16, against a perfectly good dump.
+offers_line="$(grep -ni 'copy fuel_offers ' "$WORK/psql.log" | head -1 | cut -d: -f1)"
+volumes_line="$(grep -ni 'copy fuel_offer_volumes ' "$WORK/psql.log" | head -1 | cut -d: -f1)"
+if [ -n "$offers_line" ] && [ -n "$volumes_line" ] && [ "$offers_line" -lt "$volumes_line" ]; then
+  ok "the parent is restored before the child that references it"
+else
+  bad "the parent is restored before the child that references it" \
+      "offers at '${offers_line:-none}', volumes at '${volumes_line:-none}'" "offers first"
+fi
+
+# A table in the dump that the restore order does not name is a silent gap, and the loop must say
+# so rather than skipping it quietly. This is what stops the next dump change from repeating this.
+: > "$WORK/psql.log"
+echo "id,x" > "$WORK/restore-tree/dryrun/brand_new_table.csv"
+( cd "$WORK/restore-tree" && PATH="$WORK/bin:$PATH" PSQL_LOG="$WORK/psql.log" PGPASSWORD=postgres \
+    bash "$WORK/restore.raw" ) > "$WORK/restore-unknown.out" 2>&1
+rc=$?
+if [ "$rc" -ne 0 ] && grep -q 'brand_new_table' "$WORK/restore-unknown.out"; then
+  ok "an unnamed table in the dump fails the restore loudly"
+else
+  bad "an unnamed table in the dump fails the restore loudly" \
+      "exit $rc, output: $(tail -1 "$WORK/restore-unknown.out")" "non-zero exit naming the table"
+fi
+rm -f "$WORK/restore-tree/dryrun/brand_new_table.csv"
 
 # The migration step. `dotnet ef` builds the project it targets, so a step that does not restore
 # first dies on a fresh runner with NETSDK1004 and never reaches a migration at all. Asserted as
