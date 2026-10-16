@@ -10,13 +10,13 @@ namespace FuelFlow.IntegrationTests;
 
 /// <summary>
 /// <c>is_test_data boolean</c> became <c>data_kind varchar NOT NULL CHECK (...)</c> on
-/// <c>fuel_packages</c> and <c>fuel_vouchers</c>. See <see cref="DataKinds"/> for the two production
+/// <c>fuel_offers</c> and <c>fuel_vouchers</c>. See <see cref="DataKinds"/> for the two production
 /// incidents that motivated it.
 /// <para>
 /// The migration is hand-written because EF's scaffold was destructive. It emitted, in this order:
 /// <c>ADD COLUMN data_kind NOT NULL DEFAULT ''</c>, then <c>DROP COLUMN is_test_data</c>, then
 /// <c>UpdateData</c> setting <c>data_kind = 'real'</c> for the thirty rows in
-/// <c>SeedData.FuelPackages</c> and nothing else. Every row the seed does not know about — which is
+/// <c>SeedData.FuelOffers</c> and nothing else. Every row the seed does not know about - which is
 /// every voucher, and every package created at runtime rather than shipped — would have landed on
 /// <c>''</c> and been rejected by the very CHECK the same migration adds.
 /// </para>
@@ -41,7 +41,7 @@ public sealed class DataKindMigrationTests : IClassFixture<TestDatabaseFixture>
 
     [Theory]
     [InlineData("fuel_vouchers")]
-    [InlineData("fuel_packages")]
+    [InlineData("fuel_offers")]
     public async Task TheBooleanIsGone_ReplacedByANamedColumn(string table)
     {
         await using var context = CreateContext();
@@ -59,7 +59,7 @@ public sealed class DataKindMigrationTests : IClassFixture<TestDatabaseFixture>
 
     [Theory]
     [InlineData("fuel_vouchers")]
-    [InlineData("fuel_packages")]
+    [InlineData("fuel_offers")]
     public async Task TheColumnIsNotNull_AndPinnedToTheKnownSet(string table)
     {
         await using var context = CreateContext();
@@ -92,49 +92,49 @@ public sealed class DataKindMigrationTests : IClassFixture<TestDatabaseFixture>
         // The regression pin. Under the scaffolded ordering this insert would have failed on the
         // CHECK with data_kind = '', and the failure would have appeared only on a database that
         // actually holds stock.
-        var package = NewPackage($"dk-pkg-{Guid.NewGuid():N}");
+        var offer = NewOffer($"dk-offer-{Guid.NewGuid():N}");
         var voucher = NewVoucher();
 
         await using (var context = CreateContext())
         {
-            context.FuelPackages.Add(package);
+            context.FuelOffers.Add(offer);
             context.FuelVouchers.Add(voucher);
             await context.SaveChangesAsync();
         }
 
         await using var verify = CreateContext();
 
-        var storedPackage = await verify.FuelPackages.AsNoTracking().SingleAsync(p => p.Id == package.Id);
+        var storedOffer = await verify.FuelOffers.AsNoTracking().SingleAsync(o => o.Id == offer.Id);
         var storedVoucher = await verify.FuelVouchers.AsNoTracking().SingleAsync(v => v.Id == voucher.Id);
 
-        storedPackage.DataKind.Should().Be(DataKinds.Real, "real unless somebody says otherwise");
+        storedOffer.DataKind.Should().Be(DataKinds.Real, "real unless somebody says otherwise");
         storedVoucher.DataKind.Should().Be(DataKinds.Real);
     }
 
     [Fact]
     public async Task TheQaFlag_RoundTrips_ThroughTheColumn()
     {
-        var package = NewPackage($"dk-qa-pkg-{Guid.NewGuid():N}", isTestData: true);
+        var offer = NewOffer($"dk-qa-offer-{Guid.NewGuid():N}", isTestData: true);
         var voucher = NewVoucher(isTestData: true);
 
         await using (var context = CreateContext())
         {
-            context.FuelPackages.Add(package);
+            context.FuelOffers.Add(offer);
             context.FuelVouchers.Add(voucher);
             await context.SaveChangesAsync();
         }
 
         await using var verify = CreateContext();
 
-        var storedPackage = await verify.FuelPackages.AsNoTracking().SingleAsync(p => p.Id == package.Id);
+        var storedOffer = await verify.FuelOffers.AsNoTracking().SingleAsync(o => o.Id == offer.Id);
         var storedVoucher = await verify.FuelVouchers.AsNoTracking().SingleAsync(v => v.Id == voucher.Id);
 
-        storedPackage.DataKind.Should().Be(DataKinds.Qa);
+        storedOffer.DataKind.Should().Be(DataKinds.Qa);
         storedVoucher.DataKind.Should().Be(DataKinds.Qa);
 
         // And the shim still reads correctly off a freshly materialised row, because that is how the
         // admin DTOs are filled.
-        storedPackage.IsTestData.Should().BeTrue();
+        storedOffer.IsTestData.Should().BeTrue();
         storedVoucher.IsTestData.Should().BeTrue();
 
         // What a cleanup and the admin list filter on. Both arms compare the mapped column: the
@@ -193,16 +193,20 @@ public sealed class DataKindMigrationTests : IClassFixture<TestDatabaseFixture>
         DataKinds.IsKnown(kind).Should().Be(expected);
     }
 
-    private static FuelPackage NewPackage(string id, bool isTestData = false)
+    /// <summary>
+    /// The pool is a property of the OFFER - it is what the storefront filters on and what
+    /// <c>EnforceDataKind</c> backfilled. So this seeds an offer, where the old version seeded a
+    /// package row, and every assertion below moved with it.
+    /// </summary>
+    private static FuelOffer NewOffer(string id, bool isTestData = false)
         => new()
         {
             Id = id,
             StationId = "okko-0001",
             FuelTypeId = "okko-95",
-            FuelName = "95",
-            Liters = 10m,
-            Price = 500m,
-            OriginalPrice = 520m,
+            SupplierPricePerLiter = 50m,
+            MarginUahPerLiter = 5m,
+            FinalPricePerLiter = 55m,
             IsTestData = isTestData,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow

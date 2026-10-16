@@ -92,7 +92,7 @@ public sealed class DataKindBackfillTests : IClassFixture<TestDatabaseFixture>
         (await CountAsync(verify, "SELECT count(*) FROM fuel_vouchers WHERE voucher_number LIKE 'BK-KEEP-%'"))
             .Should().Be(2, "the old column is dropped only after the new one has been filled from it");
 
-        (await CountAsync(verify, "SELECT count(*) FROM fuel_packages WHERE id LIKE 'bk-keep-%'"))
+        (await CountAsync(verify, "SELECT count(*) FROM fuel_offer_volumes WHERE id LIKE 'bk-keep-%'"))
             .Should().Be(2);
 
         // One string column rather than a two-column projection: Npgsql will not map a composite type out
@@ -106,8 +106,13 @@ public sealed class DataKindBackfillTests : IClassFixture<TestDatabaseFixture>
             "BK-KEEP-REAL|real"  // unflagged before, real after
         });
 
-        var packageKinds = await ReadKeysAsync(verify, "fuel_packages", "id", "'bk-keep-%'");
-        packageKinds.Should().BeEquivalentTo(new[]
+        // Read from fuel_offer_volumes, not fuel_packages. The rows are still seeded into the old
+        // table - it is the only shape that exists at BeforeDataKind - but the split gave each
+        // volume the id of the package row it replaced, so the value is asserted where it now
+        // lives. That makes this test cover two migrations rather than one: the boolean-to-name
+        // rename AND the collapse into a volume.
+        var volumeKinds = await ReadVolumeKindsAsync(verify, "'bk-keep-%'");
+        volumeKinds.Should().BeEquivalentTo(new[]
         {
             $"{qaPackage}|qa",
             $"{realPackage}|real"
@@ -231,6 +236,23 @@ public sealed class DataKindBackfillTests : IClassFixture<TestDatabaseFixture>
     }
 
     /// <summary>"key|kind" for every row matching the filter — see the note on the caller.</summary>
+    /// <summary>
+    /// "volumeId|pool" for every matching volume. A join, because <c>data_kind</c> is a property of
+    /// the OFFER: reading it off the volume is not a shorter query, it is a wrong one.
+    /// </summary>
+    private static async Task<List<string>> ReadVolumeKindsAsync(
+        ApplicationDbContext context,
+        string filter)
+    {
+        var sql = $"""
+            SELECT v.id || '|' || o.data_kind
+            FROM fuel_offer_volumes v
+            JOIN fuel_offers o ON o.id = v.offer_id
+            WHERE v.id LIKE {filter}
+            """;
+        return await context.Database.SqlQueryRaw<string>(sql).ToListAsync();
+    }
+
     private static async Task<List<string>> ReadKeysAsync(
         ApplicationDbContext context,
         string table,

@@ -77,7 +77,8 @@ SCHEMA
   *COPY*__EFMigrationsHistory*) echo "MigrationId,ProductVersion"; echo "20240101_Initial,1.0.0" ;;
   *COPY*fuel_types*)            echo "id,name"; echo "1,A-95" ;;
   *COPY*stations*)              echo "id,name"; echo "1,OKKO" ;;
-  *COPY*fuel_packages*)         echo "id,station_id"; echo "1,1" ;;
+  *COPY*fuel_offers*)          echo "id,station_id"; echo "1,1" ;;
+  *COPY*fuel_offer_volumes*)   echo "id,offer_id"; echo "1,1" ;;
   *COPY*)                       [ -n "${LEAK_INTO:-}" ] && printf 'number,qr_payload\n1234,eyJzaWduYXR1cmUiOiJ4In0=\n' ;;
 esac
 exit 0
@@ -86,7 +87,7 @@ chmod +x "$WORK/bin/docker"
 
 # Runs the real extracted block and echoes the argv the stub docker collected.
 run_dump() {
-  local tables="${1:-fuel_types stations fuel_packages}"
+  local tables="${1:-fuel_types stations fuel_offers fuel_offer_volumes}"
   : > "$WORK/argv"
   ( PATH="$WORK/bin:$PATH" ARGV_LOG="$WORK/argv" RUNNER_TEMP="$WORK/runner" TABLES="$tables" \
     bash "$WORK/dump.raw" ) > "$WORK/out" 2>&1
@@ -130,7 +131,7 @@ eq "every call carries -U fuelflow -d fuelflow" "$missing" ""
 # The exit code is the assertion: 0 means the upload was allowed, non-zero means the block stopped.
 # These two cases bracket the bug that shipped - a guard that scans the schema dump refuses every
 # run, because "qr_payload" is a column name that pg_dump puts in the DDL.
-run_block() { : > "$WORK/argv"; ( PATH="$WORK/bin:$PATH" ARGV_LOG="$WORK/argv" RUNNER_TEMP="$WORK/runner" TABLES="fuel_types stations fuel_packages" bash "$WORK/dump.raw" ) >"$WORK/out" 2>&1; }
+run_block() { : > "$WORK/argv"; ( PATH="$WORK/bin:$PATH" ARGV_LOG="$WORK/argv" RUNNER_TEMP="$WORK/runner" TABLES="fuel_types stations fuel_offers fuel_offer_volumes" bash "$WORK/dump.raw" ) >"$WORK/out" 2>&1; }
 
 # Baseline: the block as it stands, against a stub schema that mentions qr_payload as a column name.
 run_block; rc=$?
@@ -144,7 +145,7 @@ fi
 # `rm -rf "$out"` and would delete anything written before it ran - which is exactly how a guard
 # test can pass for the wrong reason.
 ( PATH="$WORK/bin:$PATH" ARGV_LOG="$WORK/argv" RUNNER_TEMP="$WORK/runner" LEAK_INTO=1 \
-  TABLES="fuel_types stations fuel_packages fuel_offers" bash "$WORK/dump.raw" ) >"$WORK/leak" 2>&1
+  TABLES="fuel_types stations fuel_offers fuel_offer_volumes fingerprint_leak" bash "$WORK/dump.raw" ) >"$WORK/leak" 2>&1
 rc=$?
 if [ "$rc" -ne 0 ] && grep -q "refusing to upload" "$WORK/leak"; then
   ok "a qr_payload VALUE in a data file refuses the upload"
@@ -155,7 +156,7 @@ fi
 # And the other arm: TABLES is widened to name the vouchers table outright, so a file with that name
 # lands in the artifact whatever its content.
 ( PATH="$WORK/bin:$PATH" ARGV_LOG="$WORK/argv" RUNNER_TEMP="$WORK/runner" \
-  TABLES="fuel_types stations fuel_packages fuel_vouchers" bash "$WORK/dump.raw" ) >"$WORK/wide" 2>&1
+  TABLES="fuel_types stations fuel_offers fuel_offer_volumes fuel_vouchers" bash "$WORK/dump.raw" ) >"$WORK/wide" 2>&1
 rc=$?
 if [ "$rc" -ne 0 ] && [ -e "$WORK/runner/dryrun/fuel_vouchers.csv" ]; then
   ok "dumping the vouchers table still refuses the upload"

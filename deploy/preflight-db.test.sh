@@ -77,7 +77,7 @@ run() { # env assignments... -- runs the preflight in --data-only mode
 # ------------------------------------------------------------------------------
 out="$(run DOCKER_STUB_RUNNING=1 DOCKER_STUB_ROWS= DOCKER_STUB_STRICT_UNUSED=1)"
 check "a clean database exits 0" "0" "$?"
-contains "the file is reported ok" "010-fuel-package-single-price.sql: ok" "$out"
+contains "the file is reported ok" "010-offer-volume-price-agreement.sql: ok" "$out"
 contains "and satisfaction is stated with a count" "all data preconditions satisfied (1 checked)" "$out"
 # The regression, stated on its own. psql prints BEGIN, SET and COMMIT to stdout whatever -t -A
 # says, so counting non-empty lines calls those three a violation on a database that is fine — which
@@ -88,17 +88,17 @@ lacks "psql's own chatter is not counted as a violation" "VIOLATED" "$out"
 # ------------------------------------------------------------------------------
 # A violated precondition
 # ------------------------------------------------------------------------------
-out="$(run DOCKER_STUB_RUNNING=1 DOCKER_STUB_ROWS='a|b|real|2|final_price_per_liter|2')"
+out="$(run DOCKER_STUB_RUNNING=1 DOCKER_STUB_ROWS='offer-1|klo|ft-1|real|10.00|2.50')"
 check "a violation is a WARNING, not a failure, by default" "0" "$?"
 contains "the violation is named" "VIOLATED" "$out"
-contains "the offending file is named" "010-fuel-package-single-price.sql: VIOLATED" "$out"
-contains "the rows are shown, indented under the warning" "a|b|real|2|final_price_per_liter|2" "$out"
+contains "the offending file is named" "010-offer-volume-price-agreement.sql: VIOLATED" "$out"
+contains "the rows are shown, indented under the warning" "offer-1|klo|ft-1|real|10.00|2.50" "$out"
 lacks "and it does not claim the preconditions were satisfied" "all data preconditions satisfied" "$out"
 
 # ------------------------------------------------------------------------------
 # Strict mode: the same database, now blocking
 # ------------------------------------------------------------------------------
-out="$(run DOCKER_STUB_RUNNING=1 DOCKER_STUB_ROWS='a|b|real|2|final_price_per_liter|2' PREFLIGHT_DB_STRICT=1)"
+out="$(run DOCKER_STUB_RUNNING=1 DOCKER_STUB_ROWS='offer-1|klo|ft-1|real|10.00|2.50' PREFLIGHT_DB_STRICT=1)"
 check "strict mode blocks the deploy" "1" "$?"
 contains "and says why" "PREFLIGHT_DB_STRICT=1" "$out"
 # The whole point of testing the order: "Preflight passed" printed before an exit 1 is a

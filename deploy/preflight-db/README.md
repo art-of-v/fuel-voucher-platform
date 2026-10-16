@@ -34,8 +34,29 @@ Staging could not catch it: staging's `fuel_packages` holds no imported fuel typ
 simply is not there to be found. The same condition asked here, before the pull, is a thirty-second
 answer instead of an outage.
 
-**Both places keep the guard.** A precondition passing is not a promise, and the migration must
-still refuse rather than pick a copy if the data changes between the preflight and the boot.
+**Both places kept the guard.** A precondition passing is not a promise, and the migration had to
+still refuse rather than pick a copy if the data changed between the preflight and the boot.
+
+## What `010` asks now
+
+The file was renamed and rewritten when `DropFuelPackages` removed the table the original detector
+read. The question changed shape, not purpose.
+
+The old detector counted how many distinct values a `(station, fuel, pool)` group held for each
+per-litre column on `fuel_packages`. Per-litre pricing then moved onto `fuel_offers`, and the unique
+index on `(station_id, fuel_type_id, data_kind)` makes one group exactly one row — so that
+disagreement is no longer representable and there would be nothing to count.
+
+What is still expressible is the pair that now holds a price in two places: an offer names a rate, a
+volume names what that nominal costs, and nothing ties them together. So `010` now reports every live
+volume whose price disagrees with its offer by more than half a kopeck — **in UAH**, as
+`discrepancy_uah`, because that is what a customer would be over- or under-charged and it is the
+number a human resolving it needs. Offers with no `final_price_per_liter` are skipped, not reported:
+there is no rate to disagree with, and firing on the legacy cost-plus rows the pricing migration
+deliberately left alone would put a permanent warning on the deploy path.
+
+The tests are `OfferVolumePriceAgreementTests`, and they read this file from disk rather than
+repeating its SQL — so the two cannot drift apart.
 
 ## Adding a file
 
@@ -56,5 +77,5 @@ adding the check.
 Running one by hand:
 
 ```bash
-docker exec -i fuelflow-postgres psql -U fuelflow -d fuelflow -X -f - < deploy/preflight-db/010-fuel-package-single-price.sql
+docker exec -i fuelflow-postgres psql -U fuelflow -d fuelflow -X -f - < deploy/preflight-db/010-offer-volume-price-agreement.sql
 ```
