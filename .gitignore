@@ -102,3 +102,6 @@ GEMINI.md
 
 admin/src/**/*.js
 admin/src/**/*.js.map
+# Screenshots written by admin/scripts/preview-theme.mjs. A generated artifact of a theme
+# preview - it changes on every run and was never meant to be tracked.
+admin/preview-*.png
