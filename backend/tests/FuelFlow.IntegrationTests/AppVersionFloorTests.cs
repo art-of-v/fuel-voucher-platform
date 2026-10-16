@@ -28,7 +28,7 @@ namespace FuelFlow.IntegrationTests;
 /// <para>
 /// The opposite requirement - that the floor is <em>above</em> the published build - cannot be
 /// checked from this repository, because the repository does not know what the stores serve. That
-/// direction is a deliberate decision per release (see <see cref="PublishedInStores"/>), not an
+/// direction is a deliberate decision per release (see <see cref="PublishedOnAppStore"/>), not an
 /// invariant, so there is no test for it here.
 /// </para>
 /// </summary>
@@ -50,7 +50,52 @@ public class AppVersionFloorTests
     /// every sub-1.1.0 device on 2026-10-16 was iOS (<c>SELECT app_version, device_model FROM devices
     /// WHERE app_version &lt;&gt; '1.1.0'</c>). Re-run it before raising the floor again.
     /// </remarks>
-    private const string PublishedInStores = "1.1.0";
+    /// <summary>
+    /// The version each store actually serves, per store, and <c>null</c> for a store nothing has
+    /// ever been published to.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This used to be one constant called <c>PublishedInStores</c> reading <c>"1.1.0"</c>. That was
+    /// a claim about <em>both</em> stores, and it was true of exactly one: iOS shipped 1.1.0 on
+    /// 2026-10-16, while no Android build has ever been published to Play at all. A single constant
+    /// cannot say "1.1.0" and "never published" at the same time, so it said neither — it claimed
+    /// 1.1.0 everywhere, and the check built on it guarded a store that has nothing.
+    /// </para>
+    /// <para>
+    /// The hazard it was supposed to catch is real and narrow: if an Android build <em>older</em> than
+    /// the floor is ever published, every Android user on it hits the forced-update wall and cannot
+    /// use the app. That is #291's incident, and with Play empty it cannot happen yet.
+    /// </para>
+    /// <para>
+    /// <b>Why Play is still a constant and not an observation.</b> Apple publishes a free, unauthenticated
+    /// lookup endpoint that returns the live version, so <see cref="AppVersionFloorLiveTests"/> can
+    /// watch iOS for real. Google has no equivalent, and reaching the Play Console needs credentials
+    /// this repository deliberately does not hold. So the honest thing for Play is to make "nothing
+    /// published" <em>expressible</em> — which it is not while the value is a non-null string — and to
+    /// catch the real risk from the fleet instead, which
+    /// <see cref="AppVersionFloorLiveTests.Floor_DoesNotWallAnyDeviceActuallyInUse"/> does.
+    /// </para>
+    /// <para>
+    /// Bump a store's entry in the same PR that submits the build, never the one that prepares it.
+    /// </para>
+    /// </remarks>
+    private const string? PublishedOnAppStore = "1.1.0";
+
+    /// <summary>
+    /// Nothing has ever been published to Google Play from this tree, and that is a fact rather than
+    /// an omission. <c>null</c> means "this store has no users, so it cannot constrain the floor".
+    /// </summary>
+    private const string? PublishedOnPlayStore = null;
+
+    /// <summary>
+    /// Every store that has something published, which is what the floor has to respect.
+    /// </summary>
+    private static readonly (string Store, string? Version)[] Stores =
+    {
+        ("App Store", PublishedOnAppStore),
+        ("Google Play", PublishedOnPlayStore),
+    };
 
     private static string RepositoryRoot()
     {
@@ -75,7 +120,7 @@ public class AppVersionFloorTests
     /// by part, treating a missing part as zero. Done here rather than asserted against a constant
     /// so the test keeps working when either number is bumped.
     /// </summary>
-    private static int Compare(string left, string right)
+    internal static int Compare(string left, string right)
     {
         var a = left.Split('.').Select(int.Parse).ToArray();
         var b = right.Split('.').Select(int.Parse).ToArray();
@@ -111,7 +156,7 @@ public class AppVersionFloorTests
         return doc.RootElement.GetProperty("expo").GetProperty("version").GetString()!;
     }
 
-    private static string ConfiguredFloor()
+    internal static string ConfiguredFloor()
     {
         var path = Path.Combine(RepositoryRoot(), "backend", "src", "FuelFlow.API", "appsettings.json");
         using var doc = JsonDocument.Parse(File.ReadAllText(path), Lenient);
@@ -151,14 +196,39 @@ public class AppVersionFloorTests
     /// check above passed while every real user was locked out.
     /// </summary>
     [Fact]
-    public void Floor_DoesNotExcludeTheVersionLiveInTheStores()
+    public void Floor_DoesNotExcludeTheVersionLiveInAnyStoreThatHasOne()
     {
         var floor = ConfiguredFloor();
 
-        Compare(PublishedInStores, floor).Should().BeGreaterThanOrEqualTo(0,
-            $"AppVersion:MinimumVersion demands {floor} but the stores serve {PublishedInStores}: " +
-            "every user on the installed build would hit the forced-update wall and be sent to a " +
-            "store that cannot give them that version");
+        foreach (var (store, published) in Stores.Where(s => s.Version is not null))
+        {
+            Compare(published!, floor).Should().BeGreaterThanOrEqualTo(0,
+                $"AppVersion:MinimumVersion demands {floor} but {store} serves {published}: every " +
+                "user on the installed build would hit the forced-update wall and be sent to a " +
+                "store that cannot give them that version");
+        }
+    }
+
+    /// <summary>
+    /// A store with nothing published constrains nothing, and that is the whole reason the value is
+    /// nullable rather than an empty string or a sentinel. Asserted rather than assumed, because the
+    /// failure mode is silent: with Play absent from the list, the floor is genuinely unconstrained
+    /// there, and a reader who does not know that could assume the floor is being checked against
+    /// Play when it is not.
+    /// </summary>
+    [Fact]
+    public void AStoreWithNothingPublishedIsExcludedRatherThanTreatedAsZero()
+    {
+        Stores.Should().Contain(s => s.Version == null,
+            "Google Play has nothing published, and pretending otherwise would either break the " +
+            "comparison or, worse, silently constrain the floor to an empty string");
+
+        foreach (var (store, published) in Stores.Where(s => s.Version != null))
+        {
+            (Version.TryParse(published, out _) ? published! : "unparseable").Should().NotBe("unparseable",
+                $"{store} is recorded as serving {published}, which is not a version, so every " +
+                "comparison below would be comparing noise");
+        }
     }
 
     /// <summary>
@@ -172,8 +242,11 @@ public class AppVersionFloorTests
     {
         var shipped = ShippedVersion();
 
-        Compare(PublishedInStores, shipped).Should().BeLessThanOrEqualTo(0,
-            $"the stores are recorded as serving {PublishedInStores} but app.json already ships " +
-            $"{shipped}: record the version in the stores only once a build carrying it is submitted");
+        foreach (var (store, published) in Stores.Where(s => s.Version is not null))
+        {
+            Compare(published!, shipped).Should().BeLessThanOrEqualTo(0,
+                $"{store} is recorded as serving {published} but app.json already ships " +
+                $"{shipped}: record the version in the stores only once a build carrying it is submitted");
+        }
     }
 }
