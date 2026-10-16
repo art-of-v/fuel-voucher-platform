@@ -165,29 +165,47 @@ public class FulfillmentService
                         currentOrder = freshOrder;
                     }
 
-                    var lineItemCounts = currentOrder.LineItems?
+var lineItemCounts = currentOrder.LineItems?
                         .GroupBy(li => li.Liters)
                         .ToDictionary(g => g.Key, g => g.Sum(li => li.Quantity))
-                        ?? [];
+                    ?? [];
 
-                    var fulfillments = await _context.Fulfillments
-                        .Where(f => f.OrderId == currentOrder.Id)
-                        .ToListAsync(cancellationToken);
+var fulfillments = await _context.Fulfillments
+        .Where(f => f.OrderId == currentOrder.Id)
+        .ToListAsync(cancellationToken);
 
-                    var fulfillmentVoucherIds = fulfillments.Select(f => f.VoucherId).ToList();
+var fulfillmentVoucherIds = fulfillments.Select(f => f.VoucherId).ToList();
 
-                    var vouchers = fulfillmentVoucherIds.Count != 0
-                        ? await _context.FuelVouchers
-                            .Where(v => fulfillmentVoucherIds.Contains(v.Id))
-                            .ToListAsync(cancellationToken)
-                        : [];
+var vouchers = fulfillmentVoucherIds.Count != 0
+    ? await _context.FuelVouchers
+        .Where(v => fulfillmentVoucherIds.Contains(v.Id))
+        .ToListAsync(cancellationToken)
+    : [];
 
-                    var voucherCounts = vouchers
-                        .GroupBy(v => v.Liters)
-                        .ToDictionary(g => g.Key, g => g.Count());
+var vouchersById = vouchers.ToDictionary(v => v.Id);
 
-                    var hasMismatch = lineItemCounts.Any(kv =>
-                        !voucherCounts.TryGetValue(kv.Key, out var count) || count != kv.Value);
+var voucherCounts = vouchers
+    .GroupBy(v => v.Liters)
+    .ToDictionary(g => g.Key, g => g.Count());
+
+// Per-line comparison is only sound when every fulfilment names its line. A single unattributed
+// row would make the per-line counts disagree with reality in a way that reads as a short delivery,
+// and the repair below would then take fuel from a customer to "fix" it.
+var fullyAttributed = fulfillments.Count > 0 && fulfillments.All(f => f.LineItemId.HasValue);
+
+var hasMismatch = fullyAttributed
+    ? HasPerLineMismatch(currentOrder.LineItems, fulfillments)
+    : lineItemCounts.Any(kv =>
+        !voucherCounts.TryGetValue(kv.Key, out var count) || count != kv.Value);
+
+if (!fullyAttributed && fulfillments.Count > 0)
+{
+    // Worth saying, because this is the weaker comparison and an operator reading the log should know
+    // which one produced the verdict below.
+    _logger.LogInformation(
+        "Order {OrderId}: {Unattributed} of {Total} fulfilments carry no line, so the count is compared by litres",
+        currentOrder.Id, fulfillments.Count(f => f.LineItemId is null), fulfillments.Count);
+}
 
                     // How many vouchers this order is about to have taken back, held until the
                     // transaction has committed. 0 means there is nothing to announce afterwards.
@@ -229,22 +247,19 @@ public class FulfillmentService
                         var excessVouchers = new List<(Fulfillment Fulfillment, FuelVoucher Voucher)>();
                         var releasedCount = 0;
 
-                        foreach (var kv in voucherCounts)
+                        // Release the excess out of the line that was over-delivered, not out of a
+                        // litres bucket. Under the litres fallback the two are the same thing; under a
+                        // per-line verdict they are not, and releasing across lines would take fuel
+                        // from a customer whose own line was satisfied correctly.
+                        var excessToRelease = fullyAttributed
+                            ? ExcessPerLine(currentOrder.LineItems, fulfillments)
+                            : ExcessPerLitres(lineItemCounts, voucherCounts, fulfillments, vouchers);
+
+                        foreach (var fulfillment in excessToRelease)
                         {
-                            var needed = lineItemCounts.GetValueOrDefault(kv.Key, 0);
-                            var excess = kv.Value - needed;
-
-                            if (excess > 0)
+                            if (vouchersById.TryGetValue(fulfillment.VoucherId, out var voucher))
                             {
-                                var toRemove = fulfillments
-                                    .Join(vouchers.Where(v => v.Liters == kv.Key),
-                                        f => f.VoucherId, v => v.Id,
-                                        (f, v) => (Fulfillment: f, Voucher: v))
-                                    .OrderByDescending(x => x.Fulfillment.FulfilledAtUtc)
-                                    .Take(excess)
-                                    .ToList();
-
-                                excessVouchers.AddRange(toRemove);
+                                excessVouchers.Add((fulfillment, voucher));
                             }
                         }
 
@@ -351,6 +366,113 @@ public class FulfillmentService
     {
         var since = DateTime.UtcNow - (order.FulfilledAtUtc ?? order.CreatedAtUtc);
         return since <= TimeSpan.FromMinutes(ReconciliationGraceMinutes);
+    }
+
+    /// <summary>
+    /// Whether the order was delivered what each of its lines asked for.
+    /// </summary>
+    /// <remarks>
+    /// The litres-only comparison this replaces could not tell two lines of the same volume apart.
+    /// An order for "OKKO A95 10 L x2" and "WOG A95 10 L x1" that received three OKKO vouchers and
+    /// no WOG voucher produced <c>10 L: 3</c> on both sides and passed. The customer was short a line,
+    /// the order read as fulfilled, and the repair - which released the excess from the same litres
+    /// bucket - had no way to know which delivery was wrong.
+    /// <para>
+    /// A line with nothing against it is a mismatch, which is the half of the check that mattered
+    /// most: the old form could only ever see a count going the wrong way in aggregate.
+    /// </para>
+    /// </remarks>
+    private static bool HasPerLineMismatch(
+        ICollection<OrderLineItem>? lineItems,
+        List<Fulfillment> fulfillments)
+    {
+        if (lineItems is null)
+        {
+            return fulfillments.Count > 0;
+        }
+
+        var delivered = fulfillments
+            .GroupBy(f => f.LineItemId!.Value)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        foreach (var line in lineItems)
+        {
+            if (delivered.GetValueOrDefault(line.Id) != line.Quantity)
+            {
+                return true;
+            }
+        }
+
+        // A fulfillment pointing at a line this order does not have would otherwise pass every
+        // per-line check while adding to no bucket.
+        return delivered.Keys.Any(id => lineItems.All(li => li.Id != id));
+    }
+
+    /// <summary>
+    /// The fulfilments to release, newest first within whatever bucket they belong to.
+    /// </summary>
+    /// <remarks>
+    /// Newest first because a later delivery is the more likely double: a replayed callback, a second
+    /// worker that got there first. That is the same reason the litres version ordered by
+    /// <c>FulfilledAtUtc</c> descending, applied per line rather than per litre count.
+    /// </remarks>
+    private static List<Fulfillment> ExcessPerLine(
+        ICollection<OrderLineItem>? lineItems,
+        List<Fulfillment> fulfillments)
+    {
+        var excess = new List<Fulfillment>();
+
+        if (lineItems is null)
+        {
+            return excess;
+        }
+
+        foreach (var line in lineItems)
+        {
+            var forLine = fulfillments.Where(f => f.LineItemId == line.Id).ToList();
+            var over = forLine.Count - line.Quantity;
+
+            if (over > 0)
+            {
+                excess.AddRange(forLine.OrderByDescending(f => f.FulfilledAtUtc).Take(over));
+            }
+        }
+
+        return excess;
+    }
+
+    /// <summary>
+    /// The pre-attribute comparison, kept for fulfilments that carry no line.
+    /// </summary>
+    /// <remarks>
+    /// Historical rows, and anything written before the column existed. It cannot tell two lines of the
+    /// same volume apart, which is why it is only reached when no row names its line - and why the
+    /// backfill filled in everything it could rather than leaving all of it null.
+    /// </remarks>
+    private static List<Fulfillment> ExcessPerLitres(
+        Dictionary<decimal, int> lineItemCounts,
+        Dictionary<decimal, int> voucherCounts,
+        List<Fulfillment> fulfillments,
+        List<FuelVoucher> vouchers)
+    {
+        var excess = new List<Fulfillment>();
+
+        foreach (var (litres, count) in voucherCounts)
+        {
+            var over = count - lineItemCounts.GetValueOrDefault(litres, 0);
+
+            if (over <= 0)
+            {
+                continue;
+            }
+
+            excess.AddRange(fulfillments
+                .Join(vouchers.Where(v => v.Liters == litres), f => f.VoucherId, v => v.Id, (f, _) => f)
+                .OrderByDescending(f => f.FulfilledAtUtc)
+                .Take(over));
+        }
+
+        return excess;
     }
 
     private static string Describe(Dictionary<decimal, int> counts)
@@ -647,6 +769,10 @@ public class FulfillmentService
                     {
                         OrderId = order.Id,
                         VoucherId = availableVoucher.Id,
+                        // The line is in scope here, so this is exact rather than inferred. Without it
+                        // the reconciliation can only compare litres, which cannot tell two lines of
+                        // the same volume apart - see Fulfillment.LineItemId.
+                        LineItemId = lineItem.Id,
                         FulfilledAtUtc = DateTime.UtcNow
                     };
 
@@ -1102,6 +1228,7 @@ public class FulfillmentService
                     {
                         OrderId = orderId,
                         VoucherId = source.Id,
+                        LineItemId = item.LineItemId,
                         FulfilledAtUtc = now
                     });
                     fulfilledCount++;
@@ -1176,6 +1303,7 @@ public class FulfillmentService
                     {
                         OrderId = orderId,
                         VoucherId = stock.Id,
+                        LineItemId = item.LineItemId,
                         FulfilledAtUtc = now
                     });
                     fulfilledCount++;

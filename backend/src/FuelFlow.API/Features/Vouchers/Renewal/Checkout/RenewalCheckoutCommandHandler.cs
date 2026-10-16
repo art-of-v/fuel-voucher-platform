@@ -353,12 +353,21 @@ public sealed class RenewalCheckoutCommandHandler
 
         _context.Orders.Add(order);
 
-        foreach (var line in resolved)
+        for (var i = 0; i < resolved.Count; i++)
         {
+            var line = resolved[i];
+
+            // Both objects exist and both are ordered the same way, so the pairing is taken here
+            // while it is unambiguous. Reconstructing it at fulfilment time would mean matching on
+            // (brand, fuel, litres) with no ordering guarantee - the same ambiguity that made the
+            // litres-only reconciliation able to pass a short order.
+            var lineItem = order.LineItems.ElementAt(i);
+
             _context.VoucherRenewalItems.Add(new VoucherRenewalItem
             {
                 Id = Guid.CreateVersion7(),
                 OrderId = order.Id,
+                LineItemId = lineItem.Id,
                 SourceVoucherId = line.Source.Id,
                 TermCode = line.Term.Code(),
                 AmountPaid = line.LineAmount,

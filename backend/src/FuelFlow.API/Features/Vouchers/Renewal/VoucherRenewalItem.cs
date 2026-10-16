@@ -25,6 +25,24 @@ public sealed class VoucherRenewalItem
     /// <summary>The customer's voucher being renewed/replaced.</summary>
     public Guid SourceVoucherId { get; set; }
 
+    /// <summary>
+    /// The order line this renewal charges, named explicitly at checkout.
+    /// </summary>
+    /// <remarks>
+    /// A renewal order does carry line items — one per renewed voucher, mirroring the source's
+    /// brand/fuel/nominal — and they exist so the shared refund maths keeps working. Until this
+    /// column, the correspondence between a renewal item and its line was only positional, and the
+    /// fulfilment path reads these rows by order id with no guaranteed ordering. Matching them
+    /// afterwards on (brand, fuel, litres) is the same ambiguity the fulfilment reconciliation just
+    /// had, moved one level up: a batch renewing two 10 L vouchers of the same fuel has two candidate
+    /// lines and nothing to choose between them.
+    /// <para>
+    /// Set where both objects are in hand, which is the one moment the truth is available. Null for
+    /// rows predating it; those renewals simply keep <c>Fulfillment.LineItemId</c> null too.
+    /// </para>
+    /// </remarks>
+    public Guid? LineItemId { get; set; }
+
     /// <summary>The bought term as a stable <see cref="VoucherRenewalTerm.Code"/> (1w/2w/1m…6m).</summary>
     public string TermCode { get; set; } = string.Empty;
 

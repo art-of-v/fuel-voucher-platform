@@ -219,6 +219,11 @@ level stored in `roles.level` and the authority matrix enforced in
    `(provider, fuelTypeId, liters)` via **FEFO**; the order → `Fulfilled`, or `PartiallyFulfilled` when
    stock ran short between the checkout gate and the claim (or when the order predates that gate).
    `NotificationService` then creates an in-app notification.
+   **Each fulfilment records the line it satisfied** (`fulfillments.line_item_id`), which is what lets
+   the same job's reconciliation compare *per line* rather than per litre count. Litres cannot
+   distinguish `OKKO A95 10 L ×2` from `WOG A95 10 L ×1`, so an order short on one line while
+   over-delivered on the other compared equal and passed. Rows written before the column stay null and
+   fall back to the litres comparison — see `FulfillmentService.HasPerLineMismatch`.
 5. The app polls `GET /api/vouchers/my` + `GET /api/sync/orders`; redemption at the pump is
    self-reported via `PATCH /api/vouchers/{id}/mark-used`.
 
@@ -331,7 +336,7 @@ The primary tables:
 | `orders` / `order_line_items` | Purchase orders and their line items (UAH); `kind` = `Purchase` \| `Renewal` \| `ReceivedFromCompany` (a company→worker handover, priced 0, with `source_order_id` naming the purchase the fuel came from) |
 | `payments` | **A payment as an entity, not four columns on `orders`.** One row per acquirer invoice, written when the invoice is created and moved by the webhook or the statement. Carries `paid_at_utc` (when the money moved), `status` (`Pending`/`Succeeded`/`Failed`/`Cancelled`/`Expired`), and **both** amounts: `amount_uah`/`amount_kopecks` are what we billed and `provider_amount_kopecks` is what the acquirer reported. `ck_payments_amount_units_agree` keeps the first two from drifting; the third is deliberately **not** constrained against them, because a mismatch is the finding. See `docs/TARGET_SCHEMA.md` D-10 |
 | `webhook_events` | **Every acquirer callback, stored verbatim before anything acts on it.** `UNIQUE (provider, provider_event_id)` is the idempotency guarantee — a redelivery is refused by Postgres, not judged by a handler. `attempts > 1` means the acquirer retried us. `status` = `Received`/`Processed`/`Ignored`/`Failed`, and `Failed` is reachable through a partial index because it means "we were told and did nothing". Monobank sends no event id, so `provider_event_id` is derived from `(invoice, status, modifiedDate)` — see `WebhookEventIdentity`. See `docs/TARGET_SCHEMA.md` D-11 |
-| `fulfillments` | Junction linking orders to the vouchers that satisfy them |
+| `fulfillments` | Junction linking orders to the vouchers that satisfy them, and **which line** of the order each one satisfied (`line_item_id`, nullable — see below) |
 | `refunds` | Refund records (amount in **kopecks**, `bigint`; one per order) |
 | `monobank_statement_entries` | Acquirer statement rows as imported — immutable evidence, never rewritten by a re-import |
 | `voucher_imports` / `voucher_import_errors` | Batch PDF import jobs + per-voucher failures |
