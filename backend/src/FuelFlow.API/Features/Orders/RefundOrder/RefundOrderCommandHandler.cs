@@ -254,6 +254,7 @@ public sealed class RefundOrderCommandHandler
         if (refundPayment is null)
         {
             refundPayment = PaymentFactory.CreateRefund(
+                refund.Id,
                 order,
                 capture,
                 amount,
@@ -282,10 +283,9 @@ public sealed class RefundOrderCommandHandler
             refundPayment.UpdatedAtUtc = DateTime.UtcNow;
         }
 
-        // The bridge to the `refunds` row, until that table is the view. Deliberately set at the
-        // call site rather than in the factory, so removing the column later is a deletion here and
-        // not a change to how every payment is built.
-        refundPayment.RefundId = refund.Id;
+        // No bridge to the `refunds` row is needed: CreateRefund was handed refund.Id, so the payment
+        // and the refund are the same identity. That is what lets payments.refund_id go away now
+        // rather than in the final stage - it was only ever pointing from one row to its twin.
 
         try
         {

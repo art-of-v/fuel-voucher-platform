@@ -1986,10 +1986,6 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("provider_payment_id");
 
-                    b.Property<Guid?>("RefundId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("refund_id");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(16)
@@ -2010,8 +2006,6 @@ namespace FuelFlow.API.Migrations
 
                     b.HasIndex("ParentPaymentId")
                         .HasDatabaseName("ix_payments_parent_payment_id");
-
-                    b.HasIndex("RefundId");
 
                     b.HasIndex("WebhookEventId")
                         .HasDatabaseName("ix_payments_webhook_event_id");
@@ -4065,11 +4059,6 @@ namespace FuelFlow.API.Migrations
                     b.HasOne("FuelFlow.Payments.SharedModels.Payment", null)
                         .WithMany()
                         .HasForeignKey("ParentPaymentId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("FuelFlow.Features.Orders.SharedModels.Refund", null)
-                        .WithMany()
-                        .HasForeignKey("RefundId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Order");

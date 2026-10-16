@@ -73,7 +73,7 @@ private readonly ApplicationDbContext _context;
         CancellationToken cancellationToken)
     {
         var payment = await _context.Payments
-            .FirstOrDefaultAsync(p => p.RefundId == refund.Id, cancellationToken);
+            .FirstOrDefaultAsync(p => p.Id == refund.Id && p.Kind == PaymentKind.Refund, cancellationToken);
 
         if (payment is null)
         {

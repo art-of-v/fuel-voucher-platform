@@ -2,6 +2,7 @@ using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.Payments.SharedModels;
 using FuelFlow.SharedKernel;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -45,10 +46,10 @@ public sealed class GetReportQueryHandler
             .ToListAsync(cancellationToken);
 
         var orderIds = orders.Select(o => o.Id).ToList();
-        var refundsByOrder = await _context.Refunds
+        var refundsByOrder = await _context.Payments
             .AsNoTracking()
-            .Where(r => orderIds.Contains(r.OrderId))
-            .ToDictionaryAsync(r => r.OrderId, cancellationToken);
+            .Where(p => p.Kind == PaymentKind.Refund && orderIds.Contains(p.OrderId))
+            .ToDictionaryAsync(p => p.OrderId, cancellationToken);
 
         var vouchersQuery = _context.FuelVouchers
             .AsNoTracking()
@@ -130,8 +131,8 @@ public sealed class GetReportQueryHandler
                 o.MonobankStatus?.ToString(),
                 o.MonobankInvoiceId,
                 RefundOrderCommandHandler.ComputeFulfilledValueKopecks(o),
-                refund is { Status: RefundStatus.Completed } ? refund.AmountKopecks : 0,
-                refund?.Status.ToString()
+                refund is { Status: PaymentStatus.Succeeded } ? refund.AmountKopecks : 0,
+                refund is null ? null : RefundStatusWord(refund.Status)
             );
         }).ToList();
 
@@ -182,7 +183,7 @@ public sealed class GetReportQueryHandler
             usedVouchers.Sum(v => v.Liters),
             orders.Where(o => o.MonobankStatus == MonobankStatus.Success).Sum(o => Money.ToKopecks(o.Price)),
             orders.Sum(o => RefundOrderCommandHandler.ComputeFulfilledValueKopecks(o)),
-            refundsByOrder.Values.Where(r => r.Status == RefundStatus.Completed).Sum(r => r.AmountKopecks)
+            refundsByOrder.Values.Where(p => p.Status == PaymentStatus.Succeeded).Sum(p => p.AmountKopecks)
         );
 
         var monthlyGroups = orders
@@ -201,7 +202,7 @@ public sealed class GetReportQueryHandler
         foreach (var o in orders)
         {
             if (refundsByOrder.TryGetValue(o.Id, out var completedRefund) &&
-                completedRefund.Status == RefundStatus.Completed)
+                completedRefund.Status == PaymentStatus.Succeeded)
             {
                 var refundMonth = o.CreatedAtUtc.ToString("yyyy-MM");
                 if (monthlyGroups.TryGetValue(refundMonth, out var existing))
@@ -251,4 +252,20 @@ public sealed class GetReportQueryHandler
             monthlyBreakdown
         );
     }
+
+    /// <summary>
+    /// A refund payment's status, spelled the way these reports have always spelled it.
+    /// </summary>
+    /// <remarks>
+    /// The reports carry a refund status string that the frontend and exports have been reading for
+    /// years, keyed on <c>Processing</c> / <c>Completed</c> / <c>Failed</c>. <see cref="PaymentStatus"/>
+    /// says the same three things under different names, so the vocabulary is mapped here rather than
+    /// every consumer's expectations being rewritten.
+    /// </remarks>
+    private static string RefundStatusWord(PaymentStatus status) => status switch
+    {
+        PaymentStatus.Pending => nameof(RefundStatus.Processing),
+        PaymentStatus.Succeeded => nameof(RefundStatus.Completed),
+        _ => nameof(RefundStatus.Failed)
+    };
 }

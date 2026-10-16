@@ -6,6 +6,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.Payments.SharedModels;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
 using Microsoft.EntityFrameworkCore;
@@ -1021,11 +1022,11 @@ if (!fullyAttributed && fulfillments.Count > 0)
 
             // Don't hammer Monobank when a cancel keeps failing: retry a failed auto-refund
             // at most once an hour. (Manual refunds always retry immediately on demand.)
-            var lastFailedAtUtc = await _context.Refunds
-                .AsNoTracking()
-                .Where(r => r.OrderId == orderId && r.Status == RefundStatus.Failed)
-                .Select(r => (DateTime?)r.UpdatedAtUtc)
-                .OrderByDescending(r => r)
+var lastFailedAtUtc = await _context.Payments
+    .AsNoTracking()
+    .Where(p => p.OrderId == orderId && p.Kind == PaymentKind.Refund && p.Status == PaymentStatus.Failed)
+    .Select(p => (DateTime?)p.UpdatedAtUtc)
+    .OrderByDescending(r => r)
                 .FirstOrDefaultAsync(cancellationToken);
 
             if (lastFailedAtUtc is not null &&

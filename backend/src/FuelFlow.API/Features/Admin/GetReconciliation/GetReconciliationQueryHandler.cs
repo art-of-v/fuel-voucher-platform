@@ -2,6 +2,7 @@ using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.Payments.SharedModels;
 using FuelFlow.SharedKernel;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -127,10 +128,10 @@ public sealed class GetReconciliationQueryHandler
             .ToListAsync(cancellationToken);
         var fulfillByOrder = allFulfillments.GroupBy(f => f.OrderId).ToDictionary(g => g.Key, g => g.Count());
 
-        var refundsByOrder = await _context.Refunds
+        var refundsByOrder = await _context.Payments
             .AsNoTracking()
-            .Where(r => orderIds.Contains(r.OrderId))
-            .ToDictionaryAsync(r => r.OrderId, cancellationToken);
+            .Where(p => p.Kind == PaymentKind.Refund && orderIds.Contains(p.OrderId))
+            .ToDictionaryAsync(p => p.OrderId, cancellationToken);
 
         var threeWayMatch = orders.Select(o =>
         {
@@ -164,8 +165,8 @@ public sealed class GetReconciliationQueryHandler
                 matchStatus,
                 (DateTime.UtcNow - o.CreatedAtUtc).Days,
                 o.CreatedAtUtc,
-                refund?.Status.ToString(),
-                refund is { Status: RefundStatus.Completed } ? refund.AmountKopecks : 0L);
+                refund is null ? null : RefundStatusWord(refund.Status),
+                refund is { Status: PaymentStatus.Succeeded } ? refund.AmountKopecks : 0L);
         }).ToList();
 
         var exceptions = new List<GetReconciliationResponse.ExceptionItem>();
@@ -231,8 +232,24 @@ public sealed class GetReconciliationQueryHandler
             orders.Count(o => o.Status == OrderStatus.PartiallyRefunded || o.Status == OrderStatus.Refunded),
             orders.Where(o => o.MonobankStatus == MonobankStatus.Success).Sum(o => Money.ToKopecks(o.Price)),
             orders.Sum(o => RefundOrderCommandHandler.ComputeFulfilledValueKopecks(o)),
-            refundsByOrder.Values.Where(r => r.Status == RefundStatus.Completed).Sum(r => r.AmountKopecks));
+            refundsByOrder.Values.Where(p => p.Status == PaymentStatus.Succeeded).Sum(p => p.AmountKopecks));
 
         return new GetReconciliationResponse(summary, threeWayMatch, exceptions, funnel, revenueSummary);
     }
+
+    /// <summary>
+    /// A refund payment's status, spelled the way these reports have always spelled it.
+    /// </summary>
+    /// <remarks>
+    /// The reports carry a refund status string that the frontend and exports have been reading for
+    /// years, keyed on <c>Processing</c> / <c>Completed</c> / <c>Failed</c>. <see cref="PaymentStatus"/>
+    /// says the same three things under different names, so the vocabulary is mapped here rather than
+    /// every consumer's expectations being rewritten.
+    /// </remarks>
+    private static string RefundStatusWord(PaymentStatus status) => status switch
+    {
+        PaymentStatus.Pending => nameof(RefundStatus.Processing),
+        PaymentStatus.Succeeded => nameof(RefundStatus.Completed),
+        _ => nameof(RefundStatus.Failed)
+    };
 }

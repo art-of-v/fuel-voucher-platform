@@ -53,9 +53,6 @@ public sealed class Payment
 
     public PaymentKind Kind { get; set; } = PaymentKind.Capture;
 
-    /// <summary>The refund this payment settles, when <see cref="Kind"/> is <c>Refund</c>.</summary>
-    public Guid? RefundId { get; set; }
-
     /// <summary>
     /// The capture a refund reverses. Null on a capture. Self-referential rather than an order-level
     /// link so that a refund is always answerable as "money back against this exact charge".

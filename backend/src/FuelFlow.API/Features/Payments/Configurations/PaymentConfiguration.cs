@@ -26,9 +26,6 @@ internal sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
             .HasMaxLength(16)
             .IsRequired();
 
-        builder.Property(e => e.RefundId)
-            .HasColumnName("refund_id");
-
         builder.Property(e => e.ParentPaymentId)
             .HasColumnName("parent_payment_id");
 
@@ -132,11 +129,6 @@ builder.Property(e => e.ProviderAmountKopecks)
         builder.HasOne(e => e.Order)
             .WithMany()
             .HasForeignKey(e => e.OrderId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasOne<Refund>()
-            .WithMany()
-            .HasForeignKey(e => e.RefundId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne<Payment>()

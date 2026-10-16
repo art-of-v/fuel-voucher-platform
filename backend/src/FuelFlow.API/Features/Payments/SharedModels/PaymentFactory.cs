@@ -47,27 +47,38 @@ public static class PaymentFactory
     /// <summary>
     /// A pending refund against a capture, carrying the approval that authorised it.
     /// </summary>
-    /// <remarks>
-    /// <para>
-    /// The money left via the same acquirer invoice the capture came in on, so
-    /// <paramref name="providerInvoiceId"/> is the order's invoice rather than a new one - and the
-    /// partial index over <c>(provider, provider_invoice_id, kind)</c> is what keeps that honest: the
-    /// capture and the refund share the invoice but not the kind, so they coexist instead of
-    /// colliding.
-    /// </para>
-    /// <para>
-    /// <b>The amount is deliberately the refund's, not the capture's.</b> A refund can correct a price
-    /// downwards and return less than was taken, so this is passed in rather than derived from
-    /// <paramref name="capture"/>. It is still validated against the capture's own amount by the
-    /// caller's arithmetic - the factory records what it was told, and the order's refund computation
-    /// owns whether that number is right.
-    /// </para>
-    /// <para>
-    /// The approval travels with the payment because once <c>refunds</c> becomes a view over this
-    /// table there is nowhere else for it to live.
-    /// </para>
-    /// </remarks>
-    public static Payment CreateRefund(
+/// <remarks>
+/// <para>
+/// <paramref name="id"/> is the refund's own id, not a fresh one, and that is the point rather than
+/// an optimisation. While <c>refunds</c> is still a table this makes the refund payment and the refund
+/// row one identity under two names, so a caller holding a refund id - a notification, an API
+/// response, the status sync - finds the payment by it directly. It also means that when
+/// <c>refunds</c> becomes a view over this table, the view's <c>id</c> is already what every caller
+/// passes around, and nothing has to be remapped at that point. Minting a separate id would have kept
+/// a <c>refund_id</c> back-reference alive for the whole migration, which is the circular dependency
+/// this exists to remove.
+/// </para>
+/// <para>
+/// The money left via the same acquirer invoice the capture came in on, so
+/// <paramref name="providerInvoiceId"/> is the order's invoice rather than a new one - and the
+/// partial index over <c>(provider, provider_invoice_id, kind)</c> is what keeps that honest: the
+/// capture and the refund share the invoice but not the kind, so they coexist instead of
+/// colliding.
+/// </para>
+/// <para>
+/// <b>The amount is deliberately the refund's, not the capture's.</b> A refund can correct a price
+/// downwards and return less than was taken, so this is passed in rather than derived from
+/// <paramref name="capture"/>. It is still validated against the capture's own amount by the
+/// caller's arithmetic - the factory records what it was told, and the order's refund computation
+/// owns whether that number is right.
+/// </para>
+/// <para>
+/// The approval travels with the payment because once <c>refunds</c> becomes a view over this
+/// table there is nowhere else for it to live.
+/// </para>
+/// </remarks>
+public static Payment CreateRefund(
+        Guid id,
         Order order,
         Payment capture,
         decimal amountKopecks,
@@ -78,7 +89,7 @@ public static class PaymentFactory
     {
         return new Payment
         {
-            Id = Guid.CreateVersion7(),
+            Id = id,
             OrderId = order.Id,
             Kind = PaymentKind.Refund,
             ParentPaymentId = capture.Id,
