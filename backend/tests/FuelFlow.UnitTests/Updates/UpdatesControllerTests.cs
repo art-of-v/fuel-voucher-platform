@@ -6,7 +6,7 @@ using FuelFlow.Features.Updates;
 using FuelFlow.SharedKernel.Options;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace FuelFlow.UnitTests.Updates;
@@ -20,7 +20,7 @@ public class UpdatesControllerTests
     public async Task GetManifest_WithPublishedUpdate_ReturnsSignedMultipartBody()
     {
         const string manifestJson = "{\"id\":\"update-1\",\"runtimeVersion\":\"1.0.0\"}";
-        var (controller, _) = CreateController(HttpStatusCode.OK, DescriptorJson(manifestJson, Signature), BaseUrl);
+        var (controller, _, _) = CreateController(HttpStatusCode.OK, DescriptorJson(manifestJson, Signature), BaseUrl);
 
         var result = await controller.GetManifest(CancellationToken.None);
 
@@ -49,7 +49,7 @@ public class UpdatesControllerTests
             manifestBase64 = Convert.ToBase64String(manifestBytes),
             signature = Signature,
         });
-        var (controller, _) = CreateController(HttpStatusCode.OK, descriptor, BaseUrl);
+        var (controller, _, _) = CreateController(HttpStatusCode.OK, descriptor, BaseUrl);
 
         var result = await controller.GetManifest(CancellationToken.None);
 
@@ -60,7 +60,7 @@ public class UpdatesControllerTests
     [Fact]
     public async Task GetManifest_RequestsContentAddressedR2Key()
     {
-        var (controller, handler) = CreateController(HttpStatusCode.NotFound, "", BaseUrl,
+        var (controller, handler, _) = CreateController(HttpStatusCode.NotFound, "", BaseUrl,
             platform: "ios", runtimeVersion: "1.0.0");
 
         await controller.GetManifest(CancellationToken.None);
@@ -71,7 +71,7 @@ public class UpdatesControllerTests
     [Fact]
     public async Task GetManifest_WhenNothingPublished_Returns204()
     {
-        var (controller, _) = CreateController(HttpStatusCode.NotFound, "", BaseUrl);
+        var (controller, _, _) = CreateController(HttpStatusCode.NotFound, "", BaseUrl);
 
         var result = await controller.GetManifest(CancellationToken.None);
 
@@ -82,7 +82,7 @@ public class UpdatesControllerTests
     [Fact]
     public async Task GetManifest_WhenNotConfigured_Returns204WithoutCallingUpstream()
     {
-        var (controller, handler) = CreateController(HttpStatusCode.OK, DescriptorJson("{}", Signature),
+        var (controller, handler, _) = CreateController(HttpStatusCode.OK, DescriptorJson("{}", Signature),
             publicBaseUrl: "");
 
         var result = await controller.GetManifest(CancellationToken.None);
@@ -94,7 +94,7 @@ public class UpdatesControllerTests
     [Fact]
     public async Task GetManifest_WhenUpstreamFails_Returns502()
     {
-        var (controller, _) = CreateController(HttpStatusCode.InternalServerError, "boom", BaseUrl);
+        var (controller, _, _) = CreateController(HttpStatusCode.InternalServerError, "boom", BaseUrl);
 
         var result = await controller.GetManifest(CancellationToken.None);
 
@@ -112,7 +112,7 @@ public class UpdatesControllerTests
             manifestBase64 = "!!!not-base64!!!",
             signature = Signature,
         });
-        var (controller, _) = CreateController(HttpStatusCode.OK, descriptor, BaseUrl);
+        var (controller, _, _) = CreateController(HttpStatusCode.OK, descriptor, BaseUrl);
 
         var result = await controller.GetManifest(CancellationToken.None);
 
@@ -125,12 +125,48 @@ public class UpdatesControllerTests
     [InlineData("ios", "")]
     public async Task GetManifest_WithMissingHeaders_Returns400(string platform, string runtimeVersion)
     {
-        var (controller, _) = CreateController(HttpStatusCode.OK, DescriptorJson("{}", Signature), BaseUrl,
+        var (controller, _, _) = CreateController(HttpStatusCode.OK, DescriptorJson("{}", Signature), BaseUrl,
             platform: platform, runtimeVersion: runtimeVersion);
 
         var result = await controller.GetManifest(CancellationToken.None);
 
         result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    /// <summary>
+    /// The runtime version in the log is the only record that an out-of-date build is still polling: the
+    /// endpoint answers an unknown fingerprint with the same 204 as an up-to-date client, and the devices
+    /// table stores the marketing version rather than the fingerprint. If this log ever stops carrying
+    /// the pair, "which builds exist in the wild" becomes unanswerable again - and so does the decision of
+    /// whether a legacy publish is worth doing.
+    /// </summary>
+    [Fact]
+    public async Task GetManifest_LogsTheRuntimeVersionItWasAskedFor()
+    {
+        var (controller, _, logger) = CreateController(HttpStatusCode.NotFound, "", BaseUrl,
+            platform: "ios", runtimeVersion: "0e1f2a3b-unreachable-legacy-fingerprint");
+
+        await controller.GetManifest(CancellationToken.None);
+
+        logger.Entries.Should().ContainSingle()
+            .Which.Message.Should().Contain("0e1f2a3b-unreachable-legacy-fingerprint");
+    }
+
+    [Theory]
+    [InlineData("", "1.0.0", false, true)]
+    [InlineData("ios", "", true, false)]
+    public async Task GetManifest_WithMissingHeaders_WarnsAndNamesWhatWasMissing(
+        string platform, string runtimeVersion, bool expectPlatform, bool expectRuntimeVersion)
+    {
+        var (controller, _, logger) = CreateController(HttpStatusCode.OK, DescriptorJson("{}", Signature), BaseUrl,
+            platform: platform, runtimeVersion: runtimeVersion);
+
+        await controller.GetManifest(CancellationToken.None);
+
+        var entry = logger.Entries.Should().ContainSingle().Subject;
+        entry.Level.Should().Be(LogLevel.Warning, "a client asking without the headers is a misconfiguration, not a no-op");
+        entry.Fields.Should().Contain("HasPlatform", expectPlatform);
+        entry.Fields.Should().Contain("HasRuntimeVersion", expectRuntimeVersion);
     }
 
     private static string DescriptorJson(string manifestJson, string signature)
@@ -139,12 +175,13 @@ public class UpdatesControllerTests
         return JsonSerializer.Serialize(new { manifestBase64, signature });
     }
 
-    private static (UpdatesController Controller, RecordingHttpMessageHandler Handler) CreateController(
-        HttpStatusCode statusCode,
-        string responseBody,
-        string publicBaseUrl,
-        string platform = "ios",
-        string runtimeVersion = "1.0.0")
+    private static (UpdatesController Controller, RecordingHttpMessageHandler Handler, CapturingLogger Logger)
+        CreateController(
+            HttpStatusCode statusCode,
+            string responseBody,
+            string publicBaseUrl,
+            string platform = "ios",
+            string runtimeVersion = "1.0.0")
     {
         var handler = new RecordingHttpMessageHandler
         {
@@ -155,9 +192,9 @@ public class UpdatesControllerTests
         };
         var httpClient = new HttpClient(handler);
         var options = Options.Create(new UpdatesOptions { PublicBaseUrl = publicBaseUrl });
-        var source = new UpdateManifestSource(httpClient, options);
+        var logger = new CapturingLogger();
 
-        var controller = new UpdatesController(source, NullLogger<UpdatesController>.Instance)
+        var controller = new UpdatesController(new UpdateManifestSource(httpClient, options), logger)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };
@@ -166,7 +203,34 @@ public class UpdatesControllerTests
         if (!string.IsNullOrEmpty(runtimeVersion))
             controller.Request.Headers["expo-runtime-version"] = runtimeVersion;
 
-        return (controller, handler);
+        return (controller, handler, logger);
+    }
+
+    /// <summary>
+    /// Captures what the controller logged, with the structured fields kept as fields - the point of the
+    /// change under test is that <c>RuntimeVersion</c> arrives as a queryable field in Loki, not only as
+    /// text inside a formatted sentence.
+    /// </summary>
+    private sealed class CapturingLogger : ILogger<UpdatesController>
+    {
+        public List<(LogLevel Level, string Message, Dictionary<string, object?> Fields)> Entries { get; } = new();
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            // The framework hands over FormattedLogValues, which is a list of key/value pairs - not a
+            // dictionary - so the cast that would read most naturally here is always null.
+            var pairs = state as IEnumerable<KeyValuePair<string, object?>>;
+            var fields = pairs is null
+                ? new Dictionary<string, object?>()
+                : pairs.ToDictionary(p => p.Key, p => p.Value);
+
+            Entries.Add((logLevel, formatter(state, exception), fields));
+        }
     }
 
     private sealed class RecordingHttpMessageHandler : HttpMessageHandler
