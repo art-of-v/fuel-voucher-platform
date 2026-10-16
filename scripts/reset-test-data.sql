@@ -19,8 +19,9 @@
 --
 -- Delete order matters, and it is not stylistic:
 --   * `fuel_vouchers.order_id` restricts, so a held voucher blocks its order from being deleted.
---   * `refunds.order_id` restricts and does NOT cascade, so a refunded test order blocks its own
---     deletion until the refund row is removed first.
+--   * `payments.order_id` restricts and does NOT cascade, so a paid test order blocks its own
+--     deletion until its payment rows are removed first. A refund is a payment (`kind = 'Refund'`),
+--     not a row in a table of its own, and the capture it reverses restricts the same way.
 --   * `fulfillments` now cascades from its order (FK added in AddFulfillmentOrderForeignKey), but
 --     its `voucher_id` restricts, so vouchers have to go too.
 --   * every row an operator renewal writes -- `operator_voucher_renewals.voucher_id`,
@@ -89,10 +90,17 @@ DELETE FROM fulfillments
 WHERE order_id IN (SELECT id FROM reset_orders)
    OR voucher_id IN (SELECT id FROM reset_vouchers);
 
--- `refunds.order_id` restricts and does not cascade, so a refunded test order cannot be deleted
--- until its refund row is gone. Deleting it here is correct for a test reset: the money movement is
--- part of what the session produced.
-DELETE FROM refunds WHERE order_id IN (SELECT id FROM reset_orders);
+-- `payments.order_id` restricts and does not cascade, so a paid test order cannot be deleted until
+-- its payment rows are gone. Both kinds have to go: a refund payment AND the capture it reverses,
+-- because a refund is a payment rather than a row in a table of its own. Deleting them here is
+-- correct for a test reset: the money movement is part of what the session produced.
+--
+-- Two statements, children first: a refund points at its capture and that FK restricts too. RESTRICT
+-- is immediate rather than deferred, so one DELETE covering both kinds fails the moment it reaches a
+-- capture whose refund has not gone yet.
+DELETE FROM payments WHERE order_id IN (SELECT id FROM reset_orders) AND kind = 'Refund';
+
+DELETE FROM payments WHERE order_id IN (SELECT id FROM reset_orders);
 
 DELETE FROM order_line_items WHERE order_id IN (SELECT id FROM reset_orders);
 DELETE FROM fuel_vouchers WHERE id IN (SELECT id FROM reset_vouchers);

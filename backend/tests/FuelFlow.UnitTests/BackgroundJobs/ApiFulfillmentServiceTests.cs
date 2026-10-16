@@ -9,6 +9,7 @@ using FuelFlow.Features.Settings;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
+using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -385,7 +386,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
 
         var updatedOrder = await _context.Orders.FindAsync(order.Id);
         updatedOrder!.Status.Should().Be(OrderStatus.PartiallyFulfilled);
-        (await _context.Refunds.AnyAsync(r => r.OrderId == order.Id)).Should().BeFalse();
+        (await _context.Payments.AnyAsync(r => r.OrderId == order.Id && r.Kind == PaymentKind.Refund)).Should().BeFalse();
     }
 
     [Fact]
@@ -403,8 +404,8 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
         var updatedOrder = await _context.Orders.FindAsync(order.Id);
         updatedOrder!.Status.Should().Be(OrderStatus.PartiallyFulfilled);
 
-        var refund = await _context.Refunds.SingleAsync(r => r.OrderId == order.Id);
-        refund.Status.Should().Be(RefundStatus.Processing);
+        var refund = await _context.Payments.SingleAsync(r => r.OrderId == order.Id && r.Kind == PaymentKind.Refund);
+        refund.Status.Should().Be(PaymentStatus.Pending);
         refund.AmountKopecks.Should().Be(250000);
     }
 
@@ -420,7 +421,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
 
         var updatedOrder = await _context.Orders.FindAsync(order.Id);
         updatedOrder!.Status.Should().Be(OrderStatus.PartiallyFulfilled);
-        (await _context.Refunds.AnyAsync(r => r.OrderId == order.Id)).Should().BeFalse();
+        (await _context.Payments.AnyAsync(r => r.OrderId == order.Id && r.Kind == PaymentKind.Refund)).Should().BeFalse();
     }
 
     private async Task<Order> SeedPartialOrderAsync(Guid userId, string monobankInvoiceId)

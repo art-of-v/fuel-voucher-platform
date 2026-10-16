@@ -9,6 +9,7 @@ using FuelFlow.Features.Settings;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
+using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -594,16 +595,16 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
             .ToListAsync();
         fullOrderFulfillments.Should().HaveCount(2);
 
-        var refunds = await verify.Refunds
+        var refunds = await verify.Payments
             .Where(r => r.OrderId == partialOrderId)
             .ToListAsync();
-        refunds.Should().ContainSingle(r => r.Status == RefundStatus.Processing);
+        refunds.Should().ContainSingle(r => r.Status == PaymentStatus.Pending);
     }
 
     private static async Task ResetDataAsync(ApplicationDbContext context)
     {
         await context.Database.ExecuteSqlRawAsync(
-            """TRUNCATE TABLE "refunds", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
+            """TRUNCATE TABLE "payments", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
     }
 
     private ApplicationDbContext CreateContext()

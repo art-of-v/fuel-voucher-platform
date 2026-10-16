@@ -215,7 +215,7 @@ new decimal?[] { 90.00m }, surchargePerPair: 10m, reset: false);
         await using (var clean = CreateContext())
         {
             await clean.Database.ExecuteSqlRawAsync(
-                """TRUNCATE TABLE "refunds", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "voucher_exchanges", "purchase_batches", "voucher_imports", "company_invitations", "company_members", "legal_entities", "verification_codes", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
+                """TRUNCATE TABLE "payments", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "voucher_exchanges", "purchase_batches", "voucher_imports", "company_invitations", "company_members", "legal_entities", "verification_codes", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
         }
 
         var response = await BatchesAsync();
@@ -265,7 +265,7 @@ private async Task SeedExchangeAsync(
         if (reset)
         {
             await seed.Database.ExecuteSqlRawAsync(
-                """TRUNCATE TABLE "refunds", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "voucher_exchanges", "purchase_batches", "voucher_imports", "company_invitations", "company_members", "legal_entities", "verification_codes", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
+                """TRUNCATE TABLE "payments", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "voucher_exchanges", "purchase_batches", "voucher_imports", "company_invitations", "company_members", "legal_entities", "verification_codes", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
         }
 
         if (!await seed.Suppliers.AnyAsync(s => s.Id == supplierId))

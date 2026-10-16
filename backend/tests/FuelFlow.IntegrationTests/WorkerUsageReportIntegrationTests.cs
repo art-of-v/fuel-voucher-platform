@@ -209,7 +209,7 @@ public sealed class WorkerUsageReportIntegrationTests : IClassFixture<TestDataba
 
     private static async Task ResetAsync(ApplicationDbContext context)
         => await context.Database.ExecuteSqlRawAsync(
-            """TRUNCATE TABLE "refunds", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "company_invitations", "company_members", "legal_entities", "verification_codes", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
+            """TRUNCATE TABLE "payments", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "company_invitations", "company_members", "legal_entities", "verification_codes", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
 
     private static void SeedUser(ApplicationDbContext seed, Guid id)
         => seed.Users.Add(new User

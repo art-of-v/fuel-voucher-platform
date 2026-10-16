@@ -240,7 +240,7 @@ public sealed class DeletedUnpaidOrderCleanupIntegrationTests : IClassFixture<Te
 
         // Keep each test hermetic in the shared class-fixture database.
         await context.Database.ExecuteSqlRawAsync(
-            """TRUNCATE TABLE "refunds", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
+            """TRUNCATE TABLE "payments", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
 
         seed(context);
         await context.SaveChangesAsync();

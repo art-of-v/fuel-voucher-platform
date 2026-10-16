@@ -43,58 +43,41 @@ private readonly ApplicationDbContext _context;
            _notifications = notifications;
        }
 
+
     /// <summary>
-    /// Moves the refund's payment to match the refund's own status.
+    /// The acquirer's reference for each refund: the order's idempotency key.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Every status change on a <see cref="Refund"/> routes through here, rather than each site
-    /// remembering to update the payment as well. Three call sites already existed and a fourth
-    /// would have been written without it; the pair drifting is the failure this epic is removing,
-    /// and a helper that has to be remembered at every call site is exactly how that happens.
+    /// This used to be <c>refunds.ext_ref</c>, a copy of the order's key taken when the refund was
+    /// written. With one book instead of two there is nothing to copy it onto, and copying it onto
+    /// <c>payments</c> would have carried the drift forward for the sake of a field that is one join
+    /// away. So the key is read from the order - the thing that actually owns it.
     /// </para>
     /// <para>
-    /// The two vocabularies are not the same. <see cref="RefundStatus"/> is about whether <em>the
-    /// bank has answered</em>; <see cref="PaymentStatus"/> is about whether <em>the money moved</em>.
-    /// Processing maps to Pending and the rest follow directly. No refund maps to Cancelled or
-    /// Expired - the acquirer reversing a refund is a Failed refund, not a payment that was
-    /// collected and returned, and encoding it as Cancelled would put the amount on the wrong side of
-    /// the reconciliation.
-    /// </para>
-    /// <para>
-    /// <paramref name="observedAtUtc"/> is required on completion because the database refuses
-    /// Succeeded without a paid-at, and the cancel-list entry's modification date is the best
-    /// evidence of when the money moved that this path has.
+    /// Loaded once per batch rather than once per refund, which is strictly fewer round trips than
+    /// the previous code needed only because it had the copy to hand. The <c>?? Id.ToString()</c>
+    /// fallback is the same one <c>RefundOrderCommandHandler</c> used when it wrote the copy, so a
+    /// refund on an order with no idempotency key is matched on the same string as before - which
+    /// matters, because these strings are compared against what the acquirer echoes back.
     /// </para>
     /// </remarks>
-    private async Task ApplyPaymentStatusAsync(
-        Refund refund,
-        DateTime? observedAtUtc,
+    private async Task<Dictionary<Guid, string>> LoadExtRefsAsync(
+        IReadOnlyCollection<Payment> refunds,
         CancellationToken cancellationToken)
     {
-        var payment = await _context.Payments
-            .FirstOrDefaultAsync(p => p.Id == refund.Id && p.Kind == PaymentKind.Refund, cancellationToken);
+        var orderIds = refunds.Select(p => p.OrderId).Distinct().ToList();
 
-        if (payment is null)
-        {
-            // A refund predating this column, or one written by a path that has not been converted.
-            // Logged rather than thrown: refusing to sync a real refund over a missing audit twin
-            // would strand money in Processing, which is worse than a payment row lagging behind.
-            _logger.LogWarning(
-                "Refund {RefundId} has no payment row to sync; its payment record will lag", refund.Id);
-            return;
-        }
+        var byOrder = await _context.Orders
+            .AsNoTracking()
+            .Where(o => orderIds.Contains(o.Id))
+            .Select(o => new { o.Id, o.IdempotencyKey })
+            .ToDictionaryAsync(o => o.Id, o => o.IdempotencyKey ?? o.Id.ToString(), cancellationToken);
 
-        var status = refund.Status switch
-        {
-            RefundStatus.Processing => PaymentStatus.Pending,
-            RefundStatus.Completed => PaymentStatus.Succeeded,
-            RefundStatus.Failed => PaymentStatus.Failed,
-            _ => PaymentStatus.Pending
-        };
-
-        payment.ErrorMessage = refund.ErrorMessage;
-        PaymentFactory.ApplyStatus(payment, status, observedAtUtc, DateTime.UtcNow);
+        return refunds
+            .Where(p => byOrder.ContainsKey(p.OrderId))
+            .GroupBy(p => p.Id)
+            .ToDictionary(g => g.Key, g => byOrder[g.First().OrderId]);
     }
 
     public virtual async Task SyncPendingRefundsAsync(CancellationToken cancellationToken = default)
@@ -102,32 +85,33 @@ private readonly ApplicationDbContext _context;
         var cutoff = DateTime.UtcNow.AddHours(-24);
         // AsTracking is redundant but harmless: the default is TrackAll (DatabaseSetup). Kept
         // mutated below and must be persisted by SaveChanges.
-        var staleRefunds = await _context.Refunds
+        var staleRefunds = await _context.Payments
             .AsTracking()
-            .Where(r => r.Status == RefundStatus.Processing && r.CreatedAtUtc < cutoff)
+            .Where(p => p.Kind == PaymentKind.Refund
+                     && p.Status == PaymentStatus.Pending
+                     && p.CreatedAtUtc < cutoff)
             .ToListAsync(cancellationToken);
 
         if (staleRefunds.Count > 0)
         {
             foreach (var staleRefund in staleRefunds)
             {
-                staleRefund.Status = RefundStatus.Failed;
+                PaymentFactory.ApplyStatus(
+                    staleRefund, PaymentStatus.Failed, observedAtUtc: null, DateTime.UtcNow);
                 staleRefund.ErrorMessage = "Timed out waiting for Monobank confirmation (refund abandoned)";
-                staleRefund.UpdatedAtUtc = DateTime.UtcNow;
                 await RevertPrematureRefundedOrderStatusAsync(staleRefund, cancellationToken);
-                await ApplyPaymentStatusAsync(staleRefund, observedAtUtc: null, cancellationToken);
                 _logger.LogWarning(
                     "Failed refund {RefundId} (invoice {InvoiceId}) timed out after 24h; status reset to Failed",
-                    staleRefund.Id, staleRefund.InvoiceId);
+                    staleRefund.Id, staleRefund.ProviderInvoiceId);
             }
             await _context.SaveChangesAsync(cancellationToken);
             _logger.LogInformation("Marked {Count} stale refunds as Failed", staleRefunds.Count);
         }
 
-        var pendingRefunds = await _context.Refunds
+        var pendingRefunds = await _context.Payments
             .AsTracking()
-            .Where(r => r.Status == RefundStatus.Processing)
-            .OrderBy(r => r.CreatedAtUtc)
+            .Where(p => p.Kind == PaymentKind.Refund && p.Status == PaymentStatus.Pending)
+            .OrderBy(p => p.CreatedAtUtc)
             .Take(100)
             .ToListAsync(cancellationToken);
 
@@ -136,6 +120,10 @@ private readonly ApplicationDbContext _context;
             _logger.LogDebug("No pending refunds to sync");
             return;
         }
+
+        // One lookup for the whole batch; see LoadExtRefsAsync for why the reference is read from
+        // the order rather than carried on the refund.
+        var extRefs = await LoadExtRefsAsync(pendingRefunds, cancellationToken);
 
         _logger.LogInformation("Syncing status for {Count} pending refunds", pendingRefunds.Count);
 
@@ -160,8 +148,21 @@ private readonly ApplicationDbContext _context;
                     var merchant = order?.MonobankMerchant ?? MonobankMerchant.Live;
                     var monobankClient = _monobankClientFactory.ForMerchant(merchant);
 
-                    var status = await monobankClient.GetInvoiceStatusAsync(refund.InvoiceId, cancellationToken);
-                    await ApplyCancelListStatusAsync(refund, status.CancelList, cancellationToken);
+                    var status = await monobankClient.GetInvoiceStatusAsync(
+                        refund.ProviderInvoiceId, cancellationToken);
+
+                    if (extRefs.TryGetValue(refund.Id, out var extRef))
+                    {
+                        await ApplyCancelListStatusAsync(refund, extRef, status.CancelList, cancellationToken);
+                    }
+                    else
+                    {
+                        // The order is gone. It cannot be confirmed against anything, and matching a
+                        // cancel-list entry to an order that no longer exists would be a guess.
+                        _logger.LogWarning(
+                            "Order {OrderId} not found for refund {RefundId}; leaving it pending",
+                            refund.OrderId, refund.Id);
+                    }
                 }
             catch (Exception ex)
             {
@@ -182,9 +183,11 @@ private readonly ApplicationDbContext _context;
             return;
         }
 
-        var refunds = await _context.Refunds
+        var refunds = await _context.Payments
             .AsTracking()
-            .Where(r => r.InvoiceId == invoiceId && r.Status == RefundStatus.Processing)
+            .Where(p => p.Kind == PaymentKind.Refund
+                     && p.Status == PaymentStatus.Pending
+                     && p.ProviderInvoiceId == invoiceId)
             .ToListAsync(cancellationToken);
 
         if (refunds.Count == 0)
@@ -192,16 +195,22 @@ private readonly ApplicationDbContext _context;
             return;
         }
 
+        var extRefs = await LoadExtRefsAsync(refunds, cancellationToken);
+
         foreach (var refund in refunds)
         {
-            await ApplyCancelListStatusAsync(refund, cancelList, cancellationToken);
+            if (extRefs.TryGetValue(refund.Id, out var extRef))
+            {
+                await ApplyCancelListStatusAsync(refund, extRef, cancelList, cancellationToken);
+            }
         }
 
         await _context.SaveChangesAsync(cancellationToken);
     }
 
     private async Task ApplyCancelListStatusAsync(
-        Refund refund,
+        Payment refund,
+        string extRef,
         List<MonobankCancelListItem>? cancelList,
         CancellationToken cancellationToken)
     {
@@ -209,7 +218,7 @@ private readonly ApplicationDbContext _context;
 
         var matchingEntry = entries
             .OrderByDescending(e => e.ModifiedDate)
-            .FirstOrDefault(e => e.ExtRef == refund.ExtRef);
+            .FirstOrDefault(e => e.ExtRef == extRef);
 
         if (matchingEntry == null)
         {
@@ -222,12 +231,13 @@ private readonly ApplicationDbContext _context;
             // So a fallback now has to be *provably* unambiguous: exactly one entry in the list and
             // no other refund on this invoice waiting. One entry cannot be somebody else's if there
             // is nothing else it could have been; "any entry" could.
-            var siblings = await _context.Refunds
+            var siblings = await _context.Payments
                 .AsNoTracking()
                 .CountAsync(
-                    r => r.InvoiceId == refund.InvoiceId
-                         && r.Status == RefundStatus.Processing
-                         && r.Id != refund.Id,
+                    p => p.Kind == PaymentKind.Refund
+                         && p.Status == PaymentStatus.Pending
+                         && p.ProviderInvoiceId == refund.ProviderInvoiceId
+                         && p.Id != refund.Id,
                     cancellationToken);
 
             if (entries.Count == 1 && siblings == 0)
@@ -235,19 +245,19 @@ private readonly ApplicationDbContext _context;
                 matchingEntry = entries[0];
                 _logger.LogInformation(
                     "Refund {RefundId} has no extRef match; attributing the single cancel-list entry for invoice {InvoiceId}",
-                    refund.Id, refund.InvoiceId);
+                    refund.Id, refund.ProviderInvoiceId);
             }
             else
             {
-                // Left Processing on purpose. The retry path costs nothing and a second look may well
+                // Left pending on purpose. The retry path costs nothing and a second look may well
                 // match once the bank has caught up; guessing cannot be undone after it has moved an
                 // order into a refunded state.
                 _logger.LogWarning(
-                    "No cancel-list entry matches refund {RefundId} (order {OrderId}, invoice {InvoiceId}): {Entries} entries, {Siblings} other pending refund(s). Left Processing rather than crediting one that may belong to another.",
-                    refund.Id, refund.OrderId, refund.InvoiceId, entries.Count, siblings);
+                    "No cancel-list entry matches refund {RefundId} (order {OrderId}, invoice {InvoiceId}): {Entries} entries, {Siblings} other pending refund(s). Left pending rather than crediting one that may belong to another.",
+                    refund.Id, refund.OrderId, refund.ProviderInvoiceId, entries.Count, siblings);
 
                 await _notifications.RefundSyncUnmatchedAsync(
-                    refund.Id, refund.OrderId, refund.InvoiceId, entries.Count, siblings, cancellationToken);
+                    refund.Id, refund.OrderId, refund.ProviderInvoiceId ?? "(none)", entries.Count, siblings, cancellationToken);
 
                 return;
             }
@@ -260,22 +270,18 @@ private readonly ApplicationDbContext _context;
 
         if (matchingEntry.Status.Equals("success", StringComparison.OrdinalIgnoreCase))
         {
-            refund.Status = RefundStatus.Completed;
-            refund.MonobankStatus = "success";
+            PaymentFactory.ApplyStatus(
+                refund, PaymentStatus.Succeeded, matchingEntry.ModifiedDate, DateTime.UtcNow);
             refund.ErrorMessage = null;
-            refund.UpdatedAtUtc = DateTime.UtcNow;
 
-            await ApplyPaymentStatusAsync(refund, matchingEntry.ModifiedDate, cancellationToken);
             await ApplyConfirmedRefundToOrderAsync(refund, cancellationToken);
         }
         else if (matchingEntry.Status.Equals("failure", StringComparison.OrdinalIgnoreCase))
         {
-            refund.Status = RefundStatus.Failed;
-            refund.MonobankStatus = "failure";
+            PaymentFactory.ApplyStatus(
+                refund, PaymentStatus.Failed, observedAtUtc: null, DateTime.UtcNow);
             refund.ErrorMessage = "Monobank reported refund failure";
-            refund.UpdatedAtUtc = DateTime.UtcNow;
 
-            await ApplyPaymentStatusAsync(refund, observedAtUtc: null, cancellationToken);
             await RevertPrematureRefundedOrderStatusAsync(refund, cancellationToken);
         }
         else
@@ -286,7 +292,7 @@ private readonly ApplicationDbContext _context;
         }
     }
 
-    private async Task ApplyConfirmedRefundToOrderAsync(Refund refund, CancellationToken cancellationToken)
+    private async Task ApplyConfirmedRefundToOrderAsync(Payment refund, CancellationToken cancellationToken)
     {
         var order = await _context.Orders
             .FirstOrDefaultAsync(o => o.Id == refund.OrderId, cancellationToken);
@@ -312,7 +318,7 @@ private readonly ApplicationDbContext _context;
             refund.Id, refund.OrderId, refund.AmountKopecks, newStatus);
     }
 
-    private async Task RevertPrematureRefundedOrderStatusAsync(Refund refund, CancellationToken cancellationToken)
+    private async Task RevertPrematureRefundedOrderStatusAsync(Payment refund, CancellationToken cancellationToken)
     {
         var order = await _context.Orders
             .FirstOrDefaultAsync(o => o.Id == refund.OrderId, cancellationToken);

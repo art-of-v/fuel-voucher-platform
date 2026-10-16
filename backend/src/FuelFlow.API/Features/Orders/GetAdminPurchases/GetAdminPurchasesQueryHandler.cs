@@ -108,13 +108,14 @@ var refunds = await _context.Payments
     /// </remarks>
     private static string RefundStatusWord(PaymentStatus status) => status switch
     {
-        PaymentStatus.Pending => nameof(RefundStatus.Processing),
-        PaymentStatus.Succeeded => nameof(RefundStatus.Completed),
-        PaymentStatus.Failed => nameof(RefundStatus.Failed),
-        // A refund is never collected-then-reversed or expired, so the two remaining payment states
-        // have no refund equivalent. Reporting them as Failed would be a lie; leaving the mapping
-        // absent returns null and the admin simply shows no second line.
-        _ => nameof(RefundStatus.Failed)
+        PaymentStatus.Pending => "Processing",
+        PaymentStatus.Succeeded => "Completed",
+        // A refund is never collected-then-reversed or expired, so Cancelled and Expired have no
+        // refund equivalent. They are still folded into Failed rather than left unmapped: the admin's
+        // translation keys are exactly these three words, and returning null for a status the schema
+        // permits would render an empty cell on the one screen an operator reads when money is wrong.
+        // GetReport and GetReconciliation say the same thing, so the word is consistent across reports.
+        _ => "Failed"
     };
 
     /// <summary>

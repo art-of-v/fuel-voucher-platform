@@ -5,6 +5,7 @@ using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Contracts.SharedModels;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers.Renewal;
+using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -372,15 +373,37 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
         {
             seed.Users.Add(user);
             seed.Orders.Add(order);
-            seed.Refunds.Add(new Refund
+            // The refund is a payment now. It needs a capture to reverse, so both are seeded - the
+            // point of the test is that neither money row is taken with the order.
+            var capture = new Payment
             {
                 Id = Guid.NewGuid(),
                 OrderId = order.Id,
-                UserId = user.Id,
+                Kind = PaymentKind.Capture,
+                Provider = "monobank",
+                ProviderInvoiceId = "INV-DBINT-1",
+                AmountUah = 1.00m,
                 AmountKopecks = 100L,
-                InvoiceId = "INV-DBINT-1",
-                ExtRef = "R1",
-                Status = RefundStatus.Completed,
+                Currency = "UAH",
+                Status = PaymentStatus.Succeeded,
+                PaidAtUtc = DateTime.UtcNow,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow
+            };
+            seed.Payments.Add(capture);
+            seed.Payments.Add(new Payment
+            {
+                Id = Guid.NewGuid(),
+                OrderId = order.Id,
+                Kind = PaymentKind.Refund,
+                ParentPaymentId = capture.Id,
+                Provider = "monobank",
+                ProviderInvoiceId = capture.ProviderInvoiceId,
+                AmountUah = 1.00m,
+                AmountKopecks = 100L,
+                Currency = "UAH",
+                Status = PaymentStatus.Succeeded,
+                PaidAtUtc = DateTime.UtcNow,
                 IsAutomatic = false,
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow
@@ -394,9 +417,130 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
         await act.Should().ThrowAsync<PostgresException>();
 
         await using var verify = CreateContext();
-        (await verify.Refunds.CountAsync(r => r.OrderId == order.Id))
+        (await verify.Payments.CountAsync(r => r.OrderId == order.Id && r.Kind == PaymentKind.Refund))
             .Should().Be(1, "the refund is the only record that money went out, and it must survive");
     }
+
+    /// <summary>
+    /// At most one refund per order, now carried by <c>ux_payments_one_refund_per_order</c> rather
+    /// than by <c>refunds.order_id UNIQUE</c>. That constraint used to be the only thing standing
+    /// between an admin double-click and two refunds for one order; the index has to keep standing
+    /// there, because <c>RefundOrderCommandHandler</c> reads "does a refund exist" before it writes,
+    /// and a read is not a lock.
+    /// </summary>
+    /// <remarks>
+    /// The handler's own defence is the <c>DbUpdateException</c> catch that reports the winning
+    /// refund instead of a 500. This is the other half: the database refusing at all.
+    /// </remarks>
+    [Fact]
+    public async Task A_Second_Refund_On_One_Order_Is_Refused()
+    {
+        var user = NewUser("+38000000003");
+        var order = NewPaidOrder(user, "INV-ONE-REFUND");
+        var capture = await SeedCaptureAndRefund(order, user, "INV-ONE-REFUND", "INV-ONE-REFUND-2");
+
+        await using var context = CreateContext();
+        // A different invoice on purpose: ux_payments_provider_invoice_kind is unique over
+        // (provider, provider_invoice_id, kind) and would refuse this row first, which would make the
+        // test pass for the wrong reason.
+        context.Payments.Add(RefundPayment(order.Id, capture, "INV-ONE-REFUND-3"));
+
+        var act = async () => await context.SaveChangesAsync();
+        await act.Should().ThrowAsync<DbUpdateException>();
+
+        await using var verify = CreateContext();
+        (await verify.Payments.CountAsync(p => p.OrderId == order.Id && p.Kind == PaymentKind.Refund))
+            .Should().Be(1, "the first refund stands; the second never lands");
+    }
+
+    /// <summary>
+    /// The deliberate asymmetry with the test above, and the reason the index is partial. A re-issued
+    /// payment link legitimately produces a second capture on one order - that is the whole reason
+    /// <c>payments</c> exists instead of four columns on <c>orders</c>, where a re-issue overwrote the
+    /// previous invoice id and the first attempt became unrecoverable. Refining the index away from
+    /// <c>WHERE kind = 'Refund'</c> would forbid that, and nothing else would notice.
+    /// </summary>
+    [Fact]
+    public async Task A_Second_Capture_On_One_Order_Is_Allowed()
+    {
+        var user = NewUser("+38000000004");
+        var order = NewPaidOrder(user, "INV-TWO-CAPTURES");
+        await SeedCaptureAndRefund(order, user, "INV-TWO-CAPTURES", "INV-TWO-CAPTURES-REFUND");
+
+        await using var context = CreateContext();
+        context.Payments.Add(CapturePayment(order.Id, "INV-TWO-CAPTURES-B"));
+
+        var act = async () => await context.SaveChangesAsync();
+        await act.Should().NotThrowAsync();
+
+        await using var verify = CreateContext();
+        (await verify.Payments.CountAsync(p => p.OrderId == order.Id && p.Kind == PaymentKind.Capture))
+            .Should().Be(2, "a re-issued payment link is a second capture, not a lost one");
+    }
+
+    /// <summary>An order with an invoice the acquirer issued and the customer paid.</summary>
+    private static Order NewPaidOrder(User user, string invoiceId) => new()
+    {
+        Id = Guid.NewGuid(),
+        UserId = user.Id,
+        Price = 100m,
+        Status = OrderStatus.Refunded,
+        MonobankInvoiceId = invoiceId,
+        MonobankStatus = MonobankStatus.Success,
+        IdempotencyKey = $"idem-{invoiceId}",
+        CreatedAtUtc = DateTime.UtcNow,
+        UpdatedAtUtc = DateTime.UtcNow
+    };
+
+    /// <summary>
+    /// The refund shape a real write produces: a succeeded capture and a refund against it. Returns
+    /// the capture so a caller can build further rows off it.
+    /// </summary>
+    private async Task<Payment> SeedCaptureAndRefund(Order order, User user, string captureInvoice, string refundInvoice)
+    {
+        await using var seed = CreateContext();
+        var capture = CapturePayment(order.Id, captureInvoice);
+        seed.Users.Add(user);
+        seed.Orders.Add(order);
+        seed.Payments.Add(capture);
+        seed.Payments.Add(RefundPayment(order.Id, capture, refundInvoice));
+        await seed.SaveChangesAsync();
+        return capture;
+    }
+
+    private static Payment CapturePayment(Guid orderId, string invoiceId) => new()
+    {
+        Id = Guid.NewGuid(),
+        OrderId = orderId,
+        Kind = PaymentKind.Capture,
+        Provider = "monobank",
+        ProviderInvoiceId = invoiceId,
+        AmountUah = 1.00m,
+        AmountKopecks = 100L,
+        Currency = "UAH",
+        Status = PaymentStatus.Succeeded,
+        PaidAtUtc = DateTime.UtcNow,
+        CreatedAtUtc = DateTime.UtcNow,
+        UpdatedAtUtc = DateTime.UtcNow
+    };
+
+    private static Payment RefundPayment(Guid orderId, Payment capture, string invoiceId) => new()
+    {
+        Id = Guid.NewGuid(),
+        OrderId = orderId,
+        Kind = PaymentKind.Refund,
+        ParentPaymentId = capture.Id,
+        Provider = "monobank",
+        ProviderInvoiceId = invoiceId,
+        AmountUah = 1.00m,
+        AmountKopecks = 100L,
+        Currency = "UAH",
+        Status = PaymentStatus.Succeeded,
+        PaidAtUtc = DateTime.UtcNow,
+        IsAutomatic = false,
+        CreatedAtUtc = DateTime.UtcNow,
+        UpdatedAtUtc = DateTime.UtcNow
+    };
 
     /// <summary>
     /// The same guarantee for the self-serve renewal: <c>voucher_renewal_items</c> records what the

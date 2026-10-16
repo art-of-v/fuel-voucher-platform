@@ -55,7 +55,7 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
     public DbSet<OrderEvent> OrderEvents => Set<OrderEvent>();
     public DbSet<Fulfillment> Fulfillments => Set<Fulfillment>();
     public DbSet<OrderLineItem> OrderLineItems => Set<OrderLineItem>();
-    public DbSet<Refund> Refunds => Set<Refund>();
+    // No Refunds set: a refund is a Payment with kind = 'Refund'. See Features/Payments.
     // A payment is an entity, not four columns on orders; a webhook delivery is stored before it is
     // acted on. See Features/Payments for why both arrived at once.
     public DbSet<Payment> Payments => Set<Payment>();

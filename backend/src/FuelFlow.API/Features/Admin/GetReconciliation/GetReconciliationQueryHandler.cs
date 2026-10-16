@@ -248,8 +248,8 @@ public sealed class GetReconciliationQueryHandler
     /// </remarks>
     private static string RefundStatusWord(PaymentStatus status) => status switch
     {
-        PaymentStatus.Pending => nameof(RefundStatus.Processing),
-        PaymentStatus.Succeeded => nameof(RefundStatus.Completed),
-        _ => nameof(RefundStatus.Failed)
+        PaymentStatus.Pending => "Processing",
+        PaymentStatus.Succeeded => "Completed",
+        _ => "Failed"
     };
 }

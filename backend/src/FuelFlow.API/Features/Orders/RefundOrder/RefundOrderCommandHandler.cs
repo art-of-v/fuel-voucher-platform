@@ -61,19 +61,24 @@ public sealed class RefundOrderCommandHandler
 
         // AsTracking is redundant but harmless: the default is TrackAll (DatabaseSetup). Kept
         // amount-correction branches below mutate this entity and rely on SaveChanges.
-        var existing = await _context.Refunds
+        //
+        // An existing refund IS an existing refund payment - there is no second table any more.
+        var existing = await _context.Payments
             .AsTracking()
-            .FirstOrDefaultAsync(r => r.OrderId == command.OrderId, cancellationToken);
+            .FirstOrDefaultAsync(
+                p => p.OrderId == command.OrderId && p.Kind == PaymentKind.Refund,
+                cancellationToken);
 
-        // A refund already in flight (Processing) or confirmed (Completed) is reported back
+        // A refund already in flight (Pending) or confirmed (Succeeded) is reported back
         // as-is and must never be cancelled twice. Only a Failed refund is retryable.
-        if (existing is not null && existing.Status != RefundStatus.Failed)
+        if (existing is not null && existing.Status != PaymentStatus.Failed)
         {
             var correctedAmount = ComputeRefundAmountKopecks(order);
 
             if (correctedAmount > 0 && existing.AmountKopecks != correctedAmount)
             {
                 existing.AmountKopecks = correctedAmount;
+                existing.AmountUah = Money.FromKopecks(correctedAmount);
                 existing.UpdatedAtUtc = DateTime.UtcNow;
                 await _context.SaveChangesAsync(cancellationToken);
             }
@@ -82,7 +87,7 @@ public sealed class RefundOrderCommandHandler
             // refunded state. While the refund is still Processing the order keeps its
             // fulfillment-derived status, otherwise the admin sees the contradictory
             // "PartiallyRefunded + Refund pending" combination.
-            if (existing.Status == RefundStatus.Completed)
+            if (existing.Status == PaymentStatus.Succeeded)
             {
                 // Deliberately does NOT opt out of FulfillmentConfiguration's global
                 // `HasQueryFilter(e => e.ReleasedAtUtc == null)`. A delivery the reconciliation job
@@ -119,7 +124,10 @@ public sealed class RefundOrderCommandHandler
                 RefundId = existing.Id,
                 OrderId = existing.OrderId,
                 AmountKopecks = existing.AmountKopecks,
-                Status = existing.Status.ToString(),
+                // The refund vocabulary, not the payment's. This string is an API contract the admin
+                // and the tests read, and it has always said "Processing" - a refund that is a
+                // payment of kind 'Refund' being Pending is the same state, under the old word.
+                Status = existing.Status == PaymentStatus.Pending ? "Processing" : "Completed",
                 ErrorMessage = existing.ErrorMessage
             };
         }
@@ -199,62 +207,35 @@ public sealed class RefundOrderCommandHandler
             _context.Payments.Add(capture);
         }
 
-        // A previously Failed refund is retried in place instead of creating a second row.
-        Refund refund;
-        if (existing is not null)
-        {
-            refund = existing;
-            refund.AmountKopecks = amount;
-            refund.Status = RefundStatus.Processing;
-            refund.ErrorMessage = null;
-            refund.MonobankStatus = null;
-            refund.IsAutomatic = command.IsAutomatic;
-            if (command.ChangedByUserId is not null)
-            {
-                refund.CreatedByUserId = command.ChangedByUserId;
-            }
-            if (!string.IsNullOrWhiteSpace(command.ChangedByUserName))
-            {
-                refund.CreatedByUserName = command.ChangedByUserName;
-            }
-            refund.UpdatedAtUtc = DateTime.UtcNow;
-        }
-        else
-        {
-            refund = new Refund
-            {
-                Id = Guid.CreateVersion7(),
-                OrderId = order.Id,
-                UserId = order.UserId,
-                AmountKopecks = amount,
-                InvoiceId = order.MonobankInvoiceId,
-                ExtRef = extRef,
-                Status = RefundStatus.Processing,
-                CreatedByUserId = command.ChangedByUserId,
-                CreatedByUserName = command.ChangedByUserName,
-                IsAutomatic = command.IsAutomatic,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
-            };
-
-            _context.Refunds.Add(refund);
-        }
-
-        // The refund payment. Until `refunds` becomes a view over `payments`, this is the second of
-        // two writes describing one event - the transient state this epic exists to remove, kept
-        // honest here by writing both inside the same SaveChanges below, so they cannot be
-        // half-committed.
+        // The refund itself. There is no second row: a refund IS a payment of kind 'Refund', and this is
+        // the only write. A previously Failed refund is retried in place rather than minting a
+        // second payment, so one failed attempt stays one record that comes back to life.
         //
-        // The retry path reuses the existing payment rather than minting a second one, matching the
-        // refund row it retries: one failed attempt stays one row that comes back to life.
-        var refundPayment = await _context.Payments
+        // `existing` above is that same row, already loaded and tracked, so it is reused rather than
+        // re-read - one round-trip fewer, and the instance the assignments below land on is the one
+        // the change tracker knows about.
+        //
+        // The reload this replaces looked correct only because DatabaseSetup registers TrackAll: it
+        // relied on the identity map to hand back the instance loaded at the top of the method. Under
+        // any other tracking default that second load materialises a DETACHED copy instead, and
+        // SaveChanges silently drops every assignment made to it - status back to Pending,
+        // ErrorMessage cleared, the amount correction. The handler still calls the acquirer and still
+        // answers "Processing", so a retry would report success while the row stayed Failed and the
+        // attempt was never recorded. That is the read-modify-write trap this repo has been bitten by
+        // five times; the guard test only scans for a marker per FILE, so the AsTracking() above
+        // satisfied it while this load went unmarked.
+        //
+        // AsTracking on the fallback covers the same hole for a refund written by a concurrent
+        // request between the two reads: that row arrives detached under the same default.
+        var refundPayment = existing ?? await _context.Payments
+            .AsTracking()
             .Where(p => p.OrderId == order.Id && p.Kind == PaymentKind.Refund)
             .FirstOrDefaultAsync(cancellationToken);
 
         if (refundPayment is null)
         {
             refundPayment = PaymentFactory.CreateRefund(
-                refund.Id,
+                Guid.CreateVersion7(),
                 order,
                 capture,
                 amount,
@@ -269,7 +250,8 @@ public sealed class RefundOrderCommandHandler
         {
             refundPayment.AmountUah = Money.FromKopecks(amount);
             refundPayment.AmountKopecks = amount;
-            refundPayment.Status = PaymentStatus.Pending;
+            PaymentFactory.ApplyStatus(
+                refundPayment, PaymentStatus.Pending, observedAtUtc: null, DateTime.UtcNow);
             refundPayment.ErrorMessage = null;
             refundPayment.IsAutomatic = command.IsAutomatic;
             if (command.ChangedByUserId is not null)
@@ -283,9 +265,7 @@ public sealed class RefundOrderCommandHandler
             refundPayment.UpdatedAtUtc = DateTime.UtcNow;
         }
 
-        // No bridge to the `refunds` row is needed: CreateRefund was handed refund.Id, so the payment
-        // and the refund are the same identity. That is what lets payments.refund_id go away now
-        // rather than in the final stage - it was only ever pointing from one row to its twin.
+
 
         try
         {
@@ -294,12 +274,14 @@ public sealed class RefundOrderCommandHandler
         catch (DbUpdateException) when (existing is null)
         {
             // A concurrent refund request (e.g. admin double-click) won the race past the
-            // existence check; the unique index on OrderId rejects the second insert.
+            // existence check; the partial unique index rejects the second insert.
             // Report the winning refund instead of surfacing a 500.
             _context.ChangeTracker.Clear();
 
-            var winner = await _context.Refunds
-                .FirstOrDefaultAsync(r => r.OrderId == order.Id, cancellationToken);
+            var winner = await _context.Payments
+                .FirstOrDefaultAsync(
+                    p => p.OrderId == order.Id && p.Kind == PaymentKind.Refund,
+                    cancellationToken);
 
             if (winner is null)
             {
@@ -311,7 +293,7 @@ public sealed class RefundOrderCommandHandler
                 RefundId = winner.Id,
                 OrderId = winner.OrderId,
                 AmountKopecks = winner.AmountKopecks,
-                Status = winner.Status.ToString(),
+                Status = winner.Status == PaymentStatus.Pending ? "Processing" : "Completed",
                 ErrorMessage = winner.ErrorMessage
             };
         }
@@ -355,13 +337,12 @@ public sealed class RefundOrderCommandHandler
             // Order status update is delayed to avoid confusing "PartiallyRefunded + Refund pending" state
             // Order status will be updated by RefundStatusSyncService when Monobank confirms
 
-            refund.MonobankStatus = response.Status;
-            refund.UpdatedAtUtc = DateTime.UtcNow;
+            refundPayment.UpdatedAtUtc = DateTime.UtcNow;
             await _context.SaveChangesAsync(cancellationToken);
 
             await _providerEventService.RecordEventAsync(
                 aggregateType: "Refund",
-                aggregateId: refund.Id.ToString(),
+                aggregateId: refundPayment.Id.ToString(),
                 eventType: "RefundRequested",
                 oldValue: null,
                 newValue: JsonSerializer.Serialize($"{amount} kopecks (order {order.Id})"),
@@ -375,7 +356,7 @@ public sealed class RefundOrderCommandHandler
 
             return new RefundOrderResult
             {
-                RefundId = refund.Id,
+                RefundId = refundPayment.Id,
                 OrderId = order.Id,
                 AmountKopecks = amount,
                 Status = "Processing",
@@ -384,17 +365,21 @@ public sealed class RefundOrderCommandHandler
         }
         catch (Exception ex)
         {
-            refund.Status = RefundStatus.Failed;
+            PaymentFactory.ApplyStatus(
+                refundPayment, PaymentStatus.Failed, observedAtUtc: null, DateTime.UtcNow);
             // error_message column is limited to 500 chars; a longer brand exception
             // (e.g. a full HTML error body) would make this SaveChanges throw and turn a
             // handled refund failure into an unhandled 500.
-            refund.ErrorMessage = ex.Message.Length <= 500 ? ex.Message : ex.Message[..500];
-            refund.UpdatedAtUtc = DateTime.UtcNow;
+            // error_message is 500 chars; a longer brand exception (e.g. a full HTML error
+            // body) would make this SaveChanges throw and turn a handled refund failure into an
+            // unhandled 500.
+            refundPayment.ErrorMessage = ex.Message.Length <= 500 ? ex.Message : ex.Message[..500];
+            refundPayment.UpdatedAtUtc = DateTime.UtcNow;
             await _context.SaveChangesAsync(cancellationToken);
 
             await _providerEventService.RecordEventAsync(
                 aggregateType: "Refund",
-                aggregateId: refund.Id.ToString(),
+                aggregateId: refundPayment.Id.ToString(),
                 eventType: "RefundFailed",
                 oldValue: null,
                 newValue: JsonSerializer.Serialize(ex.Message),
@@ -406,7 +391,7 @@ public sealed class RefundOrderCommandHandler
 
             return new RefundOrderResult
             {
-                RefundId = refund.Id,
+                RefundId = refundPayment.Id,
                 OrderId = order.Id,
                 AmountKopecks = amount,
                 Status = "Failed",

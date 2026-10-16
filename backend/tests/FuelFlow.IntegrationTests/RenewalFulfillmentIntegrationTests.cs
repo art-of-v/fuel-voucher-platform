@@ -13,6 +13,7 @@ using FuelFlow.Features.Vouchers.Exchange;
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Features.Vouchers.SharedModels;
+using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
@@ -1119,8 +1120,8 @@ var exchangedId = Guid.NewGuid();
         var replaceItem = await verify.VoucherRenewalItems.AsNoTracking().FirstAsync(i => i.Id == replaceItemId);
         replaceItem.FulfilledVoucherId.Should().BeNull(); // no stock ΓåÆ left for the backfill / refund
 
-        var refunds = await verify.Refunds.AsNoTracking().Where(r => r.OrderId == orderId).ToListAsync();
-        refunds.Should().ContainSingle(r => r.Status == RefundStatus.Processing);
+        var refunds = await verify.Payments.AsNoTracking().Where(r => r.OrderId == orderId && r.Kind == PaymentKind.Refund).ToListAsync();
+        refunds.Should().ContainSingle(r => r.Status == PaymentStatus.Pending);
     }
 
     // ---- Helpers -------------------------------------------------------------------------------
@@ -1378,7 +1379,7 @@ var exchangedId = Guid.NewGuid();
     private static async Task ResetDataAsync(ApplicationDbContext context)
     {
         await context.Database.ExecuteSqlRawAsync(
-            """TRUNCATE TABLE "refunds", "fulfillments", "voucher_renewal_items", "voucher_exchanges", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
+            """TRUNCATE TABLE "payments", "fulfillments", "voucher_renewal_items", "voucher_exchanges", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
     }
 
     private ApplicationDbContext CreateContext()

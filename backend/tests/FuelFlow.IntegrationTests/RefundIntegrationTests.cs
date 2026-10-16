@@ -89,8 +89,8 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
             var order = await mid.Orders.AsNoTracking().SingleAsync(o => o.Id == orderId);
             order.Status.Should().Be(OrderStatus.PendingFulfillment);
 
-            var refund = await mid.Refunds.AsNoTracking().SingleAsync(r => r.OrderId == orderId);
-            refund.Status.Should().Be(RefundStatus.Processing);
+            var refund = await mid.Payments.AsNoTracking().SingleAsync(r => r.OrderId == orderId && r.Kind == PaymentKind.Refund);
+            refund.Status.Should().Be(PaymentStatus.Pending);
             refund.IsAutomatic.Should().BeFalse();
             refund.CreatedByUserName.Should().Be("admin-test");
         }
@@ -104,9 +104,10 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
 
         using (var verify = CreateContext())
         {
-            var refund = await verify.Refunds.AsNoTracking().SingleAsync(r => r.OrderId == orderId);
-            refund.Status.Should().Be(RefundStatus.Completed);
-            refund.MonobankStatus.Should().Be("success");
+            var refund = await verify.Payments.AsNoTracking().SingleAsync(r => r.OrderId == orderId && r.Kind == PaymentKind.Refund);
+            refund.Status.Should().Be(PaymentStatus.Succeeded);
+            // The brand's own word is no longer stored on the refund - it is a typed status plus the
+            // acquirer's row in webhook_events. What matters here is the money moved, and it did.
 
             var order = await verify.Orders.AsNoTracking().SingleAsync(o => o.Id == orderId);
             order.Status.Should().Be(OrderStatus.Refunded);
@@ -159,9 +160,15 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
 
         using (var verify = CreateContext())
         {
-            var refund = await verify.Refunds.AsNoTracking().SingleAsync(r => r.OrderId == orderId);
-            refund.Status.Should().Be(RefundStatus.Processing);
-            refund.ExtRef.Should().Be(longIdempotencyKey);
+            var refund = await verify.Payments.AsNoTracking().SingleAsync(r => r.OrderId == orderId && r.Kind == PaymentKind.Refund);
+            refund.Status.Should().Be(PaymentStatus.Pending);
+
+            // The overflow this test guards against was refunds.ext_ref, a varchar(150) copy of this
+            // key. There is no copy any more - the reference is read from the order at match time, so
+            // the column's width cannot bite. The key itself still has to fit, because that is what
+            // the acquirer echoes back.
+            (await verify.Orders.AsNoTracking().SingleAsync(o => o.Id == orderId))
+                .IdempotencyKey.Should().Be(longIdempotencyKey);
         }
     }
 
@@ -258,7 +265,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
 
         using (var verify = CreateContext())
         {
-            var refunds = await verify.Refunds.AsNoTracking().Where(r => r.OrderId == orderId).ToListAsync();
+            var refunds = await verify.Payments.AsNoTracking().Where(r => r.OrderId == orderId && r.Kind == PaymentKind.Refund).ToListAsync();
             refunds.Should().ContainSingle();
         }
     }
@@ -281,20 +288,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
                 quantity: 2, unitPrice: 1000), invoiceId);
 
             // A prior refund attempt Monobank (or the network) rejected.
-            seed.Refunds.Add(new Refund
-            {
-                Id = failedRefundId,
-                OrderId = orderId,
-                UserId = userId,
-                AmountKopecks = 200000,
-                InvoiceId = invoiceId,
-                ExtRef = orderId.ToString(),
-                Status = RefundStatus.Failed,
-                MonobankStatus = "failure",
-                ErrorMessage = "Monobank reported refund failure",
-                CreatedAtUtc = DateTime.UtcNow.AddMinutes(-5),
-                UpdatedAtUtc = DateTime.UtcNow.AddMinutes(-5)
-            });
+            SeedRefundPayment(seed, orderId, invoiceId, PaymentStatus.Failed, 200000, id: failedRefundId);
         });
 
         var monobankMock = CreateMonobankMock(out _);
@@ -316,9 +310,9 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
 
         using (var verify = CreateContext())
         {
-            var refund = await verify.Refunds.AsNoTracking().SingleAsync(r => r.OrderId == orderId);
+            var refund = await verify.Payments.AsNoTracking().SingleAsync(r => r.OrderId == orderId && r.Kind == PaymentKind.Refund);
             refund.Id.Should().Be(failedRefundId);
-            refund.Status.Should().Be(RefundStatus.Processing);
+            refund.Status.Should().Be(PaymentStatus.Pending);
             refund.ErrorMessage.Should().BeNull();
         }
     }
@@ -386,7 +380,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
 
         using (var verify = CreateContext())
         {
-            var refund = await verify.Refunds.AsNoTracking().SingleAsync(r => r.OrderId == orderId);
+            var refund = await verify.Payments.AsNoTracking().SingleAsync(r => r.OrderId == orderId && r.Kind == PaymentKind.Refund);
             refund.AmountKopecks.Should().Be(104000);
         }
     }
@@ -469,8 +463,8 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
 
         using (var verify = CreateContext())
         {
-            var refund = await verify.Refunds.AsNoTracking().SingleAsync(r => r.OrderId == orderId);
-            refund.Status.Should().Be(RefundStatus.Completed);
+            var refund = await verify.Payments.AsNoTracking().SingleAsync(r => r.OrderId == orderId && r.Kind == PaymentKind.Refund);
+            refund.Status.Should().Be(PaymentStatus.Succeeded);
             refund.AmountKopecks.Should().Be(104000);
 
             var order = await verify.Orders.AsNoTracking().SingleAsync(o => o.Id == orderId);
@@ -524,9 +518,9 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
 
         using (var verify = CreateContext())
         {
-            var refund = await verify.Refunds.AsNoTracking().SingleAsync(r => r.OrderId == orderId);
-            refund.Status.Should().Be(RefundStatus.Failed);
-            refund.MonobankStatus.Should().Be("failure");
+            var refund = await verify.Payments.AsNoTracking().SingleAsync(r => r.OrderId == orderId && r.Kind == PaymentKind.Refund);
+            refund.Status.Should().Be(PaymentStatus.Failed);
+            // Same as above: the brand word is gone, the typed Failed status is the record.
             refund.ErrorMessage.Should().Be("Monobank reported refund failure");
 
             // A failed refund must never leave the order in a refunded state.
@@ -575,18 +569,9 @@ var order = CreateOrder(orderId, userId, $"test-invoice-{orderId:N}", OrderStatu
                 FulfilledAtUtc = DateTime.UtcNow.AddDays(-2)
             });
 
-            seed.Refunds.Add(new Refund
-            {
-                Id = Guid.NewGuid(),
-                OrderId = orderId,
-                UserId = userId,
-                AmountKopecks = 100000,
-                InvoiceId = order.MonobankInvoiceId!,
-                ExtRef = orderId.ToString(),
-                Status = RefundStatus.Processing,
-                CreatedAtUtc = DateTime.UtcNow.AddHours(-25),
-                UpdatedAtUtc = DateTime.UtcNow.AddHours(-25)
-            });
+            // 25h old, so the sync service's stale-refund sweep picks it up.
+            SeedRefundPayment(seed, orderId, order.MonobankInvoiceId!, PaymentStatus.Pending, 100000,
+                TimeSpan.FromHours(25));
         });
 
         var monobankMock = CreateMonobankMock(out _);
@@ -600,8 +585,8 @@ var order = CreateOrder(orderId, userId, $"test-invoice-{orderId:N}", OrderStatu
 
         using (var verify = CreateContext())
         {
-            var refund = await verify.Refunds.AsNoTracking().SingleAsync(r => r.OrderId == orderId);
-            refund.Status.Should().Be(RefundStatus.Failed);
+            var refund = await verify.Payments.AsNoTracking().SingleAsync(r => r.OrderId == orderId && r.Kind == PaymentKind.Refund);
+            refund.Status.Should().Be(PaymentStatus.Failed);
             refund.ErrorMessage.Should().Contain("Timed out");
 
             var order = await verify.Orders.AsNoTracking().SingleAsync(o => o.Id == orderId);
@@ -689,6 +674,46 @@ private static Order AddPaidOrder(
         }
     };
 
+    /// <summary>Seeds a refund payment against the capture <see cref="AddPaidOrder"/> put there.</summary>
+/// <remarks>
+/// A refund names the capture it reverses, so this reads the capture back out of the change
+/// tracker rather than minting a parent - <c>AddPaidOrder</c> has already added it and it is not
+/// in the database yet.
+/// </remarks>
+private static Payment SeedRefundPayment(
+        ApplicationDbContext seed,
+        Guid orderId,
+        string invoiceId,
+        PaymentStatus status,
+        int amountKopecks,
+        TimeSpan? age = null,
+        Guid? id = null)
+    {
+        var capture = seed.Payments.Local.First(p => p.OrderId == orderId && p.Kind == PaymentKind.Capture);
+
+        var refund = new Payment
+        {
+            Id = id ?? Guid.CreateVersion7(),
+            OrderId = orderId,
+            Kind = PaymentKind.Refund,
+            ParentPaymentId = capture.Id,
+            Provider = WebhookEventIdentity.Monobank,
+            ProviderInvoiceId = invoiceId,
+            AmountUah = amountKopecks / 100m,
+            AmountKopecks = amountKopecks,
+            Currency = "UAH",
+            Status = status,
+            ErrorMessage = status == PaymentStatus.Failed ? "Monobank reported refund failure" : null,
+            // A failed refund reads as a past attempt; the sync service's stale sweep only ever looks
+            // BACK from a cutoff, so a refund dated in the future would sit there forever.
+            CreatedAtUtc = DateTime.UtcNow - (age ?? TimeSpan.FromMinutes(5)),
+            UpdatedAtUtc = DateTime.UtcNow - (age ?? TimeSpan.FromMinutes(5))
+        };
+
+        seed.Payments.Add(refund);
+        return refund;
+    }
+
     private static Mock<IMonobankClient> CreateMonobankMock(out AmountBox cancelledAmount)
     {
         var captured = new AmountBox();
@@ -714,7 +739,7 @@ private static Order AddPaidOrder(
         // The sync service scans ALL refunds, so leftover state from a previous test in
         // this shared class-fixture database would interfere. Keep each test hermetic.
         await context.Database.ExecuteSqlRawAsync(
-            """TRUNCATE TABLE "refunds", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
+            """TRUNCATE TABLE "payments", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
 
         seed(context);
         await context.SaveChangesAsync();
