@@ -1,4 +1,9 @@
-import { parseVersion, isVersionBelow, getCurrentAppVersion, fetchAppVersion } from './versionCheck';
+import {
+  parseVersion,
+  isVersionBelow,
+  getCurrentAppVersion,
+  fetchAppVersion,
+} from './versionCheck';
 
 // `versionCheck` pulls in `BASE_URL` from `apiClient`, which reaches `react-native-device-info`
 // and its `new NativeEventEmitter()`. Same stub as `app/_layout.test.tsx`: the module under test
@@ -10,7 +15,11 @@ jest.mock('../api/apiClient', () => ({ BASE_URL: 'https://test.local' }));
 // `getCurrentAppVersion()` call time lets each test set the value it needs.
 jest.mock('expo-constants', () => ({
   __esModule: true,
-  default: { get expoConfig() { return (globalThis as any).__EXPO_CONFIG__; } },
+  default: {
+    get expoConfig() {
+      return (globalThis as any).__EXPO_CONFIG__;
+    },
+  },
 }));
 
 beforeEach(() => {
@@ -97,7 +106,11 @@ describe('fetchAppVersion', () => {
   it('returns the served floor', async () => {
     globalThis.fetch = jest.fn(async () => ({
       ok: true,
-      json: async () => ({ minimumVersion: '1.0.1', iosStoreUrl: 'ios', androidStoreUrl: 'android' }),
+      json: async () => ({
+        minimumVersion: '1.0.1',
+        iosStoreUrl: 'ios',
+        androidStoreUrl: 'android',
+      }),
     })) as unknown as typeof fetch;
     const info = await fetchAppVersion();
     expect(info?.minimumVersion).toBe('1.0.1');
@@ -109,12 +122,17 @@ describe('fetchAppVersion', () => {
    * the reason testers were walled off, and why the unreadable-version fallback was the culprit.
    */
   it('returns null on a non-ok response so the caller does not wall the user', async () => {
-    globalThis.fetch = jest.fn(async () => ({ ok: false, json: async () => ({}) })) as unknown as typeof fetch;
+    globalThis.fetch = jest.fn(async () => ({
+      ok: false,
+      json: async () => ({}),
+    })) as unknown as typeof fetch;
     expect(await fetchAppVersion()).toBeNull();
   });
 
   it('returns null when the network throws', async () => {
-    globalThis.fetch = jest.fn(async () => { throw new Error('offline'); }) as unknown as typeof fetch;
+    globalThis.fetch = jest.fn(async () => {
+      throw new Error('offline');
+    }) as unknown as typeof fetch;
     expect(await fetchAppVersion()).toBeNull();
   });
 });
