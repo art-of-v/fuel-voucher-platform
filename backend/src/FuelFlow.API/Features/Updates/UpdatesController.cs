@@ -44,7 +44,24 @@ public sealed class UpdatesController : ControllerBase
         var runtimeVersion = Request.Headers["expo-runtime-version"].ToString();
 
         if (string.IsNullOrWhiteSpace(platform) || string.IsNullOrWhiteSpace(runtimeVersion))
+        {
+            _logger.LogWarning(
+                "Manifest request missing required header(s): platform={HasPlatform}, runtimeVersion={HasRuntimeVersion}",
+                !string.IsNullOrWhiteSpace(platform), !string.IsNullOrWhiteSpace(runtimeVersion));
             return BadRequest("expo-platform and expo-runtime-version headers are required.");
+        }
+
+        // What runtime versions are actually out there is otherwise unanswerable. The endpoint matches
+        // on an exact native fingerprint, so a build from before the fingerprint policy asks for a hash
+        // nobody has ever published and gets a 204 that looks identical to "up to date" - and the
+        // devices table records only the marketing version, not the build or the fingerprint. Logging the
+        // pair on every request is the only way to tell "this build is current" from "this build is
+        // permanently unreachable", which is the difference between draining an old fleet and waiting on
+        // a store visit that may never come. See the runbook's "Reaching a build you can no longer rebuild".
+        //
+        // Information, not Debug: this is the line an operator greps for when deciding whether a legacy
+        // publish is worth doing. The volume is one line per app launch on a tester-sized fleet.
+        _logger.LogInformation("Manifest request for {Platform}/{RuntimeVersion}", platform, runtimeVersion);
 
         // No bucket configured yet (the fail-safe default before R2 exists or the first publish has
         // run): answer a valid "no update available" so the installed bundle keeps running.

@@ -13,7 +13,8 @@
  * WHAT IT DOES:
  *   0. Resolves expo.runtimeVersion. A "fingerprint" policy is recomputed here with the same tool
  *      the native build uses (expo-updates fingerprint:generate) so the descriptor is published
- *      under the exact hash the installed build asks for.
+ *      under the exact hash the installed build asks for. Pass --runtime-version <hash> to override
+ *      it and target a build this checkout cannot reproduce (see LEGACY TARGETS below).
  *   1. expo export (iOS) -> dist/
  *   2. Builds an expo-updates protocol-v1 manifest from dist/metadata.json, content-addressing
  *      the JS bundle and every asset by SHA-256.
@@ -21,6 +22,24 @@
  *   4. Uploads the bundle + assets to R2 at their content-addressed keys, then writes the
  *      descriptor the API reads at {platform}/{runtimeVersion}/update.json =
  *      { "manifestBase64": "<base64 of the exact signed bytes>", "signature": "<expo-signature>" }.
+ *
+ * LEGACY TARGETS (--runtime-version <hash>):
+ *   A build whose native layer you can no longer reproduce - anything from before the fingerprint
+ *   policy, or from before a native change - asks for a hash no current publish produces, and the
+ *   endpoint answers it with a 204 indistinguishable from "up to date". Those devices never come
+ *   forward on their own. Publishing under their hash hands them today's JS without a store visit,
+ *   which is the only way to move them short of the app-version floor.
+ *
+ *   Two preconditions, both checked by hand because neither can be verified from this machine:
+ *     - the target's native layer must still match this tree, or the bundle calls a module the old
+ *       binary does not have. JS-only differences are fine; a native dependency difference is not.
+ *     - the target must actually verify signatures. A build from before the signing certificate was
+ *       added has no certificate to verify against and may reject a signed manifest outright.
+ *
+ *   Before publishing one, check that something is asking: the manifest endpoint logs every request
+ *   as "Manifest request for {Platform}/{RuntimeVersion}" (Information), so an absent fingerprint in
+ *   that log means there is nobody to reach and the publish would be theatre.
+ *
  *
  * REQUIREMENTS (Mac, one-time): rclone configured with a scoped Object-R/W token for the public
  *   OTA bucket, the private key at keys/private-key.pem, and these env vars:
@@ -100,7 +119,56 @@ const appConfig = JSON.parse(readFileSync(join(mobileRoot, 'app.json'), 'utf8'))
 // a SILENT no-update. See docs/DEPLOYMENT.md (private docs repo) ("Runtime version — a native fingerprint").
 const usesFingerprint =
   typeof appConfig.runtimeVersion === 'object' && appConfig.runtimeVersion?.policy === 'fingerprint';
+
+// `--runtime-version <hash>` publishes under a fingerprint this checkout does NOT compute - the only way
+// to reach a build whose native layer no longer matches the current tree (a pre-fingerprint build, or one
+// from before a native change). It is deliberately not a default: publishing under the wrong hash is the
+// silent-no-update failure described above, and a flag you have to type is the last checkpoint before it.
+const argv = process.argv.slice(2);
+const readArg = (name) => {
+  const inline = argv.find((a) => a.startsWith(`${name}=`));
+  if (inline) return inline.slice(name.length + 1);
+  const index = argv.indexOf(name);
+  return index >= 0 ? argv[index + 1] : undefined;
+};
+// Presence is checked separately from the value, because a flag typed with nothing after it would
+// otherwise fall through to fingerprint:generate and quietly publish under TODAY's hash - the exact
+// silent-no-update this flag exists to let you do on purpose.
+const flagGiven = argv.includes('--runtime-version') || argv.some((a) => a.startsWith('--runtime-version='));
+const forcedRuntimeVersion = readArg('--runtime-version')?.trim();
+if (flagGiven && (!forcedRuntimeVersion || forcedRuntimeVersion.startsWith('--'))) {
+  die('--runtime-version needs a fingerprint hash: --runtime-version <hash>');
+}
+
 const resolveRuntimeVersion = () => {
+  if (forcedRuntimeVersion) {
+    const pkg = JSON.parse(readFileSync(join(mobileRoot, 'package.json'), 'utf8'));
+    const nativeNow = {
+      expo: pkg.dependencies?.expo,
+      'react-native': pkg.dependencies?.['react-native'],
+      'expo-modules-core': pkg.dependencies?.['expo-modules-core'],
+      'expo-updates': pkg.dependencies?.['expo-updates'],
+    };
+
+    console.warn(
+      `\n!! LEGACY TARGET -- this bundle is invisible to every other build.\n` +
+        `   Published under ${forcedRuntimeVersion}, which is NOT the fingerprint of this checkout.\n` +
+        `   Every build on a different fingerprint keeps getting its silent 204, including all\n` +
+        `   current testers. This is the point of the flag; it is not a no-op.\n\n` +
+        `   Before trusting it, confirm two things:\n` +
+        `     1. The target build really sends that hash:\n` +
+        `          /usr/libexec/PlistBuddy -c "Print :EXUpdatesRuntimeVersion" ios/*/Supporting/Expo.plist\n` +
+        `     2. Its native layer still matches this tree. JS-only changes are safe; a native change\n` +
+        `        is not - the bundle would call a module the old binary does not have. Compare against\n` +
+        `        the commit that built it:\n` +
+        `          git show <build-commit>:mobile/package.json | grep -E '"expo"|"react-native"|"expo-modules-core"|"expo-updates"'\n` +
+        `        This checkout: ${JSON.stringify(nativeNow)}\n\n` +
+        `   If the log shows no build asking for that hash, do not publish - there is nobody to reach.\n`
+    );
+
+    return forcedRuntimeVersion;
+  }
+
   const rv = appConfig.runtimeVersion;
   if (typeof rv === 'string') return rv;
   if (!usesFingerprint) {
@@ -132,6 +200,7 @@ const resolveRuntimeVersion = () => {
 };
 
 const runtimeVersion = resolveRuntimeVersion();
+const legacyTarget = Boolean(forcedRuntimeVersion);
 const { keyid = 'main', alg = 'rsa-v1_5-sha256' } = appConfig.updates?.codeSigningMetadata ?? {};
 
 // --- 1. export the JS bundle + assets --------------------------------------------------
@@ -220,10 +289,16 @@ uploadFile(tmpFile, descriptorKey, 'application/json');
 
 console.log(
   `\npublish-ota OK\n` +
-    `  runtimeVersion : ${runtimeVersion}${usesFingerprint ? '  (fingerprint)' : ''}\n` +
+    `  runtimeVersion : ${runtimeVersion}${usesFingerprint ? '  (fingerprint)' : ''}` +
+    `${legacyTarget ? '  <- FORCED, not this checkout\'s fingerprint' : ''}\n` +
     `  update id      : ${id}\n` +
     `  assets         : ${assets.length}\n` +
     `  descriptor     : ${publicBaseUrl}/${descriptorKey}\n\n` +
+    (legacyTarget
+      ? `LEGACY TARGET: only builds asking for ${runtimeVersion} will see this. Every other\n` +
+        `fingerprint - including every current tester - still gets a silent 204. Confirm from the\n` +
+        `manifest log that something is actually asking for it before treating this as delivered.\n\n`
+      : '') +
     (usesFingerprint
       ? `PARITY: this must equal the runtime version the target build baked in, or the app gets a\n` +
         `silent 204. Confirm on the build's checkout:\n` +
