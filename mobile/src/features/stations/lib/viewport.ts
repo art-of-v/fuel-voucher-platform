@@ -28,7 +28,11 @@ type Coords = { lat?: string | null; lng?: string | null };
  * wrap-around: a region that straddles the antimeridian has no stations in front of it in this
  * network, and treating it as empty is the safe reading.
  */
-export function isPointInRegion(point: Coords, region: MapRegion, padding = VIEWPORT_PADDING): boolean {
+export function isPointInRegion(
+  point: Coords,
+  region: MapRegion,
+  padding = VIEWPORT_PADDING,
+): boolean {
   const lat = parseFloat(point.lat ?? '');
   const lng = parseFloat(point.lng ?? '');
 
@@ -37,9 +41,7 @@ export function isPointInRegion(point: Coords, region: MapRegion, padding = VIEW
   const latPad = (region.latitudeDelta / 2) * (1 + padding);
   const lngPad = (region.longitudeDelta / 2) * (1 + padding);
 
-  return (
-    Math.abs(lat - region.latitude) <= latPad && Math.abs(lng - region.longitude) <= lngPad
-  );
+  return Math.abs(lat - region.latitude) <= latPad && Math.abs(lng - region.longitude) <= lngPad;
 }
 
 /**

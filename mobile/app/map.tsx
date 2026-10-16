@@ -440,7 +440,10 @@ export default function MapScreen() {
   // answers under memory pressure by killing the app outright. `onRegionChangeComplete` fires
   // when a gesture settles, not per frame, so this stays cheap while panning.
   const [viewport, setViewport] = React.useState<MapRegion>(KYIV_REGION);
-  const visiblePoints = React.useMemo(() => pointsInRegion(filteredPoints, viewport), [filteredPoints, viewport]);
+  const visiblePoints = React.useMemo(
+    () => pointsInRegion(filteredPoints, viewport),
+    [filteredPoints, viewport],
+  );
 
   const fuelOptions = React.useMemo(() => availableFuels(packages ?? []), [packages]);
 
