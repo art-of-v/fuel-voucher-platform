@@ -117,7 +117,14 @@ builder.Property(e => e.AmountKopecks)
 
         builder.ToTable(t =>
         {
-            t.HasCheckConstraint("ck_refund_amount_positive", "amount > 0");
+            // `amount_kopecks`, not `amount`. `20261016071102_MoneyIsDecimalOnly` renamed the column,
+            // and PostgreSQL follows a column reference inside a CHECK by OID — so the live constraint
+            // became `amount_kopecks > 0` and is correct. This string said `amount > 0` ever since,
+            // and because the model snapshot recorded the same wrong text, `migrations add` saw no
+            // difference and emitted nothing: the model agreed with itself and both disagreed with
+            // the database. Latent rather than broken, but it is a false premise for anyone reasoning
+            // from the model, which is what the README tells them to do.
+            t.HasCheckConstraint("ck_refund_amount_positive", "amount_kopecks > 0");
             // The value set RefundStatus defines. Storing a closed enum as text survives adding a
             // member; it is only safe once the database knows the set.
             t.HasCheckConstraint("ck_refund_status",
