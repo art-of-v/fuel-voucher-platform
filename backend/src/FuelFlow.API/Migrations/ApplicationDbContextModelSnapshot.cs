@@ -1867,6 +1867,248 @@ namespace FuelFlow.API.Migrations
                     b.ToTable("voucher_import_errors", (string)null);
                 });
 
+            modelBuilder.Entity("FuelFlow.Payments.SharedModels.Payment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("AmountKopecks")
+                        .HasColumnType("numeric(14,0)")
+                        .HasColumnName("amount_kopecks");
+
+                    b.Property<decimal>("AmountUah")
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("amount_uah");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Merchant")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("merchant");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<DateTime?>("PaidAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("paid_at_utc");
+
+                    b.Property<Guid?>("ParentPaymentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parent_payment_id");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("provider");
+
+                    b.Property<decimal?>("ProviderAmountKopecks")
+                        .HasColumnType("numeric(14,0)")
+                        .HasColumnName("provider_amount_kopecks");
+
+                    b.Property<string>("ProviderInvoiceId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("provider_invoice_id");
+
+                    b.Property<string>("ProviderPayload")
+                        .HasColumnType("text")
+                        .HasColumnName("provider_payload");
+
+                    b.Property<string>("ProviderPaymentId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("provider_payment_id");
+
+                    b.Property<Guid?>("RefundId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("refund_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<Guid?>("WebhookEventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("webhook_event_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ParentPaymentId")
+                        .HasDatabaseName("ix_payments_parent_payment_id");
+
+                    b.HasIndex("RefundId");
+
+                    b.HasIndex("WebhookEventId")
+                        .HasDatabaseName("ix_payments_webhook_event_id");
+
+                    b.HasIndex("OrderId", "Status")
+                        .HasDatabaseName("ix_payments_order_status");
+
+                    b.HasIndex("Provider", "ProviderInvoiceId", "Kind")
+                        .IsUnique()
+                        .HasDatabaseName("ux_payments_provider_invoice_kind")
+                        .HasFilter("provider_invoice_id IS NOT NULL");
+
+                    b.ToTable("payments", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_payments_amount_positive", "amount_uah > 0 AND amount_kopecks > 0");
+
+                            t.HasCheckConstraint("ck_payments_amount_units_agree", "amount_kopecks = round(amount_uah * 100)");
+
+                            t.HasCheckConstraint("ck_payments_currency", "currency = 'UAH'");
+
+                            t.HasCheckConstraint("ck_payments_kind", "kind IN ('Capture','Refund')");
+
+                            t.HasCheckConstraint("ck_payments_parent_not_self", "parent_payment_id IS DISTINCT FROM id");
+
+                            t.HasCheckConstraint("ck_payments_provider_amount_non_negative", "provider_amount_kopecks IS NULL OR provider_amount_kopecks > 0");
+
+                            t.HasCheckConstraint("ck_payments_provider_length", "length(provider) > 0 AND length(provider) <= 20");
+
+                            t.HasCheckConstraint("ck_payments_refund_shape", "(kind = 'Refund' AND parent_payment_id IS NOT NULL) OR (kind = 'Capture')");
+
+                            t.HasCheckConstraint("ck_payments_status", "status IN ('Pending','Succeeded','Failed','Cancelled','Expired')");
+
+                            t.HasCheckConstraint("ck_payments_succeeded_has_paid_at", "status <> 'Succeeded' OR paid_at_utc IS NOT NULL");
+                        });
+                });
+
+            modelBuilder.Entity("FuelFlow.Payments.SharedModels.WebhookEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal?>("AmountKopecks")
+                        .HasColumnType("numeric(14,0)")
+                        .HasColumnName("amount_kopecks");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("error");
+
+                    b.Property<string>("InvoiceId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("invoice_id");
+
+                    b.Property<string>("KeyId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("key_id");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("payload");
+
+                    b.Property<DateTime?>("ProcessedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("processed_at_utc");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("provider");
+
+                    b.Property<DateTime?>("ProviderCreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("provider_created_at_utc");
+
+                    b.Property<string>("ProviderEventId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("provider_event_id");
+
+                    b.Property<DateTime?>("ProviderModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("provider_modified_at_utc");
+
+                    b.Property<string>("ProviderStatus")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("provider_status");
+
+                    b.Property<DateTime>("ReceivedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at_utc");
+
+                    b.Property<string>("Signature")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("signature");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InvoiceId")
+                        .HasDatabaseName("ix_webhook_events_invoice_id");
+
+                    b.HasIndex("ProviderStatus")
+                        .HasDatabaseName("ix_webhook_events_provider_status");
+
+                    b.HasIndex("ReceivedAtUtc")
+                        .HasDatabaseName("ix_webhook_events_outstanding")
+                        .HasFilter("status IN ('Received','Failed')");
+
+                    b.HasIndex("Provider", "ProviderEventId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_webhook_events_provider_event");
+
+                    b.ToTable("webhook_events", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_webhook_events_amount_non_negative", "amount_kopecks IS NULL OR amount_kopecks > 0");
+
+                            t.HasCheckConstraint("ck_webhook_events_attempts", "attempts >= 1");
+
+                            t.HasCheckConstraint("ck_webhook_events_event_id_length", "length(provider_event_id) = 64");
+
+                            t.HasCheckConstraint("ck_webhook_events_processed", "status NOT IN ('Processed','Ignored') OR processed_at_utc IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_webhook_events_status", "status IN ('Received','Processed','Ignored','Failed')");
+                        });
+                });
+
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.AuditEventOutbox", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3858,6 +4100,27 @@ namespace FuelFlow.API.Migrations
                         .HasForeignKey("ImportId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("FuelFlow.Payments.SharedModels.Payment", b =>
+                {
+                    b.HasOne("FuelFlow.Features.Orders.SharedModels.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FuelFlow.Payments.SharedModels.Payment", null)
+                        .WithMany()
+                        .HasForeignKey("ParentPaymentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("FuelFlow.Features.Orders.SharedModels.Refund", null)
+                        .WithMany()
+                        .HasForeignKey("RefundId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Order");
                 });
 
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.FuelOfferVolume", b =>

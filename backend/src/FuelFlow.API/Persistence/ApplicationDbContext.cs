@@ -3,6 +3,7 @@ using FuelFlow.Features.Company.SharedModels;
 using FuelFlow.Features.Contracts.SharedModels;
 using FuelFlow.Features.Feedback.SharedModels;
 using FuelFlow.Features.Notifications.SharedModels;
+using FuelFlow.Payments.SharedModels;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Support.SharedModels;
@@ -55,6 +56,10 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
     public DbSet<Fulfillment> Fulfillments => Set<Fulfillment>();
     public DbSet<OrderLineItem> OrderLineItems => Set<OrderLineItem>();
     public DbSet<Refund> Refunds => Set<Refund>();
+    // A payment is an entity, not four columns on orders; a webhook delivery is stored before it is
+    // acted on. See Features/Payments for why both arrived at once.
+    public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<WebhookEvent> WebhookEvents => Set<WebhookEvent>();
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
     public DbSet<OutboxEvent> OutboxEvents => Set<OutboxEvent>();
     public DbSet<Notification> Notifications => Set<Notification>();

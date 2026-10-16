@@ -1,5 +1,7 @@
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
+using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.Features.Acquiring;
+using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Options;
 using Microsoft.EntityFrameworkCore;
@@ -202,8 +204,128 @@ public class MonobankStatementImportService
 
         await _context.SaveChangesAsync(cancellationToken);
 
+        await SettlePaymentsFromStatementAsync(merchant, nameable, now, cancellationToken);
+
         _logger.LogInformation(
             "Imported the {Merchant} statement for [{From} - {To}): {Inserted} new, {Updated} already known",
             merchant, fromUtc, toUtc, inserted, updated);
     }
+
+    /// <summary>
+    /// Moves capture payments to what the acquirer's statement says about them.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The statement is the authority on money in a way the webhook is not. Two things come out of
+    /// this that nothing else in the system can supply:
+    /// </para>
+    /// <list type="number">
+    /// <item><b>The time the money actually moved.</b> A callback carries the acquirer's
+    /// <c>modifiedDate</c>, which moves every time the invoice is touched - including by a later,
+    /// unrelated callback. The statement's <c>date</c> is the financial operation time. For a VAT
+    /// payer that is a reporting-period boundary, so "roughly when the callback arrived" is not a
+    /// substitute and this is where <c>payments.paid_at_utc</c> becomes the answer rather than an
+    /// approximation.</item>
+    ///
+    /// <item><b>Payments nobody told us about.</b> An invoice paid while a callback was lost still
+    /// appears here. Before this, such a payment was found only when an operator noticed an order
+    /// stuck; now it is a row that says so.</item>
+    /// </list>
+    ///
+    /// <para>
+    /// The amount is NOT overwritten. The acquirer's figure is written beside ours into
+    /// <c>provider_amount_kopecks</c> and the two are left to disagree, because they disagreeing is
+    /// a finding this system should surface rather than resolve by picking a side. The same rule as
+    /// the statement rows themselves: the acquirer is the authority on what it charged, and re-fetching
+    /// a period must not quietly rewrite what we recorded.
+    /// </para>
+    ///
+    /// <para>
+    /// Only captures. Refund payments are matched by <c>ext_ref</c> in
+    /// <c>RefundStatusSyncService.ApplyCancelListStatusAsync</c>, which owns that path and its tests;
+    /// widening it here would duplicate a machine this job knows nothing about.
+    /// </para>
+    /// </remarks>
+    private async Task SettlePaymentsFromStatementAsync(
+        MonobankMerchant merchant,
+        IReadOnlyList<MonobankStatementItem> items,
+        DateTime nowUtc,
+        CancellationToken cancellationToken)
+    {
+        var invoiceIds = items
+            .Select(i => i.InvoiceId)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct()
+            .ToList();
+
+        if (invoiceIds.Count == 0)
+        {
+            return;
+        }
+
+        var payments = await _context.Payments
+            .Where(p => p.Kind == PaymentKind.Capture
+                     && p.Provider == WebhookEventIdentity.Monobank
+                     && p.ProviderInvoiceId != null
+                     && invoiceIds.Contains(p.ProviderInvoiceId))
+            .ToListAsync(cancellationToken);
+
+        if (payments.Count == 0)
+        {
+            return;
+        }
+
+        var byInvoice = payments
+            .GroupBy(p => p.ProviderInvoiceId!)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var settled = 0;
+
+        foreach (var item in items)
+        {
+            if (string.IsNullOrWhiteSpace(item.InvoiceId) || !byInvoice.TryGetValue(item.InvoiceId, out var candidates))
+            {
+                continue;
+            }
+
+            // Only what the acquirer actually reported as money received counts. A statement row in
+            // any other state is evidence, but promoting a Pending capture to Succeeded off it would
+            // assert a payment nobody made.
+            if (!IsReceived(item.Status))
+            {
+                continue;
+            }
+
+            foreach (var payment in candidates)
+            {
+                payment.ProviderAmountKopecks = item.Amount;
+                PaymentFactory.ApplyStatus(payment, PaymentStatus.Succeeded, item.Date ?? nowUtc, nowUtc);
+                settled++;
+            }
+        }
+
+        if (settled == 0)
+        {
+            return;
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "Reconciled {Settled} capture payment(s) against the {Merchant} statement",
+            settled, merchant);
+    }
+
+    /// <summary>
+    /// The acquirer's own vocabulary, matched loosely on purpose.
+    /// </summary>
+    /// <remarks>
+    /// The status column is explicitly not mapped onto our enums - the statement speaks in its own
+    /// words and the whole point of the table is to keep them. So this is a substring test, not an
+    /// equality test against a closed set: "success" and "hold"/"success_hold" both mean received,
+    /// and a vocabulary we have not seen should fail closed here rather than be guessed at.
+    /// </remarks>
+    private static bool IsReceived(string? acquirerStatus)
+        => !string.IsNullOrWhiteSpace(acquirerStatus)
+           && acquirerStatus.Contains("success", StringComparison.OrdinalIgnoreCase);
 }

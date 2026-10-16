@@ -106,13 +106,25 @@ public sealed class MonobankWebhookController : ControllerBase
             {
                 if (response.ErrorCode == "AMOUNT_MISMATCH")
                 {
+                    // 200, not 400. A non-2xx tells Monobank to deliver again, and an amount
+                    // mismatch is permanent - our price is not going to change because a callback
+                    // arrives twice - so answering 400 turns one unresolvable event into an endless
+                    // retry loop against our door, paid for in traffic.
+                    //
+                    // The money really was taken and the order stays PendingPayment, so nothing is
+                    // fulfilled and no customer sees a paid order that was not. What is left is the
+                    // evidence, and that is recorded: the delivery is on file as webhook_events with
+                    // status 'Failed' and the acquirer's amount beside ours, which is what a dispute
+                    // about this charge will be settled from.
                     _logger.LogError(
-                        "Monobank webhook rejected for invoice {InvoiceId}: {Message}",
+                        "Monobank webhook for invoice {InvoiceId} accepted without acting: {Message}",
                         command.InvoiceId, response.Message);
 
-                    return BadRequest(response.Message);
+                    return Ok(response);
                 }
 
+                // A 404 here is a genuine race: the invoice exists at the acquirer while its order is
+                // still committing. Retrying is the correct answer, and Monobank does it.
                 _logger.LogWarning("Webhook processing failed: {Message}", response.Message);
                 return NotFound(response.Message);
             }

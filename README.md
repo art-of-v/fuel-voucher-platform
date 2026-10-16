@@ -202,12 +202,19 @@ level stored in `roles.level` and the authority matrix enforced in
 1. User picks a station → selects fuel packages (liters × quantity) → basket. A package with no stock is
    shown but not buyable (`isAvailable: false`).
 2. `POST /api/purchases` (or `POST /api/purchases/bulk`), device-signed, creates an order
-   (`PendingPayment`) and a Monobank invoice, returning a payment URL. **Price is recomputed
-   server-side from `FuelPackages`** — the client value is only a proposal.
+   (`PendingPayment`), a **`payments` row** and a Monobank invoice, returning a payment URL.
+   **Price is recomputed server-side from `FuelPackages`** — the client value is only a proposal.
 3. User pays in Monobank → Monobank calls `POST /api/monobank/webhook`. The signature
    (`X-Sign`, ECDSA over the raw body) is **verified and fail-closed (401)** and the amount is
    checked; on success the order → `PendingFulfillment` and an `OrderCreated` outbox event is queued.
    (In dev, `POST /api/purchases/simulate` — Admin — stands in for the webhook.)
+   **The delivery is written to `webhook_events` before any of that runs**, so the acquirer's own
+   signed statement survives whether or not we could act on it, and a redelivery is refused by the
+   unique index rather than re-processed. An **amount mismatch answers 200, not 4xx**: the difference
+   is permanent, so asking Monobank to retry only produces a loop — the money really was taken, the
+   order stays `PendingPayment`, and the evidence lands as a `Failed` delivery with the acquirer's
+   amount beside ours on the `payments` row. A **404** is still returned for an invoice whose order
+   has not committed yet, because that one is a race and retrying is correct.
 4. The Hangfire `FulfillmentService` (`*/1 * * * *`) assigns `Available` vouchers matching
    `(provider, fuelTypeId, liters)` via **FEFO**; the order → `Fulfilled`, or `PartiallyFulfilled` when
    stock ran short between the checkout gate and the claim (or when the order predates that gate).
@@ -282,7 +289,7 @@ only at the Monobank boundary.**
 | UAH | `numeric(12,2)` | `orders.price`, `order_line_items.unit_price` / `line_total`, `fuel_packages.price` / `original_price`, `fuel_types.base_price` / `discount_price`, `voucher_renewal_items.amount_paid` |
 | UAH per litre | `numeric(10,4)` | `fuel_vouchers.cost_per_liter`, `fuel_packages.*_per_liter`, `voucher_exchanges.cost_per_liter_applied` |
 | UAH surcharge | `numeric(10,2)` | `voucher_exchanges.surcharge_uah`, `operator_voucher_renewals.surcharge_uah` |
-| kopecks | `bigint` | `refunds.amount`, `monobank_statement_entries.amount_kopecks`; every Monobank API call (`invoice/create`, `invoice/cancel`, webhooks) and any DTO field explicitly named `...Kopecks` |
+| kopecks | `numeric(14,0)` | `refunds.amount_kopecks`, `monobank_statement_entries.amount_kopecks`, `payments.amount_kopecks`, `payments.provider_amount_kopecks`, `webhook_events.amount_kopecks`; every Monobank API call (`invoice/create`, `invoice/cancel`, webhooks) and any DTO field explicitly named `...Kopecks` |
 
 Monobank's merchant API mandates kopeck integers, so every conversion goes through
 `SharedKernel.Money` at that boundary and nowhere else. Per-litre rates keep 4 dp because
@@ -322,6 +329,8 @@ The primary tables:
 | `fuel_vouchers` | Voucher inventory; QR rendered from `qr_parameters`; carries `legal_entity_id` + `worker_user_id`; `order_id` names the order that delivered it and is **required** for a held voucher (`Assigned`/`Used`/`Blocked`, DB CHECK `ck_voucher_held_has_order`), null while it is stock |
 | `qr_parameters` | QR encoding config (version, ECC level, mask, encoding mode) |
 | `orders` / `order_line_items` | Purchase orders and their line items (UAH); `kind` = `Purchase` \| `Renewal` \| `ReceivedFromCompany` (a company→worker handover, priced 0, with `source_order_id` naming the purchase the fuel came from) |
+| `payments` | **A payment as an entity, not four columns on `orders`.** One row per acquirer invoice, written when the invoice is created and moved by the webhook or the statement. Carries `paid_at_utc` (when the money moved), `status` (`Pending`/`Succeeded`/`Failed`/`Cancelled`/`Expired`), and **both** amounts: `amount_uah`/`amount_kopecks` are what we billed and `provider_amount_kopecks` is what the acquirer reported. `ck_payments_amount_units_agree` keeps the first two from drifting; the third is deliberately **not** constrained against them, because a mismatch is the finding. See `docs/TARGET_SCHEMA.md` D-10 |
+| `webhook_events` | **Every acquirer callback, stored verbatim before anything acts on it.** `UNIQUE (provider, provider_event_id)` is the idempotency guarantee — a redelivery is refused by Postgres, not judged by a handler. `attempts > 1` means the acquirer retried us. `status` = `Received`/`Processed`/`Ignored`/`Failed`, and `Failed` is reachable through a partial index because it means "we were told and did nothing". Monobank sends no event id, so `provider_event_id` is derived from `(invoice, status, modifiedDate)` — see `WebhookEventIdentity`. See `docs/TARGET_SCHEMA.md` D-11 |
 | `fulfillments` | Junction linking orders to the vouchers that satisfy them |
 | `refunds` | Refund records (amount in **kopecks**, `bigint`; one per order) |
 | `monobank_statement_entries` | Acquirer statement rows as imported — immutable evidence, never rewritten by a re-import |
