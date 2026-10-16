@@ -93,6 +93,10 @@ done
 check_data_preconditions() {
   echo "== data preconditions =="
   local violated=0 checked=0 sql name rows
+  # The names, not just the count. A blocking message that says "1 precondition violated" sends
+  # someone hunting through the log for which file; the file is already known here and is the one
+  # thing worth reading, because its header explains what the condition means and what to do.
+  local -a violated_files=()
 
   if [[ ! -d preflight-db ]]; then
     echo "  no preflight-db directory (nothing to check)"
@@ -127,6 +131,7 @@ check_data_preconditions() {
       echo "  $name: ok"
     else
       violated=$((violated + 1))
+      violated_files+=("$name")
       warn "$name: VIOLATED - ${rows} row(s). Details:"
       docker exec -i fuelflow-postgres psql -U fuelflow -d fuelflow -X -f - < "$sql" 2>&1 | sed 's/^/      /' >&2
     fi
@@ -145,7 +150,7 @@ check_data_preconditions() {
   # Tested before the summary, because "Preflight passed" followed by an exit 1 is a contradiction
   # on the same screen, and the last line a reader saw is the one they remember.
   if [[ "${PREFLIGHT_DB_STRICT:-0}" == "1" && "$violated" -gt 0 ]]; then
-    fail "PREFLIGHT_DB_STRICT=1 and ${violated} data precondition(s) are violated (details above). Nothing was pulled; reconcile the rows and re-run."
+    fail "PREFLIGHT_DB_STRICT=1 and ${violated} data precondition(s) are violated: ${violated_files[*]}. Nothing was pulled. Each file's header says what the condition means and what to do about it; re-read them before touching the data."
   fi
 
   if [[ ${#warnings[@]} -gt 0 ]]; then

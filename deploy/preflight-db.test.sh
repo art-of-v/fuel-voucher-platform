@@ -101,6 +101,11 @@ lacks "and it does not claim the preconditions were satisfied" "all data precond
 out="$(run DOCKER_STUB_RUNNING=1 DOCKER_STUB_ROWS='offer-1|klo|ft-1|real|10.00|2.50' PREFLIGHT_DB_STRICT=1)"
 check "strict mode blocks the deploy" "1" "$?"
 contains "and says why" "PREFLIGHT_DB_STRICT=1" "$out"
+# The file name in the FAILURE LINE, not merely somewhere in the output. The violation warning above
+# already prints the name, so a bare "contains <filename>" would pass against the old message that said
+# only "N precondition(s) are violated (details above)" - which is the whole thing being fixed here.
+# Matched on the punctuation the new message produces, so this fails without the change.
+contains "and the failure line names the file to read" "are violated: 010-offer-volume-price-agreement.sql" "$out"
 # The whole point of testing the order: "Preflight passed" printed before an exit 1 is a
 # contradiction on one screen, and the last line a reader saw is the one they remember.
 lacks "and never prints 'Preflight passed' while failing" "Preflight passed." "$out"
