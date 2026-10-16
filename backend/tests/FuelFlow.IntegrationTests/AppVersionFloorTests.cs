@@ -40,7 +40,17 @@ public class AppVersionFloorTests
     /// non-existent version behind the wall on 2026-10-12. Update it in the same PR that ships the
     /// build, never the one that prepares it.
     /// </summary>
-    private const string PublishedInStores = "1.0.1";
+    /// <remarks>
+    /// 1.1.0 reached the public <b>iOS</b> App Store on 2026-10-16, which is what made the floor 1.1.0
+    /// safe. Android is a different story and this constant cannot express it: no Android build has
+    /// ever been produced from this tree and none is on Play, so a floor of 1.1.0 walls every Android
+    /// build below it and points it at a listing that cannot serve the version. That is the lockout
+    /// this file exists to prevent - it just cannot happen through Play, because there is nothing on
+    /// Play. It is currently clear, and the place to re-check it is not this constant but the fleet:
+    /// every sub-1.1.0 device on 2026-10-16 was iOS (<c>SELECT app_version, device_model FROM devices
+    /// WHERE app_version &lt;&gt; '1.1.0'</c>). Re-run it before raising the floor again.
+    /// </remarks>
+    private const string PublishedInStores = "1.1.0";
 
     private static string RepositoryRoot()
     {

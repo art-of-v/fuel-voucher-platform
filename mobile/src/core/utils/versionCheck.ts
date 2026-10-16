@@ -18,8 +18,8 @@ export function parseVersion(version: string): number[] {
  * `current` is null when the build could not read its own version — `Constants.expoConfig` is not
  * reliably populated in a standalone App Store binary. That case returns FALSE on purpose.
  *
- * The previous fallback returned the literal '1.0.0', which is *below* the floor the API serves
- * ('1.0.1'). So a build that could not read its own version was declared older than the minimum and
+ * The previous fallback returned the literal '1.0.0', which was *below* the floor the API served at
+ * the time (1.0.1). So a build that could not read its own version was declared older than the minimum and
  * shown a full-screen update wall, and the wall offered a store build that would fail the same check —
  * the same brick the floor's own comment warns about, reached from the other side. Blocking on a value
  * that was never read is not caution, it is refusing to serve.
