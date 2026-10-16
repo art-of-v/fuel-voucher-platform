@@ -37,12 +37,14 @@ DELETE FROM order_line_items
 WHERE order_id IN (SELECT id FROM orders WHERE idempotency_key LIKE 'emu2-%');
 DELETE FROM orders WHERE idempotency_key LIKE 'emu2-%';
 
-DELETE FROM fuel_packages WHERE id LIKE 'emu2-pkg-%';
+-- The emulator-catalogue delete that used to sit here went with `fuel_packages`. These fixtures
+-- never seeded packages - they buy against the live catalogue - so it cleaned up nothing, and no
+-- substitute is pointed at `fuel_offers`: this file removes emulator rows, and a live catalogue
+-- offer is not one.
 
 COMMIT;
 
 \echo '=== remaining emulator rows (must all be 0) ==='
 SELECT
   (SELECT count(*) FROM fuel_vouchers WHERE voucher_number LIKE 'EMU2-%') AS emu_vouchers,
-  (SELECT count(*) FROM orders WHERE idempotency_key LIKE 'emu2-%') AS emu_orders,
-  (SELECT count(*) FROM fuel_packages WHERE id LIKE 'emu2-pkg-%') AS emu_packages;
+  (SELECT count(*) FROM orders WHERE idempotency_key LIKE 'emu2-%') AS emu_orders;

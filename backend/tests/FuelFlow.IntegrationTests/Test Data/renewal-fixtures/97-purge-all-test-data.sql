@@ -16,7 +16,7 @@
 -- KEPT, deliberately:
 --   roles, stations, fuel_types, qr_parameters   — reference data the app needs to boot
 --   app_settings                                  — configuration (the renewal and term ladders)
---   fuel_packages                                 — the live supplier catalog
+--   fuel_offers, fuel_offer_volumes             - the live supplier catalog
 --   the real customer's vouchers, orders, fulfilments, refunds and their company
 --
 -- NOT TOUCHED, deliberately:
@@ -108,7 +108,6 @@ UNION ALL SELECT 'renewal items', count(*) FROM voucher_renewal_items WHERE orde
 UNION ALL SELECT 'supplier exchanges', count(*) FROM voucher_exchanges
     WHERE old_voucher_id IN (SELECT id FROM _test_voucher)
 UNION ALL SELECT 'operator renewals', count(*) FROM operator_voucher_renewals WHERE voucher_id IN (SELECT id FROM _test_voucher)
-UNION ALL SELECT 'emulator packages', count(*) FROM fuel_packages WHERE id LIKE 'emu2-pkg-%'
 UNION ALL SELECT 'devices', count(*) FROM devices WHERE user_id IN (SELECT id FROM _test_user)
 UNION ALL SELECT 'push tokens', count(*) FROM push_tokens WHERE user_id IN (SELECT id FROM _test_user)
 UNION ALL SELECT 'refresh tokens', count(*) FROM refresh_tokens
@@ -207,8 +206,10 @@ ORDER BY 1, 2;
   -- 9. Test accounts last: everything above that referenced them is already gone.
   DELETE FROM users WHERE id IN (SELECT id FROM _test_user);
 
-  -- 10. Fixture catalog rows.
-  DELETE FROM fuel_packages WHERE id LIKE 'emu2-pkg-%';
+-- Step 10 (delete the fixture's emulator catalogue rows) went with `fuel_packages`. The fixtures
+-- never seeded packages - they buy against the live catalogue - so there was nothing to delete, and
+-- there is deliberately no substitute pointed at `fuel_offers`: this purge removes test rows, and a
+-- live catalogue row is not one.
 
 COMMIT;
 
@@ -234,7 +235,8 @@ COMMIT;
   UNION ALL SELECT 'error logs', count(*) FROM error_logs
   UNION ALL SELECT 'voucher imports', count(*) FROM voucher_imports
   UNION ALL SELECT 'outbox events', count(*) FROM outbox_events
-  UNION ALL SELECT 'fuel packages (catalog)', count(*) FROM fuel_packages
+  UNION ALL SELECT 'fuel offers (catalog)', count(*) FROM fuel_offers
+  UNION ALL SELECT 'fuel offer volumes', count(*) FROM fuel_offer_volumes
   UNION ALL SELECT 'app settings (config)', count(*) FROM app_settings
   UNION ALL SELECT 'roles', count(*) FROM roles
   UNION ALL SELECT 'stations', count(*) FROM stations

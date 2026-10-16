@@ -66,7 +66,11 @@ WHERE order_id IN (SELECT id FROM orders WHERE idempotency_key LIKE 'emu2-%');
 
 DELETE FROM orders WHERE idempotency_key LIKE 'emu2-%';
 
-DELETE FROM fuel_packages WHERE id LIKE 'emu2-pkg-%';
+-- The `DELETE FROM fuel_packages WHERE id LIKE 'emu2-pkg-%'` that used to sit here is gone with the
+-- table. Nothing seeded packages to begin with - these fixtures buy against the live catalogue, as
+-- the closing report says - so that delete only ever cleaned up rows an older fixture version had
+-- left behind. It cannot be re-pointed at `fuel_offers`: the rows it would have matched were never
+-- emulators, and deleting an offer by id here would take a real catalogue entry with it.
 
 -- ---------------------------------------------------------------------------------------------
 -- 1. The customer under test
@@ -384,8 +388,13 @@ ORDER BY voucher_number;
 \echo '=== the real catalog these purchases will use (nothing was seeded) ==='
 -- The term discount a fuel can carry is bounded by its margin: a discount above the margin sells
 -- below cost and is refused at checkout, so this row is what decides which tiers are sellable.
-SELECT id, liters, price AS line_price, supplier_price_per_liter AS cost,
-       final_price_per_liter AS shelf, final_price_per_liter - supplier_price_per_liter AS margin
-FROM fuel_packages
-WHERE fuel_type_id = (SELECT id FROM _fuel)
-ORDER BY liters;
+-- Per-litre pricing lives on the offer, the nominal's total on the volume - so this is one join, and
+-- the margin repeats down it because every nominal of a fuel shares its offer.
+SELECT v.id, v.liters, v.package_price AS line_price,
+       o.supplier_price_per_liter AS cost,
+       o.final_price_per_liter AS shelf,
+       o.final_price_per_liter - o.supplier_price_per_liter AS margin
+FROM fuel_offer_volumes v
+JOIN fuel_offers o ON o.id = v.offer_id
+WHERE o.fuel_type_id = (SELECT id FROM _fuel)
+ORDER BY v.liters;

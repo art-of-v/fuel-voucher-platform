@@ -567,7 +567,7 @@ jobs:
       # point of the split - the job needs a shell and a running postgres, not the repository.
       - name: Dump schema, history and catalogue from production
         env:
-          TABLES: fuel_types stations fuel_packages
+          TABLES: fuel_types stations fuel_offers fuel_offer_volumes
         run: |
           set -euo pipefail
           out="$RUNNER_TEMP/dryrun"
@@ -691,7 +691,7 @@ jobs:
             db -q -c "\\copy $table FROM '$f' WITH (FORMAT csv, HEADER true)"
             echo "  $table restored"
           done
-          db -t -A -c "SELECT count(*) FROM fuel_packages WHERE NOT is_deleted" | sed 's/^/live packages: /'
+          db -t -A -c "SELECT count(*) FROM fuel_offers WHERE NOT is_deleted" | sed 's/^/live offers: /'
 
       # The whole point. On the production dump this is where the offer split failed twice.
       - name: Apply pending migrations
@@ -715,9 +715,9 @@ jobs:
           # `SELECT count(*) FROM fuel_offers WHERE to_regclass('public.fuel_offers') IS NOT NULL`,
           # which looks guarded and is not: Postgres resolves the table at PARSE time, so on a run
           # where the migration created no offers table this step errors instead of reporting zero.
-          db -X -t -A -F' | ' -c "SELECT 'live packages', count(*) FROM fuel_packages WHERE NOT is_deleted"
-          db -X -t -A -F' | ' -c "SELECT 'archived packages', count(*) FROM fuel_packages WHERE is_deleted"
-          for t in fuel_offers fuel_offer_volumes; do
+          # fuel_packages is gone from the schema, so it is no longer counted here. The offers and volumes
+          # loop below reports both pools' worth of rows, and a migration that DROPS fuel_packages is exactly
+          # the case this step exists to show - its absence is the result, not a gap in the summary.          for t in fuel_offers fuel_offer_volumes; do
             if db -X -t -A -c "SELECT to_regclass('public.$t') IS NOT NULL" | grep -q t; then
               db -X -t -A -F' | ' -c "SELECT '$t', count(*) FROM $t"
             else

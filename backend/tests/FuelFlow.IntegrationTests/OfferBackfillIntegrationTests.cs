@@ -36,35 +36,15 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
             .UseNpgsql(_fixture.ConnectionString)
             .Options);
 
-    [Fact]
-    public async Task EveryPackageRow_BecameExactlyOneVolume()
-    {
-        // The row count is the first assertion because the failure mode is not "wrong price" but
-        // "no row". A backfill that dropped or duplicated rows passes any value-level check that only
-        // looks at the rows that survived.
-        await using var context = CreateContext();
-
-        var packages = await context.FuelPackages.IgnoreQueryFilters().CountAsync();
-        var volumes = await context.FuelOfferVolumes.IgnoreQueryFilters().CountAsync();
-
-        volumes.Should().Be(packages, "one volume per package row, no more and no fewer");
-    }
-
-    [Fact]
-    public async Task VolumesKeepTheIdOfThePackageRowThey_Replace()
-    {
-        // An id quoted in a log, a support ticket or a saved cart must still resolve to the same
-        // thing after the split. This is the property that makes the split invisible from outside.
-        await using var context = CreateContext();
-
-        var packageIds = await context.FuelPackages.IgnoreQueryFilters()
-            .Select(p => p.Id).ToListAsync();
-
-        var volumeIds = await context.FuelOfferVolumes.IgnoreQueryFilters()
-            .Select(v => v.Id).ToListAsync();
-
-        volumeIds.Should().BeEquivalentTo(packageIds);
-    }
+    // `EveryPackageRow_BecameExactlyOneVolume` and `VolumesKeepTheIdOfThePackageRowThey_Replace`
+    // are gone with `fuel_packages`. Both compared the old rows against the new ones directly -
+    // one volume per package row, and every volume keeping the id of the row it replaced - which is
+    // the backfill's central promise, and also only askable while the old rows exist.
+    //
+    // What is left in this file is the half that does not need them: every volume points at a real
+    // offer, no volume carries a per-litre column, the offers carry the pool, and the seed is
+    // self-consistent. Those are the properties that still have to hold on every row added from now
+    // on, which is the only part a test can still be responsible for.
 
     [Fact]
     public async Task EveryVolumeRow_PointedAtAnExistingOffer()
@@ -79,45 +59,16 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
         orphans.Should().Be(0);
     }
 
-    [Fact]
-    public async Task EveryOfferCarriesThePriceItsVolumeRowsAgreedOn()
-    {
-        // The defect being fixed, asserted against the data it came from.
-        //
-        // A volume row has no per-litre price to disagree with - that is the point of the split, and
-        // the test above proves the column is absent. So the disagreement to rule out is between the
-        // old rows and the offer they collapsed into: had two package rows for one (station, fuel,
-        // pool) carried different prices, the migration's guard would have aborted the deploy, and
-        // had it somehow not fired, this is the assertion that would notice.
-        //
-        // This one reads fuel_packages on purpose. It is the only place in the suite where the old
-        // table is the subject rather than a leftover: PR C drops those columns, and the assertion
-        // goes with them, having by then served its purpose as the check on the backfill.
-        await using var context = CreateContext();
-
-        var disagreeing = await context.FuelPackages.IgnoreQueryFilters()
-            .Where(p =>
-                context.FuelPackages.IgnoreQueryFilters().Any(other =>
-                    other.StationId == p.StationId
-                    && other.FuelTypeId == p.FuelTypeId
-                    && other.DataKind == p.DataKind
-                    && other.FinalPricePerLiter != p.FinalPricePerLiter))
-            .CountAsync();
-
-        disagreeing.Should().Be(0, "one offer, one per-litre price - the premise the whole split rests on");
-
-        // And the offer took exactly that price, for every seeded fuel.
-        var mismatched = await context.FuelPackages.IgnoreQueryFilters()
-            .Where(p =>
-                !context.FuelOffers.IgnoreQueryFilters().Any(o =>
-                    o.StationId == p.StationId
-                    && o.FuelTypeId == p.FuelTypeId
-                    && o.DataKind == p.DataKind
-                    && o.FinalPricePerLiter == p.FinalPricePerLiter))
-            .CountAsync();
-
-        mismatched.Should().Be(0, "the backfill copied the price rather than inventing one");
-    }
+    // `EveryOfferCarriesThePriceItsVolumeRowsAgreedOn` is gone with `fuel_packages`. It existed to
+    // catch a backfill that invented a price instead of copying one, by reading the old rows and
+    // comparing them to the offers they became - the only place in the suite where the old table was
+    // the subject rather than a leftover, and its own comment said it would go when the table did.
+    //
+    // The live question it was reaching for did not go with it. "Does a volume advertise the same
+    // price as the offer it belongs to?" is now asked before every deploy, in money rather than as a
+    // ratio, by deploy/preflight-db/010-offer-volume-price-agreement.sql - and by
+    // OfferVolumePriceAgreementTests. What was lost is only the ability to ask it of rows that no
+    // longer exist.
 
     [Fact]
     public async Task VolumesCarryNoPerLitrePricing()

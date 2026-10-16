@@ -68,7 +68,11 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
     public DbSet<Station> Stations => Set<Station>();
     public DbSet<StationNode> StationNodes => Set<StationNode>();
     public DbSet<FuelTypeEntity> FuelTypes => Set<FuelTypeEntity>();
-    public DbSet<FuelPackage> FuelPackages => Set<FuelPackage>();
+
+    // No FuelPackages DbSet: the table is gone (SplitFuelPackagesIntoOffers then DropFuelPackages).
+    // The `FuelPackage` class stays, but as an API shape only - `PackageProjection` builds one from a
+    // volume and its offer, and the admin endpoints still speak it. Registering it here is what would
+    // make EF try to map it, and there is no longer a table to map it to.
 
     // The split target of #318. Nothing reads these yet in this PR: they are created, backfilled and
     // constrained so the migration can be proved against a real database before any read path moves.
@@ -94,9 +98,10 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
         modelBuilder.Entity<Station>().HasData(SeedData.Stations);
         modelBuilder.Entity<FuelTypeEntity>().HasData(SeedData.FuelTypes);
         // The catalogue is seeded as offers plus volumes, because that is what the application reads.
-        // fuel_packages is deliberately NOT seeded: it survives this release as the rollback target for
-        // a database that was migrated, but nothing reads it any more, and seeding it would create a
-        // second source of truth for prices in a fresh database. It goes when the table does (PR C).
+        // fuel_packages is not seeded and no longer exists: it was deliberately left unseeded while it
+        // survived as the rollback target for an already-migrated database, because seeding it would
+        // have created a second source of truth for prices in a fresh database. DropFuelPackages is
+        // that release, so there is now only one shape and it is the one the application reads.
         var (seedOffers, seedVolumes) = SeedData.Catalogue;
         modelBuilder.Entity<FuelOffer>().HasData(seedOffers);
         modelBuilder.Entity<FuelOfferVolume>().HasData(seedVolumes);

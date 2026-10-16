@@ -105,8 +105,8 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         var bad = result.Should().BeOfType<BadRequestObjectResult>().Subject;
         bad.StatusCode.Should().Be((int)HttpStatusCode.BadRequest);
 
-        var packages = await _context.FuelPackages.Where(p => p.FuelTypeId == "qa-a95").ToListAsync();
-        packages.Should().OnlyContain(p => p.IsTestData,
+          var offers = await _context.FuelOffers.Where(o => o.FuelTypeId == "qa-a95").ToListAsync();
+          offers.Should().OnlyContain(o => o.IsTestData,
             "an edit that does not say must not be able to put rehearsal stock on sale");
     }
 
@@ -244,13 +244,21 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
             BasePrice = 92.90m, DiscountPrice = 72.34m,
             CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
         });
-        _context.FuelPackages.Add(new FuelPackage
+        // The rehearsal flag lives on the OFFER now - it is what the storefront filters on, and what
+        // `EnforceDataKind` backfilled onto. The volume is here because a fuel with no nominal on it
+        // is not a fuel the storefront can sell, and these assertions are about what the admin
+        // screens read back.
+        var offer = new FuelOffer
         {
-            Id = "qa-pkg-a95", StationId = "okko", FuelTypeId = "qa-a95",
-            FuelName = "А95 ЄВРО(QA)", Liters = 10m, Price = 723.40m,
-            FinalPricePerLiter = 72.34m, IsTestData = true,
+            Id = "qa-offer-a95", StationId = "okko", FuelTypeId = "qa-a95",
+            SupplierPricePerLiter = 60m, FinalPricePerLiter = 72.34m, IsTestData = true,
+            CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
+        };
+        _context.FuelOffers.Add(offer);
+        _context.FuelOfferVolumes.Add(new FuelOfferVolume
+        {
+            Id = "qa-vol-a95", OfferId = offer.Id, Liters = 10m, PackagePrice = 723.40m,
             CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
         });
-        await _context.SaveChangesAsync();
     }
 }

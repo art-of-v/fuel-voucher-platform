@@ -110,7 +110,7 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
     [InlineData("stations", "ck_stations_id_length")]
     [InlineData("fuel_types", "ck_fuel_types_id_length")]
     [InlineData("station_nodes", "ck_station_nodes_id_length")]
-    [InlineData("fuel_packages", "ck_fuel_packages_id_length")]
+    [InlineData("fuel_offer_volumes", "ck_fuel_offer_volumes_id_length")]
     [InlineData("fuel_vouchers", "ck_fuel_vouchers_fuel_type_id_length")]
     [InlineData("purchase_batches", "ck_purchase_batches_fuel_type_id_length")]
     [InlineData("voucher_exchanges", "ck_voucher_exchanges_fuel_type_id_length")]
@@ -170,30 +170,49 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
     /// <summary>
     /// <c>fuel_packages</c> was the only sellable-money table in the schema with no sign
     /// constraint, while every sibling one (<c>fuel_vouchers</c>, <c>orders</c>,
-    /// <c>order_line_items</c>, <c>refunds</c>, …) has one and is asserted above.
+    /// <c>order_line_items</c>, <c>refunds</c>, .) has one and is asserted above.
     /// <c>PUT /api/admin/brands/fuels/{id}/nominals</c> binds <c>List&lt;int&gt;</c> off the request
-    /// body, so a nominal of <c>-10</c> produced a package priced at <c>-10 ×</c> the per-litre
+    /// body, so a nominal of <c>-10</c> produced a package priced at <c>-10 x</c> the per-litre
     /// rate and the storefront listed it.
+    ///
+    /// The guards moved with the data, and are worth asserting by their new names rather than
+    /// assumed: <c>ck_fuel_offer_volumes_liters_positive</c> holds the nominal positive,
+    /// <c>ck_fuel_offer_volumes_package_price_non_negative</c> holds the total, and
+    /// <c>ck_fuel_offers_prices_non_negative</c> holds the per-litre rate — which the old table had
+    /// no guard on at all, because on the old table the rate was only ever derived.
     /// </summary>
     [Theory]
     [InlineData(0)]
     [InlineData(-10)]
-    public async Task A_NonPositive_Liters_Package_Is_Refused(double liters)
+    public async Task A_NonPositive_Liters_Volume_Is_Refused(double liters)
     {
         await using var context = CreateContext();
-        context.FuelPackages.Add(NewPackage($"pkg-liters-{liters}", liters));
+        context.FuelOfferVolumes.Add(NewVolume($"vol-liters-{liters}", liters));
 
         var act = async () => await context.SaveChangesAsync();
         await act.Should().ThrowAsync<DbUpdateException>();
     }
 
     [Fact]
-    public async Task A_Negative_Price_Package_Is_Refused()
+    public async Task A_Negative_Price_Volume_Is_Refused()
     {
         await using var context = CreateContext();
-        var package = NewPackage("pkg-negative-price", 10);
-        package.Price = -100m;
-        context.FuelPackages.Add(package);
+        var volume = NewVolume("vol-negative-price", 10);
+        volume.PackagePrice = -100m;
+        context.FuelOfferVolumes.Add(volume);
+
+        var act = async () => await context.SaveChangesAsync();
+        await act.Should().ThrowAsync<DbUpdateException>();
+    }
+
+    /// <summary>
+    /// The negative-rate guard, which the old table never needed because it had no column for one.
+    /// </summary>
+    [Fact]
+    public async Task A_Negative_Offer_Price_Is_Refused()
+    {
+        await using var context = CreateContext();
+        context.FuelOffers.Add(NewOffer("offer-negative-final", -1m));
 
         var act = async () => await context.SaveChangesAsync();
         await act.Should().ThrowAsync<DbUpdateException>();
@@ -226,44 +245,75 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
     }
 
     /// <summary>
-    /// A zero-litre package is the boundary case, not a theoretical one: <c>List&lt;int&gt;</c>
+    /// A zero-litre volume is the boundary case, not a theoretical one: <c>List&lt;int&gt;</c>
     /// would have accepted it before, and "0 litres for 0 UAH" is a package the storefront would
     /// have listed as free fuel.
+    ///
+    /// The free half has to be a REAL offer + volume pair, because it asserts the row is accepted.
+    /// <see cref="NewVolume"/> deliberately points at nothing so the refusal halves cannot pass on a
+    /// foreign key instead of a sign constraint; that trick is unavailable when success is the claim.
     /// </summary>
     [Fact]
-    public async Task A_Zero_Price_Package_Is_Allowed_But_Zero_Liters_Is_Not()
+    public async Task A_Zero_Price_Volume_Is_Allowed_But_Zero_Liters_Is_Not()
     {
         await using (var seed = CreateContext())
         {
-            seed.FuelPackages.Add(NewPackage("pkg-free-giveaway", 5, price: 0m));
+            var offer = NewOffer("offer-free-giveaway", 0m);
+            seed.FuelOffers.Add(offer);
+            seed.FuelOfferVolumes.Add(new FuelOfferVolume
+            {
+                Id = "vol-free-giveaway",
+                OfferId = offer.Id,
+                Liters = 5m,
+                PackagePrice = 0m,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow
+            });
             await seed.SaveChangesAsync();
         }
 
         await using var context = CreateContext();
-        context.FuelPackages.Add(NewPackage("pkg-zero-litres", 0));
+        context.FuelOfferVolumes.Add(NewVolume("vol-zero-litres", 0));
 
         var act = async () => await context.SaveChangesAsync();
         await act.Should().ThrowAsync<DbUpdateException>();
     }
 
-    private static FuelPackage NewPackage(string id, double liters, decimal price = 100m) => new()
+    /// <summary>
+    /// An offer to hang a volume off. Only the sign-constraint tests need one, so it carries the
+    /// bare minimum the column constraints demand and nothing else — a negative rate is the point.
+    /// </summary>
+    private static FuelOffer NewOffer(string id, decimal finalPricePerLiter) => new()
     {
         Id = id,
         StationId = "okko",
         FuelTypeId = "okko-a95",
-        FuelName = "A-95",
-        Liters = (decimal)liters,
-        Price = price,
-        // Set outright rather than derived from liters - the zero-litre case divides by zero, and
-        // the point of that test is that the row is rejected by the database, not that the test
-        // helper survived building it.
-        FinalPricePerLiter = price,
+        SupplierPricePerLiter = 10m,
+        MarginUahPerLiter = 1m,
+        FinalPricePerLiter = finalPricePerLiter,
         CreatedAtUtc = DateTime.UtcNow,
         UpdatedAtUtc = DateTime.UtcNow
     };
 
-    // ── F-01: the cascades that could destroy paid-for paper ───────────────────────────────
-
+    /// <summary>
+    /// A volume with no offer behind it. That is deliberate and load-bearing: the point of these
+    /// tests is that the DATABASE refuses the row, and a volume pointing at a real offer would
+    /// either need one seeded or would fail on the foreign key instead — turning a sign assertion
+    /// into a wiring assertion that passes for the wrong reason. The sign constraints live on the
+    /// volume's own columns and fire before anything else is consulted.
+    /// </summary>
+    private static FuelOfferVolume NewVolume(string id, double liters, decimal price = 100m) => new()
+    {
+        Id = id,
+        OfferId = $"no-such-offer-{id}",
+        Liters = (decimal)liters,
+        // Set outright rather than derived from liters - the zero-litre case divides by zero, and
+        // the point of that test is that the row is rejected by the database, not that the test
+        // helper survived building it.
+        PackagePrice = price,
+        CreatedAtUtc = DateTime.UtcNow,
+        UpdatedAtUtc = DateTime.UtcNow
+    };
     /// <summary>
     /// The sharpest edge in the schema. Deleting a fuel type used to cascade straight into
     /// fuel_vouchers and destroy every voucher sold against it — paper the customer had already
