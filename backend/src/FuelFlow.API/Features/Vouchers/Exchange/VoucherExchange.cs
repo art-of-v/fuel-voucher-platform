@@ -24,6 +24,9 @@ public sealed class VoucherExchange
     /// <summary>Groups every old voucher retired in one confirm action.</summary>
     public Guid ExchangeBatchId { get; set; }
 
+    /// <summary>The settlement this pair belongs to. See <see cref="MovementBatch"/>.</summary>
+    public MovementBatch? MovementBatch { get; set; }
+
     /// <summary>The retired stock voucher (FK → fuel_vouchers, Restrict).</summary>
     public Guid OldVoucherId { get; set; }
 

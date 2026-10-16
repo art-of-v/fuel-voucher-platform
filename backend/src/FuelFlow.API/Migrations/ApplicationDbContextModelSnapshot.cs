@@ -1210,6 +1210,83 @@ namespace FuelFlow.API.Migrations
                     b.ToTable("support_messages", (string)null);
                 });
 
+            modelBuilder.Entity("FuelFlow.Features.Vouchers.Exchange.MovementBatch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("ConfirmedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("confirmed_at_utc");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTime>("OpenedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("opened_at_utc");
+
+                    b.Property<Guid>("OpenedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("opened_by_user_id");
+
+                    b.Property<string>("OpenedByUserName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("opened_by_user_name");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("rejection_reason");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid?>("SupplierId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("supplier_id");
+
+                    b.Property<decimal>("SurchargeUah")
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("surcharge_uah");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OpenedAtUtc")
+                        .HasDatabaseName("ix_movement_batches_opened_at_utc");
+
+                    b.HasIndex("SupplierId")
+                        .HasDatabaseName("ix_movement_batches_supplier_id");
+
+                    b.ToTable("movement_batches", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_movement_batches_confirmed_has_timestamp", "(status = 'confirmed') = (confirmed_at_utc IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_movement_batches_kind", "kind IN ('voucher_exchange','bulk_issuance')");
+
+                            t.HasCheckConstraint("ck_movement_batches_rejection_reason", "(status = 'rejected') = (rejection_reason IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_movement_batches_status", "status IN ('draft','confirmed','rejected','cancelled')");
+
+                            t.HasCheckConstraint("ck_movement_batches_supplier_matches_kind", "kind <> 'voucher_exchange' OR supplier_id IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_movement_batches_surcharge_non_negative", "surcharge_uah >= 0");
+                        });
+                });
+
             modelBuilder.Entity("FuelFlow.Features.Vouchers.Exchange.VoucherExchange", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3797,8 +3874,22 @@ namespace FuelFlow.API.Migrations
                     b.Navigation("Order");
                 });
 
+            modelBuilder.Entity("FuelFlow.Features.Vouchers.Exchange.MovementBatch", b =>
+                {
+                    b.HasOne("FuelFlow.SharedKernel.Domain.Supplier", null)
+                        .WithMany()
+                        .HasForeignKey("SupplierId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("FuelFlow.Features.Vouchers.Exchange.VoucherExchange", b =>
                 {
+                    b.HasOne("FuelFlow.Features.Vouchers.Exchange.MovementBatch", "MovementBatch")
+                        .WithMany()
+                        .HasForeignKey("ExchangeBatchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", "NewVoucher")
                         .WithMany()
                         .HasForeignKey("NewVoucherId")
@@ -3815,6 +3906,8 @@ namespace FuelFlow.API.Migrations
                         .HasForeignKey("SupplierId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("MovementBatch");
 
                     b.Navigation("NewVoucher");
 

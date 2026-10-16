@@ -95,6 +95,11 @@ public class DataRetentionService
     //                                 VOUCHER_LIFECYCLE.md calls the system itself the record
     //                                 (suppliers issue no invoices, there is no paper to check
     //                                 against). Pruning them destroys the audit trail.
+    //   movement_batches           - the settlement those rows belong to (#319). Same argument one
+    //                                 level up: the batch is the statement of what was agreed, and a
+    //                                 pair list without it cannot answer "which batch, with whom,
+    //                                 for how much". It is also the only place a batch's lifecycle
+    //                                 (opened, confirmed, rejected) is written down at all.
     //   voucher_renewal_items      - what the customer paid and how the term moved. CASCADE from
     //                                 orders is the only thing that may remove one.
     //   operator_voucher_renewals  - the same settlement fact for the operator path.

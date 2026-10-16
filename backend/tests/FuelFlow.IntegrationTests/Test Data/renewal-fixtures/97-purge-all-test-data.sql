@@ -143,6 +143,12 @@ ORDER BY 1, 2;
 
   DELETE FROM voucher_exchanges x WHERE x.old_voucher_id IN (SELECT id FROM _test_voucher);
 
+  -- 1b. Settlements those rows belonged to (#319). exchange_batch_id restricts onto this table, so the
+  --     batches have to be cleared after their members or not at all - and only the ones left empty,
+  --     so a batch that still covers real stock survives the purge.
+  DELETE FROM movement_batches b
+  WHERE NOT EXISTS (SELECT 1 FROM voucher_exchanges e WHERE e.exchange_batch_id = b.id);
+
   DELETE FROM voucher_renewal_items i WHERE i.order_id IN (SELECT id FROM _test_order);
 
   -- 2. Fulfilments before vouchers (voucher_id is RESTRICT).

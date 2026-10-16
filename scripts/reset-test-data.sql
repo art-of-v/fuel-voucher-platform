@@ -65,9 +65,15 @@ SELECT coalesce(voucher_number, '(null)') AS voucher_number, status, count(*)
 FROM fuel_vouchers v JOIN reset_vouchers r ON r.id = v.id
 GROUP BY 1, 2 ORDER BY 1;
 
+-- `voucher_exchanges.exchange_batch_id` restricts onto `movement_batches` since #319, so the exchange
+-- rows go first and the batches they were part of follow. A batch that still has members left is kept
+-- rather than half-deleted.
 DELETE FROM voucher_exchanges
 WHERE old_voucher_id IN (SELECT id FROM reset_vouchers)
    OR new_voucher_id IN (SELECT id FROM reset_vouchers);
+
+DELETE FROM movement_batches b
+WHERE NOT EXISTS (SELECT 1 FROM voucher_exchanges e WHERE e.exchange_batch_id = b.id);
 
 DELETE FROM voucher_renewal_items
 WHERE source_voucher_id IN (SELECT id FROM reset_vouchers)
