@@ -62,10 +62,16 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasColumnName("referred_by")
             .HasMaxLength(50);
 
-        builder.Property(e => e.BonusBalance)
-            .HasColumnName("bonus_balance")
-            .HasDefaultValue(0)
-            .IsRequired();
+    builder.Property(e => e.BonusBalance)
+               .HasColumnName("bonus_balance")
+               .HasColumnType("numeric(12,2)")
+               .HasDefaultValue(0m)
+               .IsRequired();
+
+        // A negative bonus is not a discount, it is a bug: nothing in the domain credits a balance
+        // below zero, and one that can go negative silently means every figure derived from it - the
+        // admin list, the user's own profile - is untrustworthy.
+        builder.ToTable(t => t.HasCheckConstraint("ck_users_bonus_balance_non_negative", "bonus_balance >= 0"));
 
         builder.Property(e => e.IsActive)
             .HasColumnName("is_active")

@@ -28,10 +28,10 @@ internal sealed class RefundConfiguration : IEntityTypeConfiguration<Refund>
             .HasColumnName("user_id")
             .IsRequired();
 
-        builder.Property(e => e.Amount)
-            .HasColumnName("amount")
-            .HasColumnType("bigint")
-            .IsRequired();
+builder.Property(e => e.AmountKopecks)
+               .HasColumnName("amount_kopecks")
+               .HasColumnType("numeric(14,0)")
+               .IsRequired();
 
         // The reconciliation endpoint filters on invoice_id, and it had no index - a sequential
         // scan of the whole refunds table inside the query an operator runs when money is already

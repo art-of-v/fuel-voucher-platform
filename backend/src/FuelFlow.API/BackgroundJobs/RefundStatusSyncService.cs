@@ -251,7 +251,7 @@ private readonly ApplicationDbContext _context;
 
         _logger.LogInformation(
             "Refund {RefundId} for order {OrderId} confirmed by Monobank ({Amount} kopecks). Order status updated to {Status}",
-            refund.Id, refund.OrderId, refund.Amount, newStatus);
+            refund.Id, refund.OrderId, refund.AmountKopecks, newStatus);
     }
 
     private async Task RevertPrematureRefundedOrderStatusAsync(Refund refund, CancellationToken cancellationToken)

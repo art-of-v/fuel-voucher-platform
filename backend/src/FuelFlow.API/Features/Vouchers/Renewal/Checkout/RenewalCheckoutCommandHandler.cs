@@ -296,7 +296,7 @@ public sealed class RenewalCheckoutCommandHandler
             invoiceResponse = await monobankClient.CreateInvoiceAsync(
                 new MonobankInvoiceRequest
                 {
-                    Amount = Money.ToKopecksLong(totalUah),
+                    Amount = Money.ForMonobank(totalUah),
                     MerchantPaymentInfo = "FuelFlow Voucher Renewal",
                     RedirectUrl = _monobankOptions.RedirectUrl,
                     WebhookUrl = _monobankOptions.WebhookUrl

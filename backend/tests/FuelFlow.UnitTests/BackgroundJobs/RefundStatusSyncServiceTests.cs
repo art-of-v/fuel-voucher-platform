@@ -50,7 +50,7 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
         Id = Guid.NewGuid(),
         OrderId = orderId,
         UserId = Guid.NewGuid(),
-        Amount = 52000,
+        AmountKopecks = 52000,
         InvoiceId = "INV-REFUND-1",
         ExtRef = "idem-key-1",
         Status = status,

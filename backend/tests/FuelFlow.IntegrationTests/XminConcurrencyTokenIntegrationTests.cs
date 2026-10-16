@@ -68,14 +68,14 @@ public sealed class XminConcurrencyTokenIntegrationTests : IClassFixture<TestDat
         // would. TrackAll is the app-wide default, so a plain query attaches.
         await using var stale = CreateContext();
         var snapshot = await stale.Refunds.FirstAsync(r => r.Id == refund.Id);
-        snapshot.Amount = 2000;
+        snapshot.AmountKopecks = 2000;
 
         // Meanwhile somebody else moves the same row.
         await using (var other = CreateContext())
         {
             var affected = await other.Refunds
                 .Where(r => r.Id == refund.Id)
-                .ExecuteUpdateAsync(s => s.SetProperty(r => r.Amount, 5000));
+                .ExecuteUpdateAsync(s => s.SetProperty(r => r.AmountKopecks, 5000));
             affected.Should().Be(1, "precondition: the other writer moved the row");
         }
 
@@ -94,10 +94,10 @@ public sealed class XminConcurrencyTokenIntegrationTests : IClassFixture<TestDat
         await using var verify = CreateContext();
         var stored = await verify.Refunds
             .Where(r => r.Id == refund.Id)
-            .Select(r => new { r.Amount, r.ErrorMessage })
+            .Select(r => new { r.AmountKopecks, r.ErrorMessage })
             .SingleAsync();
 
-        stored.Amount.Should().Be(5000, "the winning write stands - the loser's 2000 never landed");
+        stored.AmountKopecks.Should().Be(5000, "the winning write stands - the loser's 2000 never landed");
         stored.ErrorMessage.Should().BeNull("and the loser's other change went with it");
     }
 
@@ -163,7 +163,7 @@ public sealed class XminConcurrencyTokenIntegrationTests : IClassFixture<TestDat
             Id = Guid.NewGuid(),
             OrderId = orderId,
             UserId = orderId,
-            Amount = amount,
+            AmountKopecks = amount,
             InvoiceId = $"inv-{orderId:N}"[..Math.Min(100, 4 + 32)],
             ExtRef = $"ref-{orderId:N}"[..Math.Min(150, 4 + 32)],
             Status = RefundStatus.Processing,

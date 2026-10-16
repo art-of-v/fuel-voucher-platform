@@ -21,7 +21,7 @@ public sealed class AdminPurchaseDto
     public DateTime CreatedAtUtc { get; set; }
     public DateTime? FulfilledAtUtc { get; set; }
     public int VoucherCount { get; set; }
-    public long RefundableAmountKopecks { get; set; }
+    public decimal RefundableAmountKopecks { get; set; }
     public string? RefundStatus { get; set; }
     public string? RefundMonobankStatus { get; set; }
     public List<OrderLineItemDto> LineItems { get; set; } = new();

@@ -327,7 +327,7 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
                 Id = Guid.NewGuid(),
                 OrderId = order.Id,
                 UserId = user.Id,
-                Amount = 100L,
+                AmountKopecks = 100L,
                 InvoiceId = "INV-DBINT-1",
                 ExtRef = "R1",
                 Status = RefundStatus.Completed,

@@ -78,7 +78,7 @@ public sealed class RefundCancelListAttributionTests : IDisposable
         Id = Guid.NewGuid(),
         OrderId = orderId,
         UserId = userId,
-        Amount = 500,
+        AmountKopecks = 500,
         InvoiceId = InvoiceId,
         ExtRef = extRef,
         Status = RefundStatus.Processing,

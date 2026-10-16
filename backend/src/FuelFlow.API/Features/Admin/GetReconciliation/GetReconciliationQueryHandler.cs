@@ -50,9 +50,9 @@ public sealed class GetReconciliationQueryHandler
                 && o.Kind != OrderKind.ReceivedFromCompany)
             .ToListAsync(cancellationToken);
 
-        long EarnedMarginKopecks(Order o)
+        decimal EarnedMarginKopecks(Order o)
         {
-            long sum = 0;
+            decimal sum = 0m;
             foreach (var g in o.LineItems.GroupBy(li => (li.Brand, li.FuelTypeId, li.Liters)))
             {
                 if (!fpLookup.TryGetValue(g.Key, out var fp) || fp.MarginUahPerLiter is null)
@@ -65,7 +65,7 @@ public sealed class GetReconciliationQueryHandler
                     && f.Voucher.FuelTypeId == g.Key.FuelTypeId
                     && f.Voucher.Liters == g.Key.Liters);
 
-                sum += (long)(fp.MarginUahPerLiter.Value * (decimal)g.Key.Liters * Math.Min(g.Sum(li => li.Quantity), delivered));
+                sum += fp.MarginUahPerLiter.Value * (decimal)g.Key.Liters * Math.Min(g.Sum(li => li.Quantity), delivered);
             }
 
             return sum;
@@ -140,7 +140,7 @@ public sealed class GetReconciliationQueryHandler
                 (DateTime.UtcNow - o.CreatedAtUtc).Days,
                 o.CreatedAtUtc,
                 refund?.Status.ToString(),
-                refund is { Status: RefundStatus.Completed } ? refund.Amount : 0L);
+                refund is { Status: RefundStatus.Completed } ? refund.AmountKopecks : 0L);
         }).ToList();
 
         var exceptions = new List<GetReconciliationResponse.ExceptionItem>();
@@ -204,9 +204,9 @@ public sealed class GetReconciliationQueryHandler
             totalOrders, paidUnfulfilled, partiallyFulfilled, fulfilled,
             revenue, orphanVouchers, unprocessed, lowInventoryProviders, importErrors,
             orders.Count(o => o.Status == OrderStatus.PartiallyRefunded || o.Status == OrderStatus.Refunded),
-            orders.Where(o => o.MonobankStatus == MonobankStatus.Success).Sum(o => Money.ToKopecksLong(o.Price)),
-            orders.Sum(o => (long)RefundOrderCommandHandler.ComputeFulfilledValueKopecks(o)),
-            refundsByOrder.Values.Where(r => r.Status == RefundStatus.Completed).Sum(r => (long)r.Amount));
+            orders.Where(o => o.MonobankStatus == MonobankStatus.Success).Sum(o => Money.ToKopecks(o.Price)),
+            orders.Sum(o => RefundOrderCommandHandler.ComputeFulfilledValueKopecks(o)),
+            refundsByOrder.Values.Where(r => r.Status == RefundStatus.Completed).Sum(r => r.AmountKopecks));
 
         return new GetReconciliationResponse(summary, threeWayMatch, exceptions, funnel, revenueSummary);
     }

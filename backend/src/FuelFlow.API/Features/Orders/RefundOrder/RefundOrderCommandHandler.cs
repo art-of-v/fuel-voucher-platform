@@ -70,9 +70,9 @@ public sealed class RefundOrderCommandHandler
         {
             var correctedAmount = ComputeRefundAmountKopecks(order);
 
-            if (correctedAmount > 0 && existing.Amount != correctedAmount)
+            if (correctedAmount > 0 && existing.AmountKopecks != correctedAmount)
             {
-                existing.Amount = correctedAmount;
+                existing.AmountKopecks = correctedAmount;
                 existing.UpdatedAtUtc = DateTime.UtcNow;
                 await _context.SaveChangesAsync(cancellationToken);
             }
@@ -117,7 +117,7 @@ public sealed class RefundOrderCommandHandler
             {
                 RefundId = existing.Id,
                 OrderId = existing.OrderId,
-                AmountKopecks = existing.Amount,
+                AmountKopecks = existing.AmountKopecks,
                 Status = existing.Status.ToString(),
                 ErrorMessage = existing.ErrorMessage
             };
@@ -155,7 +155,7 @@ public sealed class RefundOrderCommandHandler
         if (existing is not null)
         {
             refund = existing;
-            refund.Amount = amount;
+            refund.AmountKopecks = amount;
             refund.Status = RefundStatus.Processing;
             refund.ErrorMessage = null;
             refund.MonobankStatus = null;
@@ -177,7 +177,7 @@ public sealed class RefundOrderCommandHandler
                 Id = Guid.CreateVersion7(),
                 OrderId = order.Id,
                 UserId = order.UserId,
-                Amount = amount,
+                AmountKopecks = amount,
                 InvoiceId = order.MonobankInvoiceId,
                 ExtRef = extRef,
                 Status = RefundStatus.Processing,
@@ -214,7 +214,7 @@ public sealed class RefundOrderCommandHandler
             {
                 RefundId = winner.Id,
                 OrderId = winner.OrderId,
-                AmountKopecks = winner.Amount,
+                AmountKopecks = winner.AmountKopecks,
                 Status = winner.Status.ToString(),
                 ErrorMessage = winner.ErrorMessage
             };
@@ -244,7 +244,13 @@ public sealed class RefundOrderCommandHandler
 
             var response = await monobankClient.CancelInvoiceAsync(
                 order.MonobankInvoiceId,
-                amount,
+                // `amount` is ALREADY kopecks - it came off a refund column, not off a UAH price.
+                // It becomes a long here purely because Monobank's JSON contract is integers, and
+                // going through a named conversion keeps that boundary visible instead of leaving a
+                // bare cast in the call. It must NOT be routed through Money.ForMonobank, which takes
+                // UAH: doing that multiplied every refund by 100, and RefundOrderCommandHandlerTests
+                // caught it on the first run.
+                Money.KopecksForWire(amount),
                 extRef,
                 returnItems,
                 cancellationToken);
@@ -339,8 +345,8 @@ public sealed class RefundOrderCommandHandler
     }
 
     /// <summary>Total ordered value in kopecks (all line items, regardless of fulfillment).</summary>
-    internal static long ComputeTotalValueKopecks(Order order) =>
-        Money.ToKopecksLong(order.LineItems.Sum(li => li.UnitPrice * li.Quantity));
+    internal static decimal ComputeTotalValueKopecks(Order order) =>
+        Money.ForMonobank(order.LineItems.Sum(li => li.UnitPrice * li.Quantity));
 
     /// <summary>Value of delivered vouchers in kopecks (total ordered value minus unfulfilled value).</summary>
     /// <remarks>
@@ -349,8 +355,8 @@ public sealed class RefundOrderCommandHandler
     /// abandoned checkout as fulfilled revenue in both GetReport and GetReconciliation. Nothing
     /// was delivered, so the answer is zero.
     /// </remarks>
-    internal static long ComputeFulfilledValueKopecks(Order order) =>
-        !WasPaid(order) ? 0 : ComputeTotalValueKopecks(order) - ComputeRefundAmountKopecks(order);
+    internal static decimal ComputeFulfilledValueKopecks(Order order) =>
+        !WasPaid(order) ? 0m : ComputeTotalValueKopecks(order) - ComputeRefundAmountKopecks(order);
 
     /// <summary>
     /// Whether the brand confirmed this order was paid.
@@ -440,11 +446,11 @@ public sealed class RefundOrderCommandHandler
         return unfulfilled;
     }
 
-    internal static long ComputeRefundAmountKopecks(Order order)
+    internal static decimal ComputeRefundAmountKopecks(Order order)
     {
         var unfulfilledValue = ComputeUnfulfilledLines(order)
             .Sum(l => l.UnfulfilledUnits * l.UnitPrice);
 
-        return Money.ToKopecksLong(unfulfilledValue);
+        return Money.ForMonobank(unfulfilledValue);
     }
 }

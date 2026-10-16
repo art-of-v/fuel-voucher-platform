@@ -6,15 +6,15 @@ public sealed record ReportPeriod(
 );
 
 public sealed record ReportSummary(
-    long TotalSpent,
+    decimal TotalSpent,
     int TotalOrders,
     int VouchersPurchased,
     int VouchersUsed,
     decimal TotalLitersPurchased,
     decimal TotalLitersUsed,
-    long TotalReceivedKopecks,
-    long TotalFulfilledValueKopecks,
-    long TotalRefundedKopecks
+    decimal TotalReceivedKopecks,
+    decimal TotalFulfilledValueKopecks,
+    decimal TotalRefundedKopecks
 );
 
 public sealed record PaymentEntry(
@@ -29,8 +29,8 @@ public sealed record PaymentEntry(
     int Quantity,
     string? MonobankStatus,
     string? MonobankInvoiceId,
-    long FulfilledValueKopecks,
-    long RefundedKopecks,
+    decimal FulfilledValueKopecks,
+    decimal RefundedKopecks,
     string? RefundStatus
 );
 
@@ -45,12 +45,12 @@ public sealed record RedemptionEntry(
 
 public sealed record MonthlyBreakdown(
     string Month,
-    long TotalSpent,
+    decimal TotalSpent,
     int VouchersPurchased,
     int VouchersUsed,
     decimal TotalLitersPurchased,
     decimal TotalLitersUsed,
-    long TotalRefundedKopecks
+    decimal TotalRefundedKopecks
 );
 
 public sealed record GetReportResponse(

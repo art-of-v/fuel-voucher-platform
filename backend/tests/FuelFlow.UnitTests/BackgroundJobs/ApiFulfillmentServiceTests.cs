@@ -405,7 +405,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
 
         var refund = await _context.Refunds.SingleAsync(r => r.OrderId == order.Id);
         refund.Status.Should().Be(RefundStatus.Processing);
-        refund.Amount.Should().Be(250000);
+        refund.AmountKopecks.Should().Be(250000);
     }
 
     [Fact]
