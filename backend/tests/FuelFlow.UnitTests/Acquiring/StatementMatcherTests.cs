@@ -2,6 +2,7 @@ using FluentAssertions;
 using FuelFlow.Features.Acquiring;
 using FuelFlow.Features.Acquiring.Reconciliation;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Payments.SharedModels;
 using FuelFlow.SharedKernel.Options;
 using Xunit;
 
@@ -22,6 +23,34 @@ public class StatementMatcherTests
             AcquirerCreatedAtUtc = new DateTime(2026, 10, 5, 9, 0, 0, DateTimeKind.Utc)
         };
 
+    /// <summary>
+    /// The note on a matched reversal names the order's own idempotency key.
+    /// </summary>
+/// <remarks>
+/// It used to name <c>refunds.ext_ref</c>, a copy of that key taken when the refund was written.
+    /// The copy could drift from the order - nothing kept them equal - and nothing asserted on the
+/// text, so a stale or wrong reference would have reached an operator reading the reconciliation
+/// report without any test noticing. Reading the order closes both gaps at once.
+/// </remarks>
+[Fact]
+    public void A_Refund_Match_Names_The_Orders_Own_Reference()
+    {
+        var order = Order("INV1", 978.57m);
+        order.IdempotencyKey = "checkout-abc-123";
+
+        var refund = RefundFor("INV1", 97857);
+        refund.OrderId = order.Id;
+
+        var rows = StatementMatcher.Match(
+            new[] { Entry("ST1", "INV1", 97857) },
+            new[] { order },
+            new[] { refund });
+
+        rows.Should().ContainSingle();
+        rows[0].Status.Should().Be(StatementMatchStatus.RefundMatch);
+        rows[0].Note.Should().Contain("checkout-abc-123");
+    }
+
     private static Order Order(string invoiceId, decimal price) => new()
     {
         Id = Guid.NewGuid(),
@@ -31,13 +60,25 @@ public class StatementMatcherTests
         Status = OrderStatus.Fulfilled
     };
 
-    private static Refund RefundFor(string invoiceId, int amountKopecks) => new()
+    /// <summary>
+    /// A completed refund payment - the shape <c>StatementMatcher</c> now matches on. The note it
+    /// writes names the refund's order, so the order's idempotency key is the reference the
+    /// assertion below expects rather than a copy of it on the refund.
+    /// </summary>
+    private static Payment RefundFor(string invoiceId, int amountKopecks) => new()
     {
         Id = Guid.NewGuid(),
         OrderId = Guid.NewGuid(),
-        InvoiceId = invoiceId,
-        ExtRef = "cancel-" + invoiceId,
-        AmountKopecks = amountKopecks
+        Kind = PaymentKind.Refund,
+        Provider = "monobank",
+        ProviderInvoiceId = invoiceId,
+        AmountUah = amountKopecks / 100m,
+        AmountKopecks = amountKopecks,
+        Currency = "UAH",
+        Status = PaymentStatus.Succeeded,
+        PaidAtUtc = DateTime.UtcNow,
+        CreatedAtUtc = DateTime.UtcNow,
+        UpdatedAtUtc = DateTime.UtcNow
     };
 
     [Fact]
@@ -46,7 +87,7 @@ public class StatementMatcherTests
         var rows = StatementMatcher.Match(
             new[] { Entry("ST1", "INV1", 97857) },
             new[] { Order("INV1", 978.57m) },
-            Array.Empty<Refund>());
+            Array.Empty<Payment>());
 
         rows.Should().ContainSingle();
         rows[0].Status.Should().Be(StatementMatchStatus.Matched);
@@ -62,7 +103,7 @@ public class StatementMatcherTests
         var rows = StatementMatcher.Match(
             new[] { Entry("ST1", "INV1", 97900) },
             new[] { Order("INV1", 978.57m) },
-            Array.Empty<Refund>());
+            Array.Empty<Payment>());
 
         rows.Should().ContainSingle();
         rows[0].Status.Should().Be(StatementMatchStatus.AmountMismatch);
@@ -79,7 +120,7 @@ public class StatementMatcherTests
         var rows = StatementMatcher.Match(
             new[] { Entry("ST1", "INV1", 97857) },
             new[] { Order("INV1", 978.57m) },
-            Array.Empty<Refund>());
+            Array.Empty<Payment>());
 
         rows[0].Status.Should().Be(StatementMatchStatus.Matched);
     }
@@ -92,7 +133,7 @@ public class StatementMatcherTests
         var rows = StatementMatcher.Match(
             new[] { Entry("ST1", "INV1", 97857) },
             new[] { Order("INV1", 978.571m) },
-            Array.Empty<Refund>());
+            Array.Empty<Payment>());
 
         rows[0].Status.Should().Be(StatementMatchStatus.AmountMismatch);
     }
@@ -104,7 +145,7 @@ public class StatementMatcherTests
         var rows = StatementMatcher.Match(
             new[] { Entry("ST1", "INV-UNKNOWN", 50000) },
             new[] { Order("INV1", 500m) },
-            Array.Empty<Refund>());
+            Array.Empty<Payment>());
 
         rows.Should().ContainSingle();
         rows[0].Status.Should().Be(StatementMatchStatus.Unmatched);
@@ -118,7 +159,7 @@ public class StatementMatcherTests
         var rows = StatementMatcher.Match(
             new[] { Entry("ST1", null, 50000) },
             new[] { Order("INV1", 500m) },
-            Array.Empty<Refund>());
+            Array.Empty<Payment>());
 
         rows[0].Status.Should().Be(StatementMatchStatus.Unmatched);
     }
@@ -138,7 +179,7 @@ public class StatementMatcherTests
         var rows = StatementMatcher.Match(
             new[] { entry },
             new[] { alsoLive, live },
-            Array.Empty<Refund>());
+            Array.Empty<Payment>());
 
         rows.Should().ContainSingle();
         rows[0].Status.Should().Be(StatementMatchStatus.Matched);
@@ -181,7 +222,7 @@ public class StatementMatcherTests
         var rows = StatementMatcher.Match(
             new[] { Entry("ST1", "INV1", null) },
             new[] { Order("INV1", 978.57m) },
-            Array.Empty<Refund>());
+            Array.Empty<Payment>());
 
         rows[0].Status.Should().Be(StatementMatchStatus.Matched);
         rows[0].AcquirerAmount.Should().BeNull();
@@ -198,7 +239,7 @@ public class StatementMatcherTests
                 Entry("ST3", "INV-MISSING", 25000)
             },
             new[] { Order("INV1", 978.57m), Order("INV2", 100m) },
-            Array.Empty<Refund>());
+            Array.Empty<Payment>());
 
         var summary = StatementMatcher.Summarise(rows);
 
@@ -216,7 +257,7 @@ public class StatementMatcherTests
         var rows = StatementMatcher.Match(
             new[] { Entry("ST1", "INV1", 97900) },
             new[] { Order("INV1", 978.57m) },
-            Array.Empty<Refund>());
+            Array.Empty<Payment>());
 
         StatementMatcher.Summarise(rows).MismatchDeltaUah.Should().Be(0.43m);
     }
