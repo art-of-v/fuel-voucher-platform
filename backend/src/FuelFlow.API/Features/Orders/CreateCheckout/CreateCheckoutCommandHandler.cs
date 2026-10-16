@@ -4,6 +4,7 @@ using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers.Availability;
+using FuelFlow.Payments.SharedModels;
 using FuelFlow.SharedKernel;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
@@ -249,6 +250,13 @@ public sealed class CreateCheckoutCommandHandler
 
             order.MonobankInvoiceId = invoiceResponse.InvoiceId;
             order.MonobankPaymentUrl = invoiceResponse.PageUrl;
+
+            // The payment gets its own row rather than living on the order's four columns. This is
+            // the only point at which an invoice is born, so it is the only point that can write
+            // down that it exists - and until a Payment row exists, a payment link re-issued later
+            // would have nowhere to put a second attempt.
+            _context.Payments.Add(PaymentFactory.CreateCapture(
+                order, merchant, invoiceResponse.InvoiceId, DateTime.UtcNow));
 
             _logger.LogInformation(
                 "Monobank invoice created on {Merchant} merchant for order {OrderId}: {InvoiceId}, payment URL: {PaymentUrl}",

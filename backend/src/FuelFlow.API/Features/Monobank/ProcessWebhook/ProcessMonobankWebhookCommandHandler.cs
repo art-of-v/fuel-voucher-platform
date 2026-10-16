@@ -1,4 +1,6 @@
 using FuelFlow.API.BackgroundJobs;
+using FuelFlow.Payments;
+using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.SharedKernel;
@@ -37,6 +39,165 @@ public sealed class ProcessMonobankWebhookCommandHandler
     public async Task<ProcessMonobankWebhookResponse> HandleAsync(
         ProcessMonobankWebhookCommand command,
         CancellationToken cancellationToken = default)
+    {
+        _metrics.MonobankWebhookReceived(command.Status.ToLowerInvariant());
+
+        _logger.LogInformation(
+            "Processing Monobank webhook for invoice {InvoiceId}, status: {Status}",
+            command.InvoiceId,
+            command.Status);
+
+        // Stored before anything acts on it. Until this existed the delivery existed only for the
+        // duration of the request: the body was read in the controller, handed over, and never
+        // written anywhere. A customer disputing a charge had nothing to show.
+        var outcome = await WebhookEventRecorder.RecordAsync(_context, command, _logger, cancellationToken);
+
+        if (outcome.IsRedelivery)
+        {
+            // Acknowledged, not processed. Monobank retries on a non-2xx, so anything else here turns
+            // one redelivery into a loop against an event we already acted on.
+            return new ProcessMonobankWebhookResponse
+            {
+                Success = true,
+                Message = "Duplicate delivery already recorded"
+            };
+        }
+
+        var stored = outcome.Stored!;
+
+        ProcessMonobankWebhookResponse response;
+        try
+        {
+            response = await ProcessAsync(command, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            // The delivery is on file and still marked outstanding, which is the point: "we received
+            // it and could not act on it" is a state an operator can find, and it is the opposite of
+            // the delivery silently disappearing.
+            await WebhookEventRecorder.CompleteAsync(
+                _context, stored, WebhookReceiptStatus.Failed, ex.Message, _logger, cancellationToken);
+            throw;
+        }
+
+        await WebhookEventRecorder.CompleteAsync(
+            _context, stored, ReceiptStatusFor(response), ErrorFor(response), _logger, cancellationToken);
+
+        await SyncPaymentAsync(command, response, stored.Id, cancellationToken);
+
+        return response;
+    }
+
+    /// <summary>
+    /// What the stored delivery should say about itself once processing has an answer.
+    /// </summary>
+    /// <remarks>
+    /// Only a response that actually moved an order is <see cref="WebhookReceiptStatus.Processed"/>.
+    /// Everything else the handler acknowledges on purpose - a replay, a status with no mapping, a
+    /// transition the state machine refused, an invoice we have no order for - is recorded as
+    /// <see cref="WebhookReceiptStatus.Ignored"/>, because "we saw it and decided against it" is an
+    /// answer and "we never saw it" is not. An amount mismatch is the one thing that is neither:
+    /// it is a real problem nobody acted on, so it is <see cref="WebhookReceiptStatus.Failed"/> and it
+    /// surfaces through the outstanding-delivery index.
+    /// </remarks>
+    private static WebhookReceiptStatus ReceiptStatusFor(ProcessMonobankWebhookResponse response)
+    {
+        if (!response.Success)
+        {
+            return response.ErrorCode == "AMOUNT_MISMATCH"
+                ? WebhookReceiptStatus.Failed
+                : WebhookReceiptStatus.Ignored;
+        }
+
+        var moved = response.PreviousStatus is not null
+            && response.NewStatus is not null
+            && response.PreviousStatus != response.NewStatus;
+
+        return moved ? WebhookReceiptStatus.Processed : WebhookReceiptStatus.Ignored;
+    }
+
+    private static string? ErrorFor(ProcessMonobankWebhookResponse response)
+        => response.Success ? null : response.Message;
+
+    /// <summary>
+    /// Moves the payment row this delivery concerns.
+    /// </summary>
+    /// <remarks>
+    /// The order's <c>monobank_status</c> and the payment's <c>status</c> are two records of the
+    /// same event and are allowed to disagree: the order says what we did about the money (a terminal
+    /// order still reads paid, via <c>RecordUnappliedPaymentTruthAsync</c>), while the payment says
+    /// what the acquirer did. Keeping the payment's own status is what will let the double-entry
+    /// journal post revenue against money that arrived, independently of whether an order was allowed
+    /// to proceed - which is precisely the case the current schema cannot represent at all.
+    /// </remarks>
+    private async Task SyncPaymentAsync(
+        ProcessMonobankWebhookCommand command,
+        ProcessMonobankWebhookResponse response,
+        Guid webhookEventId,
+        CancellationToken cancellationToken)
+    {
+        var status = PaymentFactory.FromProviderStatus(command.Status);
+        if (status is null)
+        {
+            return;
+        }
+
+        var payment = await _context.Payments
+            .FirstOrDefaultAsync(p => p.Provider == WebhookEventIdentity.Monobank
+                                   && p.ProviderInvoiceId == command.InvoiceId
+                                   && p.Kind == PaymentKind.Capture, cancellationToken);
+
+        if (payment is null)
+        {
+            // Not a failure. The payment row is written when the invoice is created, so a delivery
+            // with no row means the invoice predates this table or checkout failed before its save.
+            // Both are legitimate, and neither belongs on a money path as an error.
+            _logger.LogInformation(
+                "No capture payment row for Monobank invoice {InvoiceId}; nothing to update",
+                command.InvoiceId);
+            return;
+        }
+
+        // The provider's modified date is the best available approximation of when the money moved
+        // and is what the order already trusts for replay ordering. The statement import replaces it
+        // with the acquirer's financial operation time when one arrives, which is the authority.
+        PaymentFactory.ApplyStatus(payment, status.Value, command.ModifiedDate, DateTime.UtcNow);
+
+        // The acquirer's own figure, kept beside ours rather than only in the delivery. This is what
+        // makes an amount mismatch answerable from the money row: two numbers on one row, and a
+        // query that finds them differing. The database deliberately does not forbid the difference.
+        payment.ProviderAmountKopecks = command.Amount;
+
+        if (payment.WebhookEventId is null)
+        {
+            payment.WebhookEventId = webhookEventId;
+        }
+
+        if (payment.ProviderPayload is null && command.RawBody is not null)
+        {
+            payment.ProviderPayload = command.RawBody;
+        }
+
+        var advanced = response.NewStatus is not null
+            && response.PreviousStatus is not null
+            && response.PreviousStatus != response.NewStatus;
+
+        if (!response.Success || (status == PaymentStatus.Succeeded && !advanced))
+        {
+            // Money taken, order not advanced. The common cause is a terminal order whose invoice was
+            // paid late, which RecordUnappliedPaymentTruthAsync already handles by refusing the goods;
+            // this says so at the payment, where an operator looking at the money will look.
+            _logger.LogWarning(
+                "Payment for invoice {InvoiceId} is {PaymentStatus} but the order did not advance ({Outcome})",
+                command.InvoiceId, status.Value, response.Message);
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<ProcessMonobankWebhookResponse> ProcessAsync(
+        ProcessMonobankWebhookCommand command,
+        CancellationToken cancellationToken)
     {
         _metrics.MonobankWebhookReceived(command.Status.ToLowerInvariant());
 

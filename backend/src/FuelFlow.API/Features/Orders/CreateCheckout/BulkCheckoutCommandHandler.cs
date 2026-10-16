@@ -11,6 +11,7 @@ using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.SharedKernel;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -308,6 +309,11 @@ private readonly RuntimeSettingsService _runtimeSettings;
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };
+
+        // See CreateCheckoutCommandHandler for why the payment is its own row. Same reason here: this
+        // is the only moment the invoice exists, so it is the only moment it can be recorded.
+        _context.Payments.Add(PaymentFactory.CreateCapture(
+            order, merchant, invoiceResponse.InvoiceId, DateTime.UtcNow));
 
         foreach (var (item, package, discountPerLiter, unitPrice, lineTotal, originalLineTotal, termCode) in itemPricing)
         {
