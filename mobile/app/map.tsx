@@ -30,6 +30,7 @@ import {
 import { resolveCartoApiKey } from '../src/features/stations/lib/basemap';
 import { filterStationsByQuery } from '../src/features/stations/lib/search';
 import { routeTarget } from '../src/features/stations/lib/navigation';
+import { pointsInRegion, type MapRegion } from '../src/features/stations/lib/viewport';
 import { useTabBarOverride } from '../src/core/navigation/tabBarOverride';
 import { NavigatorPickerSheet } from '../src/features/stations/components/NavigatorPickerSheet';
 import { BrandLogoChip, StationMarker } from '../src/features/stations/components/StationMarker';
@@ -42,7 +43,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { Station, StationNode } from '../src/core/types/api';
 import { BlurView } from 'expo-blur';
 
-const KYIV_REGION = {
+const KYIV_REGION: MapRegion = {
   latitude: 50.4501,
   longitude: 30.5234,
   latitudeDelta: 0.15,
@@ -434,6 +435,13 @@ export default function MapScreen() {
     [allPoints, searchQuery],
   );
 
+  // Mount only what the viewport can show. Every station node is fetched once, but rendering
+  // all of them means one native marker view each — the whole network is ~1300, which the OS
+  // answers under memory pressure by killing the app outright. `onRegionChangeComplete` fires
+  // when a gesture settles, not per frame, so this stays cheap while panning.
+  const [viewport, setViewport] = React.useState<MapRegion>(KYIV_REGION);
+  const visiblePoints = React.useMemo(() => pointsInRegion(filteredPoints, viewport), [filteredPoints, viewport]);
+
   const fuelOptions = React.useMemo(() => availableFuels(packages ?? []), [packages]);
 
   // Keep the selected fuel valid as packages load: prefer А95, else the first available.
@@ -566,13 +574,14 @@ export default function MapScreen() {
             style={StyleSheet.absoluteFill}
             initialRegion={KYIV_REGION}
             onPress={() => setSelectedStation(null)}
+            onRegionChangeComplete={(region) => setViewport(region)}
             userInterfaceStyle={tokens.colors.isDark ? 'dark' : 'light'}
             showsUserLocation={locationStatus === 'granted'}
             showsMyLocationButton={false}
           >
             {tileUrl && <UrlTile urlTemplate={tileUrl} maximumZ={19} flipY={false} />}
 
-            {filteredPoints.map((point) => {
+            {visiblePoints.map((point) => {
               const isNode = 'stationId' in point;
               const coordinate = {
                 latitude: parseFloat(point.lat!),
