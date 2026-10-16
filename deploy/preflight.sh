@@ -82,7 +82,10 @@ done
 #
 # WARNINGS, not failures, and that is a deliberate temporary state: production currently violates
 # 010, so a blocking check would stop every deploy behind one unresolved group. Flip
-# PREFLIGHT_DB_STRICT=1 once planning #328 reconciles it - see preflight-db/README.md.
+# PREFLIGHT_DB_STRICT comes from the environment of this process, NOT from .env. The script passes
+# --env-file to docker compose and never sources anything into its own shell, so writing it to
+# deploy/.env has no effect on this line. The workflow step that runs this sets it from a repository
+# variable; see preflight-db/README.md.
 #
 # Defined with the other checks rather than inline at the bottom, because --data-only calls it
 # before step 1 has run. Returns 1 only in strict mode, so that flag is testable on its own.

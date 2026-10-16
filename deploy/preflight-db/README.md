@@ -67,12 +67,29 @@ repeating its SQL — so the two cannot drift apart.
 
 ## Wiring
 
-`preflight.sh` step 5 runs these. It **warns** rather than fails by default, because production
-currently violates `010` and a blocking check would stop every deploy behind it. Once
-[planning #328](https://github.com/art-of-v/fuel-voucher-platform-planning/issues/328) reconciles
-the two OKKO fuel types, the check is switched to blocking by setting
-`PREFLIGHT_DB_STRICT=1` — that is the whole flip, and it is deliberately a separate decision from
-adding the check.
+`preflight.sh` step 5 runs these. It **warns** rather than fails by default.
+
+**That default was a temporary condition, and it no longer holds.** The check used to warn because
+production *did* violate it: two OKKO fuel types carried different per-litre prices across their
+volumes, and a blocking check would have stopped every deploy behind them. That was
+[planning #328](https://github.com/art-of-v/fuel-voucher-platform-planning/issues/328), and it is
+resolved. Run against production on 2026-10-16, both named fuel types reconcile to the kopeck across
+all six of their nominals, and this file returns zero rows:
+
+```bash
+docker exec -i fuelflow-postgres psql -U fuelflow -d fuelflow -X -f - < deploy/preflight-db/010-offer-volume-price-agreement.sql
+```
+
+So strict mode is available and is enabled.
+
+**Where `PREFLIGHT_DB_STRICT` has to be set, which is the part that is easy to get wrong.** It is
+read from the environment of the `preflight.sh` **process**. The script passes `--env-file` to
+`docker compose` and never sources anything into its own shell, so writing it into `deploy/.env` has
+no effect — the line would still read the `:-0` default. The CI job that runs the preflight sets it
+from the repository variable `PREFLIGHT_DB_STRICT`, so flipping it is a settings change rather than
+an edit to a file on the box. It stays a separate decision from adding the check: a warning that
+blocks nothing and a gate that stops a deploy are different instruments, and only one of them is
+worth having if the data is actually clean.
 
 Running one by hand:
 

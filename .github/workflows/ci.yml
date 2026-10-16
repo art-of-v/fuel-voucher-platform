@@ -1080,6 +1080,12 @@ jobs:
       # Caddyfile, an ambiguous upstream or a stale :main tag stops THIS deploy rather
       # than the next person who restarts something by hand.
       - name: Preflight the box
+        # PREFLIGHT_DB_STRICT is read from this process environment, not from deploy/.env - the
+        # script never sources anything into its own shell, it only passes --env-file to compose.
+        # Set the repository variable to 1 to make a violated data precondition block the deploy.
+        # Defaults to 0 because the check must warn rather than block until the data is clean.
+        env:
+          PREFLIGHT_DB_STRICT: ${{ vars.PREFLIGHT_DB_STRICT || '0' }}
         run: bash /root/FuelFlow/deploy/preflight.sh
 
       - name: Resolve image tags
