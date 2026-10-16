@@ -1,6 +1,7 @@
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Settings;
 using FuelFlow.Persistence;
+using FuelFlow.Payments.SharedModels;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.API.BackgroundJobs;
@@ -76,7 +77,8 @@ public class DeletedUnpaidOrderCleanupService
                      && o.Status == OrderStatus.Cancelled
                      && o.UpdatedAtUtc < cutoff)
             .Where(o => !_context.FuelVouchers.IgnoreQueryFilters().Any(v => v.OrderId == o.Id))
-            .Where(o => !_context.Refunds.IgnoreQueryFilters().Any(r => r.OrderId == o.Id))
+            .Where(o => !_context.Payments.IgnoreQueryFilters()
+                .Any(p => p.OrderId == o.Id && p.Kind == PaymentKind.Refund))
             .Where(o => !_context.VoucherRenewalItems.IgnoreQueryFilters().Any(i => i.OrderId == o.Id))
             .OrderBy(o => o.UpdatedAtUtc)
             .Take(BatchSize)

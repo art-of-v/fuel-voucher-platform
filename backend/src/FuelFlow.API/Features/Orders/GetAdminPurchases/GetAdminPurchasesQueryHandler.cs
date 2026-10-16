@@ -1,6 +1,7 @@
 using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.Payments.SharedModels;
 using FuelFlow.SharedKernel.DTOs;
 using Microsoft.EntityFrameworkCore;
 
@@ -50,12 +51,13 @@ public sealed class GetAdminPurchasesQueryHandler
             .OrderByDescending(o => o.CreatedAtUtc)
             .ToListAsync(cancellationToken);
 
-        var refunds = await _context.Refunds
-            .AsNoTracking()
-            .Where(r => purchases.Select(o => o.Id).Contains(r.OrderId))
-            .ToListAsync(cancellationToken);
+var refunds = await _context.Payments
+    .AsNoTracking()
+    .Where(p => p.Kind == PaymentKind.Refund
+             && purchases.Select(o => o.Id).Contains(p.OrderId))
+    .ToListAsync(cancellationToken);
 
-        var refundByOrderId = refunds.ToDictionary(r => r.OrderId);
+    var refundByOrderId = refunds.ToDictionary(p => p.OrderId);
 
         return purchases.Select(o =>
         {
@@ -80,8 +82,8 @@ public sealed class GetAdminPurchasesQueryHandler
                 FulfilledAtUtc = o.FulfilledAtUtc,
                 VoucherCount = o.Fulfillments.Count,
                 RefundableAmountKopecks = RefundOrderCommandHandler.ComputeRefundAmountKopecks(o),
-                RefundStatus = refund?.Status.ToString(),
-                RefundMonobankStatus = refund?.MonobankStatus,
+                RefundStatus = refund is null ? null : RefundStatusWord(refund.Status),
+                RefundMonobankStatus = refund is null ? null : ProviderWordFor(refund.Status),
                 LineItems = lineItemsList.Select(li => new OrderLineItemDto
                 {
                     Id = li.Id,
@@ -95,4 +97,42 @@ public sealed class GetAdminPurchasesQueryHandler
             };
         }).ToList();
     }
+
+    /// <summary>
+    /// Our refund status, spelled the way the admin UI already expects.
+    /// </summary>
+    /// <remarks>
+    /// The DTO field has always carried a <c>RefundStatus</c> name, and the translations are keyed on
+    /// <c>Processing</c> / <c>Completed</c> / <c>Failed</c>. <see cref="PaymentStatus"/> says the same
+    /// three things with different words, so the names are mapped rather than the UI's keys rewritten.
+    /// </remarks>
+    private static string RefundStatusWord(PaymentStatus status) => status switch
+    {
+        PaymentStatus.Pending => nameof(RefundStatus.Processing),
+        PaymentStatus.Succeeded => nameof(RefundStatus.Completed),
+        PaymentStatus.Failed => nameof(RefundStatus.Failed),
+        // A refund is never collected-then-reversed or expired, so the two remaining payment states
+        // have no refund equivalent. Reporting them as Failed would be a lie; leaving the mapping
+        // absent returns null and the admin simply shows no second line.
+        _ => nameof(RefundStatus.Failed)
+    };
+
+    /// <summary>
+    /// The acquirer's word for a refund state, reconstructed from ours for display.
+    /// </summary>
+    /// <remarks>
+    /// <c>refunds.monobank_status</c> was free text - the F-15 defect - and did not survive into
+    /// <c>payments</c>, which stores a typed status instead. The admin renders it as a secondary line
+    /// under the status above, so this inverts <see cref="PaymentFactory.FromProviderStatus"/> to keep
+    /// that line working. It is a display reconstruction, not a stored observation: the brand's own
+    /// word lives on <c>webhook_events.provider_status</c> and on the payment's payload, where an
+    /// audit would read it.
+    /// </remarks>
+    private static string? ProviderWordFor(PaymentStatus status) => status switch
+    {
+        PaymentStatus.Pending => "processing",
+        PaymentStatus.Succeeded => "success",
+        PaymentStatus.Failed => "failure",
+        _ => null
+    };
 }

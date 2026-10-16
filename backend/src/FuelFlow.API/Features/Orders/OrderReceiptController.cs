@@ -3,6 +3,7 @@ using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.Features.Orders.Receipt;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.Payments.SharedModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -193,11 +194,11 @@ public sealed class OrderReceiptController : ControllerBase
 
         // The refund row knows when the refund was actually recorded; UpdatedAtUtc moves on any
         // later edit to the order, which is not when the money went back.
-        var refundedAtUtc = await _context.Refunds
-            .Where(r => r.OrderId == order.Id)
-            .OrderByDescending(r => r.CreatedAtUtc)
-            .Select(r => (DateTime?)r.CreatedAtUtc)
-            .FirstOrDefaultAsync(cancellationToken) ?? order.UpdatedAtUtc;
+var refundedAtUtc = await _context.Payments
+    .Where(p => p.OrderId == order.Id && p.Kind == PaymentKind.Refund)
+    .OrderByDescending(p => p.CreatedAtUtc)
+    .Select(p => (DateTime?)p.CreatedAtUtc)
+    .FirstOrDefaultAsync(cancellationToken) ?? order.UpdatedAtUtc;
 
         return new ReceiptData
         {
