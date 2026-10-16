@@ -105,7 +105,7 @@ public sealed class GetReportQueryHandler
                 o.MonobankStatus?.ToString(),
                 o.MonobankInvoiceId,
                 RefundOrderCommandHandler.ComputeFulfilledValueKopecks(o),
-                refund is { Status: RefundStatus.Completed } ? refund.Amount : 0,
+                refund is { Status: RefundStatus.Completed } ? refund.AmountKopecks : 0,
                 refund?.Status.ToString()
             );
         }).ToList();
@@ -121,10 +121,10 @@ public sealed class GetReportQueryHandler
 
         // Ledger semantics: margin is earned only on liters actually delivered via
         // vouchers; refunded or still-undelivered liters contribute no profit.
-        long GetProfit(Order o)
+        decimal GetProfit(Order o)
         {
             var groups = o.LineItems.GroupBy(li => (li.Brand, li.FuelTypeId, li.Liters));
-            long sum = 0;
+            decimal sum = 0m;
 
             foreach (var g in groups)
             {
@@ -139,7 +139,7 @@ public sealed class GetReportQueryHandler
                     && f.Voucher.Liters == g.Key.Liters);
 
                 var ordered = g.Sum(li => li.Quantity);
-                sum += (long)(fp.MarginUahPerLiter.Value * (decimal)g.Key.Liters * Math.Min(ordered, delivered));
+                sum += fp.MarginUahPerLiter.Value * (decimal)g.Key.Liters * Math.Min(ordered, delivered);
             }
 
             return sum;
@@ -152,9 +152,9 @@ public sealed class GetReportQueryHandler
             usedVouchers.Count,
             orders.Sum(o => o.LineItems.Sum(li => li.Liters * li.Quantity)),
             usedVouchers.Sum(v => v.Liters),
-            orders.Where(o => o.MonobankStatus == MonobankStatus.Success).Sum(o => Money.ToKopecksLong(o.Price)),
-            orders.Sum(o => (long)RefundOrderCommandHandler.ComputeFulfilledValueKopecks(o)),
-            refundsByOrder.Values.Where(r => r.Status == RefundStatus.Completed).Sum(r => (long)r.Amount)
+            orders.Where(o => o.MonobankStatus == MonobankStatus.Success).Sum(o => Money.ToKopecks(o.Price)),
+            orders.Sum(o => RefundOrderCommandHandler.ComputeFulfilledValueKopecks(o)),
+            refundsByOrder.Values.Where(r => r.Status == RefundStatus.Completed).Sum(r => r.AmountKopecks)
         );
 
         var monthlyGroups = orders
@@ -180,7 +180,7 @@ public sealed class GetReportQueryHandler
                 {
                     monthlyGroups[refundMonth] = existing with
                     {
-                        TotalRefundedKopecks = existing.TotalRefundedKopecks + completedRefund.Amount
+                        TotalRefundedKopecks = existing.TotalRefundedKopecks + completedRefund.AmountKopecks
                     };
                 }
             }

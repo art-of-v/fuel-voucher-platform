@@ -110,7 +110,7 @@ public sealed class AdminQueryHandlersTests : IDisposable
         Id = Guid.NewGuid(),
         OrderId = orderId,
         UserId = UserId,
-        Amount = amountKopecks,
+        AmountKopecks = amountKopecks,
         InvoiceId = "INV-TEST",
         ExtRef = $"ext-{orderId}",
         Status = RefundStatus.Completed,

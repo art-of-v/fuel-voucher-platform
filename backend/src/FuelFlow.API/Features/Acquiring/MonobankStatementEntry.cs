@@ -50,9 +50,26 @@ public class MonobankStatementEntry
     /// would suggest it joins, and it does not.</summary>
     public string? Reference { get; set; }
 
-    /// <summary>Kopecks, exactly as reported. Never a decimal: the reconciliation compares these
-    /// against our own kopeck-exact amounts, and a conversion is where the 978.57/979 bug class lives.</summary>
-    public long? AmountKopecks { get; set; }
+    /// <summary>
+    /// Kopecks, exactly as Monobank reports them - the acquirer's API speaks kopecks and nothing else,
+    /// so this is a boundary value and is not converted on the way in.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This property used to carry a comment saying "Never a decimal", on the grounds that a conversion
+    /// is where the 978.57/979 bug class lives. That reasoning was half right and the conclusion was
+    /// wrong: the protection against a conversion is <em>not converting</em>, and a <c>long</c> is an
+    /// integer type holding money, which is the thing that goes wrong at scale and invites unit
+    /// arithmetic. <c>numeric(14,0)</c> is exact for kopecks - no rounding, no precision loss - and it
+    /// makes the type declare the same thing the column name does.
+    /// </para>
+    /// <para>
+    /// The reconciliation still divides by 100 to compare against our own UAH amounts, and that
+    /// division stays visible in the code rather than hidden in the type, because both sides of that
+    /// comparison being kopecks is exactly what makes it safe.
+    /// </para>
+    /// </remarks>
+    public decimal? AmountKopecks { get; set; }
 
     /// <summary>Currency code, 980 for UAH.</summary>
     public int? Ccy { get; set; }

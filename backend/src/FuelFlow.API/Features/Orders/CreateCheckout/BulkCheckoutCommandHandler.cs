@@ -277,7 +277,7 @@ private readonly RuntimeSettingsService _runtimeSettings;
                 new MonobankInvoiceRequest
                 {
                     // Monobank is the one place amounts must be kopecks.
-                    Amount = Money.ToKopecksLong(totalPrice),
+                    Amount = Money.ForMonobank(totalPrice),
                     MerchantPaymentInfo = $"FuelFlow Bundle",
                     RedirectUrl = _monobankOptions.RedirectUrl,
                     WebhookUrl = _monobankOptions.WebhookUrl

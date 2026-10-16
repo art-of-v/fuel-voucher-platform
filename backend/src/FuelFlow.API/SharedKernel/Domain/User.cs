@@ -17,7 +17,13 @@ public sealed class User
 
     public string? ReferralCode { get; set; }
     public string? ReferredBy { get; set; }
-    public int BonusBalance { get; set; }
+    /// <summary>
+    /// UAH. Decimal, not an integer type: money is never an integer type, whatever the scale - see the
+    /// money-type decision in the schema notes. Displayed directly as UAH by the admin client
+    /// (<c>admin.tsx</c> renders <c>{bonusBalance} UAH</c> with no division), so the stored unit and
+    /// the displayed unit are the same and a /100 would be a bug.
+    /// </summary>
+    public decimal BonusBalance { get; set; }
 
     public bool IsActive { get; set; } = true;
     public int TokenVersion { get; set; } = 1;

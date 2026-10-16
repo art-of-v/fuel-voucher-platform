@@ -232,7 +232,7 @@ public sealed class CreateCheckoutCommandHandler
             var invoiceRequest = new MonobankInvoiceRequest
             {
                 // Monobank is the one place amounts must be kopecks.
-                Amount = Money.ToKopecksLong(order.Price),
+                Amount = Money.ForMonobank(order.Price),
                 MerchantPaymentInfo = $"FuelFlow Order {order.Id}",
                 Destination = "╨ƒ╨░╨╗╨╕╨▓╨╛",
                 Items = MonobankBasketBuilder.Build(order.LineItems.Select(li => (

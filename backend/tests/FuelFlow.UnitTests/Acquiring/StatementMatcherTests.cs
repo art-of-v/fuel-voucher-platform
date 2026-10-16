@@ -37,7 +37,7 @@ public class StatementMatcherTests
         OrderId = Guid.NewGuid(),
         InvoiceId = invoiceId,
         ExtRef = "cancel-" + invoiceId,
-        Amount = amountKopecks
+        AmountKopecks = amountKopecks
     };
 
     [Fact]

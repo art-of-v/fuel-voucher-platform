@@ -232,7 +232,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
                 Id = failedRefundId,
                 OrderId = orderId,
                 UserId = userId,
-                Amount = 200000,
+                AmountKopecks = 200000,
                 InvoiceId = invoiceId,
                 ExtRef = orderId.ToString(),
                 Status = RefundStatus.Failed,
@@ -333,7 +333,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
         using (var verify = CreateContext())
         {
             var refund = await verify.Refunds.AsNoTracking().SingleAsync(r => r.OrderId == orderId);
-            refund.Amount.Should().Be(104000);
+            refund.AmountKopecks.Should().Be(104000);
         }
     }
 
@@ -416,7 +416,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
         {
             var refund = await verify.Refunds.AsNoTracking().SingleAsync(r => r.OrderId == orderId);
             refund.Status.Should().Be(RefundStatus.Completed);
-            refund.Amount.Should().Be(104000);
+            refund.AmountKopecks.Should().Be(104000);
 
             var order = await verify.Orders.AsNoTracking().SingleAsync(o => o.Id == orderId);
             order.Status.Should().Be(OrderStatus.PartiallyRefunded);
@@ -525,7 +525,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
                 Id = Guid.NewGuid(),
                 OrderId = orderId,
                 UserId = userId,
-                Amount = 100000,
+                AmountKopecks = 100000,
                 InvoiceId = order.MonobankInvoiceId!,
                 ExtRef = orderId.ToString(),
                 Status = RefundStatus.Processing,

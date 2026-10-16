@@ -37,8 +37,8 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("acquirer_modified_at_utc");
 
-                    b.Property<long?>("AmountKopecks")
-                        .HasColumnType("bigint")
+                    b.Property<decimal?>("AmountKopecks")
+                        .HasColumnType("numeric(14,0)")
                         .HasColumnName("amount_kopecks");
 
                     b.Property<string>("ApprovalCode")
@@ -1129,9 +1129,9 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<long>("Amount")
-                        .HasColumnType("bigint")
-                        .HasColumnName("amount");
+                    b.Property<decimal>("AmountKopecks")
+                        .HasColumnType("numeric(14,0)")
+                        .HasColumnName("amount_kopecks");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
@@ -3465,10 +3465,10 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("date")
                         .HasColumnName("birthdate");
 
-                    b.Property<int>("BonusBalance")
+                    b.Property<decimal>("BonusBalance")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0)
+                        .HasColumnType("numeric(12,2)")
+                        .HasDefaultValue(0m)
                         .HasColumnName("bonus_balance");
 
                     b.Property<DateTime>("CreatedAtUtc")
@@ -3579,7 +3579,10 @@ namespace FuelFlow.API.Migrations
 
                     b.HasIndex("RoleId");
 
-                    b.ToTable("users", (string)null);
+                    b.ToTable("users", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_users_bonus_balance_non_negative", "bonus_balance >= 0");
+                        });
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Auth.SharedModels.Device", b =>

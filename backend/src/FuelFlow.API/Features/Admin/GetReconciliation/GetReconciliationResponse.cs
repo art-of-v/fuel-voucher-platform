@@ -12,15 +12,15 @@ public sealed record GetReconciliationResponse(
         int PaidUnfulfilled,
         int PartiallyFulfilled,
         int Fulfilled,
-        long TotalRevenueKopecks,
+        decimal TotalRevenueKopecks,
         int OrphanVouchers,
         int UnprocessedEvents,
         int LowInventoryProviders,
         int ImportErrors7d,
         int RefundedOrders,
-        long TotalReceivedKopecks,
-        long TotalFulfilledValueKopecks,
-        long TotalRefundedKopecks);
+        decimal TotalReceivedKopecks,
+        decimal TotalFulfilledValueKopecks,
+        decimal TotalRefundedKopecks);
 
     public sealed record ThreeWayMatchItem(
         Guid OrderId,
@@ -38,7 +38,7 @@ public sealed record GetReconciliationResponse(
         int DaysSinceCreated,
         DateTime CreatedAtUtc,
         string? RefundStatus,
-        long RefundedKopecks);
+        decimal RefundedKopecks);
 
     public sealed record ExceptionItem(
         Guid Id,
@@ -56,5 +56,5 @@ public sealed record GetReconciliationResponse(
         int Year,
         int Month,
         int OrderCount,
-        long RevenueKopecks);
+        decimal RevenueKopecks);
 }

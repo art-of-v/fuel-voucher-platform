@@ -42,8 +42,9 @@ internal sealed class MonobankStatementEntryConfiguration : IEntityTypeConfigura
             .HasColumnName("reference")
             .HasMaxLength(200);
 
-        builder.Property(e => e.AmountKopecks)
-            .HasColumnName("amount_kopecks");
+builder.Property(e => e.AmountKopecks)
+               .HasColumnName("amount_kopecks")
+               .HasColumnType("numeric(14,0)");
 
         builder.Property(e => e.Ccy)
             .HasColumnName("ccy");

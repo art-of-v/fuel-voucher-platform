@@ -206,7 +206,7 @@ public sealed class GetReportQueryHandlerTests : IDisposable
             Id = Guid.NewGuid(),
             OrderId = pendingOrder.Id,
             UserId = userId,
-            Amount = 100000,
+            AmountKopecks = 100000,
             InvoiceId = "inv-1",
             ExtRef = "ext-1",
             Status = RefundStatus.Completed,

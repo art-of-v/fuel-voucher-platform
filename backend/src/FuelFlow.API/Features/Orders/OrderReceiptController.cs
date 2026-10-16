@@ -111,7 +111,7 @@ public sealed class OrderReceiptController : ControllerBase
     /// </remarks>
     internal static RefundReceiptInfo? BuildRefundSection(
         OrderStatus status,
-        long refundableKopecks,
+        decimal refundableKopecks,
         DateTime refundedAtUtc,
         Guid orderId)
     {

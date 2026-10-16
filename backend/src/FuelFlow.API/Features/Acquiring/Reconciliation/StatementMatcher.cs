@@ -31,7 +31,7 @@ public sealed record StatementMatchRow(
     StatementMatchStatus Status,
     string? InvoiceId,
     string? Reference,
-    long? AcquirerAmountKopecks,
+    decimal? AcquirerAmountKopecks,
     decimal? AcquirerAmount,
     Guid? OrderId,
     decimal? LocalAmount,
@@ -82,7 +82,7 @@ public static class StatementMatcher
             {
                 rows.Add(new StatementMatchRow(
                     entry.StatementId, StatementMatchStatus.RefundMatch, invoiceId, entry.Reference,
-                    entry.AmountKopecks, amount, refund.OrderId, refund.Amount / 100m,
+                    entry.AmountKopecks, amount, refund.OrderId, refund.AmountKopecks / 100m,
                     refund.InvoiceId, null, entry.AcquirerCreatedAtUtc,
                     $"Reversal of refund {refund.Id:N} on {refund.ExtRef}"));
                 continue;

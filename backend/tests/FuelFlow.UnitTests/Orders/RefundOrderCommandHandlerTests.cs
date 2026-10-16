@@ -126,7 +126,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
             Times.Once);
 
         var refund = await _context.Refunds.SingleAsync(r => r.OrderId == order.Id);
-        refund.Amount.Should().Be(250000);
+        refund.AmountKopecks.Should().Be(250000);
         refund.InvoiceId.Should().Be("INV123");
         refund.IsAutomatic.Should().BeFalse();
         refund.Status.Should().Be(RefundStatus.Processing);
@@ -216,7 +216,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
             Times.Once);
 
         var refund = await _context.Refunds.SingleAsync(r => r.OrderId == order.Id);
-        refund.Amount.Should().Be(250000);
+        refund.AmountKopecks.Should().Be(250000);
     }
 
     [Fact]
@@ -275,7 +275,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
             Id = Guid.NewGuid(),
             OrderId = order.Id,
             UserId = order.UserId,
-            Amount = 2500,
+            AmountKopecks = 2500,
             InvoiceId = "INV123",
             ExtRef = "idem-key-1",
             Status = RefundStatus.Processing,
@@ -294,7 +294,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
             Times.Never);
 
         var refund = await _context.Refunds.SingleAsync(r => r.OrderId == order.Id);
-        refund.Amount.Should().Be(500000);
+        refund.AmountKopecks.Should().Be(500000);
 
         // An in-flight (Processing) refund must not move the order into a refunded state.
         var updatedOrder = await _context.Orders.FindAsync(order.Id);
@@ -321,7 +321,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
             Id = Guid.NewGuid(),
             OrderId = order.Id,
             UserId = order.UserId,
-            Amount = 250000,
+            AmountKopecks = 250000,
             InvoiceId = "INV123",
             ExtRef = "idem-key-1",
             Status = RefundStatus.Completed,
@@ -378,7 +378,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
             Id = Guid.NewGuid(),
             OrderId = order.Id,
             UserId = order.UserId,
-            Amount = 500000,
+            AmountKopecks = 500000,
             InvoiceId = "INV-ALL-RELEASED",
             ExtRef = "idem-key-released",
             Status = RefundStatus.Completed,
@@ -430,7 +430,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
             Id = Guid.NewGuid(),
             OrderId = order.Id,
             UserId = order.UserId,
-            Amount = 250000,
+            AmountKopecks = 250000,
             InvoiceId = "INV-SOME-RELEASED",
             ExtRef = "idem-key-some-released",
             Status = RefundStatus.Completed,
@@ -559,7 +559,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
             Id = Guid.NewGuid(),
             OrderId = order.Id,
             UserId = order.UserId,
-            Amount = 2500,
+            AmountKopecks = 2500,
             InvoiceId = "INV123",
             ExtRef = "idem-key-1",
             Status = RefundStatus.Failed,
@@ -582,7 +582,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         refunds[0].Status.Should().Be(RefundStatus.Processing);
         refunds[0].ErrorMessage.Should().BeNull();
         refunds[0].MonobankStatus.Should().Be("processing");
-        refunds[0].Amount.Should().Be(500000);
+        refunds[0].AmountKopecks.Should().Be(500000);
     }
 
     [Fact]
