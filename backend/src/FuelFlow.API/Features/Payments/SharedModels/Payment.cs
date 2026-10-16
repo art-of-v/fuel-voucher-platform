@@ -123,6 +123,34 @@ public sealed class Payment
     /// <summary>The acquirer's row verbatim, when we have one.</summary>
     public string? ProviderPayload { get; set; }
 
+    /// <summary>
+    /// Who approved the refund, and whether it was automatic. Audit of the decision, not of the
+    /// money - only a refund has one, and the database refuses these on a capture.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// These lived on <c>refunds</c>, which is the table this design is dissolving into
+    /// <see cref="Kind"/>. They moved here rather than being dropped because "who authorised
+    /// returning this customer's money" is a question an auditor asks, and a payment row is the
+    /// only place left that can answer it once there is one book instead of two.
+    /// </para>
+    /// <para>
+    /// <see cref="CreatedByUserName"/> is a denormalised copy of the name at approval time. The id
+    /// is the real reference and can be restricted against a live user; the name is kept so the
+    /// audit still reads correctly after a user is renamed, and is never a join target.
+    /// </para>
+    /// </remarks>
+    public Guid? CreatedByUserId { get; set; }
+
+    /// <summary>The approver's name as it read at approval time. Not a foreign key.</summary>
+    public string? CreatedByUserName { get; set; }
+
+    /// <summary>The refund was raised by a system rule rather than by a person.</summary>
+    public bool IsAutomatic { get; set; }
+
+    /// <summary>Why the refund could not be completed, when it could not.</summary>
+    public string? ErrorMessage { get; set; }
+
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
 

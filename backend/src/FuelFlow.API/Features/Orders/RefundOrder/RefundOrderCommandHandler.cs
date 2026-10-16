@@ -2,6 +2,7 @@ using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
+using FuelFlow.Payments.SharedModels;
 using FuelFlow.SharedKernel;
 using FuelFlow.SharedKernel.Options;
 using Microsoft.EntityFrameworkCore;
@@ -150,6 +151,54 @@ public sealed class RefundOrderCommandHandler
 
         var extRef = order.IdempotencyKey ?? order.Id.ToString();
 
+        // The capture this refund reverses. payments.refund_parent links back to exactly this row,
+        // so it is what makes the refund answerable as "money back against this exact charge"
+        // rather than only "money back against this order".
+        //
+        // Only Succeeded counts. A Pending or Expired capture has no money in it to return.
+        var capture = await _context.Payments
+            .Where(p => p.OrderId == order.Id
+                     && p.Kind == PaymentKind.Capture
+                     && p.Status == PaymentStatus.Succeeded)
+            .OrderByDescending(p => p.CreatedAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (capture is null)
+        {
+            // An order that predates the payments table carries its payment in four columns of its
+            // own - invoice id, brand status, price - which is precisely what that table was created
+            // to replace. Those columns are real evidence, so they are promoted into a proper capture
+            // row rather than the refund being refused: refusing would leave a genuinely paid
+            // customer unable to be refunded, which is the worst possible answer.
+            //
+            // The brand status is the proof. The order passed the refundability gate above, which
+            // requires MonobankStatus.Success, so a capture back-filled here is asserting something
+            // already recorded, not inventing a payment.
+            if (order.MonobankInvoiceId is null || order.MonobankStatus != MonobankStatus.Success)
+            {
+                return new RefundOrderResult
+                {
+                    OrderId = order.Id,
+                    AmountKopecks = 0,
+                    Status = "NotPayable",
+                    ErrorMessage = "No succeeded capture payment to reverse"
+                };
+            }
+
+            capture = PaymentFactory.CreateCapture(
+                order,
+                order.MonobankMerchant ?? MonobankMerchant.Live,
+                order.MonobankInvoiceId,
+                DateTime.UtcNow);
+            PaymentFactory.ApplyStatus(
+                capture,
+                PaymentStatus.Succeeded,
+                order.UpdatedAtUtc,
+                DateTime.UtcNow);
+
+            _context.Payments.Add(capture);
+        }
+
         // A previously Failed refund is retried in place instead of creating a second row.
         Refund refund;
         if (existing is not null)
@@ -190,6 +239,53 @@ public sealed class RefundOrderCommandHandler
 
             _context.Refunds.Add(refund);
         }
+
+        // The refund payment. Until `refunds` becomes a view over `payments`, this is the second of
+        // two writes describing one event - the transient state this epic exists to remove, kept
+        // honest here by writing both inside the same SaveChanges below, so they cannot be
+        // half-committed.
+        //
+        // The retry path reuses the existing payment rather than minting a second one, matching the
+        // refund row it retries: one failed attempt stays one row that comes back to life.
+        var refundPayment = await _context.Payments
+            .Where(p => p.OrderId == order.Id && p.Kind == PaymentKind.Refund)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (refundPayment is null)
+        {
+            refundPayment = PaymentFactory.CreateRefund(
+                order,
+                capture,
+                amount,
+                command.ChangedByUserId,
+                command.ChangedByUserName,
+                command.IsAutomatic,
+                DateTime.UtcNow);
+
+            _context.Payments.Add(refundPayment);
+        }
+        else
+        {
+            refundPayment.AmountUah = Money.FromKopecks(amount);
+            refundPayment.AmountKopecks = amount;
+            refundPayment.Status = PaymentStatus.Pending;
+            refundPayment.ErrorMessage = null;
+            refundPayment.IsAutomatic = command.IsAutomatic;
+            if (command.ChangedByUserId is not null)
+            {
+                refundPayment.CreatedByUserId = command.ChangedByUserId;
+            }
+            if (!string.IsNullOrWhiteSpace(command.ChangedByUserName))
+            {
+                refundPayment.CreatedByUserName = command.ChangedByUserName;
+            }
+            refundPayment.UpdatedAtUtc = DateTime.UtcNow;
+        }
+
+        // The bridge to the `refunds` row, until that table is the view. Deliberately set at the
+        // call site rather than in the factory, so removing the column later is a deletion here and
+        // not a change to how every payment is built.
+        refundPayment.RefundId = refund.Id;
 
         try
         {

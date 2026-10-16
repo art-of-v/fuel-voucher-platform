@@ -45,6 +45,59 @@ public static class PaymentFactory
     }
 
     /// <summary>
+    /// A pending refund against a capture, carrying the approval that authorised it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The money left via the same acquirer invoice the capture came in on, so
+    /// <paramref name="providerInvoiceId"/> is the order's invoice rather than a new one - and the
+    /// partial index over <c>(provider, provider_invoice_id, kind)</c> is what keeps that honest: the
+    /// capture and the refund share the invoice but not the kind, so they coexist instead of
+    /// colliding.
+    /// </para>
+    /// <para>
+    /// <b>The amount is deliberately the refund's, not the capture's.</b> A refund can correct a price
+    /// downwards and return less than was taken, so this is passed in rather than derived from
+    /// <paramref name="capture"/>. It is still validated against the capture's own amount by the
+    /// caller's arithmetic - the factory records what it was told, and the order's refund computation
+    /// owns whether that number is right.
+    /// </para>
+    /// <para>
+    /// The approval travels with the payment because once <c>refunds</c> becomes a view over this
+    /// table there is nowhere else for it to live.
+    /// </para>
+    /// </remarks>
+    public static Payment CreateRefund(
+        Order order,
+        Payment capture,
+        decimal amountKopecks,
+        Guid? createdByUserId,
+        string? createdByUserName,
+        bool isAutomatic,
+        DateTime nowUtc)
+    {
+        return new Payment
+        {
+            Id = Guid.CreateVersion7(),
+            OrderId = order.Id,
+            Kind = PaymentKind.Refund,
+            ParentPaymentId = capture.Id,
+            Provider = WebhookEventIdentity.Monobank,
+            Merchant = capture.Merchant,
+            ProviderInvoiceId = capture.ProviderInvoiceId,
+            AmountUah = Money.FromKopecks(amountKopecks),
+            AmountKopecks = amountKopecks,
+            Currency = "UAH",
+            Status = PaymentStatus.Pending,
+            CreatedByUserId = createdByUserId,
+            CreatedByUserName = createdByUserName,
+            IsAutomatic = isAutomatic,
+            CreatedAtUtc = nowUtc,
+            UpdatedAtUtc = nowUtc
+        };
+    }
+
+    /// <summary>
     /// The acquirer's status word as a <see cref="PaymentStatus"/>, or <see langword="null"/> when
     /// we have no mapping for it.
     /// </summary>

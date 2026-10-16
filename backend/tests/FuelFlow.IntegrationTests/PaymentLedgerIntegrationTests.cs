@@ -135,6 +135,104 @@ public sealed class PaymentLedgerIntegrationTests : IClassFixture<TestDatabaseFi
             "one capture per provider invoice is the identity that survives a re-issued payment link");
     }
 
+    // ---------------------------------------------------------------- refund audit columns
+
+    // The approval columns arrived on `payments` from the `refunds` table, which is being dissolved
+    // into `kind = 'Refund'`. A capture has nobody to approve it, so a capture carrying an approver is
+    // a row written by a path that has lost track of which kind it is - and it is invisible until
+    // someone asks who authorised a payment and gets an answer that cannot be true.
+
+    [Fact]
+    public async Task ACapture_MayNotCarryARefundApprover()
+    {
+        var (orderId, userId) = await SeedOrderWithUserAsync();
+
+        await using var context = CreateContext();
+        context.Payments.Add(NewPayment(orderId, createdByUserId: userId, createdByUserName: "Admin"));
+
+        var act = async () => await context.SaveChangesAsync();
+        await act.Should().ThrowAsync<DbUpdateException>(
+            "only a refund is approved by anyone");
+    }
+
+    [Fact]
+    public async Task ACapture_MayNotClaimItWasAutomatic()
+    {
+        var orderId = await SeedOrderAsync();
+
+        await using var context = CreateContext();
+        context.Payments.Add(NewPayment(orderId, isAutomatic: true));
+
+        var act = async () => await context.SaveChangesAsync();
+        await act.Should().ThrowAsync<DbUpdateException>(
+            "an automatic flag on a capture is the same misclassification with a different column");
+    }
+
+    [Fact]
+    public async Task ARefund_MayCarryItsApprover()
+    {
+        var (orderId, userId) = await SeedOrderWithUserAsync();
+
+        await using var context = CreateContext();
+
+        var capture = NewPayment(orderId, status: PaymentStatus.Succeeded, paidAtUtc: DateTime.UtcNow);
+        context.Payments.Add(capture);
+        await context.SaveChangesAsync();
+
+        var refund = NewPayment(
+            orderId,
+            amountUah: 2500.00m,
+            amountKopecks: 250000m,
+            status: PaymentStatus.Succeeded,
+            paidAtUtc: DateTime.UtcNow,
+            kind: PaymentKind.Refund,
+            parentPaymentId: capture.Id,
+            providerInvoiceId: capture.ProviderInvoiceId,
+            createdByUserId: userId,
+            createdByUserName: "Admin",
+            errorMessage: null);
+        context.Payments.Add(refund);
+
+        var act = async () => await context.SaveChangesAsync();
+        await act.Should().NotThrowAsync(
+            "this is the shape the whole refunds-to-payments move depends on");
+    }
+
+    /// <summary>
+    /// An approver name with no approver id is allowed, and this is the test that stopped me from
+    /// forbidding it.
+    /// </summary>
+/// <remarks>
+/// The first cut of the audit columns paired the two: a name without an id was refused as "a name in
+/// a log". Real refunds immediately broke it - an automatic refund triggered by a stock-out has no
+/// approver at all, and a webhook-driven one carries a name the id was never captured for. The
+/// constraint would have refused refunds that genuinely happened, which is the worse failure.
+/// The foreign key already does the part that matters: an id, when present, is a real user.
+/// </remarks>
+[Fact]
+    public async Task AnApproverName_WithNoApproverId_IsAllowed()
+    {
+        var (orderId, _) = await SeedOrderWithUserAsync();
+
+        await using var context = CreateContext();
+
+        var capture = NewPayment(orderId, status: PaymentStatus.Succeeded, paidAtUtc: DateTime.UtcNow);
+        context.Payments.Add(capture);
+        await context.SaveChangesAsync();
+
+        context.Payments.Add(NewPayment(
+            orderId,
+            status: PaymentStatus.Pending,
+            kind: PaymentKind.Refund,
+            parentPaymentId: capture.Id,
+            createdByUserName: "stock-out rule",
+            isAutomatic: true));
+
+        var act = async () => await context.SaveChangesAsync();
+        await act.Should().NotThrowAsync(
+            "an automatic refund has no approver user, and refusing it would strand a real refund");
+    }
+
     // ---------------------------------------------------------------- money shape
 
     [Fact]
@@ -268,7 +366,11 @@ public sealed class PaymentLedgerIntegrationTests : IClassFixture<TestDatabaseFi
         DateTime? paidAtUtc = null,
         PaymentKind kind = PaymentKind.Capture,
         Guid? parentPaymentId = null,
-        string? providerInvoiceId = null) => new()
+        string? providerInvoiceId = null,
+        Guid? createdByUserId = null,
+        string? createdByUserName = null,
+        bool isAutomatic = false,
+        string? errorMessage = null) => new()
     {
         Id = Guid.CreateVersion7(),
         OrderId = orderId,
@@ -283,11 +385,21 @@ public sealed class PaymentLedgerIntegrationTests : IClassFixture<TestDatabaseFi
         Currency = "UAH",
         Status = status,
         PaidAtUtc = paidAtUtc,
+        CreatedByUserId = createdByUserId,
+        CreatedByUserName = createdByUserName,
+        IsAutomatic = isAutomatic,
+        ErrorMessage = errorMessage,
         CreatedAtUtc = DateTime.UtcNow,
         UpdatedAtUtc = DateTime.UtcNow
     };
 
     private async Task<Guid> SeedOrderAsync()
+    {
+        var (orderId, _) = await SeedOrderWithUserAsync();
+        return orderId;
+    }
+
+    private async Task<(Guid OrderId, Guid UserId)> SeedOrderWithUserAsync()
     {
         var userId = Guid.CreateVersion7();
 
@@ -318,6 +430,6 @@ public sealed class PaymentLedgerIntegrationTests : IClassFixture<TestDatabaseFi
         });
         await context.SaveChangesAsync();
 
-        return orderId;
+        return (orderId, userId);
     }
 }
