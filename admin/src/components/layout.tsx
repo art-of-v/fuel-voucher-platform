@@ -95,6 +95,9 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, className, onClose, user, b
                                 onTabChange(item.id);
                                 if (onClose) onClose();
                             }}
+                            // Full label on hover. The visible one is truncated to keep every row one
+                            // line tall - see the span below for why that needs saying at all.
+                            title={item.label}
                             className={cn(
                                 "w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200",
                                 isActive
@@ -102,10 +105,16 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, className, onClose, user, b
                                     : "border border-transparent text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
                             )}
                         >
-                            <item.icon className={cn("w-4 h-4", isActive ? "text-primary" : "text-muted-foreground")} />
-                            {item.label}
+                            <item.icon className={cn("w-4 h-4 shrink-0", isActive ? "text-primary" : "text-muted-foreground")} />
+                            {/* Was a bare text node in a flex row, so it wrapped: «Продовження
+                                оператором» is 21 characters and the aside is w-64, which pushed that
+                                one item onto two lines and made it visibly taller than its
+                                neighbours. `min-w-0` lets the flex item actually shrink (default
+                                min-width:auto refuses to), and truncate draws the ellipsis. The
+                                same applies to the label whenever a locale's string is longer. */}
+                            <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>
                             {badgeCount > 0 && (
-                                <span className="ml-auto min-w-[1.25rem] px-1.5 py-0.5 text-[10px] font-bold leading-none text-center rounded-full bg-destructive text-destructive-foreground tabular-nums">
+                                <span className="ml-auto min-w-[1.25rem] shrink-0 px-1.5 py-0.5 text-[10px] font-bold leading-none text-center rounded-full bg-destructive text-destructive-foreground tabular-nums">
                                     {badgeCount > 99 ? "99+" : badgeCount}
                                 </span>
                             )}
