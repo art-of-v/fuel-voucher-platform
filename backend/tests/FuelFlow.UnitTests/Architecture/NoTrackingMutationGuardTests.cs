@@ -7,24 +7,32 @@ namespace FuelFlow.UnitTests.Architecture;
 /// <summary>
 /// Architecture guard for the NoTracking mutation trap.
 ///
-/// The API's ApplicationDbContext runs with a global QueryTrackingBehavior.NoTracking
-/// default (DatabaseSetup). A handler that loads an entity WITHOUT .AsTracking(), mutates
-/// a property on it, and calls SaveChanges persists NOTHING — the entity is untracked, so
-/// the change tracker has no entry. It fails silently: no error, the handler reports success.
-/// This has bitten real code five times (PR #566: SetUserActive/Role/Banned; PR #570:
-/// DeleteMyOrder, ProductOwnerBootstrap — the last a silent ProductOwner grant).
+/// The trap is a read-modify-write against an entity that was loaded WITHOUT .AsTracking(): under a
+/// NoTracking default the load materialises a detached copy, every assignment to it is dropped by
+/// SaveChanges, and the handler reports success anyway. No error, no row moved.
+///
+/// It is no longer the production default - DatabaseSetup registers TrackAll, pinned by
+/// <c>DatabaseTrackingDefaultsTests</c>, after #929 and #930 shipped exactly this bug (the supplier
+/// endpoints, and the renewal cost reduction that meant invoicing suppliers for fuel a customer had
+/// already paid for). The guard stays because TrackAll is a DI setting one careless change can undo,
+/// and because a file can still opt out per query. That is what has bitten real code five times
+/// (PR #566: SetUserActive/Role/Banned; PR #570: DeleteMyOrder, ProductOwnerBootstrap - the last a
+/// silent ProductOwner grant).
 ///
 /// This test catches the shape at CI time instead of in production: every source file that
 /// calls SaveChanges must also carry an explicit persistence-intent marker — either
 /// .AsTracking() on the load, or a .Add()/.Update()/.Remove() (which change entity state
 /// regardless of the tracking default), or a bulk/raw operation that bypasses the tracker.
 ///
-/// KNOWN BLIND SPOT (documented, accepted): a handler that BOTH .Add()s one entity AND
-/// mutates a *different* loaded-but-untracked entity passes this check — the .Add() marker
-/// satisfies the scan while the untracked mutation still silently fails. Catching that needs
-/// data-flow analysis (Roslyn), which is disproportionate: the audit for PR #570 checked all
-/// 59 SaveChanges sites and found zero such masked cases. If a sixth instance ever surfaces
-/// with that shape, revisit with a semantic analyzer. See memory: notracking-mutation-trap.
+/// KNOWN BLIND SPOT (documented, accepted): the marker is per FILE, so a handler that loads the
+/// entity it mutates through one query which carries the marker, while a SECOND load of the same
+/// row that it then mutates does not, passes this check — and on a context not defaulting to
+/// TrackAll the second write is silently lost. That is not hypothetical: the refund retry path did
+/// exactly this, reusing the identity map to skip a round-trip, and only
+/// <c>RefundOrderCommandHandlerTests.HandleAsync_ShouldRetryFailedRefund_InPlace</c> caught it.
+/// Catching the general shape needs data-flow analysis (Roslyn), which is disproportionate; the audit
+/// for PR #570 checked all 59 SaveChanges sites and found zero such masked cases. See memory:
+/// notracking-mutation-trap.
 /// </summary>
 public sealed class NoTrackingMutationGuardTests
 {

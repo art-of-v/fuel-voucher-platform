@@ -5,6 +5,7 @@ using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers;
+using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Options;
 using Microsoft.EntityFrameworkCore;
@@ -23,9 +24,10 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
-            // Mirror production: the API registers the context with a NoTracking
-            // default, so write paths must opt in via AsTracking. Tests must catch
-            // mutations lost to detached entities.
+            // Stricter than production on purpose: DatabaseSetup registers TrackAll, and a write that
+            // only lands because the identity map happened to resolve a second load of the same row is
+            // one DI change away from being silently dropped. Running NoTracking keeps the retry path
+            // honest about mutating a tracked instance.
             .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
             .Options;
 
@@ -50,13 +52,59 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
     }
 
     /// <summary>
+    /// Seeds a refund for this order: the capture it reverses, then the refund payment.
+    /// </summary>
+    /// <remarks>
+    /// A refund names the capture it reverses, so the parent has to exist first - the old
+    /// <c>refunds</c> row needed no parent and these tests never had to think about one. The capture is
+    /// succeeded so the handler's capture lookup finds it; the refund's own status is whatever the test
+    /// is arranging.
+    /// </remarks>
+    private void SeedRefundPayment(Order order, PaymentStatus status)
+    {
+        var capture = new Payment
+    {
+        Id = Guid.NewGuid(),
+        OrderId = order.Id,
+        Kind = PaymentKind.Capture,
+        Provider = "monobank",
+        ProviderInvoiceId = order.MonobankInvoiceId ?? "INV-DEFAULT",
+        AmountUah = order.Price,
+        AmountKopecks = FuelFlow.SharedKernel.Money.ToKopecks(order.Price),
+        Currency = "UAH",
+        Status = PaymentStatus.Succeeded,
+        PaidAtUtc = DateTime.UtcNow,
+        CreatedAtUtc = DateTime.UtcNow,
+        UpdatedAtUtc = DateTime.UtcNow
+    };
+    _context.Payments.Add(capture);
+
+    _context.Payments.Add(new Payment
+    {
+        Id = Guid.NewGuid(),
+        OrderId = order.Id,
+        Kind = PaymentKind.Refund,
+        ParentPaymentId = capture.Id,
+        Provider = "monobank",
+        ProviderInvoiceId = capture.ProviderInvoiceId,
+        AmountUah = order.Price,
+        AmountKopecks = capture.AmountKopecks,
+        Currency = "UAH",
+        Status = status,
+        PaidAtUtc = status == PaymentStatus.Succeeded ? DateTime.UtcNow : null,
+        CreatedAtUtc = DateTime.UtcNow,
+        UpdatedAtUtc = DateTime.UtcNow
+    });
+}
+
+    /// <summary>
     /// A PAID order by default: every suite below is about returning money a customer actually
     /// handed over, and the fixture now says so explicitly.
     /// </summary>
     /// <remarks>
     /// It used to leave <c>MonobankStatus</c> unset and still be treated as refundable, which
     /// only worked because the amount was derived from line items alone. That made the fixture
-    /// quietly assert the thing this PR removes ΓÇö that an order with an invoice is refundable
+    /// quietly assert the thing this PR removes — that an order with an invoice is refundable
     /// whether or not anyone paid. Override <paramref name="monobankStatus"/> for the unpaid cases.
     /// </remarks>
     private static Order BuildOrder(
@@ -125,11 +173,11 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
             x => x.CancelInvoiceAsync("INV123", 250000, "idem-key-1", It.IsAny<IReadOnlyList<MonobankBasketItem>>(), It.IsAny<CancellationToken>()),
             Times.Once);
 
-        var refund = await _context.Refunds.SingleAsync(r => r.OrderId == order.Id);
+        var refund = await _context.Payments.SingleAsync(r => r.OrderId == order.Id && r.Kind == PaymentKind.Refund);
         refund.AmountKopecks.Should().Be(250000);
-        refund.InvoiceId.Should().Be("INV123");
+        refund.ProviderInvoiceId.Should().Be("INV123");
         refund.IsAutomatic.Should().BeFalse();
-        refund.Status.Should().Be(RefundStatus.Processing);
+        refund.Status.Should().Be(PaymentStatus.Pending);
 
         // Order status must stay fulfillment-derived until Monobank confirms the refund,
         // otherwise the admin shows "PartiallyRefunded + Refund pending" at the same time.
@@ -215,7 +263,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
             x => x.CancelInvoiceAsync("INV123", 250000, "idem-key-1", It.IsAny<IReadOnlyList<MonobankBasketItem>>(), It.IsAny<CancellationToken>()),
             Times.Once);
 
-        var refund = await _context.Refunds.SingleAsync(r => r.OrderId == order.Id);
+        var refund = await _context.Payments.SingleAsync(r => r.OrderId == order.Id && r.Kind == PaymentKind.Refund);
         refund.AmountKopecks.Should().Be(250000);
     }
 
@@ -270,19 +318,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         _context.Orders.Add(order);
         await _context.SaveChangesAsync();
 
-        _context.Refunds.Add(new Refund
-        {
-            Id = Guid.NewGuid(),
-            OrderId = order.Id,
-            UserId = order.UserId,
-            AmountKopecks = 2500,
-            InvoiceId = "INV123",
-            ExtRef = "idem-key-1",
-            Status = RefundStatus.Processing,
-            IsAutomatic = false,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
-        });
+        SeedRefundPayment(order, PaymentStatus.Pending);
         await _context.SaveChangesAsync();
 
         var result = await _handler.HandleAsync(new RefundOrderCommand { OrderId = order.Id });
@@ -293,7 +329,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
             x => x.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<long>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<MonobankBasketItem>>(), It.IsAny<CancellationToken>()),
             Times.Never);
 
-        var refund = await _context.Refunds.SingleAsync(r => r.OrderId == order.Id);
+        var refund = await _context.Payments.SingleAsync(r => r.OrderId == order.Id && r.Kind == PaymentKind.Refund);
         refund.AmountKopecks.Should().Be(500000);
 
         // An in-flight (Processing) refund must not move the order into a refunded state.
@@ -316,19 +352,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         _context.Orders.Add(order);
         await _context.SaveChangesAsync();
 
-        _context.Refunds.Add(new Refund
-        {
-            Id = Guid.NewGuid(),
-            OrderId = order.Id,
-            UserId = order.UserId,
-            AmountKopecks = 250000,
-            InvoiceId = "INV123",
-            ExtRef = "idem-key-1",
-            Status = RefundStatus.Completed,
-            IsAutomatic = false,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
-        });
+        SeedRefundPayment(order, PaymentStatus.Succeeded);
         await _context.SaveChangesAsync();
 
         var result = await _handler.HandleAsync(new RefundOrderCommand { OrderId = order.Id });
@@ -373,19 +397,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         _context.Orders.Add(order);
         await _context.SaveChangesAsync();
 
-        _context.Refunds.Add(new Refund
-        {
-            Id = Guid.NewGuid(),
-            OrderId = order.Id,
-            UserId = order.UserId,
-            AmountKopecks = 500000,
-            InvoiceId = "INV-ALL-RELEASED",
-            ExtRef = "idem-key-released",
-            Status = RefundStatus.Completed,
-            IsAutomatic = false,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
-        });
+        SeedRefundPayment(order, PaymentStatus.Succeeded);
         await _context.SaveChangesAsync();
 
         var result = await _handler.HandleAsync(new RefundOrderCommand { OrderId = order.Id });
@@ -425,19 +437,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         _context.Orders.Add(order);
         await _context.SaveChangesAsync();
 
-        _context.Refunds.Add(new Refund
-        {
-            Id = Guid.NewGuid(),
-            OrderId = order.Id,
-            UserId = order.UserId,
-            AmountKopecks = 250000,
-            InvoiceId = "INV-SOME-RELEASED",
-            ExtRef = "idem-key-some-released",
-            Status = RefundStatus.Completed,
-            IsAutomatic = false,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
-        });
+        SeedRefundPayment(order, PaymentStatus.Succeeded);
         await _context.SaveChangesAsync();
 
         await _handler.HandleAsync(new RefundOrderCommand { OrderId = order.Id });
@@ -543,31 +543,24 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         result.Status.Should().Be("Failed");
         result.ErrorMessage.Should().Contain("502");
 
-        var refund = await _context.Refunds.SingleAsync(r => r.OrderId == order.Id);
-        refund.Status.Should().Be(RefundStatus.Failed);
+        var refund = await _context.Payments.SingleAsync(r => r.OrderId == order.Id && r.Kind == PaymentKind.Refund);
+        refund.Status.Should().Be(PaymentStatus.Failed);
     }
 
     [Fact]
     public async Task HandleAsync_ShouldRetryFailedRefund_InPlace()
     {
+        // This suite's context runs NoTracking (see the fixture), which is what makes the assertion
+        // below a real one rather than an accident of the production TrackAll default. A retry has to
+        // bring the row back to life on the instance the change tracker knows about: reload the refund
+        // untracked and every assignment is dropped, so the handler still calls Monobank and still
+        // answers "Processing" while the row sits at Failed and the attempt leaves no record. That is
+        // a money-path regression this file exists to catch.
         var order = BuildOrder();
         _context.Orders.Add(order);
         await _context.SaveChangesAsync();
 
-        _context.Refunds.Add(new Refund
-        {
-            Id = Guid.NewGuid(),
-            OrderId = order.Id,
-            UserId = order.UserId,
-            AmountKopecks = 2500,
-            InvoiceId = "INV123",
-            ExtRef = "idem-key-1",
-            Status = RefundStatus.Failed,
-            ErrorMessage = "previous failure",
-            IsAutomatic = false,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
-        });
+        SeedRefundPayment(order, PaymentStatus.Failed);
         await _context.SaveChangesAsync();
 
         var result = await _handler.HandleAsync(new RefundOrderCommand { OrderId = order.Id });
@@ -577,11 +570,11 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
             x => x.CancelInvoiceAsync("INV123", 500000, "idem-key-1", It.IsAny<IReadOnlyList<MonobankBasketItem>>(), It.IsAny<CancellationToken>()),
             Times.Once);
 
-        var refunds = await _context.Refunds.Where(r => r.OrderId == order.Id).ToListAsync();
+        var refunds = await _context.Payments.Where(r => r.OrderId == order.Id && r.Kind == PaymentKind.Refund).ToListAsync();
         refunds.Should().ContainSingle();
-        refunds[0].Status.Should().Be(RefundStatus.Processing);
+        refunds[0].Status.Should().Be(PaymentStatus.Pending);
         refunds[0].ErrorMessage.Should().BeNull();
-        refunds[0].MonobankStatus.Should().Be("processing");
+        // The brand's word is not stored on the refund any more; Pending is the record.
         refunds[0].AmountKopecks.Should().Be(500000);
     }
 
@@ -633,7 +626,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         _monobankClientMock.Verify(
             x => x.CancelInvoiceAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<MonobankBasketItem>>(), It.IsAny<CancellationToken>()),
             Times.Never);
-        (await _context.Refunds.CountAsync()).Should().Be(0);
+        (await _context.Payments.CountAsync(p => p.Kind == PaymentKind.Refund)).Should().Be(0);
     }
 
     [Fact]
@@ -676,7 +669,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         // never an invoice to reverse, because checkout failed before it reached the brand.
         result.Status.Should().Be("NotPayable");
         result.ErrorMessage.Should().Contain("no Monobank invoice");
-        (await _context.Refunds.CountAsync()).Should().Be(0);
+        (await _context.Payments.CountAsync(p => p.Kind == PaymentKind.Refund)).Should().Be(0);
     }
 
     [Fact]

@@ -103,7 +103,7 @@ UNION ALL SELECT 'vouchers', count(*) FROM fuel_vouchers WHERE id IN (SELECT id 
 UNION ALL SELECT 'orders', count(*) FROM orders WHERE id IN (SELECT id FROM _test_order)
 UNION ALL SELECT 'fulfilments', count(*) FROM fulfillments WHERE order_id IN (SELECT id FROM _test_order)
 UNION ALL SELECT 'order line items', count(*) FROM order_line_items WHERE order_id IN (SELECT id FROM _test_order)
-UNION ALL SELECT 'refunds', count(*) FROM refunds WHERE order_id IN (SELECT id FROM _test_order)
+UNION ALL SELECT 'refund payments', count(*) FROM payments WHERE order_id IN (SELECT id FROM _test_order) AND kind = 'Refund'
 UNION ALL SELECT 'renewal items', count(*) FROM voucher_renewal_items WHERE order_id IN (SELECT id FROM _test_order)
 UNION ALL SELECT 'supplier exchanges', count(*) FROM voucher_exchanges
     WHERE old_voucher_id IN (SELECT id FROM _test_voucher)
@@ -152,6 +152,14 @@ ORDER BY 1, 2;
   -- 3. Vouchers before orders (fuel_vouchers.order_id is RESTRICT, and the held-voucher check makes
   --    clearing it illegal).
   DELETE FROM fuel_vouchers WHERE id IN (SELECT id FROM _test_voucher);
+
+  -- 3b. Payments before orders (payments.order_id is RESTRICT). A refund IS a payment
+  --     (kind = 'Refund'), and it points at the capture it reverses, which restricts too - so the
+  --     children go first. RESTRICT is immediate, not deferred, so one DELETE covering both kinds
+  --     fails the moment it reaches a capture whose refund has not gone yet.
+  DELETE FROM payments WHERE order_id IN (SELECT id FROM _test_order) AND kind = 'Refund';
+
+  DELETE FROM payments WHERE order_id IN (SELECT id FROM _test_order);
 
   DELETE FROM orders WHERE id IN (SELECT id FROM _test_order);
 
@@ -223,7 +231,7 @@ COMMIT;
   UNION ALL SELECT 'orders', count(*) FROM orders
   UNION ALL SELECT 'order line items', count(*) FROM order_line_items
   UNION ALL SELECT 'fulfilments', count(*) FROM fulfillments
-  UNION ALL SELECT 'refunds', count(*) FROM refunds
+  UNION ALL SELECT 'refund payments', count(*) FROM payments WHERE kind = 'Refund'
   UNION ALL SELECT 'renewal items', count(*) FROM voucher_renewal_items
   UNION ALL SELECT 'supplier exchanges', count(*) FROM voucher_exchanges
   UNION ALL SELECT 'devices', count(*) FROM devices

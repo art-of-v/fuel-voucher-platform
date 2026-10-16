@@ -73,7 +73,7 @@ public sealed class ConcurrencyTokenTrackingRuleIntegrationTests : IClassFixture
 
         await using var seed = CreateContext();
         await seed.Database.ExecuteSqlRawAsync(
-            """TRUNCATE TABLE "refunds", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
+            """TRUNCATE TABLE "payments", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
 
         seed.Users.Add(new User
         {

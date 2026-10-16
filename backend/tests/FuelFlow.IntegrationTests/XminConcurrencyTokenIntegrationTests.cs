@@ -3,6 +3,7 @@ using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers.Exchange;
 using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Features.Vouchers.Renewal.Operator;
+using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -42,13 +43,13 @@ public sealed class XminConcurrencyTokenIntegrationTests : IClassFixture<TestDat
         refund.ErrorMessage = "written once";
         await using (var context = CreateContext())
         {
-            var loaded = await context.Refunds.FirstAsync(r => r.Id == refund.Id);
+            var loaded = await context.Payments.FirstAsync(r => r.Id == refund.Id);
             loaded.ErrorMessage = "written once";
             await context.SaveChangesAsync();
         }
 
         await using var verify = CreateContext();
-        (await verify.Refunds.Where(r => r.Id == refund.Id).Select(r => r.ErrorMessage).SingleAsync())
+        (await verify.Payments.Where(r => r.Id == refund.Id).Select(r => r.ErrorMessage).SingleAsync())
             .Should().Be("written once");
     }
 
@@ -67,15 +68,16 @@ public sealed class XminConcurrencyTokenIntegrationTests : IClassFixture<TestDat
         // A holds a stale copy, exactly as a handler that read the row before doing something slow
         // would. TrackAll is the app-wide default, so a plain query attaches.
         await using var stale = CreateContext();
-        var snapshot = await stale.Refunds.FirstAsync(r => r.Id == refund.Id);
+        var snapshot = await stale.Payments.FirstAsync(r => r.Id == refund.Id);
         snapshot.AmountKopecks = 2000;
 
         // Meanwhile somebody else moves the same row.
         await using (var other = CreateContext())
         {
-            var affected = await other.Refunds
+            var affected = await other.Payments
                 .Where(r => r.Id == refund.Id)
-                .ExecuteUpdateAsync(s => s.SetProperty(r => r.AmountKopecks, 5000));
+                .ExecuteUpdateAsync(s => s.SetProperty(r => r.AmountKopecks, 5000)
+                    .SetProperty(r => r.AmountUah, 50.00m));
             affected.Should().Be(1, "precondition: the other writer moved the row");
         }
 
@@ -92,7 +94,7 @@ public sealed class XminConcurrencyTokenIntegrationTests : IClassFixture<TestDat
         threw.Should().BeTrue("the token must refuse the write, not silently let it overwrite");
 
         await using var verify = CreateContext();
-        var stored = await verify.Refunds
+        var stored = await verify.Payments
             .Where(r => r.Id == refund.Id)
             .Select(r => new { r.AmountKopecks, r.ErrorMessage })
             .SingleAsync();
@@ -130,11 +132,11 @@ public sealed class XminConcurrencyTokenIntegrationTests : IClassFixture<TestDat
             .ToList();
 
         tokenised.Should().BeEquivalentTo(
-            ["fuel_vouchers", "operator_voucher_renewals", "orders", "refunds", "voucher_exchanges", "voucher_renewal_items"],
+            ["fuel_vouchers", "operator_voucher_renewals", "orders", "payments", "voucher_exchanges", "voucher_renewal_items"],
             "the two hot tables are included now that nothing mixes a raw write with a tracked save of the same row");
     }
 
-    private async Task<Refund> SeedRefundAsync(Guid orderId, int amount)
+    private async Task<Payment> SeedRefundAsync(Guid orderId, int amount)
     {
         await using var seed = CreateContext();
         await ResetDataAsync(seed);
@@ -158,19 +160,42 @@ public sealed class XminConcurrencyTokenIntegrationTests : IClassFixture<TestDat
             UpdatedAtUtc = DateTime.UtcNow
         });
 
-        var refund = new Refund
+        // A refund is a payment of kind 'Refund', and a refund must name the capture it reverses - so this
+        // seeds both, which is also why the tokenised list below expects `payments` rather than a
+        // `refunds` table that no longer exists.
+        var capture = new Payment
         {
             Id = Guid.NewGuid(),
             OrderId = orderId,
-            UserId = orderId,
+            Kind = PaymentKind.Capture,
+            Provider = "monobank",
+            ProviderInvoiceId = $"inv-{orderId:N}"[..Math.Min(100, 4 + 32)],
+            AmountUah = amount / 100m,
             AmountKopecks = amount,
-            InvoiceId = $"inv-{orderId:N}"[..Math.Min(100, 4 + 32)],
-            ExtRef = $"ref-{orderId:N}"[..Math.Min(150, 4 + 32)],
-            Status = RefundStatus.Processing,
+            Currency = "UAH",
+            Status = PaymentStatus.Succeeded,
+            PaidAtUtc = DateTime.UtcNow,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
         };
-        seed.Refunds.Add(refund);
+        seed.Payments.Add(capture);
+
+        var refund = new Payment
+        {
+            Id = Guid.NewGuid(),
+            OrderId = orderId,
+            Kind = PaymentKind.Refund,
+            ParentPaymentId = capture.Id,
+            Provider = "monobank",
+            ProviderInvoiceId = capture.ProviderInvoiceId,
+            AmountUah = amount / 100m,
+            AmountKopecks = amount,
+            Currency = "UAH",
+            Status = PaymentStatus.Pending,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+        };
+        seed.Payments.Add(refund);
 
         await seed.SaveChangesAsync();
         return refund;
@@ -178,7 +203,7 @@ public sealed class XminConcurrencyTokenIntegrationTests : IClassFixture<TestDat
 
     private static async Task ResetDataAsync(ApplicationDbContext context)
         => await context.Database.ExecuteSqlRawAsync(
-            """TRUNCATE TABLE "refunds", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
+            """TRUNCATE TABLE "payments", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
 
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()

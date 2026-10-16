@@ -1130,99 +1130,6 @@ namespace FuelFlow.API.Migrations
                         });
                 });
 
-            modelBuilder.Entity("FuelFlow.Features.Orders.SharedModels.Refund", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<decimal>("AmountKopecks")
-                        .HasColumnType("numeric(14,0)")
-                        .HasColumnName("amount_kopecks");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<Guid?>("CreatedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("created_by_user_id");
-
-                    b.Property<string>("CreatedByUserName")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("created_by_user_name");
-
-                    b.Property<string>("ErrorMessage")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("error_message");
-
-                    b.Property<string>("ExtRef")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("character varying(150)")
-                        .HasColumnName("ext_ref");
-
-                    b.Property<string>("InvoiceId")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("invoice_id");
-
-                    b.Property<bool>("IsAutomatic")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_automatic");
-
-                    b.Property<string>("MonobankStatus")
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
-                        .HasColumnName("monobank_status");
-
-                    b.Property<Guid>("OrderId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("order_id");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
-                        .HasColumnName("status");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.Property<uint>("xmin")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedByUserId");
-
-                    b.HasIndex("InvoiceId");
-
-                    b.HasIndex("OrderId")
-                        .IsUnique();
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("refunds", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_refund_amount_positive", "amount_kopecks > 0");
-
-                            t.HasCheckConstraint("ck_refund_status", "status IN ('Processing', 'Completed', 'Failed')");
-                        });
-                });
-
             modelBuilder.Entity("FuelFlow.Features.Settings.SharedModels.AppSetting", b =>
                 {
                     b.Property<string>("Key")
@@ -2000,9 +1907,20 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("webhook_event_id");
 
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("OrderId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_payments_one_refund_per_order")
+                        .HasFilter("kind = 'Refund'");
 
                     b.HasIndex("ParentPaymentId")
                         .HasDatabaseName("ix_payments_parent_payment_id");
@@ -3874,28 +3792,6 @@ namespace FuelFlow.API.Migrations
                         .WithMany("LineItems")
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Order");
-                });
-
-            modelBuilder.Entity("FuelFlow.Features.Orders.SharedModels.Refund", b =>
-                {
-                    b.HasOne("FuelFlow.SharedKernel.Domain.User", null)
-                        .WithMany()
-                        .HasForeignKey("CreatedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("FuelFlow.Features.Orders.SharedModels.Order", "Order")
-                        .WithMany()
-                        .HasForeignKey("OrderId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("FuelFlow.SharedKernel.Domain.User", null)
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Order");

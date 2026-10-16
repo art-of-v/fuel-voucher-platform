@@ -56,36 +56,43 @@ SELECT md5('SEED-DEMO-' || tag || '-user')::uuid,
 FROM seed_params
 ON CONFLICT (id) DO NOTHING;
 
+-- `idempotency_key` is the reference the statement matcher attributes a reversal by, read off the
+-- order rather than off the refund. Only the refunded order needs one; the rest stay null.
 INSERT INTO orders (id, user_id, price, status, kind, monobank_invoice_id, monobank_status,
-                    monobank_merchant, created_at_utc, updated_at_utc, fulfilled_at_utc)
+                    monobank_merchant, idempotency_key, created_at_utc, updated_at_utc, fulfilled_at_utc)
 SELECT v.id, md5('SEED-DEMO-' || p.tag || '-user')::uuid, v.price, v.status, v.kind,
-       v.invoice_id, v.mono_status, v.mono_merchant,
+       v.invoice_id, v.mono_status, v.mono_merchant, v.idem,
        p.p_month + v.created_offset, now(),
        CASE WHEN v.fulfilled_offset IS NULL THEN NULL
             ELSE p.p_month + v.fulfilled_offset END
 FROM seed_params p
 JOIN LATERAL (VALUES
-  -- Agrees exactly: the matcher must call this one Matched.
+  -- Agrees exactly: the matcher must call this one Matched. Also the order that gets refunded below.
   (gen_random_uuid(), 1200.00::numeric, 'Paid'::text, 'Purchase'::text,
    'SEED-DEMO-INV-A-'      || p.tag, 'Success'::text, 'Live'::text,
+   'SEED-DEMO-EXTREF-'     || p.tag,
    interval '2 days 10:00', interval '2 days 12:00'),
   -- The rounding disagreement: ours 979.00, the acquirer says 978.57.
   (gen_random_uuid(), 979.00::numeric, 'Paid'::text, 'Purchase'::text,
    'SEED-DEMO-INV-B-'      || p.tag, 'Success'::text, 'Live'::text,
+   NULL::text,
    interval '5 days 9:30',  interval '5 days 11:00'),
   -- Paid, waiting to be fulfilled: the status the three-way match separates on.
   (gen_random_uuid(), 640.50::numeric, 'PendingFulfillment'::text, 'Purchase'::text,
    'SEED-DEMO-INV-C-'      || p.tag, 'Success'::text, 'Live'::text,
+   NULL::text,
    interval '8 days 14:00', NULL),
   -- Paid, and the acquirer never mentions it: the "never mentioned" table.
   (gen_random_uuid(), 555.00::numeric, 'Fulfilled'::text, 'Purchase'::text,
    'SEED-DEMO-INV-SILENT-' || p.tag, 'Success'::text, 'Live'::text,
+   NULL::text,
    interval '11 days 8:00', interval '11 days 8:30'),
   -- Never paid: belongs in no acquirer act, but the order counts and the funnel want it.
   (gen_random_uuid(), 300.00::numeric, 'PendingPayment'::text, 'Purchase'::text,
    NULL::text, NULL::text, NULL::text,
+   NULL::text,
    interval '14 days 16:00', NULL)
-) AS v(id, price, status, kind, invoice_id, mono_status, mono_merchant, created_offset, fulfilled_offset)
+) AS v(id, price, status, kind, invoice_id, mono_status, mono_merchant, idem, created_offset, fulfilled_offset)
   ON true
 WHERE NOT EXISTS (
   SELECT 1 FROM orders o
@@ -94,14 +101,39 @@ WHERE NOT EXISTS (
 );
 
 -- A refund, so the "Refund match" verdict and the refunds report both have something in them.
-INSERT INTO refunds (id, order_id, user_id, amount, invoice_id, ext_ref, status, is_automatic,
-                     created_at_utc, updated_at_utc)
-SELECT gen_random_uuid(), o.id, o.user_id, 25000, 'SEED-DEMO-REF-' || p.tag,
-       'SEED-DEMO-EXTREF-' || p.tag, 'Completed'::text, false,
-       p.p_month + interval '20 days 10:00', now()
+--
+-- A refund IS a payment now: `kind = 'Refund'`, naming the capture it reverses in `parent_payment_id`
+-- (ck_payments_refund_shape refuses one without a parent). The capture therefore has to exist first,
+-- and the two rows must NOT share `provider_invoice_id` - ux_payments_provider_invoice_kind is unique
+-- over (provider, provider_invoice_id, kind).
+--
+-- The acquirer's reference the matcher attributes a reversal by is `orders.idempotency_key` now, not
+-- a copy on the refund, so the order carrying the refund is the one that gets a key. That is what the
+-- reversal row below quotes as its ext_ref.
+INSERT INTO payments (id, order_id, kind, parent_payment_id, provider, merchant, provider_invoice_id,
+                      amount_uah, amount_kopecks, currency, status, paid_at_utc, is_automatic,
+                      created_at_utc, updated_at_utc)
+SELECT gen_random_uuid(), o.id, 'Capture'::text, NULL::uuid, 'monobank'::text, 'Live'::text,
+       o.monobank_invoice_id, o.price, round(o.price * 100), 'UAH'::text, 'Succeeded'::text,
+       p.p_month + interval '2 days 10:00', false,
+       p.p_month + interval '2 days 10:00', now()
 FROM seed_params p
 JOIN orders o ON o.monobank_invoice_id = 'SEED-DEMO-INV-A-' || p.tag
-WHERE NOT EXISTS (SELECT 1 FROM refunds r WHERE r.ext_ref = 'SEED-DEMO-EXTREF-' || p.tag);
+WHERE NOT EXISTS (SELECT 1 FROM payments c WHERE c.order_id = o.id AND c.kind = 'Capture');
+
+INSERT INTO payments (id, order_id, kind, parent_payment_id, provider, merchant, provider_invoice_id,
+                      amount_uah, amount_kopecks, currency, status, paid_at_utc, is_automatic,
+                      created_at_utc, updated_at_utc)
+SELECT gen_random_uuid(), c.order_id, 'Refund'::text, c.id, 'monobank'::text, 'Live'::text,
+       'SEED-DEMO-REF-' || p.tag, 250.00::numeric, 25000::numeric, 'UAH'::text, 'Succeeded'::text,
+       p.p_month + interval '20 days 10:00', false,
+       p.p_month + interval '20 days 10:00', now()
+FROM seed_params p
+JOIN payments c ON c.kind = 'Capture' AND c.order_id = (
+    SELECT o.id FROM orders o WHERE o.monobank_invoice_id = 'SEED-DEMO-INV-A-' || p.tag)
+-- One refund per order, enforced by ux_payments_one_refund_per_order, so re-running with the same
+-- tag has to find the existing one rather than mint a second.
+WHERE NOT EXISTS (SELECT 1 FROM payments r WHERE r.order_id = c.order_id AND r.kind = 'Refund');
 
 -- The acquirer's side of the same month.
 INSERT INTO monobank_statement_entries
@@ -148,7 +180,8 @@ COMMIT;
 SELECT 'orders seeded'   AS check, count(*)::text AS value FROM orders
  WHERE monobank_invoice_id LIKE 'SEED-DEMO-%'
 UNION ALL
-SELECT 'refunds seeded', count(*)::text FROM refunds WHERE ext_ref LIKE 'SEED-DEMO-%'
+SELECT 'refunds seeded', count(*)::text FROM payments
+ WHERE kind = 'Refund' AND provider_invoice_id LIKE 'SEED-DEMO-%'
 UNION ALL
 SELECT 'statement rows', count(*)::text FROM monobank_statement_entries WHERE statement_id LIKE 'SEED-DEMO-%';
 
@@ -157,8 +190,10 @@ SELECT 'statement rows', count(*)::text FROM monobank_statement_entries WHERE st
 \echo 'Expect: 3 matched, 1 amount mismatch (978.57 vs 979.00), 1 unmatched, 1 refund match,'
 \echo '        and one order in the "acquirer never mentioned" table.'
 \echo ''
-\echo 'Cleanup, with the same demo_tag:'
+\echo 'Cleanup, with the same demo_tag (refund payments first: they point at the capture they reverse'
+\echo 'and that FK restricts immediately, and payments.order_id restricts the order delete):'
 \echo '  DELETE FROM monobank_statement_entries WHERE statement_id LIKE ''SEED-DEMO-%-TAG%'';'
-\echo '  DELETE FROM refunds                 WHERE ext_ref         LIKE ''SEED-DEMO-%-TAG%'';'
+\echo '  DELETE FROM payments                 WHERE kind = ''Refund'' AND order_id IN (SELECT id FROM orders WHERE monobank_invoice_id LIKE ''SEED-DEMO-%-TAG%'');'
+\echo '  DELETE FROM payments                 WHERE order_id IN (SELECT id FROM orders WHERE monobank_invoice_id LIKE ''SEED-DEMO-%-TAG%'');'
 \echo '  DELETE FROM orders                  WHERE monobank_invoice_id LIKE ''SEED-DEMO-%-TAG%'';'
 \echo '  DELETE FROM users                   WHERE id = md5(''SEED-DEMO-TAG-user'')::uuid;'

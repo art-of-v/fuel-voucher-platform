@@ -211,7 +211,7 @@ public sealed class VoucherExchangeTransactionAtomicityTests : IClassFixture<Tes
 
     private static async Task ResetDataAsync(ApplicationDbContext context)
         => await context.Database.ExecuteSqlRawAsync(
-            """TRUNCATE TABLE "voucher_exchanges", "refunds", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "voucher_imports", "suppliers", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
+            """TRUNCATE TABLE "voucher_exchanges", "payments", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "voucher_imports", "suppliers", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
 
     private ApplicationDbContext CreateContext(IInterceptor? interceptor = null)
     {

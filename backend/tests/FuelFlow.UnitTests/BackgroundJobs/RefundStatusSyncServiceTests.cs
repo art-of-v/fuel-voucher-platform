@@ -4,6 +4,7 @@ using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers;
+using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Options;
 using Microsoft.EntityFrameworkCore;
@@ -45,14 +46,52 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
         _context.Dispose();
     }
 
-    private static Refund BuildRefund(Guid orderId, RefundStatus status = RefundStatus.Processing, DateTime? createdAtUtc = null) => new()
+    /// <summary>
+    /// Seeds the capture a refund will reverse, and returns it. A refund names the capture it
+    /// reverses, so the parent has to exist first - the old <c>refunds</c> row needed no parent and
+    /// these tests never had to think about one.
+    /// </summary>
+    private Payment SeedCapture(ApplicationDbContext ctx, Guid orderId)
+    {
+        var capture = new Payment
+        {
+            Id = Guid.NewGuid(),
+            OrderId = orderId,
+            Kind = PaymentKind.Capture,
+            Provider = "monobank",
+            ProviderInvoiceId = "INV-REFUND-1",
+            AmountUah = 520.00m,
+            AmountKopecks = 52000,
+            Currency = "UAH",
+            Status = PaymentStatus.Succeeded,
+            PaidAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+
+        ctx.Payments.Add(capture);
+        return capture;
+    }
+
+    /// <summary>
+    /// A pending refund, as a payment of kind 'Refund'. The capture it reverses comes from
+    /// <see cref="SeedCapture"/>, because a refund has to name what it gives back.
+    /// </summary>
+    private static Payment BuildRefund(
+        Guid orderId,
+        Guid captureId,
+        PaymentStatus status = PaymentStatus.Pending,
+        DateTime? createdAtUtc = null) => new()
     {
         Id = Guid.NewGuid(),
         OrderId = orderId,
-        UserId = Guid.NewGuid(),
+        Kind = PaymentKind.Refund,
+        ParentPaymentId = captureId,
+        Provider = "monobank",
+        ProviderInvoiceId = "INV-REFUND-1",
+        AmountUah = 520.00m,
         AmountKopecks = 52000,
-        InvoiceId = "INV-REFUND-1",
-        ExtRef = "idem-key-1",
+        Currency = "UAH",
         Status = status,
         IsAutomatic = false,
         CreatedAtUtc = createdAtUtc ?? DateTime.UtcNow,
@@ -103,7 +142,8 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
         // invoice, which is the one recorded at checkout - not the live token by default.
         var orderId = Guid.NewGuid();
         _context.Orders.Add(BuildOrder(orderId, OrderStatus.PartiallyRefunded, MonobankMerchant.Sandbox));
-        _context.Refunds.Add(BuildRefund(orderId));
+        var capture = SeedCapture(_context, orderId);
+        _context.Payments.Add(BuildRefund(orderId, capture.Id));
         await _context.SaveChangesAsync();
 
         _monobankClientMock
@@ -122,7 +162,8 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
         // to live keeps them resolvable; defaulting to sandbox would strand real money.
         var orderId = Guid.NewGuid();
         _context.Orders.Add(BuildOrder(orderId, OrderStatus.PartiallyRefunded, merchant: null));
-        _context.Refunds.Add(BuildRefund(orderId));
+        var capture = SeedCapture(_context, orderId);
+        _context.Payments.Add(BuildRefund(orderId, capture.Id));
         await _context.SaveChangesAsync();
 
         _monobankClientMock
@@ -138,7 +179,9 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
     public async Task SyncPendingRefundsAsync_ShouldMarkCompleted_WhenCancelSucceeded()
     {
         var orderId = Guid.NewGuid();
-        _context.Refunds.Add(BuildRefund(orderId));
+        _context.Orders.Add(BuildOrder(orderId, OrderStatus.PartiallyRefunded));
+        var capture = SeedCapture(_context, orderId);
+        _context.Payments.Add(BuildRefund(orderId, capture.Id));
         await _context.SaveChangesAsync();
 
         _monobankClientMock
@@ -162,16 +205,18 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
 
         await _service.SyncPendingRefundsAsync();
 
-        var refund = await _context.Refunds.SingleAsync();
-        refund.Status.Should().Be(RefundStatus.Completed);
-        refund.MonobankStatus.Should().Be("success");
+        var refund = await _context.Payments.SingleAsync(p => p.Kind == PaymentKind.Refund);
+        refund.Status.Should().Be(PaymentStatus.Succeeded);
+        // The brand's word is no longer stored on the refund; the typed status is the record.
     }
 
     [Fact]
     public async Task SyncPendingRefundsAsync_ShouldMarkFailed_WhenCancelFailed()
     {
         var orderId = Guid.NewGuid();
-        _context.Refunds.Add(BuildRefund(orderId));
+        _context.Orders.Add(BuildOrder(orderId, OrderStatus.PartiallyRefunded));
+        var capture = SeedCapture(_context, orderId);
+        _context.Payments.Add(BuildRefund(orderId, capture.Id));
         await _context.SaveChangesAsync();
 
         _monobankClientMock
@@ -195,16 +240,18 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
 
         await _service.SyncPendingRefundsAsync();
 
-        var refund = await _context.Refunds.SingleAsync();
-        refund.Status.Should().Be(RefundStatus.Failed);
-        refund.MonobankStatus.Should().Be("failure");
+        var refund = await _context.Payments.SingleAsync(p => p.Kind == PaymentKind.Refund);
+        refund.Status.Should().Be(PaymentStatus.Failed);
+        // Same: the typed Failed status above is the record.
     }
 
     [Fact]
     public async Task SyncPendingRefundsAsync_ShouldLeaveProcessing_WhenStillProcessing()
     {
         var orderId = Guid.NewGuid();
-        _context.Refunds.Add(BuildRefund(orderId));
+        _context.Orders.Add(BuildOrder(orderId, OrderStatus.PartiallyRefunded));
+        var capture = SeedCapture(_context, orderId);
+        _context.Payments.Add(BuildRefund(orderId, capture.Id));
         await _context.SaveChangesAsync();
 
         _monobankClientMock
@@ -228,8 +275,8 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
 
         await _service.SyncPendingRefundsAsync();
 
-        var refund = await _context.Refunds.SingleAsync();
-        refund.Status.Should().Be(RefundStatus.Processing);
+        var refund = await _context.Payments.SingleAsync(p => p.Kind == PaymentKind.Refund);
+        refund.Status.Should().Be(PaymentStatus.Pending);
     }
 
     [Fact]
@@ -239,7 +286,8 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
         var order = BuildOrder(orderId, OrderStatus.PartiallyFulfilled);
         order.Fulfillments.Add(BuildFulfillment(orderId));
         _context.Orders.Add(order);
-        _context.Refunds.Add(BuildRefund(orderId));
+        var capture = SeedCapture(_context, orderId);
+        _context.Payments.Add(BuildRefund(orderId, capture.Id));
         await _context.SaveChangesAsync();
 
         _monobankClientMock
@@ -274,7 +322,8 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
         var order = BuildOrder(orderId, OrderStatus.PartiallyRefunded);
         order.Fulfillments.Add(BuildFulfillment(orderId));
         _context.Orders.Add(order);
-        _context.Refunds.Add(BuildRefund(orderId));
+        var capture = SeedCapture(_context, orderId);
+        _context.Payments.Add(BuildRefund(orderId, capture.Id));
         await _context.SaveChangesAsync();
 
         _monobankClientMock
@@ -298,8 +347,8 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
 
         await _service.SyncPendingRefundsAsync();
 
-        var refund = await _context.Refunds.SingleAsync();
-        refund.Status.Should().Be(RefundStatus.Failed);
+        var refund = await _context.Payments.SingleAsync(p => p.Kind == PaymentKind.Refund);
+        refund.Status.Should().Be(PaymentStatus.Failed);
 
         var updatedOrder = await _context.Orders.FindAsync(orderId);
         updatedOrder!.Status.Should().Be(OrderStatus.PartiallyFulfilled);
@@ -315,7 +364,8 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
         var order = BuildOrder(orderId, OrderStatus.PartiallyRefunded);
         order.Fulfillments.Add(BuildFulfillment(orderId));
         _context.Orders.Add(order);
-        _context.Refunds.Add(BuildRefund(orderId));
+        var capture = SeedCapture(_context, orderId);
+        _context.Payments.Add(BuildRefund(orderId, capture.Id));
         await _context.SaveChangesAsync();
 
         _monobankClientMock
@@ -339,8 +389,8 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
 
         await _service.SyncPendingRefundsAsync();
 
-        var refund = await _context.Refunds.SingleAsync();
-        refund.Status.Should().Be(RefundStatus.Processing);
+        var refund = await _context.Payments.SingleAsync(p => p.Kind == PaymentKind.Refund);
+        refund.Status.Should().Be(PaymentStatus.Pending);
 
         var updatedOrder = await _context.Orders.FindAsync(orderId);
         updatedOrder!.Status.Should().Be(OrderStatus.PartiallyFulfilled);
@@ -353,13 +403,14 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
         var order = BuildOrder(orderId, OrderStatus.PartiallyRefunded);
         order.Fulfillments.Add(BuildFulfillment(orderId));
         _context.Orders.Add(order);
-        _context.Refunds.Add(BuildRefund(orderId, createdAtUtc: DateTime.UtcNow.AddHours(-25)));
+        var capture = SeedCapture(_context, orderId);
+        _context.Payments.Add(BuildRefund(orderId, capture.Id, createdAtUtc: DateTime.UtcNow.AddHours(-25)));
         await _context.SaveChangesAsync();
 
         await _service.SyncPendingRefundsAsync();
 
-        var refund = await _context.Refunds.SingleAsync();
-        refund.Status.Should().Be(RefundStatus.Failed);
+        var refund = await _context.Payments.SingleAsync(p => p.Kind == PaymentKind.Refund);
+        refund.Status.Should().Be(PaymentStatus.Failed);
         refund.ErrorMessage.Should().Contain("Timed out");
 
         var updatedOrder = await _context.Orders.FindAsync(orderId);
@@ -370,7 +421,9 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
     public async Task SyncRefundForInvoiceAsync_ShouldMarkCompleted_FromWebhookCancelList()
     {
         var orderId = Guid.NewGuid();
-        _context.Refunds.Add(BuildRefund(orderId));
+        _context.Orders.Add(BuildOrder(orderId, OrderStatus.PartiallyRefunded));
+        var capture = SeedCapture(_context, orderId);
+        _context.Payments.Add(BuildRefund(orderId, capture.Id));
         await _context.SaveChangesAsync();
 
         await _service.SyncRefundForInvoiceAsync(
@@ -387,8 +440,8 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
                 }
             });
 
-        var refund = await _context.Refunds.SingleAsync();
-        refund.Status.Should().Be(RefundStatus.Completed);
+        var refund = await _context.Payments.SingleAsync(p => p.Kind == PaymentKind.Refund);
+        refund.Status.Should().Be(PaymentStatus.Succeeded);
     }
 
     private sealed class NullLogger<T> : ILogger<T>

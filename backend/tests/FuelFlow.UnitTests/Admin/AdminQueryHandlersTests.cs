@@ -293,12 +293,12 @@ public sealed class AdminQueryHandlersTests : IDisposable
         response.ThreeWayMatch.Should().ContainSingle(t =>
             t.OrderId == refundedOrder.Id
             && t.MatchStatus == "REFUNDED"
-            && t.RefundStatus == nameof(RefundStatus.Completed)
+            && t.RefundStatus == "Completed"
             && t.RefundedKopecks == 100000);
         response.ThreeWayMatch.Should().ContainSingle(t =>
             t.OrderId == partialOrder.Id
             && t.MatchStatus == "PARTIAL_REFUNDED"
-            && t.RefundStatus == nameof(RefundStatus.Completed)
+            && t.RefundStatus == "Completed"
             && t.RefundedKopecks == 100000
             && t.VouchersDelivered == 1
             && t.VouchersExpected == 2);

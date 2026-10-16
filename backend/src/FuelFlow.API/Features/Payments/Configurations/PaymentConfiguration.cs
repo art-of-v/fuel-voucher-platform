@@ -14,6 +14,16 @@ internal sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
 
         builder.HasKey(e => e.Id);
 
+        // #246 detector: xmin token. No DDL - xmin is a system column. Raw SQL must never write
+        // this table, or the token starts failing saves that did not actually race.
+        //
+        // This came across with the refunds this table absorbed. `refunds` had it and `payments` did
+        // not, so for the life of the two-table migration a refund's concurrency protection lived on
+        // the twin row rather than the one everything actually read and wrote. Two refund payments on
+        // one order - a retry racing the status sync - could both save, and the loser's write would be
+        // gone silently. With one table there is nothing to be protected on but this row.
+        builder.UseXminAsConcurrencyToken();
+
         builder.Property(e => e.Id).HasColumnName("id");
 
         builder.Property(e => e.OrderId)
@@ -120,6 +130,18 @@ builder.Property(e => e.ProviderAmountKopecks)
 
         builder.HasIndex(e => e.ParentPaymentId)
             .HasDatabaseName("ix_payments_parent_payment_id");
+
+        // At most one refund per order - the guarantee `refunds.order_id` carried while that table
+        // existed. A second concurrent refund request races past the existence check and is stopped
+        // here, so the admin never opens two refunds for one order or gets a 500 for a double-click.
+        //
+        // Partial on kind = 'Refund', so this says nothing about captures: an order can still hold
+        // several capture rows when a payment link is re-issued, which is the deliberate difference
+        // from the refund side.
+        builder.HasIndex(e => e.OrderId)
+            .IsUnique()
+            .HasFilter("kind = 'Refund'")
+            .HasDatabaseName("ux_payments_one_refund_per_order");
 
         builder.HasIndex(e => e.WebhookEventId)
             .HasDatabaseName("ix_payments_webhook_event_id");
