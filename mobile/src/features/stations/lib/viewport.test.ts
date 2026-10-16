@@ -1,8 +1,17 @@
 import { isPointInRegion, pointsInRegion, VIEWPORT_PADDING, type MapRegion } from './viewport';
 
-const KYIV: MapRegion = { latitude: 50.4501, longitude: 30.5234, latitudeDelta: 0.15, longitudeDelta: 0.15 };
+const KYIV: MapRegion = {
+  latitude: 50.4501,
+  longitude: 30.5234,
+  latitudeDelta: 0.15,
+  longitudeDelta: 0.15,
+};
 
-const at = (lat: number, lng: number) => ({ id: `${lat},${lng}`, lat: String(lat), lng: String(lng) });
+const at = (lat: number, lng: number) => ({
+  id: `${lat},${lng}`,
+  lat: String(lat),
+  lng: String(lng),
+});
 
 describe('isPointInRegion', () => {
   it('accepts a point inside the region', () => {
@@ -22,7 +31,7 @@ describe('isPointInRegion', () => {
   });
 
   it('rejects points past the padded edge', () => {
-    const farOutside = KYIV.latitude + KYIV.latitudeDelta / 2 * (1 + VIEWPORT_PADDING) + 0.01;
+    const farOutside = KYIV.latitude + (KYIV.latitudeDelta / 2) * (1 + VIEWPORT_PADDING) + 0.01;
 
     expect(isPointInRegion(at(farOutside, KYIV.longitude), KYIV)).toBe(false);
   });
