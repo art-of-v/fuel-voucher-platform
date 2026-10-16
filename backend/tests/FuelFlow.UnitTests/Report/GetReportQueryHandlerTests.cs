@@ -1,5 +1,6 @@
 using FluentAssertions;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Payments.SharedModels;
 using FuelFlow.Features.Report.GetReport;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
@@ -178,16 +179,20 @@ public sealed class GetReportQueryHandlerTests : IDisposable
             new Fulfillment { OrderId = paidOrder.Id, VoucherId = voucher95.Id, FulfilledAtUtc = now },
             new Fulfillment { OrderId = pendingOrder.Id, VoucherId = voucherDp.Id, FulfilledAtUtc = now });
 
-        _context.Refunds.Add(new Refund
+        // The report reads refund *payments* now, so it is seeded as one. A refund and its payment
+        // are the same identity since the stage-2 migration, which is why the id is shared.
+        _context.Payments.Add(new Payment
         {
             Id = Guid.NewGuid(),
             OrderId = pendingOrder.Id,
-            UserId = userId,
+            Kind = PaymentKind.Refund,
+            Provider = "monobank",
+            ProviderInvoiceId = "inv-1",
+            AmountUah = 1000.00m,
             AmountKopecks = 100000,
-            InvoiceId = "inv-1",
-            ExtRef = "ext-1",
-            Status = RefundStatus.Completed,
-            MonobankStatus = "success",
+            Currency = "UAH",
+            Status = PaymentStatus.Succeeded,
+            PaidAtUtc = now,
             CreatedAtUtc = now,
             UpdatedAtUtc = now
         });
