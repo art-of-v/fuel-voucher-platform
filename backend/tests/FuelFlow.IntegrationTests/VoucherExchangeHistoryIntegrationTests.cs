@@ -299,6 +299,7 @@ private async Task SeedExchangeAsync(
         {
             Id = importId,
             FileName = "history.pdf",
+            CompletedAtUtc = DateTime.UtcNow,
             Status = "Completed",
             StartedAtUtc = atUtc
         });

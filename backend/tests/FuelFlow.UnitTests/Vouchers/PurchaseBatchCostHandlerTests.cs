@@ -84,6 +84,7 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         {
             Id = id,
             FileName = "batch.pdf",
+            CompletedAtUtc = DateTime.UtcNow,
             Status = "Completed",
             StartedAtUtc = DateTime.UtcNow
         });

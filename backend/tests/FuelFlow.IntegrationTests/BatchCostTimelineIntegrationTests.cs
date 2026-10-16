@@ -215,6 +215,7 @@ public sealed class BatchCostTimelineIntegrationTests : IClassFixture<TestDataba
         {
             Id = importId,
             FileName = "timeline.pdf",
+            CompletedAtUtc = DateTime.UtcNow,
             Status = "Completed",
             StartedAtUtc = DateTime.UtcNow
         });
@@ -255,6 +256,7 @@ public sealed class BatchCostTimelineIntegrationTests : IClassFixture<TestDataba
         {
             Id = importId,
             FileName = "other.pdf",
+            CompletedAtUtc = DateTime.UtcNow,
             Status = "Completed",
             StartedAtUtc = DateTime.UtcNow
         });
