@@ -9,7 +9,12 @@ public sealed class AppVersionOptions
     /// fallback the endpoint serves - two literals in two places drift apart silently, and the
     /// drifted copy is the one nobody reads.
     /// </summary>
-    public const string DefaultMinimumVersion = "1.0.1";
+    /// <remarks>
+    /// Bumped to 1.1.0 on 2026-10-16, once 1.1.0 was live in the App Store. It tracks the real floor,
+    /// not the one the project would like: a fallback below the configured floor is a silent
+    /// downgrade for any deployment that drops the <c>AppVersion</c> section.
+    /// </remarks>
+    public const string DefaultMinimumVersion = "1.1.0";
 
     /// <summary>
     /// Hard floor, not a suggestion. <c>mobile/app/_layout.tsx</c> reads <c>/api/app-version</c> on
@@ -32,8 +37,8 @@ public sealed class AppVersionOptions
     ///
     /// <para>
     /// The other direction - high enough that a stale build cannot call an endpoint that has been
-    /// deleted - is a real cost of parking it here, and is why 1.1.0 still has to ship.
-    /// <c>AppVersionFloorTests</c> checks the locking-out direction against both
+    /// deleted - is a real cost of parking it here, and is why the floor has to trail a shipped build
+    /// rather than lead it. <c>AppVersionFloorTests</c> checks the locking-out direction against both
     /// <c>mobile/app.json</c> and the version recorded as published in the stores.
     /// </para>
     ///
