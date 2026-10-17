@@ -793,23 +793,18 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
     // === D-13 stage 3: what a voucher_movements row is allowed to say ===
 
     /// <summary>
-    /// A movement names where the voucher came from or where it went, and never both at once, and its
-    /// kind is one of the words this schema understands.
+    /// A movement says a piece of paper changed place, so it names two places and they differ. A row
+    /// that says "from the shelf, to the shelf" is not a movement, and that is the whole of what keeps
+    /// <c>extend</c> out: pushing an expiry out moves no paper, so it is not one.
     /// </summary>
-    /// <remarks>
-    /// <c>distinct_sides</c> is the load-bearing one. It is what makes "extend" unrepresentable in the
-    /// ledger rather than merely discouraged: pushing an expiry out moves no voucher, so
-    /// <c>from = to</c>, so there is no row to write. That is the constraint that made the TARGET_SCHEMA
-    /// draft's <c>renewal_extend</c> kind impossible, and the reason extend belongs in
-    /// <c>voucher_events</c>.
-    /// </remarks>
     [Theory]
-    [InlineData("exchange_out", null, null, false)]     // no side        - ck_voucher_movements_has_a_side
-    [InlineData("exchange_out", true, true, false)]     // from = to       - ck_voucher_movements_distinct_sides
-    [InlineData("renewal_extend", true, true, false)]   // the kind the draft wanted; it cannot exist
-    [InlineData("frozen", true, false, false)]           // unknown word    - ck_voucher_movements_kind
+    [InlineData("issued", "pool", "pool", false)]              // same place - distinct_locations
+    [InlineData("issued", "pool", "warehouse", false)]         // not a place - locations
+    [InlineData("issued", "shelf", "customer", false)]         // not a place - locations
+    [InlineData("redeem", "pool", "customer", false)]         // a state change, not a kind
+    [InlineData("renewal_extend", "pool", "customer", false)] // never was a kind
     public async Task An_Impossible_Voucher_Movement_Is_Refused(
-        string kind, bool hasFrom, bool hasTo, bool _)
+        string kind, string from, string to, bool _)
     {
         await using var context = CreateContext();
         var voucher = NewVoucher(
@@ -821,42 +816,65 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
         {
             Id = Guid.NewGuid(),
             Kind = kind,
-            FromVoucherId = hasFrom ? voucher.Id : null,
-            ToVoucherId = hasTo ? voucher.Id : null,
+            VoucherId = voucher.Id,
+            FromLocation = from,
+            ToLocation = to,
             OccurredAtUtc = DateTime.UtcNow
         });
 
         var act = async () => await context.SaveChangesAsync();
         await act.Should().ThrowAsync<DbUpdateException>(
-            $"kind={kind} from={hasFrom} to={hasTo} is not a movement this schema can describe");
+            $"kind={kind} {from}->{to} is not a movement this schema can describe");
     }
 
+    /// <summary>
+    /// The counterpart, and the reason this shape replaced the last one: a real handover fills in BOTH
+    /// ends. Issuing a ticket to a customer is pool → customer with nothing empty anywhere, which is
+    /// exactly what the previous <c>from_voucher_id</c>/<c>to_voucher_id</c> shape could not say — it
+    /// wrote <c>to_voucher_id = NULL</c> for every one of them.
+    /// </summary>
     [Fact]
-    public async Task A_Deposit_With_No_Predecessor_Is_Allowed()
+    public async Task A_Real_Handover_Needs_No_Empty_Side()
     {
-        // The counterpart, and the reason for from_voucher_id being nullable at all. A voucher
-        // arriving from a supplier PDF has nothing before it, and ImportVouchersCommand creates the
-        // majority of vouchers in this system. Under a NOT NULL here the largest class of movement
-        // would have had no representable row - so this test exists to fail loudly if anyone
-        // "tightens" the column back.
         await using var context = CreateContext();
         var voucher = NewVoucher(
-            "movement-dep-" + Guid.NewGuid().ToString("N")[..6],
-            "movement-dep-qr-" + Guid.NewGuid().ToString("N")[..6]);
+            "movement-out-" + Guid.NewGuid().ToString("N")[..6],
+            "movement-out-qr-" + Guid.NewGuid().ToString("N")[..6]);
 
         context.FuelVouchers.Add(voucher);
         context.VoucherMovements.Add(new VoucherMovement
         {
             Id = Guid.NewGuid(),
-            Kind = VoucherMovementKinds.Deposit,
-            ToVoucherId = voucher.Id,
+            Kind = VoucherMovementKinds.Issued,
+            VoucherId = voucher.Id,
+            FromLocation = VoucherLocations.Pool,
+            ToLocation = VoucherLocations.Customer,
+            AmountUah = 500m,
             OccurredAtUtc = DateTime.UtcNow
         });
 
         await context.SaveChangesAsync();
 
-        (await context.VoucherMovements.CountAsync())
-            .Should().Be(1, "a deposit is the one movement with no predecessor");
+        var saved = await context.VoucherMovements.AsNoTracking().SingleAsync();
+        saved.VoucherId.Should().NotBe(Guid.Empty);
+        saved.FromLocation.Should().Be(VoucherLocations.Pool);
+        saved.ToLocation.Should().Be(VoucherLocations.Customer,
+            "a movement always says where the paper went");
+    }
+
+    /// <summary>
+    /// The second counterpart, and the second reason for the shape: a state change is not a movement.
+    /// Activation, redemption, block, expiry and extension all change what a ticket is and not where it
+    /// is, so they belong in <c>voucher_events</c> and there is deliberately no kind for them. Asserted
+    /// as an exact list because adding one back is the mistake this table was just reshaped to remove,
+    /// and an exact list is what makes that a test failure rather than a review comment.
+    /// </summary>
+    [Fact]
+    public void Every_Kind_Is_A_Real_Change_Of_Place()
+    {
+        VoucherMovementKinds.All.Should().BeEquivalentTo(
+            ["deposit", "issued", "returned", "replace_out",
+             "exchange_out", "exchange_in", "gift", "recall"]);
     }
 
     [Fact]
@@ -873,8 +891,10 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
         context.VoucherMovements.Add(new VoucherMovement
         {
             Id = Guid.NewGuid(),
-            Kind = VoucherMovementKinds.Issuance,
-            ToVoucherId = voucher.Id,
+            Kind = VoucherMovementKinds.Issued,
+            VoucherId = voucher.Id,
+            FromLocation = VoucherLocations.Pool,
+            ToLocation = VoucherLocations.Customer,
             AmountUah = -1m,
             OccurredAtUtc = DateTime.UtcNow
         });

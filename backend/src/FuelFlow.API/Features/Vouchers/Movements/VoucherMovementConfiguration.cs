@@ -7,33 +7,30 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 namespace FuelFlow.Features.Vouchers.Movements;
 
 /// <summary>
-/// D-13. The one append-only ledger <c>voucher_renewal_items</c>, <c>voucher_exchanges</c> and
-/// <c>operator_voucher_renewals</c> were three private copies of.
+/// D-13. The append-only custody log that <c>voucher_renewal_items</c>, <c>voucher_exchanges</c> and
+/// <c>operator_voucher_renewals</c> each kept their own fragment of.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Three decisions here would each have been written the other way by the TARGET_SCHEMA draft, and each
-/// was checked against the shipped schema before being changed.
+/// <b>The shape is <c>voucher_id</c> plus <c>from_location</c> → <c>to_location</c>, and getting there
+/// took two corrections.</b> The first draft of D-13 proposed <c>from_voucher_id NOT NULL</c> and
+/// <c>to_voucher_id</c>, which asks two questions with two columns: which paper moved, and which paper
+/// it became. The second is provenance, not movement, so every genuine handover wrote
+/// <c>to_voucher_id = NULL</c> and put the real destination in <c>order_id</c>. A ledger row whose
+/// second column is always empty is a ledger modelling the wrong thing.
 /// </para>
 /// <para>
-/// <b><c>from_voucher_id</c> is nullable.</b> <c>ImportVouchersCommand</c> creates the majority of
-/// vouchers in this system and a voucher arriving from a supplier PDF has no predecessor, so a
-/// NOT NULL here made the largest class of movement unrepresentable. What is required instead is that
-/// a row names <i>something</i>: <c>ck_voucher_movements_has_a_side</c>.
+/// Fixing it has a consequence worth stating: <c>extend</c> no longer needs a constraint to keep it
+/// out. It moves no paper between places, so it simply is not a movement. Under the old shape it had to
+/// be excluded by refusing <c>from = to</c>, which is a rule about the wrong thing.
 /// </para>
 /// <para>
-/// <b>The voucher foreign keys are RESTRICT; <c>order_id</c> and both actor columns have none.</b> A
-/// voucher that took part in a movement must not be deletable — that is the same rule
-/// <c>voucher_exchanges</c> already follows on both of its voucher sides. But an audit row must not be
-/// the thing that blocks deleting its own subject either, and that is what an FK on <c>order_id</c>
-/// makes it: <c>order_line_items.order_id</c> is RESTRICT, and that already forced
-/// <c>DeletedUnpaidOrderCleanupService</c> to remove its lines before the order. The actor columns
-/// follow §G of TARGET_SCHEMA and the four tables in this schema that already keep them FK-free.
-/// </para>
-/// <para>
-/// <b>The enum is checked, not trusted.</b> Nineteen kinds is a lot of surface for a
-/// <c>varchar(24)</c>, and an unrecognised word arriving here later would silently be a movement
-/// nobody can interpret. The CHECK is what makes the set closed.
+/// <b>The voucher foreign key is RESTRICT</b>: paper that moved must not be deletable out from under
+/// the record that it moved, the same rule <c>voucher_exchanges</c> already follows on both its
+/// voucher sides. <b>order_id</b> and both actor columns carry none — an audit row must not block
+/// deleting its own subject, which is exactly how <c>order_line_items.order_id</c> being RESTRICT
+/// wedged <c>DeletedUnpaidOrderCleanupService</c>. The actor rule is §G of TARGET_SCHEMA, as four
+/// tables in this schema already follow it.
 /// </para>
 /// </remarks>
 internal sealed class VoucherMovementConfiguration : IEntityTypeConfiguration<VoucherMovement>
@@ -50,8 +47,8 @@ internal sealed class VoucherMovementConfiguration : IEntityTypeConfiguration<Vo
         builder.Property(e => e.BatchId)
             .HasColumnName("batch_id");
 
-        // A movement may be part of a settlement or stand alone; it is RESTRICT rather than SetNull
-        // because a movement must stay attributable to the agreement it belonged to.
+        // A movement may be part of a settlement or stand alone; RESTRICT rather than SetNull because a
+        // movement must stay attributable to the agreement it belonged to.
         builder.HasOne<MovementBatch>()
             .WithMany()
             .HasForeignKey(e => e.BatchId)
@@ -62,23 +59,26 @@ internal sealed class VoucherMovementConfiguration : IEntityTypeConfiguration<Vo
             .HasMaxLength(24)
             .IsRequired();
 
-        builder.Property(e => e.FromVoucherId)
-            .HasColumnName("from_voucher_id");
+        builder.Property(e => e.VoucherId)
+            .HasColumnName("voucher_id")
+            .IsRequired();
 
-        builder.Property(e => e.ToVoucherId)
-            .HasColumnName("to_voucher_id");
-
-        // Restrict on the vouchers: paper that moved must not be deletable out from under the record
-        // that it moved, exactly as voucher_exchanges restricts on old_voucher_id and new_voucher_id.
+        // Restrict: paper that moved must not be deletable, exactly as voucher_exchanges restricts on
+        // old_voucher_id and new_voucher_id.
         builder.HasOne<FuelVoucher>()
             .WithMany()
-            .HasForeignKey(e => e.FromVoucherId)
+            .HasForeignKey(e => e.VoucherId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne<FuelVoucher>()
-            .WithMany()
-            .HasForeignKey(e => e.ToVoucherId)
-            .OnDelete(DeleteBehavior.Restrict);
+        builder.Property(e => e.FromLocation)
+            .HasColumnName("from_location")
+            .HasMaxLength(16)
+            .IsRequired();
+
+        builder.Property(e => e.ToLocation)
+            .HasColumnName("to_location")
+            .HasMaxLength(16)
+            .IsRequired();
 
         // No FK on order_id, and no navigations to users or parties. See the remarks.
         builder.Property(e => e.OrderId)
@@ -110,14 +110,10 @@ internal sealed class VoucherMovementConfiguration : IEntityTypeConfiguration<Vo
         builder.Property(e => e.LineItemId)
             .HasColumnName("line_item_id");
 
-        // Every question the operator screen asks is "what happened to THIS voucher", so both sides
-        // are indexed and both are ordered newest-first: a voucher's life is read forwards.
-        builder.HasIndex(e => new { e.FromVoucherId, e.OccurredAtUtc })
-            .HasDatabaseName("ix_voucher_movements_from");
-
-        builder.HasIndex(e => e.ToVoucherId)
-            .HasDatabaseName("ix_voucher_movements_to")
-            .HasFilter("to_voucher_id IS NOT NULL");
+        // The question the operator screen asks is "what happened to THIS voucher", and it reads
+        // forwards through time, so the index carries occurred_at_utc with it.
+        builder.HasIndex(e => new { e.VoucherId, e.OccurredAtUtc })
+            .HasDatabaseName("ix_voucher_movements_voucher");
 
         builder.HasIndex(e => e.BatchId)
             .HasDatabaseName("ix_voucher_movements_batch")
@@ -128,22 +124,26 @@ internal sealed class VoucherMovementConfiguration : IEntityTypeConfiguration<Vo
             .HasDatabaseName("ix_voucher_movements_line")
             .HasFilter("line_item_id IS NOT NULL");
 
+        // Every movement a sale settled, for revenue and refund arithmetic.
+        builder.HasIndex(e => e.OrderId)
+            .HasDatabaseName("ix_voucher_movements_order")
+            .HasFilter("order_id IS NOT NULL");
+
         builder.ToTable(t =>
         {
             t.HasCheckConstraint(
                 "ck_voucher_movements_kind",
                 $"kind IN ({string.Join(",", VoucherMovementKinds.All.Select(k => $"'{k}'"))})");
 
-            // A movement with neither side names nothing and means nothing. This is the check that
-            // replaces the NOT NULL the first draft put on from_voucher_id.
-            t.HasCheckConstraint("ck_voucher_movements_has_a_side",
-                "from_voucher_id IS NOT NULL OR to_voucher_id IS NOT NULL");
+            t.HasCheckConstraint(
+                "ck_voucher_movements_locations",
+                $"from_location IN ({string.Join(",", VoucherLocations.All.Select(k => $"'{k}'"))}) AND to_location IN ({string.Join(",", VoucherLocations.All.Select(k => $"'{k}'"))})");
 
-            // A voucher cannot move to itself. This is also what makes extend unrepresentable here,
-            // which is the point: extending an expiry moves no voucher, and it is a voucher_events
-            // state change instead.
-            t.HasCheckConstraint("ck_voucher_movements_distinct_sides",
-                "from_voucher_id IS DISTINCT FROM to_voucher_id");
+            // The row says a paper moved, so it must say it moved somewhere else. This is what
+            // "extend is not a movement" now means structurally, rather than a rule about vouchers
+            // happening to be the same row on both sides.
+            t.HasCheckConstraint("ck_voucher_movements_distinct_locations",
+                "from_location <> to_location");
 
             // Money in is money in: a negative customer payment is a sign error, not a refund. Refunds
             // are Payments rows (D-10), not negative movements.
