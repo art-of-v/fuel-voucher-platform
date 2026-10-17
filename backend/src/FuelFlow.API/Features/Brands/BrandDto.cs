@@ -73,6 +73,16 @@ public sealed record BrandFuelDto
     /// after. Null in the ordinary case, where every package agrees.
     /// </summary>
     public BrandFuelPriceSpreadDto? PriceSpread { get; init; }
+
+    /// <summary>
+    /// The fuel's own code at the network ("A-95", "DP", "Pulls 95"). Read back so the screen can
+    /// show it; sent to set or clear it. Null on read means the fuel has none.
+    /// </summary>
+    /// <remarks>
+    /// Omitted on an edit leaves it alone; an empty string clears it. That asymmetry is deliberate —
+    /// an edit that repriced a fuel must not silently drop the code a catalogue import matched on.
+    /// </remarks>
+    public string? SupplierCode { get; init; }
 }
 
 /// <summary>What the packages of one fuel actually disagree about, when they disagree.</summary>
@@ -99,6 +109,13 @@ public sealed record CreateFuelRequest
     public bool AllowBelowCost { get; init; }
 
     public List<int> PackageLiters { get; init; } = [];
+
+    /// <summary>
+    /// The fuel's own code at the network ("A-95", "DP", "Pulls 95"). Optional: a fuel can exist
+    /// without one, and two hand-entered fuels at one station must not collide over a value neither
+    /// has. Unique among the live fuels of the same network that do have one.
+    /// </summary>
+    public string? SupplierCode { get; init; }
 
     /// <summary>
     /// Rehearsal flag, propagated to every package created for this fuel. Read back on

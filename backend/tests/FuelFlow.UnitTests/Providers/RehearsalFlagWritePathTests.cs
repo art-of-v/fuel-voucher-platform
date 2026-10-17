@@ -336,6 +336,113 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         result.Should().BeOfType<CreatedAtActionResult>();
     }
 
+    [Fact]
+    public async Task AddingAFuelWhoseCodeIsTaken_IsRefused()
+    {
+        // The other half of a fuel's identity, refused in the same shape as the name. A code identifies
+        // one fuel per network, so two fuels claiming one is what a catalogue import would resolve
+        // arbitrarily - and the database's answer (23505) names neither fuel.
+        await SeedQaFuelAsync();
+        await _context.SaveChangesAsync();
+
+        var existing = await _context.FuelTypes.FirstAsync(f => f.Id == "qa-a95");
+        existing.SupplierCode = "9018";
+        await _context.SaveChangesAsync();
+
+        var result = await _controller.AddFuel(
+            "okko",
+            new CreateFuelRequest
+            {
+                Name = "ДП (code guard test)",
+                SupplierPricePerLiter = 60m,
+                MarginUahPerLiter = 12.34m,
+                PumpPricePerLiter = 92.90m,
+                MinDiscountPerLiter = 4m,
+                IsTestData = true,
+                SupplierCode = "9018"
+            },
+            CancellationToken.None);
+
+        var conflict = result.Should().BeOfType<ConflictObjectResult>().Subject;
+        conflict.Value.Should().NotBeNull("the operator is told which fuel already holds the code");
+
+        (await _context.FuelTypes.CountAsync(f => f.SupplierCode == "9018"))
+            .Should().Be(1, "and no second fuel claims it");
+    }
+
+    [Fact]
+    public void ACodeIsStoredTrimmed_AndAnEmptyOneMeansNone()
+    {
+        // "" and null mean opposite things to a unique index: null is excluded from it, "" is a value.
+        // One rule, on the entity, for every write path.
+        FuelTypeEntity.NormaliseSupplierCode("  A-95 ").Should().Be("A-95");
+        FuelTypeEntity.NormaliseSupplierCode("   ").Should().BeNull();
+        FuelTypeEntity.NormaliseSupplierCode(null).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task RepricingAFuel_LeavesItsCodeAlone()
+    {
+        // An edit is a repricing. A repricing that silently dropped the code would leave a fuel a
+        // catalogue import can no longer match to the network's price sheet - which reads as "we sell
+        // this" on screen and as one we stopped importing on the site.
+        await SeedQaFuelAsync();
+        await _context.SaveChangesAsync();
+
+        var existing = await _context.FuelTypes.FirstAsync(f => f.Id == "qa-a95");
+        existing.SupplierCode = "9018";
+        await _context.SaveChangesAsync();
+
+        await _controller.UpdateFuel(
+            "qa-a95",
+            new BrandFuelDto
+            {
+                Id = "qa-a95",
+                Name = "А95 ЄВРО(QA)",
+                SupplierPricePerLiter = 60m,
+                MarginUahPerLiter = 12.34m,
+                PumpPricePerLiter = 92.90m,
+                MinDiscountPerLiter = 4m,
+                AllowBelowCost = false,
+                IsTestData = true
+                // SupplierCode deliberately absent.
+            },
+            CancellationToken.None);
+
+        var reloaded = await _context.FuelTypes.FirstAsync(f => f.Id == "qa-a95");
+        reloaded.SupplierCode.Should().Be("9018");
+    }
+
+    [Fact]
+    public async Task AnEmptyCode_ClearsIt()
+    {
+        await SeedQaFuelAsync();
+        await _context.SaveChangesAsync();
+
+        var existing = await _context.FuelTypes.FirstAsync(f => f.Id == "qa-a95");
+        existing.SupplierCode = "9018";
+        await _context.SaveChangesAsync();
+
+        await _controller.UpdateFuel(
+            "qa-a95",
+            new BrandFuelDto
+            {
+                Id = "qa-a95",
+                Name = "А95 ЄВРО(QA)",
+                SupplierPricePerLiter = 60m,
+                MarginUahPerLiter = 12.34m,
+                PumpPricePerLiter = 92.90m,
+                MinDiscountPerLiter = 4m,
+                AllowBelowCost = false,
+                IsTestData = true,
+                SupplierCode = ""
+            },
+            CancellationToken.None);
+
+        var reloaded = await _context.FuelTypes.FirstAsync(f => f.Id == "qa-a95");
+        reloaded.SupplierCode.Should().BeNull();
+    }
+
     private async Task SeedQaFuelAsync()
     {
         _context.FuelTypes.Add(new FuelTypeEntity

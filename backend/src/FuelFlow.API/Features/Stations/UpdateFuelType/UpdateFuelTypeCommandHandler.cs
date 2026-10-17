@@ -1,4 +1,5 @@
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Stations.UpdateFuelType;
@@ -17,6 +18,9 @@ public sealed class UpdateFuelTypeCommandHandler
         entity.StationId = command.Updated.StationId;
         entity.BasePrice = command.Updated.BasePrice;
         entity.DiscountPrice = command.Updated.DiscountPrice;
+        // Copied rather than ignored: this endpoint takes the whole entity, and a write path that
+        // silently dropped a field is how a fuel ends up with a name the catalogue import cannot match.
+        entity.SupplierCode = FuelTypeEntity.NormaliseSupplierCode(command.Updated.SupplierCode);
         _context.FuelTypes.Update(entity);
 
         await _context.SaveChangesAsync(ct);

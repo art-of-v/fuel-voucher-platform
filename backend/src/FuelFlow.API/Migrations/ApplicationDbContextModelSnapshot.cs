@@ -3011,6 +3011,10 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("text")
                         .HasColumnName("station_id");
 
+                    b.Property<string>("SupplierCode")
+                        .HasColumnType("text")
+                        .HasColumnName("supplier_code");
+
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at_utc");
@@ -3026,6 +3030,11 @@ namespace FuelFlow.API.Migrations
                         .HasDatabaseName("ux_fuel_types_station_name")
                         .HasFilter("NOT is_deleted");
 
+                    b.HasIndex("StationId", "SupplierCode")
+                        .IsUnique()
+                        .HasDatabaseName("ux_fuel_types_station_supplier_code")
+                        .HasFilter("supplier_code IS NOT NULL AND NOT is_deleted");
+
                     b.ToTable("fuel_types", null, t =>
                         {
                             t.HasCheckConstraint("ck_fuel_types_id_length", "length(id) <= 100");
@@ -3035,6 +3044,8 @@ namespace FuelFlow.API.Migrations
                             t.HasCheckConstraint("ck_fuel_types_prices_non_negative", "base_price >= 0 AND discount_price >= 0");
 
                             t.HasCheckConstraint("ck_fuel_types_station_id_length", "length(station_id) <= 100");
+
+                            t.HasCheckConstraint("ck_fuel_types_supplier_code_length", "supplier_code IS NULL OR length(supplier_code) <= 50");
                         });
 
                     b.HasData(
