@@ -141,9 +141,10 @@ public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDataba
     }
 
     /// <summary>
-    /// The production incident, reduced to its one cause. OKKO renders "ГАЗ" for the LPG grade, the
-    /// catalogue carries a fuel called "ГАЗ", and neither fuel holds a code - so a test that asks "do we
-    /// know this code?" cannot tell the import there is nothing to add.
+    /// The production incident, reduced to its one cause, in the form the grade rule now makes
+    /// impossible: OKKO renders the LPG grade as "ГАЗ" and as a code, the catalogue carries a fuel called
+    /// "ГАЗ" with no code, and a test that asks only "do we know this code?" cannot tell the import
+    /// there is nothing to add.
     /// </summary>
     [Fact]
     public async Task AGradeWeAlreadySellByName_IsNotCreatedASecondTime()
@@ -175,8 +176,7 @@ public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDataba
             1, "and under no circumstances two of them: the second one is what Postgres refused, "
             + "fifteen minutes at a time");
 
-        // A second tick has to be as quiet and as pointless as the first: by now the fuel holds its code,
-        // so nothing matches by name and nothing matches by code either.
+        // A second tick has to be as quiet and as pointless as the first.
         var secondTick = new CollectingLogger();
         using var second = _fixture.Services.CreateScope();
         var again = second.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -187,6 +187,72 @@ public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDataba
 
         (await again.FuelTypes.CountAsync(f => f.StationId == OkkoStationId))
             .Should().Be(2, "a second tick must be as idempotent as the first");
+    }
+
+    /// <summary>
+    /// The duplicate the grade rule exists to prevent, against the index that would let it through:
+    /// "ДП PULLS" already means the diesel the sheet publishes as "Pulls Diesel", and neither carries a
+    /// code on a fresh catalogue. Code-only matching finds nothing and adds "ДП" beside it.
+    /// </summary>
+    [Fact]
+    public async Task AGradeWeAlreadySellUnderAnotherName_IsReportedAndNotDuplicated()
+    {
+        using var scope = _fixture.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await SeedOperatorTypedFuelsAsync(context);
+
+        // Our own spelling of the grade, no code - exactly the state a fresh catalogue is in.
+        context.FuelTypes.Add(new FuelTypeEntity
+        {
+            Id = "prod-pulls-diesel", Name = "ДП PULLS", StationId = OkkoStationId,
+            BasePrice = 105.90m, DiscountPrice = 102.90m,
+            CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow,
+        });
+        await context.SaveChangesAsync();
+        ForgetTrackedEntities(context);
+
+        var sheet = new List<OkkoPumpPrice>
+        {
+            new("SPBT", 45.90m, "ГАЗ"),
+            new("Pulls Diesel", 105.90m, "ДП"),
+        };
+
+        await Sync(context, sheet).SyncPricesAsync();
+        ForgetTrackedEntities(context);
+
+        (await context.FuelTypes.CountAsync(f => f.StationId == OkkoStationId))
+            .Should().Be(3, "'ДП' and 'ДП PULLS' are one grade written two ways, not two fuels");
+
+        (await context.FuelTypes.Select(f => f.Name).ToListAsync())
+            .Should().NotContain("ДП", "and the name the site printed never reaches the catalogue");
+    }
+
+    /// <summary>
+    /// A fuel the catalogue genuinely lacks is still created — the rule is one row per grade, not one row
+    /// per brand — and it is named from the grade, not from the label the site printed.
+    /// </summary>
+    [Fact]
+    public async Task AGradeNobodySells_IsCreatedUnderItsCanonicalName()
+    {
+        using var scope = _fixture.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await SeedOperatorTypedFuelsAsync(context);
+
+        // "100 PULLS" classifies as no grade at all, so it holds nothing and blocks nothing.
+        var sheet = new List<OkkoPumpPrice>
+        {
+            new("Pulls 95", 95.90m, "95 PULLS"),
+        };
+
+        await Sync(context, sheet).SyncPricesAsync();
+        ForgetTrackedEntities(context);
+
+        var created = await context.FuelTypes.SingleAsync(f => f.BrandFuelCode == "Pulls 95");
+        created.Name.Should().Be(
+            "Пульс 95",
+            "'95 PULLS' is a rendering; the code is the identity, and the name follows it");
+
+        (await context.FuelTypes.CountAsync(f => f.StationId == OkkoStationId)).Should().Be(3);
     }
 
     /// <summary>

@@ -56,7 +56,14 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
         _context.ChangeTracker.Clear();
     }
 
-    /// <summary>The shape the scraper returns: the site's code, its price, and its own label for the grade.</summary>
+    /// <summary>
+    /// The shape the scraper returns: the site's code, its price, and its own label for the grade.
+    /// <para>
+    /// The labels are deliberately the awkward ones the brands actually print — "ДП ЄВРО", "Пульс 100" —
+    /// because they are renderings of a grade and not its identity. Nothing here may reach the catalogue
+    /// as a name.
+    /// </para>
+    /// </summary>
     private static readonly OkkoPumpPrice[] PublishedSheet =
     [
         new("A-95", 92.90m, "А-95"),
@@ -73,12 +80,16 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
         var result = await Handler().ApplyAsync(
             new ImportOkkoCatalogueCommand(PublishedSheet, DryRun: false), Guid.Empty, "tester");
 
-        result.Created.Should().Be(2, "A-95 and ДП ЄВРО are grades we sell; jet fuel and AdBlue are not ours");
+        result.Created.Should().Be(2, "A-95 and diesel are grades we sell; jet fuel and AdBlue are not ours");
         result.CreatedFuels.Select(c => c.BrandFuelCode).Should().BeEquivalentTo(["A-95", "DP"]);
 
         var fuel = await _context.FuelTypes.SingleAsync(f => f.BrandFuelCode == "DP");
         fuel.StationId.Should().Be("okko");
-        fuel.Name.Should().Be("ДП ЄВРО", "named the way the brand names it, not the way a code reads");
+        fuel.Name.Should().Be(
+            "ДП",
+            "the name comes from the grade the code identifies, not from the label the brand happened to "
+            + "render — 'ДП ЄВРО' is one diesel spelled for a shelf, and a name that moves with a designer "
+            + "is how '95' ended up beside '100 PULLS'");
         fuel.CreatedAtUtc.Should().NotBe(default);
 
         var offer = await _context.FuelOffers.SingleAsync(o => o.FuelTypeId == fuel.Id);
@@ -234,19 +245,70 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
     }
 
     [Fact]
-    public async Task AGradeWithNoLabel_IsReportedAndNotNamedAfterItsCode()
+    public async Task AGradeWithNoLabel_StillGetsItsCanonicalName()
     {
-        // "DP" on the storefront is a worse name for a customer than the one OKKO prints, so a payload
-        // without labels yields a report rather than a fuel.
+        // The name comes from the grade now, not from the site's label, so a payload that carried no
+        // label is no longer a reason to refuse a grade the brand clearly sells. That used to end in
+        // "reported and nothing created", which meant a missing field on their side silently removed a
+        // fuel from our catalogue.
         await SeedStationAsync();
 
         var result = await Handler().ApplyAsync(
             new ImportOkkoCatalogueCommand([new OkkoPumpPrice("DP", 99.90m)], DryRun: false), Guid.Empty, "t");
 
-        result.Created.Should().Be(0);
-        result.UnnamedSiteFuels.Should().BeEquivalentTo(["DP"]);
+        result.Created.Should().Be(1);
+        result.CreatedFuels.Single().Name.Should().Be(
+            "ДП", "the name follows the code, which is the identity; the label was only ever a rendering");
 
-        (await _context.FuelTypes.AnyAsync()).Should().BeFalse();
+        (await _context.FuelTypes.SingleAsync()).BrandFuelCode.Should().Be("DP");
+    }
+
+    [Fact]
+    public async Task AGradeWeAlreadySellUnderOurOwnName_IsReportedAndNeverDuplicated()
+    {
+        // The production incident: matching on the code alone found nothing because nothing carried a
+        // code, and the import added "ДП" beside the "ДП PULLS" that already meant the same diesel.
+        // Grade is the identity, so the second row is impossible by construction.
+        await SeedStationAsync();
+        _context.FuelTypes.Add(new FuelTypeEntity
+        {
+            Id = "hand-typed", Name = "ДП PULLS", StationId = "okko", CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+        });
+        await _context.SaveChangesAsync();
+
+        var result = await Handler().ApplyAsync(
+            new ImportOkkoCatalogueCommand([new OkkoPumpPrice("Pulls Diesel", 102.90m, "ДП")], DryRun: false),
+            Guid.Empty, "t");
+
+        result.Created.Should().Be(0);
+        result.GradesHeld.Should().ContainSingle();
+        result.GradesHeld[0].SiteFuelCode.Should().Be("Pulls Diesel");
+        result.GradesHeld[0].OurFuelName.Should().Be("ДП PULLS");
+
+        (await _context.FuelTypes.Select(f => f.Name).ToListAsync())
+            .Should().BeEquivalentTo(["ДП PULLS"], "one row per grade, whatever either side calls it");
+    }
+
+    [Fact]
+    public async Task ASecondSpellingOfOneGrade_IsTheSameFuel_NotANewRow()
+    {
+        // "ДП" and "DP" are one diesel written two ways. Our own catalogue holds both spellings, and the
+        // site alternates between them, so a code check alone would keep adding rows forever.
+        await SeedStationAsync();
+        _context.FuelTypes.Add(new FuelTypeEntity
+        {
+            Id = "latin-diesel", Name = "DP", StationId = "okko",
+            BrandFuelCode = "DP", CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow,
+        });
+        await _context.SaveChangesAsync();
+
+        var result = await Handler().ApplyAsync(
+            new ImportOkkoCatalogueCommand([new OkkoPumpPrice("DP", 99.90m, "ДП ЄВРО")], DryRun: false),
+            Guid.Empty, "t");
+
+        result.Created.Should().Be(0);
+        (await _context.FuelTypes.CountAsync()).Should().Be(1);
     }
 
     [Fact]
@@ -259,7 +321,7 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
 
         result.DryRun.Should().BeTrue();
         result.Created.Should().Be(2, "the preview is the same answer without the writes");
-        result.CreatedFuels.Select(c => c.Name).Should().BeEquivalentTo(["А-95", "ДП ЄВРО"]);
+        result.CreatedFuels.Select(c => c.Name).Should().BeEquivalentTo(["А-95", "ДП"]);
 
         (await _context.FuelTypes.AnyAsync()).Should().BeFalse();
         (await _context.FuelOffers.AnyAsync()).Should().BeFalse();

@@ -101,12 +101,35 @@ public sealed class OkkoPriceSyncService
                     catalogue.Created, string.Join(", ", catalogue.CreatedFuels.Select(f => $"{f.Name} [{f.BrandFuelCode}]")));
             }
 
-            if (catalogue.UnnamedSiteFuels.Count > 0)
+            if (catalogue.GradesHeld.Count > 0)
             {
+                // Information, not Warning: "the sheet calls it X, we call it Y" is a fact about the two
+                // vocabularies, and it is the only thing that can give the operator the brand's code.
+                _logger.LogInformation(
+                    "OKKO publishes {Count} grade(s) we already sell under our own name: {Grades}. "
+                    + "Nothing was created - one row per grade, whatever it is called. Giving our fuel the "
+                    + "brand's code is what makes it resolve exactly.",
+                    catalogue.GradesHeld.Count,
+                    string.Join(" | ", catalogue.GradesHeld.Select(g => $"{g.SiteFuelCode} = \"{g.OurFuelName}\"")));
+            }
+
+            if (catalogue.NameCollisions.Count > 0)
+            {
+                // Warning: this one needs a human to rename something, and nothing will resolve it.
                 _logger.LogWarning(
-                    "OKKO published {Count} grade(s) we recognise but could not name, because the "
-                    + "payload carried no label: {Codes}. Nothing was created for them.",
-                    catalogue.UnnamedSiteFuels.Count, string.Join(", ", catalogue.UnnamedSiteFuels));
+                    "OKKO publishes {Count} grade(s) whose canonical name is already taken by a fuel of "
+                    + "another grade: {Collisions}. Nothing was created; one of the two has to be renamed.",
+                    catalogue.NameCollisions.Count,
+                    string.Join(" | ", catalogue.NameCollisions.Select(c => $"{c.SiteFuelCode} wants \"{c.Name}\"")));
+            }
+
+            if (catalogue.UnclassifiedSiteFuels.Count > 0)
+            {
+                _logger.LogInformation(
+                    "OKKO published {Count} product(s) we do not sell as a grade (jet fuel, AdBlue): "
+                    + "{Codes}. Nothing was created for them.",
+                    catalogue.UnclassifiedSiteFuels.Count,
+                    string.Join(", ", catalogue.UnclassifiedSiteFuels));
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
