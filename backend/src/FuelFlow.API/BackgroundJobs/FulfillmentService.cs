@@ -272,8 +272,15 @@ if (!fullyAttributed && fulfillments.Count > 0)
                             // is the record that a delivery happened; the correction is the fact that
                             // it was undone, and both are true at once. Deleting it destroyed the
                             // only evidence, in the same statement that took the fuel away.
-                            fulfillment.ReleasedAtUtc = DateTime.UtcNow;
+                            var releasedAtUtc = DateTime.UtcNow;
+                            fulfillment.ReleasedAtUtc = releasedAtUtc;
                             fulfillment.ReleaseReason = "quantity_mismatch";
+
+                            // Read before the flip: the candidate set is not status-filtered here, so
+                            // the voucher may be Assigned, Used or anything else a fulfilment row can
+                            // still point at, and the history has to say which one it was rather than
+                            // asserting a single one.
+                            var fromStatus = voucher.Status;
 
                             voucher.Status = VoucherStatus.Available;
                             voucher.AssignedToUserId = null;
@@ -284,9 +291,51 @@ if (!fullyAttributed && fulfillments.Count > 0)
                             // otherwise a stock voucher that still claims an order would show up as
                             // delivered in that order's history.
                             voucher.OrderId = null;
-                            voucher.UpdatedAtUtc = DateTime.UtcNow;
+                            voucher.UpdatedAtUtc = releasedAtUtc;
                             _context.Fulfillments.Update(fulfillment);
                             _context.FuelVouchers.Update(voucher);
+
+                            // D-13, and the reason `order_id = null` above is the tell: this is CUSTODY,
+                            // not just state. The paper goes back from a customer into the warehouse, so
+                            // it owes a `returned` movement as well as the status change. One row for
+                            // either alone would lose half of what happened.
+                            //
+                            // `system`, not `user`: a nightly reconciliation found the mismatch, nobody
+                            // pressed anything. The customer is the voucher_id on the movement, not its
+                            // author — attributing a scheduler's correction to them would be a different
+                            // falsehood.
+                            if (fromStatus != VoucherStatus.Available)
+                            {
+                                _context.VoucherEvents.Add(new VoucherEvent
+                                {
+                                    Id = Guid.CreateVersion7(),
+                                    VoucherId = voucher.Id,
+                                    EventType = VoucherEventTypes.StatusChanged,
+                                    FromStatus = fromStatus.ToString(),
+                                    ToStatus = nameof(VoucherStatus.Available),
+                                    // The order is the reason this happened, and it is the causal link a
+                                    // reader needs: "which order gave back fuel, and when".
+                                    ExternalRef = currentOrder.Id.ToString(),
+                                    ActorKind = VoucherActorKinds.System,
+                                    ActorUserId = null,
+                                    OccurredAtUtc = releasedAtUtc
+                                });
+                            }
+
+                            _context.VoucherMovements.Add(new VoucherMovement
+                            {
+                                Id = Guid.CreateVersion7(),
+                                Kind = VoucherMovementKinds.Returned,
+                                VoucherId = voucher.Id,
+                                FromLocation = VoucherLocations.Customer,
+                                ToLocation = VoucherLocations.Pool,
+                                OrderId = currentOrder.Id,
+                                ActorKind = VoucherActorKinds.System,
+                                ActorUserId = null,
+                                // The customer-side order line is what the litres were compared against.
+                                LineItemId = fulfillment.LineItemId,
+                                OccurredAtUtc = releasedAtUtc
+                            });
 
                             _logger.LogInformation(
                                 "Released fulfillment {FulfillmentId} for voucher {VoucherId} ({Liters}L) from order {OrderId} - the record is kept, the voucher is back in stock",
