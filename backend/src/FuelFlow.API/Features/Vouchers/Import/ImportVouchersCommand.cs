@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using FuelFlow.API.BackgroundJobs;
 using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.SharedKernel.Observability;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
@@ -13,7 +14,14 @@ namespace FuelFlow.Features.Vouchers.Import;
 /// and the vouchers it creates have to be settled with that supplier — the brand printed on them cannot
 /// tell us who issued them.
 /// </summary>
-public sealed record ImportVouchersCommand(Stream PdfStream, string FileName, Guid SupplierId);
+/// <param name="ActingUserId">
+/// Who ran the import. It was not passed before D-13, and the omission was invisible while the only
+/// record of an import was the file-level <c>voucher_imports</c> row - which is not the question the
+/// ledger answers. A deposit that cannot say who took delivery of the paper cannot be the start of a
+/// voucher's life story, and an import is the start of most of them.
+/// </param>
+public sealed record ImportVouchersCommand(
+    Stream PdfStream, string FileName, Guid SupplierId, Guid ActingUserId);
 
 // One rejected row, surfaced inline in the import result so staff see WHY a row failed
 // (not just a count). Reason is the same human-readable message persisted to
@@ -481,6 +489,30 @@ public sealed class ImportVouchersCommandHandler
                         }
 
                         _context.FuelVouchers.Add(voucher);
+
+                        // D-13. The voucher's first entry into the world: paper arrived from a supplier
+                        // and is now ours, sitting in the pool. This is the one movement the ledger
+                        // cannot do without - every voucher's life starts here - and it is why
+                        // from_voucher_id could not stay NOT NULL in the first design.
+                        //
+                        // No batch_id: an import is a delivery, not a settlement, and `bulk_issuance`
+                        // is the other thing - releasing an already-imported batch to its vouchers, which
+                        // is a different event. `fuel_vouchers.import_job_id` already names the import, so
+                        // a second copy here would be a third thing to keep in step.
+                        //
+                        // No event either. A brand-new row has no status to have changed FROM, so there is
+                        // no transition to record; its starting status is the row itself.
+                        _context.VoucherMovements.Add(new VoucherMovement
+                        {
+                            Id = Guid.CreateVersion7(),
+                            Kind = VoucherMovementKinds.Deposit,
+                            VoucherId = voucher.Id,
+                            FromLocation = VoucherLocations.Supplier,
+                            ToLocation = VoucherLocations.Pool,
+                            ActorUserId = request.ActingUserId,
+                            OccurredAtUtc = voucher.CreatedAtUtc
+                        });
+
                         addedNumbers.Add(voucher.VoucherNumber);
                         addedPayloads.Add(voucher.QrPayload);
                         import.ImportedCount++;

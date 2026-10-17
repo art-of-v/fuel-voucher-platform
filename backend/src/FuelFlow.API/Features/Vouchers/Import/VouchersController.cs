@@ -46,6 +46,9 @@ public sealed class VouchersController : ControllerBase
     public async Task<IActionResult> ImportVouchers([FromForm] IFormFile file, [FromForm] Guid supplierId, CancellationToken cancellationToken)
     {
         var adminName = User.FindFirst("first_name")?.Value ?? User.FindFirst(ClaimTypes.Name)?.Value ?? "unknown";
+        // Resolved up front, not after the import: the ledger records who took delivery of this paper,
+        // and `voucher_imports` still has no operator column to fall back on.
+        _ = Guid.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var adminId);
 
         if (file == null || file.Length == 0)
         {
@@ -76,11 +79,11 @@ public sealed class VouchersController : ControllerBase
         try
         {
             using var stream = file.OpenReadStream();
-            var command = new ImportVouchersCommand(stream, file.FileName, supplierId);
+            var command = new ImportVouchersCommand(stream, file.FileName, supplierId, adminId);
             var result = await _importHandler.HandleAsync(command, cancellationToken);
 
-            var adminIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (Guid.TryParse(adminIdClaim, out var adminId))
+            // adminId was resolved at the top of the method, for the import itself.
+            if (adminId != Guid.Empty)
             {
                 await _eventService.RecordEventAsync(
                     "Voucher",

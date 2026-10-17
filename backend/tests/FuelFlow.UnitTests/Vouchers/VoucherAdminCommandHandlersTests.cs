@@ -2,6 +2,7 @@ using FluentAssertions;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Vouchers.BulkActionVouchers;
 using FuelFlow.Features.Vouchers.DeleteVoucher;
 using FuelFlow.Features.Vouchers.GetAdminVoucherById;
@@ -794,6 +795,8 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
     [Fact]
     public async Task ImportVouchers_ShouldImportVouchers_WhenParsedSuccessfully()
     {
+        var adminId = Guid.NewGuid();
+
         var voucherNumber = "OKKO-2026-0001";
         var parsed = CreateParsedVoucher(voucherNumber, $"{voucherNumber}|qrpayload");
         var pageRender = CreatePageRender();
@@ -820,7 +823,7 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
             pdfRendererMock.Object, detectorMock.Object, qrDecoderMock.Object, new[] { parserMock.Object });
 
         var supplierId = await SeedSupplierAsync();
-        var response = await handler.HandleAsync(new ImportVouchersCommand(new MemoryStream(), "vouchers.pdf", supplierId), CancellationToken.None);
+        var response = await handler.HandleAsync(new ImportVouchersCommand(new MemoryStream(), "vouchers.pdf", supplierId, adminId), CancellationToken.None);
 
         response.Imported.Should().Be(1);
         response.Failed.Should().Be(0);
@@ -832,12 +835,27 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
         saved[0].Status.Should().Be(VoucherStatus.Imported);
         saved[0].ImportJobId.Should().NotBeNull();
 
+        // D-13: the voucher's first entry into the ledger. This is the one movement the table cannot
+        // do without - a voucher's life starts here - and the reason `from_voucher_id` could not stay
+        // NOT NULL in the first design.
+        var deposit = await _context.VoucherMovements.AsNoTracking().SingleAsync();
+        deposit.Kind.Should().Be(VoucherMovementKinds.Deposit);
+        deposit.VoucherId.Should().Be(saved[0].Id);
+        deposit.FromLocation.Should().Be(VoucherLocations.Supplier);
+        deposit.ToLocation.Should().Be(VoucherLocations.Pool);
+        // The actor is the point: `voucher_imports` has no operator column, so without this the ledger
+        // would say a paper arrived without saying who took delivery of it.
+        deposit.ActorUserId.Should().Be(adminId);
+        // An import is a delivery, not a settlement, so there is no batch to point at.
+        deposit.BatchId.Should().BeNull();
+
         _backgroundJobClientMock.Verify(c => c.Create(It.IsAny<Job>(), It.IsAny<IState>()), Times.Once);
     }
 
     [Fact]
     public async Task ImportVouchers_ShouldIncrementFailed_WhenNoParserFound()
     {
+        var adminId = Guid.NewGuid();
         var pageRender = CreatePageRender();
         var region = CreateRegion();
 
@@ -855,7 +873,7 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
             pdfRendererMock.Object, detectorMock.Object, qrDecoderMock.Object, Array.Empty<IVoucherProviderParser>());
 
         var supplierId = await SeedSupplierAsync();
-        var response = await handler.HandleAsync(new ImportVouchersCommand(new MemoryStream(), "vouchers.pdf", supplierId), CancellationToken.None);
+        var response = await handler.HandleAsync(new ImportVouchersCommand(new MemoryStream(), "vouchers.pdf", supplierId, adminId), CancellationToken.None);
 
         response.Imported.Should().Be(0);
         response.Failed.Should().Be(1);
@@ -869,6 +887,7 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
     [Fact]
     public async Task ImportVouchers_ShouldFailImport_WhenDetectionThrows()
     {
+        var adminId = Guid.NewGuid();
         var pageRender = CreatePageRender();
 
         var pdfRendererMock = new Mock<IPdfRenderer>();
@@ -886,7 +905,7 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
 
         var supplierId = await SeedSupplierAsync();
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            handler.HandleAsync(new ImportVouchersCommand(new MemoryStream(), "vouchers.pdf", supplierId), CancellationToken.None));
+            handler.HandleAsync(new ImportVouchersCommand(new MemoryStream(), "vouchers.pdf", supplierId, adminId), CancellationToken.None));
 
         var import = await _context.VoucherImports.SingleAsync();
         import.Status.Should().Be("Failed");
