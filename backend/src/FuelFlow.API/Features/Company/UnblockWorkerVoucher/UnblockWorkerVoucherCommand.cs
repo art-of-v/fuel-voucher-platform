@@ -1,5 +1,8 @@
 using FuelFlow.Features.Company.SharedModels;
 using FuelFlow.Features.Vouchers.SharedModels;
+using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.Events;
+using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Observability;
 using Microsoft.EntityFrameworkCore;
@@ -64,6 +67,14 @@ public sealed class UnblockWorkerVoucherCommandHandler
             return new UnblockWorkerVoucherResult("InvalidState", "Only a worker's blocked voucher can be unblocked.");
         }
 
+        // The thaw and the record of it commit together - see the same note in
+        // BlockWorkerVoucherCommand. Without it a failed SaveChanges leaves an Assigned voucher with
+        // nothing saying who released it.
+        await using var tx = _context.Database.IsRelational()
+            ? await _context.Database.BeginTransactionAsync(cancellationToken)
+            : null;
+
+        var unblockedAtUtc = DateTime.UtcNow;
         var affected = await _context.FuelVouchers
             .Where(v => v.Id == command.VoucherId
                         && v.Status == VoucherStatus.Blocked
@@ -71,12 +82,39 @@ public sealed class UnblockWorkerVoucherCommandHandler
             .ExecuteUpdateAsync(
                 s => s
                     .SetProperty(v => v.Status, VoucherStatus.Assigned)
-                    .SetProperty(v => v.UpdatedAtUtc, DateTime.UtcNow),
+                    .SetProperty(v => v.UpdatedAtUtc, unblockedAtUtc),
                 cancellationToken);
 
         if (affected == 0)
         {
+            if (tx is not null)
+            {
+                await tx.RollbackAsync(cancellationToken);
+            }
+
             return new UnblockWorkerVoucherResult("InvalidState", "Only a worker's blocked voucher can be unblocked.");
+        }
+
+        // D-13. Event only, exactly like the block: an unblock does not move the paper either. The
+        // worker never lost custody, so there is nothing for a movement to say.
+        _context.VoucherEvents.Add(new VoucherEvent
+        {
+            Id = Guid.CreateVersion7(),
+            VoucherId = command.VoucherId,
+            EventType = VoucherEventTypes.StatusChanged,
+            FromStatus = nameof(VoucherStatus.Blocked),
+            ToStatus = nameof(VoucherStatus.Assigned),
+            ActorKind = VoucherActorKinds.User,
+            ActorUserId = command.OwnerUserId,
+            ActorPartyId = legalEntityId,
+            OccurredAtUtc = unblockedAtUtc
+        });
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        if (tx is not null)
+        {
+            await tx.CommitAsync(cancellationToken);
         }
 
         _metrics.VoucherUnblocked();
