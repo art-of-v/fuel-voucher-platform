@@ -1,6 +1,7 @@
 using System.Text.Json;
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers.BulkActionVouchers;
+using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Vouchers.PurchaseBatchCost;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
@@ -240,7 +241,6 @@ public sealed class ConfirmVoucherExchangeCommandHandler
             if (blended is { } b)
             {
                 repriced = await _recalculator.RepriceAsync(fuel, b, command.ActingUserId, ct);
-                await _context.SaveChangesAsync(ct);
             }
 
             blendedByFuel.Add(new ExchangeFuelBlended(fuel, blended));
@@ -304,6 +304,60 @@ public sealed class ConfirmVoucherExchangeCommandHandler
             });
         }
 
+        // D-13. The custody half of the same settlement: one movement per piece of paper that changed
+        // hands, all carrying the batch id, so an exchange is one settlement with a direction per
+        // voucher rather than a per-pair row that has to be re-joined to say who moved.
+        //
+        // Iterating `olds` and `news` rather than `pairing.Pairs` is deliberate: custody is a fact about
+        // a voucher, and an old can legitimately come back with no replacement. Pairing is about which
+        // replacement matched which retirement, which is a different question and already has a table.
+        //
+        // The gate here is the transaction, not a rows-affected count. `tx.CommitAsync` runs only on the
+        // path below, so every early `Fail(...)` returns without committing and the movements roll back
+        // with the exchange they describe. That is a stronger guarantee than the CAS gates the renewal
+        // writers needed, and it is why nothing here is conditional.
+        foreach (var old in olds)
+        {
+            _context.VoucherMovements.Add(new VoucherMovement
+            {
+                Id = Guid.CreateVersion7(),
+                BatchId = batchId,
+                Kind = VoucherMovementKinds.ExchangeOut,
+                VoucherId = old.Id,
+                FromLocation = VoucherLocations.Pool,
+                ToLocation = VoucherLocations.Supplier,
+                ActorUserId = command.ActingUserId,
+                OccurredAtUtc = now
+            });
+        }
+
+        foreach (var newVoucher in news)
+        {
+            _context.VoucherMovements.Add(new VoucherMovement
+            {
+                Id = Guid.CreateVersion7(),
+                BatchId = batchId,
+                Kind = VoucherMovementKinds.ExchangeIn,
+                VoucherId = newVoucher.Id,
+                FromLocation = VoucherLocations.Supplier,
+                ToLocation = VoucherLocations.Pool,
+                ActorUserId = command.ActingUserId,
+                OccurredAtUtc = now
+            });
+        }
+
+        // No StatusChanged events here on purpose. The retirement sets Expired on the old vouchers and
+        // the activation sets Available on the new ones, and BOTH of those are the business of the code
+        // that performs them - `BulkActionVouchersCommandHandler` for the activation, and the bulk
+        // archive/loss paths for the rest. Recording a status change from a handler that merely arranged
+        // it is how the same transition ends up written twice, and the second copy is the one nobody
+        // looks at.
+        //
+        // cost_delta_uah is left null too: what the brand charged for the settlement as a whole is
+        // movement_batches.surcharge_uah, and each voucher's own cost is on the voucher. There is no
+        // third number here that is not one of those two.
+
+        await _context.SaveChangesAsync(ct);
         await _context.SaveChangesAsync(ct);
 
         await _eventService.RecordEventAsync(

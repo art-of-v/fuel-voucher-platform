@@ -3,6 +3,7 @@ using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.BulkActionVouchers;
+using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Vouchers.Exchange;
 using FuelFlow.Features.Vouchers.PurchaseBatchCost;
 using FuelFlow.Features.Vouchers.SharedModels;
@@ -108,6 +109,35 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
         exchanges.Should().OnlyContain(x => x.CostPerLiterApplied == 32m);
         exchanges.Should().OnlyContain(x => x.SurchargeUah == 100m);   // 50 L of the 100 new L
         exchanges.Sum(x => x.SurchargeUah).Should().Be(200m);          // the whole surcharge, once
+
+        // D-13. One movement per piece of paper that changed hands, all under the batch - so an
+        // exchange is one settlement with a direction per voucher, rather than per-pair rows that have
+        // to be re-joined to say which paper went where.
+        var movements = await verify.VoucherMovements.AsNoTracking().ToListAsync();
+        movements.Should().HaveCount(4, "two retired out to the supplier, two received back");
+
+        movements.Should().OnlyContain(m => m.BatchId == result.ExchangeBatchId);
+
+        var outMovements = movements.Where(m => m.Kind == VoucherMovementKinds.ExchangeOut).ToList();
+        outMovements.Should().HaveCount(2);
+        outMovements.Select(m => m.VoucherId).Should().BeEquivalentTo([old1, old2]);
+        outMovements.Should().OnlyContain(m =>
+            m.FromLocation == VoucherLocations.Pool && m.ToLocation == VoucherLocations.Supplier);
+
+        var inMovements = movements.Where(m => m.Kind == VoucherMovementKinds.ExchangeIn).ToList();
+        inMovements.Should().HaveCount(2);
+        inMovements.Select(m => m.VoucherId).Should().BeEquivalentTo([new1, new2]);
+        inMovements.Should().OnlyContain(m =>
+            m.FromLocation == VoucherLocations.Supplier && m.ToLocation == VoucherLocations.Pool);
+
+        // The money is NOT copied per voucher: the settlement total is on the batch, and each voucher's
+        // own cost is on the voucher. A third number would be a third thing to reconcile.
+        movements.Should().OnlyContain(m => m.AmountUah == null && m.CostDeltaUah == null);
+
+        // And no status events from here: the retirement and the activation belong to the code that
+        // performs them, not to the handler that arranged them.
+        (await verify.VoucherEvents.AsNoTracking().AnyAsync())
+            .Should().BeFalse("status changes are recorded by whoever performs them, not by the exchange");
 
         var audit = await verify.Set<AuditEventOutbox>().AsNoTracking()
             .Where(e => e.EventType == "VoucherExchanged").ToListAsync();
@@ -490,6 +520,16 @@ public async Task MoreNewThanOld_IsRefused_SoSurplusCannotEnterStockCheaply()
         newV.Status.Should().Be(VoucherStatus.Imported); // never activated
         (await verify.VoucherExchanges.AsNoTracking().AnyAsync()).Should().BeFalse();
         (await verify.PurchaseBatches.AsNoTracking().AnyAsync(b => b.ImportJobId == importId)).Should().BeFalse();
+
+        // D-13. A refused exchange must leave no custody history either. The movements are written in the
+        // same transaction as the batch and the pair rows, and `tx.CommitAsync` runs only on the success
+        // path - so a rejection rolls them back. This is the gate that makes the exchange writers safe,
+        // and it is worth asserting rather than trusting: a movement for a voucher that never went to the
+        // supplier is exactly the kind of false history the ledger exists to prevent.
+        (await verify.VoucherMovements.AsNoTracking().AnyAsync())
+            .Should().BeFalse("a refused exchange must not record that any paper changed hands");
+        (await verify.VoucherEvents.AsNoTracking().AnyAsync())
+            .Should().BeFalse("nor that anything changed state");
     }
 
     [Fact]
