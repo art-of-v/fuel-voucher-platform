@@ -1626,9 +1626,11 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("numeric(14,2)")
                         .HasColumnName("cost_delta_uah");
 
-                    b.Property<Guid?>("FromVoucherId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("from_voucher_id");
+                    b.Property<string>("FromLocation")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("from_location");
 
                     b.Property<string>("Kind")
                         .IsRequired()
@@ -1653,9 +1655,15 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("reason");
 
-                    b.Property<Guid?>("ToVoucherId")
+                    b.Property<string>("ToLocation")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("to_location");
+
+                    b.Property<Guid>("VoucherId")
                         .HasColumnType("uuid")
-                        .HasColumnName("to_voucher_id");
+                        .HasColumnName("voucher_id");
 
                     b.HasKey("Id");
 
@@ -1667,22 +1675,22 @@ namespace FuelFlow.API.Migrations
                         .HasDatabaseName("ix_voucher_movements_line")
                         .HasFilter("line_item_id IS NOT NULL");
 
-                    b.HasIndex("ToVoucherId")
-                        .HasDatabaseName("ix_voucher_movements_to")
-                        .HasFilter("to_voucher_id IS NOT NULL");
+                    b.HasIndex("OrderId")
+                        .HasDatabaseName("ix_voucher_movements_order")
+                        .HasFilter("order_id IS NOT NULL");
 
-                    b.HasIndex("FromVoucherId", "OccurredAtUtc")
-                        .HasDatabaseName("ix_voucher_movements_from");
+                    b.HasIndex("VoucherId", "OccurredAtUtc")
+                        .HasDatabaseName("ix_voucher_movements_voucher");
 
                     b.ToTable("voucher_movements", null, t =>
                         {
                             t.HasCheckConstraint("ck_voucher_movements_amount_non_negative", "amount_uah IS NULL OR amount_uah >= 0");
 
-                            t.HasCheckConstraint("ck_voucher_movements_distinct_sides", "from_voucher_id IS DISTINCT FROM to_voucher_id");
+                            t.HasCheckConstraint("ck_voucher_movements_distinct_locations", "from_location <> to_location");
 
-                            t.HasCheckConstraint("ck_voucher_movements_has_a_side", "from_voucher_id IS NOT NULL OR to_voucher_id IS NOT NULL");
+                            t.HasCheckConstraint("ck_voucher_movements_kind", "kind IN ('deposit','issued','returned','replace_out','exchange_out','exchange_in','gift','recall')");
 
-                            t.HasCheckConstraint("ck_voucher_movements_kind", "kind IN ('deposit','activate','deactivate','archive','unarchive','issuance','redeem','unredeem','exchange_out','exchange_in','replace_out','restock','gift','recall','block','unblock','fire_worker','expire')");
+                            t.HasCheckConstraint("ck_voucher_movements_locations", "from_location IN ('pool','customer','supplier','company','worker') AND to_location IN ('pool','customer','supplier','company','worker')");
                         });
                 });
 
@@ -4056,13 +4064,9 @@ namespace FuelFlow.API.Migrations
 
                     b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", null)
                         .WithMany()
-                        .HasForeignKey("FromVoucherId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", null)
-                        .WithMany()
-                        .HasForeignKey("ToVoucherId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .HasForeignKey("VoucherId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Vouchers.Renewal.Operator.OperatorVoucherRenewal", b =>
