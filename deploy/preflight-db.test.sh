@@ -84,7 +84,17 @@ checked_expected="$(find "$SCRIPT_DIR/preflight-db" -name '*.sql' | wc -l | tr -
 
 out="$(run DOCKER_STUB_RUNNING=1 DOCKER_STUB_ROWS= DOCKER_STUB_STRICT_UNUSED=1)"
 check "a clean database exits 0" "0" "$?"
-contains "the file is reported ok" "010-offer-volume-price-agreement.sql: ok" "$out"
+
+# The file named below must EXIST. It did not: `010-offer-volume-price-agreement.sql` was deleted on
+# 2026-10-17 with its migration, and these three assertions kept naming it, so the deploy preflight
+# went red on the next deploy with 33 passing and 3 failing and no hint that the file was gone.
+# That is the same tripwire as the literal file COUNT two blocks up, in a different costume: a
+# hardcoded name is a claim about the directory that nothing checks.
+#
+# Read from the directory instead, so deleting a precondition cannot leave the test naming a ghost.
+violated_file="$(find "$SCRIPT_DIR/preflight-db" -name '*.sql' | sort | head -1)"
+
+contains "the file is reported ok" "$(basename "$violated_file"): ok" "$out"
 contains "and satisfaction is stated with a count" "all data preconditions satisfied (${checked_expected} checked)" "$out"
 # The regression, stated on its own. psql prints BEGIN, SET and COMMIT to stdout whatever -t -A
 # says, so counting non-empty lines calls those three a violation on a database that is fine — which
@@ -98,7 +108,7 @@ lacks "psql's own chatter is not counted as a violation" "VIOLATED" "$out"
 out="$(run DOCKER_STUB_RUNNING=1 DOCKER_STUB_ROWS='offer-1|klo|ft-1|real|10.00|2.50')"
 check "a violation is a WARNING, not a failure, by default" "0" "$?"
 contains "the violation is named" "VIOLATED" "$out"
-contains "the offending file is named" "010-offer-volume-price-agreement.sql: VIOLATED" "$out"
+contains "the offending file is named" "$(basename "$violated_file"): VIOLATED" "$out"
 contains "the rows are shown, indented under the warning" "offer-1|klo|ft-1|real|10.00|2.50" "$out"
 lacks "and it does not claim the preconditions were satisfied" "all data preconditions satisfied" "$out"
 
@@ -112,7 +122,7 @@ contains "and says why" "PREFLIGHT_DB_STRICT=1" "$out"
 # already prints the name, so a bare "contains <filename>" would pass against the old message that said
 # only "N precondition(s) are violated (details above)" - which is the whole thing being fixed here.
 # Matched on the punctuation the new message produces, so this fails without the change.
-contains "and the failure line names the file to read" "are violated: 010-offer-volume-price-agreement.sql" "$out"
+contains "and the failure line names the file to read" "are violated: $(basename "$violated_file")" "$out"
 # The whole point of testing the order: "Preflight passed" printed before an exit 1 is a
 # contradiction on one screen, and the last line a reader saw is the one they remember.
 lacks "and never prints 'Preflight passed' while failing" "Preflight passed." "$out"
