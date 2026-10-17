@@ -1319,6 +1319,8 @@ namespace FuelFlow.API.Migrations
 
                     b.ToTable("voucher_events", null, t =>
                         {
+                            t.HasCheckConstraint("ck_voucher_events_actor_is_somebody", "actor_user_id IS NULL OR actor_user_id <> '00000000-0000-0000-0000-000000000000'");
+
                             t.HasCheckConstraint("ck_voucher_events_actor_kind", "actor_kind IN ('user','system')");
 
                             t.HasCheckConstraint("ck_voucher_events_actor_named", "(actor_kind = 'user') = (actor_user_id IS NOT NULL)");
@@ -1787,6 +1789,8 @@ namespace FuelFlow.API.Migrations
 
                     b.ToTable("voucher_movements", null, t =>
                         {
+                            t.HasCheckConstraint("ck_voucher_movements_actor_is_somebody", "actor_user_id IS NULL OR actor_user_id <> '00000000-0000-0000-0000-000000000000'");
+
                             t.HasCheckConstraint("ck_voucher_movements_actor_kind", "actor_kind IN ('user','system')");
 
                             t.HasCheckConstraint("ck_voucher_movements_actor_named", "(actor_kind = 'user') = (actor_user_id IS NOT NULL)");

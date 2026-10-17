@@ -894,9 +894,75 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
         VoucherActorKinds.All.Should().BeEquivalentTo(["user", "system"]);
     }
 
+    /// <summary>
+    /// The zero GUID is the value a missing claim actually becomes, not a hypothetical:
+    /// <c>AdminVoucherController.GetUserId</c> returns <c>Guid.Empty</c> rather than null. Being NOT
+    /// NULL it satisfies the pairing constraint on its own, so this is the one way to name a user who
+    /// does not exist — and the test that lets the author rule keep its promise.
+    /// </summary>
+    [Fact]
+    public async Task An_Author_Id_That_Names_Nobody_Is_Refused()
+    {
+        await using var context = CreateContext();
+        var voucher = NewVoucher(
+            "nobody-v-" + Guid.NewGuid().ToString("N")[..6],
+            "nobody-v-qr-" + Guid.NewGuid().ToString("N")[..6]);
+
+        context.FuelVouchers.Add(voucher);
+        context.VoucherMovements.Add(new VoucherMovement
+        {
+            Id = Guid.NewGuid(),
+            Kind = VoucherMovementKinds.Issued,
+            VoucherId = voucher.Id,
+            FromLocation = VoucherLocations.Pool,
+            ToLocation = VoucherLocations.Customer,
+            ActorKind = VoucherActorKinds.User,
+            ActorUserId = Guid.Empty,
+            OccurredAtUtc = DateTime.UtcNow
+        });
+
+        var act = async () => await context.SaveChangesAsync();
+
+        // 23514 is Postgres's check_violation.
+        var violation = await act.Should().ThrowAsync<DbUpdateException>();
+        violation.Which.InnerException.Should().BeOfType<Npgsql.PostgresException>()
+            .Which.SqlState.Should().Be("23514");
+    }
+
+    /// <summary>
+    /// The other half of the same rule, and the only author a scheduler can honestly have.
+    /// </summary>
+    [Fact]
+    public async Task The_Scheduler_May_Have_No_Id_At_All()
+    {
+        await using var context = CreateContext();
+        var voucher = NewVoucher(
+            "sched-v-" + Guid.NewGuid().ToString("N")[..6],
+            "sched-v-qr-" + Guid.NewGuid().ToString("N")[..6]);
+
+        context.FuelVouchers.Add(voucher);
+        context.VoucherMovements.Add(new VoucherMovement
+        {
+            Id = Guid.NewGuid(),
+            Kind = VoucherMovementKinds.Issued,
+            VoucherId = voucher.Id,
+            FromLocation = VoucherLocations.Pool,
+            ToLocation = VoucherLocations.Customer,
+            ActorKind = VoucherActorKinds.System,
+            ActorUserId = null,
+            OccurredAtUtc = DateTime.UtcNow
+        });
+
+        var act = async () => await context.SaveChangesAsync();
+
+        // NULL is the one thing a scheduler is allowed to have, and the whole reason the pairing
+        // constraint is written `(kind = 'user') = (id IS NOT NULL)` rather than "id is required".
+        await act.Should().NotThrowAsync();
+    }
+
     [Theory]
-    [InlineData("user", true, false)]     // a person, named          - allowed
-    [InlineData("system", false, false)] // the scheduler            - allowed
+    [InlineData("user", true, false)]     // a person, named            - allowed
+    [InlineData("system", false, false)] // the scheduler              - allowed
     [InlineData("user", false, true)]    // says "a person", names none - refused
     [InlineData("system", true, true)]   // the scheduler with an id  - refused
     [InlineData("robot", true, true)]    // not a kind at all          - refused
