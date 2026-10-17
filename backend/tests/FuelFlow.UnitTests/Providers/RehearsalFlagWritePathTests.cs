@@ -1,4 +1,5 @@
 using FuelFlow.Features.Brands.GetFuelPriceHistory;
+using FuelFlow.Features.Brands.GetFuelPriceAt;
 using FuelFlow.Features.Pricing;
 using System.Net;
 using System.Security.Claims;
@@ -52,6 +53,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
             new GetBrandByIdQueryHandler(_context),
             new GetBrandHistoryQueryHandler(_context),
             new GetFuelPriceHistoryQueryHandler(_context),
+            new GetFuelPriceAtQueryHandler(_context),
             new AuditEventService(_context),
             _context,
             NotificationDispatcher.Disabled,
