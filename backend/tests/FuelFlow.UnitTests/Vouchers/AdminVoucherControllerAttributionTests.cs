@@ -6,6 +6,7 @@ using FuelFlow.Features.Vouchers.BulkActionVouchers;
 using FuelFlow.Features.Vouchers.DeleteVoucher;
 using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.GetAdminVoucherById;
+using FuelFlow.Features.Vouchers.GetAdminVoucherLifecycle;
 using FuelFlow.Features.Vouchers.GetAdminVouchers;
 using FuelFlow.Features.Vouchers.GetVoucherVerification;
 using FuelFlow.Features.Vouchers.Import;
@@ -68,7 +69,8 @@ public sealed class AdminVoucherControllerAttributionTests : IDisposable
             new UpdateVoucherCommandHandler(_context, _eventService),
             new DeleteVoucherCommandHandler(_context, _eventService),
             new BulkActionVouchersCommandHandler(_context, _jobs.Object, _eventService),
-            new UnarchiveVoucherCommandHandler(_context, _eventService))
+            new UnarchiveVoucherCommandHandler(_context, _eventService),
+            new GetAdminVoucherLifecycleQueryHandler(_context))
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = user } }
         };
