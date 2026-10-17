@@ -58,6 +58,13 @@ public sealed class DataKindBackfillTests : IClassFixture<TestDatabaseFixture>
             // SeedData.FuelPackages. These are exactly the rows the scaffolded migration would have
             // left sitting on ''.
             //
+            // 'okko-0001-bk95' rather than 'okko-95': the offer key is now the fuel type id alone
+            // (DropTheStationPrefixFromOfferKeys), so an offer for 'okko-95' at a second station
+            // beside the seeded one is no longer representable - and this test rolls the schema BACK
+            // and forward, so it walks through that migration and would hit its collision guard. The
+            // station/fuel pair is invented either way, and inventing one that survives the re-key is
+            // what this line is about.
+            //
             // Parameters are unquoted on purpose - a placeholder inside '' stays a string literal
             // and the cast to uuid fails with 22P02 on the parameter itself.
 #pragma warning disable EF1002 // identifiers and values, not SQL fragments; all from this file
@@ -79,8 +86,8 @@ public sealed class DataKindBackfillTests : IClassFixture<TestDatabaseFixture>
                                            original_price, created_at_utc, updated_at_utc,
                                            is_test_data, is_deleted)
                 VALUES
-                  ({0}, 'okko-0001', 'okko-95', '95 (QA)', 10, 100, 120, now(), now(), true, false),
-                  ({1}, 'okko-0001', 'okko-95', '95', 20, 500, 520, now(), now(), false, false)
+                  ({0}, 'okko-0001', 'okko-0001-bk95', '95 (QA)', 10, 100, 120, now(), now(), true, false),
+                  ({1}, 'okko-0001', 'okko-0001-bk95', '95', 20, 500, 520, now(), now(), false, false)
                 """, qaPackage, realPackage);
 #pragma warning restore EF1002
         });

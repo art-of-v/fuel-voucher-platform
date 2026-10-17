@@ -58,12 +58,30 @@ deliberately left alone would put a permanent warning on the deploy path.
 The tests are `OfferVolumePriceAgreementTests`, and they read this file from disk rather than
 repeating its SQL — so the two cannot drift apart.
 
+## The files
+
+| File | Asks | Blocks |
+|---|---|---|
+| `010-offer-volume-price-agreement.sql` | Does any live volume's total disagree with its offer's rate, and by how much in UAH | yes |
+| `011-fuel-type-name-twins.sql` | Does any station have more than one **live** fuel row under one name | yes |
+| `012-offer-station-matches-its-fuel-type.sql` | Does any offer name a station its own fuel type does not | no — a question, not a gate (see its header) |
+
+`010` and `011` are preconditions their migrations refuse on: a failed deploy with the refusal on the
+box, versus thirty seconds and a list of rows to reconcile. `012` is different — it cannot be a
+precondition, because no constraint can span two tables, and it guards a state that is legal until
+proved otherwise. Both new files exist because `DropTheStationPrefixFromOfferKeys` (2026-10-17) keys an
+offer by its fuel type id alone: one live fuel per name per station is what makes the name identify a
+fuel, and an offer's station has to be its fuel type's for that key to mean anything.
+
 ## Adding a file
 
 - Name it `NNN-what-it-checks.sql`, numbered so output reads in a fixed order.
 - Do not write to a table, and do not `DO $$ ... RAISE`.
 - State in the header what the previous failure looked like, so the check earns its place by
   referring to a real outage rather than a hypothetical.
+- Wrap it in `BEGIN; / SET TRANSACTION READ ONLY; / COMMIT;`, and add a row to `PreflightDbFileTests`
+  — that test walks the directory and fails if a file ships without a case, so a new check cannot
+  arrive without the read-only guarantee the whole directory runs on.
 
 ## Wiring
 

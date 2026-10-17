@@ -216,6 +216,31 @@ public sealed class BrandsController : ControllerBase
         var station = await _context.Stations.FirstOrDefaultAsync(s => s.Id == id, ct);
         if (station is null) return NotFound();
 
+        // One fuel type per name per station, refused rather than accepted as a second row. This fuel
+        // id is generated here, so nothing about the write collides on a duplicate the way it did when
+        // the id was the brand-encoded 'okko-95' - and a twin is not a cosmetic duplicate: it becomes a
+        // second offer, the storefront lists one fuel at two prices, and the voucher importer resolves
+        // the fuel by name with FirstOrDefault (OkkoFuelClassifier/WogFuelClassifier), so the twin
+        // without the imported pump price is the one a real voucher can land on. The database refuses
+        // the same thing with ux_fuel_types_station_name; this says which fuel already owns the name.
+        var duplicate = await _context.FuelTypes
+            .Where(f => f.StationId == id && f.Name == request.Name)
+            .Select(f => f.Id)
+            .FirstOrDefaultAsync(ct);
+
+        if (duplicate is not null)
+        {
+            return Conflict(new
+            {
+                message = $"'{request.Name}' already exists at {station.Name}. Price it with PUT "
+                          + $"fuels/{duplicate} instead of adding it twice: a second row for the same "
+                          + "fuel is a second offer, and a voucher can then be priced against whichever "
+                          + "of the two the importer happens to pick.",
+                fuelTypeId = duplicate,
+                field = nameof(request.Name)
+            });
+        }
+
         if (!request.IsTestData.Value)
         {
             var token = RehearsalMarkers.MatchedToken(null, request.Name);
@@ -290,7 +315,7 @@ public sealed class BrandsController : ControllerBase
         var pool = DataKinds.ForPool(request.IsTestData.Value);
         var offer = new FuelOffer
         {
-            Id = OfferKeys.For(id, fuel.Id, pool),
+            Id = OfferKeys.For(fuel.Id, pool),
             StationId = id,
             FuelTypeId = fuel.Id,
             SupplierPricePerLiter = request.SupplierPricePerLiter,
@@ -401,7 +426,7 @@ public sealed class BrandsController : ControllerBase
         // base = pump/reference (колонка) when known, else legacy final + min discount.
         var baseUahPerLiter = request.PumpPricePerLiter ?? (finalPerLiter + request.MinDiscountPerLiter);
 
-        var offerId = OfferKeys.For(fuel.StationId, fuel.Id, pool);
+        var offerId = OfferKeys.For(fuel.Id, pool);
         var offer = await _context.FuelOffers.FirstOrDefaultAsync(o => o.Id == offerId, ct);
 
         // Flipping isTestData is not an update any more, and pretending otherwise is the bug this shape
@@ -410,7 +435,7 @@ public sealed class BrandsController : ControllerBase
         // different rows rather than one row with a flag. Moving a fuel from real to rehearsal
         // therefore means moving its volumes onto the rehearsal offer and archiving the real one.
         var otherPool = pool == DataKinds.Real ? DataKinds.Qa : DataKinds.Real;
-        var otherOfferId = OfferKeys.For(fuel.StationId, fuel.Id, otherPool);
+        var otherOfferId = OfferKeys.For(fuel.Id, otherPool);
         var otherOffer = await _context.FuelOffers.FirstOrDefaultAsync(o => o.Id == otherOfferId, ct);
 
         if (offer is null)

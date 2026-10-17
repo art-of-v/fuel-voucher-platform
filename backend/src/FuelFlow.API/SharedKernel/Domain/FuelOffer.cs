@@ -38,17 +38,18 @@ namespace FuelFlow.SharedKernel.Domain;
 public sealed class FuelOffer
 {
     /// <summary>
-    /// Natural key, derived from <c>(station_id, fuel_type_id, data_kind)</c> by the migration and by
-    /// <see cref="OfferKeys"/>. Composed of three bounded text columns rather than one short
-    /// identifier, so it carries its own uniqueness: the bound is 200, not the 100 the single-column
-    /// keys use.
+    /// Key of the offer: its <see cref="FuelTypeId"/>, with <c>-qa</c> appended for the rehearsal
+    /// pool, derived by <see cref="OfferKeys"/>. The station is deliberately not spelled out — a fuel
+    /// type belongs to exactly one station, so its id already determines it, and writing both produced
+    /// <c>okko-okko-95</c>. Bounded by CHECK at 103 rather than at the 100 the single-column keys use.
     /// </summary>
     public string Id { get; set; } = null!;
 
     /// <summary>
-    /// The network selling it. Mirrors <c>fuel_types.station_id</c> today, and is carried
-    /// separately because the storefront groups and resolves on the pair — a fuel type that a
-    /// supplier lists under two networks must be able to say so.
+    /// The network selling it. Mirrors <c>fuel_types.station_id</c> — which is what lets the id above
+    /// omit it — and is carried separately because the storefront groups and resolves on the pair: a
+    /// fuel type that a supplier lists under two networks must be able to say so.
+    /// <c>deploy/preflight-db/012</c> reports the case where the two disagree.
     /// </summary>
     public string StationId { get; set; } = null!;
 

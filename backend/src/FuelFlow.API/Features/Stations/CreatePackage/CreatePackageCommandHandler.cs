@@ -21,7 +21,7 @@ public sealed class CreatePackageCommandHandler
             return new CreatePackageResult { Conflict = true, Error = $"Package with id '{command.Package.Id}' already exists" };
 
         var pool = DataKinds.ForPool(command.Package.IsTestData);
-        var offerId = OfferKeys.For(command.Package.StationId, command.Package.FuelTypeId, pool);
+        var offerId = OfferKeys.For(command.Package.FuelTypeId, pool);
 
         // One supplier price per fuel, per pool. Every other write path copies the cost off the
         // existing offer (BrandsController seeds, prices and station creation), so this endpoint is the

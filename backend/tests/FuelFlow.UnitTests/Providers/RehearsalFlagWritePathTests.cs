@@ -236,6 +236,106 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
             "a false positive here would block a real product from being published");
     }
 
+    /// <summary>
+    /// The guard a natural fuel id used to give for free. The id is generated now
+    /// (<c>Guid.CreateVersion7</c>), so a second 'А95 ЄВРО' at OKKO no longer collides on the primary
+    /// key — and it must not be allowed to land as a second row.
+    /// <para>
+    /// What a twin costs: two offers for one fuel, one fuel listed twice on the storefront at two
+    /// prices, and <c>OkkoFuelClassifier</c> resolving a parsed voucher by name with
+    /// <c>FirstOrDefault</c> — so the twin that never received the imported pump price is a landing
+    /// place for a real voucher. The database refuses the same thing with
+    /// <c>ux_fuel_types_station_name</c>; this is the version that can say which fuel already owns the
+    /// name, and it is asserted here on an in-memory context that has no index at all.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task AddingAFuelThatAlreadyExistsAtThatStation_IsRefused()
+    {
+        await SeedQaFuelAsync();
+        await _context.SaveChangesAsync(); // the guard reads the row, not the change tracker
+
+        var result = await _controller.AddFuel(
+            "okko",
+            new CreateFuelRequest
+            {
+                Name = "А95 ЄВРО(QA)",
+                SupplierPricePerLiter = 60m,
+                MarginUahPerLiter = 12.34m,
+                PumpPricePerLiter = 92.90m,
+                MinDiscountPerLiter = 4m,
+                IsTestData = true
+            },
+            CancellationToken.None);
+
+        var conflict = result.Should().BeOfType<ConflictObjectResult>().Subject;
+
+        (await _context.FuelTypes.CountAsync(f => f.StationId == "okko" && f.Name == "А95 ЄВРО(QA)"))
+            .Should().Be(1, "a second row for the same fuel is a second offer the storefront would list twice");
+
+        (await _context.FuelOffers.CountAsync()).Should().Be(1, "and it must not have created one");
+        conflict.Value.Should().NotBeNull("the operator is told which fuel to reprice instead");
+    }
+
+    [Fact]
+    public async Task TheSameFuelNameAtAnotherStation_IsNotADuplicate()
+    {
+        // The uniqueness is per station, deliberately: two networks both listing 'ГАЗ' is the
+        // catalogue working, not a duplicate.
+        await SeedQaFuelAsync();
+
+        _context.Stations.Add(new Station
+        {
+            Id = "wog", Name = "WOG", Color = "#10b981", LogoText = "WOG",
+            CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
+        });
+        await _context.SaveChangesAsync();
+
+        var result = await _controller.AddFuel(
+            "wog",
+            new CreateFuelRequest
+            {
+                Name = "А95 ЄВРО(QA)",
+                SupplierPricePerLiter = 60m,
+                MarginUahPerLiter = 12.34m,
+                PumpPricePerLiter = 92.90m,
+                MinDiscountPerLiter = 4m,
+                IsTestData = true
+            },
+            CancellationToken.None);
+
+        result.Should().BeOfType<CreatedAtActionResult>();
+    }
+
+    [Fact]
+    public async Task AnArchivedFuel_FreesItsNameForAFreshOne()
+    {
+        // The write path's half of the partial index: what the admin screen archives is not a
+        // candidate for "already exists", so a catalogue can be rebuilt under the same names.
+        await SeedQaFuelAsync();
+        await _context.SaveChangesAsync();
+
+        var archived = await _context.FuelTypes.FirstAsync(f => f.Id == "qa-a95");
+        archived.IsDeleted = true;
+        archived.DeletedAtUtc = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        var result = await _controller.AddFuel(
+            "okko",
+            new CreateFuelRequest
+            {
+                Name = "А95 ЄВРО(QA)",
+                SupplierPricePerLiter = 60m,
+                MarginUahPerLiter = 12.34m,
+                PumpPricePerLiter = 92.90m,
+                MinDiscountPerLiter = 4m,
+                IsTestData = true
+            },
+            CancellationToken.None);
+
+        result.Should().BeOfType<CreatedAtActionResult>();
+    }
+
     private async Task SeedQaFuelAsync()
     {
         _context.FuelTypes.Add(new FuelTypeEntity

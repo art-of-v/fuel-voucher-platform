@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -29,17 +30,38 @@ namespace FuelFlow.API.Migrations
     /// this migration's entire purpose is to install the seed, so the seed is the thing it must agree
     /// with.
     /// </para>
-    /// <para>
+/// <para>
     /// <b>Idempotence is the point, not a nicety.</b> Production already carries these offers from
     /// <c>SplitFuelPackagesIntoOffers</c>, at the same keys. A plain INSERT would fail there on the
     /// unique constraint and take the deploy - and the API - down.
     /// </para>
-    /// </remarks>
+/// <para>
+/// <b>Which key it writes, and why it is not the current one.</b> The offers are keyed the way
+    /// <c>SplitFuelPackagesIntoOffers</c> keyed them - <c>station_id || '-' || fuel_type_id</c> - rather
+    /// than through <c>OfferKeys</c>, which on 2026-10-17 stopped prefixing the station. This migration
+    /// runs BEFORE <c>DropTheStationPrefixFromOfferKeys</c>, and on a fresh database the offers it is
+    /// about to insert already exist: the backfill created them from the seeded <c>fuel_packages</c>
+/// rows. Writing today's key would collide on <c>ix_fuel_offers_station_fuel_pool</c> instead of on
+    /// <c>id</c>, and <c>ON CONFLICT (id) DO NOTHING</c> only covers the latter - so a fresh database
+    /// would fail to build, and a second row per fuel would be the alternative. Two migrations stating
+    /// one rule in two shapes is the price of append-only history; the third re-keys both to the current
+    /// one, and this one is not edited again.
+    /// </para>
+/// </remarks>
     public partial class SeedCatalogueAsOffers : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             var (offers, volumes) = SeedData.Catalogue;
+
+            // The key as it stood when this migration shipped: the station, then the fuel, then the pool
+            // suffix. OfferKeys moved on 2026-10-17 and this file deliberately did not - see the class
+            // remark. Keyed through the offer's own columns rather than through offer.Id, so the shape
+            // is stated here where the migration lives instead of being read out of a seed object whose
+            // keys have since changed.
+            var historicalKey = offers.ToDictionary(
+                o => o.Id,
+                o => $"{o.StationId}-{o.FuelTypeId}" + (o.DataKind == DataKinds.Qa ? "-qa" : ""));
 
             foreach (var offer in offers)
             {
@@ -50,7 +72,7 @@ namespace FuelFlow.API.Migrations
                          pump_price_per_liter, min_discount_per_liter, is_deleted, deleted_at_utc,
                          price_updated_at, price_updated_by_user_id, created_at_utc, updated_at_utc)
                     VALUES
-                        ({Quote(offer.Id)}, {Quote(offer.StationId)}, {Quote(offer.FuelTypeId)}, {Quote(offer.DataKind)},
+                        ({Quote(historicalKey[offer.Id])}, {Quote(offer.StationId)}, {Quote(offer.FuelTypeId)}, {Quote(offer.DataKind)},
                          {Num(offer.SupplierPricePerLiter)}, {Num(offer.MarginUahPerLiter)}, {Num(offer.MarginPercent)},
                          {Num(offer.FinalPricePerLiter)}, NULL, NULL, FALSE, NULL, NULL, NULL,
                          {Ts(offer.CreatedAtUtc)}, {Ts(offer.UpdatedAtUtc)})
@@ -65,7 +87,7 @@ namespace FuelFlow.API.Migrations
                         (id, offer_id, liters, package_price, is_deleted, deleted_at_utc,
                          created_at_utc, updated_at_utc)
                     VALUES
-                        ({Quote(volume.Id)}, {Quote(volume.OfferId)}, {Num(volume.Liters)}, {Num(volume.PackagePrice)},
+                        ({Quote(volume.Id)}, {Quote(historicalKey[volume.OfferId])}, {Num(volume.Liters)}, {Num(volume.PackagePrice)},
                          FALSE, NULL, {Ts(volume.CreatedAtUtc)}, {Ts(volume.UpdatedAtUtc)})
                     ON CONFLICT (id) DO NOTHING;
                     """);
@@ -76,14 +98,19 @@ namespace FuelFlow.API.Migrations
         {
             // Only the seed rows are removed, and only ones this migration could have created. Rows
             // belonging to a real catalogue are not identified by anything in this migration, so the
-            // Down does not guess: it removes what its own Up inserts, by key.
+            // Down does not guess: it removes what its own Up inserts, by key - the same keys the Up
+            // inserts them under, which on a database this migration has already run are long gone.
             var (offers, volumes) = SeedData.Catalogue;
+
+            var historicalKey = offers.ToDictionary(
+                o => o.Id,
+                o => $"{o.StationId}-{o.FuelTypeId}" + (o.DataKind == DataKinds.Qa ? "-qa" : ""));
 
             foreach (var volume in volumes.Reverse())
                 migrationBuilder.Sql($"DELETE FROM fuel_offer_volumes WHERE id = {Quote(volume.Id)};");
 
             foreach (var offer in offers.Reverse())
-                migrationBuilder.Sql($"DELETE FROM fuel_offers WHERE id = {Quote(offer.Id)};");
+                migrationBuilder.Sql($"DELETE FROM fuel_offers WHERE id = {Quote(historicalKey[offer.Id])};");
         }
 
         private static string Quote(string? value)

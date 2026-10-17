@@ -2435,7 +2435,7 @@ namespace FuelFlow.API.Migrations
 
                             t.HasCheckConstraint("ck_fuel_offers_fuel_type_id_length", "length(fuel_type_id) <= 100");
 
-                            t.HasCheckConstraint("ck_fuel_offers_id_length", "length(id) <= 204");
+                            t.HasCheckConstraint("ck_fuel_offers_id_length", "length(id) <= 103");
 
                             t.HasCheckConstraint("ck_fuel_offers_margin_signs", "margin_uah_per_liter IS NULL OR margin_uah_per_liter >= 0");
 
@@ -2447,7 +2447,7 @@ namespace FuelFlow.API.Migrations
                     b.HasData(
                         new
                         {
-                            Id = "okko-okko-dp",
+                            Id = "okko-dp",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DataKind = "real",
                             FinalPricePerLiter = 52m,
@@ -2460,7 +2460,7 @@ namespace FuelFlow.API.Migrations
                         },
                         new
                         {
-                            Id = "okko-okko-95",
+                            Id = "okko-95",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DataKind = "real",
                             FinalPricePerLiter = 51m,
@@ -2473,7 +2473,7 @@ namespace FuelFlow.API.Migrations
                         },
                         new
                         {
-                            Id = "okko-okko-p95",
+                            Id = "okko-p95",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DataKind = "real",
                             FinalPricePerLiter = 56m,
@@ -2486,7 +2486,7 @@ namespace FuelFlow.API.Migrations
                         },
                         new
                         {
-                            Id = "okko-okko-pulls-dp",
+                            Id = "okko-pulls-dp",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DataKind = "real",
                             FinalPricePerLiter = 55m,
@@ -2499,7 +2499,7 @@ namespace FuelFlow.API.Migrations
                         },
                         new
                         {
-                            Id = "okko-okko-gas",
+                            Id = "okko-gas",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DataKind = "real",
                             FinalPricePerLiter = 27m,
@@ -2512,7 +2512,7 @@ namespace FuelFlow.API.Migrations
                         },
                         new
                         {
-                            Id = "wog-wog-dp",
+                            Id = "wog-dp",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DataKind = "real",
                             FinalPricePerLiter = 53m,
@@ -2525,7 +2525,7 @@ namespace FuelFlow.API.Migrations
                         },
                         new
                         {
-                            Id = "wog-wog-95",
+                            Id = "wog-95",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DataKind = "real",
                             FinalPricePerLiter = 52m,
@@ -2538,7 +2538,7 @@ namespace FuelFlow.API.Migrations
                         },
                         new
                         {
-                            Id = "wog-wog-95-euro",
+                            Id = "wog-95-euro",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DataKind = "real",
                             FinalPricePerLiter = 53m,
@@ -2551,7 +2551,7 @@ namespace FuelFlow.API.Migrations
                         },
                         new
                         {
-                            Id = "wog-wog-100",
+                            Id = "wog-100",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DataKind = "real",
                             FinalPricePerLiter = 61m,
@@ -2564,7 +2564,7 @@ namespace FuelFlow.API.Migrations
                         },
                         new
                         {
-                            Id = "wog-wog-gas",
+                            Id = "wog-gas",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DataKind = "real",
                             FinalPricePerLiter = 27m,
@@ -2626,7 +2626,7 @@ namespace FuelFlow.API.Migrations
 
                             t.HasCheckConstraint("ck_fuel_offer_volumes_liters_positive", "liters > 0");
 
-                            t.HasCheckConstraint("ck_fuel_offer_volumes_offer_id_length", "length(offer_id) <= 204");
+                            t.HasCheckConstraint("ck_fuel_offer_volumes_offer_id_length", "length(offer_id) <= 103");
 
                             t.HasCheckConstraint("ck_fuel_offer_volumes_package_price_non_negative", "package_price >= 0");
                         });
@@ -2638,7 +2638,7 @@ namespace FuelFlow.API.Migrations
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             Liters = 10m,
-                            OfferId = "okko-okko-dp",
+                            OfferId = "okko-dp",
                             PackagePrice = 520m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -2648,7 +2648,7 @@ namespace FuelFlow.API.Migrations
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             Liters = 20m,
-                            OfferId = "okko-okko-dp",
+                            OfferId = "okko-dp",
                             PackagePrice = 1040m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -2658,7 +2658,7 @@ namespace FuelFlow.API.Migrations
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             Liters = 50m,
-                            OfferId = "okko-okko-dp",
+                            OfferId = "okko-dp",
                             PackagePrice = 2600m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -2668,7 +2668,7 @@ namespace FuelFlow.API.Migrations
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             Liters = 10m,
-                            OfferId = "okko-okko-95",
+                            OfferId = "okko-95",
                             PackagePrice = 510m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -2678,7 +2678,7 @@ namespace FuelFlow.API.Migrations
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             Liters = 20m,
-                            OfferId = "okko-okko-95",
+                            OfferId = "okko-95",
                             PackagePrice = 1020m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -2688,7 +2688,7 @@ namespace FuelFlow.API.Migrations
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             Liters = 50m,
-                            OfferId = "okko-okko-95",
+                            OfferId = "okko-95",
                             PackagePrice = 2550m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -2698,7 +2698,7 @@ namespace FuelFlow.API.Migrations
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             Liters = 10m,
-                            OfferId = "okko-okko-p95",
+                            OfferId = "okko-p95",
                             PackagePrice = 560m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -2708,7 +2708,7 @@ namespace FuelFlow.API.Migrations
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             Liters = 20m,
-                            OfferId = "okko-okko-p95",
+                            OfferId = "okko-p95",
                             PackagePrice = 1120m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -2718,7 +2718,7 @@ namespace FuelFlow.API.Migrations
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             Liters = 50m,
-                            OfferId = "okko-okko-p95",
+                            OfferId = "okko-p95",
                             PackagePrice = 2800m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -2728,7 +2728,7 @@ namespace FuelFlow.API.Migrations
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             Liters = 10m,
-                            OfferId = "okko-okko-pulls-dp",
+                            OfferId = "okko-pulls-dp",
                             PackagePrice = 550m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -2738,7 +2738,7 @@ namespace FuelFlow.API.Migrations
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             Liters = 20m,
-                            OfferId = "okko-okko-pulls-dp",
+                            OfferId = "okko-pulls-dp",
                             PackagePrice = 1100m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -2748,7 +2748,7 @@ namespace FuelFlow.API.Migrations
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             Liters = 50m,
-                            OfferId = "okko-okko-pulls-dp",
+                            OfferId = "okko-pulls-dp",
                             PackagePrice = 2750m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -2758,7 +2758,7 @@ namespace FuelFlow.API.Migrations
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             Liters = 10m,
-                            OfferId = "okko-okko-gas",
+                            OfferId = "okko-gas",
                             PackagePrice = 270m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -2768,7 +2768,7 @@ namespace FuelFlow.API.Migrations
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             Liters = 20m,
-                            OfferId = "okko-okko-gas",
+                            OfferId = "okko-gas",
                             PackagePrice = 540m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -2778,7 +2778,7 @@ namespace FuelFlow.API.Migrations
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             Liters = 50m,
-                            OfferId = "okko-okko-gas",
+                            OfferId = "okko-gas",
                             PackagePrice = 1350m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -2788,7 +2788,7 @@ namespace FuelFlow.API.Migrations
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             Liters = 10m,
-                            OfferId = "wog-wog-dp",
+                            OfferId = "wog-dp",
                             PackagePrice = 530m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -2798,7 +2798,7 @@ namespace FuelFlow.API.Migrations
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             Liters = 20m,
-                            OfferId = "wog-wog-dp",
+                            OfferId = "wog-dp",
                             PackagePrice = 1060m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -2808,7 +2808,7 @@ namespace FuelFlow.API.Migrations
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             Liters = 50m,
-                            OfferId = "wog-wog-dp",
+                            OfferId = "wog-dp",
                             PackagePrice = 2650m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -2818,7 +2818,7 @@ namespace FuelFlow.API.Migrations
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             Liters = 10m,
-                            OfferId = "wog-wog-95",
+                            OfferId = "wog-95",
                             PackagePrice = 520m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -2828,7 +2828,7 @@ namespace FuelFlow.API.Migrations
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             Liters = 20m,
-                            OfferId = "wog-wog-95",
+                            OfferId = "wog-95",
                             PackagePrice = 1040m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -2838,7 +2838,7 @@ namespace FuelFlow.API.Migrations
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             Liters = 50m,
-                            OfferId = "wog-wog-95",
+                            OfferId = "wog-95",
                             PackagePrice = 2600m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -2848,7 +2848,7 @@ namespace FuelFlow.API.Migrations
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             Liters = 10m,
-                            OfferId = "wog-wog-95-euro",
+                            OfferId = "wog-95-euro",
                             PackagePrice = 530m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -2858,7 +2858,7 @@ namespace FuelFlow.API.Migrations
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             Liters = 20m,
-                            OfferId = "wog-wog-95-euro",
+                            OfferId = "wog-95-euro",
                             PackagePrice = 1060m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -2868,7 +2868,7 @@ namespace FuelFlow.API.Migrations
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             Liters = 50m,
-                            OfferId = "wog-wog-95-euro",
+                            OfferId = "wog-95-euro",
                             PackagePrice = 2650m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -2878,7 +2878,7 @@ namespace FuelFlow.API.Migrations
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             Liters = 10m,
-                            OfferId = "wog-wog-100",
+                            OfferId = "wog-100",
                             PackagePrice = 610m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -2888,7 +2888,7 @@ namespace FuelFlow.API.Migrations
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             Liters = 20m,
-                            OfferId = "wog-wog-100",
+                            OfferId = "wog-100",
                             PackagePrice = 1220m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -2898,7 +2898,7 @@ namespace FuelFlow.API.Migrations
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             Liters = 50m,
-                            OfferId = "wog-wog-100",
+                            OfferId = "wog-100",
                             PackagePrice = 3050m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -2908,7 +2908,7 @@ namespace FuelFlow.API.Migrations
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             Liters = 10m,
-                            OfferId = "wog-wog-gas",
+                            OfferId = "wog-gas",
                             PackagePrice = 270m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -2918,7 +2918,7 @@ namespace FuelFlow.API.Migrations
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             Liters = 20m,
-                            OfferId = "wog-wog-gas",
+                            OfferId = "wog-gas",
                             PackagePrice = 540m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -2928,7 +2928,7 @@ namespace FuelFlow.API.Migrations
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             Liters = 50m,
-                            OfferId = "wog-wog-gas",
+                            OfferId = "wog-gas",
                             PackagePrice = 1350m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -2938,7 +2938,7 @@ namespace FuelFlow.API.Migrations
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             Liters = 2m,
-                            OfferId = "okko-okko-dp",
+                            OfferId = "okko-dp",
                             PackagePrice = 104m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
@@ -2948,7 +2948,7 @@ namespace FuelFlow.API.Migrations
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             Liters = 3m,
-                            OfferId = "okko-okko-dp",
+                            OfferId = "okko-dp",
                             PackagePrice = 156m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         });
@@ -3006,7 +3006,10 @@ namespace FuelFlow.API.Migrations
 
                     b.HasIndex("StationId");
 
-                    b.HasIndex("StationId", "Name");
+                    b.HasIndex("StationId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("ux_fuel_types_station_name")
+                        .HasFilter("NOT is_deleted");
 
                     b.ToTable("fuel_types", null, t =>
                         {
