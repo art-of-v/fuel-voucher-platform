@@ -1,3 +1,4 @@
+using FuelFlow.Features.Pricing;
 using FluentAssertions;
 using FuelFlow.Features.Contracts.SharedModels;
 using FuelFlow.Features.Orders.SharedModels;
@@ -204,7 +205,7 @@ public sealed class BatchCostTimelineIntegrationTests : IClassFixture<TestDataba
         var context = CreateContext();
         var handler = new GetImportBatchCostTimelineQueryHandler(
             context,
-            new GetImportBatchCostsQueryHandler(context, new BlendedCostRecalculator(context)));
+            new GetImportBatchCostsQueryHandler(context, new BlendedCostRecalculator(context, new OfferPriceRecorder(context))));
         return await handler.HandleAsync(new GetImportBatchCostTimelineQuery(importId));
     }
 

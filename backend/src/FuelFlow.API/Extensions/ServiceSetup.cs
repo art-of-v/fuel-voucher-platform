@@ -183,6 +183,10 @@ internal static class ServiceSetup
         services.AddScoped<GetImportBatchByIdQueryHandler>();
         services.AddScoped<GetImportBatchVouchersQueryHandler>();
         services.AddScoped<BlendedCostRecalculator>();
+        // The single point every offer price passes through, which is what makes the history complete
+        // rather than best-effort. Registered next to its first caller because all five of them need it.
+        services.AddScoped<FuelFlow.Features.Pricing.OfferPriceRecorder>();
+        services.AddScoped<FuelFlow.Features.Brands.GetFuelPriceHistory.GetFuelPriceHistoryQueryHandler>();
         services.AddScoped<GetImportBatchCostsQueryHandler>();
         services.AddScoped<GetImportBatchPnlQueryHandler>();
         services.AddScoped<SetBatchCostCommandHandler>();

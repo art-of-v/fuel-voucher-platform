@@ -2707,6 +2707,104 @@ namespace FuelFlow.API.Migrations
                         });
                 });
 
+            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.FuelOfferPrice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("ChangedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("changed_by_user_id");
+
+                    b.Property<string>("DataKind")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("data_kind");
+
+                    b.Property<DateTime>("EffectiveFromUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("effective_from_utc");
+
+                    b.Property<decimal?>("FinalPricePerLiter")
+                        .HasColumnType("numeric(10,4)")
+                        .HasColumnName("final_price_per_liter");
+
+                    b.Property<string>("FuelTypeId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("fuel_type_id");
+
+                    b.Property<decimal?>("MarginPercent")
+                        .HasColumnType("numeric(10,4)")
+                        .HasColumnName("margin_percent");
+
+                    b.Property<decimal?>("MarginUahPerLiter")
+                        .HasColumnType("numeric(10,4)")
+                        .HasColumnName("margin_uah_per_liter");
+
+                    b.Property<decimal?>("MinDiscountPerLiter")
+                        .HasColumnType("numeric(10,4)")
+                        .HasColumnName("min_discount_per_liter");
+
+                    b.Property<string>("OfferId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("offer_id");
+
+                    b.Property<decimal?>("PumpPricePerLiter")
+                        .HasColumnType("numeric(10,4)")
+                        .HasColumnName("pump_price_per_liter");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("reason");
+
+                    b.Property<DateTime>("RecordedAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("recorded_at_utc");
+
+                    b.Property<string>("StationId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("station_id");
+
+                    b.Property<decimal?>("SupplierPricePerLiter")
+                        .HasColumnType("numeric(10,4)")
+                        .HasColumnName("supplier_price_per_liter");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChangedByUserId");
+
+                    b.HasIndex("FuelTypeId", "EffectiveFromUtc")
+                        .HasDatabaseName("ix_fuel_offer_prices_fuel_effective");
+
+                    b.HasIndex("OfferId", "EffectiveFromUtc")
+                        .HasDatabaseName("ix_fuel_offer_prices_offer_effective");
+
+                    b.ToTable("fuel_offer_prices", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_fuel_offer_prices_data_kind", "data_kind IN ('real', 'qa')");
+
+                            t.HasCheckConstraint("ck_fuel_offer_prices_fuel_type_id_length", "length(fuel_type_id) <= 100");
+
+                            t.HasCheckConstraint("ck_fuel_offer_prices_margin_signs", "margin_uah_per_liter IS NULL OR margin_uah_per_liter >= 0");
+
+                            t.HasCheckConstraint("ck_fuel_offer_prices_offer_id_length", "length(offer_id) <= 103");
+
+                            t.HasCheckConstraint("ck_fuel_offer_prices_prices_non_negative", "(final_price_per_liter IS NULL OR final_price_per_liter >= 0) AND (pump_price_per_liter IS NULL OR pump_price_per_liter >= 0) AND (min_discount_per_liter IS NULL OR min_discount_per_liter >= 0)");
+
+                            t.HasCheckConstraint("ck_fuel_offer_prices_reason", "reason IN ('operator', 'pump-import', 'catalogue-import', 'batch-cost', 'exchange-release', 'backfill')");
+
+                            t.HasCheckConstraint("ck_fuel_offer_prices_station_id_length", "length(station_id) <= 100");
+                        });
+                });
+
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.FuelOfferVolume", b =>
                 {
                     b.Property<string>("Id")
@@ -4278,6 +4376,17 @@ namespace FuelFlow.API.Migrations
                     b.Navigation("Order");
                 });
 
+            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.FuelOfferPrice", b =>
+                {
+                    b.HasOne("FuelFlow.SharedKernel.Domain.FuelOffer", "Offer")
+                        .WithMany("Prices")
+                        .HasForeignKey("OfferId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Offer");
+                });
+
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.FuelOfferVolume", b =>
                 {
                     b.HasOne("FuelFlow.SharedKernel.Domain.FuelOffer", "Offer")
@@ -4345,6 +4454,8 @@ namespace FuelFlow.API.Migrations
 
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.FuelOffer", b =>
                 {
+                    b.Navigation("Prices");
+
                     b.Navigation("Volumes");
                 });
 #pragma warning restore 612, 618

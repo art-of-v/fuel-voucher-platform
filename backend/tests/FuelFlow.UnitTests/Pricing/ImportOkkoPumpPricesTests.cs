@@ -1,3 +1,4 @@
+using FuelFlow.Features.Pricing;
 using System.Globalization;
 using System.Text.Json;
 using FluentAssertions;
@@ -31,7 +32,7 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
         _context.Dispose();
     }
 
-    private ImportOkkoPumpPricesCommandHandler Handler() => new(_context, _events);
+    private ImportOkkoPumpPricesCommandHandler Handler() => new(_context, _events, new OfferPriceRecorder(_context));
 
     /// <summary>The production seed catalog: five OKKO fuel types with their pump/cost/margin knobs.</summary>
     private async Task SeedCatalogAsync()
@@ -370,6 +371,50 @@ var (wogVolume, wogOffer) = await ReadAsync("wog-95-20");
         fuel.BrandFuelCode = code;
         await _context.SaveChangesAsync();
         _context.ChangeTracker.Clear();
+    }
+
+    [Fact]
+    public async Task Import_ShouldAppendTheNewPrice_ToTheOfferHistory()
+    {
+        await SeedCatalogAsync();
+
+        await Handler().HandleAsync(Import(ScrapedSheet), Guid.Empty, "tester");
+        _context.ChangeTracker.Clear();
+
+        // This path runs unattended over the whole catalogue every quarter hour, which is exactly why
+        // it has to be the one that cannot forget the history: nobody is watching it not to.
+        var prices = await _context.FuelOfferPrices.ToListAsync();
+
+        prices.Should().HaveCount(5, "one opening row per offer the import repriced");
+        prices.Should().OnlyContain(p => p.Reason == OfferPriceReasons.PumpImport);
+        prices.Should().OnlyContain(p => p.ChangedByUserId == null, "no person typed these");
+        prices.Should().OnlyContain(p => p.StationId == "okko" && p.DataKind == DataKinds.Real);
+
+        // Each row holds what its offer now holds - the invariant the history rests on, checked here at
+        // the path that writes most rows rather than only in the schema-level suite.
+        foreach (var price in prices)
+        {
+            var offer = await _context.FuelOffers.FirstAsync(o => o.Id == price.OfferId);
+            price.PumpPricePerLiter.Should().Be(offer.PumpPricePerLiter);
+            price.FinalPricePerLiter.Should().Be(offer.FinalPricePerLiter);
+            price.SupplierPricePerLiter.Should().Be(offer.SupplierPricePerLiter);
+        }
+    }
+
+    [Fact]
+    public async Task Import_ShouldAppendNothing_WhenTheSheetMovesNoPrice()
+    {
+        await SeedCatalogAsync();
+
+        await Handler().HandleAsync(Import(ScrapedSheet), Guid.Empty, "tester");
+        _context.ChangeTracker.Clear();
+        var before = await _context.FuelOfferPrices.CountAsync();
+
+        await Handler().HandleAsync(Import(ScrapedSheet), Guid.Empty, "tester");
+        _context.ChangeTracker.Clear();
+
+        // Twenty-five rows a quarter hour is noise that buries the changes the history exists to show.
+        (await _context.FuelOfferPrices.CountAsync()).Should().Be(before);
     }
 
     [Fact]

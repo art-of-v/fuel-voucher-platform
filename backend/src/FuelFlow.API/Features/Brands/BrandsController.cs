@@ -4,9 +4,11 @@ using FuelFlow.Features.Orders.CreateCheckout;
 using FuelFlow.Features.Brands.GetProviderById;
 using FuelFlow.Features.Brands.GetProviderHistory;
 using FuelFlow.Features.Brands.GetProviders;
+using FuelFlow.Features.Brands.GetFuelPriceHistory;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.Features.Pricing;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -20,27 +22,36 @@ namespace FuelFlow.Features.Brands;
 [Authorize(Policy = "Staff")]
 public sealed class BrandsController : ControllerBase
 {
-    private readonly GetBrandsQueryHandler _getAll;
+private readonly GetBrandsQueryHandler _getAll;
     private readonly GetBrandByIdQueryHandler _getById;
     private readonly GetBrandHistoryQueryHandler _getHistory;
+    private readonly GetFuelPriceHistoryQueryHandler _getPriceHistory;
     private readonly AuditEventService _eventService;
     private readonly ApplicationDbContext _context;
     private readonly NotificationDispatcher _notifications;
+
+    // Every price this controller writes goes through here, so the history cannot be missed by the one
+    // endpoint that forgets. See OfferPriceRecorder for why that is a service rather than a comment.
+    private readonly OfferPriceRecorder _priceRecorder;
 
     public BrandsController(
         GetBrandsQueryHandler getAll,
         GetBrandByIdQueryHandler getById,
         GetBrandHistoryQueryHandler getHistory,
+        GetFuelPriceHistoryQueryHandler getPriceHistory,
         AuditEventService eventService,
         ApplicationDbContext context,
-        NotificationDispatcher notifications)
+        NotificationDispatcher notifications,
+        OfferPriceRecorder priceRecorder)
     {
         _getAll = getAll;
         _getById = getById;
         _getHistory = getHistory;
+        _getPriceHistory = getPriceHistory;
         _eventService = eventService;
         _context = context;
         _notifications = notifications;
+        _priceRecorder = priceRecorder;
     }
 
     private static readonly List<int> DefaultNominals = new() { 2, 3, 5, 10, 20, 50 };
@@ -62,6 +73,18 @@ public sealed class BrandsController : ControllerBase
         [FromQuery] int limit = 50,
         CancellationToken ct = default) =>
         Ok(await _getHistory.HandleAsync(new GetBrandHistoryQuery(id, limit), ct));
+
+    /// <summary>
+    /// What one fuel was priced at, oldest first. The numbers the dashboard and reconciliation apply to
+    /// historical orders, against the sequence that produced them - see
+    /// <see cref="GetFuelPriceHistoryQueryHandler"/>.
+    /// </summary>
+    [HttpGet("fuels/{fuelId}/price-history")]
+    public async Task<IActionResult> GetFuelPriceHistory(
+        [FromRoute] string fuelId,
+        [FromQuery] int limit = 50,
+        CancellationToken ct = default) =>
+        Ok(await _getPriceHistory.HandleAsync(new GetFuelPriceHistoryQuery(fuelId, limit), ct));
 
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] BrandDto request, CancellationToken ct)
@@ -356,6 +379,11 @@ public sealed class BrandsController : ControllerBase
         };
         _context.FuelOffers.Add(offer);
 
+        // A new offer has no previous price, so this row is not a change but the price it was born with
+        // - the same as every later row's role, and the reason a fuel's history starts at its creation
+        // rather than at the first time somebody edited it.
+        await _priceRecorder.RecordAsync(offer, OfferPriceReasons.Operator, GetUserId(), ct: ct);
+
         foreach (var liters in litersToCreate)
         {
             _context.FuelOfferVolumes.Add(new FuelOfferVolume
@@ -539,6 +567,11 @@ public sealed class BrandsController : ControllerBase
             volume.PackagePrice = Math.Round(finalPerLiter * volume.Liters, 2, MidpointRounding.AwayFromZero);
             volume.UpdatedAtUtc = DateTime.UtcNow;
         }
+
+        // The history row, before the save that persists the offer - and it also stamps
+        // price_updated_at / price_updated_by_user_id, which this endpoint previously left at their
+        // creation-time values, so the audit trail could not say when an operator repriced a fuel.
+        await _priceRecorder.RecordAsync(offer, OfferPriceReasons.Operator, GetUserId(), ct: ct);
 
         // Archive rather than delete the offer we just emptied: it carries the pricing history that
         // `fuel_packages.is_deleted` rows carried before the split, and a delete here would take the

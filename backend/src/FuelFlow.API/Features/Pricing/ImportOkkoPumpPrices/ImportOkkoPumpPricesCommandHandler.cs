@@ -64,10 +64,19 @@ public sealed class ImportOkkoPumpPricesCommandHandler
     private readonly ApplicationDbContext _context;
     private readonly AuditEventService _events;
 
-    public ImportOkkoPumpPricesCommandHandler(ApplicationDbContext context, AuditEventService events)
+    // Appends to fuel_offer_prices for every offer this import repriced. Injected rather than reached
+    // for, so the unattended path is as bound to leave history as the operator path is - this is the
+    // one write path that runs every quarter hour with nobody watching.
+    private readonly OfferPriceRecorder _priceRecorder;
+
+    public ImportOkkoPumpPricesCommandHandler(
+        ApplicationDbContext context,
+        AuditEventService events,
+        OfferPriceRecorder priceRecorder)
     {
         _context = context;
         _events = events;
+        _priceRecorder = priceRecorder;
     }
 
     public async Task<OkkoPumpApplyResult> HandleAsync(
@@ -159,6 +168,11 @@ public sealed class ImportOkkoPumpPricesCommandHandler
         var changedCount = 0;
         var packagesRepriced = 0;
 
+        // The offers this run touched, for the one history write at the end. Collected rather than
+        // recorded inside the loop, which would cost a query per offer on a path that runs unattended
+        // over the whole catalogue every quarter hour.
+        var repricedOffers = new List<FuelOffer>();
+
         foreach (var ft in okkoFuelTypes)
         {
             // By the brand's code where the catalogue has one, by category otherwise.
@@ -234,14 +248,14 @@ public sealed class ImportOkkoPumpPricesCommandHandler
                     offer.PumpPricePerLiter = pump;
                     offer.FinalPricePerLiter = finalPerLiter;
                     offer.UpdatedAtUtc = now;
-                    offer.PriceUpdatedAt = now;
-                    offer.PriceUpdatedByUserId = actor;
 
                     foreach (var volume in vols)
                     {
                         volume.PackagePrice = Math.Round(finalPerLiter * volume.Liters, 2, MidpointRounding.AwayFromZero);
                         volume.UpdatedAtUtc = now;
                     }
+
+                    repricedOffers.Add(offer);
                 }
 
                 if (changed) changedCount++;
@@ -297,6 +311,12 @@ public sealed class ImportOkkoPumpPricesCommandHandler
 
         if (!dryRun && changedCount > 0)
         {
+            // One row per offer whose price actually moved, all stamped with this run's `now` so the run
+            // reads as one moment rather than twenty-five - and all appended in one call, so the recorder
+            // fetches the existing history in a single query instead of one per fuel. It also re-stamps
+            // price_updated_at / price_updated_by_user_id, which the loop above used to do itself.
+            await _priceRecorder.RecordRangeAsync(
+                repricedOffers, OfferPriceReasons.PumpImport, actor, now, ct);
             await _context.SaveChangesAsync(ct);
             await RecordEventsAsync(applied, actor, actingUserName, ct);
         }

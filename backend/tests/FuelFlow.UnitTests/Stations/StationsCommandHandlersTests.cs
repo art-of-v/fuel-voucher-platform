@@ -1,3 +1,4 @@
+using FuelFlow.Features.Pricing;
 using FluentAssertions;
 using FuelFlow.Features.Stations.CreateFuelType;
 using FuelFlow.Features.Stations.CreatePackage;
@@ -273,7 +274,7 @@ public sealed class StationsCommandHandlersTests : IDisposable
     {
         var package = CreatePackage("pkg-1", "station-1", "ft-1", "A-95", 20m, 1000, 980);
 
-        var handler = new CreatePackageCommandHandler(_context);
+        var handler = new CreatePackageCommandHandler(_context, new OfferPriceRecorder(_context));
 
         var result = await handler.HandleAsync(new CreatePackageCommand(package));
 
@@ -303,7 +304,7 @@ public sealed class StationsCommandHandlersTests : IDisposable
         SeedFromPackage(package);
         await _context.SaveChangesAsync();
 
-        var handler = new CreatePackageCommandHandler(_context);
+        var handler = new CreatePackageCommandHandler(_context, new OfferPriceRecorder(_context));
 
         var result = await handler.HandleAsync(new CreatePackageCommand(package));
 
@@ -318,7 +319,7 @@ public sealed class StationsCommandHandlersTests : IDisposable
     {
         var package = CreatePackage("", "", "", "A-95", 20m);
 
-        var handler = new CreatePackageCommandHandler(_context);
+        var handler = new CreatePackageCommandHandler(_context, new OfferPriceRecorder(_context));
 
         var result = await handler.HandleAsync(new CreatePackageCommand(package));
 
@@ -338,7 +339,7 @@ public sealed class StationsCommandHandlersTests : IDisposable
         SeedFromPackage(CreatePackage("existing-2", "station-1", "ft-1", "ДП ЄВРО", 2m, costPerLiter: 100m));
         await _context.SaveChangesAsync();
 
-        var handler = new CreatePackageCommandHandler(_context);
+        var handler = new CreatePackageCommandHandler(_context, new OfferPriceRecorder(_context));
         var result = await handler.HandleAsync(new CreatePackageCommand(
             CreatePackage("qa-1kop", "station-1", "ft-1", "QA 1 коп", 0.01m, costPerLiter: 5m)));
 
@@ -356,7 +357,7 @@ public sealed class StationsCommandHandlersTests : IDisposable
         SeedFromPackage(CreatePackage("existing", "station-1", "ft-1", "ДП ЄВРО", 10m, costPerLiter: 94.9m));
         await _context.SaveChangesAsync();
 
-        var handler = new CreatePackageCommandHandler(_context);
+        var handler = new CreatePackageCommandHandler(_context, new OfferPriceRecorder(_context));
         var result = await handler.HandleAsync(new CreatePackageCommand(
             CreatePackage("new-nominal", "station-1", "ft-1", "ДП ЄВРО", 5m, costPerLiter: 94.9m)));
 
@@ -372,7 +373,7 @@ public sealed class StationsCommandHandlersTests : IDisposable
         SeedFromPackage(CreatePackage("existing", "station-1", "ft-1", "A-95", 10m, costPerLiter: 94.9000m));
         await _context.SaveChangesAsync();
 
-        var handler = new CreatePackageCommandHandler(_context);
+        var handler = new CreatePackageCommandHandler(_context, new OfferPriceRecorder(_context));
         var result = await handler.HandleAsync(new CreatePackageCommand(
             CreatePackage("rounding", "station-1", "ft-1", "A-95", 5m, costPerLiter: 94.90001m)));
 
@@ -385,7 +386,7 @@ public sealed class StationsCommandHandlersTests : IDisposable
         SeedFromPackage(CreatePackage("existing", "station-1", "ft-1", "A-95", 10m));
         await _context.SaveChangesAsync();
 
-        var handler = new CreatePackageCommandHandler(_context);
+        var handler = new CreatePackageCommandHandler(_context, new OfferPriceRecorder(_context));
         var result = await handler.HandleAsync(new CreatePackageCommand(
             CreatePackage("priced", "station-1", "ft-1", "A-95", 5m, costPerLiter: 87.9m)));
 
@@ -400,7 +401,7 @@ public sealed class StationsCommandHandlersTests : IDisposable
         SeedFromPackage(CreatePackage("existing", "station-1", "ft-1", "A-95", 10m, costPerLiter: 87.9m));
         await _context.SaveChangesAsync();
 
-        var handler = new CreatePackageCommandHandler(_context);
+        var handler = new CreatePackageCommandHandler(_context, new OfferPriceRecorder(_context));
         var result = await handler.HandleAsync(new CreatePackageCommand(
             CreatePackage("uncosted", "station-1", "ft-1", "A-95", 5m)));
 
@@ -413,7 +414,7 @@ public sealed class StationsCommandHandlersTests : IDisposable
         SeedFromPackage(CreatePackage("existing", "station-1", "ft-1", "A-95", 10m, costPerLiter: 87.9m));
         await _context.SaveChangesAsync();
 
-        var handler = new CreatePackageCommandHandler(_context);
+        var handler = new CreatePackageCommandHandler(_context, new OfferPriceRecorder(_context));
         var result = await handler.HandleAsync(new CreatePackageCommand(
             CreatePackage("other-fuel", "station-1", "ft-2", "ДП ЄВРО", 10m, costPerLiter: 94.9m)));
 

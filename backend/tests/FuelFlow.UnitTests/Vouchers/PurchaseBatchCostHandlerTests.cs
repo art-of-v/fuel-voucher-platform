@@ -1,3 +1,4 @@
+using FuelFlow.Features.Pricing;
 using FluentAssertions;
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers;
@@ -49,7 +50,7 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         });
         _context.SaveChanges();
 
-        _recalculator = new BlendedCostRecalculator(_context);
+        _recalculator = new BlendedCostRecalculator(_context, new OfferPriceRecorder(_context));
         _eventService = new AuditEventService(_context);
         _setHandler = new SetBatchCostCommandHandler(_context, _recalculator, _eventService, NotificationDispatcher.Disabled);
         _getHandler = new GetImportBatchCostsQueryHandler(_context, _recalculator);
@@ -193,6 +194,31 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         fuel.BasePrice.Should().Be(27);       // pump null ⇒ final + minDiscount(0)
 
         _context.AuditEventOutbox.Should().ContainSingle(e => e.EventType == "BatchCostEntered");
+    }
+
+    [Fact]
+    public async Task SetCost_AppendsTheNewCost_ToTheOfferHistory()
+    {
+        var import = SeedImport();
+        SeedVoucher(import, "okko-dp", 100m);
+        SeedVoucher(import, "okko-dp", 100m);
+        await _context.SaveChangesAsync();
+
+        await _setHandler.HandleAsync(Cmd(import, "okko-dp", 25m));
+
+        var offer = await _context.FuelOffers.FirstAsync(o => o.FuelTypeId == "okko-dp");
+        var history = await _context.FuelOfferPrices
+            .Where(p => p.OfferId == offer.Id)
+            .OrderBy(p => p.EffectiveFromUtc).ThenBy(p => p.Id)
+            .ToListAsync();
+
+        // A batch cost is a price change like any other, and it arrives through a door of its own: an
+        // exchange releasing expired stock moves the same cost through `exchange-release`. The history
+        // row is the only thing that says which happened.
+        history.Should().HaveCount(1);
+        history[0].SupplierPricePerLiter.Should().Be(25m);
+        history[0].Reason.Should().Be(OfferPriceReasons.BatchCost);
+        history[0].ChangedByUserId.Should().Be(AdminId);
     }
 
     [Fact]

@@ -1,3 +1,4 @@
+using FuelFlow.Features.Pricing;
 using FluentAssertions;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Brands;
@@ -621,7 +622,7 @@ var actingUserId = Guid.NewGuid();
 
     private static ConfirmVoucherExchangeCommandHandler BuildHandler(ApplicationDbContext ctx)
     {
-        var recalculator = new BlendedCostRecalculator(ctx);
+        var recalculator = new BlendedCostRecalculator(ctx, new OfferPriceRecorder(ctx));
         var eventService = new AuditEventService(ctx);
 
         var backgroundJobClient = new Mock<IBackgroundJobClient>();
