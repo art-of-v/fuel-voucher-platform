@@ -73,11 +73,10 @@ internal sealed class FuelOfferConfiguration : IEntityTypeConfiguration<FuelOffe
 
         builder.ToTable(t =>
         {
-            // 204, derived rather than guessed: the key composes a station id and a fuel type id,
-            // each bounded at 100 by the two CHECKs above, plus a separator and the '-qa' suffix.
-            // OfferKeyTests states the same arithmetic, so a tightened column bound cannot silently
-            // start rejecting a legal offer at write time.
-            t.HasCheckConstraint("ck_fuel_offers_id_length", "length(id) <= 204");
+            // 103, derived rather than guessed: the key is the fuel type id - bounded at 100 by
+            // ck_fuel_types_id_length - plus the '-qa' suffix. OfferKeyTests states the same arithmetic,
+            // so a tightened column bound cannot silently start rejecting a legal offer at write time.
+            t.HasCheckConstraint("ck_fuel_offers_id_length", "length(id) <= 103");
             t.HasCheckConstraint("ck_fuel_offers_station_id_length", "length(station_id) <= 100");
             t.HasCheckConstraint("ck_fuel_offers_fuel_type_id_length", "length(fuel_type_id) <= 100");
 

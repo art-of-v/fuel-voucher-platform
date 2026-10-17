@@ -61,7 +61,22 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
 
         builder.HasIndex(e => e.Name);
         builder.HasIndex(e => e.StationId);
-        builder.HasIndex(e => new { e.StationId, e.Name });
+
+        // (station_id, name), unique and partial on NOT is_deleted. A natural key used to give "one
+        // fuel per name per station" for free — the id was 'okko-95', so a second A-95 at OKKO collided
+        // on the primary key — and the id is generated at the write path instead
+        // (BrandsController.AddFuel), so the second row is accepted. It is not a cosmetic duplicate: it
+        // becomes a second offer, the storefront lists one fuel at two prices, and the voucher importer
+        // resolves the fuel by name with FirstOrDefault (OkkoFuelClassifier/WogFuelClassifier), so a
+        // real voucher can land on the twin that never received the imported pump price.
+        //
+        // This REPLACES the plain (station_id, name) index rather than sitting beside it — same key, so
+        // nothing that used it loses a plan, and the only queries that filter on both columns
+        // (BrandsController's duplicate check, KloVoucherParser) read live rows anyway.
+        builder.HasIndex(e => new { e.StationId, e.Name })
+            .IsUnique()
+            .HasFilter("NOT is_deleted")
+            .HasDatabaseName("ux_fuel_types_station_name");
 
         // Natural key ("okko-95"), deliberately not a UUID. Bounded by CHECK rather than by a type
         // change - see StationConfiguration for why converting a natural key is not worth the

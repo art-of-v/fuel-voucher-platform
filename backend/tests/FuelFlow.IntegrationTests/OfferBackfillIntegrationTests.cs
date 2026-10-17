@@ -112,9 +112,12 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
     [Fact]
     public async Task TheOfferIds_AreExactlyWhatTheApplicationWouldCompute()
     {
-        // The key derivation is stated twice - in OfferKeys and inline in the migration's SQL,
-        // because a migration cannot call into the assembly it migrates from. This is what keeps the
-        // two copies of that rule from drifting apart.
+        // The key derivation is stated three times - in OfferKeys and inline in the SQL of the two
+        // migrations that have to produce or repair these ids, because a migration cannot call into the
+        // assembly it migrates from. This is what keeps those copies from drifting apart. The ids here
+        // were written by SplitFuelPackagesIntoOffers under the older station-prefixed key and then
+        // re-keyed by DropTheStationPrefixFromOfferKeys, so this asserts the end state both migrations
+        // had to agree on.
         await using var context = CreateContext();
 
         var rows = await context.FuelOffers.IgnoreQueryFilters()
@@ -124,7 +127,109 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
         rows.Should().NotBeEmpty();
 
         rows.Should().AllSatisfy(o =>
-            o.Id.Should().Be(OfferKeys.For(o.StationId, o.FuelTypeId, o.DataKind)));
+            o.Id.Should().Be(OfferKeys.For(o.FuelTypeId, o.DataKind)));
+    }
+
+    [Fact]
+    public async Task EveryOffer_IsSoldByItsOwnFuelsStation()
+    {
+        // The premise that lets the station stay out of the key: fuel_type_id is a primary key, so it
+        // identifies a fuel, and a fuel belongs to exactly one station - which is what makes the key
+        // unique. Nothing in the schema can enforce it (it is a fact about two tables), so it is a
+        // test here and deploy/preflight-db/012 before every pull. If this ever fails, the offer key is
+        // ambiguous and OfferKeys has to start spelling the station out again.
+        //
+        // Asked in SQL because FuelOffer has no navigation to the fuel type, which is the whole point:
+        // the two columns are related by an agreement, not by a foreign key.
+        await using var context = CreateContext();
+
+        var mismatched = await context.Database.SqlQueryRaw<string>(
+            """
+            SELECT o.id AS "Value"
+            FROM fuel_offers o
+            JOIN fuel_types f ON f.id = o.fuel_type_id
+            WHERE o.station_id <> f.station_id
+            """).ToListAsync();
+
+        mismatched.Should().BeEmpty("the offer's station is its fuel type's station, which is what makes the key unique");
+    }
+
+    [Fact]
+    public async Task ALiveFuelWithADuplicateName_IsRefusedAtTheSameStation()
+    {
+        // The guard that the natural fuel id used to give for free. A second 'А-95' at OKKO used to
+        // collide on the primary key; the id is generated now, so without ux_fuel_types_station_name it
+        // would become a second offer and a second landing place for a parsed voucher.
+        await using var context = CreateContext();
+        var now = DateTime.UtcNow;
+
+        context.FuelTypes.Add(new FuelTypeEntity
+        {
+            Id = "twin-a",
+            StationId = "upg",
+            Name = "А-95 (twin test)",
+            BasePrice = 50m,
+            DiscountPrice = 48m,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        });
+
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+
+        context.FuelTypes.Add(new FuelTypeEntity
+        {
+            Id = "twin-b",            // different id, same (station, name)
+            StationId = "upg",
+            Name = "А-95 (twin test)",
+            BasePrice = 50m,
+            DiscountPrice = 48m,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        });
+
+        var act = async () => await context.SaveChangesAsync();
+        await act.Should().ThrowAsync<DbUpdateException>();
+
+        await context.Database.ExecuteSqlRawAsync("DELETE FROM fuel_types WHERE id IN ('twin-a', 'twin-b')");
+    }
+
+    [Fact]
+    public async Task AnArchivedFuel_FreesItsNameForAFreshOne()
+    {
+        // The index is partial on NOT is_deleted, so archiving takes a fuel out of the catalogue and
+        // releases the name. Asserted because the opposite - an archived twin blocking a catalogue the
+        // operator is trying to rebuild - is the failure mode a unique index silently acquires.
+        await using var context = CreateContext();
+        var now = DateTime.UtcNow;
+
+        context.FuelTypes.Add(new FuelTypeEntity
+        {
+            Id = "reused-a",
+            StationId = "upg",
+            Name = "ДП (reuse test)",
+            BasePrice = 50m,
+            DiscountPrice = 48m,
+            IsDeleted = true,
+            DeletedAtUtc = now,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        });
+        context.FuelTypes.Add(new FuelTypeEntity
+        {
+            Id = "reused-b",
+            StationId = "upg",
+            Name = "ДП (reuse test)",
+            BasePrice = 50m,
+            DiscountPrice = 48m,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        });
+
+        var act = async () => await context.SaveChangesAsync();
+        await act.Should().NotThrowAsync();
+
+        await context.Database.ExecuteSqlRawAsync("DELETE FROM fuel_types WHERE id IN ('reused-a', 'reused-b')");
     }
 
     [Fact]
@@ -139,7 +244,7 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
 
         context.FuelOffers.Add(new FuelOffer
         {
-            Id = OfferKeys.For("upg", "upg-pool", DataKinds.Real),
+            Id = OfferKeys.For("upg-pool", DataKinds.Real),
             StationId = "upg",
             FuelTypeId = "upg-pool",
             DataKind = DataKinds.Real,
@@ -150,7 +255,7 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
 
         context.FuelOffers.Add(new FuelOffer
         {
-            Id = OfferKeys.For("upg", "upg-pool", DataKinds.Qa),
+            Id = OfferKeys.For("upg-pool", DataKinds.Qa),
             StationId = "upg",
             FuelTypeId = "upg-pool",
             DataKind = DataKinds.Qa,

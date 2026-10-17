@@ -81,7 +81,7 @@ internal static class SeedData
 
                 var offer = new FuelOffer
                 {
-                    Id = OfferKeys.For(ft.StationId, ft.Id, DataKinds.Real),
+                    Id = OfferKeys.For(ft.Id, DataKinds.Real),
                     StationId = ft.StationId,
                     FuelTypeId = ft.Id,
                     DataKind = DataKinds.Real,

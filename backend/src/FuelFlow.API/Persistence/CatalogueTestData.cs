@@ -47,7 +47,7 @@ internal static class CatalogueTestData
         DateTime? updatedAtUtc = null)
     {
         var pool = DataKinds.ForPool(isTestData);
-        var offerId = OfferKeys.For(stationId, fuelTypeId, pool);
+        var offerId = OfferKeys.For(fuelTypeId, pool);
         var now = DateTime.UtcNow;
 
         var offer = context.FuelOffers.Local.FirstOrDefault(o => o.Id == offerId)

@@ -267,7 +267,7 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
         int updatedMinutesAgo)
     {
         var pool = DataKinds.ForPool(isTestData);
-        var offerId = OfferKeys.For("okko", "okko-a95", pool);
+        var offerId = OfferKeys.For("okko-a95", pool);
 
         if (!seed.FuelOffers.Local.Any(o => o.Id == offerId) && !seed.FuelOffers.Any(o => o.Id == offerId))
         {

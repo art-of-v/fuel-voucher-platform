@@ -46,7 +46,10 @@ internal sealed class FuelOfferVolumeConfiguration : IEntityTypeConfiguration<Fu
         builder.ToTable(t =>
         {
             t.HasCheckConstraint("ck_fuel_offer_volumes_id_length", "length(id) <= 100");
-            t.HasCheckConstraint("ck_fuel_offer_volumes_offer_id_length", "length(offer_id) <= 204");
+
+            // The offer id is the fuel type id plus the pool suffix - the same 103 OfferKeys derives -
+            // so this is not an independent guess about how long a key may be.
+            t.HasCheckConstraint("ck_fuel_offer_volumes_offer_id_length", "length(offer_id) <= 103");
 
             // Carried over from ck_fuel_packages_liters_positive (#314): PUT .../nominals binds
             // List<int> off the request body, so a nominal of -10 was reachable from the admin API.
