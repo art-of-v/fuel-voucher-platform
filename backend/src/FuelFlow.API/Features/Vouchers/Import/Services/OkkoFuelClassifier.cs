@@ -41,8 +41,32 @@ public static class OkkoFuelClassifier
 
     // "ДП" (diesel) as a standalone token. .NET \b honours Unicode word chars, so this
     // matches the Cyrillic token in "ДП ЄВРО" / "ДП PULLS" without matching larger words.
+    //
+    // The Latin "DP" is the same grade written by the brand's own code and by operators who paste
+    // it. Without it a hand-entered "DP" classifies as no grade at all, which is the near-duplicate
+    // this whole identity work exists to remove: "ДП" and "DP" are one fuel spelled two ways.
     private static readonly Regex DieselToken =
-        new(@"\bдп\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        new(@"\bдп\b|\bdp\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// The one name a grade is sold under in this system, derived from the brand's code rather than
+    /// from any label the brand renders.
+    /// <para>
+    /// The site prints "A-95 ЄВРО", "ДП ЄВРО", "95 PULLS", "100 PULLS" — a label per brand, per
+    /// locale, per designer. Those are renderings of a grade, not its identity, and taking one as the
+    /// name is what put "95" and "ДП" in the catalogue beside the "100 PULLS" and "ДП PULLS" that
+    /// already meant those grades. The code is the identity, so the name follows the code.
+    /// </para>
+    /// </summary>
+    public static string CanonicalName(OkkoFuelCategory category) => category switch
+    {
+        OkkoFuelCategory.A95 => "А-95",
+        OkkoFuelCategory.A95Pulls => "Пульс 95",
+        OkkoFuelCategory.Diesel => "ДП",
+        OkkoFuelCategory.DieselPulls => "Пульс ДП",
+        OkkoFuelCategory.Gas => "Пропан",
+        _ => throw new ArgumentOutOfRangeException(nameof(category), category, "unmapped grade"),
+    };
 
     /// <summary>
     /// Extracts the leading numeric OKKO product code from a QR payload (the digits before the
@@ -110,7 +134,11 @@ public static class OkkoFuelClassifier
 
         var lower = source.ToLowerInvariant();
 
-        if (lower.Contains("газ") || lower.Contains("gas") || lower.Contains("лпг") || lower.Contains("lpg"))
+        // "ГАЗ" and its Latin spellings. "SPBT" is the brand's own code for LPG (сжижений пропан),
+        // and "LPG" is how an operator writes it; neither contains "газ", so without them a fuel
+        // named after the code classifies as no grade at all.
+        if (lower.Contains("газ") || lower.Contains("gas") || lower.Contains("лпг")
+            || lower.Contains("lpg") || lower.Contains("spbt"))
             return OkkoFuelCategory.Gas;
 
         var hasPulls = lower.Contains("pulls") || lower.Contains("пулс");

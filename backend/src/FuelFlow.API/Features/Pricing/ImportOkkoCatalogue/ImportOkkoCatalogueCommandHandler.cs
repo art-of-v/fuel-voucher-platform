@@ -13,46 +13,72 @@ public sealed record ImportOkkoCatalogueCommand(IReadOnlyList<OkkoPumpPrice> She
 /// <summary>One fuel the catalogue did not have and now has, or would have in a dry run.</summary>
 public sealed record OkkoCatalogueCreated(string FuelTypeId, string Name, string BrandFuelCode, decimal PumpPricePerLiter);
 
+/// <summary>
+/// A grade the sheet publishes and we already sell, under a name of our own choosing. Nothing is written
+/// for it — a second row for a grade we already carry is the duplicate this whole identity rule exists to
+/// prevent — and the pair is reported so an operator can give that fuel the brand's code.
+/// </summary>
+public sealed record OkkoCatalogueGradeHeld(string SiteFuelCode, OkkoFuelCategory Grade, string OurFuelName);
+
+/// <summary>Two grades wanting one name; reported rather than resolved by renaming something by guesswork.</summary>
+public sealed record OkkoCatalogueNameCollision(string Name, string SiteFuelCode);
+
 public sealed record OkkoCatalogueApplyResult(
     int Created,
     int AlreadyKnown,
     IReadOnlyList<OkkoCatalogueCreated> CreatedFuels,
+    /// <summary>Grades the sheet publishes that we already sell under our own name, with nothing written.</summary>
+    IReadOnlyList<OkkoCatalogueGradeHeld> GradesHeld,
+    /// <summary>Grades whose canonical name is already taken by a fuel of another grade; a human decides.</summary>
+    IReadOnlyList<OkkoCatalogueNameCollision> NameCollisions,
     /// <summary>Site rows the catalogue has no counterpart for and no category we sell (jet fuel, AdBlue).</summary>
     IReadOnlyList<string> UnclassifiedSiteFuels,
-    /// <summary>Site rows we know the grade of but could not name, because the payload carried no label.</summary>
-    IReadOnlyList<string> UnnamedSiteFuels,
     bool DryRun);
 
 /// <summary>
 /// Brings the OKKO catalogue up to what OKKO sells, from the same price sheet the pump sync already
-/// fetches every fifteen minutes. Planning #349, step 4.
+/// fetches every fifteen minutes. Planning #349 step 4, #360.
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>What it writes, and what it refuses to.</b> A missing fuel becomes a row: the brand's code, the
-/// brand's own label, and an offer carrying nothing but the published pump price. Everything an
-/// operator owns is left alone — our price, the margin, the minimum discount, the below-cost opt-in —
-/// and an existing fuel is not touched at all, because the pump sync already owns its price. The
-/// asymmetry is the point: this is a way of learning that a grade exists, not a way of pricing one.
+/// <b>One row per grade.</b> A fuel is identified by (brand, grade), and the grade is read from the
+/// brand's own code — never from the label the site renders, because those are per-brand, per-locale
+/// renderings that move with a designer ("95 PULLS", "ДП ЄВРО", "100 PULLS"). A sheet row whose grade
+/// the catalogue already holds is <em>reported</em>, never created: that is what stopped the import
+/// adding "ДП" beside the "ДП PULLS" that already meant the same diesel, and "95" beside "100 PULLS".
+/// Two rows for one grade is not a cosmetic problem — the storefront lists the result as two fuels, and
+/// a voucher importer resolving by grade could price against either twin.
+/// </para>
+/// <para>
+/// <b>What it writes, and what it refuses to.</b> A missing grade becomes a row: the brand's code, a name
+/// derived from the grade, and an offer carrying nothing but the published pump price. Everything an
+/// operator owns is left alone — our price, the margin, the minimum discount, the below-cost opt-in,
+/// the name itself — and an existing fuel is not touched at all, because the pump sync already owns its
+/// price. The asymmetry is the point: this is a way of learning that a grade exists, not a way of
+/// pricing one.
+/// </para>
+/// <para>
+/// <b>It never renames.</b> "А95 ЄВРО" stays "А95 ЄВРО": the operator put "ЄВРО" there and it means
+/// something to whoever reads it. A rename is an event in the price history and a human's decision, not
+/// something an import does to a row nobody is looking at.
 /// </para>
 /// <para>
 /// <b>It never archives.</b> "Not on the site this morning" is not "remove it from the catalogue": a
 /// broken selector, an anti-bot page or a locale change would empty the storefront of every fuel at
 /// once, and every voucher already sold points at a fuel that must still resolve. A grade the brand
-/// drops stays here until an operator archives it, which is the same policy as everywhere else in the
-/// catalog (#217).
+/// drops stays here — and, having no nominals of its own, leaves the shelf on its own (#217, #360).
 /// </para>
 /// <para>
-/// <b>It only creates grades we already sell.</b> A row whose code maps to no canonical category —
-/// aviation jet, the AdBlue additive — is reported and dropped. Inventing a fuel the catalogue has no
-/// category for is how an import turns a supplier's new product into a sellable row nobody priced.
+/// <b>It only creates grades we sell.</b> A row whose code maps to no canonical grade — aviation jet,
+/// the AdBlue additive — is reported and dropped. Inventing a fuel the catalogue has no grade for is how
+/// an import turns a supplier's new product into a sellable row nobody priced.
 /// </para>
 /// <para>
 /// <b>A created fuel is not sellable.</b> It gets an offer with a pump price and <em>no volumes</em>,
-/// and the storefront lists volumes: so the fuel is invisible until an operator opens the brand
-/// screen and sets a margin, at which point the default nominals are seeded and it appears at a price
-/// a human chose. An import that guessed a margin would be publishing a price nobody approved, which
-/// is the incident the whole offer split came from (F-33: 1,00 грн/л on the live site).
+/// and the storefront lists volumes: so the fuel is invisible until an operator adds nominals, at which
+/// point it appears at the pump price with no acquisition cost behind it. An import that guessed a
+/// margin would be publishing a price nobody approved, which is the incident the whole offer split came
+/// from (F-33: 1,00 грн/л on the live site).
 /// </para>
 /// <para>
 /// <b>An empty sheet is refused outright.</b> Zero rows must never be able to mean "the catalogue is
@@ -94,17 +120,11 @@ public sealed class ImportOkkoCatalogueCommandHandler
         var created = new List<OkkoCatalogueCreated>();
         var alreadyKnown = 0;
         var unclassified = new List<string>();
-        var unnamed = new List<string>();
+        var gradesHeld = new List<OkkoCatalogueGradeHeld>();
+        var nameCollisions = new List<OkkoCatalogueNameCollision>();
 
         // What we already carry, live rows only: an archived fuel must not stop a fresh one from being
         // created for a grade the brand sells again.
-        //
-        // BOTH the codes and the names, and the names are what made this necessary. Production carried
-        // fifteen fuels and not one code, so a code-only test said "every grade is missing" and the
-        // import tried to create "ГАЗ" beside the "ГАЗ" that was already there — refused by
-        // ux_fuel_types_station_name, every fifteen minutes, since the deploy. A name is not an identity
-        // (that is the whole point of the code), but on its own it is enough to say "we sell this grade
-        // already", and the code it lacks is the backfill's job, not this import's.
         var carried = (await _context.FuelTypes
                 .AsNoTracking()
                 .Where(f => f.StationId == OkkoStationId && !f.IsDeleted)
@@ -121,39 +141,72 @@ public sealed class ImportOkkoCatalogueCommandHandler
             .Select(name => name!)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+        // The grade each carried fuel already occupies, and under what name. This is what makes a second
+        // row for one grade impossible: a fuel is identified by (brand, grade), and the grade is read
+        // from the brand's code rather than from spelling.
+        //
+        // Code first, name second, because our own catalogue holds both spellings - "ДП" and "DP",
+        // "А-95" and "А95 ЄВРО" - and each pair is one fuel. A fuel whose code is unmapped still holds
+        // its grade if its name classifies.
+        var gradeHolder = new Dictionary<OkkoFuelCategory, string>();
+        foreach (var fuel in carried)
+        {
+            var held = OkkoFuelClassifier.CategoryFromSiteFuelCode(fuel.BrandFuelCode)
+                ?? OkkoFuelClassifier.CategoryFromName(fuel.Name);
+
+            if (held is { } grade && !gradeHolder.ContainsKey(grade))
+                gradeHolder[grade] = fuel.Name;
+        }
+
         foreach (var row in command.Sheet)
         {
             var code = FuelTypeEntity.NormaliseBrandFuelCode(row.SiteFuelCode);
             if (code is null) continue;
 
-            if (OkkoFuelClassifier.CategoryFromSiteFuelCode(code) is null)
+            if (OkkoFuelClassifier.CategoryFromSiteFuelCode(code) is not { } grade)
             {
                 unclassified.Add(code);
                 continue;
             }
 
-            var name = FuelTypeEntity.NormaliseBrandFuelCode(row.FuelName) is { } rawName && rawName.Length > 0
-                ? rawName
-                : null;
-
-            // The code first: it is the stronger claim, and a fuel holding it needs nothing from us.
-            // The name second, which is how a grade we sell under our own spelling is left alone.
-            if (knownCodes.Contains(code) || (name is not null && knownNames.Contains(name)))
+            // Code first: a live fuel already holding the brand's own code for this grade is the whole job
+            // done, and there is nothing for an operator to act on.
+            if (knownCodes.Contains(code))
             {
                 alreadyKnown++;
                 continue;
             }
 
-            if (name is null)
+            // The grade is the identity. If we sell this grade under another name - ours, or the site's,
+            // or a spelling we have never seen - then a second row is a duplicate by construction.
+            // Production grew one by skipping this test: nothing carried a code, so every grade looked
+            // missing and "ДП" was added beside the "ДП PULLS" that already meant the same diesel.
+            //
+            // Reported rather than created, and reported loudly, because this is the one case where a
+            // human still has work to do: our fuel needs the brand's code to resolve exactly.
+            if (gradeHolder.TryGetValue(grade, out var holder))
             {
-                // Known grade, no label. Creating it would mean naming a customer-facing fuel after its
-                // code — "DP" on the storefront — so it is reported instead.
-                unnamed.Add(code);
+                gradesHeld.Add(new OkkoCatalogueGradeHeld(code, grade, holder));
+                continue;
+            }
+
+            // The name comes from the grade, never from the site's label. The labels are per-brand
+            // renderings of a grade - "95 PULLS", "ДП ЄВРО", "100 PULLS" - that move with a designer or
+            // a locale, and taking one as the name is how a fuel called "95" ended up next to
+            // "100 PULLS".
+            var name = OkkoFuelClassifier.CanonicalName(grade);
+
+            if (!command.DryRun && knownNames.Contains(name))
+            {
+                // Two grades wanting one name. The unique index would refuse it and guessing which to
+                // rename would be worse, so it is reported and a human decides.
+                nameCollisions.Add(new OkkoCatalogueNameCollision(name, code));
                 continue;
             }
 
             knownCodes.Add(code);
             knownNames.Add(name);
+            gradeHolder[grade] = name;
 
             if (command.DryRun)
             {
@@ -223,8 +276,13 @@ public sealed class ImportOkkoCatalogueCommandHandler
             Created: created.Count,
             AlreadyKnown: alreadyKnown,
             CreatedFuels: created,
+            GradesHeld: gradesHeld
+                .DistinctBy(h => (h.Grade, h.OurFuelName))
+                .ToList(),
+            NameCollisions: nameCollisions
+                .DistinctBy(c => (c.Name, c.SiteFuelCode))
+                .ToList(),
             UnclassifiedSiteFuels: unclassified.Distinct(StringComparer.Ordinal).ToList(),
-            UnnamedSiteFuels: unnamed.Distinct(StringComparer.Ordinal).ToList(),
             DryRun: command.DryRun);
     }
 }

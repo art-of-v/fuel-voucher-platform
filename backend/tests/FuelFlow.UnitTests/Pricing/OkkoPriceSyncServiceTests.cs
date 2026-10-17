@@ -285,7 +285,9 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
         _context.ChangeTracker.Clear();
 
         var created = await _context.FuelTypes.SingleAsync(f => f.BrandFuelCode == "DP");
-        created.Name.Should().Be("ДП ЄВРО");
+        created.Name.Should().Be(
+            "ДП",
+            "the name comes from the grade the code identifies; the site's own label is a rendering of it");
 
         // The new fuel's offer carries the published pump and nothing else, and stays off sale: no
         // volumes, no cost, no margin. It waits for an operator rather than going live at zero.
