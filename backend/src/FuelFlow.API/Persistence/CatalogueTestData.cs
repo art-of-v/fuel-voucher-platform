@@ -130,18 +130,31 @@ internal static class CatalogueTestData
         DateTime? createdAtUtc = null,
         DateTime? updatedAtUtc = null)
     {
-        var offer = context.SeedOffer(
+var offer = context.SeedOffer(
             stationId, fuelTypeId, isTestData,
             supplierPricePerLiter, marginUahPerLiter, marginPercent,
             finalPricePerLiter, pumpPricePerLiter, minDiscountPerLiter,
             createdAtUtc, updatedAtUtc);
+
+        // `price` is what the test wants this package to sell for. Under the override model that is
+        // either the offer's own rate × litres — in which case it is written as nothing at all and the
+        // package follows its fuel — or a deliberate exception, in which case it becomes the override and
+        // stays visible as one. Which of the two it is is decided here rather than by each test, so a
+        // fixture cannot accidentally pin a price it meant to be derived.
+        var derived = FuelPricing.TryPackagePrice(
+            offer.SupplierPricePerLiter,
+            offer.MarginUahPerLiter,
+            offer.PumpPricePerLiter,
+            offer.MinDiscountPerLiter,
+            liters,
+            overrideUah: null);
 
         var volume = new FuelOfferVolume
         {
             Id = id,
             OfferId = offer.Id,
             Liters = liters,
-            PackagePrice = price,
+            PriceOverrideUah = derived == price ? null : price,
             CreatedAtUtc = createdAtUtc ?? DateTime.UtcNow,
             UpdatedAtUtc = updatedAtUtc ?? DateTime.UtcNow,
         };

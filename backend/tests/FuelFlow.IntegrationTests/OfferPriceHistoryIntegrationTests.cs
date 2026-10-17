@@ -254,7 +254,7 @@ public sealed class OfferPriceHistoryIntegrationTests : IClassFixture<TestDataba
             Id = $"vol-history-restrict-{Guid.CreateVersion7()}",
             OfferId = offer.Id,
             Liters = 10m,
-            PackagePrice = 520m,
+            PriceOverrideUah = 520m,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };

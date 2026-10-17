@@ -336,7 +336,7 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
             Id = "vol-a",
             OfferId = offer.Id,
             Liters = 10m,
-            PackagePrice = 500m,
+            PriceOverrideUah = 500m,
             CreatedAtUtc = now,
             UpdatedAtUtc = now
         });
@@ -349,7 +349,7 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
             Id = "vol-b",           // different id, same (offer, litres)
             OfferId = offer.Id,
             Liters = 10m,
-            PackagePrice = 400m,
+            PriceOverrideUah = 400m,
             CreatedAtUtc = now,
             UpdatedAtUtc = now
         });
@@ -384,7 +384,7 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
             Id = $"neg-vol-{liters}",
             OfferId = offer.Id,
             Liters = liters,
-            PackagePrice = 100m,
+            PriceOverrideUah = 100m,
             CreatedAtUtc = now,
             UpdatedAtUtc = now
         });
@@ -463,7 +463,7 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
 
         await context.Database.ExecuteSqlRawAsync(
             """
-            INSERT INTO fuel_offer_volumes (id, offer_id, liters, package_price, is_deleted,
+            INSERT INTO fuel_offer_volumes (id, offer_id, liters, price_override_uah, is_deleted,
                                            created_at_utc, updated_at_utc)
             VALUES ('arch-vol-live', 'arch-offer', 10, 600, false, now(), now()),
                    ('arch-vol-dead', 'arch-offer', 20, 1200, true,  now(), now())
@@ -506,7 +506,7 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
 
         await context.Database.ExecuteSqlRawAsync(
             """
-            INSERT INTO fuel_offer_volumes (id, offer_id, liters, package_price, is_deleted,
+            INSERT INTO fuel_offer_volumes (id, offer_id, liters, price_override_uah, is_deleted,
                                            created_at_utc, updated_at_utc)
             VALUES ('keep-vol-live', 'keep-offer', 10, 600, false, now(), now()),
                    ('keep-vol-dead', 'keep-offer', 20, 1200, true,  now(), now())
@@ -542,12 +542,14 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
 
         var volumes = await context.FuelOfferVolumes.IgnoreQueryFilters()
             .Where(v => v.OfferId == okko95.Id)
-            .Select(v => new { v.Liters, v.PackagePrice })
+            .Select(v => new { v.Liters, v.PriceOverrideUah })
             .OrderBy(v => v.Liters)
             .ToListAsync();
 
         volumes.Should().HaveCount(3, "the seed gives okko-95 its 10/20/50 L nominals");
         volumes.Select(v => v.Liters).Should().BeEquivalentTo([10m, 20m, 50m]);
-        volumes.Single(v => v.Liters == 10m).PackagePrice.Should().Be(510m, "10 L at 51.00");
+        // No stored total and no override: the 10 L nominal works out to 10 L at 51.00 through the
+        // offer's rate, which is the same number the seed used to write into a package_price column.
+        volumes.Should().OnlyContain(v => v.PriceOverrideUah == null);
     }
 }

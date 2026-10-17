@@ -456,7 +456,9 @@ public sealed class StationsCommandHandlersTests : IDisposable
         _context.ChangeTracker.Clear();
         var persisted = await _context.FuelOfferVolumes.FindAsync("pkg-1");
         persisted!.Liters.Should().Be(50m);
-        persisted.PackagePrice.Should().Be(3000);
+        // The endpoint now sets an OVERRIDE, and 3000 is the round marketing price it was written to
+        // test with. It is no longer a stored total that other write paths overwrite.
+        persisted.PriceOverrideUah.Should().Be(3000);
 
         // The volume still belongs to the offer it was created under.
         persisted.OfferId.Should().Be(offerIdBefore);
@@ -537,7 +539,11 @@ public sealed class StationsCommandHandlersTests : IDisposable
             FuelTypeId = fuelTypeId,
             FuelName = fuelName,
             Liters = liters,
+            // The effective price is what these fixtures state the package should sell for, and the
+            // endpoint writes it as an OVERRIDE — so it is both, here. A package priced by hand rather than
+            // derived from its fuel's rate is exactly what these two endpoints exist for.
             Price = price,
+            PriceOverrideUah = price,
             OriginalPrice = originalPrice,
             SupplierPricePerLiter = costPerLiter
         };

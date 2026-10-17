@@ -25,7 +25,6 @@ namespace FuelFlow.IntegrationTests;
 public sealed class PreflightDbFileTests
 {
     [Theory]
-    [InlineData("010-offer-volume-price-agreement.sql")]
     [InlineData("011-fuel-type-name-twins.sql")]
     [InlineData("012-offer-station-matches-its-fuel-type.sql")]
     public void EveryCheck_IsShapedSoItCannotWrite(string fileName)
@@ -52,7 +51,7 @@ public sealed class PreflightDbFileTests
         // silent gap as a preflight check nobody reads. Enumerating the directory rather than trusting
         // the [InlineData] list is what makes the list exhaust the directory.
         var directory = Path.GetDirectoryName(
-            FindRepoFile(Path.Combine("deploy", "preflight-db", "010-offer-volume-price-agreement.sql")))!;
+            FindRepoFile(Path.Combine("deploy", "preflight-db", "011-fuel-type-name-twins.sql")))!;
         var files = Directory.GetFiles(directory, "*.sql").Select(Path.GetFileName).ToList();
 
         files.Should().NotBeEmpty();

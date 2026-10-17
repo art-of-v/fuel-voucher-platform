@@ -42,18 +42,13 @@ public sealed class OfferSplitGuardTests
         sql.Should().Contain("WHERE NOT is_deleted",
             "grouping over archived rows is what aborted the 2026-10-15 production deploy");
 
-        // And the same scope as the preflight that checks the live catalogue before a deploy.
-        //
-        // The preflight asks a different question now — a volume against its offer, rather than two
-        // rows of one group — but it excludes archived rows for the same reason, and it joins two
-        // tables, so BOTH have to be filtered. Asserting only the offer side would pass while a
-        // volume-side filter went missing, and an archived volume is exactly the row whose stale
-        // price must never be able to block a deploy.
-        var preflight = CodeOnly(File.ReadAllText(FindRepoFile(
-            Path.Combine("deploy", "preflight-db", "010-offer-volume-price-agreement.sql"))));
-
-        preflight.Should().Contain("WHERE NOT o.is_deleted", "an archived offer is history, not a live price");
-        preflight.Should().Contain("AND NOT v.is_deleted", "and an archived volume must not count against its offer either");
+        // The preflight that used to answer the same question is gone: `010` asked whether a volume's
+        // total disagreed with its offer, and `PackagePriceOverrideOnNominals` (2026-10-17) removed the
+        // stored total, so there is nothing left to disagree — the price is computed at read time by
+        // `FuelPricing.PackagePrice`, and the shelf and the charge call the same function. Nothing took
+        // its place, because a drift between one number and another is no longer representable. The
+        // archived-row scope below therefore belongs to no file, and asserting it against one that is
+        // gone would only assert that a path exists. See deploy/preflight-db/README.md.
     }
 
     [Fact]

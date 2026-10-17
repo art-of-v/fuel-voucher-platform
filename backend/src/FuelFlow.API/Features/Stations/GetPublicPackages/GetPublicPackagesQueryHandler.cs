@@ -68,13 +68,13 @@ var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
                 offer.FuelTypeId,
                 FuelName = fuel.Name,
                 volume.Liters,
-                Price = volume.PackagePrice,
-                offer.PumpPricePerLiter,
-                // The four knobs, not the derived price: `fuel_offers` stopped storing the figure on
-                // 2026-10-17, so the customer price is computed below from these. Four nullable columns
-                // cross the wire to the projection; the supplier cost never leaves the database.
+                // The nominal's own price if one was set, otherwise null — resolved below against the
+                // offer's rate. Four nullable columns cross the wire to the projection; the supplier cost
+                // never leaves the database.
+                volume.PriceOverrideUah,
                 offer.SupplierPricePerLiter,
                 offer.MarginUahPerLiter,
+                offer.PumpPricePerLiter,
                 offer.MinDiscountPerLiter,
             })
             .ToListAsync(ct);
@@ -86,17 +86,29 @@ var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
         var available = await _stock.AvailableKeysAsync(isTestAccount, ct);
 
         return rows
-            .Select(x => new PublicPackageResponse(
-                x.Id,
-                x.StationId,
-                x.FuelTypeId,
-                x.FuelName,
-                x.Liters,
-                x.Price,
-                FuelPricing.OriginalPackagePrice(x.PumpPricePerLiter, x.Liters, x.Price),
-                FuelPricing.FinalPerLiterOrNull(
-                    x.SupplierPricePerLiter, x.MarginUahPerLiter, x.PumpPricePerLiter, x.MinDiscountPerLiter),
-                available.Contains(StockKey.For(x.StationId, x.FuelTypeId, x.Liters))))
+            // A package whose fuel nobody has priced yet and which carries no override has no price to
+            // show. It is skipped rather than published at zero: a zero on the shelf is a free fuel, and
+            // the row would also be unbuyable. On production that is 0 of 122 rows.
+            .Where(x => x.PriceOverrideUah is not null
+                || (x.SupplierPricePerLiter is not null && x.MarginUahPerLiter is not null))
+            .Select(x =>
+            {
+                var price = FuelPricing.PackagePrice(
+                    x.SupplierPricePerLiter, x.MarginUahPerLiter, x.PumpPricePerLiter, x.MinDiscountPerLiter,
+                    x.Liters, x.PriceOverrideUah);
+
+                return new PublicPackageResponse(
+                    x.Id,
+                    x.StationId,
+                    x.FuelTypeId,
+                    x.FuelName,
+                    x.Liters,
+                    price,
+                    FuelPricing.OriginalPackagePrice(x.PumpPricePerLiter, x.Liters, price),
+                    FuelPricing.FinalPerLiterOrNull(
+                        x.SupplierPricePerLiter, x.MarginUahPerLiter, x.PumpPricePerLiter, x.MinDiscountPerLiter),
+                    available.Contains(StockKey.For(x.StationId, x.FuelTypeId, x.Liters)));
+            })
             .ToList();
     }
 }

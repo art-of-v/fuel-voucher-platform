@@ -248,12 +248,11 @@ public sealed class ImportOkkoPumpPricesCommandHandler
                     offer.PumpPricePerLiter = pump;
                     offer.UpdatedAtUtc = now;
 
-                    foreach (var volume in vols)
-                    {
-                        volume.PackagePrice = Math.Round(finalPerLiter * volume.Liters, 2, MidpointRounding.AwayFromZero);
-                        volume.UpdatedAtUtc = now;
-                    }
-
+                    // The volumes' prices are not restated here, and that is the change: a volume's price
+                    // is the offer's rate × its litres unless it carries an override, so this loop used
+                    // to write the same number into every row every quarter hour — and erased any
+                    // per-nominal override the moment a pump moved. The offer is the single price now,
+                    // which is what `PackagesRepriced` counts and what the operator screen shows.
                     repricedOffers.Add(offer);
                 }
 

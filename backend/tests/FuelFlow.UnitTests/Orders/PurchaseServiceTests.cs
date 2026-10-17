@@ -366,7 +366,10 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
             BasePrice = 50, DiscountPrice = 48,
             CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
         });
-        _context.SeedPackage("pkg-okko-frac-10", "okko", "okko-frac", 10m, 4567m,
+        // 45.67/litre × 10 = 456.70 — the price the offer's own knobs produce, stated so the fixture agrees
+        // with the formula. It said 4567 here before, which the old stored total made harmless; under an
+        // override model that would have pinned the package at ten times its worth.
+        _context.SeedPackage("pkg-okko-frac-10", "okko", "okko-frac", 10m, 456.70m,
             supplierPricePerLiter: 43m, marginUahPerLiter: 2.67m, // cost-plus 45.67/л, ≥ cost → not below-cost
             finalPricePerLiter: 45.67m);
         await _context.SaveChangesAsync();

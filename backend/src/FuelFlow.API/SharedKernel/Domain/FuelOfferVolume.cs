@@ -1,23 +1,36 @@
 namespace FuelFlow.SharedKernel.Domain;
 
 /// <summary>
-/// One volume an offer is sold in — 2 L, 3 L, 5 L — and the price of that package.
+/// One volume an offer is sold in — 2 L, 3 L, 5 L — and, optionally, a price that is this nominal's
+/// own rather than the offer's rate applied to it.
 /// </summary>
 /// <remarks>
 /// <para>
 /// This is the row that <c>fuel_packages</c> rows become. It keeps exactly two facts of its own: how
-/// many litres, and what the whole package costs. Everything else about pricing moved to
-/// <see cref="FuelOffer"/>, because it was true of the offer rather than of the volume.
+/// many litres, and whether an operator has deliberately priced this nominal differently.
 /// </para>
 ///
 /// <para>
-/// <b><see cref="PackagePrice"/> is redundant with the offer price times the volume, and that is
-/// deliberate.</b> It is what the customer is charged for this package, and freezing it is the same
-/// reasoning as <c>order_line_items.unit_price</c>: a checkout must be reproducible after the price
-/// moves, and the offer price at the moment of sale is not recorded anywhere else. The relation
-/// <c>PackagePrice = round(FinalPricePerLiter × liters, 2)</c> holds today and is asserted in
-/// <c>FuelOfferVolumeConsistencyTests</c>, but it is not a database constraint: the retailer's own
-/// price for a 50 L bottle is allowed to differ from the arithmetic.
+/// <b>What replaced <c>package_price</c>, and why it is nullable.</b> The old column held what the
+/// customer pays for this package, stored as <c>round(final_price_per_liter × liters, 2)</c> on every one
+/// of the 122 live production volumes — a second copy of a number the offer's rate already determined.
+/// Two admin endpoints could write any value into it without checking it against the knobs, and five
+/// other write paths then overwrote it back to the arithmetic, so it was at once a duplicate and a
+/// "soft" override pretending to be a frozen price: one reprice erased it, and
+/// <c>deploy/preflight-db/010</c> existed to notice when it had not.
+///
+/// <see cref="PriceOverrideUah"/> splits those two jobs. Null means "price this nominal like the rest of
+/// the fuel", and every repricing moves it with the offer. A number means an operator set this nominal on
+/// purpose — a round marketing price for a 50 L canister — and a reprice leaves it alone. Which one is
+/// in force is resolved by <see cref="FuelPricing.PackagePrice"/>, the same function the shelf, the quote
+/// and the charge use, so a displayed price and a charged price cannot disagree.
+/// </para>
+///
+/// <para>
+/// <b>An override is not a way around the below-cost guard.</b> It is a price like any other and is
+/// refused the same way when it would sell under cost — see
+/// <see cref="FuelPricing.IsBelowCost(decimal?,decimal,decimal)"/>, which is asked about the price that
+/// will actually be charged.
 /// </para>
 ///
 /// <para>
@@ -46,10 +59,11 @@ public sealed class FuelOfferVolume
     public decimal Liters { get; set; }
 
     /// <summary>
-    /// What the whole package costs, in UAH. Bounded at zero by
-    /// <c>ck_fuel_offer_volumes_package_price_non_negative</c>.
+    /// This nominal's own price in UAH, or null to price it from the offer's rate. See the class remarks
+    /// for what this replaced and why null is the ordinary case. Bounded at zero by
+    /// <c>ck_fuel_offer_volumes_price_override_non_negative</c>.
     /// </summary>
-    public decimal PackagePrice { get; set; }
+    public decimal? PriceOverrideUah { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }

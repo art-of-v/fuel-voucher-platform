@@ -50,30 +50,41 @@ public sealed class GetPublicPackagesByStationQueryHandler
                 offer.FuelTypeId,
                 FuelName = fuel.Name,
                 volume.Liters,
-                Price = volume.PackagePrice,
-                offer.PumpPricePerLiter,
-                // The knobs rather than the derived figure - see GetPublicPackagesQueryHandler, which
-                // explains why the supplier cost crosses this projection and stops there.
+                // Resolved against the offer's rate below — see GetPublicPackagesQueryHandler, which is
+                // the same query narrowed to one station.
+                volume.PriceOverrideUah,
                 offer.SupplierPricePerLiter,
                 offer.MarginUahPerLiter,
+                offer.PumpPricePerLiter,
                 offer.MinDiscountPerLiter,
             })
             .ToListAsync(ct);
 
         var available = await _stock.AvailableKeysAsync(isTestAccount, ct);
 
+        // Unpriced, unoverridden packages are skipped rather than shown at zero: see the same filter in
+        // GetPublicPackagesQueryHandler.
         return rows
-            .Select(x => new PublicPackageResponse(
-                x.Id,
-                x.StationId,
-                x.FuelTypeId,
-                x.FuelName,
-                x.Liters,
-                x.Price,
-                FuelPricing.OriginalPackagePrice(x.PumpPricePerLiter, x.Liters, x.Price),
-                FuelPricing.FinalPerLiterOrNull(
-                    x.SupplierPricePerLiter, x.MarginUahPerLiter, x.PumpPricePerLiter, x.MinDiscountPerLiter),
-                available.Contains(StockKey.For(x.StationId, x.FuelTypeId, x.Liters))))
+            .Where(x => x.PriceOverrideUah is not null
+                || (x.SupplierPricePerLiter is not null && x.MarginUahPerLiter is not null))
+            .Select(x =>
+            {
+                var price = FuelPricing.PackagePrice(
+                    x.SupplierPricePerLiter, x.MarginUahPerLiter, x.PumpPricePerLiter, x.MinDiscountPerLiter,
+                    x.Liters, x.PriceOverrideUah);
+
+                return new PublicPackageResponse(
+                    x.Id,
+                    x.StationId,
+                    x.FuelTypeId,
+                    x.FuelName,
+                    x.Liters,
+                    price,
+                    FuelPricing.OriginalPackagePrice(x.PumpPricePerLiter, x.Liters, price),
+                    FuelPricing.FinalPerLiterOrNull(
+                        x.SupplierPricePerLiter, x.MarginUahPerLiter, x.PumpPricePerLiter, x.MinDiscountPerLiter),
+                    available.Contains(StockKey.For(x.StationId, x.FuelTypeId, x.Liters)));
+            })
             .ToList();
     }
 }

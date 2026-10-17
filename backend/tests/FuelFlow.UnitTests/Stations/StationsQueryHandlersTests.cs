@@ -699,7 +699,7 @@ public sealed class StationsQueryHandlersTests : IDisposable
             Id = id,
             OfferId = offer.Id,
             Liters = liters,
-            PackagePrice = 500m,
+            PriceOverrideUah = 500m,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
         };

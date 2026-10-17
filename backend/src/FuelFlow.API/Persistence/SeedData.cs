@@ -114,7 +114,9 @@ internal static class SeedData
                         Id = $"{ft.Id}-{liters}",
                         OfferId = offer.Id,
                         Liters = liters,
-                        PackagePrice = Math.Round(finalPrice * liters, 2, MidpointRounding.AwayFromZero),
+                        // No override: the seeded catalogue is priced from its fuel's rate, which is what
+                        // the old stored total worked out to anyway (finalPrice = cost + margin, no pump).
+                        PriceOverrideUah = null,
                         CreatedAtUtc = CreatedAtUtc,
                         UpdatedAtUtc = CreatedAtUtc,
                     });
@@ -128,7 +130,7 @@ internal static class SeedData
                 Id = "okko-dp-2",
                 OfferId = dp.Id,
                 Liters = 2m,
-                PackagePrice = 104,
+                PriceOverrideUah = null,   // 104 = 52/litre x 2, i.e. exactly the fuel's rate
                 CreatedAtUtc = CreatedAtUtc,
                 UpdatedAtUtc = CreatedAtUtc,
             });
@@ -137,7 +139,7 @@ internal static class SeedData
                 Id = "okko-dp-3",
                 OfferId = dp.Id,
                 Liters = 3m,
-                PackagePrice = 156,
+                PriceOverrideUah = null,   // 156 = 52/litre x 3
                 CreatedAtUtc = CreatedAtUtc,
                 UpdatedAtUtc = CreatedAtUtc,
             });
