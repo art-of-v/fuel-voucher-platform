@@ -164,13 +164,21 @@ internal sealed class VoucherMovementConfiguration : IEntityTypeConfiguration<Vo
                 "amount_uah IS NULL OR amount_uah >= 0");
 
             // Every action has an author. A person needs an id; the scheduler does not and must not
-            // invent one. This is what makes NULL, a zero GUID and a fake user id all unrepresentable.
+            // invent one. This is what makes NULL unrepresentable.
             t.HasCheckConstraint(
                 "ck_voucher_movements_actor_kind",
                 $"actor_kind IN ({string.Join(",", VoucherActorKinds.All.Select(k => $"'{k}'"))})");
 
             t.HasCheckConstraint("ck_voucher_movements_actor_named",
                 "(actor_kind = 'user') = (actor_user_id IS NOT NULL)");
+
+            // The zero GUID is what a missing claim actually becomes, not a hypothetical:
+            // `AdminVoucherController.GetUserId` returns `Guid.Empty` rather than null when the
+            // NameIdentifier claim is absent. Being NOT NULL it satisfies the pairing constraint
+            // above, so without this the row names a user that does not exist. The first version of
+            // this table claimed otherwise; this is what makes the claim true.
+            t.HasCheckConstraint("ck_voucher_movements_actor_is_somebody",
+                "actor_user_id IS NULL OR actor_user_id <> '00000000-0000-0000-0000-000000000000'");
         });
     }
 }

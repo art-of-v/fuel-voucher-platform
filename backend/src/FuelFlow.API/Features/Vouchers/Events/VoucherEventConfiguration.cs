@@ -155,14 +155,27 @@ internal sealed class VoucherEventConfiguration : IEntityTypeConfiguration<Vouch
                 "event_type <> 'Imported' OR (from_status IS NULL AND previous_customer_expiration IS NULL)");
 
             // Every action has an author, same rule as voucher_movements. A person needs an id; the
-            // scheduler does not and must not invent one. This makes NULL, a zero GUID and a fake user
-            // id all unrepresentable rather than merely discouraged.
+            // scheduler does not and must not invent one. This makes NULL unrepresentable.
             t.HasCheckConstraint(
                 "ck_voucher_events_actor_kind",
                 $"actor_kind IN ({string.Join(",", VoucherActorKinds.All.Select(k => $"'{k}'"))})");
 
             t.HasCheckConstraint("ck_voucher_events_actor_named",
                 "(actor_kind = 'user') = (actor_user_id IS NOT NULL)");
+
+            // The zero GUID is what a missing claim actually becomes, not a hypothetical:
+            // `AdminVoucherController.GetUserId` returns `Guid.Empty` rather than null when the
+            // NameIdentifier claim is absent. That value is NOT NULL, so the pairing CHECK above
+            // accepts it — and the row then names a user that does not exist, which is precisely the
+            // "plausible-looking value that resolves to nobody" this whole arrangement exists to
+            // prevent. The first version of this table claimed the zero GUID was unrepresentable and
+            // it was not; this is what makes that claim true.
+            //
+            // Stated as its own constraint rather than folded into the pairing, so each rule reads
+            // separately. `IS NULL OR ...` also cannot evaluate to NULL for a non-null id, so this
+            // half does not repeat the NULL trap above.
+            t.HasCheckConstraint("ck_voucher_events_actor_is_somebody",
+                "actor_user_id IS NULL OR actor_user_id <> '00000000-0000-0000-0000-000000000000'");
         });
     }
 }
