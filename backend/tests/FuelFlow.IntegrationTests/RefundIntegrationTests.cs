@@ -120,7 +120,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
         // Regression (#63): the refund copies the order's IdempotencyKey into refunds.ext_ref.
         // A bulk checkout builds a 111-char key (userId + time bucket + cart digest + a fresh
         // GUID), which fits orders.idempotency_key (varchar 150) but overflowed the old
-        // ext_ref (varchar 100) ΓÇö the INSERT threw Postgres 22001 "value too long for type
+        // ext_ref (varchar 100) — the INSERT threw Postgres 22001 "value too long for type
         // character varying(100)", surfacing as an unhandled 500 on every bulk-order refund.
         // ext_ref is now varchar(150), matching its source column.
         var userId = Guid.NewGuid();

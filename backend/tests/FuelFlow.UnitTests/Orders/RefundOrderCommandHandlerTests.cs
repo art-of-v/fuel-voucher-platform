@@ -249,7 +249,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         await _context.SaveChangesAsync();
 
         // One of two units is already delivered, so only 250000 kopecks are
-        // refundable ΓÇö the caller-supplied 999999 must be capped down.
+        // refundable — the caller-supplied 999999 must be capped down.
         var result = await _handler.HandleAsync(new RefundOrderCommand
         {
             OrderId = order.Id,
