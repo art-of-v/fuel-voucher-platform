@@ -850,13 +850,15 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
             VoucherId = voucher.Id,
             FromLocation = VoucherLocations.Pool,
             ToLocation = VoucherLocations.Customer,
+            ActorKind = VoucherActorKinds.User,
+            ActorUserId = Guid.NewGuid(),
             AmountUah = 500m,
             OccurredAtUtc = DateTime.UtcNow
         });
 
         await context.SaveChangesAsync();
 
-        var saved = await context.VoucherMovements.AsNoTracking().SingleAsync();
+        var saved = await context.VoucherMovements.AsNoTracking().SingleAsync(m => m.VoucherId == voucher.Id);
         saved.VoucherId.Should().NotBe(Guid.Empty);
         saved.FromLocation.Should().Be(VoucherLocations.Pool);
         saved.ToLocation.Should().Be(VoucherLocations.Customer,
@@ -879,6 +881,58 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
     }
 
     [Fact]
+    public void The_Author_Vocabulary_Is_Exactly_Two_Words()
+    {
+        // Deliberately tiny. A third kind would be the moment "which of these is it again?" starts, and
+        // the two that exist cover every action: a person did it, or the scheduler did.
+        VoucherActorKinds.All.Should().BeEquivalentTo(["user", "system"]);
+    }
+
+    [Theory]
+    [InlineData("user", true, false)]     // a person, named          - allowed
+    [InlineData("system", false, false)] // the scheduler            - allowed
+    [InlineData("user", false, true)]    // says "a person", names none - refused
+    [InlineData("system", true, true)]   // the scheduler with an id  - refused
+    [InlineData("robot", true, true)]    // not a kind at all          - refused
+    public async Task A_Recorded_Action_Must_Name_Its_Author(
+        string actorKind, bool hasUserId, bool shouldBeRefused)
+    {
+        // The point of the kind column: "always record the actor" is not enforceable against a bare
+        // FK-free uuid, because NULL, a zero GUID and a sentinel that resolves to nobody all look like
+        // data. Here none of them is writable.
+        await using var context = CreateContext();
+        var voucher = NewVoucher(
+            "actor-v-" + Guid.NewGuid().ToString("N")[..6],
+            "actor-v-qr-" + Guid.NewGuid().ToString("N")[..6]);
+
+        context.FuelVouchers.Add(voucher);
+        context.VoucherMovements.Add(new VoucherMovement
+        {
+            Id = Guid.NewGuid(),
+            Kind = VoucherMovementKinds.Issued,
+            VoucherId = voucher.Id,
+            FromLocation = VoucherLocations.Pool,
+            ToLocation = VoucherLocations.Customer,
+            ActorKind = actorKind,
+            ActorUserId = hasUserId ? Guid.NewGuid() : null,
+            OccurredAtUtc = DateTime.UtcNow
+        });
+
+        if (shouldBeRefused)
+        {
+            var act = async () => await context.SaveChangesAsync();
+            await act.Should().ThrowAsync<DbUpdateException>(
+                $"actor_kind={actorKind} with user id={hasUserId} names no author");
+            return;
+        }
+
+        // The counterpart: a stated author is writable, which is the point.
+        await context.SaveChangesAsync();
+        (await context.VoucherMovements.AsNoTracking().SingleAsync(m => m.VoucherId == voucher.Id))
+            .ActorKind.Should().Be(actorKind);
+    }
+
+    [Fact]
     public async Task An_Amount_That_Is_Negative_Is_Refused()
     {
         // A negative payment is a sign error, not a refund. Refunds are Payments rows (D-10); a
@@ -896,6 +950,8 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
             VoucherId = voucher.Id,
             FromLocation = VoucherLocations.Pool,
             ToLocation = VoucherLocations.Customer,
+            ActorKind = VoucherActorKinds.User,
+            ActorUserId = Guid.NewGuid(),
             AmountUah = -1m,
             OccurredAtUtc = DateTime.UtcNow
         });
@@ -937,6 +993,8 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
             ToStatus = hasTo ? "Available" : null,
             PreviousCustomerExpiration = hasPreviousDate ? new DateOnly(2026, 10, 1) : null,
             NewCustomerExpiration = hasNewDate ? new DateOnly(2026, 9, 1) : null,
+            ActorKind = VoucherActorKinds.User,
+            ActorUserId = Guid.NewGuid(),
             OccurredAtUtc = DateTime.UtcNow
         });
 
@@ -963,6 +1021,8 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
             EventType = VoucherEventTypes.StatusChanged,
             FromStatus = nameof(VoucherStatus.Available),
             ToStatus = nameof(VoucherStatus.Assigned),
+            ActorKind = VoucherActorKinds.User,
+            ActorUserId = Guid.NewGuid(),
             OccurredAtUtc = DateTime.UtcNow
         });
 
@@ -993,6 +1053,8 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
             EventType = VoucherEventTypes.Extended,
             PreviousCustomerExpiration = new DateOnly(2026, 10, 22),
             NewCustomerExpiration = new DateOnly(2026, 11, 22),
+            ActorKind = VoucherActorKinds.User,
+            ActorUserId = Guid.NewGuid(),
             ExternalRef = "order:00000000-0000-0000-0000-000000000001",
             OccurredAtUtc = DateTime.UtcNow
         });

@@ -76,6 +76,16 @@ internal sealed class VoucherEventConfiguration : IEntityTypeConfiguration<Vouch
 
         // Bare uuid, no FK: an event has to stay writable whatever happened to the actor row, which is
         // §G of TARGET_SCHEMA and what order_events and the three settlement records already do.
+        //
+        // The DEFAULT is here so the migration can ADD this column to a table that already exists.
+        // Every writer states the kind explicitly; an automatic action with no person behind it is
+        // `system`, which is an answer rather than a missing author.
+        builder.Property(e => e.ActorKind)
+            .HasColumnName("actor_kind")
+            .HasMaxLength(12)
+            .HasDefaultValue(VoucherActorKinds.System)
+            .IsRequired();
+
         builder.Property(e => e.ActorUserId)
             .HasColumnName("actor_user_id");
 
@@ -143,6 +153,16 @@ internal sealed class VoucherEventConfiguration : IEntityTypeConfiguration<Vouch
             // what a half-finished import would write.
             t.HasCheckConstraint("ck_voucher_events_imported_has_no_predecessor",
                 "event_type <> 'Imported' OR (from_status IS NULL AND previous_customer_expiration IS NULL)");
+
+            // Every action has an author, same rule as voucher_movements. A person needs an id; the
+            // scheduler does not and must not invent one. This makes NULL, a zero GUID and a fake user
+            // id all unrepresentable rather than merely discouraged.
+            t.HasCheckConstraint(
+                "ck_voucher_events_actor_kind",
+                $"actor_kind IN ({string.Join(",", VoucherActorKinds.All.Select(k => $"'{k}'"))})");
+
+            t.HasCheckConstraint("ck_voucher_events_actor_named",
+                "(actor_kind = 'user') = (actor_user_id IS NOT NULL)");
         });
     }
 }

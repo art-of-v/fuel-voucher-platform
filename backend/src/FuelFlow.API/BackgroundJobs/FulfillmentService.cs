@@ -1271,6 +1271,7 @@ var lastFailedAtUtc = await _context.Payments
                         // order_line_items.term_code - and repeating it here would be a second copy of a
                         // fact that already has an owner.
                         ExternalRef = orderId.ToString(),
+                    ActorKind = VoucherActorKinds.User,
                         ActorUserId = order.UserId,
                         OccurredAtUtc = now
                     });
@@ -1356,6 +1357,7 @@ var lastFailedAtUtc = await _context.Payments
                         ToLocation = VoucherLocations.Customer,
                         OrderId = orderId,
                         LineItemId = line.Id,
+                    ActorKind = VoucherActorKinds.User,
                         ActorUserId = order.UserId,
                         OccurredAtUtc = now
                     });
@@ -1369,6 +1371,7 @@ var lastFailedAtUtc = await _context.Payments
                         FromStatus = nameof(VoucherStatus.Available),
                         ToStatus = nameof(VoucherStatus.Assigned),
                         ExternalRef = orderId.ToString(),
+                    ActorKind = VoucherActorKinds.User,
                         ActorUserId = order.UserId,
                         OccurredAtUtc = now
                     });
@@ -1395,6 +1398,7 @@ var lastFailedAtUtc = await _context.Payments
                             ToLocation = VoucherLocations.Pool,
                             OrderId = orderId,
                             LineItemId = line.Id,
+                    ActorKind = VoucherActorKinds.User,
                             ActorUserId = order.UserId,
                             OccurredAtUtc = now
                         });
@@ -1408,6 +1412,7 @@ var lastFailedAtUtc = await _context.Payments
                             FromStatus = nameof(VoucherStatus.Assigned),
                             ToStatus = nameof(VoucherStatus.Available),
                             ExternalRef = orderId.ToString(),
+                    ActorKind = VoucherActorKinds.User,
                             ActorUserId = order.UserId,
                             OccurredAtUtc = now
                         });

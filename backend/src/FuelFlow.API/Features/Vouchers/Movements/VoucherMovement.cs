@@ -78,10 +78,13 @@ public sealed class VoucherMovement
     /// </remarks>
     public Guid? OrderId { get; set; }
 
+    /// <summary>Who caused it: a person, or the scheduler. See <see cref="VoucherActorKinds"/>.</summary>
+    public string ActorKind { get; set; } = VoucherActorKinds.User;
+
     /// <summary>
-    /// The operator or customer who caused the movement. Bare uuid, no foreign key, for the reason every
-    /// other audit record in this schema gives — see §G of TARGET_SCHEMA, and
-    /// <c>movement_batches.opened_by_user_id</c> for a settlement record that already works this way.
+    /// The person who caused it, required when <see cref="ActorKind"/> is <c>user</c>. Bare uuid, no
+    /// foreign key, for the reason every other audit record in this schema gives — see §G of TARGET_SCHEMA,
+    /// and <c>movement_batches.opened_by_user_id</c> for a settlement record that already works this way.
     /// </summary>
     public Guid? ActorUserId { get; set; }
 
