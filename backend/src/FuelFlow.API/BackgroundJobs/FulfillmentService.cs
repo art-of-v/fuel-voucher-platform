@@ -4,6 +4,7 @@ using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Events;
+using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
@@ -1332,13 +1333,85 @@ var lastFailedAtUtc = await _context.Payments
                         continue;
                     }
 
+                    // The replacement is in the customer's hands NOW, and this is the winning side of
+                    // the CAS - which is the only reason the records below describe something that
+                    // happened rather than something we intended. Past `claimed == 0` the paper really
+                    // moved; above it, nothing did.
+                    //
+                    // Two facts, two owners: the custody movement, and the status change the same
+                    // statement made. Neither derives the other - you cannot tell who received a ticket
+                    // from a status row, and you cannot tell it changed state from a custody row - so
+                    // writing one would lose half of what happened.
+                    //
+                    // amount_uah is deliberately NOT written. What the customer paid for this is
+                    // order_line_items.line_total, and the line already carries it; the movement points at
+                    // the line through line_item_id, so a copy here would be a second thing to keep in
+                    // step. The column exists for movements with no order behind them.
+                    _context.VoucherMovements.Add(new VoucherMovement
+                    {
+                        Id = Guid.CreateVersion7(),
+                        Kind = VoucherMovementKinds.ReplaceOut,
+                        VoucherId = stock.Id,
+                        FromLocation = VoucherLocations.Pool,
+                        ToLocation = VoucherLocations.Customer,
+                        OrderId = orderId,
+                        LineItemId = line.Id,
+                        ActorUserId = order.UserId,
+                        OccurredAtUtc = now
+                    });
+
+                    _context.VoucherEvents.Add(new VoucherEvent
+                    {
+                        Id = Guid.CreateVersion7(),
+                        VoucherId = stock.Id,
+                        EventType = VoucherEventTypes.StatusChanged,
+                        // Taken from the CAS itself: it sets 'Assigned' WHERE status = 'Available'.
+                        FromStatus = nameof(VoucherStatus.Available),
+                        ToStatus = nameof(VoucherStatus.Assigned),
+                        ExternalRef = orderId.ToString(),
+                        ActorUserId = order.UserId,
+                        OccurredAtUtc = now
+                    });
+
                     // The old voucher is ours again and goes back into the sellable pool: the customer walked away with a
                     // different one, so this is stock again and whoever claims it next pays for it. Ownership
                     // and the stale order link are cleared so it cannot resurface in the previous customer's
                     // wallet (GetUserPurchases reads vouchers through fulfillments) or read as sold stock.
                     // Best-effort - 0 rows means it was already released or reassigned, an acceptable end
                     // state since the replacement is already in the customer's hands.
-                    await TryReleaseReplacedVoucherAsync(source.Id, order.UserId, cancellationToken);
+                    var released = await TryReleaseReplacedVoucherAsync(source.Id, order.UserId, cancellationToken);
+
+                    // Gated on the release itself, for the same reason the claim above is gated on its
+                    // own: 0 rows means the paper did not move, so recording a `returned` would put a
+                    // voucher in the ledger's custody history that never left anyone.
+                    if (released > 0)
+                    {
+                        _context.VoucherMovements.Add(new VoucherMovement
+                        {
+                            Id = Guid.CreateVersion7(),
+                            Kind = VoucherMovementKinds.Returned,
+                            VoucherId = source.Id,
+                            FromLocation = VoucherLocations.Customer,
+                            ToLocation = VoucherLocations.Pool,
+                            OrderId = orderId,
+                            LineItemId = line.Id,
+                            ActorUserId = order.UserId,
+                            OccurredAtUtc = now
+                        });
+
+                        _context.VoucherEvents.Add(new VoucherEvent
+                        {
+                            Id = Guid.CreateVersion7(),
+                            VoucherId = source.Id,
+                            EventType = VoucherEventTypes.StatusChanged,
+                            // Also from the CAS: it sets 'Available' on the customer's voucher.
+                            FromStatus = nameof(VoucherStatus.Assigned),
+                            ToStatus = nameof(VoucherStatus.Available),
+                            ExternalRef = orderId.ToString(),
+                            ActorUserId = order.UserId,
+                            OccurredAtUtc = now
+                        });
+                    }
 
                     usedStockIds.Add(stock.Id);
                     line.PreviousCustomerExpiration = source.CustomerExpirationDate;

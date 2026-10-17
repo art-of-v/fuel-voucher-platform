@@ -10,6 +10,7 @@ using FuelFlow.Features.Settings;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Events;
+using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Vouchers.Exchange;
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.Renewal;
@@ -185,6 +186,93 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             .Should().NotBe(OrderStatus.Fulfilled, "an unapplied line leaves the order open for the retry sweep");
     }
 
+    [Fact]
+    public async Task A_Replace_Whose_Old_Paper_Was_Not_Released_Records_No_Return()
+    {
+        // The second gate. TryReleaseReplacedVoucherAsync is best-effort by design - 0 rows means the old
+        // paper was already released or reassigned, which is an acceptable end state. It is NOT an
+        // acceptable reason to record a custody movement: the paper did not come back from anyone, and a
+        // `returned` row would put a voucher in the ledger's history that never left.
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var sourceId = Guid.NewGuid();
+        var stockId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        // providerExpiry equal to the customer expiry is what makes this a REPLACE and not an extend:
+        // CanExtend needs room under the supplier term, and without it the source has a year of room.
+        var sourceExpiry = today.AddDays(2);
+        var promise = sourceExpiry.AddDays(7); // today + 9 days
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+
+            SeedUser(seed, userId);
+            var purchaseOrderId = SeedPurchaseOrder(seed, userId);
+            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", 50m,
+                sourceExpiry, providerExpiry: sourceExpiry));
+            seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 50m, today.AddDays(10)));
+            seed.Orders.Add(RenewalOrder(orderId, userId, price: 500, monobankInvoiceId: null,
+                ("OKKO", "okko-95", 50m, 500)));
+            MarkAsRenewalLine(seed, orderId, sourceId, termCode: "1w");
+
+            await seed.SaveChangesAsync();
+        }
+
+        using (var ctx = CreateContext())
+        {
+            var service = new FulfillmentServiceThatLostTheRelease(
+                ctx,
+                NullLogger<FulfillmentService>.Instance,
+                new RefundOrderCommandHandler(ctx, new StubMonobankClientFactory(new Mock<IMonobankClient>().Object), new AuditEventService(ctx)),
+                new RuntimeSettingsService(ctx),
+                NotificationDispatcher.Disabled,
+                new ConfigurationBuilder().Build());
+
+            await service.ProcessRenewalOrderAsync(orderId);
+        }
+
+        using var verify = CreateContext();
+
+        // The replacement still moved, and that half is recorded.
+        (await verify.VoucherMovements.AsNoTracking()
+                .AnyAsync(m => m.Kind == VoucherMovementKinds.ReplaceOut && m.VoucherId == stockId))
+            .Should().BeTrue("the claim succeeded, so the replacement did leave the pool");
+
+        // The old paper did not move back, so nothing says it did - not the ledger and not the state
+        // history either, since its status never changed.
+        (await verify.VoucherMovements.AsNoTracking()
+                .AnyAsync(m => m.Kind == VoucherMovementKinds.Returned && m.VoucherId == sourceId))
+            .Should().BeFalse("the release changed no rows, so no return happened");
+
+        (await verify.VoucherEvents.AsNoTracking()
+                .AnyAsync(e => e.VoucherId == sourceId))
+            .Should().BeFalse("and a voucher whose status never changed gets no status event");
+    }
+
+    /// <summary>
+    /// A release that reports it changed nothing, which is what it returns when the old paper was
+    /// already released or reassigned.
+    /// </summary>
+    private sealed class FulfillmentServiceThatLostTheRelease : FulfillmentService
+    {
+        public FulfillmentServiceThatLostTheRelease(
+            ApplicationDbContext ctx,
+            ILogger<FulfillmentService> logger,
+            RefundOrderCommandHandler refundHandler,
+            RuntimeSettingsService settings,
+            NotificationDispatcher notificationDispatcher,
+            IConfiguration configuration)
+            : base(ctx, logger, refundHandler, settings, notificationDispatcher, configuration)
+        {
+        }
+
+        protected internal override Task<int> TryReleaseReplacedVoucherAsync(
+            Guid voucherId, Guid userId, CancellationToken cancellationToken)
+            => Task.FromResult(0);
+    }
+
     /// <summary>
     /// Reports the rows-affected a lost compare-and-swap reports, so the test can assert what the
     /// handler does with that answer without staging a race inside a transaction.
@@ -263,6 +351,38 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
 
         var (replaceLine, replaceDelivered) = await LoadRenewalAsync(verify, orderId, sourceId);
         replaceDelivered!.VoucherId.Should().Be(stockId, "a replace delivers fresh stock, not the source");
+
+        // D-13. A replace is TWO movements, because the code makes two statements: the replacement left
+        // the pool for the customer, and the old paper came back. One row for the pair would have
+        // recorded one of them.
+        var movements = await verify.VoucherMovements.AsNoTracking().ToListAsync();
+        movements.Should().HaveCount(2, "a replace moves the replacement out and the old paper back");
+
+        var out_ = movements.Single(m => m.Kind == VoucherMovementKinds.ReplaceOut);
+        out_.VoucherId.Should().Be(stockId, "the replacement is what left the pool");
+        out_.FromLocation.Should().Be(VoucherLocations.Pool);
+        out_.ToLocation.Should().Be(VoucherLocations.Customer);
+        out_.OrderId.Should().Be(orderId);
+        out_.LineItemId.Should().Be(replaceLine.Id);
+
+        var back = movements.Single(m => m.Kind == VoucherMovementKinds.Returned);
+        back.VoucherId.Should().Be(sourceId, "the old paper is what came back");
+        back.FromLocation.Should().Be(VoucherLocations.Customer);
+        back.ToLocation.Should().Be(VoucherLocations.Pool);
+
+        // And the state history carries both transitions, from the statuses the CAS statements set.
+        var events = await verify.VoucherEvents.AsNoTracking().ToListAsync();
+        var issued = events.Single(e => e.VoucherId == stockId);
+        issued.EventType.Should().Be(VoucherEventTypes.StatusChanged);
+        issued.FromStatus.Should().Be(nameof(VoucherStatus.Available));
+        issued.ToStatus.Should().Be(nameof(VoucherStatus.Assigned));
+
+        var released = events.Single(e => e.VoucherId == sourceId);
+        released.FromStatus.Should().Be(nameof(VoucherStatus.Assigned));
+        released.ToStatus.Should().Be(nameof(VoucherStatus.Available));
+
+        // The money is NOT copied onto the movement: the line owns it, and the movement points at the line.
+        out_.AmountUah.Should().BeNull("order_line_items.line_total already says what the customer paid");
 
         var source = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == sourceId);
         source.CustomerExpirationDate.Should().Be(sourceExpiry, "the retired voucher's dates are left alone");
