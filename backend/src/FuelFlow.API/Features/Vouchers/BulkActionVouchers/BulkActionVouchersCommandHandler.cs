@@ -12,6 +12,13 @@ namespace FuelFlow.Features.Vouchers.BulkActionVouchers;
 
 public sealed class BulkActionVouchersCommandHandler
 {
+    /// <summary>
+    /// How many vouchers one `delete_all` pass archives. Matches <c>ExpiredVoucherLossService</c>, which
+    /// batches for the same reason: the work is unbounded in the number of rows and one voucher can
+    /// carry a lot of columns.
+    /// </summary>
+    private const int ArchiveBatchSize = 500;
+
     private readonly ApplicationDbContext _context;
     private readonly IBackgroundJobClient _backgroundJobClient;
     private readonly AuditEventService _eventService;
@@ -30,11 +37,22 @@ public sealed class BulkActionVouchersCommandHandler
         BulkActionVouchersCommand command,
         CancellationToken cancellationToken = default)
     {
-if (command.Action == "delete_all")
+        if (command.Action == "delete_all")
         {
-            // Soft, never hard (#217), and no ToListAsync: the old version materialised the entire
-            // voucher table into memory before deleting it, which on a stock table is both a spike
-            // and a pointless transfer. ExecuteUpdateAsync flips the flag in the database.
+            // Soft, never hard (#217), and bounded: the old version materialised the entire voucher
+            // table into memory before deleting it, which on a stock table is both a spike and a
+            // pointless transfer.
+            //
+            // Batched rather than one set-based ExecuteUpdateAsync, because D-13 requires an
+            // `Archived` event per voucher and that is what needs the ids. A single SaveChanges over
+            // 50k events rebuilds the very spike the batching removed - so the ids come back 500 at a
+            // time instead, the same shape ExpiredVoucherLossService uses for the same reason.
+            //
+            // What this gives up is atomicity, deliberately. The one-statement version flipped every
+            // row or none; this commits per batch. That is the right trade here because the operation
+            // is idempotent and re-runnable: an archived row leaves the `!IsDeleted` filter, so the
+            // next batch pulls fresh candidates and a half-finished run simply completes on the next
+            // press. A memory spike at 50k rows is a hard failure with no such recovery.
             //
             // The global !IsDeleted query filter means this only ever touches rows that are still
             // visible, so a second "delete all" cannot re-flag an already-deleted voucher.
@@ -47,13 +65,67 @@ if (command.Action == "delete_all")
             // was kept is named rather than left for the admin to infer from a list that did not
             // empty.
             var visibleCount = await _context.FuelVouchers.CountAsync(cancellationToken);
-            var removedCount = await _context.FuelVouchers
-                .Where(VoucherDeletionGuard.IsStock)
-                .ExecuteUpdateAsync(
-                    setters => setters
-                        .SetProperty(v => v.IsDeleted, true)
-                        .SetProperty(v => v.UpdatedAtUtc, DateTime.UtcNow),
-                    cancellationToken);
+
+            // Ids only. Loading whole entities would put back the per-row memory the batching exists
+            // to avoid, and nothing below reads anything else off the voucher.
+            var removedCount = 0;
+            var batchActor = command.ActingAdminUserId is { } a && a != Guid.Empty ? a : (Guid?)null;
+
+            while (true)
+            {
+                var batchIds = await _context.FuelVouchers
+                    .Where(VoucherDeletionGuard.IsStock)
+                    .Select(v => v.Id)
+                    .Take(ArchiveBatchSize)
+                    .ToListAsync(cancellationToken);
+
+                if (batchIds.Count == 0)
+                {
+                    break;
+                }
+
+                // One transaction per batch: the flag flip and the events that describe it are one
+                // fact, and a batch that committed its flips without its events would archive vouchers
+                // with no record of who did it - the gap `ck_voucher_events_actor_named` exists to
+                // close, reachable through a 500 rather than a bad write.
+                await using var batchTx = _context.Database.IsRelational()
+                    ? await _context.Database.BeginTransactionAsync(cancellationToken)
+                    : null;
+
+                var archivedAtUtc = DateTime.UtcNow;
+                await _context.FuelVouchers
+                    .Where(v => batchIds.Contains(v.Id))
+                    .ExecuteUpdateAsync(
+                        setters => setters
+                            .SetProperty(v => v.IsDeleted, true)
+                            .SetProperty(v => v.UpdatedAtUtc, archivedAtUtc),
+                        cancellationToken);
+
+                if (batchActor is { } archiveActor)
+                {
+                    // `Archived`, not `StatusChanged`: is_deleted is a separate column and a ticket can
+                    // be archived while sitting in any state, so from/to would be invented. The handler
+                    // never reads a status here, and must not need to.
+                    _context.VoucherEvents.AddRange(batchIds.Select(id => new VoucherEvent
+                    {
+                        Id = Guid.CreateVersion7(),
+                        VoucherId = id,
+                        EventType = VoucherEventTypes.Archived,
+                        ActorKind = VoucherActorKinds.User,
+                        ActorUserId = archiveActor,
+                        OccurredAtUtc = archivedAtUtc
+                    }));
+
+                    await _context.SaveChangesAsync(cancellationToken);
+                }
+
+                if (batchTx is not null)
+                {
+                    await batchTx.CommitAsync(cancellationToken);
+                }
+
+                removedCount += batchIds.Count;
+            }
 
             var keptCount = visibleCount - removedCount;
 
