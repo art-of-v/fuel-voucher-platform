@@ -30,7 +30,9 @@ namespace FuelFlow.IntegrationTests;
 public static class TestQrCipher
 {
     /// <summary>32 bytes, base64. Supplied to the application host through <c>QrCipher__Key</c>.</summary>
-    public const string KeyBase64 = "aW50ZWdyYXRpb25zLXFyLWNpcGhlci1rZXktMjAyNiE=";
+    public static string KeyBase64 { get; } = Convert.ToBase64String(Encoding.UTF8.GetBytes(Phrase));
+
+    private const string Phrase = "integrations-qr-cipher-key-2026!";
 
     public static IQrCipher Instance { get; } = new QrCipher(Options.Create(new QrCipherOptions
     {
