@@ -152,6 +152,13 @@ public sealed class TestDatabaseFixture : WebApplicationFactory<Program>, IAsync
         // value at Program.cs:48 - is disposed before the next one boots.
         Environment.SetEnvironmentVariable(ConnectionStringVariable, ConnectionString);
 
+        // The voucher QR cipher refuses to construct without a key, by design - a default key would
+        // be a key every deployment shares. Tests get a fixed one for the same reason the QA access
+        // code is fixed below: determinism. Nothing encrypted in a test container survives it.
+        Environment.SetEnvironmentVariable(
+            "QrCipher__Key",
+            TestQrCipher.KeyBase64);
+
         // The test host has no Loki and no credentials; leaving the sink enabled makes the
         // composition root throw at startup (see LokiEnabledVariable). Set alongside the
         // connection string, before any host is built.
@@ -228,7 +235,7 @@ public sealed class TestDatabaseFixture : WebApplicationFactory<Program>, IAsync
         // Pooling off on purpose: a pooled connection stays open after the context is disposed and
         // would be a live session on the database being frozen. One migration run, so the cost of
         // not pooling is irrelevant.
-        await using (var context = new ApplicationDbContext(NonPoolingContextOptions(container, TemplateDatabaseName)))
+        await using (var context = new ApplicationDbContext(NonPoolingContextOptions(container, TemplateDatabaseName), TestQrCipher.Instance))
         {
             await context.Database.MigrateAsync();
         }
@@ -245,7 +252,7 @@ public sealed class TestDatabaseFixture : WebApplicationFactory<Program>, IAsync
         //
         // Parameterised rather than interpolated: ExecuteSqlRaw treats a bare {...} as a
         // placeholder, so a name pasted into the SQL as text fails at run time, not at compile time.
-        await using (var maintenance = new ApplicationDbContext(MaintenanceContextOptions(container)))
+        await using (var maintenance = new ApplicationDbContext(MaintenanceContextOptions(container), TestQrCipher.Instance))
         {
             await maintenance.Database.ExecuteSqlRawAsync(
                 "UPDATE pg_database SET datistemplate = true, datallowconn = false WHERE datname = {0}",
@@ -280,7 +287,7 @@ public sealed class TestDatabaseFixture : WebApplicationFactory<Program>, IAsync
     /// </remarks>
     private async Task ReapPreviousClassesAsync()
     {
-        await using var maintenance = new ApplicationDbContext(MaintenanceContextOptions(DbContainer));
+        await using var maintenance = new ApplicationDbContext(MaintenanceContextOptions(DbContainer), TestQrCipher.Instance);
         await maintenance.Database.ExecuteSqlRawAsync(
             """
             SELECT pg_terminate_backend(pid)
@@ -300,7 +307,7 @@ public sealed class TestDatabaseFixture : WebApplicationFactory<Program>, IAsync
 
         // CREATE DATABASE cannot run inside a transaction, and ExecuteSqlRaw issues it as a bare
         // command, so this is fine - but it is why this cannot be a Migrate() call.
-        await using (var maintenance = new ApplicationDbContext(MaintenanceContextOptions(DbContainer)))
+        await using (var maintenance = new ApplicationDbContext(MaintenanceContextOptions(DbContainer), TestQrCipher.Instance))
         {
             // EF1002 suppressed rather than satisfied: a database name is an IDENTIFIER, and
             // Postgres will not take an identifier as a bind parameter, so ExecuteSqlAsync cannot

@@ -29,6 +29,12 @@ public sealed class DatabaseTrackingDefaultsTests
         // A syntactically valid connection string that is never dialled.
         services.AddDatabase("Host=localhost;Database=none;Username=none;Password=none");
 
+        // This builds its own container rather than going through AddFeatureServices, so the voucher
+        // QR cipher has to be registered here too - ApplicationDbContext takes it as a required
+        // argument, and requiring it is deliberate rather than incidental.
+        services.AddSingleton<FuelFlow.Features.Vouchers.Security.IQrCipher>(
+            FuelFlow.UnitTests.TestQrCipher.Instance);
+
         var brand = services.BuildServiceProvider();
         return (brand.GetRequiredService<ApplicationDbContext>(), brand);
     }

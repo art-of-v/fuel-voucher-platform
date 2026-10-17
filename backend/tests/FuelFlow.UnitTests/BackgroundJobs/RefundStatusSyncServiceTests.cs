@@ -30,7 +30,7 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
             .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
             .Options;
 
-        _context = new ApplicationDbContext(options);
+        _context = new ApplicationDbContext(options, TestQrCipher.Instance);
 
         _monobankClientMock = new Mock<IMonobankClient>();
         _monobankClientFactory = new StubMonobankClientFactory(_monobankClientMock.Object);

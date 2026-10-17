@@ -74,7 +74,7 @@ public class MonobankStatementImportServiceTests
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
 
-        return new ApplicationDbContext(options);
+        return new ApplicationDbContext(options, TestQrCipher.Instance);
     }
 
     private static (MonobankStatementImportService Service, ApplicationDbContext Context, FakeMonobankClientFactory Factory) Build(

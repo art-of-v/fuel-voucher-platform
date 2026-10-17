@@ -221,6 +221,6 @@ public sealed class VoucherExchangeTransactionAtomicityTests : IClassFixture<Tes
         if (interceptor != null)
             options.AddInterceptors(interceptor);
 
-        return new ApplicationDbContext(options.Options);
+        return new ApplicationDbContext(options.Options, TestQrCipher.Instance);
     }
 }

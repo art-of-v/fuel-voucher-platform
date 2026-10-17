@@ -57,8 +57,24 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
         // unique index below TOAST so the entry is a predictable size.
         builder.Property(e => e.QrPayload)
             .HasColumnName("qr_payload")
-            .HasColumnType("varchar(2000)")
+            // bytea, not varchar: this holds AES-GCM output - nonce, tag, ciphertext. The conversion
+            // itself is applied in ApplicationDbContext.OnModelCreating, because it needs the cipher
+            // instance and this configuration is discovered by assembly scan with no access to DI.
+            .HasColumnType("bytea")
             .IsRequired();
+
+        builder.Property(e => e.QrPayloadSha256)
+            .HasColumnName("qr_payload_sha256")
+            .HasColumnType("bytea")
+            // Required, and that is load-bearing rather than tidiness. PostgreSQL treats NULLs as
+            // distinct inside a unique index, so a nullable hash column would let any number of rows
+            // through with a NULL hash and deduplication would stop working with no error anywhere -
+            // the same paper imported twice under two numbers, which is exactly what this index
+            // exists to prevent.
+            .IsRequired()
+            // Filled automatically on insert, so no writer has to remember. See the generator for why
+            // a forgotten hash is worse than a failed write.
+            .HasValueGenerator<FuelFlow.Features.Vouchers.Security.QrPayloadHashValueGenerator>();
 
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
@@ -233,9 +249,15 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
             .IsUnique()
             .HasFilter("is_deleted = false");
 
-        // Security control, not just an index: dedup on the QR payload means the same paper cannot
+// Security control, not just an index: dedup on the QR payload means the same paper cannot
         // be imported twice under two numbers. Worth the storage.
-        builder.HasIndex(e => e.QrPayload)
+        //
+        // It sits on the SHA-256, not the payload. It used to sit on the payload itself, which was
+        // possible only because that column was plaintext - and it is the reason the payload was
+        // stored in the clear at all. AES-GCM produces a fresh nonce per encryption, so the same QR
+        // encrypts differently every time and cannot be compared; the hash can. Deduplication is
+        // unchanged in strength: both are one-way, and a collision would need a SHA-256 preimage.
+        builder.HasIndex(e => e.QrPayloadSha256)
             .IsUnique()
             .HasFilter("is_deleted = false");
 

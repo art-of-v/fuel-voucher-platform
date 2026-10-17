@@ -39,7 +39,7 @@ public sealed class WebhookDeliveryRecordingTests : IDisposable
         _context = new ApplicationDbContext(
             new DbContextOptionsBuilder<ApplicationDbContext>()
                 .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
-                .Options);
+                .Options, TestQrCipher.Instance);
 
         _handler = new ProcessMonobankWebhookCommandHandler(
             _context,

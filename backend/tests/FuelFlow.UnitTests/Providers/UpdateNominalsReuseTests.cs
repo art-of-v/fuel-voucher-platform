@@ -28,7 +28,7 @@ public sealed class UpdateNominalsReuseTests : IDisposable
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase($"nominals-{Guid.NewGuid():N}")
             .Options;
-        _context = new ApplicationDbContext(options);
+        _context = new ApplicationDbContext(options, TestQrCipher.Instance);
     }
 
     public void Dispose() => _context.Dispose();

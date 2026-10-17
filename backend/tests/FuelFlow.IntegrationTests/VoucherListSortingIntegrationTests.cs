@@ -140,6 +140,7 @@ public sealed class VoucherListSortingIntegrationTests : IClassFixture<TestDatab
         => new(
             new DbContextOptionsBuilder<ApplicationDbContext>()
                 .UseNpgsql(_fixture.ConnectionString)
-                .Options
+                .Options,
+            TestQrCipher.Instance
         );
 }

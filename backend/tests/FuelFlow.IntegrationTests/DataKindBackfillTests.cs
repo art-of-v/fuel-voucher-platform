@@ -172,9 +172,9 @@ public sealed class DataKindBackfillTests : IClassFixture<TestDatabaseFixture>
         await context.Database.ExecuteSqlRawAsync(
             """
             INSERT INTO fuel_vouchers (id, brand, fuel_type_id, liters, supplier_expiration_date,
-                                       customer_expiration_date, voucher_number, qr_payload,
+                                       customer_expiration_date, voucher_number, qr_payload, qr_payload_sha256,
                                        created_at_utc, updated_at_utc, status, data_kind, is_deleted)
-            VALUES ({0}, 'okko', 'okko-95', 10, '2027-01-01', '2027-01-01', 'BK-ROUND', 'BK-ROUND-QR',
+            VALUES ({0}, 'okko', 'okko-95', 10, '2027-01-01', '2027-01-01', 'BK-ROUND', 'BK-ROUND-QR', sha256(convert_to('BK-ROUND-QR','UTF8')),
                     now(), now(), 'Available', 'qa', false)
             """, qaVoucher);
 #pragma warning restore EF1002
@@ -223,7 +223,7 @@ public sealed class DataKindBackfillTests : IClassFixture<TestDatabaseFixture>
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(_fixture.ConnectionString)
-            .Options);
+            .Options, TestQrCipher.Instance);
 
     /// <summary>
     /// A single count, as a number. <c>ExecuteSqlRawAsync</c> would return rows-affected (-1 for a

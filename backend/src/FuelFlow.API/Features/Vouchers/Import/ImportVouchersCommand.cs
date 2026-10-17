@@ -45,6 +45,7 @@ public sealed class ImportVouchersCommandHandler
     private readonly ILogger<ImportVouchersCommandHandler> _logger;
     private readonly IBackgroundJobClient _backgroundJobClient;
     private readonly FuelFlowMetrics _metrics;
+    private readonly FuelFlow.Features.Vouchers.Security.IQrCipher _qrCipher;
     private readonly NotificationDispatcher _notifications;
 
     public ImportVouchersCommandHandler(
@@ -56,7 +57,8 @@ public sealed class ImportVouchersCommandHandler
         ILogger<ImportVouchersCommandHandler> logger,
         IBackgroundJobClient backgroundJobClient,
         FuelFlowMetrics metrics,
-        NotificationDispatcher notifications)
+        NotificationDispatcher notifications,
+        FuelFlow.Features.Vouchers.Security.IQrCipher qrCipher)
     {
         _context = context;
         _pdfRenderer = pdfRenderer;
@@ -67,6 +69,7 @@ public sealed class ImportVouchersCommandHandler
         _backgroundJobClient = backgroundJobClient;
         _notifications = notifications;
         _metrics = metrics;
+        _qrCipher = qrCipher;
     }
 
     /// <summary>
@@ -341,8 +344,18 @@ public sealed class ImportVouchersCommandHandler
                             continue;
                         }
 
+                        // Match on the SHA-256, not on the payload. This used to be
+                        // `v.QrPayload == parsed.QrPayload`, which compared plaintext in SQL - possible only
+                        // because the column was stored in the clear, and it was the reason the same paper
+                        // could be looked up at all. Now that the payload is encrypted the comparison
+                        // would translate to decrypt-every-row-and-compare: correct, but a sequential scan
+                        // of the whole table on every voucher of every import, which is the cost this index
+                        // was supposed to avoid. The hash is indexed, and a collision would need a SHA-256
+                        // preimage.
+                        var payloadHash = _qrCipher.Sha256(parsed.QrPayload);
+
                         bool existsInDb = await _context.FuelVouchers.AnyAsync(
-                            v => v.VoucherNumber == parsed.VoucherNumber || v.QrPayload == parsed.QrPayload,
+                            v => v.VoucherNumber == parsed.VoucherNumber || v.QrPayloadSha256 == payloadHash,
                             cancellationToken);
 
                         bool existsInBatch = addedNumbers.Contains(parsed.VoucherNumber) || addedPayloads.Contains(parsed.QrPayload);
@@ -409,6 +422,10 @@ public sealed class ImportVouchersCommandHandler
                             CustomerExpirationDate = parsed.ExpirationDate,
                             VoucherNumber = parsed.VoucherNumber,
                             QrPayload = parsed.QrPayload,
+                            // Carries the deduplication the encrypted column cannot. Set from the
+                            // same value the duplicate check above matched on, so the two cannot
+                            // disagree about what this voucher is.
+                            QrPayloadSha256 = payloadHash,
                             CreatedAtUtc = DateTime.UtcNow,
                             ImportJobId = import.Id,
                             // Who issued this paper. One PDF is one supplier's delivery, so it is decided

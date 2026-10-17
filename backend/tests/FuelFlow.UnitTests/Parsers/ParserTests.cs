@@ -28,7 +28,7 @@ public class ParserTests : IDisposable
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
 
-        _context = new ApplicationDbContext(options);
+        _context = new ApplicationDbContext(options, TestQrCipher.Instance);
         SeedFuelTypes();
     }
 
@@ -471,7 +471,7 @@ public class ParserTests : IDisposable
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
-        var context = new ApplicationDbContext(options);
+        var context = new ApplicationDbContext(options, TestQrCipher.Instance);
         context.FuelTypes.AddRange(fuelTypes);
         context.SaveChanges();
         return context;

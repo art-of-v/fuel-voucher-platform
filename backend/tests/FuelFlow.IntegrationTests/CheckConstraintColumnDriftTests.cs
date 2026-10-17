@@ -51,7 +51,7 @@ public sealed class CheckConstraintColumnDriftTests : IClassFixture<TestDatabase
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(_fixture.ConnectionString)
-            .Options);
+            .Options, TestQrCipher.Instance);
 
     [Fact]
     public async Task EveryCheckConstraintInTheDatabase_NamesOnlyColumnsThatExist()
@@ -155,7 +155,7 @@ public sealed class CheckConstraintColumnDriftTests : IClassFixture<TestDatabase
             .UseNpgsql("Host=localhost;Database=unused;Username=unused")
             .Options;
 
-        using var context = new ApplicationDbContext(options);
+        using var context = new ApplicationDbContext(options, TestQrCipher.Instance);
 
         // IDesignTimeModel, not context.Model. The read-optimized model drops check constraints
         // entirely — asking it throws — which is the one thing this test cannot do.

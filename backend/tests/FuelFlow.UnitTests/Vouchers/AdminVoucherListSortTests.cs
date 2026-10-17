@@ -35,7 +35,7 @@ public sealed class AdminVoucherListSortTests : IDisposable
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
 
-        _context = new ApplicationDbContext(options);
+        _context = new ApplicationDbContext(options, TestQrCipher.Instance);
 
         _context.Suppliers.AddRange(
             new Supplier { Id = AlphaId, Name = "Альфа Палив", CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },

@@ -106,6 +106,7 @@ public sealed class TestDataFlagIntegrationTests : IClassFixture<TestDatabaseFix
         => new(
             new DbContextOptionsBuilder<ApplicationDbContext>()
                 .UseNpgsql(_fixture.ConnectionString)
-                .Options
+                .Options,
+            TestQrCipher.Instance
         );
 }

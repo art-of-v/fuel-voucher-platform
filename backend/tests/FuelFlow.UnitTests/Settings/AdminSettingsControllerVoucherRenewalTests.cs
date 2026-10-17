@@ -44,7 +44,7 @@ public sealed class AdminSettingsControllerVoucherRenewalTests : IDisposable
             .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
             .Options;
 
-        _context = new ApplicationDbContext(options);
+        _context = new ApplicationDbContext(options, TestQrCipher.Instance);
         _settings = new RuntimeSettingsService(_context);
         _controller = new AdminSettingsController(
             _settings,

@@ -237,7 +237,7 @@ public class KloVoucherParserTests : IDisposable
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
-        _context = new ApplicationDbContext(options);
+        _context = new ApplicationDbContext(options, TestQrCipher.Instance);
         _context.FuelTypes.AddRange(
             new FuelTypeEntity { Id = "klo-dp", Name = "ДП Mustang", StationId = "klo", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow },
             new FuelTypeEntity { Id = "klo-95", Name = "A 95 EURO", StationId = "klo", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow });

@@ -171,5 +171,5 @@ public sealed class UnarchiveVoucherIntegrationTests : IClassFixture<TestDatabas
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(_fixture.ConnectionString)
-            .Options);
+            .Options, TestQrCipher.Instance);
 }

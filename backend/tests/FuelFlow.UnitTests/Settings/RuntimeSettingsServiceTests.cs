@@ -19,7 +19,7 @@ public sealed class RuntimeSettingsServiceTests : IDisposable
             .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
             .Options;
 
-        _context = new ApplicationDbContext(options);
+        _context = new ApplicationDbContext(options, TestQrCipher.Instance);
         _service = new RuntimeSettingsService(_context);
     }
 

@@ -189,5 +189,5 @@ public sealed class RestoreVoucherIntegrationTests : IClassFixture<TestDatabaseF
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(_fixture.ConnectionString)
-            .Options);
+            .Options, TestQrCipher.Instance);
 }

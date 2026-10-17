@@ -164,7 +164,7 @@ public sealed class SetUserEmailCommandHandlerTests
 
     private static ApplicationDbContext CreateContext() => new(
         new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
+            .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options, TestQrCipher.Instance);
 
     private static async Task SeedRolesAsync(ApplicationDbContext context)
     {

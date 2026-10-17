@@ -57,7 +57,7 @@ public sealed class OfferVolumePriceAgreementTests : IClassFixture<TestDatabaseF
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(_fixture.ConnectionString)
-            .Options);
+            .Options, TestQrCipher.Instance);
 
     /// <summary>The file the deploy preflight executes. Resolved from the repository root.</summary>
     /// <summary>The tag every case seeds under, so a station id reads as its own name.</summary>

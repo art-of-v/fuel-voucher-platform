@@ -49,7 +49,7 @@ public sealed class FulfillmentLineAttributionTests : IClassFixture<TestDatabase
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(_fixture.ConnectionString)
-            .Options);
+            .Options, TestQrCipher.Instance);
 
     /// <summary>
     /// The bug. Two lines, same volume, different brand. Three vouchers delivered, but all of them

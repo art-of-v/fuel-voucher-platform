@@ -42,7 +42,7 @@ public sealed class RenewalCheckoutCommandHandlerTests : IDisposable
             .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
             .Options;
 
-        _context = new ApplicationDbContext(options);
+        _context = new ApplicationDbContext(options, TestQrCipher.Instance);
         SeedActiveUser();
 
         _monobankClientMock = new Mock<IMonobankClient>();

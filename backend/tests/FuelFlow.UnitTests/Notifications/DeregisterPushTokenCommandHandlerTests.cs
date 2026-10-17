@@ -20,7 +20,7 @@ public sealed class DeregisterPushTokenCommandHandlerTests : IDisposable
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
 
-        _context = new ApplicationDbContext(options);
+        _context = new ApplicationDbContext(options, TestQrCipher.Instance);
         _handler = new DeregisterPushTokenCommandHandler(_context);
     }
 

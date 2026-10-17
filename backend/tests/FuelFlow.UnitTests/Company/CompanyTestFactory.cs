@@ -24,7 +24,7 @@ internal static class CompanyTestFactory
             .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
             .Options;
 
-        return new ApplicationDbContext(options);
+        return new ApplicationDbContext(options, TestQrCipher.Instance);
     }
 
     public static User NewUser(

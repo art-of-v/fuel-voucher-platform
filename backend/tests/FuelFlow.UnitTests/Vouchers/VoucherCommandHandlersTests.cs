@@ -27,7 +27,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
 
-        _context = new ApplicationDbContext(options);
+        _context = new ApplicationDbContext(options, TestQrCipher.Instance);
         SeedFuelTypes();
     }
 

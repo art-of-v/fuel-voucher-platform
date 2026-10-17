@@ -320,5 +320,5 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(_fixture.ConnectionString)
-            .Options);
+            .Options, TestQrCipher.Instance);
 }

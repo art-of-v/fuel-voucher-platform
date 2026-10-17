@@ -139,7 +139,7 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
             // on localhost cannot satisfy.
             .UseNpgsql(_fixture.ConnectionString + ";SSL Mode=Disable")
             .Options;
-        return new ApplicationDbContext(options);
+        return new ApplicationDbContext(options, TestQrCipher.Instance);
     }
 
     private static User NewUser(string phone) => new()
@@ -850,9 +850,9 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
         var act = () => context.Database.ExecuteSqlRawAsync(
             """
             INSERT INTO fuel_vouchers (id, brand, fuel_type_id, liters, supplier_expiration_date,
-                                       customer_expiration_date, voucher_number, qr_payload,
+                                       customer_expiration_date, voucher_number, qr_payload, qr_payload_sha256,
                                        created_at_utc, updated_at_utc, status, data_kind, is_deleted)
-            VALUES ({0}, 'okko', 'okko-dp', 10, '2027-01-01', '2027-01-01', 'bad-status', 'bad-status-qr',
+            VALUES ({0}, 'okko', 'okko-dp', 10, '2027-01-01', '2027-01-01', 'bad-status', 'bad-status-qr', sha256(convert_to('bad-status-qr','UTF8')),
                     now(), now(), 'Availble', 'real', false)
             """, Guid.NewGuid());
 
@@ -887,9 +887,9 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
         var act = () => context.Database.ExecuteSqlRawAsync(
             """
             INSERT INTO fuel_vouchers (id, brand, fuel_type_id, liters, supplier_expiration_date,
-                                       customer_expiration_date, voucher_number, qr_payload,
+                                       customer_expiration_date, voucher_number, qr_payload, qr_payload_sha256,
                                        created_at_utc, updated_at_utc, status, data_kind, is_deleted)
-            VALUES ({0}, 'okko', 'okko-dp', 10, '2027-01-01', '2027-01-01', 'longest-status', 'longest-status-qr',
+            VALUES ({0}, 'okko', 'okko-dp', 10, '2027-01-01', '2027-01-01', 'longest-status', 'longest-status-qr', sha256(convert_to('longest-status-qr','UTF8')),
                     now(), now(), 'VerifiedWithWarnings', 'real', false)
             """, Guid.NewGuid());
 

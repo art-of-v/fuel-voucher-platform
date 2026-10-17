@@ -114,12 +114,12 @@ public sealed class SetUserActiveCommandHandlerTests
 
     private static ApplicationDbContext CreateContext() => new(
         new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
+            .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options, TestQrCipher.Instance);
 
     private static ApplicationDbContext CreateNoTrackingContext(string dbName, InMemoryDatabaseRoot root) => new(
         new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(dbName, root)
-            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking).Options);
+            .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking).Options, TestQrCipher.Instance);
 
     private static SetUserActiveCommandHandler CreateHandler(ApplicationDbContext context) => new(
         context, NullLogger<SetUserActiveCommandHandler>.Instance, new AuditEventService(context));

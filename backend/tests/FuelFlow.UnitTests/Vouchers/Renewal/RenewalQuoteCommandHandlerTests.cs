@@ -33,7 +33,7 @@ public sealed class RenewalQuoteCommandHandlerTests : IDisposable
             .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
             .Options;
 
-        _context = new ApplicationDbContext(options);
+        _context = new ApplicationDbContext(options, TestQrCipher.Instance);
         SeedActiveUser();
 
         _handler = new RenewalQuoteCommandHandler(_context, new RuntimeSettingsService(_context));

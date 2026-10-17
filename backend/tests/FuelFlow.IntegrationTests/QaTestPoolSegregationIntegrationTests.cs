@@ -245,7 +245,7 @@ public sealed class QaTestPoolSegregationIntegrationTests : IClassFixture<TestDa
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(_fixture.ConnectionString)
-            .Options);
+            .Options, TestQrCipher.Instance);
 
     private FuelFlow.API.BackgroundJobs.FulfillmentService CreateService(ApplicationDbContext context)
         => new(

@@ -30,7 +30,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
 
-        _context = new ApplicationDbContext(options);
+        _context = new ApplicationDbContext(options, TestQrCipher.Instance);
         _loggerMock = new Mock<ILogger<FuelFlow.API.BackgroundJobs.FulfillmentService>>();
 
         var monobankClientMock = new Mock<IMonobankClient>();

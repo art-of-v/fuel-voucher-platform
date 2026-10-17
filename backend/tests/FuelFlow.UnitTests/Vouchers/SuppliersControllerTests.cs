@@ -32,7 +32,7 @@ public sealed class SuppliersControllerTests : IDisposable
             .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking)
             .Options;
 
-        _context = new ApplicationDbContext(options);
+        _context = new ApplicationDbContext(options, TestQrCipher.Instance);
         // The audit write needs a signed-in user, or RecordAsync short-circuits and nothing is recorded.
         var claims = new[]
         {

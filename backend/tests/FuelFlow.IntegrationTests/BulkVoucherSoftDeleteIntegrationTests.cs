@@ -234,7 +234,7 @@ private BulkActionVouchersCommandHandler Handler(ApplicationDbContext context)
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(_fixture.ConnectionString)
-            .Options);
+            .Options, TestQrCipher.Instance);
 
 [Fact]
 public async Task Delete_All_Archives_Stock_And_Names_What_It_Kept()

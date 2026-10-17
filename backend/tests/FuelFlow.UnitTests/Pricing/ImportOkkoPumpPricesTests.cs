@@ -21,7 +21,7 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
 
-        _context = new ApplicationDbContext(options);
+        _context = new ApplicationDbContext(options, TestQrCipher.Instance);
         _events = new AuditEventService(_context);
     }
 
