@@ -8,6 +8,7 @@ using FuelFlow.Features.Company.SharedModels;
 using FuelFlow.Features.Contracts.SharedModels;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
@@ -519,6 +520,33 @@ public sealed class CompanyMembershipIntegrationTests : IClassFixture<TestDataba
         recalled.WorkerUserId.Should().BeNull();
         recalled.Status.Should().Be(VoucherStatus.Assigned);
         recalled.OrderId.Should().Be(purchaseOrderId);
+
+        // D-13. The gift and the recall are the two halves of one custody round trip, and before
+        // this the ledger held neither — so a worker's voucher had no history at all until it was
+        // redeemed. Two movements, opposing directions, and the recall names the owner who did it.
+        var movements = await verify.VoucherMovements.AsNoTracking()
+            .Where(m => m.VoucherId == voucherId)
+            .OrderBy(m => m.OccurredAtUtc)
+            .ToListAsync();
+
+        movements.Should().HaveCount(2);
+        movements[0].Kind.Should().Be(VoucherMovementKinds.Gift);
+        movements[0].FromLocation.Should().Be(VoucherLocations.Company);
+        movements[0].ToLocation.Should().Be(VoucherLocations.Worker);
+
+        movements[1].Kind.Should().Be(VoucherMovementKinds.Recall);
+        movements[1].FromLocation.Should().Be(VoucherLocations.Worker);
+        movements[1].ToLocation.Should().Be(VoucherLocations.Company);
+        movements[1].ActorKind.Should().Be(VoucherActorKinds.User);
+        movements[1].ActorUserId.Should().Be(ownerId);
+
+        // The recall's order_id points at the gift it undoes, not at the purchase the voucher went
+        // back to — otherwise the ledger would blame the original purchase for a recall it never caused.
+        movements[1].OrderId.Should().NotBe(purchaseOrderId);
+
+        // And no status event: a recall takes the paper back but does not change what it is.
+        (await verify.VoucherEvents.CountAsync(e => e.VoucherId == voucherId))
+            .Should().Be(0, "the status stayed Assigned across the whole round trip");
     }
 
     [Fact]

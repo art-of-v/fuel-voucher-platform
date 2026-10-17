@@ -1,5 +1,7 @@
 using FuelFlow.API.Features.Orders.SharedServices;
 using FuelFlow.Features.Company.SharedModels;
+using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Observability;
@@ -54,6 +56,12 @@ public sealed class RecallVoucherCommandHandler
             return new RecallVoucherResult("InvalidState", "Only assigned gifted vouchers can be recalled.");
         }
 
+        // Captured before the restore below rewrites it: the movement's order_id is the order this
+        // recall is a *consequence of* — the gift that put the paper in the worker's hands — matching
+        // how the renewal writers point `returned` at the renewal order rather than at the purchase the
+        // returned voucher originally came from.
+        var issuanceOrderId = voucher.OrderId;
+
         // The fuel goes back to the company, so the voucher goes back under the purchase it arrived
         // with. Leaving it on the issuance order would keep the handover showing a voucher the worker
         // no longer has, and the voucher would keep belonging to an order that no longer describes it.
@@ -68,6 +76,28 @@ public sealed class RecallVoucherCommandHandler
         voucher.UpdatedAtUtc = DateTime.UtcNow;
 
         _context.Update(voucher);
+
+        // D-13. `recall` is the last movement kind with no writer and this is its path: the paper goes
+        // from a worker's hands back to the company that issued it.
+        //
+        // No StatusChanged event on purpose — the guard above required `Assigned` and nothing below
+        // changes it. A recall takes the voucher back but does not make it a different kind of thing,
+        // so a status row here would claim a transition that did not happen. `FireWorkerCommand` is the
+        // one that does change status, and it writes its own event.
+        _context.VoucherMovements.Add(new VoucherMovement
+        {
+            Id = Guid.CreateVersion7(),
+            Kind = VoucherMovementKinds.Recall,
+            VoucherId = voucher.Id,
+            FromLocation = VoucherLocations.Worker,
+            ToLocation = VoucherLocations.Company,
+            OrderId = issuanceOrderId,
+            ActorKind = VoucherActorKinds.User,
+            ActorUserId = command.OwnerUserId,
+            ActorPartyId = legalEntityId,
+            OccurredAtUtc = voucher.UpdatedAtUtc
+        });
+
         await _context.SaveChangesAsync(cancellationToken);
 
         _metrics.VoucherRecalled();
