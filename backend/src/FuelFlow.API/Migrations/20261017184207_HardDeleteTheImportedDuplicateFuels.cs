@@ -30,9 +30,10 @@ namespace FuelFlow.API.Migrations
     /// anybody sells against them between this being merged and this running, nothing is deleted.
     /// </para>
     /// <para>
-    /// Not reversible by design: <see cref="Down"/> raises rather than resurrecting rows it cannot
-    /// reconstruct. The archived state and their nominals are recoverable from the database's own history
-    /// if that ever matters, which is a different and much slower promise than a <c>DELETE</c>.
+    /// Not reversible by design, and <see cref="Down"/> is empty rather than throwing: the rows existed
+    /// only in the database, and EF Core enumerates every migration's <c>DownOperations</c> to build a
+    /// rollback script — so a throwing <c>Down</c> would make the entire history un-rollable, not just
+    /// this migration. The comment on that method records the first attempt and what it cost.
     /// </para>
     /// </summary>
     public partial class HardDeleteTheImportedDuplicateFuels : Migration
@@ -67,14 +68,25 @@ namespace FuelFlow.API.Migrations
                 """);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Deliberately empty, and the reason is not laziness.
+        /// <para>
+        /// These rows cannot be reconstructed: their ids, names, creation timestamps and nominals
+        /// existed only in the database. Re-inserting placeholders would fabricate catalogue history for
+        /// prices that were never charged, which is worse than a rollback that restores nothing.
+        /// </para>
+        /// <para>
+        /// An earlier version of this migration threw <see cref="NotSupportedException"/> here, on the
+        /// reasoning that refusing to reverse is more honest than reversing into a fiction. That broke
+        /// <c>DataKindBackfillTests</c>, and it is worth recording why rather than reverting quietly:
+        /// EF Core builds a migration's rollback script by enumerating <c>DownOperations</c> for
+        /// <em>every</em> migration in the history, whether or not anyone intends to roll it back. A
+        /// throwing <c>Down</c> is therefore not a refusal to reverse — it makes the whole history
+        /// un-rollable, and any test that walks backwards over it fails far from the cause.
+        /// </para>
+        /// </summary>
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            throw new NotSupportedException(
-                "These rows were deleted outright and cannot be reconstructed from a migration: their "
-                + "ids, names, creation timestamps and nominals existed only in the database. Recreating "
-                + "them would fabricate catalogue history that never happened to any price that was ever "
-                + "charged.");
         }
     }
 }
