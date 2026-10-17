@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Trash2, Loader2, FileUp, Filter, CheckSquare, ChevronUp, ChevronDown, ArrowUpDown, ChevronLeft, ChevronRight, FileSignature, Package, X, ArrowLeft, CheckCircle, XCircle, QrCode, BarChart, Building, ScrollText, Bug, Ban, ShieldCheck, MapPin, Replace, RefreshCw, Handshake, MessageSquare } from "lucide-react";
+import { Trash2, Loader2, FileUp, Filter, CheckSquare, ChevronUp, ChevronDown, ArrowUpDown, ChevronLeft, ChevronRight, FileSignature, Package, X, ArrowLeft, CheckCircle, XCircle, QrCode, BarChart, Building, ScrollText, Bug, Ban, ShieldCheck, MapPin, Replace, RefreshCw, Handshake, MessageSquare, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/ui/alert-dialog";
 import { apiRequest, apiBlob } from "@/lib/api-client";
+import { VoucherLifecycleDrawer } from "@/components/VoucherLifecycleDrawer";
 import { toast } from "sonner";
 import { Layout } from "@/components/layout";
 import { LionMark } from "@/components/LionMark";
@@ -206,6 +207,8 @@ export default function AdminScreen() {
   const [importProgress, setImportProgress] = useState({ processed: 0, total: 0 });
   const [importErrorMsg, setImportErrorMsg] = useState('');
   const [selectedQrId, setSelectedQrId] = useState<string | null>(null);
+  // The D-13 record read for one voucher (VOUCHER_LIFECYCLE.md slice 2). Null id means closed.
+  const [lifecycleVoucher, setLifecycleVoucher] = useState<{ id: string; number: string } | null>(null);
 
   // Fetch single voucher details when modal is open to get decrypted QR
   const { data: fullVoucherData, isLoading: isVoucherLoading } = useQuery({
@@ -1651,6 +1654,11 @@ if (status === "booting") {
                         { id: 'externalId', label: t('vouchers.externalId'), sortable: true },
                         { id: 'status', label: t('vouchers.status'), sortable: true },
                         { id: 'createdAt', label: t('common.date'), sortable: true },
+                        // Not sortable: it is an action, not a fact about the voucher. Declared with the
+                        // other columns so the header and the cells stay in step - the alternative is a
+                        // header outside the map and a cell inside it, which drifts the moment one of them
+                        // gains an entry.
+                        { id: 'lifecycle', label: t('voucherLifecycle.open'), sortable: false },
                       ].map((col) => (
                         <th
                           key={col.id}
@@ -1752,18 +1760,30 @@ if (status === "booting") {
                           <td className="p-4 text-muted-foreground text-xs font-mono">
                             {formatDate(v.createdAtUtc || Date.now())}
                           </td>
+                          <td className="p-4">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-xs"
+                              aria-label={`${t('voucherLifecycle.open')}: ${v.voucherNumber}`}
+                              onClick={() => setLifecycleVoucher({ id: v.id, number: v.voucherNumber })}
+                            >
+                              <History className="w-3 h-3 mr-1" />
+                              {t('voucherLifecycle.open')}
+                            </Button>
+                          </td>
 
                         </tr>
                       );
                     })}
                     {isVouchersLoading && (
-                      <tr><td colSpan={11} className="p-16 text-center text-muted-foreground">
+                      <tr><td colSpan={12} className="p-16 text-center text-muted-foreground">
                         <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
                         Loading...
                       </td></tr>
                     )}
                     {!isVouchersLoading && vouchers.length === 0 && (
-                      <tr><td colSpan={11} className="p-16 text-center text-muted-foreground flex flex-col items-center justify-center gap-2">
+                      <tr><td colSpan={12} className="p-16 text-center text-muted-foreground flex flex-col items-center justify-center gap-2">
                         <Package className="w-8 h-8 opacity-20" />
                         {t('import.noVouchers')}
                       </td></tr>
@@ -3006,6 +3026,12 @@ if (status === "booting") {
         </div>
       )}
 
+
+      <VoucherLifecycleDrawer
+        voucherId={lifecycleVoucher?.id ?? null}
+        voucherNumber={lifecycleVoucher?.number ?? null}
+        onOpenChange={(open) => { if (!open) setLifecycleVoucher(null); }}
+      />
     </Layout>
   );
 }
