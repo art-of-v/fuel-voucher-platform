@@ -326,6 +326,7 @@ public sealed class ConfirmVoucherExchangeCommandHandler
                 VoucherId = old.Id,
                 FromLocation = VoucherLocations.Pool,
                 ToLocation = VoucherLocations.Supplier,
+                    ActorKind = VoucherActorKinds.User,
                 ActorUserId = command.ActingUserId,
                 OccurredAtUtc = now
             });
@@ -341,6 +342,7 @@ public sealed class ConfirmVoucherExchangeCommandHandler
                 VoucherId = newVoucher.Id,
                 FromLocation = VoucherLocations.Supplier,
                 ToLocation = VoucherLocations.Pool,
+                    ActorKind = VoucherActorKinds.User,
                 ActorUserId = command.ActingUserId,
                 OccurredAtUtc = now
             });

@@ -1247,6 +1247,14 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("ActorKind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasDefaultValue("system")
+                        .HasColumnName("actor_kind");
+
                     b.Property<Guid?>("ActorPartyId")
                         .HasColumnType("uuid")
                         .HasColumnName("actor_party_id");
@@ -1311,6 +1319,10 @@ namespace FuelFlow.API.Migrations
 
                     b.ToTable("voucher_events", null, t =>
                         {
+                            t.HasCheckConstraint("ck_voucher_events_actor_kind", "actor_kind IN ('user','system')");
+
+                            t.HasCheckConstraint("ck_voucher_events_actor_named", "(actor_kind = 'user') = (actor_user_id IS NOT NULL)");
+
                             t.HasCheckConstraint("ck_voucher_events_expiration_pair", "(event_type = 'Extended') = (previous_customer_expiration IS NOT NULL AND new_customer_expiration IS NOT NULL) AND (event_type <> 'Extended' OR new_customer_expiration > previous_customer_expiration)");
 
                             t.HasCheckConstraint("ck_voucher_events_imported_has_no_predecessor", "event_type <> 'Imported' OR (from_status IS NULL AND previous_customer_expiration IS NULL)");
@@ -1689,6 +1701,14 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("ActorKind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasDefaultValue("system")
+                        .HasColumnName("actor_kind");
+
                     b.Property<Guid?>("ActorPartyId")
                         .HasColumnType("uuid")
                         .HasColumnName("actor_party_id");
@@ -1767,6 +1787,10 @@ namespace FuelFlow.API.Migrations
 
                     b.ToTable("voucher_movements", null, t =>
                         {
+                            t.HasCheckConstraint("ck_voucher_movements_actor_kind", "actor_kind IN ('user','system')");
+
+                            t.HasCheckConstraint("ck_voucher_movements_actor_named", "(actor_kind = 'user') = (actor_user_id IS NOT NULL)");
+
                             t.HasCheckConstraint("ck_voucher_movements_amount_non_negative", "amount_uah IS NULL OR amount_uah >= 0");
 
                             t.HasCheckConstraint("ck_voucher_movements_distinct_locations", "from_location <> to_location");

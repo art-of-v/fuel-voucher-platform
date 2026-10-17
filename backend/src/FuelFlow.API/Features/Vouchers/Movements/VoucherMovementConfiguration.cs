@@ -84,6 +84,19 @@ internal sealed class VoucherMovementConfiguration : IEntityTypeConfiguration<Vo
         builder.Property(e => e.OrderId)
             .HasColumnName("order_id");
 
+        // Bare uuid, no FK: an audit row has to be writable whatever happened to the actor row, which is §G
+        // of TARGET_SCHEMA and what voucher_exchanges.acting_user_id and
+        // operator_voucher_renewals.acting_user_id are bare too.
+        //
+        // The DEFAULT is here so the migration can ADD this column to a table that already exists.
+        // Every writer states the kind explicitly; an automatic action with no person behind it is
+        // `system`, which is an answer rather than a missing author.
+        builder.Property(e => e.ActorKind)
+            .HasColumnName("actor_kind")
+            .HasMaxLength(12)
+            .HasDefaultValue(VoucherActorKinds.System)
+            .IsRequired();
+
         builder.Property(e => e.ActorUserId)
             .HasColumnName("actor_user_id");
 
@@ -149,6 +162,15 @@ internal sealed class VoucherMovementConfiguration : IEntityTypeConfiguration<Vo
             // are Payments rows (D-10), not negative movements.
             t.HasCheckConstraint("ck_voucher_movements_amount_non_negative",
                 "amount_uah IS NULL OR amount_uah >= 0");
+
+            // Every action has an author. A person needs an id; the scheduler does not and must not
+            // invent one. This is what makes NULL, a zero GUID and a fake user id all unrepresentable.
+            t.HasCheckConstraint(
+                "ck_voucher_movements_actor_kind",
+                $"actor_kind IN ({string.Join(",", VoucherActorKinds.All.Select(k => $"'{k}'"))})");
+
+            t.HasCheckConstraint("ck_voucher_movements_actor_named",
+                "(actor_kind = 'user') = (actor_user_id IS NOT NULL)");
         });
     }
 }

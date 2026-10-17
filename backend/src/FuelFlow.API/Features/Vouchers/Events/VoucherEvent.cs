@@ -71,7 +71,13 @@ public sealed class VoucherEvent
     /// </remarks>
     public string? ExternalRef { get; set; }
 
-    /// <summary>Who or what caused it. Bare uuid, no foreign key — see §G of TARGET_SCHEMA.</summary>
+    /// <summary>Who caused it: a person, or the scheduler. See <see cref="VoucherActorKinds"/>.</summary>
+    public string ActorKind { get; set; } = VoucherActorKinds.User;
+
+    /// <summary>
+    /// The person who caused it, required when <see cref="ActorKind"/> is <c>user</c>. Bare uuid, no
+    /// foreign key — see §G of TARGET_SCHEMA.
+    /// </summary>
     public Guid? ActorUserId { get; set; }
 
     /// <summary>The company that caused it. Bare uuid; D-02.</summary>

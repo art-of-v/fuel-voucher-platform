@@ -509,6 +509,7 @@ public sealed class ImportVouchersCommandHandler
                             VoucherId = voucher.Id,
                             FromLocation = VoucherLocations.Supplier,
                             ToLocation = VoucherLocations.Pool,
+                            ActorKind = VoucherActorKinds.User,
                             ActorUserId = request.ActingUserId,
                             OccurredAtUtc = voucher.CreatedAtUtc
                         });
