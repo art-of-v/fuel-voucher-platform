@@ -1,3 +1,4 @@
+using FuelFlow.Features.Pricing;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
@@ -14,8 +15,13 @@ namespace FuelFlow.Features.Vouchers.PurchaseBatchCost;
 public sealed class BlendedCostRecalculator
 {
     private readonly ApplicationDbContext _context;
+    private readonly OfferPriceRecorder _priceRecorder;
 
-    public BlendedCostRecalculator(ApplicationDbContext context) => _context = context;
+    public BlendedCostRecalculator(ApplicationDbContext context, OfferPriceRecorder priceRecorder)
+    {
+        _context = context;
+        _priceRecorder = priceRecorder;
+    }
 
     /// <summary>
     /// Blended cost/liter across the whole in-stock pool for <paramref name="fuelTypeId"/>
@@ -53,11 +59,21 @@ public sealed class BlendedCostRecalculator
     /// <summary>
     /// Rewrites every offer for <paramref name="fuelTypeId"/> to price off <paramref name="blendedCost"/>,
     /// preserving each offer's profit/pump/min-discount knobs, restating each volume's frozen package
-    /// total, and syncing the fuel type's base/discount headline — mirroring
-    /// <c>BrandsController.UpdateFuel</c>. Does NOT call SaveChanges (the caller batches the save);
-    /// returns the number of packages repriced.
+    /// total, syncing the fuel type's base/discount headline — mirroring
+    /// <c>BrandsController.UpdateFuel</c> — and appending each moved price to <c>fuel_offer_prices</c>.
+    /// Does NOT call SaveChanges (the caller batches the save); returns the number of packages repriced.
     /// </summary>
-    public async Task<int> RepriceAsync(string fuelTypeId, decimal blendedCost, Guid actingUserId, CancellationToken ct = default)
+    /// <param name="reason">
+    /// Which door the cost came through, from <see cref="OfferPriceReasons"/>: an operator entering a
+    /// batch cost, or a voucher exchange releasing expired stock back into the pool. Both end here, and
+    /// the history row is the only thing that says which.
+    /// </param>
+    public async Task<int> RepriceAsync(
+        string fuelTypeId,
+        decimal blendedCost,
+        Guid actingUserId,
+        string reason = OfferPriceReasons.BatchCost,
+        CancellationToken ct = default)
     {
         var offers = await _context.FuelOffers.Where(o => o.FuelTypeId == fuelTypeId).ToListAsync(ct);
         if (offers.Count == 0) return 0;
@@ -86,8 +102,6 @@ public sealed class BlendedCostRecalculator
             offer.SupplierPricePerLiter = blendedCost;
             offer.FinalPricePerLiter = finalPerLiter;
             offer.UpdatedAtUtc = now;
-            offer.PriceUpdatedAt = now;
-            offer.PriceUpdatedByUserId = actingUser;
 
             foreach (var volume in volumes.Where(v => v.OfferId == offer.Id))
             {
@@ -101,6 +115,11 @@ public sealed class BlendedCostRecalculator
 
         _context.FuelOffers.UpdateRange(offers);
         if (volumes.Count > 0) _context.FuelOfferVolumes.UpdateRange(volumes);
+
+        // The history, in one call for every pool's offer: the recorder stamps
+        // price_updated_at / price_updated_by_user_id (this method used to) and appends a row per offer
+        // whose cost or final price actually moved. It does not save - the caller owns that.
+        await _priceRecorder.RecordRangeAsync(offers, reason, actingUser, now, ct);
 
         // Keep the fuel-type headline (base/discount UAH/L) in step, as UpdateFuel does.
         var fuelType = await _context.FuelTypes.FirstOrDefaultAsync(f => f.Id == fuelTypeId, ct);

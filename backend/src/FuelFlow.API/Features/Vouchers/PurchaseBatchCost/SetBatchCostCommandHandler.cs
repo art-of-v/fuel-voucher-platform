@@ -159,7 +159,8 @@ public sealed class SetBatchCostCommandHandler
         var repriced = 0;
         if (blended is { } b)
         {
-            repriced = await _recalculator.RepriceAsync(command.FuelTypeId, b, command.ActingUserId, cancellationToken);
+            repriced = await _recalculator.RepriceAsync(
+                command.FuelTypeId, b, command.ActingUserId, OfferPriceReasons.BatchCost, cancellationToken);
             await _context.SaveChangesAsync(cancellationToken);
 
             // Slice-3 proactive alert: a rising blended cost may have pushed this supplier+fuel's

@@ -1,3 +1,4 @@
+using FuelFlow.Features.Pricing;
 using FluentAssertions;
 using FuelFlow.BackgroundJobs;
 using FuelFlow.Features.Orders.CreateCheckout;
@@ -69,8 +70,8 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
     private OkkoPriceSyncService Service(StubClient client, bool enabled, ILogger<OkkoPriceSyncService>? logger = null)
         => new(
             client,
-            new ImportOkkoPumpPricesCommandHandler(_context, _events),
-            new ImportOkkoCatalogueCommandHandler(_context, _events),
+            new ImportOkkoPumpPricesCommandHandler(_context, _events, new OfferPriceRecorder(_context)),
+            new ImportOkkoCatalogueCommandHandler(_context, _events, new OfferPriceRecorder(_context)),
             new BackfillBrandFuelCodesCommandHandler(_context, _events),
             Options.Create(new OkkoPriceOptions { Enabled = enabled }),
             logger ?? NullLogger<OkkoPriceSyncService>.Instance);
@@ -174,7 +175,7 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
         await SeedAsync(pump: 50m);
         var cheap = new[] { new OkkoPumpPrice("A-95", 40.50m) };
 
-        var result = await new ImportOkkoPumpPricesCommandHandler(_context, _events)
+        var result = await new ImportOkkoPumpPricesCommandHandler(_context, _events, new OfferPriceRecorder(_context))
             .ApplyAsync(cheap, dryRun: false, Guid.Empty, "OKKO price sync");
 
         result.BelowCostSkipped.Should().ContainSingle().Which.Should().Be("A-95");
@@ -230,7 +231,7 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
         await _context.SaveChangesAsync();
         _context.ChangeTracker.Clear();
 
-        var result = await new ImportOkkoPumpPricesCommandHandler(_context, _events)
+        var result = await new ImportOkkoPumpPricesCommandHandler(_context, _events, new OfferPriceRecorder(_context))
             .ApplyAsync([new OkkoPumpPrice("A-95", 40.50m)], dryRun: false, Guid.Empty, "OKKO price sync");
 
         result.BelowCostSkipped.Should().BeEmpty();
@@ -249,7 +250,7 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
             new OkkoPumpPrice("SPBT", 47.90m),  // fine
         };
 
-        var result = await new ImportOkkoPumpPricesCommandHandler(_context, _events)
+        var result = await new ImportOkkoPumpPricesCommandHandler(_context, _events, new OfferPriceRecorder(_context))
             .ApplyAsync(mixed, dryRun: false, Guid.Empty, "OKKO price sync");
 
         result.BelowCostSkipped.Should().ContainSingle();

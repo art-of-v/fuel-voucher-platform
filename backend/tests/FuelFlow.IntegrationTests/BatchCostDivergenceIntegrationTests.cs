@@ -1,3 +1,4 @@
+using FuelFlow.Features.Pricing;
 using FluentAssertions;
 using FuelFlow.Features.Contracts.SharedModels;
 using FuelFlow.Features.Vouchers;
@@ -108,7 +109,7 @@ var afterCosts = (await CostsAsync(context, importId)).Single(c => c.FuelTypeId 
         await SeedImportAndFuel(context, importId);
 
         var fuelTypeId = await SeedVouchersAsync(context, importId, softDeletedLiters: 0m);
-        var recalculator = new BlendedCostRecalculator(context);
+        var recalculator = new BlendedCostRecalculator(context, new OfferPriceRecorder(context));
 
         (await recalculator.ComputeBlendedAsync(fuelTypeId)).Should().BeApproximately(50m, 0.01m,
             "10 L at 40 and 10 L at 60 blend to 50");
@@ -165,7 +166,7 @@ var afterCosts = (await CostsAsync(context, importId)).Single(c => c.FuelTypeId 
     }
 
     private async Task<List<ImportBatchCostDto>> CostsAsync(ApplicationDbContext context, Guid importId)
-        => await new GetImportBatchCostsQueryHandler(context, new BlendedCostRecalculator(context))
+        => await new GetImportBatchCostsQueryHandler(context, new BlendedCostRecalculator(context, new OfferPriceRecorder(context)))
             .HandleAsync(new GetImportBatchCostsQuery(importId));
 
     private async Task<List<ImportBatchPnlDto>> PnlAsync(ApplicationDbContext context, Guid importId)

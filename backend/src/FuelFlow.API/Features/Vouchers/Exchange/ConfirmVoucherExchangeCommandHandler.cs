@@ -240,7 +240,8 @@ public sealed class ConfirmVoucherExchangeCommandHandler
             var repriced = 0;
             if (blended is { } b)
             {
-                repriced = await _recalculator.RepriceAsync(fuel, b, command.ActingUserId, ct);
+                repriced = await _recalculator.RepriceAsync(
+                    fuel, b, command.ActingUserId, OfferPriceReasons.ExchangeRelease, ct);
             }
 
             blendedByFuel.Add(new ExchangeFuelBlended(fuel, blended));

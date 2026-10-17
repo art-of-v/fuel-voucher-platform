@@ -105,6 +105,12 @@ private readonly FuelFlow.Features.Vouchers.Security.IQrCipher _qrCipher;
     public DbSet<FuelOffer> FuelOffers => Set<FuelOffer>();
     public DbSet<FuelOfferVolume> FuelOfferVolumes => Set<FuelOfferVolume>();
 
+    // The append-only record of what each offer was priced at. Read by nothing in the application yet
+    // on purpose: the offer's own columns remain the current price, so every existing read path is
+    // untouched, and the history exists for the money questions that today's price cannot answer -
+    // see FuelOfferPrice for those.
+    public DbSet<FuelOfferPrice> FuelOfferPrices => Set<FuelOfferPrice>();
+
     // The voucher side's crosswalk: which QR product code means which grade at which network. Read by
     // the OKKO voucher parser to resolve a fuel by the one signal in a parsed voucher that is not a
     // name. #349 step 3b.

@@ -1,3 +1,4 @@
+using FuelFlow.Features.Pricing;
 using System.Text.Json;
 using FluentAssertions;
 using FuelFlow.Features.Brands;
@@ -37,7 +38,7 @@ public sealed class CostEntryAuditIntegrationTests : IClassFixture<TestDatabaseF
             .Options, TestQrCipher.Instance);
 
     private static SetBatchCostCommandHandler Handler(ApplicationDbContext ctx)
-        => new(ctx, new BlendedCostRecalculator(ctx), new AuditEventService(ctx), NotificationDispatcher.Disabled);
+        => new(ctx, new BlendedCostRecalculator(ctx, new OfferPriceRecorder(ctx)), new AuditEventService(ctx), NotificationDispatcher.Disabled);
 
     /// <summary>One import holding one uncosted voucher of a fuel the migrations already seed.</summary>
     private static async Task<Guid> SeedUncostedImportAsync(ApplicationDbContext context, string suffix)

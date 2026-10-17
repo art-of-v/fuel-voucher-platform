@@ -1,4 +1,5 @@
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Features.Pricing;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -7,9 +8,24 @@ namespace FuelFlow.Features.Stations.CreatePackage;
 public sealed class CreatePackageCommandHandler
 {
     private readonly ApplicationDbContext _context;
-    public CreatePackageCommandHandler(ApplicationDbContext context) => _context = context;
+    private readonly OfferPriceRecorder _priceRecorder;
 
-    public async Task<CreatePackageResult> HandleAsync(CreatePackageCommand command, CancellationToken ct = default)
+    public CreatePackageCommandHandler(ApplicationDbContext context, OfferPriceRecorder priceRecorder)
+    {
+        _context = context;
+        _priceRecorder = priceRecorder;
+    }
+
+    /// <param name="ct">Cancellation.</param>
+    /// <param name="actingUserId">
+    /// The staff member the endpoint ran as, stamped on the price history this path appends. Optional,
+    /// and null for a caller that has no user to name - the row is still written, because a price that
+    /// moved is worth recording even when nobody can be blamed for it.
+    /// </param>
+    public async Task<CreatePackageResult> HandleAsync(
+        CreatePackageCommand command,
+        CancellationToken ct = default,
+        Guid? actingUserId = null)
     {
         if (string.IsNullOrWhiteSpace(command.Package.Id) ||
             string.IsNullOrWhiteSpace(command.Package.StationId) ||
@@ -105,6 +121,11 @@ public sealed class CreatePackageCommandHandler
         if (command.Package.MinDiscountPerLiter is not null)
             existingOffer.MinDiscountPerLiter = command.Package.MinDiscountPerLiter;
         existingOffer.UpdatedAtUtc = now;
+
+        // The history row for whatever price this leaves on the offer - a new offer's first price, or an
+        // existing one the caller just re-costed. The recorder skips it when the six figures are
+        // unchanged, which is the common case here: creating a package usually carries no price at all.
+        await _priceRecorder.RecordAsync(existingOffer, OfferPriceReasons.Operator, actingUserId, now, ct);
 
         var volume = new FuelOfferVolume
         {

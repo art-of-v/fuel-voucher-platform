@@ -1,3 +1,4 @@
+using FuelFlow.Features.Pricing;
 using FluentAssertions;
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Brands.GetProviders;
@@ -41,7 +42,8 @@ public sealed class UpdateNominalsReuseTests : IDisposable
             new GetBrandHistoryQueryHandler(_context),
             new AuditEventService(_context),
             _context,
-            NotificationDispatcher.Disabled);
+            NotificationDispatcher.Disabled,
+            new OfferPriceRecorder(_context));
 
         // UpdateNominals records an audit event attributed to the caller, so the controller needs a
         // principal - there is no ASP.NET pipeline in a unit test.

@@ -1,3 +1,4 @@
+using FuelFlow.Features.Pricing;
 using FluentAssertions;
 using Hangfire;
 using Moq;
@@ -85,7 +86,7 @@ public sealed class VoucherExchangeTransactionAtomicityTests : IClassFixture<Tes
             var eventService = new AuditEventService(ctx);
             var handler = new ConfirmVoucherExchangeCommandHandler(
                 ctx,
-                new BlendedCostRecalculator(ctx),
+                new BlendedCostRecalculator(ctx, new OfferPriceRecorder(ctx)),
                 new BulkActionVouchersCommandHandler(ctx, new Mock<IBackgroundJobClient>().Object, eventService),
                 eventService);
 

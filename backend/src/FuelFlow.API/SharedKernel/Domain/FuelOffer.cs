@@ -68,9 +68,22 @@ public sealed class FuelOffer
     public decimal? PumpPricePerLiter { get; set; }
     public decimal? MinDiscountPerLiter { get; set; }
 
-    /// <summary>When the per-litre pricing last changed, for the price-change audit trail.</summary>
+    /// <summary>
+/// What the per-litre pricing last changed, for the price-change audit trail.</summary>
     public DateTime? PriceUpdatedAt { get; set; }
     public Guid? PriceUpdatedByUserId { get; set; }
+
+    // The price columns above are the CURRENT price, and every read path uses them. They are stamped by
+    // OfferPriceRecorder, which also appends the row below - a convention would have been forgotten by
+    // the sixth write path, and the failure is invisible: the price is right today and the history has
+    // a hole in it. Two of the five paths did not stamp these two columns at all before that.
+
+    /// <summary>
+    /// Every price this offer has been priced at, newest last. Append-only, written by
+    /// <c>OfferPriceRecorder</c> and never edited - see <see cref="FuelOfferPrice"/> for why the offer's
+    /// own columns above are the current price and this is the record of how it got there.
+    /// </summary>
+    public ICollection<FuelOfferPrice> Prices { get; set; } = new List<FuelOfferPrice>();
 
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }

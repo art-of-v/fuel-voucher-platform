@@ -1,3 +1,4 @@
+using FuelFlow.Features.Pricing;
 using FluentAssertions;
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Pricing.ImportOkkoCatalogue;
@@ -46,7 +47,7 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
         _context.Dispose();
     }
 
-    private ImportOkkoCatalogueCommandHandler Handler() => new(_context, _events);
+    private ImportOkkoCatalogueCommandHandler Handler() => new(_context, _events, new OfferPriceRecorder(_context));
 
     private async Task SeedStationAsync()
     {

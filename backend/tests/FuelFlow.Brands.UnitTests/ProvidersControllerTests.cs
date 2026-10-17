@@ -1,3 +1,5 @@
+using FuelFlow.Features.Brands.GetFuelPriceHistory;
+using FuelFlow.Features.Pricing;
 using FuelFlow.Brands.UnitTests;
 using System.Security.Claims;
 using System.Text.Json;
@@ -52,9 +54,11 @@ public sealed class BrandsControllerTests : IDisposable
             new GetBrandsQueryHandler(_context),
             new GetBrandByIdQueryHandler(_context),
             new GetBrandHistoryQueryHandler(_context),
+            new GetFuelPriceHistoryQueryHandler(_context),
             new AuditEventService(_context),
             _context,
-            notifications)
+            notifications,
+            new OfferPriceRecorder(_context))
         {
             ControllerContext = new ControllerContext
             {
@@ -292,6 +296,44 @@ public sealed class BrandsControllerTests : IDisposable
 
         var offer = await _context.FuelOffers.SingleAsync(o => o.FuelTypeId == "test-fuel-ttt");
         offer.FinalPricePerLiter.Should().Be(100.5m);
+    }
+
+    [Fact]
+    public async Task UpdateFuel_AppendsTheNewPrice_ToTheOfferHistory_WithTheOperatorAsActor()
+    {
+        await AddStationAsync("test-okko", "OKKO");
+        await AddFuelAsync("test-fuel-h", "test-okko", "A-95");
+        await AddPackageAsync("test-fuel-h", "test-okko", 10m, 51m, 49m, 2m);
+
+        var actingUser = Guid.Parse(
+            _controller.ControllerContext.HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
+        await _controller.UpdateFuel(
+            "test-fuel-h",
+            FuelDto("test-fuel-h", "A-95", 60m, 3m, 63m),
+            CancellationToken.None);
+        _context.ChangeTracker.Clear();
+
+        await _controller.UpdateFuel(
+            "test-fuel-h",
+            FuelDto("test-fuel-h", "A-95", 60m, 4m, 64m),
+            CancellationToken.None);
+        _context.ChangeTracker.Clear();
+
+        var history = await _context.FuelOfferPrices
+            .OrderBy(p => p.EffectiveFromUtc).ThenBy(p => p.Id)
+            .ToListAsync();
+
+        // Two edits, two rows. An edit that only overwrote would leave one row holding the last number
+        // and answer "what did it cost before?" with the current price - which is the question the
+        // dashboard and reconciliation cannot ask about historical orders any other way.
+        history.Should().HaveCount(2);
+        history[0].MarginUahPerLiter.Should().Be(3m);
+        history[0].FinalPricePerLiter.Should().Be(63m);
+        history[1].MarginUahPerLiter.Should().Be(4m);
+        history[1].FinalPricePerLiter.Should().Be(64m);
+        history.Should().OnlyContain(p => p.Reason == OfferPriceReasons.Operator);
+        history.Should().OnlyContain(p => p.ChangedByUserId == actingUser);
     }
 
     [Fact]

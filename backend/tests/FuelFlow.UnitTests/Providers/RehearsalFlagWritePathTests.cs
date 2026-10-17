@@ -1,3 +1,4 @@
+using FuelFlow.Features.Pricing;
 using System.Net;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
@@ -51,7 +52,8 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
             new GetBrandHistoryQueryHandler(_context),
             new AuditEventService(_context),
             _context,
-            NotificationDispatcher.Disabled);
+            NotificationDispatcher.Disabled,
+            new OfferPriceRecorder(_context));
 
         // The success path records an audit event attributed to the caller, so the controller needs
         // a principal - there is no ASP.NET pipeline in a unit test.

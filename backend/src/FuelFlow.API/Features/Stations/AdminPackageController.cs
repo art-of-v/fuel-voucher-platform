@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.Features.Stations.CreatePackage;
 using FuelFlow.Features.Stations.DeletePackage;
@@ -86,12 +87,25 @@ public sealed class AdminPackageController : ControllerBase
             }
         }
 
-        var result = await _create.HandleAsync(new CreatePackageCommand(request.ToPackage()), ct);
+        var result = await _create.HandleAsync(
+            new CreatePackageCommand(request.ToPackage()),
+            ct,
+            ActingUserId());
         if (result.Error != null && !result.Conflict)
             return BadRequest(result.Error);
         if (result.Conflict)
             return Conflict(result.Error);
         return CreatedAtAction(nameof(GetAll), new { id = result.Package!.Id }, result.Package);
+    }
+
+    /// <summary>
+    /// The staff member behind the call, for the price history this endpoint's handler appends. Null
+    /// when the token carries no identifier - the row is still written, just without an actor.
+    /// </summary>
+    private Guid? ActingUserId()
+    {
+        var claim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        return claim is not null && Guid.TryParse(claim, out var id) ? id : null;
     }
 }
 

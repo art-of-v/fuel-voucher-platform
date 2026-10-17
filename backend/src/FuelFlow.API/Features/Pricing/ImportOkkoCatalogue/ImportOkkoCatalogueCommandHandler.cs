@@ -65,11 +65,16 @@ public sealed class ImportOkkoCatalogueCommandHandler
 
     private readonly ApplicationDbContext _context;
     private readonly AuditEventService _events;
+    private readonly OfferPriceRecorder _priceRecorder;
 
-    public ImportOkkoCatalogueCommandHandler(ApplicationDbContext context, AuditEventService events)
+    public ImportOkkoCatalogueCommandHandler(
+        ApplicationDbContext context,
+        AuditEventService events,
+        OfferPriceRecorder priceRecorder)
     {
         _context = context;
         _events = events;
+        _priceRecorder = priceRecorder;
     }
 
     public async Task<OkkoCatalogueApplyResult> ApplyAsync(
@@ -152,7 +157,7 @@ public sealed class ImportOkkoCatalogueCommandHandler
             };
             _context.FuelTypes.Add(fuel);
 
-            _context.FuelOffers.Add(new FuelOffer
+            var offer = new FuelOffer
             {
                 Id = OfferKeys.For(fuel.Id, DataKinds.Real),
                 StationId = OkkoStationId,
@@ -163,7 +168,13 @@ public sealed class ImportOkkoCatalogueCommandHandler
                 PumpPricePerLiter = row.PricePerLiter,
                 CreatedAtUtc = now,
                 UpdatedAtUtc = now
-            });
+            };
+            _context.FuelOffers.Add(offer);
+
+            // The price the offer was born with, so a fuel's history starts at its creation instead of at
+            // the first time somebody repriced it. A row of mostly nulls is the honest record here: the
+            // catalogue knows the pump and nothing else.
+            await _priceRecorder.RecordAsync(offer, OfferPriceReasons.CatalogueImport, actingUserId, now, ct);
 
             created.Add(new OkkoCatalogueCreated(fuel.Id, name, code, row.PricePerLiter));
         }
