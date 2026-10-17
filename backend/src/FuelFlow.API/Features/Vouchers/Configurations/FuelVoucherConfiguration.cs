@@ -211,7 +211,61 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
             // refuse.
             t.HasCheckConstraint("ck_voucher_customer_term_within_supplier_term",
                 "customer_expiration_date <= supplier_expiration_date");
+
+            // The ownership matrix, in the database (D-02, "Consequence - ownership becomes enforceable").
+            //
+            // Declared here rather than as raw SQL in the migration so EF owns it and the model and the
+            // installed constraint can never drift - the failure CheckConstraintColumnDriftTests was
+            // written about. Because holder_kind is generated from the very columns the predicate
+            // mentions, each disjunct is a check that a combination is coherent rather than a restatement
+            // of the CASE above:
+            //
+            //   stock    - nobody holds it, so assigned_to_user_id must be null too
+            //   worker   - belongs to a worker AND to the company that issued it, which is why
+            //              legal_entity_id is required: the fuel is the company's and is in the worker's
+            //              hands. GiftVouchersCommand is the only writer of worker_user_id and already
+            //              refuses a voucher whose legal_entity_id is not the issuing company.
+            //   personal - a customer's own fuel, so there is no company and no worker on the row
+            //   company  - company fuel in the customer's own wallet, so there is no worker on the row
+            //
+            // 'stock' is the ELSE of the generated CASE, so it is also the only value that can reach
+            // this predicate with a null assigned_to_user_id; and the ORs are exhaustive, so any value
+            // outside the four is refused as well. That is why there is no separate CHECK on the
+            // value set.
+            // The value set is the enum member names, PascalCase, matching ck_voucher_status and
+            // every other enum-derived value set in this schema. The generated column writes those
+            // exact strings because the property has a string conversion - and a CHECK that compared
+            // against lowercase would refuse every row the column had just written.
+            t.HasCheckConstraint("ck_voucher_holder", """
+                (holder_kind = 'Stock'    AND assigned_to_user_id IS NULL)
+                OR (holder_kind = 'Worker'   AND legal_entity_id IS NOT NULL AND worker_user_id IS NOT NULL)
+                OR (holder_kind = 'Personal' AND worker_user_id IS NULL AND assigned_to_user_id IS NOT NULL)
+                OR (holder_kind = 'Company'  AND worker_user_id IS NULL AND assigned_to_user_id IS NOT NULL)
+                """);
         });
+
+        // GENERATED ALWAYS AS ... STORED, not a computed value EF holds in memory: the answer has to
+        // be the same in SQL, in a report, and in psql, and ck_voucher_holder below reads it. Postgres
+        // does allow a CHECK to reference a generated column - verified against 16 rather than assumed.
+        //
+        // Precedence is the whole point. worker_user_id first, because issuing fuel to a worker leaves
+        // assigned_to_user_id on the owner on purpose; testing assigned_to_user_id first would report
+        // the owner as the holder of fuel they had already given away.
+        builder.Property(e => e.HolderKind)
+            .HasColumnName("holder_kind")
+            .HasConversion<string>()
+            .HasMaxLength(16)
+            .HasComputedColumnSql(
+                """
+                CASE
+                    WHEN worker_user_id IS NOT NULL THEN 'Worker'
+                    WHEN legal_entity_id IS NOT NULL AND assigned_to_user_id IS NOT NULL THEN 'Company'
+                    WHEN assigned_to_user_id IS NOT NULL THEN 'Personal'
+                    ELSE 'Stock'
+                END
+                """,
+                stored: true)
+            .ValueGeneratedOnAddOrUpdate();
 
         builder.Property(e => e.UpdatedAtUtc)
             .HasColumnName("updated_at_utc")
