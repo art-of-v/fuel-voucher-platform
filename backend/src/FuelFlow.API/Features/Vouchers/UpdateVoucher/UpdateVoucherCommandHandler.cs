@@ -1,5 +1,6 @@
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers.SharedModels;
+using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
@@ -63,8 +64,33 @@ public sealed class UpdateVoucherCommandHandler
         if (command.AssignedToUserId.HasValue)
             entity.AssignedToUserId = newAssignedToUserId;
 
-        entity.UpdatedAtUtc = DateTime.UtcNow;
+        var changedAtUtc = DateTime.UtcNow;
+        entity.UpdatedAtUtc = changedAtUtc;
         _context.FuelVouchers.Update(entity);
+
+        // D-13. This is the only writer that can set any of the nine statuses, so anything it misses
+        // here is missed everywhere: the editor is the back door around the instrumented flows.
+        //
+        // The from/to pair is compared rather than assumed. `request.Status` is a raw string the
+        // admin UI sends verbatim, so POSTing the voucher's current status is entirely reachable, and
+        // ck_voucher_events_status_changed would refuse `from == to` by aborting this very
+        // SaveChangesAsync — turning a harmless re-save into an error.
+        var actorId = command.ActingAdminUserId is { } actor && actor != Guid.Empty ? actor : (Guid?)null;
+        if (oldStatus != newStatus && actorId is { } editor)
+        {
+            _context.VoucherEvents.Add(new VoucherEvent
+            {
+                Id = Guid.CreateVersion7(),
+                VoucherId = entity.Id,
+                EventType = VoucherEventTypes.StatusChanged,
+                FromStatus = oldStatus.ToString(),
+                ToStatus = newStatus.ToString(),
+                ActorKind = VoucherActorKinds.User,
+                ActorUserId = editor,
+                OccurredAtUtc = changedAtUtc
+            });
+        }
+
         await _context.SaveChangesAsync(cancellationToken);
 
         if (command.ActingAdminUserId.HasValue)

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using FuelFlow.Features.Brands;
+using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -58,6 +59,15 @@ public sealed class UnarchiveVoucherCommandHandler
         //
         // The predicate is repeated in the UPDATE's WHERE clause so a concurrent second call loses
         // cleanly instead of double-reporting a restore that only happened once.
+        // The flag flip and the record of it are one fact. `ExecuteUpdateAsync` leaves the change
+        // tracker untouched and commits on its own, so without this the un-archive could land with a
+        // failed SaveChanges leaving nothing naming who did it — the exact action-without-an-author the
+        // actor constraints exist to prevent. Guarded by IsRelational so the in-memory unit brand,
+        // which has no transactions and no ExecuteUpdate, is unaffected.
+        await using var tx = _context.Database.IsRelational()
+            ? await _context.Database.BeginTransactionAsync(cancellationToken)
+            : null;
+
         var affected = await _context.FuelVouchers
             .IgnoreQueryFilters()
             .Where(v => v.Id == command.VoucherId && v.IsDeleted)
@@ -69,7 +79,40 @@ public sealed class UnarchiveVoucherCommandHandler
 
         if (affected == 0)
         {
+            if (tx is not null)
+            {
+                await tx.RollbackAsync(cancellationToken);
+            }
+
             return new UnarchiveVoucherResult { Success = true };
+        }
+
+        // D-13. `Unarchived`, not `StatusChanged`: the comment above explains why status is left
+        // alone, and writing a StatusChanged here would assert a transition the statement did not
+        // make. A voucher can be archived while sitting in any state, so from/to would be a
+        // fabrication rather than a record.
+        //
+        // Written after the `affected == 0` return above, so the idempotent path records nothing:
+        // one un-archive, one row.
+        var actorId = command.ActingAdminUserId is { } actor && actor != Guid.Empty ? actor : (Guid?)null;
+        if (actorId is { } unarchiveActor)
+        {
+            _context.VoucherEvents.Add(new VoucherEvent
+            {
+                Id = Guid.CreateVersion7(),
+                VoucherId = command.VoucherId,
+                EventType = VoucherEventTypes.Unarchived,
+                ActorKind = VoucherActorKinds.User,
+                ActorUserId = unarchiveActor,
+                OccurredAtUtc = DateTime.UtcNow
+            });
+
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+
+        if (tx is not null)
+        {
+            await tx.CommitAsync(cancellationToken);
         }
 
         if (command.ActingAdminUserId.HasValue)

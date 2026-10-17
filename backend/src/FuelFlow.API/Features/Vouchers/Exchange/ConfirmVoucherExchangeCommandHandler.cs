@@ -1,6 +1,7 @@
 using System.Text.Json;
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers.BulkActionVouchers;
+using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Vouchers.PurchaseBatchCost;
 using FuelFlow.Features.Vouchers.SharedModels;
@@ -227,8 +228,39 @@ public sealed class ConfirmVoucherExchangeCommandHandler
         // the post-exchange pool — no transient under-price.
         foreach (var v in olds)
         {
+            // D-13. Read the pre-image before the flip. `EligibleOldStatuses` deliberately includes
+            // `Expired`, so a voucher that already lapsed can be selected and "expired" again — and
+            // ck_voucher_events_status_changed refuses from == to, which would abort this SaveChanges
+            // and roll the retirement back with it. The no-op is skipped rather than attempted.
+            var fromStatus = v.Status;
+
             v.Status = VoucherStatus.Expired;
             v.UpdatedAtUtc = now;
+
+            // The retirement belongs here rather than to the swap of stock above, which is why the
+            // handler declines to write events for the movement half: this statement is the one that
+            // performs it. The activation of the news is the mirror case — it is delegated to
+            // BulkActionVouchersCommandHandler, which records it as the performer, not as this
+            // handler having arranged it.
+            if (fromStatus != VoucherStatus.Expired && command.ActingUserId != Guid.Empty)
+            {
+                _context.VoucherEvents.Add(new VoucherEvent
+                {
+                    Id = Guid.CreateVersion7(),
+                    VoucherId = v.Id,
+                    EventType = VoucherEventTypes.StatusChanged,
+                    FromStatus = fromStatus.ToString(),
+                    ToStatus = nameof(VoucherStatus.Expired),
+                    // external_ref is left NULL deliberately: the exchange batch is created further
+                    // down, and moving its creation above this loop to fill the column would reorder
+                    // the exchange on purpose — "expire the olds BEFORE repricing" is load-bearing.
+                    // NULL says "no reference existed yet", which is true; the movements written below
+                    // carry the batch.
+                    ActorKind = VoucherActorKinds.User,
+                    ActorUserId = command.ActingUserId,
+                    OccurredAtUtc = now
+                });
+            }
         }
 
         await _context.SaveChangesAsync(ct);

@@ -4,6 +4,7 @@ using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.BulkActionVouchers;
+using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Vouchers.Exchange;
 using FuelFlow.Features.Vouchers.PurchaseBatchCost;
@@ -135,10 +136,34 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
         // own cost is on the voucher. A third number would be a third thing to reconcile.
         movements.Should().OnlyContain(m => m.AmountUah == null && m.CostDeltaUah == null);
 
-        // And no status events from here: the retirement and the activation belong to the code that
-        // performs them, not to the handler that arranged them.
-        (await verify.VoucherEvents.AsNoTracking().AnyAsync())
-            .Should().BeFalse("status changes are recorded by whoever performs them, not by the exchange");
+        // Both halves of the swap are now recorded, and the split is the point: a status change is
+        // written by the code that PERFORMS it, not by the handler that arranged it.
+        //
+        // The retirement is performed by this handler's own statement, so it writes it. The activation
+        // is delegated to BulkActionVouchersCommandHandler, so that writes it — which is why the event
+        // names the operator rather than the exchange, and why neither row is a "the exchange did this"
+        // claim. Before, neither was recorded at all.
+        var events = await verify.VoucherEvents.AsNoTracking().ToListAsync();
+        events.Should().HaveCount(4, "two olds retired by this handler, two news activated by the bulk handler");
+
+        var retired = events.Where(e => e.VoucherId == old1 || e.VoucherId == old2).ToList();
+        retired.Should().HaveCount(2);
+        retired.Should().OnlyContain(e =>
+            e.EventType == VoucherEventTypes.StatusChanged &&
+            e.ToStatus == nameof(VoucherStatus.Expired) &&
+            e.ActorKind == VoucherActorKinds.User);
+        retired.Select(e => e.VoucherId).Should().BeEquivalentTo([old1, old2]);
+
+        var activated = events.Where(e => e.VoucherId == new1 || e.VoucherId == new2).ToList();
+        activated.Should().HaveCount(2);
+        activated.Should().OnlyContain(e =>
+            e.EventType == VoucherEventTypes.StatusChanged &&
+            e.FromStatus == nameof(VoucherStatus.Imported) &&
+            e.ToStatus == nameof(VoucherStatus.Available));
+        activated.Select(e => e.VoucherId).Should().BeEquivalentTo([new1, new2]);
+
+        events.Should().OnlyContain(e => e.ActorUserId == actingUserId,
+            "both halves were performed by the operator who confirmed the exchange");
 
         var audit = await verify.Set<AuditEventOutbox>().AsNoTracking()
             .Where(e => e.EventType == "VoucherExchanged").ToListAsync();
