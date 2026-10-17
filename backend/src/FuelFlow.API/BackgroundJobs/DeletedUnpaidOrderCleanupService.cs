@@ -90,6 +90,19 @@ public class DeletedUnpaidOrderCleanupService
             return;
         }
 
+        // The lines go first, and explicitly. `order_line_items.order_id` is RESTRICT - the renewal line is
+        // what now keeps an order a customer paid a renewal on from being deleted, so removing the order
+        // while its lines exist is refused by EF before the database is even asked. They are loaded by
+        // the Include above, which is what makes this a tracked removal rather than a second query.
+        //
+        // This is a job whose entire purpose is deleting abandoned checkouts, so it has to be the
+        // caller that adapts: the alternative would be weakening the constraint back to CASCADE, which
+        // is the direction this whole table was moved away from.
+        foreach (var order in abandoned)
+        {
+            _context.OrderLineItems.RemoveRange(order.LineItems);
+        }
+
         _context.Orders.RemoveRange(abandoned);
         await _context.SaveChangesAsync(cancellationToken);
 

@@ -1150,6 +1150,24 @@ var lastFailedAtUtc = await _context.Payments
             var usedStockIds = new List<Guid>();
             var fulfilledCount = 0;
 
+            // The order line each item describes, keyed by the voucher it renews. Deliberately NOT by
+            // `VoucherRenewalItem.LineItemId`: that is the positional pairing D-13 exists to remove, and
+            // it is null on every row the 2026-10-16 backfill could not disambiguate — two renewal lines
+            // on the same brand, fuel and volume are the same thing after the fact. Keying on the
+            // source voucher is what the pairing was for anyway, and it cannot be ambiguous.
+            //
+            // The snapshots go to both sides for now: voucher_renewal_items stays authoritative for
+            // everything else until the contract step drops it, so this is an expand, and the two cannot
+            // disagree because they are assigned from the same two values on the same line of the loop.
+            //
+            // FulfilledVoucherId and FulfilledAtUtc are deliberately not copied: those are facts about
+            // the fulfilment, not about the order, and the contract step reads them from the Fulfillment
+            // row that already records them.
+            var renewalLines = await _context.OrderLineItems
+                .AsTracking()
+                .Where(l => l.OrderId == orderId && l.SourceVoucherId != null)
+                .ToDictionaryAsync(l => l.SourceVoucherId!.Value, cancellationToken);
+
             foreach (var item in items)
             {
                 // Done-marker: this line was already applied by an earlier run.
@@ -1223,6 +1241,11 @@ var lastFailedAtUtc = await _context.Payments
                     item.PreviousCustomerExpiration = source.CustomerExpirationDate;
                     item.NewCustomerExpiration = newExpiration;
                     item.FulfilledAtUtc = now;
+                    if (renewalLines.TryGetValue(item.SourceVoucherId, out var extendLine))
+                    {
+                        extendLine.PreviousCustomerExpiration = item.PreviousCustomerExpiration;
+                        extendLine.NewCustomerExpiration = item.NewCustomerExpiration;
+                    }
                     // The fee is revenue, not a cost adjustment: cost_per_liter records what we PAID a
                     // supplier for this voucher and nothing else moves it. See VoucherCosting.
                     _context.Fulfillments.Add(new Fulfillment
@@ -1298,6 +1321,13 @@ var lastFailedAtUtc = await _context.Payments
                     // hidden reserve the customer can extend again later.
                     item.NewCustomerExpiration = promisedExpiration;
                     item.FulfilledAtUtc = now;
+                    if (renewalLines.TryGetValue(item.SourceVoucherId, out var replaceLine))
+                    {
+                        replaceLine.PreviousCustomerExpiration = item.PreviousCustomerExpiration;
+                        // The PROMISE, matching the item: the replacement voucher's own longer real life
+                        // is a reserve the customer may extend again, not what they bought.
+                        replaceLine.NewCustomerExpiration = promisedExpiration;
+                    }
                     // Same as the extend branch: the fee is revenue. The replacement's cost stays what we
                     // paid for it, which is also what the below-cost guard measured it against.
                     _context.Fulfillments.Add(new Fulfillment
