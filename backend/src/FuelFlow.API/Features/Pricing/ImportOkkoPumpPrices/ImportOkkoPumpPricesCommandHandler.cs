@@ -26,15 +26,23 @@ public sealed record SyncOkkoPumpPricesCommand(
     IReadOnlyList<OkkoPumpPrice> Prices, bool DryRun);
 
 /// <summary>
-/// Writes a parsed OKKO price sheet into the catalog's pump field. For each OKKO fuel type whose
-/// canonical category (<see cref="OkkoFuelClassifier"/>) matches a scraped row, it writes the
-/// sheet's price into <see cref="FuelPackage.PumpPricePerLiter"/> on every package and reprices
-/// <c>FinalPricePerLiter</c>/<c>OriginalPrice</c> plus the fuel-type headline — exactly mirroring
-/// the pump path of <c>BrandsController.UpdateFuel</c>.
+/// Writes a parsed OKKO price sheet into the catalog's pump field.
+/// </summary>
 /// <para>
-/// A pump change is NOT a cost event, so the supplier cost (<c>SupplierPricePerLiter</c>) is held
-/// constant — only the ceiling moves. Writing the pump turns on the struck "до" price and the
-/// per-liter savings display; it only lowers the sale price if the ceiling actually binds
+/// <b>How a fuel is matched to a row of the sheet.</b> By <see cref="FuelTypeEntity.BrandFuelCode"/>
+/// first — the brand publishes that code on the sheet it also publishes prices on, so a fuel whose
+/// catalogue carries it is matched by equality and needs no interpretation. A fuel with no code is
+/// matched the way this always was, by collapsing both sides onto a canonical category
+/// (<see cref="OkkoFuelClassifier"/>), which is why the seeded fuels still price while they are empty.
+/// A fuel that has a code the sheet does not carry is reported as having no price and is
+/// <em>not</em> re-matched by category: two fuels of one category are exactly what the code exists to
+/// tell apart, and falling back would hand the price to whichever sorted first.
+/// </para>
+/// <para>
+/// Writing the pump means writing the offer's ceiling and repricing its volumes, mirroring the pump
+/// path of <c>BrandsController.UpdateFuel</c>. A pump change is NOT a cost event, so the supplier cost
+/// (<c>SupplierPricePerLiter</c> — what we pay the reseller) is held constant; only the ceiling moves.
+/// It lowers the sale price only when the ceiling actually binds
 /// (<c>final = min(cost + profit, pump − minDiscount)</c>).
 /// </para>
 /// <para>
@@ -85,8 +93,19 @@ public sealed class ImportOkkoPumpPricesCommandHandler
         string? actingUserName,
         CancellationToken ct = default)
     {
-        // Collapse the sheet onto canonical categories; first price per category wins. Rows whose code
-        // does not classify, or whose category we do not carry, are reported back as unmatched.
+        // Two lookups, and which one answers depends on whether the catalogue carries the brand's own
+        // code for a fuel. The code is the one to trust: the sheet publishes it, so matching it needs no
+        // guess. The category map is what this did before any fuel had a code - site code collapses to a
+        // category, a name collapses to the same category, and two fuels of one category are then
+        // indistinguishable - so it stays as the fallback for the fuels that have no code yet, and stops
+        // being consulted the moment one does.
+        var priceByCode = new Dictionary<string, decimal>(StringComparer.Ordinal);
+        foreach (var row in prices)
+        {
+            var code = FuelTypeEntity.NormaliseBrandFuelCode(row.SiteFuelCode);
+            if (code is not null) priceByCode.TryAdd(code, row.PricePerLiter);
+        }
+
         var classified = prices
             .Select(p => (Price: p, Category: OkkoFuelClassifier.CategoryFromSiteFuelCode(p.SiteFuelCode)))
             .ToList();
@@ -136,20 +155,46 @@ public sealed class ImportOkkoPumpPricesCommandHandler
         var withoutPrice = new List<string>();
         var belowCostSkipped = new List<string>();
         var matchedCategories = new HashSet<OkkoFuelCategory>();
+        var matchedCodes = new HashSet<string>(StringComparer.Ordinal);
         var changedCount = 0;
         var packagesRepriced = 0;
 
         foreach (var ft in okkoFuelTypes)
         {
-            var category = OkkoFuelClassifier.CategoryFromName(ft.Name);
-            if (category is null || !priceByCategory.TryGetValue(category.Value, out var pump))
+            // By the brand's code where the catalogue has one, by category otherwise.
+            var catalogueCode = FuelTypeEntity.NormaliseBrandFuelCode(ft.BrandFuelCode);
+            OkkoFuelCategory? category;
+            decimal pump;
+            string siteCode;
+
+            if (catalogueCode is not null)
             {
-                withoutPrice.Add(ft.Name);
-                continue;
+                // A code that the sheet does not carry means this fuel has no pump price today. It is
+                // deliberately NOT re-matched by category: two fuels of one category are exactly what a
+                // code disambiguates, and guessing would hand the price to whichever one sorted first.
+                if (!priceByCode.TryGetValue(catalogueCode, out pump))
+                {
+                    withoutPrice.Add(ft.Name);
+                    continue;
+                }
+
+                siteCode = catalogueCode;
+                category = OkkoFuelClassifier.CategoryFromSiteFuelCode(catalogueCode);
+                matchedCodes.Add(catalogueCode);
+            }
+            else
+            {
+                category = OkkoFuelClassifier.CategoryFromName(ft.Name);
+                if (category is null || !priceByCategory.TryGetValue(category.Value, out pump))
+                {
+                    withoutPrice.Add(ft.Name);
+                    continue;
+                }
+
+                siteCode = classified.First(c => c.Category == category).Price.SiteFuelCode;
             }
 
-var poolOffers = offersByFuel.TryGetValue(ft.Id, out var found) ? found : new List<FuelOffer>();
-            var siteCode = classified.First(c => c.Category == category).Price.SiteFuelCode;
+            var poolOffers = offersByFuel.TryGetValue(ft.Id, out var found) ? found : new List<FuelOffer>();
 
             // Cost and margin are the offer's, and a fuel with more than one offer here (one per pool)
             // is priced per pool - each offer keeps its own cost, and only the imported pump is shared.
@@ -179,7 +224,7 @@ var poolOffers = offersByFuel.TryGetValue(ft.Id, out var found) ? found : new Li
                     continue;
                 }
 
-                matchedCategories.Add(category.Value);
+                if (category is { } matched) matchedCategories.Add(matched);
 
                 var previousPump = offer.PumpPricePerLiter;
                 var changed = previousPump != pump;
@@ -228,7 +273,7 @@ var poolOffers = offersByFuel.TryGetValue(ft.Id, out var found) ? found : new Li
             // distinguished from an unmatched one.
             if (poolOffers.Count == 0)
             {
-                matchedCategories.Add(category.Value);
+                if (category is { } matched) matchedCategories.Add(matched);
 
                 // No offer means no cost and no margin to hold, so these are the figures the old
                 // per-package loop produced off an empty list: zero cost, zero margin, and a final price
@@ -256,9 +301,15 @@ var poolOffers = offersByFuel.TryGetValue(ft.Id, out var found) ? found : new Li
             await RecordEventsAsync(applied, actor, actingUserName, ct);
         }
 
-        var unmatchedSheet = classified
-            .Where(c => c.Category is null || !matchedCategories.Contains(c.Category.Value))
-            .Select(c => c.Price.SiteFuelCode)
+        // A sheet row is accounted for when either lookup consumed it: the code it publishes, or the
+        // category a code-less fuel was matched by. What is left is genuinely unmatched and is what the
+        // operator needs to see — a new grade on the site, or a grade this catalogue does not sell.
+        var unmatchedSheet = prices
+            .Select(p => FuelTypeEntity.NormaliseBrandFuelCode(p.SiteFuelCode))
+            .OfType<string>()
+            .Where(code => !matchedCodes.Contains(code)
+                && !(OkkoFuelClassifier.CategoryFromSiteFuelCode(code) is { } cat
+                     && matchedCategories.Contains(cat)))
             .Distinct(StringComparer.Ordinal)
             .ToList();
 

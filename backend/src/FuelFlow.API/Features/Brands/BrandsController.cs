@@ -245,11 +245,11 @@ public sealed class BrandsController : ControllerBase
         // A code is the half of a fuel's identity that is not free text, so two fuels claiming one at
         // the same network is the ambiguity the catalogue import would resolve arbitrarily - and the
         // index below would answer 23505 naming neither fuel.
-        var supplierCode = FuelTypeEntity.NormaliseSupplierCode(request.SupplierCode);
-        if (supplierCode is not null)
+        var brandFuelCode = FuelTypeEntity.NormaliseBrandFuelCode(request.BrandFuelCode);
+        if (brandFuelCode is not null)
         {
             var codeOwner = await _context.FuelTypes
-                .Where(f => f.StationId == id && f.SupplierCode == supplierCode)
+                .Where(f => f.StationId == id && f.BrandFuelCode == brandFuelCode)
                 .Select(f => f.Id)
                 .FirstOrDefaultAsync(ct);
 
@@ -257,11 +257,11 @@ public sealed class BrandsController : ControllerBase
             {
                 return Conflict(new
                 {
-                    message = $"Supplier code '{supplierCode}' is already taken at {station.Name} by fuel "
+                    message = $"Brand fuel code '{brandFuelCode}' is already taken at {station.Name} by fuel "
                               + $"{codeOwner}. A code identifies one fuel per network: two fuels claiming "
                               + "it is what makes a catalogue import pick the wrong row.",
                     fuelTypeId = codeOwner,
-                    field = nameof(request.SupplierCode)
+                    field = nameof(request.BrandFuelCode)
                 });
             }
         }
@@ -302,7 +302,7 @@ public sealed class BrandsController : ControllerBase
             Id = Guid.CreateVersion7().ToString(),
             StationId = id,
             Name = request.Name,
-            SupplierCode = supplierCode,
+            BrandFuelCode = brandFuelCode,
             // base_price / discount_price are UAH per liter, decimal to the kopeck (spec §12, #90):
             // round to 2dp, never store kopecks-as-integer (that once made the app show 8492.00).
             BasePrice = Math.Round(baseUahPerLiter, 2, MidpointRounding.AwayFromZero),
@@ -562,14 +562,14 @@ public sealed class BrandsController : ControllerBase
         // repricing that silently dropped the code would leave a fuel that a catalogue import can no
         // longer match to the network's price sheet - which reads on screen as "we sell this fuel" and
         // on the site as one we stopped importing.
-        if (request.SupplierCode is not null)
+        if (request.BrandFuelCode is not null)
         {
-            var wanted = FuelTypeEntity.NormaliseSupplierCode(request.SupplierCode);
+            var wanted = FuelTypeEntity.NormaliseBrandFuelCode(request.BrandFuelCode);
 
-            if (wanted != fuel.SupplierCode)
+            if (wanted != fuel.BrandFuelCode)
             {
                 var codeOwner = await _context.FuelTypes
-                    .Where(f => f.StationId == fuel.StationId && f.SupplierCode == wanted && f.Id != fuel.Id)
+                    .Where(f => f.StationId == fuel.StationId && f.BrandFuelCode == wanted && f.Id != fuel.Id)
                     .Select(f => f.Id)
                     .FirstOrDefaultAsync(ct);
 
@@ -577,15 +577,15 @@ public sealed class BrandsController : ControllerBase
                 {
                     return Conflict(new
                     {
-                        message = $"Supplier code '{wanted}' is already taken at {fuel.StationId} by fuel "
+                        message = $"Brand fuel code '{wanted}' is already taken at {fuel.StationId} by fuel "
                                   + $"{codeOwner}. A code identifies one fuel per network.",
                         fuelTypeId = codeOwner,
-                        field = nameof(request.SupplierCode)
+                        field = nameof(request.BrandFuelCode)
                     });
                 }
             }
 
-            fuel.SupplierCode = wanted;
+            fuel.BrandFuelCode = wanted;
         }
 
         if (!seededVolumes) _context.FuelOfferVolumes.UpdateRange(volumes);

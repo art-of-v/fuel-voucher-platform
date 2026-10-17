@@ -34,8 +34,8 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
             .HasColumnType("text")
             .IsRequired();
 
-        builder.Property(e => e.SupplierCode)
-            .HasColumnName("supplier_code")
+        builder.Property(e => e.BrandFuelCode)
+            .HasColumnName("brand_fuel_code")
             .HasColumnType("text");
 
         builder.Property(e => e.BasePrice)
@@ -83,13 +83,13 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
             .HasDatabaseName("ux_fuel_types_station_name");
 
         // The same guarantee, on the half of a fuel's identity that is not free text: one live row per
-        // supplier code per network. Nullable on purpose, and therefore excluded from the index - a
+        // brand fuel code per network. Nullable on purpose, and therefore excluded from the index - a
         // fuel entered by hand has no code, and two such rows at one station must not collide with
         // each other over a value neither of them has.
-        builder.HasIndex(e => new { e.StationId, e.SupplierCode })
+        builder.HasIndex(e => new { e.StationId, e.BrandFuelCode })
             .IsUnique()
-            .HasFilter("supplier_code IS NOT NULL AND NOT is_deleted")
-            .HasDatabaseName("ux_fuel_types_station_supplier_code");
+            .HasFilter("brand_fuel_code IS NOT NULL AND NOT is_deleted")
+            .HasDatabaseName("ux_fuel_types_station_brand_fuel_code");
 
         // Natural key ("okko-95"), deliberately not a UUID. Bounded by CHECK rather than by a type
         // change - see StationConfiguration for why converting a natural key is not worth the
@@ -100,9 +100,9 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
             t.HasCheckConstraint("ck_fuel_types_name_length", "length(name) <= 200");
             t.HasCheckConstraint("ck_fuel_types_station_id_length", "length(station_id) <= 100");
 
-            // 50 for a supplier's own code for a grade - "A-95", "Pulls 95", "SPBT", a QR product
+            // 50 for a brand's own code for a grade - "A-95", "Pulls 95", "SPBT", a QR product
             // code. Generous for what it is, bounded because it is indexed and unique per station.
-            t.HasCheckConstraint("ck_fuel_types_supplier_code_length", "supplier_code IS NULL OR length(supplier_code) <= 50");
+            t.HasCheckConstraint("ck_fuel_types_brand_fuel_code_length", "brand_fuel_code IS NULL OR length(brand_fuel_code) <= 50");
 
             // A negative discount price means the customer is paid to take the fuel, which is not a
             // discount policy anyone has agreed to. The only guard today is the application-level

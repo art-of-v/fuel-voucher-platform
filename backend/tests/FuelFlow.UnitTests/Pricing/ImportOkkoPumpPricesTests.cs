@@ -292,6 +292,87 @@ var (wogVolume, wogOffer) = await ReadAsync("wog-95-20");
     }
 
     [Fact]
+    public async Task Import_MatchesByTheBrandCode_WhereTheCatalogueCarriesOne()
+    {
+        // The lookup the whole column exists for: the sheet publishes a code, the catalogue carries the
+        // same code, and matching them is equality rather than an interpretation of two names.
+        await SeedCatalogAsync();
+        await SetCodeAsync("okko-95", "A-95");
+
+        var result = await Handler().HandleAsync(Import(ScrapedSheet), Guid.Empty, "tester");
+
+        result.Applied.Should().Contain(a => a.FuelTypeId == "okko-95" && a.SiteFuelCode == "A-95");
+
+        _context.ChangeTracker.Clear();
+        var offer = await _context.FuelOffers.FirstAsync(o => o.FuelTypeId == "okko-95" && o.DataKind == DataKinds.Real);
+        offer.PumpPricePerLiter.Should().Be(92.90m);
+    }
+
+    [Fact]
+    public async Task ACodeTheSheetDoesNotCarry_LeavesTheFuelUnpriced_AndDoesNotFallBackToTheName()
+    {
+        // The sharp edge. "ДП ЄВРО" and a second diesel both classify as Diesel, so before the code
+        // existed both would have been handed the sheet's diesel price; with a code that the sheet does
+        // not publish, the fuel simply has no price today. Guessing would give one brand's grade
+        // another's ceiling, and which one won was decided by id order.
+        await SeedCatalogAsync();
+        await SetCodeAsync("okko-95", "A-95 Premium");   // a code OKKO does not publish
+
+        var result = await Handler().HandleAsync(Import(ScrapedSheet), Guid.Empty, "tester");
+
+        result.Applied.Should().NotContain(a => a.FuelTypeId == "okko-95",
+            "the name still classifies as A95, and that is exactly the guess the code replaces");
+        result.OkkoFuelsWithoutPrice.Should().Contain("A-95");
+    }
+
+    [Fact]
+    public async Task TwoFuelsOfOneCategory_AreSeparatedByTheirCode()
+    {
+        // The case a category cannot express: two A-95s at one brand, one of them the one the sheet is
+        // pricing. Both names classify identically, so without a code both receive the same price.
+        await SeedCatalogAsync();
+        _context.FuelTypes.Add(new FuelTypeEntity
+        {
+            Id = "okko-95-euro",
+            Name = "A-95 EURO",
+            StationId = "okko",
+            BasePrice = 56,
+            DiscountPrice = 53,
+            BrandFuelCode = "A-95"
+        });
+        AddPackages("okko-95-euro", "A-95 EURO", 10, 56, 5, 58);
+        await _context.SaveChangesAsync();
+        await SetCodeAsync("okko-95", "A-95 Extra");     // a second grade the sheet does not publish
+
+        var result = await Handler().HandleAsync(Import(ScrapedSheet), Guid.Empty, "tester");
+
+        result.Applied.Should().ContainSingle(a => a.SiteFuelCode == "A-95").Which.FuelTypeId
+            .Should().Be("okko-95-euro", "the code says which A-95 the sheet is pricing");
+        result.OkkoFuelsWithoutPrice.Should().Contain("A-95");
+    }
+
+    [Fact]
+    public async Task ACode_IsComparedTrimmed()
+    {
+        // Sheets carry trailing spaces; the stored code is trimmed by the one normalisation rule. A
+        // mismatch here would silently stop pricing a fuel that is on the site.
+        await SeedCatalogAsync();
+        await SetCodeAsync("okko-95", " A-95 ");
+
+        var result = await Handler().HandleAsync(Import(ScrapedSheet), Guid.Empty, "tester");
+
+        result.Applied.Should().Contain(a => a.FuelTypeId == "okko-95");
+    }
+
+    private async Task SetCodeAsync(string fuelTypeId, string code)
+    {
+        var fuel = await _context.FuelTypes.FirstAsync(f => f.Id == fuelTypeId);
+        fuel.BrandFuelCode = code;
+        await _context.SaveChangesAsync();
+        _context.ChangeTracker.Clear();
+    }
+
+    [Fact]
     public async Task Import_ShouldRecordAnAuditEvent_PerChangedFuel()
     {
         await SeedCatalogAsync();

@@ -82,7 +82,7 @@ public sealed record BrandFuelDto
     /// Omitted on an edit leaves it alone; an empty string clears it. That asymmetry is deliberate —
     /// an edit that repriced a fuel must not silently drop the code a catalogue import matched on.
     /// </remarks>
-    public string? SupplierCode { get; init; }
+    public string? BrandFuelCode { get; init; }
 }
 
 /// <summary>What the packages of one fuel actually disagree about, when they disagree.</summary>
@@ -115,7 +115,7 @@ public sealed record CreateFuelRequest
     /// without one, and two hand-entered fuels at one station must not collide over a value neither
     /// has. Unique among the live fuels of the same network that do have one.
     /// </summary>
-    public string? SupplierCode { get; init; }
+    public string? BrandFuelCode { get; init; }
 
     /// <summary>
     /// Rehearsal flag, propagated to every package created for this fuel. Read back on
