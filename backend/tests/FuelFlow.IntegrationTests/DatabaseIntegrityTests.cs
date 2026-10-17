@@ -4,6 +4,7 @@ using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Contracts.SharedModels;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Payments.SharedModels;
@@ -901,6 +902,117 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
 
         var act = async () => await context.SaveChangesAsync();
         await act.Should().ThrowAsync<DbUpdateException>("money in is money in");
+    }
+
+    // === D-13 stage 4: what a voucher_events row is allowed to say ===
+
+    /// <summary>
+    /// An event is a state change or an expiry push, and it says which. Everything else about it is
+    /// enforced by the pairing: a status change carries both ends, an extension carries both dates,
+    /// and nothing else carries either.
+    /// </summary>
+    [Theory]
+    [InlineData("StatusChanged", true, false, false, false)] // only a "from" - half a change
+    [InlineData("StatusChanged", true, true, false, false)]  // from == to - changed to itself
+    [InlineData("Extended", false, false, true, false)]      // only a "previous" date - half a pair
+    [InlineData("Extended", false, false, false, true)]      // the new date runs backwards
+    [InlineData("Imported", true, false, false, false)]      // imported from a status - half an import
+    [InlineData("Redeemed", true, true, false, false)]       // a state change wearing the wrong name
+    [InlineData("StatusChanged", false, false, false, false)] // nothing at all
+    public async Task An_Impossible_Voucher_Event_Is_Refused(
+        string eventType, bool hasFrom, bool hasTo, bool hasPreviousDate, bool hasNewDate)
+    {
+        await using var context = CreateContext();
+        var voucher = NewVoucher(
+            "event-v-" + Guid.NewGuid().ToString("N")[..6],
+            "event-v-qr-" + Guid.NewGuid().ToString("N")[..6]);
+
+        context.FuelVouchers.Add(voucher);
+        context.VoucherEvents.Add(new VoucherEvent
+        {
+            Id = Guid.NewGuid(),
+            VoucherId = voucher.Id,
+            EventType = eventType,
+            FromStatus = hasFrom ? "Available" : null,
+            ToStatus = hasTo ? "Available" : null,
+            PreviousCustomerExpiration = hasPreviousDate ? new DateOnly(2026, 10, 1) : null,
+            NewCustomerExpiration = hasNewDate ? new DateOnly(2026, 9, 1) : null,
+            OccurredAtUtc = DateTime.UtcNow
+        });
+
+        var act = async () => await context.SaveChangesAsync();
+        await act.Should().ThrowAsync<DbUpdateException>(
+            $"event_type={eventType} is not a state change this schema can describe");
+    }
+
+    [Fact]
+    public async Task A_Status_Change_Must_Say_Both_Ends_And_They_Must_Differ()
+    {
+        // The counterpart to the theory above, and the row the table exists for: an ordinary
+        // transition, written the way every writer will write it.
+        await using var context = CreateContext();
+        var voucher = NewVoucher(
+            "event-ok-" + Guid.NewGuid().ToString("N")[..6],
+            "event-ok-qr-" + Guid.NewGuid().ToString("N")[..6]);
+
+        context.FuelVouchers.Add(voucher);
+        context.VoucherEvents.Add(new VoucherEvent
+        {
+            Id = Guid.NewGuid(),
+            VoucherId = voucher.Id,
+            EventType = VoucherEventTypes.StatusChanged,
+            FromStatus = nameof(VoucherStatus.Available),
+            ToStatus = nameof(VoucherStatus.Assigned),
+            OccurredAtUtc = DateTime.UtcNow
+        });
+
+        await context.SaveChangesAsync();
+
+        // This class does not reset between tests, so filter rather than SingleAsync.
+        var saved = await context.VoucherEvents.AsNoTracking().SingleAsync(e => e.VoucherId == voucher.Id);
+        saved.FromStatus.Should().Be(nameof(VoucherStatus.Available));
+        saved.ToStatus.Should().Be(nameof(VoucherStatus.Assigned));
+    }
+
+    [Fact]
+    public async Task An_Extension_Must_Carry_Its_Both_Dates()
+    {
+        // An extension is the one event whose detail is NOT recoverable from anywhere else: the voucher's
+        // customer_expiration_date was overwritten by the same statement that wrote this row. So the
+        // pair is pinned whole and forward-only.
+        await using var context = CreateContext();
+        var voucher = NewVoucher(
+            "event-ext-" + Guid.NewGuid().ToString("N")[..6],
+            "event-ext-qr-" + Guid.NewGuid().ToString("N")[..6]);
+
+        context.FuelVouchers.Add(voucher);
+        context.VoucherEvents.Add(new VoucherEvent
+        {
+            Id = Guid.NewGuid(),
+            VoucherId = voucher.Id,
+            EventType = VoucherEventTypes.Extended,
+            PreviousCustomerExpiration = new DateOnly(2026, 10, 22),
+            NewCustomerExpiration = new DateOnly(2026, 11, 22),
+            ExternalRef = "order:00000000-0000-0000-0000-000000000001",
+            OccurredAtUtc = DateTime.UtcNow
+        });
+
+        await context.SaveChangesAsync();
+
+        // This class does not reset between tests, so filter rather than SingleAsync.
+        var saved = await context.VoucherEvents.AsNoTracking().SingleAsync(e => e.VoucherId == voucher.Id);
+        saved.PreviousCustomerExpiration.Should().Be(new DateOnly(2026, 10, 22));
+        saved.NewCustomerExpiration.Should().Be(new DateOnly(2026, 11, 22));
+    }
+
+    [Fact]
+    public void Every_Event_Type_Is_A_State_Change_Or_An_Import()
+    {
+        // Exact list on purpose. A per-action vocabulary is how order_events ended up with eight types
+        // and two writers; adding "Redeemed" or "Blocked" here would be that mistake again, and an exact
+        // list is what makes it a test failure rather than a review comment.
+        VoucherEventTypes.All.Should().BeEquivalentTo(
+            ["Imported", "StatusChanged", "Extended", "Archived", "Unarchived"]);
     }
 
     /// <summary>

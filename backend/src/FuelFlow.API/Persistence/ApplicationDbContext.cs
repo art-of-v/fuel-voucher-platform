@@ -9,6 +9,7 @@ using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Support.SharedModels;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.Exchange;
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.Movements;
@@ -64,6 +65,8 @@ private readonly FuelFlow.Features.Vouchers.Security.IQrCipher _qrCipher;
     // D-13 / #319: the parent voucher_exchanges.exchange_batch_id never had. Still additive - the
     // three movement tables are folded into one ledger in later stages of D-13.
     public DbSet<MovementBatch> MovementBatches => Set<MovementBatch>();
+    // D-13: the state history voucher_movements deliberately does not carry - see VoucherEvent.
+    public DbSet<VoucherEvent> VoucherEvents => Set<VoucherEvent>();
     // D-13 / #319: the single ledger the three movement tables fold into. Also additive for now -
     // nothing writes it until every writer is gated on its compare-and-swap actually changing a row.
     public DbSet<VoucherMovement> VoucherMovements => Set<VoucherMovement>();
