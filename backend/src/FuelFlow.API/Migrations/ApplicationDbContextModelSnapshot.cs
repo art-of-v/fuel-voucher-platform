@@ -786,6 +786,31 @@ namespace FuelFlow.API.Migrations
                         });
                 });
 
+            modelBuilder.Entity("FuelFlow.Features.Ledger.SharedModels.NaturalPerson", b =>
+                {
+                    b.Property<Guid>("PartyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("party_id");
+
+                    b.Property<DateOnly?>("Birthdate")
+                        .HasColumnType("date")
+                        .HasColumnName("birthdate");
+
+                    b.Property<string>("TaxId")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("tax_id");
+
+                    b.HasKey("PartyId");
+
+                    b.ToTable("natural_persons", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_natural_persons_tax_id_digits", "tax_id IS NULL OR tax_id ~ '^[0-9]{9,10}$'");
+
+                            t.HasCheckConstraint("ck_natural_persons_tax_id_length", "tax_id IS NULL OR length(tax_id) <= 20");
+                        });
+                });
+
             modelBuilder.Entity("FuelFlow.Features.Ledger.SharedModels.OperatorLegalEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -868,6 +893,39 @@ namespace FuelFlow.API.Migrations
                             t.HasCheckConstraint("ck_operator_legal_entities_tax_regime", "tax_regime IN ('Vat','Simplified')");
 
                             t.HasCheckConstraint("ck_operator_legal_entities_vat_number_digits", "vat_number IS NULL OR vat_number ~ '^[0-9]{12}$'");
+                        });
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Ledger.SharedModels.Party", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("display_name");
+
+                    b.Property<string>("PartyType")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("party_type");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("parties", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_parties_display_name_not_blank", "btrim(display_name) <> ''");
+
+                            t.HasCheckConstraint("ck_parties_party_type", "party_type IN ('Natural','Legal')");
                         });
                 });
 
@@ -4021,6 +4079,10 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("last_name");
 
+                    b.Property<Guid?>("PartyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("party_id");
+
                     b.Property<string>("PendingEmail")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
@@ -4071,6 +4133,8 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("updated_at_utc");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("PartyId");
 
                     b.HasIndex("PhoneNumber")
                         .IsUnique()
@@ -4233,6 +4297,17 @@ namespace FuelFlow.API.Migrations
                         .IsRequired();
 
                     b.Navigation("OperatorLegalEntity");
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Ledger.SharedModels.NaturalPerson", b =>
+                {
+                    b.HasOne("FuelFlow.Features.Ledger.SharedModels.Party", "Party")
+                        .WithOne("NaturalPerson")
+                        .HasForeignKey("FuelFlow.Features.Ledger.SharedModels.NaturalPerson", "PartyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Party");
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Notifications.SharedModels.Notification", b =>
@@ -4562,6 +4637,11 @@ namespace FuelFlow.API.Migrations
             modelBuilder.Entity("FuelFlow.Features.Ledger.SharedModels.OperatorLegalEntity", b =>
                 {
                     b.Navigation("BankAccounts");
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Ledger.SharedModels.Party", b =>
+                {
+                    b.Navigation("NaturalPerson");
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Orders.SharedModels.Order", b =>
