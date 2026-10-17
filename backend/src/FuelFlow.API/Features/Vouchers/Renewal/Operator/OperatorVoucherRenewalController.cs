@@ -81,7 +81,14 @@ public sealed class OperatorVoucherRenewalController : ControllerBase
         if (string.IsNullOrWhiteSpace(command.TermCode))
             return BadRequest(new { code = "term_required", message = "TermCode is required." });
 
-        command.ActingUserId = GetUserId();
+        // Refused rather than performed anonymously. The command's ActingUserId is overwritten here
+        // rather than trusted from the body, and it is the author on every event and movement this
+        // path writes - an operator renewal with no operator behind it would be a paid term push that
+        // nobody can be shown to have authorised.
+        var userId = GetUserId();
+        if (userId is null) return Unauthorized();
+
+        command.ActingUserId = userId.Value;
         command.ActingUserName = GetUserName();
 
         try
@@ -115,10 +122,20 @@ public sealed class OperatorVoucherRenewalController : ControllerBase
         }
     }
 
-    private Guid GetUserId()
+    /// <summary>
+    /// The authenticated operator's id, or <c>null</c> when the token carries none.
+    /// </summary>
+    /// <remarks>
+    /// Was <see cref="Guid.Empty"/>, which is NOT NULL and so satisfied
+    /// <c>ck_voucher_events_actor_named</c> on its own — an operator renewal attributed to a user who
+    /// does not exist. That is the one author the actor CHECKs cannot catch, so the writer also tested
+    /// for it; this removes the possibility instead of the symptom. Every token <c>JwtTokenService</c>
+    /// mints carries <c>sub</c>, so null here means a token this service did not issue.
+    /// </remarks>
+    private Guid? GetUserId()
     {
         var claim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        return claim is not null && Guid.TryParse(claim, out var id) ? id : Guid.Empty;
+        return claim is not null && Guid.TryParse(claim, out var id) ? id : null;
     }
 
     private string? GetUserName()

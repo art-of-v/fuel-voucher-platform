@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using FuelFlow.Features.Vouchers.BulkActionVouchers;
 using FuelFlow.Features.Vouchers.DeleteVoucher;
 using FuelFlow.Features.Vouchers.GetAdminVoucherById;
@@ -79,8 +80,11 @@ public sealed class AdminVoucherController : ControllerBase
     [HttpPut("{id}")]
     public async Task<IActionResult> Update([FromRoute] Guid id, [FromBody] UpdateVoucherRequest request, CancellationToken cancellationToken)
     {
+        var userId = GetUserId();
+        if (userId is null) return Unauthorized();
+
         var result = await _updateHandler.HandleAsync(
-            new UpdateVoucherCommand(id, request.Status, request.AssignedToUserId, GetUserId(), GetUserName()), cancellationToken);
+            new UpdateVoucherCommand(id, request.Status, request.AssignedToUserId, userId, GetUserName()), cancellationToken);
         if (result is null) return NotFound();
         if (!result.Success && !string.IsNullOrWhiteSpace(result.Error))
             return BadRequest(new { error = result.Error });
@@ -90,8 +94,11 @@ public sealed class AdminVoucherController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete([FromRoute] Guid id, CancellationToken cancellationToken)
     {
+        var userId = GetUserId();
+        if (userId is null) return Unauthorized();
+
         var result = await _deleteHandler.HandleAsync(
-            new DeleteVoucherCommand(id, GetUserId(), GetUserName()), cancellationToken);
+            new DeleteVoucherCommand(id, userId, GetUserName()), cancellationToken);
         if (result is null) return NotFound();
         if (!result.Success) return BadRequest(new { error = result.Error });
         return Ok(new { success = true });
@@ -100,8 +107,11 @@ public sealed class AdminVoucherController : ControllerBase
     [HttpPost("bulk-action")]
     public async Task<IActionResult> BulkAction([FromBody] BulkActionRequest request, CancellationToken cancellationToken)
     {
+        var userId = GetUserId();
+        if (userId is null) return Unauthorized();
+
         var result = await _bulkActionHandler.HandleAsync(
-            new BulkActionVouchersCommand(request.Action, request.Ids, request.TargetUserId, GetUserId(), GetUserName()), cancellationToken);
+            new BulkActionVouchersCommand(request.Action, request.Ids, request.TargetUserId, userId, GetUserName()), cancellationToken);
 
         if (!result.Success && !string.IsNullOrWhiteSpace(result.Error))
             return BadRequest(new { error = result.Error });
@@ -112,8 +122,11 @@ public sealed class AdminVoucherController : ControllerBase
     [HttpPost("{id:guid}/unblock")]
     public async Task<IActionResult> Unblock(Guid id, CancellationToken cancellationToken)
     {
+        var userId = GetUserId();
+        if (userId is null) return Unauthorized();
+
         var result = await _unblockHandler.HandleAsync(
-            new UnblockVoucherCommand(id, GetUserId(), GetUserName()),
+            new UnblockVoucherCommand(id, userId, GetUserName()),
             cancellationToken);
 
         if (result is null) return NotFound();
@@ -131,8 +144,11 @@ public sealed class AdminVoucherController : ControllerBase
     [HttpPost("{id:guid}/unarchive")]
     public async Task<IActionResult> Unarchive(Guid id, CancellationToken cancellationToken)
     {
+        var userId = GetUserId();
+        if (userId is null) return Unauthorized();
+
         var result = await _unarchiveHandler.HandleAsync(
-            new UnarchiveVoucherCommand(id, GetUserId(), GetUserName()),
+            new UnarchiveVoucherCommand(id, userId, GetUserName()),
             cancellationToken);
 
         if (result is null) return NotFound();
@@ -153,10 +169,28 @@ public sealed class AdminVoucherController : ControllerBase
 
         return Ok(result);
     }
-    private Guid GetUserId()
+    /// <summary>
+    /// The authenticated admin's id, or <c>null</c> when the token carries none.
+    /// </summary>
+    /// <remarks>
+    /// This used to return <see cref="Guid.Empty"/> instead of <c>null</c>, and that value is NOT NULL —
+    /// so it satisfied <c>ck_voucher_events_actor_named</c> and the audit row it fed was written as
+    /// <em>this user did it, and here is their id</em>, naming a user who does not exist. It is the one
+    /// way to record an author that the actor CHECKs cannot catch, which is why the writers now treat
+    /// <see cref="Guid.Empty"/> as "no actor" and skip the event rather than store a plausible nobody.
+    /// <para>
+    /// Skipping is the safety net; this is the fix. Every token <c>JwtTokenService</c> mints carries
+    /// <c>sub</c>, which JwtBearer's default claim mapping turns into
+    /// <see cref="ClaimTypes.NameIdentifier"/>, so a null here means a token this service did not issue.
+    /// A write that cannot be attributed is refused rather than performed anonymously.
+    /// </para>
+    /// </remarks>
+    private Guid? GetUserId()
     {
-        var claim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        return claim is not null && Guid.TryParse(claim, out var id) ? id : Guid.Empty;
+        var value = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                    ?? User.FindFirst("sub")?.Value;
+
+        return Guid.TryParse(value, out var id) ? id : null;
     }
 
     private string? GetUserName()
