@@ -36,6 +36,20 @@ public sealed class FuelTypeBrandFuelCodeTests : IClassFixture<TestDatabaseFixtu
             .UseNpgsql(_fixture.ConnectionString)
             .Options, TestQrCipher.Instance);
 
+    /// <summary>
+    /// The five seeded OKKO fuels and the code OKKO publishes for each, read off
+    /// <c>https://www.okko.ua/api/uk/fuels</c> on 2026-10-17. Shared by the tests below so the mapping
+    /// is stated once: two copies of it would be one too many place to forget an update.
+    /// </summary>
+    private static readonly Dictionary<string, string> SeedCodeMap = new()
+    {
+        ["okko-95"] = "A-95",
+        ["okko-dp"] = "DP",
+        ["okko-p95"] = "Pulls 95",
+        ["okko-pulls-dp"] = "Pulls Diesel",
+        ["okko-gas"] = "SPBT",
+    };
+
     private static FuelTypeEntity Fuel(string id, string stationId, string name, string? code)
         => new()
         {
@@ -74,10 +88,14 @@ public sealed class FuelTypeBrandFuelCodeTests : IClassFixture<TestDatabaseFixtu
     {
         // "A-95" is OKKO's spelling and WOG's. The code identifies a fuel *within* a brand, which
         // is why the index leads with station_id and why a global unique on the code would be wrong.
+        //
+        // "A-95 EXTRA" rather than "A-95": the seeded OKKO A-95 now carries "A-95" (step 6), and a test
+        // that reused it would be refused by the index for the right reason at the wrong moment —
+        // which is how a test stops testing what its name says.
         await using var context = CreateContext();
 
-        context.FuelTypes.Add(Fuel("net-a", "okko", "A-95 (code test)", "A-95"));
-        context.FuelTypes.Add(Fuel("net-b", "wog", "A-95 Mustang (code test)", "A-95"));
+        context.FuelTypes.Add(Fuel("net-a", "okko", "A-95 (code test)", "A-95 EXTRA"));
+        context.FuelTypes.Add(Fuel("net-b", "wog", "A-95 Mustang (code test)", "A-95 EXTRA"));
 
         var act = async () => await context.SaveChangesAsync();
         await act.Should().NotThrowAsync();
@@ -124,18 +142,61 @@ public sealed class FuelTypeBrandFuelCodeTests : IClassFixture<TestDatabaseFixtu
     }
 
     [Fact]
-    public async Task TheColumnStartsEmpty_Everywhere()
+    public async Task OnlyTheOperatorCreatedFuels_StillHaveNoCode()
     {
-        // Documents the migration's decision rather than its effect: nothing was backfilled, because a
-        // code guessed from a fuel name is the wrong identity, and a unique index then enforces the
-        // wrong one. If this ever fails, someone backfilled by name and every such value is a guess.
+        // Documents the migration's decision rather than its effect: nothing was backfilled by NAME,
+        // because a code guessed from a fuel name is the wrong identity, and a unique index then
+        // enforces the wrong one. The five seeded OKKO fuels are the deliberate exception — their codes
+        // were read off OKKO's published list, keyed by seed id.
         await using var context = CreateContext();
 
-        var withCode = await context.FuelTypes
+        var uncoded = await context.FuelTypes
             .IgnoreQueryFilters()
-            .CountAsync(f => f.BrandFuelCode != null);
+            .Where(f => f.BrandFuelCode == null)
+            .Select(f => f.Id)
+            .ToListAsync();
 
-        withCode.Should().Be(0, "the code is filled by hand or by the catalogue import, never derived from the name");
+        uncoded.Should().OnlyContain(id => !SeedCodeMap.ContainsKey(id),
+            "a seeded OKKO fuel carries the code OKKO publishes; everything else is filled by hand or by the import");
+    }
+
+    [Fact]
+    public async Task TheSeededOkkoFuels_CarryTheCodesOkkoPublishes()
+    {
+        // Read off /api/uk/fuels on 2026-10-17, not guessed from the names: the seed calls one of them
+        // "ДП ЄВРО" and OKKO calls that grade "DP", which is exactly why a name match would have been
+        // a guess. Asserted against a migrated database, so a seed edit that drops one is caught here.
+        await using var context = CreateContext();
+
+        var seeded = (await context.FuelTypes
+                .Where(f => f.StationId == "okko")
+                .ToListAsync())
+            .Where(f => SeedCodeMap.ContainsKey(f.Id))
+            .ToDictionary(f => f.Id, f => f.BrandFuelCode);
+
+        SeedCodeMap.Keys.Should().AllSatisfy(id => seeded.Should().ContainKey(id),
+            "the seed installs these five and nothing else at OKKO");
+
+        foreach (var (id, code) in SeedCodeMap)
+            seeded[id].Should().Be(code, "a freshly migrated catalogue must be born keyed");
+    }
+
+    [Fact]
+    public async Task TheSeededWogFuels_CarryNoCode()
+    {
+        // The restraint, asserted as carefully as the mapping: nobody has ever shown us WOG's
+        // vocabulary, so a code here would be a guess about a supplier's naming — and a guess is an
+        // identity the unique index would then enforce. They price by category until a WOG source is
+        // proven.
+        await using var context = CreateContext();
+
+        var wog = await context.FuelTypes
+            .Where(f => f.StationId == "wog")
+            .Select(f => f.BrandFuelCode)
+            .ToListAsync();
+
+        wog.Should().NotBeEmpty("the seed still installs them");
+        wog.Should().AllSatisfy(code => code.Should().BeNull());
     }
 
     [Fact]
