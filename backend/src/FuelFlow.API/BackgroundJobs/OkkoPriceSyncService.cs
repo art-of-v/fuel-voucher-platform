@@ -2,6 +2,7 @@ using FuelFlow.Features.Pricing.BackfillBrandFuelCodes;
 using FuelFlow.Features.Pricing.ImportOkkoCatalogue;
 using FuelFlow.Features.Pricing.ImportOkkoPumpPrices;
 using FuelFlow.Features.Pricing.ScrapeOkkoPrices;
+using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Options;
 using Microsoft.Extensions.Options;
 
@@ -36,6 +37,7 @@ public sealed class OkkoPriceSyncService
     private readonly ImportOkkoPumpPricesCommandHandler _import;
     private readonly ImportOkkoCatalogueCommandHandler _catalogue;
     private readonly BackfillBrandFuelCodesCommandHandler _backfill;
+    private readonly ApplicationDbContext _context;
     private readonly OkkoPriceOptions _options;
     private readonly ILogger<OkkoPriceSyncService> _logger;
 
@@ -44,6 +46,7 @@ public sealed class OkkoPriceSyncService
         ImportOkkoPumpPricesCommandHandler import,
         ImportOkkoCatalogueCommandHandler catalogue,
         BackfillBrandFuelCodesCommandHandler backfill,
+        ApplicationDbContext context,
         IOptions<OkkoPriceOptions> options,
         ILogger<OkkoPriceSyncService> logger)
     {
@@ -51,6 +54,7 @@ public sealed class OkkoPriceSyncService
         _import = import;
         _catalogue = catalogue;
         _backfill = backfill;
+        _context = context;
         _options = options.Value;
         _logger = logger;
     }
@@ -107,6 +111,7 @@ public sealed class OkkoPriceSyncService
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
+            ForgetFailedWrites();
             _logger.LogError(ex, "OKKO sync failed to add missing fuels; prices are still applied");
         }
 
@@ -142,6 +147,7 @@ public sealed class OkkoPriceSyncService
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
+            ForgetFailedWrites();
             _logger.LogError(ex, "OKKO sync failed to match fuels to published codes; prices are still applied");
         }
 
@@ -153,6 +159,7 @@ public sealed class OkkoPriceSyncService
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
+            ForgetFailedWrites();
             _logger.LogError(ex, "OKKO price sync fetched {Count} price(s) but failed to apply them",
                 prices.Count);
             return;
@@ -186,4 +193,18 @@ public sealed class OkkoPriceSyncService
                 result.BelowCostSkipped.Count, string.Join(", ", result.BelowCostSkipped));
         }
     }
+
+    /// <summary>
+    /// Drops the rows of a step that failed while saving.
+    /// <para>
+    /// The three handlers share this context, because Hangfire resolves one scope per tick. A step that
+    /// is refused by a unique index flushes nothing, yet the entities it added stay attached — so the
+    /// next step's own save tries to insert them a second time, and the failure it reports is about the
+    /// previous step's row. That is how a clash on a fuel name in the catalogue step surfaced as an
+    /// unrelated clash on a brand code in the backfill step, every fifteen minutes, with neither error
+    /// naming the real cause. Nothing is lost by clearing: the failed step wrote nothing, and the next
+    /// tick redoes it.
+    /// </para>
+    /// </summary>
+    private void ForgetFailedWrites() => _context.ChangeTracker.Clear();
 }

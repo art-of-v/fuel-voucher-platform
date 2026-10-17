@@ -73,6 +73,7 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
             new ImportOkkoPumpPricesCommandHandler(_context, _events, new OfferPriceRecorder(_context)),
             new ImportOkkoCatalogueCommandHandler(_context, _events, new OfferPriceRecorder(_context)),
             new BackfillBrandFuelCodesCommandHandler(_context, _events),
+            _context,
             Options.Create(new OkkoPriceOptions { Enabled = enabled }),
             logger ?? NullLogger<OkkoPriceSyncService>.Instance);
 
