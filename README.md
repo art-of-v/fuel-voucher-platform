@@ -21,14 +21,15 @@ Three applications share one backend:
 1. [Architecture](#architecture)
 2. [Repository structure](#repository-structure)
 3. [Key flows](#key-flows)
-4. [Money & currency](#money--currency)
-5. [Database schema](#database-schema)
-6. [API reference](#api-reference)
-7. [Local development](#local-development)
-8. [Environment variables](#environment-variables)
-9. [Deployment](#deployment)
-10. [Documentation index](#documentation-index)
-11. [Known limitations](#known-limitations)
+4. [Who holds a voucher's QR](#who-holds-a-vouchers-qr)
+5. [Money & currency](#money--currency)
+6. [Database schema](#database-schema)
+7. [API reference](#api-reference)
+8. [Local development](#local-development)
+9. [Environment variables](#environment-variables)
+10. [Deployment](#deployment)
+11. [Documentation index](#documentation-index)
+12. [Known limitations](#known-limitations)
 
 ---
 
@@ -286,6 +287,39 @@ firing and the admin unblock return that fuel to the **purchase** it arrived und
 
 ---
 
+## Who holds a voucher's QR
+
+A voucher's QR payload is the bearer instrument: whoever presents it at the pump spends the fuel.
+So every route that hands it out answers the same question through one rule,
+`VoucherHolder.CanRedeem` in
+`backend/src/FuelFlow.API/Features/Vouchers/SharedModels/VoucherHolder.cs`:
+
+> The holder is `WorkerUserId ?? AssignedToUserId`. A worker, once set, wins.
+
+Issuing fuel to a worker sets `worker_user_id` and deliberately **leaves** `assigned_to_user_id` on
+the owner, because the owner keeps the purchase lineage and the company's undistributed pool. The
+two columns therefore name different people, and "assigned to" is not "held by":
+
+| Caller | `GET /vouchers/my` | `GET /vouchers/{id}/qr` | `PATCH .../mark-used`, `.../restore` |
+|---|---|---|---|
+| The worker it was issued to | payload + PNG | PNG | allowed |
+| The owner who issued it | row only, QR blanked | 403 | `Forbidden` |
+| Anyone else | not in the list | 404 | `Forbidden` |
+
+`GET /vouchers/my` still returns the **row** to the owner — the owner's hub reads that same list to
+show what each order delivered and how much is still undistributed — but `qrPayload`, `qrCodeData`
+and `imageUrl` are empty for a caller who is not the holder, so the mobile client renders its
+existing "QR unavailable" placeholder. The payload itself is encrypted at rest
+(`qr_payload` is `bytea`, AES-256-GCM); that stops a database dump from yielding codes, but it does
+not help here, because the application decrypts it for whoever passes the check.
+
+One rule, three call sites, because they once disagreed: `/vouchers/my` matched the owner on
+`assigned_to_user_id` alone and returned the code and a rendered PNG for fuel they had just given
+away, while `/vouchers/{id}/qr` refused them with 403. `VoucherQrScopeTests` covers the wallet and
+`VoucherHolder` tests pin the rule itself.
+
+---
+
 ## Money & currency
 
 **Convention: the domain model stores money in decimal UAH to the kopeck; kopeck integers exist
@@ -401,8 +435,8 @@ role required; — = public. This lists the primary endpoints; admin sub-resourc
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `GET` | `/api/vouchers/my` | ✅ | User's vouchers (plain array; includes `source`, `legalEntityId`, `workerUserId`) |
-| `PATCH` | `/api/vouchers/{id}/mark-used` | ✅ | Mark a voucher used (worker-guarded for gifted vouchers) |
+| `GET` | `/api/vouchers/my` | ✅ | User's vouchers (plain array; includes `source`, `legalEntityId`, `workerUserId`). `qrPayload`, `qrCodeData` and `imageUrl` are populated only for the voucher's current holder — see [Who holds a voucher's QR](#who-holds-a-vouchers-qr) |
+| `PATCH` | `/api/vouchers/{id}/mark-used` | ✅ | Mark a voucher used (guarded to the voucher's current holder) |
 | `PATCH` | `/api/vouchers/{id}/restore` | Admin | Restore a used voucher |
 | `GET` | `/api/vouchers/inventory` | Admin | Aggregated inventory by provider/fuel/liters |
 | `POST` | `/api/voucher-catalog/import` | Admin | Upload a PDF catalog (multipart, field `file`) |

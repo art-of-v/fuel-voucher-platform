@@ -28,16 +28,16 @@ public sealed class MarkVoucherAsUsedCommandHandler
             return new MarkVoucherAsUsedResponse(false, "Voucher not found", "NotFound");
         }
 
-        if (voucher.WorkerUserId.HasValue)
+        // Same rule, and the same wording, as the endpoints that hand out the QR: VoucherHolder is the one
+        // answer to "may this user redeem it", so this write can never permit what a read refuses.
+        if (!VoucherHolder.CanRedeem(voucher.WorkerUserId, voucher.AssignedToUserId, command.UserId))
         {
-            if (voucher.WorkerUserId != command.UserId)
-            {
-                return new MarkVoucherAsUsedResponse(false, "Only the assigned worker can use this voucher", "Forbidden");
-            }
-        }
-        else if (voucher.AssignedToUserId != command.UserId)
-        {
-            return new MarkVoucherAsUsedResponse(false, "Voucher is not assigned to this user", "Forbidden");
+            return new MarkVoucherAsUsedResponse(
+                false,
+                voucher.WorkerUserId.HasValue
+                    ? "Only the assigned worker can use this voucher"
+                    : "Voucher is not assigned to this user",
+                "Forbidden");
         }
 
         if (voucher.Status == VoucherStatus.Used)

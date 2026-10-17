@@ -42,7 +42,18 @@ public sealed class GetUserVouchersCommandHandler
 
         var vouchers = entities.Select(v =>
         {
-            var qrImage = GenerateQrImage(v);
+            // The row stays in the list for whoever bought it - the owner's hub reads this same
+            // list to show what each order delivered and what is still undistributed - but the
+            // redemption material goes only to the current holder. After issuing fuel to a worker
+            // the owner still matches AssignedToUserId, and without this the owner received the
+            // payload and a rendered PNG for fuel they had already given away: the same bearer
+            // instrument that GET /vouchers/{id}/qr refuses them with 403, and that
+            // MarkVoucherAsUsed refuses them on.
+            var isHolder = VoucherHolder.CanRedeem(v.WorkerUserId, v.AssignedToUserId, command.UserId);
+
+            // Rendered only for the holder: generating the PNG is the expensive half of this
+            // handler, and a non-holder has no use for the image either.
+            var qrImage = isHolder ? GenerateQrImage(v) : null;
             return new VoucherDto(
                 v.Id,
                 v.Brand,
@@ -52,8 +63,8 @@ public sealed class GetUserVouchersCommandHandler
                 v.CustomerExpirationDate,
                 v.VoucherNumber,
                 v.VoucherNumber,
-                v.QrPayload,
-                v.QrPayload,
+                isHolder ? v.QrPayload : string.Empty,
+                isHolder ? v.QrPayload : string.Empty,
                 v.Status.ToString(),
                 v.WorkerUserId == command.UserId ? "gifted" : "own",
                 v.LegalEntityId,
