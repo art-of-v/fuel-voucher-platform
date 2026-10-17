@@ -121,6 +121,49 @@ public sealed class MigrationDiscoveryTests
         }
     }
 
+    /// <summary>
+    /// The history is <b>append-only</b>: it still starts at the migration that created the
+    /// schema, and it is not collapsed into a single baseline.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is the one migration fact that no other test here can notice losing. Every other
+    /// assertion in this class checks that a migration EF can see exists; all of them pass just as
+    /// happily against a history that has been rewritten, because every migration in a squashed set
+    /// is still perfectly discoverable — that is the whole problem.
+    /// </para>
+    /// <para>
+    /// A squash is not a neutral tidy-up here. Production is dry-run by restoring its real
+    /// <c>__EFMigrationsHistory</c> and schema and applying only the pending migrations, so a
+    /// baseline id production has never seen makes EF attempt to <c>CREATE TABLE</c> over a schema
+    /// that already has those tables — killing the one gate that tests a migration against
+    /// production's rows instead of seeded ones. It also deletes the id that
+    /// <c>DataKindBackfillTests</c> migrates *to</c> in order to assert what a past backfill
+    /// produced. See README.md, "The history is append-only — never squashed".
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void The_Migration_History_Is_Append_Only()
+    {
+        var ids = DiscoverMigrationIds();
+
+        // The oldest migration is still the one that created the schema. A squashed history does
+        // not contain it at all, and pruning a few early entries to tidy the folder would leave a
+        // later migration claiming to create tables it never touched.
+        ids.Should().Contain(
+            "20260617125815_InitialCreate",
+            "the migration history is append-only — every applied migration stays under its " +
+            "original id, and it is never collapsed into a single baseline");
+
+        // The complement of the assertion above: the count is deliberately a floor rather than a
+        // census, because an exact number would need editing on every schema change. What it rules
+        // out is the other shape a squash can take — deleting the history and scaffolding a
+        // single migration that happens to reuse the name.
+        ids.Should().HaveCountGreaterThan(
+            1,
+            "a history of one migration is a squashed history, whatever it is named");
+    }
+
     private static string FindProjectRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
