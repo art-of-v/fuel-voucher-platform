@@ -99,7 +99,12 @@ services:
       Monobank__WebhookUrl: "https://${API_DOMAIN}/api/monobank/webhook"
       Monobank__RedirectUrl: ${MONOBANK_REDIRECT_URL:-fuelflow://payment-result}
 
-      # Support-form email off by default on staging (submissions still persist to the DB).
+      # Voucher QR encryption. Same key as production: a staging database restored from a
+        # production backup would otherwise hold payloads nothing can read. Listed explicitly
+        # because this file enumerates every variable rather than passing .env through wholesale.
+        QrCipher__Key: ${QR_CIPHER_KEY:?set QR_CIPHER_KEY in .env.staging (openssl rand -base64 32)}
+
+        # Support-form email off by default on staging (submissions still persist to the DB).
       SupportMail__Host: ${SUPPORT_MAIL_HOST:-smtp.gmail.com}
       SupportMail__Port: "587"
       SupportMail__Username: ${SUPPORT_MAIL_USERNAME:-}
