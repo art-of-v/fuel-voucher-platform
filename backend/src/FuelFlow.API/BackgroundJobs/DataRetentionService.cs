@@ -108,6 +108,20 @@ public class DataRetentionService
     //                                 rewrite a stored amount (acquiring-statement-118.md), so a
     //                                 prune here would be a silent edit of the ledger.
     //   fuel_vouchers (soft-deleted)- paid-for paper. There is no window during which this is ok.
+    //   voucher_events             - "who did this, and when", for everything that happened to a
+    //                                 voucher without moving it. The redemption is the one that
+    //                                 matters: fuel is dispensed at a pump and nobody signs anything,
+    //                                 so if this row is gone the only proof a customer ever used fuel
+    //                                 is a status column with no author and no timestamp. The pairing
+    //                                 CHECK already refuses to store an author-less action, which
+    //                                 makes that promise worth more than the row is long.
+    //   voucher_movements          - "where is this paper". A voucher's custody history starts at the
+    //                                 warehouse: import puts it in the pool, the sale puts it in a
+    //                                 customer's hands, a recall brings it back. It cannot be rebuilt
+    //                                 from fuel_vouchers, because one row there is updated in place for
+    //                                 the voucher's whole life and never says where it was. Same
+    //                                 argument as voucher_exchanges one level down: the movement IS the
+    //                                 record, there is no other copy.
 
     private readonly ApplicationDbContext _context;
     private readonly RuntimeSettingsService _settings;

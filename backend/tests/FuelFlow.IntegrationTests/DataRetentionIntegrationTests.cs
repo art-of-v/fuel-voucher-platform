@@ -8,6 +8,9 @@ using FuelFlow.Features.Settings;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Support.SharedModels;
 using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.Events;
+using FuelFlow.Features.Vouchers.Movements;
+using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -191,6 +194,83 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
     /// threw on the first failure, every table listed after it was silently skipped on that run and
     /// on every run after, while the job still logged the tables it had reached.
     /// </summary>
+    /// <summary>
+    /// The D-13 tables are deliberately absent from the purge list, and the reason is written on the
+    /// wall at the top of <see cref="DataRetentionService"/> — but a comment cannot refuse anything.
+    ///
+    /// <para>
+    /// This is the test that makes the comment load-bearing: it seeds a voucher's custody movement and
+    /// its status event, both aged far past every retention window in the service, runs retention
+    /// <em>enabled</em>, and asserts both survive. Add <c>voucher_events</c> or
+    /// <c>voucher_movements</c> to the purge list and this fails — which is the moment the list would
+    /// otherwise be edited in passing, months later, by someone pruning "old audit rows" and not
+    /// reading the wall.
+    /// </para>
+    /// <para>
+    /// The seed rows are deliberately <em>ancient</em> rather than recent. A recent row would survive any
+    /// sane window by accident; only a row older than the longest retention here can prove the table is
+    /// not on the list at all.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task Cleanup_Never_Purges_The_D13_Audit_Tables_However_Old()
+    {
+        var voucherId = Guid.NewGuid();
+        var ancient = DateTime.UtcNow.AddYears(-5);
+
+        await SeedAsync(seed =>
+        {
+            Enable(seed);
+            seed.Users.Add(CreateUser(UserId));
+
+            seed.FuelVouchers.Add(new FuelVoucher
+            {
+                Id = voucherId,
+                Brand = "OKKO",
+                FuelTypeId = "okko-dp",
+                Liters = 10m,
+                VoucherNumber = $"V-{voucherId:N}"[..20],
+                QrPayload = $"qr-{voucherId:N}",
+                Status = VoucherStatus.Available,
+                CreatedAtUtc = ancient,
+                UpdatedAtUtc = ancient
+            });
+
+            seed.VoucherMovements.Add(new VoucherMovement
+            {
+                Id = Guid.NewGuid(),
+                Kind = VoucherMovementKinds.Issued,
+                VoucherId = voucherId,
+                FromLocation = VoucherLocations.Pool,
+                ToLocation = VoucherLocations.Customer,
+                ActorKind = VoucherActorKinds.System,
+                ActorUserId = null,
+                OccurredAtUtc = ancient
+            });
+
+            seed.VoucherEvents.Add(new VoucherEvent
+            {
+                Id = Guid.NewGuid(),
+                VoucherId = voucherId,
+                EventType = VoucherEventTypes.StatusChanged,
+                FromStatus = nameof(VoucherStatus.Available),
+                ToStatus = nameof(VoucherStatus.Expired),
+                ActorKind = VoucherActorKinds.System,
+                ActorUserId = null,
+                OccurredAtUtc = ancient
+            });
+        });
+
+        await RunAsync();
+
+        using var verify = CreateContext();
+
+        (await verify.VoucherMovements.CountAsync(m => m.VoucherId == voucherId))
+            .Should().Be(1, "'where is this paper' cannot be rebuilt from fuel_vouchers - the row is updated in place for its whole life");
+        (await verify.VoucherEvents.CountAsync(e => e.VoucherId == voucherId))
+            .Should().Be(1, "the redemption happened at a pump and nobody signed anything, so this is the only proof");
+    }
+
     [Fact]
     public async Task Cleanup_KeepsAnImportThatAPurchaseBatchStillReferences_AndPurgesTheRest()
     {
