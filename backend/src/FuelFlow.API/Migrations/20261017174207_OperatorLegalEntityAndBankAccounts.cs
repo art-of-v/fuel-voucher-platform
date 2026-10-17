@@ -87,17 +87,21 @@ namespace FuelFlow.API.Migrations
             //   AddCheckConstraint ck_voucher_movements_actor_is_somebody
             //   AddCheckConstraint ck_voucher_events_actor_is_somebody
             //
-            // `migrations add` emitted both even though the model, the snapshot and the Designer
+            // `migrations add` emitted both although the model, the snapshot and the Designer
             // snapshot all already carry those two constraints with identical text, and
-            // 20261017152948_ActorIdMustNameSomebody already creates them. Re-creating them aborts
-            // a fresh migrate with 42710 "constraint already exists", so the integration suite could
-            // not even reach its own tables.
+            // 20261017152948_ActorIdMustNameSomebody already creates them. Re-creating them aborts a
+            // fresh migrate with 42710 "constraint already exists".
             //
-            // Why EF emitted them is not established here, and guessing would be worse than saying
-            // so. What is established: the snapshot was verified un-corrupted (this migration only
-            // adds its own two entities to it), and a fresh database fails on the duplicate. The next
-            // person to add a migration will meet it again - the workaround is to delete these two
-            // operations and check the suite.
+            // CORRECTION, 2026-10-17: an earlier version of this comment said the cause was not
+            // established and that "the next person to add a migration will meet it again". That was
+            // wrong, and it was wrong in a way that would have sent them looking for a phantom.
+            // The cause was `migrations remove --force` run against an unreachable database, which
+            // reverted the snapshot from a state it should not have been reverted from.
+            // 20261017175323_PartySupertypeAdditive, generated normally on the next attempt, has
+            // neither operation. A normal `migrations add` does not produce them.
+            //
+            // What stays true: do not read a redundant constraint operation as harmless, and re-run
+            // the suite after touching a migration by hand.
 
             migrationBuilder.CreateIndex(
                 name: "IX_bank_accounts_operator_legal_entity_id",
