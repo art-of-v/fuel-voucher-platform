@@ -1,4 +1,5 @@
 using FuelFlow.Features.Brands.GetFuelPriceHistory;
+using FuelFlow.Features.Brands.GetFuelPriceAt;
 using FuelFlow.Features.Pricing;
 using FluentAssertions;
 using FuelFlow.Features.Brands;
@@ -42,6 +43,7 @@ public sealed class UpdateNominalsReuseTests : IDisposable
             new GetBrandByIdQueryHandler(_context),
             new GetBrandHistoryQueryHandler(_context),
             new GetFuelPriceHistoryQueryHandler(_context),
+            new GetFuelPriceAtQueryHandler(_context),
             new AuditEventService(_context),
             _context,
             NotificationDispatcher.Disabled,
