@@ -6,6 +6,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.BulkActionVouchers;
 using FuelFlow.Features.Vouchers.DeleteVoucher;
 using FuelFlow.Features.Vouchers.SharedModels;
+using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Hangfire;
@@ -263,6 +264,110 @@ public async Task Delete_All_Archives_Stock_And_Names_What_It_Kept()
 
     // And the stock did get archived - otherwise the feature is just broken.
     (await acting.FuelVouchers.IgnoreQueryFilters().CountAsync(v => v.IsDeleted)).Should().Be(1);
+}
+
+/// <summary>
+/// D-13. <c>delete_all</c> is the most destructive button in the admin and was the one writer left
+/// with no record: the audit row it wrote carried a COUNT and a scope of "all", so nothing anywhere
+/// said <em>which</em> vouchers one click put in a drawer.
+/// <para>
+/// The batching is the other half. Recording the events needs the ids, and one SaveChanges over 50k
+/// of them rebuilds the memory spike the set-based form was written to avoid - so the ids come back
+/// 500 at a time, the same shape <c>ExpiredVoucherLossService</c> uses. Asserted here by seeding
+/// more than one batch's worth, because a test that only ever exercises the single-batch path would
+/// pass with the loop removed.
+/// </para>
+/// </summary>
+[Fact]
+public async Task Delete_All_Records_An_Archived_Event_For_Every_Voucher_It_Archived()
+{
+    await SeedAsync();
+    var context = CreateContext();
+
+    // More than ArchiveBatchSize, so the drain loop has to make a second pass. The archived rows leave
+    // the !IsDeleted filter, which is what makes each pass see fresh candidates.
+    var importId = (await context.VoucherImports.FirstAsync()).Id;
+    var fuel = await context.FuelTypes.FirstAsync();
+    var supplier = await context.Suppliers.FirstAsync();
+    for (var i = 0; i < 620; i++)
+    {
+        context.FuelVouchers.Add(new FuelVoucher
+        {
+            Id = Guid.NewGuid(),
+            ImportJobId = importId,
+            FuelTypeId = fuel.Id,
+            SupplierId = supplier.Id,
+            Brand = "okko",
+            VoucherNumber = $"V-{Guid.NewGuid():N}",
+            QrPayload = Guid.NewGuid().ToString(),
+            Liters = 10m,
+            CostPerLiter = 40m,
+            Status = VoucherStatus.Imported,
+            CreatedAtUtc = DateTime.UtcNow
+        });
+    }
+
+    await context.SaveChangesAsync();
+
+    var expected = await context.FuelVouchers.CountAsync();
+    var operatorId = Guid.NewGuid();
+
+    var acting = CreateContext();
+    var result = await Handler(acting).HandleAsync(
+        new BulkActionVouchersCommand("delete_all", null, null, operatorId, "Admin User"));
+
+    result.Success.Should().BeTrue("nothing paid was seeded, so nothing was kept");
+
+    var verify = CreateContext();
+    (await verify.FuelVouchers.IgnoreQueryFilters().CountAsync(v => v.IsDeleted))
+        .Should().Be(expected, "every voucher was archived, across more than one batch");
+
+    // One event per archived voucher - the thing the count-only audit row could never answer.
+    var events = await verify.VoucherEvents.AsNoTracking().ToListAsync();
+    events.Should().HaveCount(expected);
+
+    events.Should().OnlyContain(e =>
+        e.EventType == VoucherEventTypes.Archived &&
+        e.ActorKind == VoucherActorKinds.User &&
+        e.ActorUserId == operatorId);
+
+    // Archived is not a status change, so there is no from/to to invent - and the events name exactly
+    // the vouchers that were archived, not a superset.
+    events.Should().OnlyContain(e => e.FromStatus == null && e.ToStatus == null);
+    (await verify.FuelVouchers.IgnoreQueryFilters()
+        .Where(v => v.IsDeleted)
+        .Select(v => v.Id)
+        .ToListAsync())
+        .Should().BeEquivalentTo(events.Select(e => e.VoucherId),
+            "an event for a voucher that was not archived would be a claim that never happened");
+}
+
+/// <summary>
+/// The re-run case the batching gives up atomicity for. An archived row leaves the candidate filter, so
+/// a second press picks up where the first stopped rather than re-archiving or erroring — which is why
+/// the operation is safe to run twice.
+/// </summary>
+[Fact]
+public async Task Delete_All_Run_Twice_Archives_Nothing_Second_Time_And_Records_Nothing_Either()
+{
+    await SeedAsync();
+    var first = CreateContext();
+    var operatorId = Guid.NewGuid();
+
+    (await Handler(first).HandleAsync(
+        new BulkActionVouchersCommand("delete_all", null, null, operatorId, "Admin User")))
+        .Success.Should().BeTrue();
+
+    var afterFirst = await first.VoucherEvents.AsNoTracking().CountAsync();
+
+    var second = CreateContext();
+    (await Handler(second).HandleAsync(
+        new BulkActionVouchersCommand("delete_all", null, null, operatorId, "Admin User")))
+        .Count.Should().Be(0, "the first run already archived everything still visible");
+
+    // The second run found nothing to do, so it wrote nothing: an event for a voucher nothing was
+    // done to would be the exact defect this whole table exists to prevent.
+    (await second.VoucherEvents.AsNoTracking().CountAsync()).Should().Be(afterFirst);
 }
 
 [Fact]
