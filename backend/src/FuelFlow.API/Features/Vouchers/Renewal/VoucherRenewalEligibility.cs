@@ -3,6 +3,11 @@ using FuelFlow.Features.Vouchers.SharedModels;
 namespace FuelFlow.Features.Vouchers.Renewal;
 
 /// <summary>Which fulfilment path a renewal takes once payment succeeds.</summary>
+/// <remarks>
+/// The stored spelling lives in <see cref="VoucherRenewalBranchCodes"/> and is shared with
+/// <c>order_line_items.renewal_branch</c> and <c>operator_voucher_renewals.branch</c>, so the three
+/// places that answer "was this an extend or a replace?" cannot drift into three vocabularies.
+/// </remarks>
 public enum VoucherRenewalBranch
 {
     /// <summary>Old voucher is still valid: extend the SAME voucher in place (new expiry = old + term).</summary>
@@ -10,6 +15,12 @@ public enum VoucherRenewalBranch
 
     /// <summary>Old voucher has run out of room: hand the customer a fresh one from stock, old ⇒ back to stock.</summary>
     Replace
+}
+
+public static class VoucherRenewalBranchCodes
+{
+    public const string Extend = "extend";
+    public const string Replace = "replace";
 }
 
 /// <summary>

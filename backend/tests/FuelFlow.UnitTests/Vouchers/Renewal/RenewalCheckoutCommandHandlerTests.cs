@@ -105,11 +105,49 @@ public sealed class RenewalCheckoutCommandHandlerTests : IDisposable
         line.Quantity.Should().Be(1);
         line.LineTotal.Should().Be(500);
 
+        // The line now states what it renews, for what term, and by which path - on the row the
+        // customer is charged against. All three used to live only on voucher_renewal_items, which is
+        // why the term that drives the extend/replace decision at fulfilment had to come from a
+        // different table than the line it describes.
+        line.TermCode.Should().Be("1m");
+        line.SourceVoucherId.Should().Be(source.Id);
+        line.RenewalBranch.Should().Be(VoucherRenewalBranchCodes.Extend);
+
         var renewalItem = await _context.VoucherRenewalItems.SingleAsync(i => i.OrderId == response.OrderId);
         renewalItem.SourceVoucherId.Should().Be(source.Id);
         renewalItem.TermCode.Should().Be("1m");
         renewalItem.FulfilledVoucherId.Should().BeNull();
         renewalItem.AmountPaid.Should().Be(500, "the paid amount is frozen for the history timeline");
+    }
+
+    /// <summary>
+    /// Both branches in one order, because the branch is decided per voucher and has to be recorded
+    /// per LINE. A test that only ever exercised extend would pass while replace lines were being
+    /// written as "extend" - which would tell the customer's history timeline that a swap was an
+    /// extension.
+    /// </summary>
+    [Fact]
+    public async Task Handle_MixedBatch_ShouldRecord_TheBranch_PerLine()
+    {
+        EnableRenewal(("1w", 5m));
+        var extend = SeedVoucher(liters: 30m, expiry: Today.AddDays(7), status: VoucherStatus.Assigned);
+        var replace = SeedVoucher(liters: 50m, expiry: Today.AddDays(-1), status: VoucherStatus.Expired);
+        SeedStock(replace, expiry: Today.AddMonths(6));
+
+        var response = await _handler.HandleAsync(Command((extend.Id, "1w"), (replace.Id, "1w")));
+
+        var lines = await _context.OrderLineItems
+            .Where(l => l.OrderId == response.OrderId)
+            .ToListAsync();
+        lines.Should().HaveCount(2);
+
+        var extendLine = lines.Single(l => l.SourceVoucherId == extend.Id);
+        extendLine.RenewalBranch.Should().Be(VoucherRenewalBranchCodes.Extend);
+        extendLine.TermCode.Should().Be("1w");
+
+        var replaceLine = lines.Single(l => l.SourceVoucherId == replace.Id);
+        replaceLine.RenewalBranch.Should().Be(VoucherRenewalBranchCodes.Replace);
+        replaceLine.TermCode.Should().Be("1w");
     }
 
     [Fact]

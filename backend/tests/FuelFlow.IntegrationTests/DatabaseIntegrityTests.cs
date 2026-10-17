@@ -724,7 +724,94 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
         await act.Should().ThrowAsync<DbUpdateException>();
     }
 
-    // ── F-09 / F-14: foreign keys that did not exist ─────────────────────────────────────────
+    // ── D-13 stage 2: a renewal line has to be a whole renewal ───────────────────────────────
+
+    /// <summary>
+    /// A renewal line names a voucher, a term and a branch. The three arrived separately, and the
+    /// database now refuses to have any one of them alone.
+    ///
+    /// <para>
+    /// This is the check whose absence cost a day of investigation. Renewal lines were created with a
+    /// null <c>term_code</c> and the term lived only on <c>voucher_renewal_items</c> — so the line the
+    /// customer was charged against could not say what it was for, and the term that drives the
+    /// extend/replace decision at fulfilment had to be fetched from a table with no relationship to the
+    /// line. Nothing was invalid; the row was simply incomplete, and complete-looking.
+    /// </para>
+    /// </summary>
+    [Theory]
+    [InlineData("extend", true, false)]        // no term   - ck_order_line_renewal_has_term
+    [InlineData("replace", true, false)]
+    [InlineData("extend", false, true)]        // no source - ck_order_line_renewal_pair_is_whole
+    [InlineData("extend", false, false)]
+    [InlineData("voucher_reissue", true, true)] // unknown word - ck_order_line_renewal_branch
+    public async Task An_Incomplete_Or_Unknown_Renewal_Line_Is_Refused(
+        string branch, bool hasTerm, bool hasSource)
+    {
+        await using var context = CreateContext();
+        var voucher = NewVoucher(
+            "renewal-source-" + Guid.NewGuid().ToString("N")[..6],
+            "renewal-source-qr-" + Guid.NewGuid().ToString("N")[..6]);
+        context.FuelVouchers.Add(voucher);
+        context.Users.Add(NewUser("+38000000009"));
+
+        context.OrderLineItems.Add(new OrderLineItem
+        {
+            Id = Guid.NewGuid(),
+            OrderId = Guid.NewGuid(),   // no such order; the FK never gets that far
+            Brand = "okko",
+            FuelTypeId = "okko-dp",
+            Liters = 10m,
+            Quantity = 1,
+            UnitPrice = 100m,
+            LineTotal = 100m,
+            TermCode = hasTerm ? "1m" : null,
+            SourceVoucherId = hasSource ? voucher.Id : null,
+            RenewalBranch = branch
+        });
+
+        var act = async () => await context.SaveChangesAsync();
+        await act.Should().ThrowAsync<DbUpdateException>(
+            $"branch={branch} term={hasTerm} source={hasSource} is not a whole renewal line");
+    }
+
+    /// <summary>
+    /// The counterpart, because a constraint that only ever rejects is indistinguishable from a broken
+    /// one. An ordinary buy-fuel line carries none of the three, and that must stay the normal case:
+    /// these columns are about renewals, not a new requirement on every line in the schema.
+    /// </summary>
+    [Fact]
+    public async Task An_Ordinary_Line_Needs_None_Of_The_Renewal_Columns()
+    {
+        await using var context = CreateContext();
+        var user = NewUser("+38000000010");
+        var order = new Order
+        {
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            Price = 5000m,
+            Status = OrderStatus.PendingPayment,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+        context.Users.Add(user);
+        context.Orders.Add(order);
+
+        context.OrderLineItems.Add(new OrderLineItem
+        {
+            Id = Guid.NewGuid(),
+            OrderId = order.Id,
+            Brand = "okko",
+            FuelTypeId = "okko-dp",
+            Liters = 50m,
+            Quantity = 2,
+            UnitPrice = 2500m,
+            LineTotal = 5000m
+            // TermCode, SourceVoucherId and RenewalBranch all left null - a buy-fuel line.
+        });
+
+        var act = async () => await context.SaveChangesAsync();
+        await act.Should().NotThrowAsync();
+    }
 
     /// <summary>
     /// orders.user_id was NOT NULL, indexed, and filtered on by every order query — with no FK.
