@@ -2,6 +2,8 @@ using FuelFlow.API.BackgroundJobs.Models;
 using FuelFlow.API.Features.Orders.SharedServices;
 using FuelFlow.Features.Company.SharedModels;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Observability;
@@ -144,6 +146,14 @@ public sealed class GiftVouchersCommandHandler
 
         _context.Orders.Add(issuanceOrder);
 
+        // The lines are projected from the same `vouchers` list in the same order, so the mapping is
+        // positional. Captured here rather than re-derived per voucher, because guessing it would put a
+        // custody row on the wrong money line - and a wrong LineItemId is worse than none, since NULL
+        // honestly says "this movement has no line" while a wrong id says something false.
+        var lineIdByVoucher = vouchers
+            .Select((voucher, index) => (VoucherId: voucher.Id, LineId: issuanceOrder.LineItems.ElementAt(index).Id))
+            .ToDictionary(x => x.VoucherId, x => x.LineId);
+
         foreach (var voucher in vouchers)
         {
             voucher.WorkerUserId = command.WorkerUserId;
@@ -157,6 +167,33 @@ public sealed class GiftVouchersCommandHandler
             voucher.UpdatedAtUtc = now;
 
             _context.Update(voucher);
+
+            // D-13. This is a change of place and the ledger's own guard proves it: the voucher was
+            // `LegalEntityId == this company` and `WorkerUserId == null` a few lines ago, which is the
+            // company holding stock. It is now in a worker's hands. `gift` is the last movement kind
+            // with no writer, and this is the path that should have had one all along.
+            //
+            // No StatusChanged event, and deliberately: the voucher's status stays `Assigned` across a
+            // gift. What changed is who holds it, not what it is — and an event claiming a transition
+            // that did not happen would be exactly the "handler arranged it" row the exchange declines
+            // to write.
+            //
+            // amount_uah stays NULL like every other movement with an order behind it: the money is
+            // order_line_items.line_total, and this points at that line through order_id.
+            _context.VoucherMovements.Add(new VoucherMovement
+            {
+                Id = Guid.CreateVersion7(),
+                Kind = VoucherMovementKinds.Gift,
+                VoucherId = voucher.Id,
+                FromLocation = VoucherLocations.Company,
+                ToLocation = VoucherLocations.Worker,
+                OrderId = issuanceOrder.Id,
+                LineItemId = lineIdByVoucher[voucher.Id],
+                ActorKind = VoucherActorKinds.User,
+                ActorUserId = command.OwnerUserId,
+                ActorPartyId = legalEntityId,
+                OccurredAtUtc = now
+            });
 
             _context.Fulfillments.Add(new Fulfillment
             {

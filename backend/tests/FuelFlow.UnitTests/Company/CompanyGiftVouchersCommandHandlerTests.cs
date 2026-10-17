@@ -1,6 +1,7 @@
 using FluentAssertions;
 using FuelFlow.Features.Company.GiftVouchers;
 using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Observability;
@@ -122,5 +123,39 @@ public sealed class CompanyGiftVouchersCommandHandlerTests : IDisposable
         // Gifted vouchers stay assigned to the owner but are now worker-scoped: the owner can no
         // longer redeem them (enforced at redemption by MarkVoucherAsUsed's worker check).
         stored.Should().OnlyContain(x => x.AssignedToUserId == OwnerId && x.Status == VoucherStatus.Assigned);
+    }
+
+    /// <summary>
+    /// D-13. A gift is the change of place that <c>voucher_movements</c> exists to record, and
+    /// <c>Gift</c> was the last kind with no writer — so before this, the ledger could say where a
+    /// voucher was but never that a company handed one to a worker.
+    /// <para>
+    /// The locations are the point of the assertions. The eligibility guard required
+    /// <c>LegalEntityId == this company</c> and <c>WorkerUserId == null</c>, which is the company
+    /// holding stock; the worker's id is what the write sets. Anything else would be a movement that
+    /// contradicts the guard that let it through.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task Gift_RecordsTheHandover_AsAMovement()
+    {
+        await SeedCompanyWithMemberAsync();
+        var voucher = AddPoolVoucher();
+        await _context.SaveChangesAsync();
+
+        await _handler.HandleAsync(new GiftVouchersCommand(OwnerId, WorkerId, new[] { voucher.Id }));
+
+        var movement = _context.VoucherMovements.Single(m => m.VoucherId == voucher.Id);
+        movement.Kind.Should().Be(VoucherMovementKinds.Gift);
+        movement.FromLocation.Should().Be(VoucherLocations.Company);
+        movement.ToLocation.Should().Be(VoucherLocations.Worker);
+        movement.ActorKind.Should().Be(VoucherActorKinds.User);
+        movement.ActorUserId.Should().Be(OwnerId);
+        movement.ActorPartyId.Should().Be(LegalEntityId, "the company is the acting party here, not just a user");
+        movement.OrderId.Should().NotBeNull("the gift re-homes the voucher onto the issuance order");
+
+        // A gift changes who holds the paper, not what it is: the status stays Assigned. An event
+        // claiming a transition here would be exactly the row the exchange refuses to write.
+        _context.VoucherEvents.Should().NotContain(e => e.VoucherId == voucher.Id);
     }
 }
