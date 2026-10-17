@@ -214,4 +214,63 @@ public class OkkoFuelClassifierTests
 
         result.Should().BeNull();
     }
+
+    // --- the product-code crosswalk (fuel_type_product_codes, #349 step 3b) -------------------
+
+    [Fact]
+    public void AProductCodeRow_ResolvesTheFuel_WithNoNameMatchingAtAll()
+    {
+        // The point of the table: the QR is the one signal in a parsed voucher that is not a name, so a
+        // row that claims the code answers the voucher exactly. Here the fuel's NAME deliberately
+        // classifies as something else — "А95 ЄВРО" reads as A95Pulls to the text rules — and the code
+        // still decides, because a code cannot be spelled wrong.
+        var fuels = new[]
+        {
+            new FuelTypeEntity { Id = "okko-95-euro", Name = "А95 ЄВРО", StationId = "okko", BasePrice = 56, DiscountPrice = 53 },
+            new FuelTypeEntity { Id = "okko-95", Name = "А-95", StationId = "okko", BasePrice = 54, DiscountPrice = 51 }
+        };
+        var byCode = new Dictionary<string, FuelTypeEntity> { ["9015"] = fuels[0] };
+
+        var result = OkkoFuelClassifier.ResolveFuelType(
+            rawText: "OKKO\n20 л\n99999600000020368126",
+            qrPayload: "9015$2000$;99999600000020368126=4507101299?",
+            fuels,
+            byCode);
+
+        result.Should().NotBeNull();
+        result!.Id.Should().Be("okko-95-euro",
+            "the category path would have resolved this on the name alone, to a different fuel");
+    }
+
+    [Fact]
+    public void ACodeNoRowClaims_FallsBackToTheCategoryPath()
+    {
+        // The table starts empty, so this fallback is what every voucher resolves through until somebody
+        // fills it in. Asserted so that adding a table cannot be the thing that stops imports working.
+        var byCode = new Dictionary<string, FuelTypeEntity>();
+
+        var result = OkkoFuelClassifier.ResolveFuelType(
+            rawText: "OKKO\n20 л\n99999600000020368126",
+            qrPayload: "9015$2000$;99999600000020368126=4507101299?",
+            ProductionOkkoFuelTypes,
+            byCode);
+
+        result.Should().NotBeNull();
+        result!.Id.Should().Be("okko-95");
+    }
+
+    [Fact]
+    public void NoCrosswalkAtAll_BehavesExactlyAsBefore()
+    {
+        // The parameter is optional, so a caller that never learned about the table is unchanged —
+        // including the null answer, which is what makes an import reject a row loudly rather than
+        // guess a fuel for it.
+        var result = OkkoFuelClassifier.ResolveFuelType(
+            rawText: "OKKO\n20 л\n99999600000020368126",
+            qrPayload: "9015$2000$;99999600000020368126=4507101299?",
+            ProductionOkkoFuelTypes);
+
+        result.Should().NotBeNull();
+        result!.Id.Should().Be("okko-95");
+    }
 }

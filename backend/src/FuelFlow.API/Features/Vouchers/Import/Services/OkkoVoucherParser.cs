@@ -43,6 +43,18 @@ public sealed class OkkoVoucherParser : IVoucherProviderParser
             .Where(f => f.StationId == "okko")
             .ToListAsync(cancellationToken);
 
+        // One query per import, not per voucher: the QR product code resolves a fuel exactly, and
+        // "exactly" here means a dictionary lookup instead of matching a parsed name against every
+        // fuel the brand sells. Empty until somebody fills the table in, which is why the classifier
+        // still has its category path underneath.
+        var byProductCode = (await _context.FuelTypeProductCodes
+                .Where(c => c.StationId == "okko")
+                .ToListAsync(cancellationToken))
+            .Where(c => okkoFuelTypes.Any(ft => ft.Id == c.FuelTypeId))
+            .GroupBy(c => c.ProductCode)
+            .Where(g => g.Count() == 1)
+            .ToDictionary(g => g.Key, g => okkoFuelTypes.First(ft => ft.Id == g.Single().FuelTypeId));
+
         foreach (var region in context.VoucherRegions)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -82,7 +94,7 @@ public sealed class OkkoVoucherParser : IVoucherProviderParser
 
             var qrPayload = qrResult.Text;
 
-            var fuelTypeEntity = OkkoFuelClassifier.ResolveFuelType(rawText, qrPayload, okkoFuelTypes);
+            var fuelTypeEntity = OkkoFuelClassifier.ResolveFuelType(rawText, qrPayload, okkoFuelTypes, byProductCode);
             var fuelTypeId = fuelTypeEntity?.Id;
             decimal confidence = fuelTypeEntity != null ? 20 : 0;
             if (liters > 0) confidence += 20;

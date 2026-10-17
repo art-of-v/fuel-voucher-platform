@@ -135,14 +135,30 @@ public static class OkkoFuelClassifier
     /// station catalog actually contains, so the caller rejects the row with a clear message
     /// instead of silently importing it under the wrong fuel type.
     /// </para>
-    /// </summary>
+    /// <para>
+    /// <paramref name="byProductCode"/> is the exact path and it is checked first: a code that
+    /// <c>fuel_type_product_codes</c> claims resolves to that fuel with no interpretation at all —
+    /// no category, no name matching, nothing that can be wrong about spelling. It is optional so
+    /// that a catalogue with no rows behaves exactly as it did before the table existed, and
+    /// <c>CategoryFromQrCode</c> stays as the second reading of the same code for those rows.
+    /// </para>
+    /// </remarks>
     public static FuelTypeEntity? ResolveFuelType(
         string? rawText,
         string? qrPayload,
-        IReadOnlyCollection<FuelTypeEntity> okkoFuelTypes)
+        IReadOnlyCollection<FuelTypeEntity> okkoFuelTypes,
+        IReadOnlyDictionary<string, FuelTypeEntity>? byProductCode = null)
     {
-        var category = CategoryFromQrCode(TryGetProductCode(qrPayload))
-                       ?? CategoryFromText(rawText);
+        var productCode = TryGetProductCode(qrPayload);
+
+        if (productCode is not null
+            && byProductCode is not null
+            && byProductCode.TryGetValue(productCode, out var byCode))
+        {
+            return byCode;
+        }
+
+        var category = CategoryFromQrCode(productCode) ?? CategoryFromText(rawText);
 
         if (category is null)
             return null;
