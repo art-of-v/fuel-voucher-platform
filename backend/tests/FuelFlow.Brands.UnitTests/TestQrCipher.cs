@@ -1,3 +1,4 @@
+using System.Text;
 using FuelFlow.Features.Vouchers.Security;
 using FuelFlow.SharedKernel.Options;
 using Microsoft.Extensions.Options;
@@ -18,7 +19,9 @@ namespace FuelFlow.Brands.UnitTests;
 /// </remarks>
 public static class TestQrCipher
 {
-    public const string KeyBase64 = "aW50ZWdyYXRpb25zLXFyLWNpcGhlci1rZXktMjAyNiE=";
+    public static string KeyBase64 { get; } = Convert.ToBase64String(Encoding.UTF8.GetBytes(Phrase));
+
+    private const string Phrase = "integrations-qr-cipher-key-2026!";
 
     public static IQrCipher Instance { get; } = new QrCipher(Options.Create(new QrCipherOptions
     {
