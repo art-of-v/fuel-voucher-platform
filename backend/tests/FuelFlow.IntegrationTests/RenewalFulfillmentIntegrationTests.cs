@@ -9,6 +9,7 @@ using FuelFlow.Features.Brands;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.Exchange;
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.Renewal;
@@ -19,6 +20,7 @@ using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
@@ -101,6 +103,110 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
 
         var fulfillments = await verify.Fulfillments.AsNoTracking().Where(f => f.OrderId == orderId).ToListAsync();
         fulfillments.Should().ContainSingle().Which.VoucherId.Should().Be(sourceId);
+
+        // D-13: an extension is an EVENT and not a movement, because the paper did not go anywhere -
+        // it stayed with the customer and only time moved forward. That is why voucher_movements has
+        // no extend kind, and it is why the expiry pair exists at all: the voucher's own
+        // customer_expiration_date was overwritten by the CAS that wrote this row.
+        var events = await verify.VoucherEvents.AsNoTracking().Where(e => e.VoucherId == sourceId).ToListAsync();
+        var extended = events.Should().ContainSingle().Subject;
+        extended.EventType.Should().Be(VoucherEventTypes.Extended);
+        extended.PreviousCustomerExpiration.Should().Be(sourceExpiry);
+        extended.NewCustomerExpiration.Should().Be(sourceExpiry.AddMonths(1));
+        extended.ExternalRef.Should().Be(orderId.ToString(), "the event points at the order that paid for it");
+
+        // And the paper must NOT appear in the custody ledger: it never changed place.
+        (await verify.VoucherMovements.AsNoTracking().AnyAsync(m => m.VoucherId == sourceId))
+            .Should().BeFalse("an extension moves no paper, so it is not a movement");
+    }
+
+    [Fact]
+    public async Task An_Extend_That_Lost_Its_CompareAndSwap_Writes_No_Event()
+    {
+        // The gate, and the whole risk of writing to an append-only table from a compare-and-swap.
+        //
+        // TryExtendVoucherAsync returns rows-affected, and every caller treats 0 as "another worker or a
+        // retry got here first". If the event were written before that check - or without it - it would
+        // claim a term the customer was never given, on the only record that would ever say so.
+        //
+        // Losing the race for real needs the row to change between the read of `sources` and the
+        // UPDATE, which cannot be staged from outside the handler. So the CAS is overridden to report
+        // the same answer it returns when it loses, and the assertion is about everything downstream of
+        // the gate: no event, no snapshot, no fulfilment, order left open for the retry sweep.
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var sourceId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var sourceExpiry = today.AddDays(5);
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+
+            SeedUser(seed, userId);
+            var purchaseOrderId = SeedPurchaseOrder(seed, userId);
+            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", 50m, sourceExpiry));
+            seed.Orders.Add(RenewalOrder(orderId, userId, price: 500, monobankInvoiceId: null,
+                ("OKKO", "okko-95", 50m, 500)));
+            MarkAsRenewalLine(seed, orderId, sourceId, termCode: "1m");
+
+            await seed.SaveChangesAsync();
+        }
+
+        using (var ctx = CreateContext())
+        {
+            var service = new FulfillmentServiceThatLostTheExtend(
+                ctx,
+                NullLogger<FulfillmentService>.Instance,
+                new RefundOrderCommandHandler(ctx, new StubMonobankClientFactory(new Mock<IMonobankClient>().Object), new AuditEventService(ctx)),
+                new RuntimeSettingsService(ctx),
+                NotificationDispatcher.Disabled,
+                new ConfigurationBuilder().Build());
+
+            await service.ProcessRenewalOrderAsync(orderId);
+        }
+
+        using var verify = CreateContext();
+
+        (await verify.VoucherEvents.AsNoTracking().AnyAsync(e => e.VoucherId == sourceId))
+            .Should().BeFalse("the extend changed nothing, so it must leave no event behind");
+
+        (await verify.OrderLineItems.AsNoTracking()
+                .Where(l => l.OrderId == orderId)
+                .Select(l => l.NewCustomerExpiration)
+                .SingleAsync())
+            .Should().BeNull("and no snapshot, which is written on the same gated line");
+
+        (await verify.Fulfillments.IgnoreQueryFilters().AnyAsync(f => f.OrderId == orderId))
+            .Should().BeFalse("and no delivery");
+
+        (await verify.Orders.AsNoTracking().FirstAsync(o => o.Id == orderId)).Status
+            .Should().NotBe(OrderStatus.Fulfilled, "an unapplied line leaves the order open for the retry sweep");
+    }
+
+    /// <summary>
+    /// Reports the rows-affected a lost compare-and-swap reports, so the test can assert what the
+    /// handler does with that answer without staging a race inside a transaction.
+    /// </summary>
+    private sealed class FulfillmentServiceThatLostTheExtend : FulfillmentService
+    {
+        public FulfillmentServiceThatLostTheExtend(
+            ApplicationDbContext ctx,
+            ILogger<FulfillmentService> logger,
+            RefundOrderCommandHandler refundHandler,
+            RuntimeSettingsService settings,
+            NotificationDispatcher notificationDispatcher,
+            IConfiguration configuration)
+            : base(ctx, logger, refundHandler, settings, notificationDispatcher, configuration)
+        {
+        }
+
+        protected internal override Task<int> TryExtendVoucherAsync(
+            Guid voucherId, Guid userId, DateOnly currentCustomerExpiration,
+            DateOnly supplierExpiration, DateOnly newCustomerExpiration,
+            CancellationToken cancellationToken)
+            => Task.FromResult(0);
     }
 
     /// <summary>
