@@ -1240,6 +1240,89 @@ namespace FuelFlow.API.Migrations
                     b.ToTable("support_messages", (string)null);
                 });
 
+            modelBuilder.Entity("FuelFlow.Features.Vouchers.Events.VoucherEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("ActorPartyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_party_id");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_user_id");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("event_type");
+
+                    b.Property<string>("ExternalRef")
+                        .HasColumnType("text")
+                        .HasColumnName("external_ref");
+
+                    b.Property<string>("FromStatus")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("from_status");
+
+                    b.Property<DateOnly?>("NewCustomerExpiration")
+                        .HasColumnType("date")
+                        .HasColumnName("new_customer_expiration");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at_utc");
+
+                    b.Property<string>("Payload")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("payload");
+
+                    b.Property<DateOnly?>("PreviousCustomerExpiration")
+                        .HasColumnType("date")
+                        .HasColumnName("previous_customer_expiration");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("ToStatus")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("to_status");
+
+                    b.Property<Guid>("VoucherId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("voucher_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExternalRef")
+                        .HasDatabaseName("ix_voucher_events_ref")
+                        .HasFilter("external_ref IS NOT NULL");
+
+                    b.HasIndex("VoucherId", "OccurredAtUtc")
+                        .HasDatabaseName("ix_voucher_events_voucher");
+
+                    b.ToTable("voucher_events", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_voucher_events_expiration_pair", "(event_type = 'Extended') = (previous_customer_expiration IS NOT NULL AND new_customer_expiration IS NOT NULL) AND (event_type <> 'Extended' OR new_customer_expiration > previous_customer_expiration)");
+
+                            t.HasCheckConstraint("ck_voucher_events_imported_has_no_predecessor", "event_type <> 'Imported' OR (from_status IS NULL AND previous_customer_expiration IS NULL)");
+
+                            t.HasCheckConstraint("ck_voucher_events_status_changed", "(event_type = 'StatusChanged') = (from_status IS NOT NULL AND to_status IS NOT NULL) AND (event_type <> 'StatusChanged' OR from_status <> to_status)");
+
+                            t.HasCheckConstraint("ck_voucher_events_statuses", "(from_status IS NULL OR from_status IN ('Imported','VerifiedWithWarnings','VerificationFailed','Available','Assigned','Used','Expired','Blocked','Deactivated')) AND (to_status IS NULL OR to_status IN ('Imported','VerifiedWithWarnings','VerificationFailed','Available','Assigned','Used','Expired','Blocked','Deactivated'))");
+
+                            t.HasCheckConstraint("ck_voucher_events_type", "event_type IN ('Imported','StatusChanged','Extended','Archived','Unarchived')");
+                        });
+                });
+
             modelBuilder.Entity("FuelFlow.Features.Vouchers.Exchange.MovementBatch", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3993,6 +4076,15 @@ namespace FuelFlow.API.Migrations
                     b.Navigation("Order");
 
                     b.Navigation("SourceVoucher");
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Vouchers.Events.VoucherEvent", b =>
+                {
+                    b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", null)
+                        .WithMany()
+                        .HasForeignKey("VoucherId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Vouchers.Exchange.MovementBatch", b =>
