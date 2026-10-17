@@ -75,10 +75,17 @@ run() { # env assignments... -- runs the preflight in --data-only mode
 # ------------------------------------------------------------------------------
 # A clean database
 # ------------------------------------------------------------------------------
+# The count is read from the directory rather than written down, because a literal is a tripwire: the
+# first assertion here said "(1 checked)", it went green when the directory held one file, and it went
+# red on the deploy of the PR that added the second — asserting a number that has nothing to do with
+# what this test is about. The number is an output detail; "a clean database says how many it checked"
+# is the behaviour.
+checked_expected="$(find "$SCRIPT_DIR/preflight-db" -name '*.sql' | wc -l | tr -d ' ')"
+
 out="$(run DOCKER_STUB_RUNNING=1 DOCKER_STUB_ROWS= DOCKER_STUB_STRICT_UNUSED=1)"
 check "a clean database exits 0" "0" "$?"
 contains "the file is reported ok" "010-offer-volume-price-agreement.sql: ok" "$out"
-contains "and satisfaction is stated with a count" "all data preconditions satisfied (1 checked)" "$out"
+contains "and satisfaction is stated with a count" "all data preconditions satisfied (${checked_expected} checked)" "$out"
 # The regression, stated on its own. psql prints BEGIN, SET and COMMIT to stdout whatever -t -A
 # says, so counting non-empty lines calls those three a violation on a database that is fine — which
 # is exactly what this check did on production on its first real run, printing
