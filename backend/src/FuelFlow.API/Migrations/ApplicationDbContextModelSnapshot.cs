@@ -726,6 +726,151 @@ namespace FuelFlow.API.Migrations
                     b.ToTable("feedback_message_replies", (string)null);
                 });
 
+            modelBuilder.Entity("FuelFlow.Features.Ledger.SharedModels.BankAccount", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AccountRef")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("account_ref");
+
+                    b.Property<string>("BankCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("bank_code");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_default");
+
+                    b.Property<Guid>("OperatorLegalEntityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operator_legal_entity_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OperatorLegalEntityId");
+
+                    b.HasIndex("OperatorLegalEntityId", "BankCode", "AccountRef")
+                        .IsUnique();
+
+                    b.ToTable("bank_accounts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_bank_accounts_account_ref_length", "length(account_ref) <= 100");
+
+                            t.HasCheckConstraint("ck_bank_accounts_account_ref_not_blank", "btrim(account_ref) <> ''");
+
+                            t.HasCheckConstraint("ck_bank_accounts_bank_code_length", "length(bank_code) <= 20");
+
+                            t.HasCheckConstraint("ck_bank_accounts_bank_code_not_blank", "btrim(bank_code) <> ''");
+
+                            t.HasCheckConstraint("ck_bank_accounts_currency", "currency = 'UAH'");
+                        });
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Ledger.SharedModels.OperatorLegalEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("Edrpou")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("edrpou");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("LegalForm")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("legal_form");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("RegisteredAddress")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("registered_address");
+
+                    b.Property<string>("Rnkrr")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("rnkrr");
+
+                    b.Property<string>("TaxRegime")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("tax_regime");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<string>("VatNumber")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("vat_number");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Edrpou")
+                        .IsUnique();
+
+                    b.HasIndex("IsActive")
+                        .IsUnique()
+                        .HasDatabaseName("ux_operator_legal_entities_single_active")
+                        .HasFilter("is_active");
+
+                    b.ToTable("operator_legal_entities", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_operator_legal_entities_edrpou_digits", "edrpou ~ '^[0-9]{8,10}$'");
+
+                            t.HasCheckConstraint("ck_operator_legal_entities_edrpou_not_blank", "btrim(edrpou) <> ''");
+
+                            t.HasCheckConstraint("ck_operator_legal_entities_name_not_blank", "btrim(name) <> ''");
+
+                            t.HasCheckConstraint("ck_operator_legal_entities_rnkrr_digits", "rnkrr IS NULL OR rnkrr ~ '^[0-9]{5}$'");
+
+                            t.HasCheckConstraint("ck_operator_legal_entities_tax_regime", "tax_regime IN ('Vat','Simplified')");
+
+                            t.HasCheckConstraint("ck_operator_legal_entities_vat_number_digits", "vat_number IS NULL OR vat_number ~ '^[0-9]{12}$'");
+                        });
+                });
+
             modelBuilder.Entity("FuelFlow.Features.Notifications.SharedModels.Notification", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4079,6 +4224,17 @@ namespace FuelFlow.API.Migrations
                     b.Navigation("FeedbackMessage");
                 });
 
+            modelBuilder.Entity("FuelFlow.Features.Ledger.SharedModels.BankAccount", b =>
+                {
+                    b.HasOne("FuelFlow.Features.Ledger.SharedModels.OperatorLegalEntity", "OperatorLegalEntity")
+                        .WithMany("BankAccounts")
+                        .HasForeignKey("OperatorLegalEntityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("OperatorLegalEntity");
+                });
+
             modelBuilder.Entity("FuelFlow.Features.Notifications.SharedModels.Notification", b =>
                 {
                     b.HasOne("FuelFlow.SharedKernel.Domain.User", "User")
@@ -4401,6 +4557,11 @@ namespace FuelFlow.API.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Role");
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Ledger.SharedModels.OperatorLegalEntity", b =>
+                {
+                    b.Navigation("BankAccounts");
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Orders.SharedModels.Order", b =>
