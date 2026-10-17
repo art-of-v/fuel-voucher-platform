@@ -318,6 +318,9 @@ Rules:
 
 The schema is a single PostgreSQL database managed by **EF Core migrations** in
 `backend/src/FuelFlow.API/Migrations/` — the migrations are the canonical source of truth.
+**The history is append-only**: a migration that any deployed database has applied stays in the
+folder, in order, under its original id. It is never collapsed into a single baseline — see
+[Database migrations](#database-migrations) for why, and for the gates that depend on it.
 The primary tables:
 
 | Table | Purpose |
@@ -536,6 +539,53 @@ Set `RunMigrationsOnBoot=false` to manage them manually:
 cd backend/src/FuelFlow.API
 dotnet ef database update
 ```
+
+#### The history is append-only — never squashed
+
+Every migration that has ever been applied to an environment stays in the folder, in order, with
+its original id. **Do not collapse them into one baseline migration**, and do not
+`dotnet ef migrations remove` a migration a deployed database has already applied.
+
+That is not a style preference. Three things here are built on the history being intact, and each
+breaks if it is rewritten:
+
+1. **Production is dry-run from a restored history, not from zero.** The migration dry run
+   (`.github/workflows/ci.yml`) dumps production's `__EFMigrationsHistory` and schema, restores
+   them into a throwaway Postgres, and applies *only the pending* migrations. A squashed history
+   carries an id production has never seen, so EF tries to create every table on a schema that
+   already has them — and the one gate that catches a migration which is wrong about
+   **production's rows** rather than about seeded ones dies on the first `CREATE TABLE`.
+2. **A failing migration is a crash, not a rollback.** `MigrateDatabaseOnStartup` rethrows
+   (`Extensions/DatabaseSetup.cs`), so a migration that cannot apply takes the container down and
+   the deploy stops there. The rollback for a bad migration is *restore a dump taken before the
+   deploy* (`docs/DEPLOYMENT.md` in the private docs repo), never a down-migration — and the dump
+   carries the history table with it, so restoring rewinds the history and replays from there.
+3. **The data migrations live in the history.** Several of these transform production rows rather
+   than describe a shape: `SplitFuelPackagesIntoOffers`, `MoneyIsDecimalOnly`,
+   `RefundsBecomeAViewOverPayments`, the `DataKind` backfill. `DataKindBackfillTests` proves that
+   backfill by migrating *to* `20261014225424_AddOrderHistoryAndPricingBasis` and asserting what
+   the rows look like at that point — possible only because that migration still exists under that
+   id.
+
+Collapsing the history is defensible in exactly one situation: **no database anywhere has applied
+these migrations yet** — before the first deploy, and only then. This project deployed in June
+2026, so that window closed at the first production boot.
+
+What guards the history instead:
+
+| Guard | Catches |
+|---|---|
+| `has-pending-model-changes` (CI, backend job) | a model change committed with no migration, so the snapshot is never left behind the model |
+| `MigrationDiscoveryTests.The_Migration_History_Is_Append_Only` | the history being squashed, or its oldest entries deleted |
+| `MigrationDiscoveryTests` (the rest of the class) | a migration EF cannot see — missing `[Migration]`/`[DbContext]`, or living outside the one folder |
+| `XminMigrationGuardTests` | a scaffold that would crash every boot (the `xmin` system column) |
+| the production dry run | a migration that applies cleanly to seeded data and is still wrong about production's rows |
+| `deploy/preflight-db` | production rows a migration cannot safely transform, asked *before* the pull |
+
+Adding a migration is the normal case and is covered by `AGENTS.md`: run
+`dotnet ef migrations add <Name> --project src/FuelFlow.API`, review the generated `Up`/`Down`
+(the scaffold is a starting point, not an answer — see `XminMigrationGuardTests` for a scaffold
+that looked fine and was not), and commit it. The CI step above fails the PR if you forget.
 
 ### Running the backend tests
 
