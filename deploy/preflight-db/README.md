@@ -47,13 +47,20 @@ per-litre column on `fuel_packages`. Per-litre pricing then moved onto `fuel_off
 index on `(station_id, fuel_type_id, data_kind)` makes one group exactly one row — so that
 disagreement is no longer representable and there would be nothing to count.
 
-What is still expressible is the pair that now holds a price in two places: an offer names a rate, a
-volume names what that nominal costs, and nothing ties them together. So `010` now reports every live
-volume whose price disagrees with its offer by more than half a kopeck — **in UAH**, as
-`discrepancy_uah`, because that is what a customer would be over- or under-charged and it is the
-number a human resolving it needs. Offers with no `final_price_per_liter` are skipped, not reported:
-there is no rate to disagree with, and firing on the legacy cost-plus rows the pricing migration
-deliberately left alone would put a permanent warning on the deploy path.
+What is still expressible is the pair that holds a price in two places: an offer names a rate, a volume
+names what that nominal costs, and nothing ties them together. So `010` reports every live volume whose
+price disagrees with its offer by more than half a kopeck — **in UAH**, as `discrepancy_uah`, because that
+is what a customer would be over- or under-charged and it is the number a human resolving it needs.
+
+The rate it compares against is now **derived**, not read. `DeriveTheOfferFinalPrice` (2026-10-17) dropped
+`fuel_offers.final_price_per_liter`, because it was `min(cost + margin, pump − minDiscount)` stored beside
+the three columns it is computed from and every write path computed it that way before writing it. The
+check mirrors `FuelPricing.FinalPerLiterOrNull` in SQL, nullability included, so it keeps comparing the
+same two numbers it always did.
+
+Offers with no supplier cost or no margin are skipped, not reported: there is no rate to disagree with, and
+that state is deliberate — it is what a fuel the catalogue import created and nobody has priced yet looks
+like. Firing on it would put a permanent warning on the deploy path.
 
 The tests are `OfferVolumePriceAgreementTests`, and they read this file from disk rather than
 repeating its SQL — so the two cannot drift apart.

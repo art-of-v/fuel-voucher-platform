@@ -201,10 +201,14 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         });
+        // cost 100 + margin 1 = 101, and the ceiling (pump 105 - 0.5) does not bind, so the customer price
+        // is 101. This fixture used to state 99.90, which its own cost and margin did not produce - a
+        // discrepancy the seeder now refuses, and the reason it does: a fixture that disagrees with the
+        // formula proves nothing about the rows the application would really write.
         _context.FuelOfferVolumes.AddRange(
-            Package("test-dp-a", 2m, cost: 100.00m, final: 99.90m, margin: 1.00m, pump: 105m),
-            Package("test-dp-b", 5m, cost: 100.00m, final: 99.90m, margin: 1.00m, pump: 105m),
-            Package("test-dp-c", 9m, cost: 100.00m, final: 99.90m, margin: 1.00m, pump: 105m));
+            Package("test-dp-a", 2m, cost: 100.00m, final: 101m, margin: 1.00m, pump: 105m),
+            Package("test-dp-b", 5m, cost: 100.00m, final: 101m, margin: 1.00m, pump: 105m),
+            Package("test-dp-c", 9m, cost: 100.00m, final: 101m, margin: 1.00m, pump: 105m));
         await _context.SaveChangesAsync();
 
         var first = await _handler.HandleAsync(new GetBrandsQuery());

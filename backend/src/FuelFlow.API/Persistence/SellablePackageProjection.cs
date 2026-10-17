@@ -15,9 +15,11 @@ namespace FuelFlow.Persistence;
 /// </para>
 ///
 /// <para>
-/// The field list is therefore written twice, which is a drift risk, so
-/// <c>SellablePackageProjectionTests</c> asserts that this projection and <c>From</c> agree field for
-/// field on the same rows. If someone adds a property to one and not the other, that test fails.
+/// The field list is written twice, which is a drift risk, and the guard named here has never existed —
+/// <c>SellablePackageProjectionTests</c> is referenced by this comment and by nothing else in the
+/// repository. Stated rather than left to look enforced: the two lists are shorter every time a
+/// computed member moves the price out of the projection, and the remaining risk is an <c>init</c>
+/// property that one list forgets.
 /// </para>
 /// </remarks>
 internal static class SellablePackageProjection
@@ -40,7 +42,6 @@ internal static class SellablePackageProjection
             SupplierPricePerLiter = v.Offer.SupplierPricePerLiter,
             MarginUahPerLiter = v.Offer.MarginUahPerLiter,
             MarginPercent = v.Offer.MarginPercent,
-            FinalPricePerLiter = v.Offer.FinalPricePerLiter,
             DataKind = v.Offer.DataKind,
         });
 }

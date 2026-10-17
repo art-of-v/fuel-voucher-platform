@@ -97,7 +97,9 @@ internal static class SeedData
                     DataKind = DataKinds.Real,
                     SupplierPricePerLiter = supplierPrice,
                     MarginUahPerLiter = margin,
-                    FinalPricePerLiter = finalPrice,
+                    // No `final_price_per_liter`: the offer stopped storing the derived figure on
+                    // 2026-10-17, and the seed needs no override - `supplier + margin` is exactly
+                    // `finalPrice`, since no pump price is seeded and the ceiling does not bind.
                     // No pump price is seeded, so the public "before" price is just the sale price:
                     // the store-front shows no fabricated saving and never the supplier cost (planning #73).
                     CreatedAtUtc = CreatedAtUtc,

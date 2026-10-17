@@ -9,6 +9,39 @@ namespace FuelFlow.SharedKernel.Domain;
 public static class FuelPricing
 {
     /// <summary>
+    /// The per-litre customer price, or <c>null</c> when the offer has no cost or no margin recorded.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>This is the function every read path calls</b>, and the reason is that it answers a question
+    /// with a shape the callers can act on. <see cref="FinalPerLiter"/> takes four non-null decimals
+    /// because the write paths have already decided a fuel is priced; a read path holding four nullable
+    /// columns has to decide what "not priced yet" means, and every place that decided it for itself was
+    /// a place the decision could differ. Measured on production 2026-10-17: 25 live offers, 122 live
+    /// volumes, <b>0</b> of them without both knobs — so this returns null for a fuel the catalogue
+    /// import created and nobody has priced yet, and for nothing else.
+    /// </para>
+    /// <para>
+    /// Cost or margin missing ⇒ null rather than a number built from what is there. Treating a missing
+    /// margin as zero would publish a free fuel; treating a missing cost as zero would let the
+    /// below-cost guard see a cost of zero and wave the sale through.
+    /// </para>
+    /// </remarks>
+    public static decimal? FinalPerLiterOrNull(
+        decimal? costPerLiter,
+        decimal? profitPerLiter,
+        decimal? pumpPricePerLiter,
+        decimal? minDiscountPerLiter)
+    {
+        if (costPerLiter is not { } cost || profitPerLiter is not { } profit)
+        {
+            return null;
+        }
+
+        return FinalPerLiter(cost, profit, pumpPricePerLiter, minDiscountPerLiter ?? 0m);
+    }
+
+    /// <summary>
     /// final/л = min(cost + profit, pump − minDiscount).
     /// <paramref name="pumpPricePerLiter"/> (колонка) is the hard ceiling; when it is
     /// unknown (null) we fall back to cost + profit so a fuel priced before a pump was

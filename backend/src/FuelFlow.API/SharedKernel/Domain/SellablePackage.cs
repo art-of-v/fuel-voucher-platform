@@ -53,7 +53,15 @@ public sealed record SellablePackage
 
     public decimal? MarginPercent { get; init; }
 
-    public decimal? FinalPricePerLiter { get; init; }
+    /// <summary>
+    /// The customer price per litre these four knobs produce, or <c>null</c> while the offer has no
+    /// cost or no margin. Computed, not carried: <c>fuel_offers</c> stopped storing it on 2026-10-17,
+    /// and a member that had to be projected from a column nobody selects is a member two projections
+    /// can forget in different ways. Derived here instead, once, for both.
+    /// </summary>
+    public decimal? ComputedFinalPricePerLiter =>
+        FuelPricing.FinalPerLiterOrNull(
+            SupplierPricePerLiter, MarginUahPerLiter, PumpPricePerLiter, MinDiscountPerLiter);
 
     /// <summary>Which pool this came from. Carried so a caller can assert it matched what it asked for.</summary>
     public string DataKind { get; init; } = string.Empty;
@@ -72,7 +80,6 @@ public sealed record SellablePackage
         SupplierPricePerLiter = offer.SupplierPricePerLiter,
         MarginUahPerLiter = offer.MarginUahPerLiter,
         MarginPercent = offer.MarginPercent,
-        FinalPricePerLiter = offer.FinalPricePerLiter,
         DataKind = offer.DataKind,
     };
 }

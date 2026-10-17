@@ -139,12 +139,12 @@ WHERE EXISTS (SELECT 1 FROM fuel_offers p WHERE p.station_id = s.id AND p.data_k
 INSERT INTO fuel_offers
     (id, station_id, fuel_type_id,
      supplier_price_per_liter, margin_uah_per_liter, margin_percent,
-     final_price_per_liter, pump_price_per_liter, min_discount_per_liter, price_updated_at,
+     pump_price_per_liter, min_discount_per_liter, price_updated_at,
      created_at_utc, updated_at_utc, is_deleted, deleted_at_utc, data_kind)
 SELECT
     live.id || '-qa', live.station_id, live.fuel_type_id,
     live.supplier_price_per_liter, live.margin_uah_per_liter, live.margin_percent,
-    live.final_price_per_liter, live.pump_price_per_liter, live.min_discount_per_liter,
+    live.pump_price_per_liter, live.min_discount_per_liter,
     live.price_updated_at,
     now() - interval '2 days', now() - interval '2 days', false, NULL, 'qa'
 FROM fuel_offers live
@@ -183,7 +183,16 @@ SELECT
     volume.liters            AS liters,
     volume.package_price     AS price,
     offer.supplier_price_per_liter,
-    offer.final_price_per_liter
+    offer.pump_price_per_liter,
+    offer.min_discount_per_liter,
+    -- The customer price per litre, derived the way FuelPricing.FinalPerLiterOrNull does: the QA
+    -- mirror carries the offer's knobs, and since 2026-10-17 the offer carries no stored final price to
+    -- copy. least over a value no real pump reaches stands in for a missing ceiling, which is what the
+    -- formula's pump-null branch means.
+    CASE WHEN offer.supplier_price_per_liter IS NULL OR offer.margin_uah_per_liter IS NULL THEN NULL
+         ELSE least(offer.supplier_price_per_liter + offer.margin_uah_per_liter,
+                    coalesce(offer.pump_price_per_liter, 1000000000) - coalesce(offer.min_discount_per_liter, 0))
+    END AS final_price_per_liter
 FROM fuel_offer_volumes volume
 JOIN fuel_offers offer ON offer.id = volume.offer_id
 WHERE offer.data_kind = 'qa'

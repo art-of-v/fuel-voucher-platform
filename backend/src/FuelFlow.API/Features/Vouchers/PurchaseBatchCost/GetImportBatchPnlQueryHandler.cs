@@ -74,12 +74,20 @@ public sealed class GetImportBatchPnlQueryHandler
         // arbitrary pick between rows that are now guaranteed identical: one offer per fuel per pool,
         // and the live pool is the one a P&L over real sales is about. The GroupBy().First() this
         // replaces could previously pick up a QA rehearsal offer.
-        var currentPrices = await _context.FuelOffers
+        //
+        // Materialised and then computed, because the sale price is not a column: it is
+        // `min(cost + profit, pump - minDiscount)` over four nullable columns on the offer. One row
+        // per (fuel × pool) over the fuels in this import.
+        var pricedOffers = await _context.FuelOffers
             .AsNoTracking()
-            .Where(o => fuelIds.Contains(o.FuelTypeId)
-                     && o.FinalPricePerLiter != null
-                     && o.DataKind == DataKinds.Real)
-            .ToDictionaryAsync(o => o.FuelTypeId, o => o.FinalPricePerLiter, cancellationToken);
+            .Where(o => fuelIds.Contains(o.FuelTypeId) && o.DataKind == DataKinds.Real)
+            .ToListAsync(cancellationToken);
+
+        var currentPrices = pricedOffers
+            .Select(o => new { o.FuelTypeId, Final = o.ComputedFinalPricePerLiter })
+            .Where(o => o.Final is not null)
+            .GroupBy(o => o.FuelTypeId)
+            .ToDictionary(g => g.Key, g => g.Min(o => o.Final!.Value));
 
         var voucherById = vouchers.ToDictionary(v => v.Id);
 
@@ -124,7 +132,9 @@ public sealed class GetImportBatchPnlQueryHandler
                 if (unitPriceByLine.TryGetValue((f.OrderId, v.FuelTypeId, v.Liters), out var price)) revenue += price;
             }
 
-            var currentPrice = currentPrices.TryGetValue(fuelTypeId, out var cp) ? cp : null;
+            // decimal? on purpose: an uncosted fuel has no current price, and the DTO carries null for that
+            // rather than a zero that would read as "we sell it for nothing".
+            decimal? currentPrice = currentPrices.TryGetValue(fuelTypeId, out var cp) ? cp : null;
 
             // Cost is per voucher, not per batch: a customer who extends one voucher of a batch pays for
             // exactly that voucher, so its cost drops while its siblings keep theirs. Every money figure

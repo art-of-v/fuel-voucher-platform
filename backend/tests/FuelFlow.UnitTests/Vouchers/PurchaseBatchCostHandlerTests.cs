@@ -182,7 +182,7 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         // which is precisely what this test exists to catch.
         var offer = await _context.FuelOffers.FirstAsync(o => o.FuelTypeId == "okko-dp");
         offer.SupplierPricePerLiter.Should().Be(25m);
-        offer.FinalPricePerLiter.Should().Be(27m);   // 25 cost + 2 margin
+        offer.ComputedFinalPricePerLiter.Should().Be(27m);   // 25 cost + 2 margin
 
         var volumes = await _context.FuelOfferVolumes
             .Where(v => v.OfferId == offer.Id).OrderBy(v => v.Liters).ToListAsync();
@@ -314,7 +314,7 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         result.BlendedCostPerLiter.Should().Be(25m);   // (100×20 + 100×30) / 200
         var offer = await _context.FuelOffers.FirstAsync(o => o.FuelTypeId == "okko-dp");
         offer.SupplierPricePerLiter.Should().Be(25m); // priced off blended, not the just-entered 30
-        offer.FinalPricePerLiter.Should().Be(27m);
+        offer.ComputedFinalPricePerLiter.Should().Be(27m);
     }
 
     [Fact]

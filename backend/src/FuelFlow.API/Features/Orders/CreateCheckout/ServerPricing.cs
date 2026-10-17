@@ -41,9 +41,10 @@ public static class ServerPricing
             return package.PackagePrice;
         }
 
-        // No per-liter price to discount against: scale the frozen package price by the same ratio the
-        // discount represents on the nominal, so a term still costs less. Rows this old are rare and the
-        // below-cost guard still applies.
+        // No per-liter price to discount against: scale the volume's own price by the same ratio the
+        // discount represents on the nominal, so a term still costs less. Reached only when the offer has
+        // no cost or no margin recorded, which on production is a catalogue-imported fuel nobody has
+        // priced yet; the below-cost guard still applies.
         var nominalPerLiter = liters > 0m ? package.PackagePrice / liters : package.PackagePrice;
         var reduced = Math.Max(0m, nominalPerLiter - Math.Max(0m, discountPerLiter));
         return Math.Round(reduced * liters, 2, MidpointRounding.AwayFromZero);
@@ -59,19 +60,19 @@ public static class ServerPricing
         => FuelPricing.OriginalPackagePrice(package.PumpPricePerLiter, liters, unitPrice) * quantity;
 
     /// <summary>
-    /// Per-liter customer price recomputed from the stored knobs. Falls back to the
-    /// stored <see cref="SellablePackage.FinalPricePerLiter"/>, then null (caller uses the
-    /// frozen <see cref="SellablePackage.PackagePrice"/>) for rows predating the per-litre columns.
+    /// Per-liter customer price recomputed from the stored knobs, or <c>null</c> when the offer has no
+    /// cost or no margin recorded — in which case the caller falls back to the volume's own price
+    /// (<see cref="SellablePackage.PackagePrice"/>, which by then is the per-nominal override).
+    /// <para>
+    /// There is no longer a stored per-litre figure to fall back to. Before 2026-10-17 this returned
+    /// <c>package.FinalPricePerLiter</c> when the knobs were incomplete, and that column was itself
+    /// computed from the knobs by every write path — so it could only ever have been a stale copy of the
+    /// same inputs, not an independent price. Reads now compute, and the only honest fallback is the
+    /// volume's own figure.
+    /// </para>
     /// </summary>
     private static decimal? EffectivePricePerLiter(SellablePackage package)
-    {
-        if (package.SupplierPricePerLiter is { } cost && package.MarginUahPerLiter is { } profit)
-        {
-            return FuelPricing.FinalPerLiter(cost, profit, package.PumpPricePerLiter, package.MinDiscountPerLiter ?? 0m);
-        }
-
-        return package.FinalPricePerLiter;
-    }
+        => package.ComputedFinalPricePerLiter;
 
     /// <summary>
     /// The per-litre price actually charged after a term discount, or null when the discount cannot be

@@ -91,7 +91,7 @@ BEGIN;
 INSERT INTO fuel_offers
     (id, station_id, fuel_type_id,
      supplier_price_per_liter, margin_uah_per_liter, margin_percent,
-     final_price_per_liter, pump_price_per_liter, min_discount_per_liter, price_updated_at,
+     pump_price_per_liter, min_discount_per_liter, price_updated_at,
      created_at_utc, updated_at_utc, is_deleted, deleted_at_utc, data_kind)
 SELECT
     live.id || '-qa',
@@ -100,7 +100,6 @@ SELECT
     live.supplier_price_per_liter,
     live.margin_uah_per_liter,
     live.margin_percent,
-    live.final_price_per_liter,
     live.pump_price_per_liter,
     live.min_discount_per_liter,
     live.price_updated_at,

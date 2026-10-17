@@ -57,7 +57,11 @@ public sealed class OfferPriceHistoryIntegrationTests : IClassFixture<TestDataba
     {
         await using var context = CreateContext();
 
-        var mismatches = await context.FuelOffers
+        // Materialised before the comparison, because the customer price is computed by a method EF
+        // cannot translate: it is `min(cost + margin, pump - minDiscount)` over four nullable columns,
+        // and the whole point of dropping the stored copy was to stop the database holding an answer
+        // this function gives.
+        var offers = await context.FuelOffers
             .IgnoreQueryFilters()
             .Select(o => new
             {
@@ -65,33 +69,42 @@ public sealed class OfferPriceHistoryIntegrationTests : IClassFixture<TestDataba
                 o.SupplierPricePerLiter,
                 o.MarginUahPerLiter,
                 o.MarginPercent,
-                o.FinalPricePerLiter,
+                o.PumpPricePerLiter,
+                o.MinDiscountPerLiter
+            })
+            .ToListAsync()
+            .ContinueWith(t => t.Result.Select(o => new
+            {
+                o.Id,
+                o.SupplierPricePerLiter,
+                o.MarginUahPerLiter,
+                o.MarginPercent,
                 o.PumpPricePerLiter,
                 o.MinDiscountPerLiter,
-                Current = context.FuelOfferPrices
-                    .Where(p => p.OfferId == o.Id)
-                    .OrderByDescending(p => p.EffectiveFromUtc)
-                    .ThenByDescending(p => p.Id)
-                    .Select(p => new
-                    {
-                        p.SupplierPricePerLiter,
-                        p.MarginUahPerLiter,
-                        p.MarginPercent,
-                        p.FinalPricePerLiter,
-                        p.PumpPricePerLiter,
-                        p.MinDiscountPerLiter
-                    })
-                    .FirstOrDefault()
-            })
-            .Where(x => x.Current == null
-                || x.SupplierPricePerLiter != x.Current.SupplierPricePerLiter
-                || x.MarginUahPerLiter != x.Current.MarginUahPerLiter
-                || x.MarginPercent != x.Current.MarginPercent
-                || x.FinalPricePerLiter != x.Current.FinalPricePerLiter
-                || x.PumpPricePerLiter != x.Current.PumpPricePerLiter
-                || x.MinDiscountPerLiter != x.Current.MinDiscountPerLiter)
-            .Select(x => x.Id)
-            .ToListAsync();
+                ComputedFinal = FuelPricing.FinalPerLiterOrNull(
+                    o.SupplierPricePerLiter, o.MarginUahPerLiter, o.PumpPricePerLiter, o.MinDiscountPerLiter)
+            }).ToList());
+
+        var rows = await context.FuelOfferPrices.AsNoTracking().ToListAsync();
+
+        var latest = rows
+            .GroupBy(p => p.OfferId)
+            .ToDictionary(
+                g => g.Key,
+                // Ascending order plus overwrite-on-equal keeps the newest, which is the same
+                // "current" rule the recorder and the endpoint use.
+                g => g.OrderBy(p => p.EffectiveFromUtc).ThenBy(p => p.Id).Last());
+
+        var mismatches = offers
+            .Where(o => !latest.TryGetValue(o.Id, out var current)
+                || o.SupplierPricePerLiter != current.SupplierPricePerLiter
+                || o.MarginUahPerLiter != current.MarginUahPerLiter
+                || o.MarginPercent != current.MarginPercent
+                || o.PumpPricePerLiter != current.PumpPricePerLiter
+                || o.MinDiscountPerLiter != current.MinDiscountPerLiter
+                || o.ComputedFinal != current.FinalPricePerLiter)
+            .Select(o => o.Id)
+            .ToList();
 
         mismatches.Should().BeEmpty(
             "the newest history row is the offer's current price - the invariant FuelOfferPrice states");
@@ -108,8 +121,7 @@ public sealed class OfferPriceHistoryIntegrationTests : IClassFixture<TestDataba
         var before = await RowsAsync(context, offer.Id);
         before.Should().HaveCount(1, "the opening row is what the second one is compared against");
 
-        offer.MarginUahPerLiter = 3m;
-        offer.FinalPricePerLiter = 53m;
+        offer.MarginUahPerLiter = 3m;   // 50 + 3 = the 53 the row below is expected to hold
         await Recorder(context).RecordAsync(offer, OfferPriceReasons.Operator, TestUser, DateTime.UtcNow);
         await context.SaveChangesAsync();
 
@@ -277,7 +289,6 @@ public sealed class OfferPriceHistoryIntegrationTests : IClassFixture<TestDataba
             DataKind = DataKinds.Real,
             SupplierPricePerLiter = supplierPrice,
             MarginUahPerLiter = margin,
-            FinalPricePerLiter = supplierPrice + margin,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };

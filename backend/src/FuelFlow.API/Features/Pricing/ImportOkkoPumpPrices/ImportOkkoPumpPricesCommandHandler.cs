@@ -246,7 +246,6 @@ public sealed class ImportOkkoPumpPricesCommandHandler
                 if (!dryRun)
                 {
                     offer.PumpPricePerLiter = pump;
-                    offer.FinalPricePerLiter = finalPerLiter;
                     offer.UpdatedAtUtc = now;
 
                     foreach (var volume in vols)

@@ -104,7 +104,9 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
         {
             offer.SupplierPricePerLiter.Should().BeNull("our cost is an operator's figure, not the brand's");
             offer.MarginUahPerLiter.Should().BeNull();
-            offer.FinalPricePerLiter.Should().BeNull();
+            // Not "no price recorded" any more but "not priced at all": with no cost and no margin the derived
+        // price is null, which is what makes the fuel unsellable.
+        offer.ComputedFinalPricePerLiter.Should().BeNull();
 
             (await _context.FuelOfferVolumes.CountAsync(v => v.OfferId == offer.Id))
                 .Should().Be(0, "no nominals means nothing is displayed and nothing is purchasable");
@@ -154,8 +156,7 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
             FuelTypeId = "okko-95",
             DataKind = DataKinds.Real,
             SupplierPricePerLiter = 49m,
-            MarginUahPerLiter = 2m,
-            FinalPricePerLiter = 51m,
+            MarginUahPerLiter = 2m, // 49 + 2 = the 51 the assertion below expects
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         });
@@ -174,7 +175,7 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
 
         var offer = await _context.FuelOffers.SingleAsync(o => o.FuelTypeId == "okko-95");
         offer.SupplierPricePerLiter.Should().Be(49m, "the pump sync owns the pump; this import owns nothing here");
-        offer.FinalPricePerLiter.Should().Be(51m);
+        offer.ComputedFinalPricePerLiter.Should().Be(51m);
     }
 
     [Fact]

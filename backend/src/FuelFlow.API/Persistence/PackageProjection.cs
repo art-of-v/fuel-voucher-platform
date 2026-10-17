@@ -45,7 +45,9 @@ internal static class PackageProjection
             SupplierPricePerLiter = volume.Offer.SupplierPricePerLiter,
             MarginUahPerLiter = volume.Offer.MarginUahPerLiter,
             MarginPercent = volume.Offer.MarginPercent,
-            FinalPricePerLiter = volume.Offer.FinalPricePerLiter,
+            // Computed, not read: the admin JSON keeps the field (the panel renders it), but the offer no
+            // longer stores it.
+            FinalPricePerLiter = volume.Offer.ComputedFinalPricePerLiter,
             PumpPricePerLiter = volume.Offer.PumpPricePerLiter,
             MinDiscountPerLiter = volume.Offer.MinDiscountPerLiter,
             DataKind = volume.Offer.DataKind,

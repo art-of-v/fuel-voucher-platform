@@ -48,6 +48,14 @@ namespace FuelFlow.API.Migrations
     /// one, and this one is not edited again.
     /// </para>
 /// </remarks>
+    /// <para>
+    /// <b>Edited 2026-10-17, once, and only to keep compiling.</b> <c>fuel_offers.final_price_per_liter</c>
+    /// was dropped by <c>DeriveTheOfferFinalPrice</c>, after this migration had already run everywhere. The
+    /// column still exists at this point in history, so the statement below is unchanged in what it does -
+    /// it still writes the value the seed's own arithmetic produces - but it reads the figure from
+    /// <c>ComputedFinalPricePerLiter</c> because the stored property no longer exists. Rewriting history is
+    /// not on the table; a migration that cannot compile is a migration nobody can roll back.
+    /// </para>
     public partial class SeedCatalogueAsOffers : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -74,7 +82,7 @@ namespace FuelFlow.API.Migrations
                     VALUES
                         ({Quote(historicalKey[offer.Id])}, {Quote(offer.StationId)}, {Quote(offer.FuelTypeId)}, {Quote(offer.DataKind)},
                          {Num(offer.SupplierPricePerLiter)}, {Num(offer.MarginUahPerLiter)}, {Num(offer.MarginPercent)},
-                         {Num(offer.FinalPricePerLiter)}, NULL, NULL, FALSE, NULL, NULL, NULL,
+                         {Num(offer.ComputedFinalPricePerLiter)}, NULL, NULL, FALSE, NULL, NULL, NULL,
                          {Ts(offer.CreatedAtUtc)}, {Ts(offer.UpdatedAtUtc)})
                     ON CONFLICT (id) DO NOTHING;
                     """);

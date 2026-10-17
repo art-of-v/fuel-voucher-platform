@@ -60,8 +60,8 @@ var litres = weighted.Sum(p => p.Liters);
             .Select(p => p.SupplierPricePerLiter!.Value)
             .ToList();
         var finals = packages
-            .Where(p => p.FinalPricePerLiter is not null)
-            .Select(p => p.FinalPricePerLiter!.Value)
+            .Where(p => p.ComputedFinalPricePerLiter is not null)
+            .Select(p => p.ComputedFinalPricePerLiter!.Value)
             .ToList();
 
         return new BrandFuelDto
@@ -71,7 +71,7 @@ var litres = weighted.Sum(p => p.Liters);
             SupplierPricePerLiter = WeightedCostPerLiter(packages),
             MarginUahPerLiter = reference?.MarginUahPerLiter ?? 0,
             MarginPercent = reference?.MarginPercent,
-            FinalPricePerLiter = reference?.FinalPricePerLiter ?? 0,
+            FinalPricePerLiter = reference?.ComputedFinalPricePerLiter ?? 0,
             PumpPricePerLiter = reference?.PumpPricePerLiter,
             // Fall back to the historical marketing discount (base - final) so a fuel
             // priced before the min-discount column existed shows a sane initial knob.
@@ -94,6 +94,13 @@ var litres = weighted.Sum(p => p.Liters);
     /// Null when every package agrees - the ordinary case, and the one that must stay quiet. Set
     /// when they do not, covering the two figures that decide sellability: what we paid, and what
     /// the customer pays.
+    /// <para>
+    /// Since 2026-10-17 the two columns live once per offer, so within one fuel's own pool the values
+    /// <b>cannot</b> disagree and the final-price half of this detector is structurally always null. It
+    /// is kept because the collection it is handed is not trusted to be one pool: it still catches a
+    /// caller that merged pools, and it costs two comparisons. What it can no longer catch is the drift
+    /// it was written for - two copies of one number disagreeing - because there is only one copy now.
+    /// </para>
     /// </summary>
     private static BrandFuelPriceSpreadDto? BuildSpread(List<decimal> supplierCosts, List<decimal> finals)
     {

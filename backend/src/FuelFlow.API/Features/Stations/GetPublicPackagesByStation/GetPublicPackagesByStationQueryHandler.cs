@@ -52,7 +52,11 @@ public sealed class GetPublicPackagesByStationQueryHandler
                 volume.Liters,
                 Price = volume.PackagePrice,
                 offer.PumpPricePerLiter,
-                offer.FinalPricePerLiter,
+                // The knobs rather than the derived figure - see GetPublicPackagesQueryHandler, which
+                // explains why the supplier cost crosses this projection and stops there.
+                offer.SupplierPricePerLiter,
+                offer.MarginUahPerLiter,
+                offer.MinDiscountPerLiter,
             })
             .ToListAsync(ct);
 
@@ -67,7 +71,8 @@ public sealed class GetPublicPackagesByStationQueryHandler
                 x.Liters,
                 x.Price,
                 FuelPricing.OriginalPackagePrice(x.PumpPricePerLiter, x.Liters, x.Price),
-                x.FinalPricePerLiter,
+                FuelPricing.FinalPerLiterOrNull(
+                    x.SupplierPricePerLiter, x.MarginUahPerLiter, x.PumpPricePerLiter, x.MinDiscountPerLiter),
                 available.Contains(StockKey.For(x.StationId, x.FuelTypeId, x.Liters))))
             .ToList();
     }

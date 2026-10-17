@@ -23,7 +23,7 @@ internal sealed class FuelOfferConfiguration : IEntityTypeConfiguration<FuelOffe
         builder.Property(e => e.SupplierPricePerLiter).HasColumnName("supplier_price_per_liter").HasColumnType("numeric(10,4)");
         builder.Property(e => e.MarginUahPerLiter).HasColumnName("margin_uah_per_liter").HasColumnType("numeric(10,4)");
         builder.Property(e => e.MarginPercent).HasColumnName("margin_percent").HasColumnType("numeric(10,4)");
-        builder.Property(e => e.FinalPricePerLiter).HasColumnName("final_price_per_liter").HasColumnType("numeric(10,4)");
+        builder.Ignore(e => e.ComputedFinalPricePerLiter);
         builder.Property(e => e.PumpPricePerLiter).HasColumnName("pump_price_per_liter").HasColumnType("numeric(10,4)");
         builder.Property(e => e.MinDiscountPerLiter).HasColumnName("min_discount_per_liter").HasColumnType("numeric(10,4)");
 
@@ -89,7 +89,7 @@ internal sealed class FuelOfferConfiguration : IEntityTypeConfiguration<FuelOffe
             t.HasCheckConstraint("ck_fuel_offers_margin_signs",
                 "margin_uah_per_liter IS NULL OR margin_uah_per_liter >= 0");
             t.HasCheckConstraint("ck_fuel_offers_prices_non_negative",
-                "(final_price_per_liter IS NULL OR final_price_per_liter >= 0) AND " +
+                "(supplier_price_per_liter IS NULL OR supplier_price_per_liter >= 0) AND " +
                 "(pump_price_per_liter IS NULL OR pump_price_per_liter >= 0) AND " +
                 "(min_discount_per_liter IS NULL OR min_discount_per_liter >= 0)");
         });

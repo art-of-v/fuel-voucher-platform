@@ -114,8 +114,11 @@ public sealed class CreatePackageCommandHandler
             existingOffer.MarginUahPerLiter = command.Package.MarginUahPerLiter;
         if (command.Package.MarginPercent is not null)
             existingOffer.MarginPercent = command.Package.MarginPercent;
-        if (command.Package.FinalPricePerLiter is not null)
-            existingOffer.FinalPricePerLiter = command.Package.FinalPricePerLiter;
+        // `command.Package.FinalPricePerLiter` used to be written straight onto the offer here,
+        // unvalidated against the knobs above it — the one write path in the schema that could make the
+        // stored per-litre price disagree with the cost and margin it was computed from. There is no
+        // stored per-litre price to write any more; a caller that sends the field has it ignored, which
+        // is also what happened to every other field ASP.NET does not know.
         if (command.Package.PumpPricePerLiter is not null)
             existingOffer.PumpPricePerLiter = command.Package.PumpPricePerLiter;
         if (command.Package.MinDiscountPerLiter is not null)

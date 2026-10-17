@@ -96,11 +96,11 @@ public sealed class BlendedCostRecalculator
             var minDiscount = offer.MinDiscountPerLiter ?? 0m;
 
             // Same shared formula the operator panel uses: final = min(cost + profit, pump − minDiscount);
-            // pump null ⇒ cost + profit.
+            // pump null ⇒ cost + profit. Computed here to restate the volume totals below; the offer
+            // itself stopped storing it on 2026-10-17 and derives it from the two lines this writes.
             var finalPerLiter = FuelPricing.FinalPerLiter(blendedCost, profit, pump, minDiscount);
 
             offer.SupplierPricePerLiter = blendedCost;
-            offer.FinalPricePerLiter = finalPerLiter;
             offer.UpdatedAtUtc = now;
 
             foreach (var volume in volumes.Where(v => v.OfferId == offer.Id))

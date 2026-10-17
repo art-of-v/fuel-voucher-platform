@@ -87,9 +87,12 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
 
         columns.Should().BeEmpty("per-litre pricing belongs to the offer; the volume has litres and a package price");
 
-        // Three, not five: margin_uah_per_liter and min_discount_per_liter are per-litre facts whose
-        // column names do not contain "price", and asserting the count by listing the names keeps a
-        // future column from passing unnoticed.
+        // Four, not five: `final_price_per_liter` was dropped on 2026-10-17
+        // (`DeriveTheOfferFinalPrice`) because it was `min(cost + margin, pump - minDiscount)` stored
+        // beside the columns it is computed from, and every write path computed it that way before
+        // writing it. The offer now holds inputs only; the customer price is derived at read time. The
+        // listing still names its members rather than counting them, so a future stored copy of a
+        // derived figure cannot slip in unnoticed.
         var offerColumns = await context.Database.SqlQueryRaw<string>(
             """
             SELECT column_name AS "Value"
@@ -101,12 +104,11 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
             """).ToListAsync();
 
         offerColumns.Should().BeEquivalentTo([
-            "final_price_per_liter",
             "margin_uah_per_liter",
             "min_discount_per_liter",
             "pump_price_per_liter",
             "supplier_price_per_liter"
-        ], "cost, margin, final, pump and the minimum discount - each stored once, on the offer");
+        ], "cost, margin, pump and the minimum discount - inputs only; the price itself is derived");
     }
 
     [Fact]
@@ -248,7 +250,8 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
             StationId = "upg",
             FuelTypeId = "upg-pool",
             DataKind = DataKinds.Real,
-            FinalPricePerLiter = 51m,
+            SupplierPricePerLiter = 49m,
+            MarginUahPerLiter = 2m,   // 49 + 2 = 51, the price this fixture is about
             CreatedAtUtc = now,
             UpdatedAtUtc = now
         });
@@ -259,7 +262,8 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
             StationId = "upg",
             FuelTypeId = "upg-pool",
             DataKind = DataKinds.Qa,
-            FinalPricePerLiter = 1m,
+            SupplierPricePerLiter = 0.5m,
+            MarginUahPerLiter = 0.5m,   // 0.5 + 0.5 = 1: the deliberately absurd rehearsal price
             CreatedAtUtc = now,
             UpdatedAtUtc = now
         });
@@ -452,9 +456,9 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
 
         await context.Database.ExecuteSqlRawAsync(
             """
-            INSERT INTO fuel_offers (id, station_id, fuel_type_id, data_kind, final_price_per_liter,
-                                     created_at_utc, updated_at_utc, is_deleted)
-            VALUES ('arch-offer', 'upg', 'upg-arch', 'real', 60, now(), now(), false)
+            INSERT INTO fuel_offers (id, station_id, fuel_type_id, data_kind, supplier_price_per_liter,
+                                     margin_uah_per_liter, created_at_utc, updated_at_utc, is_deleted)
+            VALUES ('arch-offer', 'upg', 'upg-arch', 'real', 58, 2, now(), now(), false)
             """);
 
         await context.Database.ExecuteSqlRawAsync(
@@ -495,9 +499,9 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
 
         await context.Database.ExecuteSqlRawAsync(
             """
-            INSERT INTO fuel_offers (id, station_id, fuel_type_id, data_kind, final_price_per_liter,
-                                     created_at_utc, updated_at_utc, is_deleted)
-            VALUES ('keep-offer', 'upg', 'upg-keep', 'real', 60, now(), now(), false)
+            INSERT INTO fuel_offers (id, station_id, fuel_type_id, data_kind, supplier_price_per_liter,
+                                     margin_uah_per_liter, created_at_utc, updated_at_utc, is_deleted)
+            VALUES ('keep-offer', 'upg', 'upg-keep', 'real', 58, 2, now(), now(), false)
             """);
 
         await context.Database.ExecuteSqlRawAsync(
@@ -532,7 +536,7 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
         var okko95 = await context.FuelOffers.IgnoreQueryFilters()
             .SingleAsync(o => o.StationId == "okko" && o.FuelTypeId == "okko-95" && o.DataKind == DataKinds.Real);
 
-        okko95.FinalPricePerLiter.Should().Be(51m, "SeedData sets DiscountPrice, and the split carries it");
+        okko95.ComputedFinalPricePerLiter.Should().Be(51m, "SeedData sets DiscountPrice, and the knobs derive it");
         okko95.SupplierPricePerLiter.Should().Be(49m);
         okko95.MarginUahPerLiter.Should().Be(2m);
 
