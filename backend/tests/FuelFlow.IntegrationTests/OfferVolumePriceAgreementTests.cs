@@ -122,11 +122,11 @@ public sealed class OfferVolumePriceAgreementTests : IClassFixture<TestDatabaseF
     }
 
     [Fact]
-    public async Task AnOfferWithNoFinalPrice_IsSkipped_RatherThanReported()
+    public async Task AnOfferWithNoMargin_IsSkipped_RatherThanReported()
     {
-        // `final_price_per_liter` is NULL for the legacy cost-plus rows the pricing migration left
-        // alone. There is no rate to disagree with, and a detector that fired on them would be
-        // crying wolf on the state the system deliberately permits.
+        // A supplier cost with no margin is the state a catalogue-imported fuel nobody has priced yet is
+        // in: the offer exists, and there is no rate to disagree with. A detector that fired on it would
+        // be crying wolf on a state the system deliberately permits.
         await using var context = CreateContext();
         await context.Database.ExecuteSqlRawAsync(
             """
@@ -351,9 +351,12 @@ public sealed class OfferVolumePriceAgreementTests : IClassFixture<TestDatabaseF
         var stationId = station ?? $"drift-stn-{tag}";
 
         var sql = $"""
+            -- Cost 40 + margin 10 = a 50 UAH/l rate, no pump price so the ceiling does not bind. The
+            -- offer stopped storing that rate on 2026-10-17; the detector derives it from these two
+            -- columns, exactly as the storefront and checkout now do.
             INSERT INTO fuel_offers (id, station_id, fuel_type_id, supplier_price_per_liter,
-                final_price_per_liter, created_at_utc, updated_at_utc, is_deleted, data_kind)
-            VALUES ('{offerId}', '{stationId}', 'drift-fuel-{tag}', 40.0000, 50.0000,
+                margin_uah_per_liter, created_at_utc, updated_at_utc, is_deleted, data_kind)
+            VALUES ('{offerId}', '{stationId}', 'drift-fuel-{tag}', 40.0000, 10.0000,
                 now(), now(), false, '{pool}');
 
             INSERT INTO fuel_offer_volumes (id, offer_id, liters, package_price,

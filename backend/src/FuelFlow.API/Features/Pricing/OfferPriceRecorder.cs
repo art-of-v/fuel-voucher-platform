@@ -146,7 +146,10 @@ public sealed class OfferPriceRecorder
             SupplierPricePerLiter = offer.SupplierPricePerLiter,
             MarginUahPerLiter = offer.MarginUahPerLiter,
             MarginPercent = offer.MarginPercent,
-            FinalPricePerLiter = offer.FinalPricePerLiter,
+            // The derived figure, recorded rather than read: the offer stopped storing it on
+            // 2026-10-17, and a history row that left it null would answer "what did this cost?"
+            // with the knobs instead of the number.
+            FinalPricePerLiter = offer.ComputedFinalPricePerLiter,
             PumpPricePerLiter = offer.PumpPricePerLiter,
             MinDiscountPerLiter = offer.MinDiscountPerLiter,
             EffectiveFromUtc = at,
@@ -162,12 +165,18 @@ public sealed class OfferPriceRecorder
     /// Whether the six per-litre facts are the same. Decimal equality, not string equality: the column
     /// is <c>numeric(10,4)</c> and EF hands the entity back whatever precision the round trip kept, so
     /// <c>51.00</c> and <c>51.0000</c> are the same price and must not open a new row.
+    /// <para>
+    /// The comparison includes the derived figure, which is redundant while the knobs match — two
+    /// identical knob sets always derive the same price. It is compared anyway so the row this writes
+    /// and the row it compares against are the same six facts, and so a row written by an older build
+    /// (which recorded the stored column) still compares correctly against a derived one.
+    /// </para>
     /// </summary>
     private static bool SamePrice(FuelOfferPrice previous, FuelOffer offer) =>
         previous.SupplierPricePerLiter == offer.SupplierPricePerLiter
         && previous.MarginUahPerLiter == offer.MarginUahPerLiter
         && previous.MarginPercent == offer.MarginPercent
-        && previous.FinalPricePerLiter == offer.FinalPricePerLiter
+        && previous.FinalPricePerLiter == offer.ComputedFinalPricePerLiter
         && previous.PumpPricePerLiter == offer.PumpPricePerLiter
         && previous.MinDiscountPerLiter == offer.MinDiscountPerLiter;
 }

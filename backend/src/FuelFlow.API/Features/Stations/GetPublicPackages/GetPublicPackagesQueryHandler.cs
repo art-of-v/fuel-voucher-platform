@@ -70,7 +70,12 @@ var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
                 volume.Liters,
                 Price = volume.PackagePrice,
                 offer.PumpPricePerLiter,
-                offer.FinalPricePerLiter,
+                // The four knobs, not the derived price: `fuel_offers` stopped storing the figure on
+                // 2026-10-17, so the customer price is computed below from these. Four nullable columns
+                // cross the wire to the projection; the supplier cost never leaves the database.
+                offer.SupplierPricePerLiter,
+                offer.MarginUahPerLiter,
+                offer.MinDiscountPerLiter,
             })
             .ToListAsync(ct);
 
@@ -89,7 +94,8 @@ var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
                 x.Liters,
                 x.Price,
                 FuelPricing.OriginalPackagePrice(x.PumpPricePerLiter, x.Liters, x.Price),
-                x.FinalPricePerLiter,
+                FuelPricing.FinalPerLiterOrNull(
+                    x.SupplierPricePerLiter, x.MarginUahPerLiter, x.PumpPricePerLiter, x.MinDiscountPerLiter),
                 available.Contains(StockKey.For(x.StationId, x.FuelTypeId, x.Liters))))
             .ToList();
     }

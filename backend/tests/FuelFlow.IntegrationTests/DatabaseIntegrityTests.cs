@@ -210,6 +210,12 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
 
     /// <summary>
     /// The negative-rate guard, which the old table never needed because it had no column for one.
+    /// <para>
+    /// It is aimed at the <b>supplier cost</b> now, not at the derived customer price: until
+    /// <c>DeriveTheOfferFinalPrice</c> (2026-10-17) the CHECK covered <c>final_price_per_liter</c> but
+    /// let a negative cost through, and a negative cost makes every price computed from it negative as
+    /// well. The same migration brought the cost under the constraint.
+    /// </para>
     /// </summary>
     [Fact]
     public async Task A_Negative_Offer_Price_Is_Refused()
@@ -282,18 +288,18 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
         await act.Should().ThrowAsync<DbUpdateException>();
     }
 
-    /// <summary>
+/// <summary>
     /// An offer to hang a volume off. Only the sign-constraint tests need one, so it carries the
-    /// bare minimum the column constraints demand and nothing else — a negative rate is the point.
+    /// bare minimum the column constraints demand and nothing else - a negative cost is the point, and
+    /// the margin rides along so the offer still has a derivable price.
     /// </summary>
-    private static FuelOffer NewOffer(string id, decimal finalPricePerLiter) => new()
+    private static FuelOffer NewOffer(string id, decimal supplierPricePerLiter) => new()
     {
         Id = id,
         StationId = "okko",
         FuelTypeId = "okko-a95",
-        SupplierPricePerLiter = 10m,
+        SupplierPricePerLiter = supplierPricePerLiter,
         MarginUahPerLiter = 1m,
-        FinalPricePerLiter = finalPricePerLiter,
         CreatedAtUtc = DateTime.UtcNow,
         UpdatedAtUtc = DateTime.UtcNow
     };

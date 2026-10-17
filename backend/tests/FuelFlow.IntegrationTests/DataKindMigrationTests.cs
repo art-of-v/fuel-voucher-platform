@@ -205,8 +205,7 @@ public sealed class DataKindMigrationTests : IClassFixture<TestDatabaseFixture>
             StationId = "okko-0001",
             FuelTypeId = "okko-95",
             SupplierPricePerLiter = 50m,
-            MarginUahPerLiter = 5m,
-            FinalPricePerLiter = 55m,
+            MarginUahPerLiter = 5m,   // 50 + 5 = 55 per litre
             IsTestData = isTestData,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow

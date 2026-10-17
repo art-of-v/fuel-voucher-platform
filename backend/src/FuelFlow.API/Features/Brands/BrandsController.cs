@@ -370,7 +370,9 @@ private readonly GetBrandsQueryHandler _getAll;
             SupplierPricePerLiter = request.SupplierPricePerLiter,
             MarginUahPerLiter = request.MarginUahPerLiter,
             MarginPercent = request.MarginPercent,
-            FinalPricePerLiter = finalPerLiter,
+            // No FinalPricePerLiter: the offer stopped storing the derived figure on 2026-10-17.
+            // inalPerLiter above is still used - to price the volumes this creates, and in the audit
+            // payload - so the formula is evaluated once here and never written down.
             PumpPricePerLiter = request.PumpPricePerLiter,
             MinDiscountPerLiter = request.MinDiscountPerLiter,
             DataKind = pool,
@@ -539,7 +541,9 @@ private readonly GetBrandsQueryHandler _getAll;
         var previousOffer = offer ?? otherOffer;
         var oldSupplierPrice = previousOffer?.SupplierPricePerLiter;
         var oldMarginPrice = previousOffer?.MarginUahPerLiter;
-        var oldFinalPrice = previousOffer?.FinalPricePerLiter;
+        // Computed from the offer's own knobs rather than read from a column: the audit payload records
+        // what the customer paid per litre, and that number is still a fact even though nothing stores it.
+        var oldFinalPrice = previousOffer?.ComputedFinalPricePerLiter;
         var oldValue = JsonSerializer.Serialize(new
         {
             fuel.Name,
@@ -559,7 +563,9 @@ private readonly GetBrandsQueryHandler _getAll;
         offer.MarginPercent = request.MarginPercent;
         offer.PumpPricePerLiter = request.PumpPricePerLiter;
         offer.MinDiscountPerLiter = request.MinDiscountPerLiter;
-        offer.FinalPricePerLiter = finalPerLiter;
+        // offer.FinalPricePerLiter = finalPerLiter used to live here. The customer price is
+        // min(cost + profit, pump - minDiscount) over the four lines above, so writing it down beside
+        // them was a second copy of the same number - and one the audit trail then compared against.
         offer.UpdatedAtUtc = DateTime.UtcNow;
 
         foreach (var volume in volumes)

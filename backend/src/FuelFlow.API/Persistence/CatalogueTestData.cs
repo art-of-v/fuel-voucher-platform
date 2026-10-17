@@ -31,6 +31,10 @@ internal static class CatalogueTestData
     /// for it. Returning the volume and letting the caller's <c>AddRange</c> do the adding keeps every
     /// such call site untouched - which matters, because rewriting a dozen <c>AddRange</c> blocks by
     /// hand is how fixtures quietly lose an argument.
+    /// <para>
+    /// <c>finalPricePerLiter</c> is a check rather than a setting, since 2026-10-17 — see the throw at
+    /// the bottom of this method.
+    /// </para>
     /// </remarks>
     public static FuelOffer SeedOffer(
         this ApplicationDbContext context,
@@ -70,9 +74,25 @@ internal static class CatalogueTestData
         if (supplierPricePerLiter is not null) offer.SupplierPricePerLiter = supplierPricePerLiter;
         if (marginUahPerLiter is not null) offer.MarginUahPerLiter = marginUahPerLiter;
         if (marginPercent is not null) offer.MarginPercent = marginPercent;
-        if (finalPricePerLiter is not null) offer.FinalPricePerLiter = finalPricePerLiter;
         if (pumpPricePerLiter is not null) offer.PumpPricePerLiter = pumpPricePerLiter;
         if (minDiscountPerLiter is not null) offer.MinDiscountPerLiter = minDiscountPerLiter;
+
+        // `finalPricePerLiter` no longer configures anything — the offer stopped storing the derived
+        // figure on 2026-10-17 — so it is checked against the formula instead of being written. Every
+        // call site that passes it keeps working, and a fixture that asserted a price its own knobs do
+        // not produce now fails here, at the fixture, with the two numbers in the message, rather than
+        // three assertions later as an unexplained price on the storefront.
+        if (finalPricePerLiter is not null)
+        {
+            var computed = offer.ComputedFinalPricePerLiter;
+            if (computed != finalPricePerLiter)
+            {
+                throw new InvalidOperationException(
+                    $"SeedOffer({offer.Id}): finalPricePerLiter {finalPricePerLiter} does not match what the "
+                    + $"knobs produce ({computed?.ToString() ?? "null - no cost or no margin"}). Pass cost and "
+                    + "margin that yield the price the test needs.");
+            }
+        }
 
         return offer;
     }

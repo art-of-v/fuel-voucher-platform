@@ -57,10 +57,34 @@ public sealed class FuelOffer
     public string FuelTypeId { get; set; } = null!;
 
     // Per-litre pricing. One copy per offer — this is the whole point of the table.
+    //
+    // Inputs only, since 2026-10-17: `final_price_per_liter` is gone, because it was
+    // `min(cost + profit, pump − minDiscount)` written down next to the three columns it is
+    // computed from, and every write path computed it exactly that way before storing it.
+    // Measured on production the day it was dropped: 25/25 live offers agreed with the
+    // arithmetic, and the only two write paths that could have made the stored copy differ
+    // were the two that took a final price from the request body and wrote whatever the caller
+    // sent — which is not a price, it is a request. Reads call
+    // `FuelPricing.FinalPerLiterOrNull`, or the [NotMapped] property below.
     public decimal? SupplierPricePerLiter { get; set; }   // cost/л (собівартість)
     public decimal? MarginUahPerLiter { get; set; }       // profit/л (заробіток)
     public decimal? MarginPercent { get; set; }
-    public decimal? FinalPricePerLiter { get; set; }      // computed: see FuelPricing.FinalPerLiter
+
+    /// <summary>
+    /// The customer price per litre this offer's knobs produce, or <c>null</c> while no cost or no
+    /// margin is recorded. Not a column and not a stored value: this is
+    /// <see cref="FuelPricing.FinalPerLiterOrNull"/> over the four properties above, spelled as a
+    /// property so a read path cannot get the argument order wrong.
+    /// <para>
+    /// <b>In memory only.</b> It cannot be translated into SQL, so a LINQ projection has to select
+    /// the four columns and compute after materialising — which is what every handler reading it
+    /// does.
+    /// </para>
+    /// </summary>
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public decimal? ComputedFinalPricePerLiter =>
+        FuelPricing.FinalPerLiterOrNull(
+            SupplierPricePerLiter, MarginUahPerLiter, PumpPricePerLiter, MinDiscountPerLiter);
 
     // Slice 1a pricing knobs. Pump (колонка) is the ceiling; MinDiscount is the
     // guaranteed gap under it. final = min(cost + profit, pump − minDiscount).

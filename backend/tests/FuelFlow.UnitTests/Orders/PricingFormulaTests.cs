@@ -11,6 +11,52 @@ namespace FuelFlow.UnitTests.Orders;
 /// </summary>
 public sealed class PricingFormulaTests
 {
+    // --- FuelPricing.FinalPerLiterOrNull -----------------------------------
+    //
+    // The nullable wrapper, which is what every read path calls now that the offer carries no stored
+    // final price. Its contract has two halves and the second is the one that matters: "no price" is
+    // null, not a number built from whatever happens to be present.
+
+    [Theory]
+    [InlineData(null, 2.0, null)]
+    [InlineData(49.0, null, null)]
+    [InlineData(null, null, null)]
+    public void FinalPerLiterOrNull_NoCostOrNoMargin_IsNotAPrice(double? cost, double? margin, double? pump)
+    {
+        var result = FuelPricing.FinalPerLiterOrNull(
+            cost is null ? null : (decimal)cost.Value,
+            margin is null ? null : (decimal)margin.Value,
+            pump is null ? null : (decimal)pump.Value,
+            0m);
+
+        // Treating a missing margin as zero would publish a fuel for free; treating a missing cost as
+        // zero would let the below-cost guard see a cost of zero and wave the sale through.
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public void FinalPerLiterOrNull_Complete_ComputesTheSameAsTheFormula()
+    {
+        // cost-plus, and the same inputs through the non-nullable overload: the wrapper decides whether
+        // there is a price, it does not have its own arithmetic.
+        FuelPricing.FinalPerLiterOrNull(49m, 2m, 55m, 0.5m)
+            .Should().Be(FuelPricing.FinalPerLiter(49m, 2m, 55m, 0.5m));
+
+        // Ceiling binding: 49 + 2 = 51 against 55 - 4 = 51 is equal here, so use a binding case.
+        FuelPricing.FinalPerLiterOrNull(49m, 2m, 50m, 0m)
+            .Should().Be(50m);
+    }
+
+    [Fact]
+    public void FinalPerLiterOrNull_WithoutAPump_FallsBackToCostPlus()
+    {
+        FuelPricing.FinalPerLiterOrNull(49m, 2m, null, 0m).Should().Be(51m);
+
+        // And a missing min-discount is zero, not an error: the column is nullable and a fuel priced
+        // before discounts existed has none.
+        FuelPricing.FinalPerLiterOrNull(49m, 2m, null, null).Should().Be(51m);
+    }
+
     // --- FuelPricing.FinalPerLiter -----------------------------------------
 
     [Fact]
@@ -112,7 +158,8 @@ public sealed class PricingFormulaTests
             MarginUahPerLiter = 7m,          // profit → cost-plus 56
             PumpPricePerLiter = 55m,
             MinDiscountPerLiter = 0.5m,      // ceiling 54.5 binds
-            FinalPricePerLiter = 56m,        // stale stored final must be ignored
+            // No stale stored final to ignore any more: the offer stopped carrying one on 2026-10-17.
+            // What this pins is that the knobs, and only the knobs, decide the charge.
         };
 
         // 54.5 * 10 = 545
@@ -120,30 +167,32 @@ public sealed class PricingFormulaTests
     }
 
     [Fact]
-    public void PackagePrice_NullKnobs_FallsBackToStoredFinal()
+    public void PackagePrice_NoKnobs_FallsBackToTheVolumesOwnPrice()
     {
         var pkg = new SellablePackage
         {
-
-            Liters = 10m, PackagePrice = 9999,
+            Liters = 10m,
+            // The volume's own figure. It used to be a frozen price kept in step by hand; it is now
+            // the per-nominal override, and this is the one case it serves: an offer nobody has priced.
+            PackagePrice = 510,
             SupplierPricePerLiter = null,
             MarginUahPerLiter = null,
-            FinalPricePerLiter = 51m,
         };
 
+        // Before 2026-10-17 there was a stored per-litre figure to fall back to when the knobs were
+        // incomplete. There is none, and 9999 must not come back as a charge: an offer with no cost and
+        // no margin has no rate of its own, so the volume's figure is the only number that exists.
         ServerPricing.PackagePrice(pkg, 10m).Should().Be(510);
     }
 
     [Fact]
-    public void PackagePrice_NoPerLiterData_UsesFrozenPrice()
+    public void PackagePrice_NoPerLiterData_UsesTheVolumesOwnPrice()
     {
         var pkg = new SellablePackage
         {
-
             Liters = 10m, PackagePrice = 510,
             SupplierPricePerLiter = null,
             MarginUahPerLiter = null,
-            FinalPricePerLiter = null,
         };
 
         ServerPricing.PackagePrice(pkg, 10m).Should().Be(510);
@@ -167,7 +216,6 @@ public sealed class PricingFormulaTests
             PackagePrice = 590m,                    // package TOTAL — a different unit entirely
             SupplierPricePerLiter = 54m,     // per-litre cost
             MarginUahPerLiter = null,        // ...and no per-litre price to be derived from
-            FinalPricePerLiter = null,
             PumpPricePerLiter = 92.90m,
         };
 
@@ -213,7 +261,6 @@ public sealed class PricingFormulaTests
             Liters = 10m,
             SupplierPricePerLiter = cost is null ? null : (decimal)cost.Value,
             MarginUahPerLiter = 2m,
-            FinalPricePerLiter = 52m,
         };
 
         ServerPricing.TryGetBelowCostVerdict(pkg, 0m)

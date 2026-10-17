@@ -171,6 +171,9 @@ public sealed class BrandsControllerTests : IDisposable
             Name = name,
             SupplierPricePerLiter = supplier,
             MarginUahPerLiter = margin,
+            // Still sent by the admin panel, and still on the request shape, but no longer written
+            // anywhere: the offer derives the customer price from cost and margin. Kept here so the
+            // tests keep describing the request the panel actually sends.
             FinalPricePerLiter = final,
             PackageLiters = packageLiters.ToList(),
             // Stated, not defaulted - see BelowCostCreate.
@@ -213,7 +216,7 @@ public sealed class BrandsControllerTests : IDisposable
         liters.Should().Equal(2, 3, 5, 10, 20, 50);
 
         var offer = await _context.FuelOffers.SingleAsync(o => o.FuelTypeId == fuel.Id);
-        offer.FinalPricePerLiter.Should().Be(100.5m);
+        offer.ComputedFinalPricePerLiter.Should().Be(100.5m);
     }
 
     [Fact]
@@ -295,7 +298,7 @@ public sealed class BrandsControllerTests : IDisposable
         liters.Should().Equal(2, 3, 5, 10, 20, 50);
 
         var offer = await _context.FuelOffers.SingleAsync(o => o.FuelTypeId == "test-fuel-ttt");
-        offer.FinalPricePerLiter.Should().Be(100.5m);
+        offer.ComputedFinalPricePerLiter.Should().Be(100.5m);
     }
 
     [Fact]
@@ -352,7 +355,7 @@ public sealed class BrandsControllerTests : IDisposable
         result.Should().BeOfType<OkObjectResult>();
 
         var offer = await _context.FuelOffers.SingleAsync(o => o.FuelTypeId == "test-fuel-a");
-        offer.FinalPricePerLiter.Should().Be(63m);
+        offer.ComputedFinalPricePerLiter.Should().Be(63m);
         offer.SupplierPricePerLiter.Should().Be(60m);
 
         // The frozen package total is restated on every volume from the new per-litre price. Asserting
@@ -441,7 +444,7 @@ public sealed class BrandsControllerTests : IDisposable
         result.Should().BeOfType<OkObjectResult>();
 
         var offer = await _context.FuelOffers.SingleAsync(o => o.FuelTypeId == "test-fuel-a");
-        offer.FinalPricePerLiter.Should().Be(51m);
+        offer.ComputedFinalPricePerLiter.Should().Be(51m);
         offer.SupplierPricePerLiter.Should().Be(49m);
         offer.MarginUahPerLiter.Should().Be(2m);
 
@@ -501,7 +504,7 @@ public sealed class BrandsControllerTests : IDisposable
         var fuel = await _context.FuelTypes.SingleAsync(f => f.StationId == "test-okko");
         fuel.AllowBelowCost.Should().BeTrue();
         var pricedOffer = await _context.FuelOffers.SingleAsync(o => o.FuelTypeId == fuel.Id);
-        pricedOffer.FinalPricePerLiter.Should().Be(48.5m);   // min(cost 50 + margin 2, pump 49 − minDisc 0.5)
+        pricedOffer.ComputedFinalPricePerLiter.Should().Be(48.5m);   // min(cost 50 + margin 2, pump 49 − minDisc 0.5)
 
         alerts.Verify(a => a.SendAsync(
             AlertSeverity.Warning, It.IsAny<string>(), It.IsAny<string>(),
@@ -525,7 +528,7 @@ public sealed class BrandsControllerTests : IDisposable
         JsonSerializer.Serialize(bad.Value).Should().Contain("below_cost");
 
         var offer = await _context.FuelOffers.SingleAsync(o => o.FuelTypeId == "test-fuel-a");
-        offer.FinalPricePerLiter.Should().Be(51m);
+        offer.ComputedFinalPricePerLiter.Should().Be(51m);
         var fuel = await _context.FuelTypes.SingleAsync(f => f.Id == "test-fuel-a");
         fuel.AllowBelowCost.Should().BeFalse();
     }
@@ -547,7 +550,7 @@ public sealed class BrandsControllerTests : IDisposable
         result.Should().BeOfType<OkObjectResult>();
 
         var offer = await _context.FuelOffers.SingleAsync(o => o.FuelTypeId == "test-fuel-a");
-        offer.FinalPricePerLiter.Should().Be(48.5m);
+        offer.ComputedFinalPricePerLiter.Should().Be(48.5m);
         var fuel = await _context.FuelTypes.SingleAsync(f => f.Id == "test-fuel-a");
         fuel.AllowBelowCost.Should().BeTrue();
 

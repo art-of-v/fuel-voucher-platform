@@ -76,8 +76,7 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
                 marginUahPerLiter: profit,
                 marginPercent: 10m,
                 pumpPricePerLiter: pump,
-                minDiscountPerLiter: 1m,
-                finalPricePerLiter: cost + profit);
+                minDiscountPerLiter: 1m);
         }
     }
 
@@ -136,7 +135,7 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
         a95.Should().HaveCount(3);
         offer.PumpPricePerLiter.Should().Be(92.90m);
         // cost 54 + profit 5 = 59, under the 92.90 - 1 = 91.90 ceiling.
-        offer.FinalPricePerLiter.Should().Be(59m);
+        offer.ComputedFinalPricePerLiter.Should().Be(59m);
         foreach (var volume in a95)
         {
             volume.PackagePrice.Should().Be(Math.Round(59m * volume.Liters, 2, MidpointRounding.AwayFromZero));
@@ -192,7 +191,7 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
 
 var (volume, offer) = await ReadAsync("okko-95-20");
         offer.PumpPricePerLiter.Should().Be(57m);
-        offer.FinalPricePerLiter.Should().Be(56m);
+        offer.ComputedFinalPricePerLiter.Should().Be(56m);
         volume.PackagePrice.Should().Be(1120m);
         // The struck "??" price is pump x litres, recomputed from the offer rather than read from a
         // stored column - which is what stops a stale copy from leaking a supplier cost.
@@ -396,7 +395,9 @@ var (wogVolume, wogOffer) = await ReadAsync("wog-95-20");
         {
             var offer = await _context.FuelOffers.FirstAsync(o => o.Id == price.OfferId);
             price.PumpPricePerLiter.Should().Be(offer.PumpPricePerLiter);
-            price.FinalPricePerLiter.Should().Be(offer.FinalPricePerLiter);
+            // The recorded figure is the derived one: the history stores what the customer paid, not the
+            // inputs it came from, which is the whole reason the column exists.
+            price.FinalPricePerLiter.Should().Be(offer.ComputedFinalPricePerLiter);
             price.SupplierPricePerLiter.Should().Be(offer.SupplierPricePerLiter);
         }
     }
