@@ -1,4 +1,6 @@
 using FuelFlow.Features.Settings;
+using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -133,8 +135,39 @@ public class ExpiredVoucherLossService
             var now = DateTime.UtcNow;
             foreach (var v in batch)
             {
+                // Read the status BEFORE the flip. The candidate set spans three values (Imported /
+                // VerifiedWithWarnings / Available), so from_status has to say which one this voucher
+                // actually was - a constant would tell the history that every stock expiry started at
+                // Available, which is false for imported-but-never-activated stock.
+                var fromStatus = v.Status;
+
                 v.Status = VoucherStatus.Expired;
                 v.UpdatedAtUtc = now;
+
+                // D-13, and the first writer with no person behind it. Every other D-13 action is a
+                // consequence of an order somebody placed, so `user` was the only honest value available.
+                // A nightly sweep has nobody to name, and 'system' is precisely why that second value
+                // exists: an author an operator can read rather than a blank. The CHECK admits it only
+                // with a NULL id, which is exactly what a scheduler has.
+                //
+                // An event and not a movement, because nothing changed place. The voucher is still the
+                // operator's paper - it has been written off as a loss. A custody row would put it
+                // somewhere it never went.
+                _context.VoucherEvents.Add(new VoucherEvent
+                {
+                    Id = Guid.CreateVersion7(),
+                    VoucherId = v.Id,
+                    EventType = VoucherEventTypes.StatusChanged,
+                    FromStatus = fromStatus.ToString(),
+                    ToStatus = nameof(VoucherStatus.Expired),
+                    ActorKind = VoucherActorKinds.System,
+                    ActorUserId = null,
+                    // The grace window is why this happened today and not on the printed date, and that
+                    // is the first question anyone asks about a write-off. Answered on the row rather
+                    // than in the log, which nobody reads twice.
+                    Reason = $"expired unsold, retired by the nightly loss sweep (grace {graceDays}d)",
+                    OccurredAtUtc = now
+                });
             }
 
             await _context.SaveChangesAsync(cancellationToken);
