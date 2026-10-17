@@ -88,6 +88,41 @@ public sealed class OkkoPriceClientTests
     }
 
     [Fact]
+    public async Task FetchAsync_ShouldCarryTheBrandsOwnLabel_ForTheFuelItCreates()
+    {
+        // The catalogue import names a fuel it creates the way OKKO names it, and the endpoint it is
+        // pointed at is the Ukrainian one - so the label is data, not decoration. It travels beside the
+        // code and never replaces it.
+        var prices = await Client(new StubHandler(_ => Json(OkkoApiSample.Json))).FetchAsync();
+
+        var diesel = prices.Single(p => p.SiteFuelCode == "Pulls Diesel");
+        diesel.FuelName.Should().Be("ДП", "the label OKKO renders for this code in the Ukrainian locale");
+        diesel.SiteFuelCode.Should().Be("Pulls Diesel", "the code stays the identity; the label is a name");
+
+        prices.Should().OnlyContain(p => p.FuelName != null, "the payload carries a title beside every price");
+    }
+
+    [Fact]
+    public async Task FetchAsync_ShouldCollapsePaddingInALabel_AndTolerateItsAbsence()
+    {
+        // Titles arrive padded when read out of the payload, and a name with runs of spaces is a name
+        // nobody typed. A payload without titles still yields prices: pricing does not need a label,
+        // and only the catalogue import degrades.
+        var padded = """
+        { "items": [ { "title": "  ДП   ЄВРО ", "price": "102.90", "fuel_code": "DP" } ] }
+        """;
+        var withTitle = (await prices(padded)).Single();
+        withTitle.FuelName.Should().Be("ДП ЄВРО");
+
+        var bare = (await prices("""{ "items": [ { "price": "102.90", "fuel_code": "DP" } ] }""")).Single();
+        bare.FuelName.Should().BeNull();
+        bare.PricePerLiter.Should().Be(102.90m);
+    }
+
+    private static async Task<IReadOnlyList<OkkoPumpPrice>> prices(string json)
+        => await Client(new StubHandler(_ => Json(json))).FetchAsync();
+
+    [Fact]
     public async Task FetchAsync_ShouldFindPrices_WhereverTheySitInTheTree()
     {
         // Same rows, buried under unrelated nesting and repeated components: the walk keys off the

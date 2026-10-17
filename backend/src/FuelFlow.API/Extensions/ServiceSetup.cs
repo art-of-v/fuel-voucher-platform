@@ -2,6 +2,7 @@ using FuelFlow.API.BackgroundJobs;
 using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.BackgroundJobs;
+using FuelFlow.Features.Pricing.ImportOkkoCatalogue;
 using FuelFlow.Features.Pricing.ScrapeOkkoPrices;
 using FuelFlow.Features.Admin.GetReconciliation;
 using FuelFlow.Features.Auth.AdminLogin;
@@ -461,6 +462,9 @@ services.AddScoped<TermQuoteQueryHandler>();
         services.AddScoped<ExpiredVoucherLossService>();
         services.AddScoped<RuntimeSettingsService>();
         services.AddScoped<OkkoPriceSyncService>();
+        // The catalogue half of the same fetch: creates the fuels OKKO sells that we do not carry yet,
+        // and nothing else. Registered beside the sync because it is only ever called by it.
+        services.AddScoped<ImportOkkoCatalogueCommandHandler>();
     }
 
     private static void AddUpdateServices(IServiceCollection services)

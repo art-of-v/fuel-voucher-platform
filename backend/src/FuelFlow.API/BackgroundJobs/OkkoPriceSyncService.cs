@@ -1,3 +1,4 @@
+using FuelFlow.Features.Pricing.ImportOkkoCatalogue;
 using FuelFlow.Features.Pricing.ImportOkkoPumpPrices;
 using FuelFlow.Features.Pricing.ScrapeOkkoPrices;
 using FuelFlow.SharedKernel.Options;
@@ -32,17 +33,20 @@ public sealed class OkkoPriceSyncService
 
     private readonly IOkkoPriceClient _client;
     private readonly ImportOkkoPumpPricesCommandHandler _import;
+    private readonly ImportOkkoCatalogueCommandHandler _catalogue;
     private readonly OkkoPriceOptions _options;
     private readonly ILogger<OkkoPriceSyncService> _logger;
 
     public OkkoPriceSyncService(
         IOkkoPriceClient client,
         ImportOkkoPumpPricesCommandHandler import,
+        ImportOkkoCatalogueCommandHandler catalogue,
         IOptions<OkkoPriceOptions> options,
         ILogger<OkkoPriceSyncService> logger)
     {
         _client = client;
         _import = import;
+        _catalogue = catalogue;
         _options = options.Value;
         _logger = logger;
     }
@@ -67,6 +71,39 @@ public sealed class OkkoPriceSyncService
             _logger.LogError(
                 ex, "OKKO price sync failed to fetch prices; keeping the last known pump prices");
             return;
+        }
+
+        // Before pricing, because a fuel that does not exist yet cannot be priced: the pump has
+        // nowhere to live until the fuel does. Its own try/catch because a catalogue failure must not
+        // cost us today's prices - the two write disjoint columns.
+        try
+        {
+            var catalogue = await _catalogue.ApplyAsync(
+                new ImportOkkoCatalogueCommand(prices, DryRun: false),
+                Guid.Empty, SyncActorName, cancellationToken);
+
+            if (catalogue.Created > 0)
+            {
+                // Information, not Debug: the catalogue grew and nobody typed it. Each created fuel also
+                // carries a FuelCreatedByImport audit row, so this is the second place it is recorded.
+                _logger.LogInformation(
+                    "OKKO sync added {Count} fuel(s) the catalogue did not have: {Fuels}. They are on no "
+                    + "offer for sale until a margin is set - each is created with the published pump "
+                    + "price only.",
+                    catalogue.Created, string.Join(", ", catalogue.CreatedFuels.Select(f => $"{f.Name} [{f.BrandFuelCode}]")));
+            }
+
+            if (catalogue.UnnamedSiteFuels.Count > 0)
+            {
+                _logger.LogWarning(
+                    "OKKO published {Count} grade(s) we recognise but could not name, because the "
+                    + "payload carried no label: {Codes}. Nothing was created for them.",
+                    catalogue.UnnamedSiteFuels.Count, string.Join(", ", catalogue.UnnamedSiteFuels));
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "OKKO sync failed to add missing fuels; prices are still applied");
         }
 
         OkkoPumpApplyResult result;

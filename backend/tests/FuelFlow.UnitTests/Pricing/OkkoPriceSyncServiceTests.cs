@@ -1,6 +1,7 @@
 using FluentAssertions;
 using FuelFlow.BackgroundJobs;
 using FuelFlow.Features.Orders.CreateCheckout;
+using FuelFlow.Features.Pricing.ImportOkkoCatalogue;
 using FuelFlow.Features.Pricing.ImportOkkoPumpPrices;
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Pricing.ScrapeOkkoPrices;
@@ -68,6 +69,7 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
         => new(
             client,
             new ImportOkkoPumpPricesCommandHandler(_context, _events),
+            new ImportOkkoCatalogueCommandHandler(_context, _events),
             Options.Create(new OkkoPriceOptions { Enabled = enabled }),
             logger ?? NullLogger<OkkoPriceSyncService>.Instance);
 
@@ -252,6 +254,61 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
         result.FuelsChanged.Should().Be(1);
         _context.ChangeTracker.Clear();
         (await OfferOfAsync("okko-gas-50"))            .PumpPricePerLiter.Should().Be(47.90m);
+    }
+
+    [Fact]
+    public async Task Sync_ShouldAddAGradeTheCatalogueLacks_BeforeItPricesAnything()
+    {
+        // The ordering is the contract: a fuel that does not exist yet has nowhere to hold a pump
+        // price, so the catalogue half runs first and the pricing half then sees the new fuel. One pass
+        // has to leave the catalogue complete AND priced, or a grade sits unpriced until the next run.
+        _context.Stations.Add(new Station { Id = "okko", Name = "OKKO", Color = "#000", LogoText = "OKKO" });
+        _context.FuelTypes.Add(new FuelTypeEntity
+        {
+            Id = "okko-95", Name = "A-95", StationId = "okko", BrandFuelCode = "A-95",
+            BasePrice = 54, DiscountPrice = 51
+        });
+        await _context.SaveChangesAsync();
+        _context.ChangeTracker.Clear();
+
+        var sheet = new[]
+        {
+            new OkkoPumpPrice("A-95", 92.90m, "А-95"),   // known already
+            new OkkoPumpPrice("DP", 99.90m, "ДП ЄВРО")  // new: the catalogue has no diesel
+        };
+
+        await Service(new StubClient(() => sheet), enabled: true).SyncPricesAsync();
+        _context.ChangeTracker.Clear();
+
+        var created = await _context.FuelTypes.SingleAsync(f => f.BrandFuelCode == "DP");
+        created.Name.Should().Be("ДП ЄВРО");
+
+        // The new fuel's offer carries the published pump and nothing else, and stays off sale: no
+        // volumes, no cost, no margin. It waits for an operator rather than going live at zero.
+        var offer = await _context.FuelOffers.SingleAsync(o => o.FuelTypeId == created.Id);
+        offer.PumpPricePerLiter.Should().Be(99.90m);
+        offer.SupplierPricePerLiter.Should().BeNull();
+        offer.MarginUahPerLiter.Should().BeNull();
+        (await _context.FuelOfferVolumes.CountAsync(v => v.OfferId == offer.Id)).Should().Be(0);
+
+        // And the fuel that already existed was priced, not recreated.
+        (await _context.FuelTypes.CountAsync(f => f.StationId == "okko")).Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Sync_ShouldNotCreateAnything_WhenTheFetchFails()
+    {
+        // The failure policy the price side already had, extended to the catalogue: a fetch that fails
+        // must not be able to change what we sell, and must not be able to empty the catalogue either.
+        await SeedAsync(pump: 50m);
+        var before = await _context.FuelTypes.CountAsync();
+
+        var service = Service(
+            new StubClient(() => throw new OkkoPriceScrapeException("layout changed")), enabled: true);
+
+        await service.SyncPricesAsync();
+
+        (await _context.FuelTypes.CountAsync()).Should().Be(before, "a fetch that failed must not change the catalogue");
     }
 
     [Fact]
