@@ -65,6 +65,7 @@ using FuelFlow.Features.Vouchers.BulkActionVouchers;
 using FuelFlow.Features.Vouchers.DeleteVoucher;
 using FuelFlow.Features.Vouchers.Exchange;
 using FuelFlow.Features.Vouchers.GetAdminVoucherById;
+using FuelFlow.Features.Vouchers.GetAdminVoucherLifecycle;
 using FuelFlow.Features.Vouchers.GetAdminVouchers;
 using FuelFlow.Features.Vouchers.GetImportBatches;
 using FuelFlow.Features.Vouchers.GetUserVouchers;
@@ -209,6 +210,10 @@ internal static class ServiceSetup
         // every exchange and read by none.
         services.AddScoped<GetVoucherExchangeBatchesQueryHandler>();
         services.AddScoped<GetVoucherExchangeBatchQueryHandler>();
+
+        // The reader D-13 was built for (VOUCHER_LIFECYCLE.md slice 2): one voucher, whole. The ledger
+        // tables have nineteen writers and, until this, no reader at all.
+        services.AddScoped<GetAdminVoucherLifecycleQueryHandler>();
         services.AddScoped<ConfirmVoucherExchangeCommandHandler>();
     }
 

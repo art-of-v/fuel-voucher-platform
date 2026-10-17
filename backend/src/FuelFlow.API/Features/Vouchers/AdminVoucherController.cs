@@ -2,6 +2,7 @@ using System.Security.Claims;
 using FuelFlow.Features.Vouchers.BulkActionVouchers;
 using FuelFlow.Features.Vouchers.DeleteVoucher;
 using FuelFlow.Features.Vouchers.GetAdminVoucherById;
+using FuelFlow.Features.Vouchers.GetAdminVoucherLifecycle;
 using FuelFlow.Features.Vouchers.GetAdminVouchers;
 using FuelFlow.Features.Vouchers.GetVoucherVerification;
 using FuelFlow.Features.Vouchers.UnblockVoucher;
@@ -25,6 +26,7 @@ public sealed class AdminVoucherController : ControllerBase
     private readonly DeleteVoucherCommandHandler _deleteHandler;
     private readonly BulkActionVouchersCommandHandler _bulkActionHandler;
     private readonly UnarchiveVoucherCommandHandler _unarchiveHandler;
+    private readonly GetAdminVoucherLifecycleQueryHandler _lifecycleHandler;
 
     public AdminVoucherController(
         GetAdminVouchersQueryHandler getAllHandler,
@@ -34,7 +36,8 @@ public sealed class AdminVoucherController : ControllerBase
         UpdateVoucherCommandHandler updateHandler,
         DeleteVoucherCommandHandler deleteHandler,
         BulkActionVouchersCommandHandler bulkActionHandler,
-        UnarchiveVoucherCommandHandler unarchiveHandler)
+        UnarchiveVoucherCommandHandler unarchiveHandler,
+        GetAdminVoucherLifecycleQueryHandler lifecycleHandler)
     {
         _getAllHandler = getAllHandler;
         _getByIdHandler = getByIdHandler;
@@ -169,6 +172,30 @@ public sealed class AdminVoucherController : ControllerBase
 
         return Ok(result);
     }
+
+    /// <summary>
+    /// One voucher, whole: the paper's custody, everything done to it, and the paid renewals in its
+    /// lineage, in one time-ordered list.
+    /// </summary>
+    /// <remarks>
+    /// The reader D-13 was built for. Nineteen writers record every handover and transition and until
+    /// now nothing could open them, so "when did this voucher become sellable and who said so" had no
+    /// answer for any voucher in the system.
+    /// <para>
+    /// An archived voucher returns 200 with <c>isArchived</c> set rather than 404: the archive flag is
+    /// itself part of the record and has its own event in the timeline, and the one voucher an operator
+    /// most wants to look up is the one somebody archived.
+    /// </para>
+    /// </remarks>
+    [HttpGet("{id:guid}/lifecycle")]
+    [ProducesResponseType(typeof(VoucherLifecycleResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetLifecycle(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _lifecycleHandler.HandleAsync(new GetAdminVoucherLifecycleQuery(id), cancellationToken);
+        return result is null ? NotFound() : Ok(result);
+    }
+
     /// <summary>
     /// The authenticated admin's id, or <c>null</c> when the token carries none.
     /// </summary>
