@@ -664,7 +664,7 @@ var actingUserId = Guid.NewGuid();
     private static async Task ResetDataAsync(ApplicationDbContext context)
     {
         await context.Database.ExecuteSqlRawAsync(
-            """TRUNCATE TABLE "voucher_exchanges", "movement_batches", "purchase_batches", "voucher_imports", "fulfillments", "voucher_renewal_items", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "suppliers", "users", "provider_event_outbox" RESTART IDENTITY CASCADE""");
+            """TRUNCATE TABLE "voucher_exchanges", "movement_batches", "purchase_batches", "voucher_imports", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "suppliers", "users", "provider_event_outbox" RESTART IDENTITY CASCADE""");
     }
 
     private ApplicationDbContext CreateContext()

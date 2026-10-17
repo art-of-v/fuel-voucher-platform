@@ -62,13 +62,17 @@ public class DeletedUnpaidOrderCleanupService
         // row would abort the whole batch (and be re-selected every night, so the job would never
         // drain again). An order that delivered fuel is never really abandoned - leave it.
         //
-        // The refunds and renewal-items guards exist for exactly the same reason, and were added
-        // alongside making those two FKs RESTRICT. A refunded order is not an abandoned checkout:
-        // money went out, and "we paid this back, for this, under this order" is answerable only
-        // from the refund row. The status predicate already excludes them today - a refund flips the
-        // order to PartiallyRefunded/Refunded, never Cancelled - so these clauses are not load-bearing
-        // today. They are there so that if that ever stops being true, the job skips the order
-        // instead of the database refusing the delete and wedging the whole cleanup.
+        // The refunds guard exists for the same reason, and was added alongside making that FK RESTRICT. A
+        // refunded order is not an abandoned checkout: money went out, and "we paid this back, for
+        // this, under this order" is answerable only from the refund row. The status predicate already
+        // excludes them today - a refund flips the order to PartiallyRefunded/Refunded, never Cancelled -
+        // so this clause is not load-bearing today. It is there so that if that ever stops being true,
+        // the job skips the order instead of the database refusing the delete and wedging the cleanup.
+        //
+        // There is deliberately no renewal guard any more. It used to be "this order has renewal items",
+        // which was the job asking the database whether it could delete the row. The database now says
+        // no on its own - order_line_items.order_id is RESTRICT - so the guard was removed and the
+        // explicit line removal below is what this job adapts to instead.
         var abandoned = await _context.Orders
             .IgnoreQueryFilters()
             .AsTracking()
@@ -79,7 +83,6 @@ public class DeletedUnpaidOrderCleanupService
             .Where(o => !_context.FuelVouchers.IgnoreQueryFilters().Any(v => v.OrderId == o.Id))
             .Where(o => !_context.Payments.IgnoreQueryFilters()
                 .Any(p => p.OrderId == o.Id && p.Kind == PaymentKind.Refund))
-            .Where(o => !_context.VoucherRenewalItems.IgnoreQueryFilters().Any(i => i.OrderId == o.Id))
             .OrderBy(o => o.UpdatedAtUtc)
             .Take(BatchSize)
             .ToListAsync(cancellationToken);

@@ -54,11 +54,11 @@ UNION ALL
 SELECT id, 'referenced by a fulfilment' FROM fuel_vouchers
 WHERE id IN (SELECT voucher_id FROM fulfillments)
 UNION ALL
-SELECT id, 'referenced by a renewal' FROM fuel_vouchers
-WHERE id IN (SELECT source_voucher_id FROM voucher_renewal_items)
+SELECT id, 'renewed by an order line' FROM fuel_vouchers
+WHERE id IN (SELECT source_voucher_id FROM order_line_items WHERE source_voucher_id IS NOT NULL)
 UNION ALL
 SELECT id, 'serves as a renewal result' FROM fuel_vouchers
-WHERE id IN (SELECT fulfilled_voucher_id FROM voucher_renewal_items WHERE fulfilled_voucher_id IS NOT NULL)
+WHERE id IN (SELECT voucher_id FROM fulfillments WHERE line_item_id IS NOT NULL)
 UNION ALL
 SELECT id, 'referenced by a supplier exchange' FROM fuel_vouchers
 WHERE id IN (SELECT old_voucher_id FROM voucher_exchanges)
@@ -117,15 +117,17 @@ LIMIT 200;
   \echo '################ APPLYING ################'
 BEGIN;
 
--- Unhook first. `fuel_vouchers` is referenced with ON DELETE RESTRICT from four places, so the
+-- Unhook first. `fuel_vouchers` is referenced with ON DELETE RESTRICT from several places, so the
 -- dependent rows have to be dealt with before the voucher can go. Anything a real order depends on is
 -- already excluded from _expired, so at this point these are only rows left by earlier campaigns.
+--
+-- The renewal reference used to be `voucher_renewal_items`, on both the source and the result voucher.
+-- It is one table now: the order line names the source, and the result is a fulfilment of that line.
 DELETE FROM fulfillments
 WHERE voucher_id IN (SELECT id FROM _expired);
 
-DELETE FROM voucher_renewal_items
-WHERE source_voucher_id IN (SELECT id FROM _expired)
-   OR fulfilled_voucher_id IN (SELECT id FROM _expired);
+DELETE FROM order_line_items
+WHERE source_voucher_id IN (SELECT id FROM _expired);
 
 UPDATE voucher_exchanges SET new_voucher_id = NULL
 WHERE old_voucher_id IN (SELECT id FROM _expired);

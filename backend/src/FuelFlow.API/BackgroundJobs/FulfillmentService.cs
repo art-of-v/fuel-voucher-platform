@@ -101,7 +101,7 @@ public class FulfillmentService
                 // them — it would strip a renewal fulfillment and wrongly flip an extended/source
                 // voucher back to Available. Exclude them.
                 .Where(o => o.Status == OrderStatus.Fulfilled
-                            && !_context.VoucherRenewalItems.Any(i => i.OrderId == o.Id)
+                            && o.Kind != OrderKind.Renewal
                             // Company issuances are one voucher per unit by construction, and their
                             // line items carry the company's internal cost rather than a sale price.
                             // Same reasoning as renewals above: not this trimmer's business.
@@ -487,7 +487,7 @@ if (!fullyAttributed && fulfillments.Count > 0)
             // Exclude them so the buy-fuel path never assigns stock vouchers against a renewal
             // order's line items.
             .Where(o => (o.Status == OrderStatus.PendingFulfillment || o.Status == OrderStatus.PartiallyFulfilled)
-                        && !_context.VoucherRenewalItems.Any(i => i.OrderId == o.Id))
+                        && o.Kind != OrderKind.Renewal)
             .OrderBy(o => o.CreatedAtUtc)
             .Take(50)
             .ToListAsync(cancellationToken);
@@ -1063,9 +1063,9 @@ var lastFailedAtUtc = await _context.Payments
     // ---------------------------------------------------------------------------------------------
     // Voucher renewal / replacement fulfilment (issue #80, slice 3).
     //
-    // A renewal order carries voucher_renewal_items instead of the buy-fuel one-stock-per-unit
-    // shape, so it is fulfilled by its own two-branch path here — never by AssignVouchersToOrderAsync
-    // or the mismatch trimmer (both exclude renewal orders). Everything runs only AFTER payment:
+    // A renewal order's lines name the voucher they renew instead of drawing one stock unit each
+    // the way a buy-fuel order does, so it is fulfilled by its own two-branch path here — never by
+    // AssignVouchersToOrderAsync or the mismatch trimmer (both exclude renewal orders). Everything runs only AFTER payment:
     //   • Extend  — the source voucher is still valid: push its expiry out by the bought term
     //               (old expiry + term, leftover days kept), same row/code stays with the customer.
     //   • Replace — the source voucher has lapsed: claim a fresh stock voucher of the same
@@ -1078,7 +1078,7 @@ var lastFailedAtUtc = await _context.Payments
 
     /// <summary>
     /// Fulfils one paid renewal order: applies the extend/replace branch to each of its
-    /// still-unfulfilled <see cref="VoucherRenewalItem"/>s, then marks the order Fulfilled (all
+    /// still-unfulfilled renewal order lines, then marks the order Fulfilled (all
     /// applied), PartiallyFulfilled (some applied — auto-refund considers the rest) or leaves it
     /// PendingFulfillment (none applied — the backfill retries and a no-stock alert was raised).
     /// </summary>
@@ -1124,14 +1124,18 @@ var lastFailedAtUtc = await _context.Payments
                 .Select(u => u.IsQaAccount)
                 .FirstOrDefaultAsync(cancellationToken);
 
-            var items = await _context.VoucherRenewalItems
+            // The work list IS the order's renewal lines. #1180 put the intent there and the contract
+            // step dissolved voucher_renewal_items, so a renewal has one home from checkout to expiry
+            // rather than two that have to agree. A line is a renewal exactly when it names the voucher
+            // it renews, which is what this predicate is - no Kind column to keep in step with it.
+            var renewalLines = await _context.OrderLineItems
                 .AsTracking()
-                .Where(i => i.OrderId == orderId)
+                .Where(l => l.OrderId == orderId && l.SourceVoucherId != null)
                 .ToListAsync(cancellationToken);
 
-            if (items.Count == 0)
+            if (renewalLines.Count == 0)
             {
-                _logger.LogWarning("Renewal order {OrderId} has no renewal items, skipping", orderId);
+                _logger.LogWarning("Renewal order {OrderId} has no renewal lines, skipping", orderId);
                 if (transaction != null)
                 {
                     await transaction.CommitAsync(cancellationToken);
@@ -1139,7 +1143,21 @@ var lastFailedAtUtc = await _context.Payments
                 return;
             }
 
-            var sourceIds = items.Select(i => i.SourceVoucherId).Distinct().ToList();
+            // The done-marker, which used to be `VoucherRenewalItem.FulfilledVoucherId IS NOT NULL` and
+            // is now simply "this line already has a fulfilment". A line that failed for want of stock
+            // has none, which is exactly right - it is still owed.
+            //
+            // IgnoreQueryFilters because the filter hides released fulfilments, and a released one is
+            // still an applied one: the term was pushed either way. Treating it as unapplied would make
+            // the retry sweep extend the same voucher a second time.
+            var deliveredLineIds = (await _context.Fulfillments
+                    .IgnoreQueryFilters()
+                    .Where(f => f.OrderId == orderId && f.LineItemId != null)
+                    .Select(f => f.LineItemId!.Value)
+                    .ToListAsync(cancellationToken))
+                .ToHashSet();
+
+            var sourceIds = renewalLines.Select(l => l.SourceVoucherId!.Value).Distinct().ToList();
             var sources = await _context.FuelVouchers
                 .AsNoTracking()
                 .Where(v => sourceIds.Contains(v.Id))
@@ -1150,47 +1168,31 @@ var lastFailedAtUtc = await _context.Payments
             var usedStockIds = new List<Guid>();
             var fulfilledCount = 0;
 
-            // The order line each item describes, keyed by the voucher it renews. Deliberately NOT by
-            // `VoucherRenewalItem.LineItemId`: that is the positional pairing D-13 exists to remove, and
-            // it is null on every row the 2026-10-16 backfill could not disambiguate — two renewal lines
-            // on the same brand, fuel and volume are the same thing after the fact. Keying on the
-            // source voucher is what the pairing was for anyway, and it cannot be ambiguous.
-            //
-            // The snapshots go to both sides for now: voucher_renewal_items stays authoritative for
-            // everything else until the contract step drops it, so this is an expand, and the two cannot
-            // disagree because they are assigned from the same two values on the same line of the loop.
-            //
-            // FulfilledVoucherId and FulfilledAtUtc are deliberately not copied: those are facts about
-            // the fulfilment, not about the order, and the contract step reads them from the Fulfillment
-            // row that already records them.
-            var renewalLines = await _context.OrderLineItems
-                .AsTracking()
-                .Where(l => l.OrderId == orderId && l.SourceVoucherId != null)
-                .ToDictionaryAsync(l => l.SourceVoucherId!.Value, cancellationToken);
-
-            foreach (var item in items)
+            foreach (var line in renewalLines)
             {
+                var sourceVoucherId = line.SourceVoucherId!.Value;
+
                 // Done-marker: this line was already applied by an earlier run.
-                if (item.FulfilledVoucherId != null)
+                if (deliveredLineIds.Contains(line.Id))
                 {
                     fulfilledCount++;
                     continue;
                 }
 
-                var source = sources.FirstOrDefault(v => v.Id == item.SourceVoucherId);
+                var source = sources.FirstOrDefault(v => v.Id == sourceVoucherId);
                 if (source == null)
                 {
                     _logger.LogWarning(
                         "Renewal order {OrderId}: source voucher {VoucherId} not found, cannot fulfil line",
-                        orderId, item.SourceVoucherId);
+                        orderId, sourceVoucherId);
                     continue;
                 }
 
-                if (!VoucherRenewalTerms.TryFromCode(item.TermCode, out var term))
+                if (!VoucherRenewalTerms.TryFromCode(line.TermCode, out var term))
                 {
                     _logger.LogWarning(
                         "Renewal order {OrderId}: unknown term code '{TermCode}' for voucher {VoucherId}",
-                        orderId, item.TermCode, item.SourceVoucherId);
+                        orderId, line.TermCode, sourceVoucherId);
                     continue;
                 }
 
@@ -1217,7 +1219,7 @@ var lastFailedAtUtc = await _context.Payments
                         _logger.LogWarning(
                             "Renewal order {OrderId}: refusing to extend voucher {VoucherId} past its supplier term " +
                             "(customer {CustomerExpiration} + {TermCode} = {Requested}, brand {ProviderExpiration})",
-                            orderId, source.Id, source.CustomerExpirationDate, item.TermCode, newExpiration,
+                            orderId, source.Id, source.CustomerExpirationDate, line.TermCode, newExpiration,
                             source.SupplierExpirationDate);
                         continue;
                     }
@@ -1237,29 +1239,25 @@ var lastFailedAtUtc = await _context.Payments
                         continue;
                     }
 
-                    item.FulfilledVoucherId = source.Id;
-                    item.PreviousCustomerExpiration = source.CustomerExpirationDate;
-                    item.NewCustomerExpiration = newExpiration;
-                    item.FulfilledAtUtc = now;
-                    if (renewalLines.TryGetValue(item.SourceVoucherId, out var extendLine))
-                    {
-                        extendLine.PreviousCustomerExpiration = item.PreviousCustomerExpiration;
-                        extendLine.NewCustomerExpiration = item.NewCustomerExpiration;
-                    }
+                    // The expiry snapshot is written here and nowhere else now that
+                    // voucher_renewal_items is gone. It has to be here: the value it records as
+                    // "previous" is one TryExtendVoucherAsync has already overwritten in place.
+                    line.PreviousCustomerExpiration = source.CustomerExpirationDate;
+                    line.NewCustomerExpiration = newExpiration;
                     // The fee is revenue, not a cost adjustment: cost_per_liter records what we PAID a
                     // supplier for this voucher and nothing else moves it. See VoucherCosting.
                     _context.Fulfillments.Add(new Fulfillment
                     {
                         OrderId = orderId,
                         VoucherId = source.Id,
-                        LineItemId = item.LineItemId,
+                        LineItemId = line.Id,
                         FulfilledAtUtc = now
                     });
                     fulfilledCount++;
 
                     _logger.LogInformation(
                         "Renewal order {OrderId}: extended voucher {VoucherId} to {NewExpiration} (term {TermCode})",
-                        orderId, source.Id, newExpiration, item.TermCode);
+                        orderId, source.Id, newExpiration, line.TermCode);
                 }
                 else
                 {
@@ -1313,41 +1311,32 @@ var lastFailedAtUtc = await _context.Payments
                     await TryReleaseReplacedVoucherAsync(source.Id, order.UserId, cancellationToken);
 
                     usedStockIds.Add(stock.Id);
-                    item.FulfilledVoucherId = stock.Id;
-                    item.PreviousCustomerExpiration = source.CustomerExpirationDate;
+                    line.PreviousCustomerExpiration = source.CustomerExpirationDate;
                     // The customer-facing expiry history must show what the customer actually holds: the
                     // promise they paid for. The replacement voucher's own customer date is NOT it — we stamp
                     // the promise onto the voucher at claim time, and any longer real life above that is a
                     // hidden reserve the customer can extend again later.
-                    item.NewCustomerExpiration = promisedExpiration;
-                    item.FulfilledAtUtc = now;
-                    if (renewalLines.TryGetValue(item.SourceVoucherId, out var replaceLine))
-                    {
-                        replaceLine.PreviousCustomerExpiration = item.PreviousCustomerExpiration;
-                        // The PROMISE, matching the item: the replacement voucher's own longer real life
-                        // is a reserve the customer may extend again, not what they bought.
-                        replaceLine.NewCustomerExpiration = promisedExpiration;
-                    }
+                    line.NewCustomerExpiration = promisedExpiration;
                     // Same as the extend branch: the fee is revenue. The replacement's cost stays what we
                     // paid for it, which is also what the below-cost guard measured it against.
                     _context.Fulfillments.Add(new Fulfillment
                     {
                         OrderId = orderId,
                         VoucherId = stock.Id,
-                        LineItemId = item.LineItemId,
+                        LineItemId = line.Id,
                         FulfilledAtUtc = now
                     });
                     fulfilledCount++;
 
                     _logger.LogInformation(
                         "Renewal order {OrderId}: replaced expired voucher {SourceId} with stock {StockId} (term {TermCode})",
-                        orderId, source.Id, stock.Id, item.TermCode);
+                        orderId, source.Id, stock.Id, line.TermCode);
                 }
             }
 
             await _context.SaveChangesAsync(cancellationToken);
 
-            if (fulfilledCount >= items.Count)
+            if (fulfilledCount >= renewalLines.Count)
             {
                 var updated = await TryMarkOrderFulfilledAsync(orderId, cancellationToken);
                 if (updated > 0)
@@ -1399,7 +1388,7 @@ var lastFailedAtUtc = await _context.Payments
 
                     _logger.LogInformation(
                         "Renewal order {OrderId} partially fulfilled: {Fulfilled}/{Total} items",
-                        orderId, fulfilledCount, items.Count);
+                        orderId, fulfilledCount, renewalLines.Count);
 
                     shouldAutoRefund = true;
                 }
@@ -1437,9 +1426,18 @@ var lastFailedAtUtc = await _context.Payments
     /// </summary>
     private async Task ProcessOpenRenewalOrdersBackfillAsync(CancellationToken cancellationToken)
     {
+// "Has a renewal line we have not delivered yet" - the same question the old
+        // `VoucherRenewalItems.Any(i => i.FulfilledVoucherId == null)` asked, asked of the line and
+        // its fulfilment instead. NOT negated by the global released-filter: a released fulfilment
+        // still delivered the term, so the line is not owed again.
         var openRenewalOrderIds = await _context.Orders
             .Where(o => (o.Status == OrderStatus.PendingFulfillment || o.Status == OrderStatus.PartiallyFulfilled)
-                     && _context.VoucherRenewalItems.Any(i => i.OrderId == o.Id && i.FulfilledVoucherId == null))
+                         && o.Kind == OrderKind.Renewal
+                         && _context.OrderLineItems
+                             .Where(l => l.OrderId == o.Id && l.SourceVoucherId != null)
+                             .Any(l => !_context.Fulfillments
+                                 .IgnoreQueryFilters()
+                                 .Any(f => f.LineItemId == l.Id)))
             .OrderBy(o => o.CreatedAtUtc)
             .Select(o => o.Id)
             .Take(50)
@@ -1550,10 +1548,11 @@ var lastFailedAtUtc = await _context.Payments
     /// reads vouchers through <c>Fulfillments</c>, and the next claim overwrites it anyway.
     /// </para>
     /// <para>
-    /// The <see cref="Fulfillment"/> row and the <c>voucher_renewal_items</c> link to the replacement are
-    /// kept too: they are the audit chain that still explains where this voucher went before. What must
-    /// NOT happen is the previous customer still seeing it — <c>GetUserPurchases</c> only returns vouchers
-    /// the caller actually owns, which is what keeps a recycled voucher out of the wallet it came from.
+    /// The <see cref="Fulfillment"/> row — and through its LineItemId, the renewal line that bought the
+    /// replacement — is kept too: together they are the audit chain that still explains where this
+    /// voucher went before. What must NOT happen is the previous customer still seeing it —
+    /// <c>GetUserPurchases</c> only returns vouchers the caller actually owns, which is what keeps a
+    /// recycled voucher out of the wallet it came from.
     /// </para>
     /// <para>
     /// It does re-enter the operator's «Заміна талонів» attention list once it nears expiry, which is right:

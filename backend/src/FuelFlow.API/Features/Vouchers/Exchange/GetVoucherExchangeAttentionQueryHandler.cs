@@ -43,7 +43,7 @@ public sealed class GetVoucherExchangeAttentionQueryHandler
                 // True when this voucher reached us because a customer bought past its real term and we
                 // issued them a different one. Those are the ones owed to the supplier with a surcharge, so
                 // the operator can tell "our stock aged out" from "we handed this one back".
-                ReleasedFromCustomer = _context.VoucherRenewalItems.Any(i => i.SourceVoucherId == v.Id)
+                ReleasedFromCustomer = _context.OrderLineItems.Any(l => l.SourceVoucherId == v.Id)
             })
             .ToListAsync(ct);
 

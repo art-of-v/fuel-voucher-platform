@@ -59,7 +59,6 @@ private readonly FuelFlow.Features.Vouchers.Security.IQrCipher _qrCipher;
     public DbSet<QrParameters> QrParameters => Set<QrParameters>();
     public DbSet<VoucherImport> VoucherImports => Set<VoucherImport>();
     public DbSet<VoucherImportError> VoucherImportErrors => Set<VoucherImportError>();
-    public DbSet<VoucherRenewalItem> VoucherRenewalItems => Set<VoucherRenewalItem>();
     public DbSet<VoucherExchange> VoucherExchanges => Set<VoucherExchange>();
     // D-13 / #319: the parent voucher_exchanges.exchange_batch_id never had. Still additive - the
     // three movement tables are folded into one ledger in later stages of D-13.

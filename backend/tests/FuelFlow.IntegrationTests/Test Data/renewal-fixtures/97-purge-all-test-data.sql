@@ -25,8 +25,8 @@
 --   bookkeeping, and hand-deleting rows from them can leave a job claimed but never executed. Use
 --   Hangfire's own pruning, or stop the worker first, if they ever need trimming.
 --
--- Delete order is forced by ON DELETE RESTRICT from four tables onto fuel_vouchers
--- (fulfillments.voucher_id, voucher_renewal_items.source_voucher_id, voucher_exchanges.old_voucher_id,
+-- Delete order is forced by ON DELETE RESTRICT from several tables onto fuel_vouchers
+-- (fulfillments.voucher_id, order_line_items.source_voucher_id, voucher_exchanges.old_voucher_id,
 -- operator_voucher_renewals.voucher_id) plus fuel_vouchers.order_id onto orders. Unhook, then delete
 -- vouchers, then orders. Never UPDATE fuel_vouchers SET order_id = NULL to "unlink": CHECK
 -- ck_voucher_held_has_order is evaluated per row on UPDATE and aborts the statement.
@@ -104,7 +104,7 @@ UNION ALL SELECT 'orders', count(*) FROM orders WHERE id IN (SELECT id FROM _tes
 UNION ALL SELECT 'fulfilments', count(*) FROM fulfillments WHERE order_id IN (SELECT id FROM _test_order)
 UNION ALL SELECT 'order line items', count(*) FROM order_line_items WHERE order_id IN (SELECT id FROM _test_order)
 UNION ALL SELECT 'refund payments', count(*) FROM payments WHERE order_id IN (SELECT id FROM _test_order) AND kind = 'Refund'
-UNION ALL SELECT 'renewal items', count(*) FROM voucher_renewal_items WHERE order_id IN (SELECT id FROM _test_order)
+UNION ALL SELECT 'renewal lines', count(*) FROM order_line_items WHERE source_voucher_id IS NOT NULL AND order_id IN (SELECT id FROM _test_order)
 UNION ALL SELECT 'supplier exchanges', count(*) FROM voucher_exchanges
     WHERE old_voucher_id IN (SELECT id FROM _test_voucher)
 UNION ALL SELECT 'operator renewals', count(*) FROM operator_voucher_renewals WHERE voucher_id IN (SELECT id FROM _test_voucher)
@@ -149,7 +149,7 @@ ORDER BY 1, 2;
   DELETE FROM movement_batches b
   WHERE NOT EXISTS (SELECT 1 FROM voucher_exchanges e WHERE e.exchange_batch_id = b.id);
 
-  DELETE FROM voucher_renewal_items i WHERE i.order_id IN (SELECT id FROM _test_order);
+  DELETE FROM order_line_items l WHERE l.order_id IN (SELECT id FROM _test_order) AND l.source_voucher_id IS NOT NULL;
 
   -- 2. Fulfilments before vouchers (voucher_id is RESTRICT).
   DELETE FROM fulfillments f WHERE f.order_id IN (SELECT id FROM _test_order)
@@ -238,7 +238,7 @@ COMMIT;
   UNION ALL SELECT 'order line items', count(*) FROM order_line_items
   UNION ALL SELECT 'fulfilments', count(*) FROM fulfillments
   UNION ALL SELECT 'refund payments', count(*) FROM payments WHERE kind = 'Refund'
-  UNION ALL SELECT 'renewal items', count(*) FROM voucher_renewal_items
+  UNION ALL SELECT 'renewal lines', count(*) FROM order_line_items WHERE source_voucher_id IS NOT NULL
   UNION ALL SELECT 'supplier exchanges', count(*) FROM voucher_exchanges
   UNION ALL SELECT 'devices', count(*) FROM devices
   UNION ALL SELECT 'push tokens', count(*) FROM push_tokens

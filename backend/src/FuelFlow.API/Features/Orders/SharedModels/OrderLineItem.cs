@@ -31,7 +31,7 @@ public class OrderLineItem
     /// <b>A renewal line always has one.</b> It did not, until #1179: <c>RenewalCheckoutCommandHandler</c>
     /// wrote the term to <c>voucher_renewal_items</c> and left this column null, so the term the branch
     /// decision is computed from was on a table that has nothing to do with the line it describes. The
-    /// value is now written here too, and
+    /// value is now written here, <c>voucher_renewal_items</c> is gone, and
     /// <c>ck_order_line_renewal_has_term</c> refuses a renewal line without one.
     /// </remarks>
     public string? TermCode { get; set; }
@@ -48,11 +48,12 @@ public class OrderLineItem
     /// is retrying.
     /// </para>
     /// <para>
-    /// Putting it here also removes the positional pairing <c>voucher_renewal_items.line_item_id</c>
-    /// relies on. That pairing is taken at write time because it is the only moment it is unambiguous,
-    /// and it cannot be reconstructed afterwards: two renewal lines on the same brand, fuel and volume
-    /// are indistinguishable after the fact, which is why the 2026-10-16 backfill leaves them null. A
-    /// source on the line is not a pairing that has to survive; it is part of what the line <em>is</em>.
+    /// Putting it here also removed the positional pairing that used to be
+    /// <c>voucher_renewal_items.line_item_id</c>. That pairing had to be taken at write time because
+    /// it was the only moment it was unambiguous, and it could not be reconstructed afterwards: two
+    /// renewal lines on the same brand, fuel and volume are indistinguishable after the fact, which is
+    /// why the 2026-10-16 backfill left them null. A source on the line is not a pairing that has to
+    /// survive; it is part of what the line <em>is</em>.
     /// </para>
     /// </remarks>
     public Guid? SourceVoucherId { get; set; }

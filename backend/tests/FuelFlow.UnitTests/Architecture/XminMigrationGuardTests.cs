@@ -81,7 +81,6 @@ public sealed class XminMigrationGuardTests
     [InlineData("fuel_vouchers")]
     [InlineData("payments")]
     [InlineData("voucher_exchanges")]
-    [InlineData("voucher_renewal_items")]
     [InlineData("operator_voucher_renewals")]
     public void The_Token_Reach_This_Table_In_The_Model(string table)
     {

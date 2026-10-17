@@ -331,12 +331,12 @@ public sealed class ProcessMonobankWebhookCommandHandler
         // are waiting longer for confirmation, usually before failures become visible.
         _metrics.RecordWebhookLag((DateTime.UtcNow - order.CreatedAtUtc).TotalSeconds);
 
-        // A renewal order (it owns voucher_renewal_items rows) fulfils on a different path than a
+        // A renewal order (its lines name the vouchers they renew) fulfils on a different path than a
         // buy-fuel order: it must NOT write an ORDER_CREATED event (that event drives the buy-fuel
         // handler, which would try to mint brand-new vouchers for it), and it is handed to
         // ProcessRenewalOrderAsync instead of the generic ProcessPendingOrdersAsync sweep.
-        var isRenewalOrder = targetStatus == OrderStatus.PendingFulfillment
-            && await _context.VoucherRenewalItems.AnyAsync(i => i.OrderId == order.Id, cancellationToken);
+var isRenewalOrder = targetStatus == OrderStatus.PendingFulfillment
+                             && order.Kind == OrderKind.Renewal;
 
         if (targetStatus == OrderStatus.PendingFulfillment)
         {

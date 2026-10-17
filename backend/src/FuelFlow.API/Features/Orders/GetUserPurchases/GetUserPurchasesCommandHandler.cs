@@ -43,15 +43,26 @@ public sealed class GetUserPurchasesCommandHandler
 
         var orderIds = orders.Select(o => o.Id).ToList();
 
-        // Orders that are voucher renewals/replacements (have renewal items). The
-        // mobile app labels these distinctly and keeps the renewed voucher in the
-        // primary "available" list instead of nesting it under a purchase-looking order.
-        var renewalOrderIds = (await _context.VoucherRenewalItems
-            .AsNoTracking()
-            .Where(i => orderIds.Contains(i.OrderId))
-            .Select(i => i.OrderId)
-            .Distinct()
-            .ToListAsync(cancellationToken)).ToHashSet();
+        // A renewal line is one that names the voucher it renews - the marker #1180 put on
+        // order_line_items when the renewal's intent moved there, and the only definition there is
+        // now that voucher_renewal_items is gone. The lines are already loaded by the Include above,
+        // so this is a partition rather than another query.
+        //
+        // `Order.Kind == Renewal` is deliberately NOT used: an operator renewal is that kind too but
+        // names no source voucher, and it is absent from this list today because it has no renewal
+        // items. Keep it that way rather than silently promoting operator renewals into the wallet's
+        // renewal view.
+        var renewalLinesByOrder = orders.ToDictionary(
+            o => o.Id,
+            o => o.LineItems.Where(l => l.SourceVoucherId != null).ToList());
+
+        // Orders that are voucher renewals/replacements. The mobile app labels these distinctly and
+        // keeps the renewed voucher in the primary "available" list instead of nesting it under a
+        // purchase-looking order.
+        var renewalOrderIds = renewalLinesByOrder
+            .Where(kv => kv.Value.Count > 0)
+            .Select(kv => kv.Key)
+            .ToHashSet();
 
         var fulfillments = await _context.Fulfillments
             .AsNoTracking()
@@ -63,20 +74,43 @@ public sealed class GetUserPurchasesCommandHandler
             .Distinct()
             .ToList();
 
+        // Which voucher each renewal line actually delivered. IgnoreQueryFilters because the global
+        // filter hides RELEASED deliveries, and a renewal whose voucher was later handed back is still
+        // part of the timeline - it was an unfiltered column on voucher_renewal_items before this.
+        var deliveredByLine = new Dictionary<Guid, Fulfillment>();
+        foreach (var f in await _context.Fulfillments
+                     .IgnoreQueryFilters()
+                     .Where(f => f.LineItemId != null && orderIds.Contains(f.OrderId))
+                     .OrderBy(f => f.FulfilledAtUtc)
+                     .ToListAsync(cancellationToken))
+        {
+            // A renewal line delivers exactly one voucher. Ascending order means that if a line ever
+            // did carry two, the later delivery wins - defensive, not expected.
+            deliveredByLine[f.LineItemId!.Value] = f;
+        }
+
         // Every renewal line this user ever placed, flattened for the per-voucher history timeline.
         // Keyed off the user's own orders, so it already spans the full extend/replace lineage.
-        var renewalNodes = (await _context.VoucherRenewalItems
-            .AsNoTracking()
-            .Where(i => orderIds.Contains(i.OrderId))
-            .Select(i => new VoucherHistoryProjector.RenewalNode(
-                i.SourceVoucherId,
-                i.FulfilledVoucherId,
-                i.FulfilledAtUtc ?? i.CreatedAtUtc,
-                i.TermCode,
-                i.AmountPaid,
-                i.PreviousCustomerExpiration,
-                i.NewCustomerExpiration))
-            .ToListAsync(cancellationToken));
+        //
+        // Two questions, two owners: the line says what was bought, for which voucher and for how
+        // much (its LineTotal is the amount, since quantity is 1 for a renewal); the fulfilment says
+        // which voucher the customer ended up holding and when. Undelivered lines still appear, dated
+        // by the order, which is what the old CreatedAtUtc fallback did.
+        var renewalNodes = orders
+            .SelectMany(o => renewalLinesByOrder[o.Id].Select(l => new { Line = l, OrderCreatedAtUtc = o.CreatedAtUtc }))
+            .Select(x =>
+            {
+                deliveredByLine.TryGetValue(x.Line.Id, out var delivered);
+                return new VoucherHistoryProjector.RenewalNode(
+                    x.Line.SourceVoucherId!.Value,
+                    delivered?.VoucherId,
+                    delivered?.FulfilledAtUtc ?? x.OrderCreatedAtUtc,
+                    x.Line.TermCode,
+                    x.Line.LineTotal,
+                    x.Line.PreviousCustomerExpiration,
+                    x.Line.NewCustomerExpiration);
+            })
+            .ToList();
 
         // Every voucher reachable through this user's orders — INCLUDING ones they have since given back. The
         // chain across a replace is only walkable while the released original is here: ResolveOriginOrderId

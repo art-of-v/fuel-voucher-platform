@@ -28,9 +28,10 @@ public class Fulfillment
     /// wrong. With the line id the comparison is per line, and so is the repair.
     /// </para>
     /// <para>
-    /// Renewal orders carry line items too (one per renewed voucher, mirroring the source), so they
-    /// are attributed the same way - see <c>VoucherRenewalItem.LineItemId</c>, which is what makes
-    /// the correspondence exact rather than positional.
+    /// A renewal order carries line items too (one per renewed voucher, naming it in
+    /// <c>SourceVoucherId</c>), so they are attributed the same way. This column is also what answers
+    /// "which voucher did that renewal deliver" now that <c>voucher_renewal_items</c> is gone, and it
+    /// is what makes the correspondence exact rather than positional.
     /// </para>
     /// </remarks>
     public Guid? LineItemId { get; set; }

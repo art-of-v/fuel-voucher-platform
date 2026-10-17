@@ -366,20 +366,28 @@ public sealed class SyncCommandHandlerTests : IDisposable
             }
         };
 
-        // Seed the parent orders before the renewal item — InMemory doesn't enforce
-        // FKs, but keeping the order honest mirrors the real relational shape (memory:
-        // integration-test FK trap when a child is seeded before its parent).
-        _context.Orders.AddRange(plainOrder, renewalOrder);
-        await _context.SaveChangesAsync();
-
-        _context.VoucherRenewalItems.Add(new VoucherRenewalItem
+        // The renewal line is what makes the order a renewal now (voucher_renewal_items is gone):
+        // GetUserPurchases keys IsRenewal off a line naming the voucher it renews.
+        var renewalSourceId = Guid.NewGuid();
+        renewalOrder.LineItems.Add(new OrderLineItem
         {
             Id = Guid.NewGuid(),
             OrderId = renewalOrderId,
-            SourceVoucherId = Guid.NewGuid(),
+            Brand = "OKKO",
+            FuelTypeId = "okko-95",
+            Liters = 20,
+            Quantity = 1,
+            UnitPrice = 800,
+            LineTotal = 800,
             TermCode = "1m",
-            CreatedAtUtc = DateTime.UtcNow
+            SourceVoucherId = renewalSourceId,
+            RenewalBranch = VoucherRenewalBranchCodes.Extend
         });
+
+        // Seed the parent orders before the lines - InMemory doesn't enforce
+        // FKs, but keeping the order honest mirrors the real relational shape (memory:
+        // integration-test FK trap when a child is seeded before its parent).
+        _context.Orders.AddRange(plainOrder, renewalOrder);
         await _context.SaveChangesAsync();
 
         var getUserPurchasesHandler = BuildGetUserPurchasesHandler();
