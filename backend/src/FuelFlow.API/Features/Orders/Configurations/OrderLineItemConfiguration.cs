@@ -57,9 +57,8 @@ internal sealed class OrderLineItemConfiguration : IEntityTypeConfiguration<Orde
             .HasColumnName("term_code")
             .HasMaxLength(8);
 
-        // Null unless the line is a renewal. RESTRICT for the same reason
-        // voucher_renewal_items.source_voucher_id was: the voucher a customer paid to renew is
-        // evidence, and it must not be deletable out from under the line that names it.
+        // Null unless the line is a renewal. RESTRICT because the voucher a customer paid to
+        // renew is evidence, and it must not be deletable out from under the line that names it.
         builder.Property(e => e.SourceVoucherId)
             .HasColumnName("source_voucher_id");
 
@@ -86,11 +85,11 @@ internal sealed class OrderLineItemConfiguration : IEntityTypeConfiguration<Orde
             .WithMany(o => o.LineItems)
             .HasForeignKey(e => e.OrderId)
             // RESTRICT, not Cascade, and this is the last table in the schema where a money line
-            // cascaded away with its order. It cost voucher_renewal_items.order_id its own RESTRICT
-            // when that table was dissolved: the renewal item was the only thing stopping an order a
-            // customer paid a renewal on from being deleted, and order_line_items.order_id cascaded in
-            // exactly the wrong direction. A line without its order is not a line, and neither is a
-            // renewal the customer paid for.
+            // cascaded away with its order. It took over from voucher_renewal_items.order_id when that
+            // table was dissolved: the renewal item was the only thing stopping an order a customer paid
+            // a renewal on from being deleted, and order_line_items.order_id cascaded in exactly the
+            // wrong direction. A line without its order is not a line, and neither is a renewal the
+            // customer paid for.
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(e => e.OrderId);
@@ -130,7 +129,8 @@ internal sealed class OrderLineItemConfiguration : IEntityTypeConfiguration<Orde
             //
             // This is the check whose absence cost a day: renewal lines were created with a null
             // term_code and the term lived only on voucher_renewal_items, so the line described the
-            // purchase without stating what was bought for it.
+            // purchase without stating what was bought for it. The term now lives here and nowhere
+            // else.
             t.HasCheckConstraint("ck_order_line_renewal_has_term",
                 "renewal_branch IS NULL OR term_code IS NOT NULL");
 

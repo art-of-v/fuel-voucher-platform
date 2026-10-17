@@ -22,9 +22,8 @@ SELECT id FROM fuel_vouchers WHERE voucher_number LIKE 'EMU2-%';
 DELETE FROM fulfillments
 WHERE voucher_id IN (SELECT id FROM _emu)
    OR order_id IN (SELECT id FROM orders WHERE idempotency_key LIKE 'emu2-%');
-DELETE FROM voucher_renewal_items
-WHERE source_voucher_id IN (SELECT id FROM _emu)
-   OR fulfilled_voucher_id IN (SELECT id FROM _emu);
+DELETE FROM order_line_items
+WHERE source_voucher_id IN (SELECT id FROM _emu);
 
 UPDATE voucher_exchanges SET new_voucher_id = NULL
 WHERE new_voucher_id IN (SELECT id FROM _emu);

@@ -1737,78 +1737,6 @@ namespace FuelFlow.API.Migrations
                         });
                 });
 
-            modelBuilder.Entity("FuelFlow.Features.Vouchers.Renewal.VoucherRenewalItem", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<decimal?>("AmountPaid")
-                        .HasColumnType("numeric(12,2)")
-                        .HasColumnName("amount_paid");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<DateTime?>("FulfilledAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("fulfilled_at_utc");
-
-                    b.Property<Guid?>("FulfilledVoucherId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("fulfilled_voucher_id");
-
-                    b.Property<Guid?>("LineItemId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("line_item_id");
-
-                    b.Property<DateOnly?>("NewCustomerExpiration")
-                        .HasColumnType("date")
-                        .HasColumnName("new_customer_expiration");
-
-                    b.Property<Guid>("OrderId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("order_id");
-
-                    b.Property<DateOnly?>("PreviousCustomerExpiration")
-                        .HasColumnType("date")
-                        .HasColumnName("previous_customer_expiration");
-
-                    b.Property<Guid>("SourceVoucherId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("source_voucher_id");
-
-                    b.Property<string>("TermCode")
-                        .IsRequired()
-                        .HasMaxLength(8)
-                        .HasColumnType("character varying(8)")
-                        .HasColumnName("term_code");
-
-                    b.Property<uint>("xmin")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("FulfilledVoucherId");
-
-                    b.HasIndex("LineItemId")
-                        .HasDatabaseName("ix_voucher_renewal_items_line_item_id");
-
-                    b.HasIndex("OrderId");
-
-                    b.HasIndex("SourceVoucherId");
-
-                    b.ToTable("voucher_renewal_items", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_voucher_renewal_amount_non_negative", "amount_paid IS NULL OR amount_paid >= 0");
-                        });
-                });
-
             modelBuilder.Entity("FuelFlow.Features.Vouchers.VoucherImport", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4034,37 +3962,6 @@ namespace FuelFlow.API.Migrations
                     b.Navigation("ReplacementVoucher");
 
                     b.Navigation("Voucher");
-                });
-
-            modelBuilder.Entity("FuelFlow.Features.Vouchers.Renewal.VoucherRenewalItem", b =>
-                {
-                    b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", "FulfilledVoucher")
-                        .WithMany()
-                        .HasForeignKey("FulfilledVoucherId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("FuelFlow.Features.Orders.SharedModels.OrderLineItem", null)
-                        .WithMany()
-                        .HasForeignKey("LineItemId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("FuelFlow.Features.Orders.SharedModels.Order", "Order")
-                        .WithMany()
-                        .HasForeignKey("OrderId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", "SourceVoucher")
-                        .WithMany()
-                        .HasForeignKey("SourceVoucherId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("FulfilledVoucher");
-
-                    b.Navigation("Order");
-
-                    b.Navigation("SourceVoucher");
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Vouchers.VoucherImportError", b =>

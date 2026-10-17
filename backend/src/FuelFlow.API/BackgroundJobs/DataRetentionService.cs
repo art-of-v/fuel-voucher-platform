@@ -100,8 +100,9 @@ public class DataRetentionService
     //                                 pair list without it cannot answer "which batch, with whom,
     //                                 for how much". It is also the only place a batch's lifecycle
     //                                 (opened, confirmed, rejected) is written down at all.
-    //   voucher_renewal_items      - what the customer paid and how the term moved. CASCADE from
-    //                                 orders is the only thing that may remove one.
+//   order_line_items (renewals)- what the customer paid and how the term moved. Their order_id was
+//                                 CASCADE, the only thing that may have removed one, and flipped to
+//                                 RESTRICT when voucher_renewal_items was dissolved (20261017065731).
     //   operator_voucher_renewals  - the same settlement fact for the operator path.
     //   monobank_statement_entries - the acquirer's immutable evidence. Re-import must never
     //                                 rewrite a stored amount (acquiring-statement-118.md), so a

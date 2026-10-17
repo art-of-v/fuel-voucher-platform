@@ -108,16 +108,17 @@ public sealed class RenewalCheckoutCommandHandlerTests : IDisposable
         // The line now states what it renews, for what term, and by which path - on the row the
         // customer is charged against. All three used to live only on voucher_renewal_items, which is
         // why the term that drives the extend/replace decision at fulfilment had to come from a
-        // different table than the line it describes.
+        // different table than the line it describes. That table is gone: the line is the whole record.
         line.TermCode.Should().Be("1m");
         line.SourceVoucherId.Should().Be(source.Id);
         line.RenewalBranch.Should().Be(VoucherRenewalBranchCodes.Extend);
 
-        var renewalItem = await _context.VoucherRenewalItems.SingleAsync(i => i.OrderId == response.OrderId);
-        renewalItem.SourceVoucherId.Should().Be(source.Id);
-        renewalItem.TermCode.Should().Be("1m");
-        renewalItem.FulfilledVoucherId.Should().BeNull();
-        renewalItem.AmountPaid.Should().Be(500, "the paid amount is frozen for the history timeline");
+        // One renewal, one line - and nothing beside it. The amount the history timeline shows is the
+        // line's own LineTotal, which is what AmountPaid used to duplicate.
+        (await _context.OrderLineItems.CountAsync(l => l.OrderId == response.OrderId))
+            .Should().Be(1);
+        line.LineTotal.Should().Be(500, "the paid amount is what the history timeline reads");
+        line.NewCustomerExpiration.Should().BeNull("nothing has been delivered yet, so no expiry was written");
     }
 
     /// <summary>
@@ -162,7 +163,7 @@ public sealed class RenewalCheckoutCommandHandlerTests : IDisposable
 
         response.TotalUah.Should().Be(480); // 40 L × 12 UAH/L
         (await _context.Orders.CountAsync()).Should().Be(1);
-        (await _context.VoucherRenewalItems.CountAsync(i => i.OrderId == response.OrderId)).Should().Be(1);
+        (await _context.OrderLineItems.CountAsync(l => l.OrderId == response.OrderId)).Should().Be(1);
     }
 
     [Fact]
@@ -177,7 +178,7 @@ public sealed class RenewalCheckoutCommandHandlerTests : IDisposable
 
         // 30 × 5 = 150, 50 × 20 = 1000 → 1150
         response.TotalUah.Should().Be(1150);
-        (await _context.VoucherRenewalItems.CountAsync(i => i.OrderId == response.OrderId)).Should().Be(2);
+        (await _context.OrderLineItems.CountAsync(l => l.OrderId == response.OrderId)).Should().Be(2);
     }
 
     // ---- Validation gates ----------------------------------------------------------------------

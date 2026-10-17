@@ -19,8 +19,9 @@ namespace FuelFlow.Features.Vouchers.Renewal.Checkout;
 /// Prices and creates a paid renewal/replacement checkout for a batch of the caller's vouchers, and
 /// mints one Monobank invoice for the lot. Nothing mutates a voucher here — every state change waits
 /// for payment success and happens in FulfillmentService. This handler only validates eligibility,
-/// prices each line, records the intent as an Order + line items + <see cref="VoucherRenewalItem"/>
-/// rows, and hands back the payment URL.
+/// prices each line, records the intent as an Order + line items (the lines are
+/// the renewal record - which voucher, which term, which branch, for how much), and
+/// hands back the payment URL.
 /// </summary>
 public sealed class RenewalCheckoutCommandHandler
 {
@@ -366,27 +367,9 @@ public sealed class RenewalCheckoutCommandHandler
 
         _context.Orders.Add(order);
 
-        for (var i = 0; i < resolved.Count; i++)
-        {
-            var line = resolved[i];
-
-            // Both objects exist and both are ordered the same way, so the pairing is taken here
-            // while it is unambiguous. Reconstructing it at fulfilment time would mean matching on
-            // (brand, fuel, litres) with no ordering guarantee - the same ambiguity that made the
-            // litres-only reconciliation able to pass a short order.
-            var lineItem = order.LineItems.ElementAt(i);
-
-            _context.VoucherRenewalItems.Add(new VoucherRenewalItem
-            {
-                Id = Guid.CreateVersion7(),
-                OrderId = order.Id,
-                LineItemId = lineItem.Id,
-                SourceVoucherId = line.Source.Id,
-                TermCode = line.Term.Code(),
-                AmountPaid = line.LineAmount,
-                CreatedAtUtc = now
-            });
-        }
+        // No second row to write. The order line above IS the renewal record: it already carries the
+        // source voucher, the term and the branch, and its UnitPrice/LineTotal is the money the customer
+        // paid. voucher_renewal_items repeated all of it, which is why D-13 could drop it.
 
         await _context.SaveChangesAsync(cancellationToken);
 

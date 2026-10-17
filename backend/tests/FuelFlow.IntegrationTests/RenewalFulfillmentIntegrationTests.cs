@@ -62,14 +62,6 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", 50m, sourceExpiry));
             seed.Orders.Add(RenewalOrder(orderId, userId, price: 500, monobankInvoiceId: null,
                 ("OKKO", "okko-95", 50m, 500)));
-            seed.VoucherRenewalItems.Add(new VoucherRenewalItem
-            {
-                Id = itemId,
-                OrderId = orderId,
-                SourceVoucherId = sourceId,
-                TermCode = "1m",
-                CreatedAtUtc = DateTime.UtcNow
-            });
             MarkAsRenewalLine(seed, orderId, sourceId, termCode: "1m");
 
             await seed.SaveChangesAsync();
@@ -90,12 +82,12 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         source.AssignedToUserId.Should().Be(userId);
         source.CustomerExpirationDate.Should().Be(sourceExpiry.AddMonths(1)); // OLD expiry + term, leftover days kept
 
-        var item = await verify.VoucherRenewalItems.AsNoTracking().FirstAsync(i => i.Id == itemId);
-        item.FulfilledVoucherId.Should().Be(sourceId);
-        item.FulfilledAtUtc.Should().NotBeNull();
+        var (extendLine, extendDelivered) = await LoadRenewalAsync(verify, orderId, sourceId);
+        extendDelivered.Should().NotBeNull("an extend delivers the source voucher itself");
+        extendDelivered!.FulfilledAtUtc.Should().BeOnOrBefore(DateTime.UtcNow, "a delivered line says when it was delivered");
         // History snapshot: the exact "valid from -> to" range this extend bought.
-        item.PreviousCustomerExpiration.Should().Be(sourceExpiry);
-        item.NewCustomerExpiration.Should().Be(sourceExpiry.AddMonths(1));
+        extendLine.PreviousCustomerExpiration.Should().Be(sourceExpiry);
+        extendLine.NewCustomerExpiration.Should().Be(sourceExpiry.AddMonths(1));
 
         // And on the order line, which is where the renewal's record is moving to (D-13). Asserted on
         // both sides because this is an expand step: the two are written from the same values in the
@@ -148,14 +140,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 50m, today.AddMonths(6)));
             seed.Orders.Add(RenewalOrder(orderId, userId, price: 500, monobankInvoiceId: null,
                 ("OKKO", "okko-95", 50m, 500)));
-            seed.VoucherRenewalItems.Add(new VoucherRenewalItem
-            {
-                Id = itemId,
-                OrderId = orderId,
-                SourceVoucherId = sourceId,
-                TermCode = "1m",
-                CreatedAtUtc = DateTime.UtcNow
-            });
+            MarkAsRenewalLine(seed, orderId, sourceId, termCode: "1m");
 
             await seed.SaveChangesAsync();
         }
@@ -170,8 +155,8 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         var order = await verify.Orders.AsNoTracking().FirstAsync(o => o.Id == orderId);
         order.Status.Should().Be(OrderStatus.Fulfilled, "the customer paid for a replacement, so it must be given");
 
-        var item = await verify.VoucherRenewalItems.AsNoTracking().FirstAsync(i => i.Id == itemId);
-        item.FulfilledVoucherId.Should().Be(stockId);
+        var (replaceLine, replaceDelivered) = await LoadRenewalAsync(verify, orderId, sourceId);
+        replaceDelivered!.VoucherId.Should().Be(stockId, "a replace delivers fresh stock, not the source");
 
         var source = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == sourceId);
         source.CustomerExpirationDate.Should().Be(sourceExpiry, "the retired voucher's dates are left alone");
@@ -189,8 +174,8 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             "the replacement carries exactly the promise: leftover term + the month that was paid for");
 
         // History snapshot: previous ΓåÆ paid, never the stock voucher's own (longer) term.
-        item.PreviousCustomerExpiration.Should().Be(sourceExpiry);
-        item.NewCustomerExpiration.Should().Be(sourceExpiry.AddMonths(1));
+        replaceLine.PreviousCustomerExpiration.Should().Be(sourceExpiry);
+        replaceLine.NewCustomerExpiration.Should().Be(sourceExpiry.AddMonths(1));
     }
 
     /// <summary>
@@ -221,14 +206,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", 50m, sourceExpiry, providerExpiry));
             seed.Orders.Add(RenewalOrder(orderId, userId, price: 500, monobankInvoiceId: null,
                 ("OKKO", "okko-95", 50m, 500)));
-            seed.VoucherRenewalItems.Add(new VoucherRenewalItem
-            {
-                Id = itemId,
-                OrderId = orderId,
-                SourceVoucherId = sourceId,
-                TermCode = "1m",
-                CreatedAtUtc = DateTime.UtcNow
-            });
+            MarkAsRenewalLine(seed, orderId, sourceId, termCode: "1m");
 
             await seed.SaveChangesAsync();
         }
@@ -248,9 +226,8 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
 
         // The line stays unfulfilled so the per-minute backfill retries it once stock exists, and the
         // order is left open rather than being marked Fulfilled on a promise we did not keep.
-        var item = await verify.VoucherRenewalItems.AsNoTracking().FirstAsync(i => i.Id == itemId);
-        item.FulfilledVoucherId.Should().BeNull();
-        item.FulfilledAtUtc.Should().BeNull();
+        var (_, noDelivery) = await LoadRenewalAsync(verify, orderId, sourceId);
+        noDelivery.Should().BeNull("no stock meant nothing was delivered, so there is no fulfilment");
 
         var order = await verify.Orders.AsNoTracking().FirstAsync(o => o.Id == orderId);
         order.Status.Should().NotBe(OrderStatus.Fulfilled);
@@ -284,14 +261,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", 50m, sourceExpiry, providerExpiry));
             seed.Orders.Add(RenewalOrder(orderId, userId, price: 500, monobankInvoiceId: null,
                 ("OKKO", "okko-95", 50m, 500)));
-            seed.VoucherRenewalItems.Add(new VoucherRenewalItem
-            {
-                Id = itemId,
-                OrderId = orderId,
-                SourceVoucherId = sourceId,
-                TermCode = "1m",
-                CreatedAtUtc = DateTime.UtcNow
-            });
+            MarkAsRenewalLine(seed, orderId, sourceId, termCode: "1m");
 
             await seed.SaveChangesAsync();
         }
@@ -336,14 +306,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 40m, today.AddMonths(6)));
             seed.Orders.Add(RenewalOrder(orderId, userId, price: 480, monobankInvoiceId: null,
                 ("OKKO", "okko-95", 40m, 480)));
-            seed.VoucherRenewalItems.Add(new VoucherRenewalItem
-            {
-                Id = itemId,
-                OrderId = orderId,
-                SourceVoucherId = sourceId,
-                TermCode = "1m",
-                CreatedAtUtc = DateTime.UtcNow
-            });
+            MarkAsRenewalLine(seed, orderId, sourceId, termCode: "1m");
 
             await seed.SaveChangesAsync();
         }
@@ -372,8 +335,8 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         source.OrderId.Should().Be(originPurchaseId,
             "the link to the purchase that delivered this paper is kept ΓÇö re-homing it would rewrite the origin");
 
-        var item = await verify.VoucherRenewalItems.AsNoTracking().FirstAsync(i => i.Id == itemId);
-        item.FulfilledVoucherId.Should().Be(stockId); // marker points at the fresh voucher
+        var (_, replacementDelivery) = await LoadRenewalAsync(verify, orderId, sourceId);
+        replacementDelivery!.VoucherId.Should().Be(stockId); // points at the fresh voucher
 
         var fulfillments = await verify.Fulfillments.AsNoTracking().Where(f => f.OrderId == orderId).ToListAsync();
         fulfillments.Should().ContainSingle().Which.VoucherId.Should().Be(stockId);
@@ -414,14 +377,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 40m, today.AddMonths(6)));
             seed.Orders.Add(RenewalOrder(orderId, userId, price: 480, monobankInvoiceId: null,
                 ("OKKO", "okko-95", 40m, 480)));
-            seed.VoucherRenewalItems.Add(new VoucherRenewalItem
-            {
-                Id = itemId,
-                OrderId = orderId,
-                SourceVoucherId = sourceId,
-                TermCode = "1m",
-                CreatedAtUtc = DateTime.UtcNow
-            });
+            MarkAsRenewalLine(seed, orderId, sourceId, termCode: "1m");
 
             await seed.SaveChangesAsync();
         }
@@ -447,9 +403,9 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         attention.Data.Should().NotContain(i => i.Id == stockId);
 
         // The link that makes the cost chain walkable: this voucher's renewal line names the fresh one.
-        var item = await verify.VoucherRenewalItems.AsNoTracking().FirstAsync(i => i.Id == itemId);
-        item.SourceVoucherId.Should().Be(sourceId);
-        item.FulfilledVoucherId.Should().Be(stockId);
+        var (costChainLine, costChainDelivery) = await LoadRenewalAsync(verify, orderId, sourceId);
+        costChainLine.SourceVoucherId.Should().Be(sourceId);
+        costChainDelivery!.VoucherId.Should().Be(stockId);
 
         // And the customer it used to belong to stays reachable through the order it was sold on.
         (await verify.Fulfillments.AsNoTracking().AnyAsync(f => f.OrderId == orderId))
@@ -493,14 +449,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             seed.FuelVouchers.Add(StockVoucher(fourteenDayId, "OKKO", "okko-95", 50m, today.AddDays(14)));
             seed.Orders.Add(RenewalOrder(orderId, userId, price: 500, monobankInvoiceId: null,
                 ("OKKO", "okko-95", 50m, 500)));
-            seed.VoucherRenewalItems.Add(new VoucherRenewalItem
-            {
-                Id = itemId,
-                OrderId = orderId,
-                SourceVoucherId = sourceId,
-                TermCode = "1w",
-                CreatedAtUtc = DateTime.UtcNow
-            });
+            MarkAsRenewalLine(seed, orderId, sourceId, termCode: "1w");
 
             await seed.SaveChangesAsync();
         }
@@ -512,8 +461,8 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
 
         using var verify = CreateContext();
 
-        var item = await verify.VoucherRenewalItems.AsNoTracking().FirstAsync(i => i.Id == itemId);
-        item.FulfilledVoucherId.Should().Be(nineDayId,
+        var (promisedLine, shortestDelivery) = await LoadRenewalAsync(verify, orderId, sourceId);
+        shortestDelivery!.VoucherId.Should().Be(nineDayId,
             "the 9-day voucher reaches the promise exactly, so it beats the 14-day one on stock preservation");
 
         (await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == eightDayId)).Status
@@ -525,7 +474,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         var issued = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == nineDayId);
         issued.Status.Should().Be(VoucherStatus.Assigned);
         issued.CustomerExpirationDate.Should().Be(promise);
-        item.NewCustomerExpiration.Should().Be(promise);
+        promisedLine.NewCustomerExpiration.Should().Be(promise);
     }
 
     /// <summary>
@@ -561,22 +510,8 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
                 ("OKKO", "okko-95", 50m, 500)));
             seed.Orders.Add(RenewalOrder(secondOrderId, userId, price: 500, monobankInvoiceId: null,
                 ("OKKO", "okko-95", 50m, 500)));
-            seed.VoucherRenewalItems.Add(new VoucherRenewalItem
-            {
-                Id = firstItemId,
-                OrderId = firstOrderId,
-                SourceVoucherId = sourceId,
-                TermCode = "1w",
-                CreatedAtUtc = DateTime.UtcNow
-            });
-            seed.VoucherRenewalItems.Add(new VoucherRenewalItem
-            {
-                Id = secondItemId,
-                OrderId = secondOrderId,
-                SourceVoucherId = sourceId,
-                TermCode = "2m",
-                CreatedAtUtc = DateTime.UtcNow.AddSeconds(1)
-            });
+            MarkAsRenewalLine(seed, firstOrderId, sourceId, termCode: "1w");
+            MarkAsRenewalLine(seed, secondOrderId, sourceId, termCode: "2m");
 
             await seed.SaveChangesAsync();
         }
@@ -609,15 +544,15 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         final.CustomerExpirationDate.Should().Be(boughtFor.AddDays(7).AddMonths(2),
             "2 months on top of the previous step, not on top of today");
 
-        var firstItem = await verify.VoucherRenewalItems.AsNoTracking().FirstAsync(i => i.Id == firstItemId);
-        firstItem.FulfilledVoucherId.Should().Be(sourceId, "Extend points the item at the source voucher");
-        firstItem.PreviousCustomerExpiration.Should().Be(boughtFor);
-        firstItem.NewCustomerExpiration.Should().Be(boughtFor.AddDays(7));
+        var (firstLine, firstDelivery) = await LoadRenewalAsync(verify, firstOrderId, sourceId);
+        firstDelivery!.VoucherId.Should().Be(sourceId, "Extend points the delivery at the source voucher");
+        firstLine.PreviousCustomerExpiration.Should().Be(boughtFor);
+        firstLine.NewCustomerExpiration.Should().Be(boughtFor.AddDays(7));
 
-        var secondItem = await verify.VoucherRenewalItems.AsNoTracking().FirstAsync(i => i.Id == secondItemId);
-        secondItem.FulfilledVoucherId.Should().Be(sourceId);
-        secondItem.PreviousCustomerExpiration.Should().Be(boughtFor.AddDays(7));
-        secondItem.NewCustomerExpiration.Should().Be(boughtFor.AddDays(7).AddMonths(2));
+        var (secondLine, secondDelivery) = await LoadRenewalAsync(verify, secondOrderId, sourceId);
+        secondDelivery!.VoucherId.Should().Be(sourceId);
+        secondLine.PreviousCustomerExpiration.Should().Be(boughtFor.AddDays(7));
+        secondLine.NewCustomerExpiration.Should().Be(boughtFor.AddDays(7).AddMonths(2));
 
         // Two extensions must consume no stock at all.
         (await verify.FuelVouchers.AsNoTracking().AnyAsync(v => v.Status == VoucherStatus.Assigned && v.Id != sourceId))
@@ -665,14 +600,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             seed.FuelVouchers.Add(StockVoucher(sixMonthsId, "OKKO", "okko-95", 50m, today.AddMonths(6)));
             seed.Orders.Add(RenewalOrder(orderId, userId, price: 500, monobankInvoiceId: null,
                 ("OKKO", "okko-95", 50m, 500)));
-            seed.VoucherRenewalItems.Add(new VoucherRenewalItem
-            {
-                Id = itemId,
-                OrderId = orderId,
-                SourceVoucherId = sourceId,
-                TermCode = "2m",
-                CreatedAtUtc = DateTime.UtcNow
-            });
+            MarkAsRenewalLine(seed, orderId, sourceId, termCode: "2m");
 
             await seed.SaveChangesAsync();
         }
@@ -687,8 +615,8 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         promise.Should().BeAfter(today.AddMonths(2), "the promise is measured from the customer's own date, so the 2-month voucher is short");
         promise.Should().BeBefore(today.AddMonths(3), "which is exactly why the 3-month voucher is the shortest that qualifies");
 
-        var item = await verify.VoucherRenewalItems.AsNoTracking().FirstAsync(i => i.Id == itemId);
-        item.FulfilledVoucherId.Should().Be(threeMonthsId, "shortest qualifying voucher, not the longest");
+        var (qualifiedLine, qualifiedDelivery) = await LoadRenewalAsync(verify, orderId, sourceId);
+        qualifiedDelivery!.VoucherId.Should().Be(threeMonthsId, "shortest qualifying voucher, not the longest");
 
         var issued = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == threeMonthsId);
         issued.Status.Should().Be(VoucherStatus.Assigned);
@@ -696,8 +624,8 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             "the customer is given what they paid for on top of what they still held ΓÇö the rest is reserve");
         issued.SupplierExpirationDate.Should().Be(today.AddMonths(3), "the paper term itself is untouched");
 
-        item.PreviousCustomerExpiration.Should().Be(sourceExpiry);
-        item.NewCustomerExpiration.Should().Be(promise);
+        qualifiedLine.PreviousCustomerExpiration.Should().Be(sourceExpiry);
+        qualifiedLine.NewCustomerExpiration.Should().Be(promise);
 
         // The rejected candidates must still be sitting in stock, untouched.
         (await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == twoMonthsId)).Status
@@ -736,14 +664,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             seed.FuelVouchers.Add(StockVoucher(Guid.NewGuid(), "OKKO", "okko-95", 50m, today.AddMonths(2)));
             seed.Orders.Add(RenewalOrder(orderId, userId, price: 500, monobankInvoiceId: null,
                 ("OKKO", "okko-95", 50m, 500)));
-            seed.VoucherRenewalItems.Add(new VoucherRenewalItem
-            {
-                Id = itemId,
-                OrderId = orderId,
-                SourceVoucherId = sourceId,
-                TermCode = "2m",
-                CreatedAtUtc = DateTime.UtcNow
-            });
+            MarkAsRenewalLine(seed, orderId, sourceId, termCode: "2m");
 
             await seed.SaveChangesAsync();
         }
@@ -759,9 +680,9 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         order.Status.Should().Be(OrderStatus.PendingFulfillment,
             "nothing was delivered, so the paid line must not be marked fulfilled");
 
-        var item = await verify.VoucherRenewalItems.AsNoTracking().FirstAsync(i => i.Id == itemId);
-        item.FulfilledVoucherId.Should().BeNull();
-        item.NewCustomerExpiration.Should().BeNull("and no clamped date was written into the history");
+        var (undeliveredLine, undelivered) = await LoadRenewalAsync(verify, orderId, sourceId);
+        undelivered.Should().BeNull();
+        undeliveredLine.NewCustomerExpiration.Should().BeNull("and no clamped date was written into the history");
 
         var source = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == sourceId);
         source.Status.Should().Be(VoucherStatus.Assigned, "the customer keeps what they had");
@@ -802,14 +723,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 50m, today.AddMonths(6)));
             seed.Orders.Add(RenewalOrder(firstOrderId, firstUserId, price: 500, monobankInvoiceId: null,
                 ("OKKO", "okko-95", 50m, 500)));
-            seed.VoucherRenewalItems.Add(new VoucherRenewalItem
-            {
-                Id = itemId,
-                OrderId = firstOrderId,
-                SourceVoucherId = sourceId,
-                TermCode = "2m",
-                CreatedAtUtc = DateTime.UtcNow
-            });
+            MarkAsRenewalLine(seed, firstOrderId, sourceId, termCode: "2m");
 
             await seed.SaveChangesAsync();
         }
@@ -918,14 +832,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 50m, today.AddMonths(6)));
             seed.Orders.Add(RenewalOrder(orderId, userId, price: 500, monobankInvoiceId: null,
                 ("OKKO", "okko-95", 50m, 500)));
-            seed.VoucherRenewalItems.Add(new VoucherRenewalItem
-            {
-                Id = itemId,
-                OrderId = orderId,
-                SourceVoucherId = sourceId,
-                TermCode = "2m",
-                CreatedAtUtc = DateTime.UtcNow
-            });
+            MarkAsRenewalLine(seed, orderId, sourceId, termCode: "2m");
 
             await seed.SaveChangesAsync();
         }
@@ -1091,22 +998,8 @@ var exchangedId = Guid.NewGuid();
                 ("OKKO", "okko-95", 50m, 500),
                 ("WOG", "wog-95", 40m, 480)));
 
-            seed.VoucherRenewalItems.Add(new VoucherRenewalItem
-            {
-                Id = extendItemId,
-                OrderId = orderId,
-                SourceVoucherId = extendSourceId,
-                TermCode = "1m",
-                CreatedAtUtc = DateTime.UtcNow
-            });
-            seed.VoucherRenewalItems.Add(new VoucherRenewalItem
-            {
-                Id = replaceItemId,
-                OrderId = orderId,
-                SourceVoucherId = replaceSourceId,
-                TermCode = "1m",
-                CreatedAtUtc = DateTime.UtcNow
-            });
+            MarkAsRenewalLine(seed, orderId, extendSourceId, termCode: "1m");
+            MarkAsRenewalLine(seed, orderId, replaceSourceId, termCode: "1m");
 
             await seed.SaveChangesAsync();
         }
@@ -1128,11 +1021,11 @@ var exchangedId = Guid.NewGuid();
         // fulfillment-derived status until RefundStatusSyncService confirms the cancel.
         order.Status.Should().Be(OrderStatus.PartiallyFulfilled);
 
-        var extendItem = await verify.VoucherRenewalItems.AsNoTracking().FirstAsync(i => i.Id == extendItemId);
-        extendItem.FulfilledVoucherId.Should().Be(extendSourceId); // the extend line applied
+        var (_, extendApplied) = await LoadRenewalAsync(verify, orderId, extendSourceId);
+        extendApplied!.VoucherId.Should().Be(extendSourceId); // the extend line applied
 
-        var replaceItem = await verify.VoucherRenewalItems.AsNoTracking().FirstAsync(i => i.Id == replaceItemId);
-        replaceItem.FulfilledVoucherId.Should().BeNull(); // no stock ΓåÆ left for the backfill / refund
+        var (_, replaceUndelivered) = await LoadRenewalAsync(verify, orderId, replaceSourceId);
+        replaceUndelivered.Should().BeNull(); // no stock -> left for the backfill / refund
 
         var refunds = await verify.Payments.AsNoTracking().Where(r => r.OrderId == orderId && r.Kind == PaymentKind.Refund).ToListAsync();
         refunds.Should().ContainSingle(r => r.Status == PaymentStatus.Pending);
@@ -1221,15 +1114,7 @@ var exchangedId = Guid.NewGuid();
             seed.FuelVouchers.Add(source);
             seed.Orders.Add(RenewalOrder(orderId, userId, price: amountPaid, monobankInvoiceId: null,
                 ("OKKO", "okko-95", liters, amountPaid)));
-            seed.VoucherRenewalItems.Add(new VoucherRenewalItem
-            {
-                Id = itemId,
-                OrderId = orderId,
-                SourceVoucherId = sourceId,
-                TermCode = "1m",
-                AmountPaid = amountPaid,
-                CreatedAtUtc = DateTime.UtcNow
-            });
+            MarkAsRenewalLine(seed, orderId, sourceId, termCode: "1m");
 
             await seed.SaveChangesAsync();
         }
@@ -1287,15 +1172,7 @@ var exchangedId = Guid.NewGuid();
 
             seed.Orders.Add(RenewalOrder(orderId, userId, price: amountPaid, monobankInvoiceId: null,
                 ("OKKO", "okko-95", liters, amountPaid)));
-            seed.VoucherRenewalItems.Add(new VoucherRenewalItem
-            {
-                Id = itemId,
-                OrderId = orderId,
-                SourceVoucherId = sourceId,
-                TermCode = "1m",
-                AmountPaid = amountPaid,
-                CreatedAtUtc = DateTime.UtcNow
-            });
+            MarkAsRenewalLine(seed, orderId, sourceId, termCode: "1m");
 
             await seed.SaveChangesAsync();
         }
@@ -1361,7 +1238,9 @@ var exchangedId = Guid.NewGuid();
     private static OrderLineItem MarkAsRenewalLine(
         ApplicationDbContext seed, Guid orderId, Guid sourceVoucherId, string termCode)
     {
-        var line = seed.OrderLineItems.Local.First(l => l.OrderId == orderId);
+        // The first line of this order that is not already a renewal line, so a test with two renewals
+        // on one order can mark them in sequence without having to say which is which.
+        var line = seed.OrderLineItems.Local.First(l => l.OrderId == orderId && l.SourceVoucherId == null);
         line.SourceVoucherId = sourceVoucherId;
         line.TermCode = termCode;
         line.RenewalBranch = VoucherRenewalBranchCodes.Extend;
@@ -1410,10 +1289,35 @@ var exchangedId = Guid.NewGuid();
         return order;
     }
 
+    /// <summary>
+    /// A renewal's two owners, loaded together: the line says what was bought and how the term moved,
+    /// the fulfilment says whether it has been delivered yet and to which voucher.
+    /// </summary>
+    /// <remarks>
+    /// These were one row on <c>voucher_renewal_items</c> until D-13 dissolved it, and they are
+    /// deliberately two here. Asserting through this helper rather than a single object is what makes
+    /// the split visible: a green test says the line was extended AND that a fulfilment exists for it,
+    /// not that some table has both columns filled in.
+    /// </remarks>
+    private static async Task<(OrderLineItem Line, Fulfillment? Delivered)> LoadRenewalAsync(
+        ApplicationDbContext ctx, Guid orderId, Guid sourceVoucherId)
+    {
+        var line = await ctx.OrderLineItems.AsNoTracking()
+            .SingleAsync(l => l.OrderId == orderId && l.SourceVoucherId == sourceVoucherId);
+
+        // IgnoreQueryFilters deliberately: a released fulfilment still delivered the term, and these
+        // tests are about whether delivery happened, not whether the voucher is still held.
+        var delivered = await ctx.Fulfillments.AsNoTracking()
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(f => f.LineItemId == line.Id);
+
+        return (line, delivered);
+    }
+
     private static async Task ResetDataAsync(ApplicationDbContext context)
     {
         await context.Database.ExecuteSqlRawAsync(
-            """TRUNCATE TABLE "payments", "fulfillments", "voucher_renewal_items", "voucher_exchanges", "movement_batches", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
+            """TRUNCATE TABLE "payments", "fulfillments", "voucher_exchanges", "movement_batches", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
     }
 
     private ApplicationDbContext CreateContext()

@@ -25,11 +25,11 @@ docker exec -i fuelflow-postgres psql -U fuelflow -d fuelflow -v ON_ERROR_STOP=1
 The customer's own vouchers are never touched. They are resolved by **phone suffix (`%1771`)**, not by
 a hardcoded id, because ids change when the test account is recreated. Protected means: assigned to
 that customer, or belonging to a company that customer works for. On top of that, a voucher is kept if
-anything references it — a fulfilment, a renewal item (as source or as result), a supplier exchange, an
-operator renewal, or a paid order.
+anything references it — a fulfilment, a renewal (as source, via the order line that names it, or as
+result, via the fulfilment of that line), a supplier exchange, an operator renewal, or a paid order.
 
 That last group is why the audit exists as a separate step. `fuel_vouchers` is referenced with
-`ON DELETE RESTRICT` from four tables, so a naive delete fails halfway and leaves a mess. The script
+`ON DELETE RESTRICT` from several tables, so a naive delete fails halfway and leaves a mess. The script
 unhooks dependents first, in one transaction, and prints what it kept alongside the reason.
 
 The date filter is `customer_expiration_date < CURRENT_DATE` — **not** `status = 'Expired'`. A voucher

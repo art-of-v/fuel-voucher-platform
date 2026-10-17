@@ -127,7 +127,6 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
         var purchaseId = Guid.NewGuid();
         var renewalId = Guid.NewGuid();
         var sourceId = Guid.NewGuid();
-        var itemId = Guid.NewGuid();
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
         using (var seed = CreateContext())
@@ -142,15 +141,7 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
             seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, "WOG", "wog-95", 40m, today.AddDays(-3), purchaseId));
             seed.FuelVouchers.Add(StockVoucher(Guid.NewGuid(), "WOG", "wog-95", 40m, today.AddMonths(1)));
 
-            seed.Orders.Add(RenewalOrder(renewalId, userId, 480));
-            seed.VoucherRenewalItems.Add(new VoucherRenewalItem
-            {
-                Id = itemId,
-                OrderId = renewalId,
-                SourceVoucherId = sourceId,
-                TermCode = "1m",
-                CreatedAtUtc = DateTime.UtcNow
-            });
+            seed.Orders.Add(RenewalOrder(renewalId, userId, 480, sourceId));
 
             await seed.SaveChangesAsync();
         }
@@ -162,11 +153,14 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
 
         using var verify = CreateContext();
 
-        var replacementId = await verify.VoucherRenewalItems.AsNoTracking()
-            .Where(i => i.Id == itemId)
-            .Select(i => i.FulfilledVoucherId)
+        // The renewal line says what was bought; the fulfilment says which voucher the customer ended
+        // up holding. The replacement is the latter, and it is a different row from the source.
+        var replacementId = await verify.Fulfillments.AsNoTracking()
+            .Where(f => f.OrderId == renewalId)
+            .Select(f => (Guid?)f.VoucherId)
             .SingleAsync();
         replacementId.Should().NotBeNull();
+        replacementId.Should().NotBe(sourceId, "a lapsed source is replaced by fresh stock, never kept");
 
         var replacement = await verify.FuelVouchers.AsNoTracking().SingleAsync(v => v.Id == replacementId);
         replacement.Status.Should().Be(VoucherStatus.Assigned);
@@ -471,7 +465,13 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
         return order;
     }
 
-    private static Order RenewalOrder(Guid orderId, Guid userId, decimal price)
+    /// <remarks>
+    /// The line IS the renewal record (voucher_renewal_items is gone), so building the order means
+    /// building the line that names the voucher being renewed. The line mirrors the source voucher's
+    /// brand, fuel and litres, which is what a real checkout copies.
+    /// </remarks>
+    private static Order RenewalOrder(
+        Guid orderId, Guid userId, decimal price, Guid sourceVoucherId, string termCode = "1m")
         => new()
         {
             Id = orderId,
@@ -481,13 +481,30 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
             Status = OrderStatus.PendingFulfillment,
             MonobankInvoiceId = $"test-invoice-{orderId:N}",
             CreatedAtUtc = DateTime.UtcNow.AddMinutes(-5),
-            UpdatedAtUtc = DateTime.UtcNow.AddMinutes(-5)
+            UpdatedAtUtc = DateTime.UtcNow.AddMinutes(-5),
+            LineItems =
+            [
+                new OrderLineItem
+                {
+                    Id = Guid.NewGuid(),
+                    OrderId = orderId,
+                    Brand = "WOG",
+                    FuelTypeId = "wog-95",
+                    Liters = 40m,
+                    Quantity = 1,
+                    UnitPrice = price,
+                    LineTotal = price,
+                    TermCode = termCode,
+                    SourceVoucherId = sourceVoucherId,
+                    RenewalBranch = VoucherRenewalBranchCodes.Extend
+                }
+            ]
         };
 
     private static async Task ResetDataAsync(ApplicationDbContext context)
     {
         await context.Database.ExecuteSqlRawAsync(
-            """TRUNCATE TABLE "payments", "fulfillments", "voucher_renewal_items", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
+            """TRUNCATE TABLE "payments", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
     }
 
     private ApplicationDbContext CreateContext()

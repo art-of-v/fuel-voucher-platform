@@ -543,11 +543,20 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
     };
 
     /// <summary>
-    /// The same guarantee for the self-serve renewal: <c>voucher_renewal_items</c> records what the
-    /// customer paid and how the term moved, so deleting the order must not erase the payment.
+    /// The same guarantee for the self-serve renewal, now enforced by the thing that replaced the
+    /// guard: the renewal LINE is what the customer paid for and what records how the term moved, so
+    /// deleting the order must not erase it.
     /// </summary>
+    /// <remarks>
+    /// This guarantee did not move, it changed owner. It used to be
+    /// <c>voucher_renewal_items.order_id</c> RESTRICT; that table was dissolved by D-13 and
+    /// <c>order_line_items.order_id</c> is RESTRICT for exactly this reason. A test that stopped
+    /// existing here would have quietly dropped the protection of a paid renewal, so it is rewritten
+    /// rather than deleted - and it now covers the line end to end, including the snapshots that used
+    /// to live on the retired table.
+    /// </remarks>
     [Fact]
-    public async Task Deleting_A_renewal_Order_With_Renewal_Items_Is_Refused()
+    public async Task Deleting_A_renewal_Order_With_Renewal_Lines_Is_Refused()
     {
         var user = NewUser("+38000000002");
         var order = new Order
@@ -563,20 +572,26 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
 
         await using (var seed = CreateContext())
         {
-            // source_voucher_id is a RESTRICT FK to a real voucher, so the renewal item needs one.
+            // source_voucher_id is a RESTRICT FK to a real voucher, so the renewal line needs one.
             var source = NewVoucher("renewal-source", "renewal-source-qr");
             seed.FuelVouchers.Add(source);
             seed.Users.Add(user);
             seed.Orders.Add(order);
-            seed.VoucherRenewalItems.Add(new VoucherRenewalItem
+            order.LineItems.Add(new OrderLineItem
             {
                 Id = Guid.NewGuid(),
                 OrderId = order.Id,
+                Brand = source.Brand,
+                FuelTypeId = source.FuelTypeId,
+                Liters = source.Liters,
+                Quantity = 1,
+                UnitPrice = 500m,
+                LineTotal = 500m,
+                TermCode = "1m",
                 SourceVoucherId = source.Id,
-                AmountPaid = 500m,
+                RenewalBranch = VoucherRenewalBranchCodes.Extend,
                 PreviousCustomerExpiration = new DateOnly(2026, 12, 1),
-                NewCustomerExpiration = new DateOnly(2027, 1, 1),
-                CreatedAtUtc = DateTime.UtcNow
+                NewCustomerExpiration = new DateOnly(2027, 1, 1)
             });
             await seed.SaveChangesAsync();
         }
@@ -587,8 +602,8 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
         await act.Should().ThrowAsync<PostgresException>();
 
         await using var verify = CreateContext();
-        (await verify.VoucherRenewalItems.CountAsync(i => i.OrderId == order.Id))
-            .Should().Be(1, "the renewal item is what the customer paid for, and it must survive");
+        (await verify.OrderLineItems.CountAsync(l => l.OrderId == order.Id))
+            .Should().Be(1, "the renewal line is what the customer paid for, and it must survive");
     }
 
     /// <summary>

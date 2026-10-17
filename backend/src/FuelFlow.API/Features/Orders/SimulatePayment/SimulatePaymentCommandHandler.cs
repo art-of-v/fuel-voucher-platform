@@ -103,8 +103,7 @@ public sealed class SimulatePaymentCommandHandler
             // write an ORDER_CREATED event (that drives the buy-fuel handler, which mints fresh stock),
             // and it is handed to ProcessRenewalOrderAsync — mirrors the real webhook handler so a
             // simulated renewal payment behaves like a real one in Development.
-            var isRenewalOrder = await _context.VoucherRenewalItems
-                .AnyAsync(i => i.OrderId == order.Id, cancellationToken);
+            var isRenewalOrder = order.Kind == OrderKind.Renewal;
 
             if (!isRenewalOrder)
             {

@@ -364,7 +364,7 @@ public sealed class MovementBatchIntegrationTests : IClassFixture<TestDatabaseFi
     /// </summary>
     private static async Task ResetAsync(ApplicationDbContext ctx)
         => await ctx.Database.ExecuteSqlRawAsync(
-            """TRUNCATE TABLE "voucher_exchanges", "movement_batches", "purchase_batches", "voucher_imports", "fulfillments", "voucher_renewal_items", "orders", "order_line_items", "outbox_events", "payments", "fuel_vouchers", "suppliers", "users", "provider_event_outbox" RESTART IDENTITY CASCADE""");
+            """TRUNCATE TABLE "voucher_exchanges", "movement_batches", "purchase_batches", "voucher_imports", "fulfillments", "orders", "order_line_items", "outbox_events", "payments", "fuel_vouchers", "suppliers", "users", "provider_event_outbox" RESTART IDENTITY CASCADE""");
 
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
