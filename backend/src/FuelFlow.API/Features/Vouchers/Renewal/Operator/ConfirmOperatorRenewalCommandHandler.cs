@@ -112,6 +112,28 @@ public sealed class ConfirmOperatorRenewalCommandHandler
             ? VoucherRenewalBranch.Extend
             : VoucherRenewalBranch.Replace;
 
+        // The ceiling, and the same rule the self-serve path applies at
+        // RenewalCheckoutCommandHandler.cs:135. `NewExpirationForExtend` has no supplier parameter by
+        // construction - its own contract says the caller checks the result via `CanExtend` - and this
+        // caller was not doing it.
+        //
+        // What it cost: an operator could choose a term the supplier's paper cannot cover, and the
+        // promise was stamped straight onto the voucher. The customer pays for fuel that stops
+        // working at the pump on the provider's date, days or weeks before the date we told them.
+        // Nothing caught it - there was no database constraint, and fulfilment, which does check,
+        // simply took the other branch and quietly replaced the voucher instead.
+        //
+        // Refused rather than silently downgraded to Replace. Checkout refuses for the same reason:
+        // the operator picked this term, and handing them a different operation without saying so is
+        // the failure mode this whole codebase argues against. The message is the self-serve one so
+        // the two paths read identically.
+        if (branch == VoucherRenewalBranch.Extend &&
+            !VoucherRenewalEligibility.CanExtend(
+                voucher.CustomerExpirationDate, voucher.SupplierExpirationDate, term))
+            throw new VoucherRenewalException("provider_term_exhausted",
+                $"The '{command.TermCode}' term runs past this voucher's supplier validity " +
+                $"(valid to {voucher.SupplierExpirationDate:yyyy-MM-dd}). Renew it as a replacement, or pick a shorter term.");
+
         var oldExpiration = voucher.CustomerExpirationDate;
         var now = DateTime.UtcNow;
 

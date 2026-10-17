@@ -190,13 +190,11 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
                            'Assigned', 'Used', 'Expired', 'Blocked', 'Deactivated')
                 """);
 
-            // Deliberately NOT constrained: customer_expiration_date <= supplier_expiration_date.
-            // It looks obviously true and is not - ConfirmOperatorRenewalCommandHandler stamps the
-            // customer's promise from the *renewal term*, not from the paper's own date ("the extra
-            // real life is a reserve"), so a deliberate business rule produces customer > brand.
-            // A constraint here would refuse a renewal the business has already decided to allow.
-            // VOUCHER_RENEWAL.md:371-374 records that as an open commercial decision, so it stays
-            // a decision rather than becoming an exception nobody can add.
+            // We promise a customer fuel only while the supplier's paper is still alive. Without this
+            // the rule lived in code, on some paths, and a path that forgot it sold fuel the pump will
+            // refuse.
+            t.HasCheckConstraint("ck_voucher_customer_term_within_supplier_term",
+                "customer_expiration_date <= supplier_expiration_date");
         });
 
         builder.Property(e => e.UpdatedAtUtc)
