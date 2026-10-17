@@ -1,6 +1,7 @@
 using FluentAssertions;
 using FuelFlow.BackgroundJobs;
 using FuelFlow.Features.Brands;
+using FuelFlow.Features.Pricing;
 using FuelFlow.Features.Pricing.BackfillBrandFuelCodes;
 using FuelFlow.Features.Pricing.ImportOkkoCatalogue;
 using FuelFlow.Features.Pricing.ImportOkkoPumpPrices;
@@ -61,10 +62,11 @@ public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDataba
         ILogger<OkkoPriceSyncService>? logger = null)
     {
         var events = new AuditEventService(context);
+        var priceRecorder = new OfferPriceRecorder(context);
         return new OkkoPriceSyncService(
             new StubClient(sheet),
-            new ImportOkkoPumpPricesCommandHandler(context, events),
-            new ImportOkkoCatalogueCommandHandler(context, events),
+            new ImportOkkoPumpPricesCommandHandler(context, events, priceRecorder),
+            new ImportOkkoCatalogueCommandHandler(context, events, priceRecorder),
             new BackfillBrandFuelCodesCommandHandler(context, events),
             context,
             Options.Create(new OkkoPriceOptions { Enabled = true }),
@@ -99,6 +101,12 @@ public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDataba
             context.FuelOfferVolumes.RemoveRange(await context.FuelOfferVolumes
                 .Where(v => seededOfferIds.Contains(v.OfferId))
                 .ToListAsync());
+
+            // The price history hangs off the offer with a foreign key and no cascade, so it goes first.
+            context.FuelOfferPrices.RemoveRange(await context.FuelOfferPrices
+                .Where(p => seededOfferIds.Contains(p.OfferId))
+                .ToListAsync());
+
             context.FuelOffers.RemoveRange(seededOffers);
             context.FuelTypes.RemoveRange(seededFuels);
             await context.SaveChangesAsync();
