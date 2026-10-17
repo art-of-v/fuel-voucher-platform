@@ -336,6 +336,12 @@ public sealed class RenewalCheckoutCommandHandler
             // The line item mirrors the source voucher (brand/fuel/nominal) so the shared refund
             // maths — which groups by Brand/FuelTypeId/Liters and refunds unfulfilled units — works
             // unchanged when a renewal order ends up only partially fulfilled.
+            //
+            // It also now carries the three things that make the line a renewal rather than a
+            // description of one: which voucher is being renewed, for what term, and which branch was
+            // chosen. They used to live only on voucher_renewal_items, which meant the line the money
+            // is charged against could not say what it was for, and the branch could only be
+            // reconstructed from a table that has nothing to do with the line.
             order.LineItems.Add(new OrderLineItem
             {
                 Id = Guid.CreateVersion7(),
@@ -345,7 +351,14 @@ public sealed class RenewalCheckoutCommandHandler
                 Liters = line.Source.Liters,
                 Quantity = 1,
                 UnitPrice = line.LineAmount,
-                LineTotal = line.LineAmount
+                LineTotal = line.LineAmount,
+                // The term is the input to CanExtend and to the expiry the customer is promised;
+                // ck_order_line_renewal_has_term refuses this line without it.
+                TermCode = line.Term.Code(),
+                SourceVoucherId = line.Source.Id,
+                RenewalBranch = line.Branch == VoucherRenewalBranch.Extend
+                    ? VoucherRenewalBranchCodes.Extend
+                    : VoucherRenewalBranchCodes.Replace
                 // OriginalLineTotal left null: a renewal fee has no pump-price reference, so it
                 // contributes no "saving vs pump" to the customer savings report.
             });

@@ -57,6 +57,21 @@ internal sealed class OrderLineItemConfiguration : IEntityTypeConfiguration<Orde
             .HasColumnName("term_code")
             .HasMaxLength(8);
 
+        // Null unless the line is a renewal. RESTRICT for the same reason
+        // voucher_renewal_items.source_voucher_id was: the voucher a customer paid to renew is
+        // evidence, and it must not be deletable out from under the line that names it.
+        builder.Property(e => e.SourceVoucherId)
+            .HasColumnName("source_voucher_id");
+
+        builder.HasOne(e => e.SourceVoucher)
+            .WithMany()
+            .HasForeignKey(e => e.SourceVoucherId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Property(e => e.RenewalBranch)
+            .HasColumnName("renewal_branch")
+            .HasMaxLength(16);
+
         builder.Property(e => e.PricingBasis)
             .HasColumnName("pricing_basis")
             .HasColumnType("jsonb");
@@ -70,6 +85,12 @@ internal sealed class OrderLineItemConfiguration : IEntityTypeConfiguration<Orde
         builder.HasIndex(e => e.FuelTypeId);
         builder.HasIndex(e => e.Brand);
 
+        // Fulfilment loads a renewal order's lines by their source voucher, and the customer timeline
+        // walks the replacement chain through it. Without an index both are a scan of every line ever
+        // placed.
+        builder.HasIndex(e => e.SourceVoucherId)
+            .HasDatabaseName("ix_order_line_items_source_voucher_id");
+
         builder.ToTable(t =>
         {
             // line_total is unit_price * quantity, computed in the handler. Nothing enforced that
@@ -80,6 +101,26 @@ internal sealed class OrderLineItemConfiguration : IEntityTypeConfiguration<Orde
                 "unit_price >= 0 AND line_total >= 0");
             t.HasCheckConstraint("ck_order_line_original_non_negative",
                 "original_line_total IS NULL OR original_line_total >= 0");
+
+            // The same two words operator_voucher_renewals uses, so the three places that answer
+            // "extend or replace?" share one vocabulary.
+            t.HasCheckConstraint("ck_order_line_renewal_branch",
+                "renewal_branch IS NULL OR renewal_branch IN ('extend','replace')");
+
+            // A line either is a renewal, carrying a source voucher and a branch, or it is not.
+            // Half a renewal is the state that reads as "renewal" in one query and "buy-fuel" in
+            // another, which is how the branch ends up derived from two different answers.
+            t.HasCheckConstraint("ck_order_line_renewal_pair_is_whole",
+                "(renewal_branch IS NULL) = (source_voucher_id IS NULL)");
+
+            // The term is the INPUT to the branch decision (VoucherRenewalEligibility.CanExtend) and
+            // to the expiry the customer is given. A renewal line without one cannot be fulfilled.
+            //
+            // This is the check whose absence cost a day: renewal lines were created with a null
+            // term_code and the term lived only on voucher_renewal_items, so the line described the
+            // purchase without stating what was bought for it.
+            t.HasCheckConstraint("ck_order_line_renewal_has_term",
+                "renewal_branch IS NULL OR term_code IS NOT NULL");
         });
     }
 }

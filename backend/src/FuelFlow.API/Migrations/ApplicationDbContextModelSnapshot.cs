@@ -1055,6 +1055,15 @@ namespace FuelFlow.API.Migrations
                         .HasDefaultValue(1)
                         .HasColumnName("quantity");
 
+                    b.Property<string>("RenewalBranch")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("renewal_branch");
+
+                    b.Property<Guid?>("SourceVoucherId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_voucher_id");
+
                     b.Property<string>("TermCode")
                         .HasMaxLength(8)
                         .HasColumnType("character varying(8)")
@@ -1072,6 +1081,9 @@ namespace FuelFlow.API.Migrations
 
                     b.HasIndex("OrderId");
 
+                    b.HasIndex("SourceVoucherId")
+                        .HasDatabaseName("ix_order_line_items_source_voucher_id");
+
                     b.ToTable("order_line_items", null, t =>
                         {
                             t.HasCheckConstraint("ck_order_line_non_negative_prices", "unit_price >= 0 AND line_total >= 0");
@@ -1081,6 +1093,12 @@ namespace FuelFlow.API.Migrations
                             t.HasCheckConstraint("ck_order_line_positive_liters", "liters > 0");
 
                             t.HasCheckConstraint("ck_order_line_positive_quantity", "quantity > 0");
+
+                            t.HasCheckConstraint("ck_order_line_renewal_branch", "renewal_branch IS NULL OR renewal_branch IN ('extend','replace')");
+
+                            t.HasCheckConstraint("ck_order_line_renewal_has_term", "renewal_branch IS NULL OR term_code IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_order_line_renewal_pair_is_whole", "(renewal_branch IS NULL) = (source_voucher_id IS NULL)");
                         });
                 });
 
@@ -3878,7 +3896,14 @@ namespace FuelFlow.API.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", "SourceVoucher")
+                        .WithMany()
+                        .HasForeignKey("SourceVoucherId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Order");
+
+                    b.Navigation("SourceVoucher");
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Vouchers.Exchange.MovementBatch", b =>
