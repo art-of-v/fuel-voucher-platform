@@ -293,7 +293,7 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
             Id = id,
             OfferId = offerId,
             Liters = liters,
-            PackagePrice = price,
+            PriceOverrideUah = price,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow.AddMinutes(-updatedMinutesAgo),
         });

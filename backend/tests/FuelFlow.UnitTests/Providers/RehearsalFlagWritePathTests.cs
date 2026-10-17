@@ -469,7 +469,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         _context.FuelOffers.Add(offer);
         _context.FuelOfferVolumes.Add(new FuelOfferVolume
         {
-            Id = "qa-vol-a95", OfferId = offer.Id, Liters = 10m, PackagePrice = 723.40m,
+            Id = "qa-vol-a95", OfferId = offer.Id, Liters = 10m, PriceOverrideUah = 723.40m,
             CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
         });
     }

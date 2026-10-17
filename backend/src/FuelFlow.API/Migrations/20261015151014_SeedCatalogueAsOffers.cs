@@ -95,11 +95,41 @@ namespace FuelFlow.API.Migrations
                         (id, offer_id, liters, package_price, is_deleted, deleted_at_utc,
                          created_at_utc, updated_at_utc)
                     VALUES
-                        ({Quote(volume.Id)}, {Quote(historicalKey[volume.OfferId])}, {Num(volume.Liters)}, {Num(volume.PackagePrice)},
+                        ({Quote(volume.Id)}, {Quote(historicalKey[volume.OfferId])}, {Num(volume.Liters)}, {Num(SeededPackagePrice(volume))},
                          FALSE, NULL, {Ts(volume.CreatedAtUtc)}, {Ts(volume.UpdatedAtUtc)})
                     ON CONFLICT (id) DO NOTHING;
                     """);
             }
+        }
+
+        /// <summary>
+        /// The price this migration's volume rows carry, which the current entity no longer has.
+        /// </summary>
+        /// <remarks>
+        /// Second hand-edited line in this file, same reason as the offer's final price above:
+        /// <c>package_price</c> was dropped by <c>PackagePriceOverrideOnNominals</c> after this migration
+        /// had already run everywhere, and the seed rows it writes here have to keep the totals they wrote
+        /// then. Recomputed from the seed's own numbers — the offer's rate × the volume's litres — which is
+        /// exactly what those rows held: <c>finalPrice × liters</c>, with no pump price seeded so the rate
+        /// is <c>cost + margin</c>.
+        /// </remarks>
+        private static decimal SeededPackagePrice(FuelOfferVolume volume)
+        {
+            var offer = SeedData.Catalogue.Offers.First(o => o.Id == volume.OfferId);
+            var perLiter = FuelPricing.FinalPerLiterOrNull(
+                offer.SupplierPricePerLiter,
+                offer.MarginUahPerLiter,
+                offer.PumpPricePerLiter,
+                offer.MinDiscountPerLiter);
+
+            if (perLiter is not { } price)
+            {
+                throw new InvalidOperationException(
+                    $"Seeded volume {volume.Id} has no derivable price, so this migration cannot reproduce the "
+                    + "package_price it wrote originally.");
+            }
+
+            return Math.Round(price * volume.Liters, 2, MidpointRounding.AwayFromZero);
         }
 
         protected override void Down(MigrationBuilder migrationBuilder)

@@ -100,7 +100,7 @@ public sealed class UpdateNominalsReuseTests : IDisposable
                 "okko", "okko-a95",
                 supplierPricePerLiter: 90m, marginUahPerLiter: 10m, finalPricePerLiter: 100m).Id,
             Liters = l,
-            PackagePrice = 1000m,
+            PriceOverrideUah = 1000m,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
         }).ToList();

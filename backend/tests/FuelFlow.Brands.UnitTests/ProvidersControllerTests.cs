@@ -274,7 +274,7 @@ public sealed class BrandsControllerTests : IDisposable
         fuel.DiscountPrice.Should().Be(97.86m);
 
         var volume = await _context.FuelOfferVolumes.SingleAsync(v => v.Offer.FuelTypeId == fuel.Id);
-        volume.PackagePrice.Should().Be(978.60m);
+        // No override on a fuel added through the brand screen: the package price is the rate x litres.`n        volume.PriceOverrideUah.Should().BeNull();`n        volume.Liters.Should().Be(10m);
     }
 
     [Fact]
@@ -363,7 +363,7 @@ public sealed class BrandsControllerTests : IDisposable
         // surviving a reprice, which is the failure the old per-package columns allowed.
         var volumes = await _context.FuelOfferVolumes
             .Where(v => v.OfferId == offer.Id).ToListAsync();
-        volumes.Should().OnlyContain(v => v.PackagePrice == Math.Round(63m * v.Liters, 2, MidpointRounding.AwayFromZero));
+        // Nothing to restate per volume any more: the offer's rate moved, and every nominal follows it.`n        // What used to be checked here - that each volume's stored total was rewritten - is now`n        // structural: there is no stored total. Asserted instead that no override was invented.`n        volumes.Should().OnlyContain(v => v.PriceOverrideUah == null);
     }
 
     [Fact]
@@ -450,7 +450,7 @@ public sealed class BrandsControllerTests : IDisposable
 
         var volume = await _context.FuelOfferVolumes.SingleAsync(v => v.OfferId == offer.Id);
         volume.Liters.Should().Be(20m);
-        volume.PackagePrice.Should().Be(Math.Round(51m * 20m, 2, MidpointRounding.AwayFromZero));
+        volume.PriceOverrideUah.Should().BeNull("a nominal priced by the operator stays null and follows the offer");
     }
 
     [Fact]

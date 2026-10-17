@@ -153,7 +153,7 @@ public sealed class PricingFormulaTests
         {
 
             Liters = 10m,
-            PackagePrice = 9999,                    // stale frozen price must be ignored
+            PriceOverrideUah = null,             // no exception: priced like the rest of the fuel
             SupplierPricePerLiter = 49m,     // cost
             MarginUahPerLiter = 7m,          // profit → cost-plus 56
             PumpPricePerLiter = 55m,
@@ -167,35 +167,52 @@ public sealed class PricingFormulaTests
     }
 
     [Fact]
-    public void PackagePrice_NoKnobs_FallsBackToTheVolumesOwnPrice()
+    public void PackagePrice_NoKnobs_FallsBackToTheVolumesOwnOverride()
     {
         var pkg = new SellablePackage
         {
             Liters = 10m,
-            // The volume's own figure. It used to be a frozen price kept in step by hand; it is now
-            // the per-nominal override, and this is the one case it serves: an offer nobody has priced.
-            PackagePrice = 510,
+            // The one case an override exists for: an offer nobody has priced, with this size priced
+            // by hand. It is the only number that exists, so it is the charge.
+            PriceOverrideUah = 510m,
             SupplierPricePerLiter = null,
             MarginUahPerLiter = null,
         };
 
-        // Before 2026-10-17 there was a stored per-litre figure to fall back to when the knobs were
-        // incomplete. There is none, and 9999 must not come back as a charge: an offer with no cost and
-        // no margin has no rate of its own, so the volume's figure is the only number that exists.
         ServerPricing.PackagePrice(pkg, 10m).Should().Be(510);
     }
 
     [Fact]
-    public void PackagePrice_NoPerLiterData_UsesTheVolumesOwnPrice()
+    public void PackagePrice_NoKnobsAndNoOverride_IsRefusedRatherThanCharged()
     {
         var pkg = new SellablePackage
         {
-            Liters = 10m, PackagePrice = 510,
+            Liters = 10m,
+            PriceOverrideUah = null,
             SupplierPricePerLiter = null,
             MarginUahPerLiter = null,
         };
 
-        ServerPricing.PackagePrice(pkg, 10m).Should().Be(510);
+        // Neither a rate nor a hand-written price. Returning zero here would put a free fuel on the
+        // shelf; the checkout handlers resolve the package before pricing it and never reach this, so
+        // throwing says "this cannot be sold" instead of quietly charging nothing.
+        var act = () => ServerPricing.PackagePrice(pkg, 10m);
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void PackagePrice_AnOverrideWins_OverTheFormula()
+    {
+        var pkg = new SellablePackage
+        {
+            Liters = 10m,
+            // A round marketing price for this size, on a fuel whose rate would say otherwise.
+            PriceOverrideUah = 500m,
+            SupplierPricePerLiter = 49m,
+            MarginUahPerLiter = 2m,      // rate would be 51/litre = 510
+        };
+
+        ServerPricing.PackagePrice(pkg, 10m).Should().Be(500m);
     }
 
     // --- ServerPricing.IsBelowCost -----------------------------------------
@@ -205,28 +222,49 @@ public sealed class PricingFormulaTests
     /// fall back to <c>Price</c> — the frozen PACKAGE TOTAL — and compare it against a per-litre cost.
     /// 590 UAH for 50 L read as "590 vs 54" and looked profitable while the customer was being charged
     /// 11.80/litre against a 54/litre cost: a 42 UAH/litre loss on every litre, guard green.
+    /// <para>
+    /// The column that held that total is now an <b>override</b>, and an override IS charged as given — so
+    /// this case is judged, not skipped. That is the point of the guard's new branch: an operator who
+    /// prices one nominal below cost gets the block, which is what stops an override from being a way to
+    /// sell at a loss. The assertion below is that it says so rather than passing.
+    /// </para>
     /// </summary>
     [Fact]
     public void IsBelowCost_NeverComparesThePackageTotalAgainstAPerLiterCost()
     {
         var pkg = new SellablePackage
         {
-
             Liters = 50m,
-            PackagePrice = 590m,                    // package TOTAL — a different unit entirely
-            SupplierPricePerLiter = 54m,     // per-litre cost
-            MarginUahPerLiter = null,        // ...and no per-litre price to be derived from
+            PriceOverrideUah = 590m,                 // package TOTAL — a different unit entirely
+            SupplierPricePerLiter = 54m,             // per-litre cost
+            MarginUahPerLiter = null,                // ...and no per-litre rate to be derived from
             PumpPricePerLiter = 92.90m,
         };
 
         // What the customer is actually charged, per litre:
         (ServerPricing.PackagePrice(pkg, 50m) / 50m).Should().BeLessThan(54m);
 
-        ServerPricing.IsBelowCost(pkg, 0m).Should().BeFalse(
-            "the guard cannot prove a loss from a per-litre cost and a package total");
+        // The override is the charge, so 590 for 50 L against a cost of 54/litre is a 42 UAH/litre loss
+        // and is refused. Per litre against per litre — the mistake this test has always covered was
+        // comparing the total to the rate, not comparing the override at all.
+        ServerPricing.IsBelowCost(pkg, 0m).Should().BeTrue();
         ServerPricing.TryGetBelowCostVerdict(pkg, 0m)
-            .Should().Be(ServerPricing.BelowCostVerdict.UnknownCost,
-                "and it must say so rather than pass silently");
+            .Should().Be(ServerPricing.BelowCostVerdict.BelowCost);
+    }
+
+    [Fact]
+    public void IsBelowCost_AnOverrideAtOrAboveCost_IsFine()
+    {
+        var pkg = new SellablePackage
+        {
+            Liters = 10m,
+            PriceOverrideUah = 500m,                 // 50/litre against a 49/litre cost
+            SupplierPricePerLiter = 49m,
+            MarginUahPerLiter = 2m,
+        };
+
+        ServerPricing.TryGetBelowCostVerdict(pkg, 0m)
+            .Should().Be(ServerPricing.BelowCostVerdict.AboveCost);
     }
 
     [Fact]

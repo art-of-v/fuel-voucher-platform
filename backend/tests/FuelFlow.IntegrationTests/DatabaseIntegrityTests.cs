@@ -201,7 +201,7 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
     {
         await using var context = CreateContext();
         var volume = NewVolume("vol-negative-price", 10);
-        volume.PackagePrice = -100m;
+        volume.PriceOverrideUah = -100m;
         context.FuelOfferVolumes.Add(volume);
 
         var act = async () => await context.SaveChangesAsync();
@@ -274,7 +274,9 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
                 Id = "vol-free-giveaway",
                 OfferId = offer.Id,
                 Liters = 5m,
-                PackagePrice = 0m,
+                // A free nominal, said so: 0 is a legal override, and the volume the offer's rate
+                // would price from is now written by nothing at all.
+                PriceOverrideUah = 0m,
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow
             });
@@ -311,15 +313,15 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
     /// into a wiring assertion that passes for the wrong reason. The sign constraints live on the
     /// volume's own columns and fire before anything else is consulted.
     /// </summary>
-    private static FuelOfferVolume NewVolume(string id, double liters, decimal price = 100m) => new()
+    private static FuelOfferVolume NewVolume(string id, double liters, decimal? overrideUah = 100m) => new()
     {
         Id = id,
         OfferId = $"no-such-offer-{id}",
         Liters = (decimal)liters,
-        // Set outright rather than derived from liters - the zero-litre case divides by zero, and
+        // Set outright rather than derived from litres - the zero-litre case would divide by zero, and
         // the point of that test is that the row is rejected by the database, not that the test
         // helper survived building it.
-        PackagePrice = price,
+        PriceOverrideUah = overrideUah,
         CreatedAtUtc = DateTime.UtcNow,
         UpdatedAtUtc = DateTime.UtcNow
     };

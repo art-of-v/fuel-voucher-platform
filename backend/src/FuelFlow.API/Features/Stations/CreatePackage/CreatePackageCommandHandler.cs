@@ -135,7 +135,13 @@ public sealed class CreatePackageCommandHandler
             Id = command.Package.Id,
             OfferId = offerId,
             Liters = command.Package.Liters,
-            PackagePrice = command.Package.Price,
+            // The only thing a caller can set about this package's price, and it is deliberately an
+            // override: null - the ordinary case - leaves the nominal on the offer's rate, and a number
+            // makes this one size an exception that survives every later reprice. The endpoint is kept
+            // because an operator occasionally needs exactly that (a round marketing price for a 50 L
+            // canister) and because it is the only way to create a nominal at all; it is not how a
+            // catalogue is priced, and the brand screen is.
+            PriceOverrideUah = command.Package.PriceOverrideUah,
             CreatedAtUtc = now,
             UpdatedAtUtc = now,
         };
@@ -143,7 +149,9 @@ public sealed class CreatePackageCommandHandler
         await _context.SaveChangesAsync(ct);
 
         // The response is still a package, because that is the contract this endpoint publishes: same
-        // JSON, same id, same field names. The caller has no reason to know a volume and an offer
+        // JSON, same id, same field names. `price` on the way out is the effective one — the override if
+        // there is one, the offer's rate × litres otherwise — so a caller that posted no override still
+        // reads back what the customer will pay. The caller has no reason to know a volume and an offer
         // are what it is looking at.
         var fuelName = await _context.FuelTypes
             .Where(f => f.Id == command.Package.FuelTypeId)

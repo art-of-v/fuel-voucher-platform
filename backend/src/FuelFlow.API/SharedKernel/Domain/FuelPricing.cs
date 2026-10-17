@@ -102,4 +102,94 @@ public static class FuelPricing
         }
         return salePrice;
     }
+
+    /// <summary>
+    /// What a nominal costs, from the offer's rate and the volume's optional override.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>One function, because a shelf price and a charged price that disagree are the bug this
+    /// column pair used to be able to cause.</b> The storefront, the basket, the quote and the charge all
+    /// come through here, so "what the customer sees" and "what the customer is charged" cannot drift:
+    /// there is one expression and every caller uses it.
+    /// </para>
+    /// <para>
+    /// <b>An override is an exception, and this is where it is honoured.</b> Null means "price it like
+    /// the rest of the fuel" — the ordinary case, and the one every write path produces. A number means an
+    /// operator set this nominal deliberately (a round marketing price for a 50 L canister, say), and it
+    /// survives a repricing of the offer rather than being overwritten, which is what the old
+    /// <c>package_price</c> column could not do.
+    /// </para>
+    /// <para>
+    /// Rounded to the kopeck half away from zero, matching per-line rounding at checkout. Money is
+    /// decimal UAH throughout (spec §12).
+    /// </para>
+    /// </remarks>
+    /// <param name="costPerLiter">The offer's supplier cost, or null when the fuel is not priced yet.</param>
+    /// <param name="profitPerLiter">The offer's margin, or null when the fuel is not priced yet.</param>
+    /// <param name="pumpPricePerLiter">The pump ceiling (колонка), or null when none is recorded.</param>
+    /// <param name="minDiscountPerLiter">The guaranteed gap under the ceiling, or null for zero.</param>
+    /// <param name="liters">The nominal being priced.</param>
+    /// <param name="overrideUah">
+    /// This nominal's own price, when one was set. Wins over the arithmetic, including when it is lower —
+    /// the below-cost guard, not this function, is where a price that loses money is refused.
+    /// </param>
+    public static decimal PackagePrice(
+        decimal? costPerLiter,
+        decimal? profitPerLiter,
+        decimal? pumpPricePerLiter,
+        decimal? minDiscountPerLiter,
+        decimal liters,
+        decimal? overrideUah)
+        => TryPackagePrice(costPerLiter, profitPerLiter, pumpPricePerLiter, minDiscountPerLiter, liters, overrideUah)
+           ?? throw new InvalidOperationException(
+               "The offer has no supplier cost or no margin, and this volume carries no price override, "
+               + "so there is no price to quote.");
+
+    /// <summary>
+    /// The nullable form of <see cref="PackagePrice"/>, for the callers that can meet a nominal with no
+    /// price and have to decide what to do about it rather than fail.
+    /// </summary>
+    /// <remarks>
+    /// Three callers, three answers, which is why this is separate from the throwing one. The storefront
+    /// skips such a package: it cannot be bought and a zero on the shelf is a free fuel. The admin
+    /// listing shows it at zero, because an operator needs to see that the nominal exists and is not
+    /// priced yet. Checkout throws, because charging nothing is not an option.
+    /// </remarks>
+    public static decimal? TryPackagePrice(
+        decimal? costPerLiter,
+        decimal? profitPerLiter,
+        decimal? pumpPricePerLiter,
+        decimal? minDiscountPerLiter,
+        decimal liters,
+        decimal? overrideUah)
+    {
+        if (overrideUah is { } set)
+        {
+            return set;
+        }
+
+        if (FinalPerLiterOrNull(costPerLiter, profitPerLiter, pumpPricePerLiter, minDiscountPerLiter) is not { } price)
+        {
+            return null;
+        }
+
+        return Math.Round(price * liters, 2, MidpointRounding.AwayFromZero);
+    }
+
+    /// <summary>
+    /// Whether charging <paramref name="packagePrice"/> for this nominal would sell under its supplier
+    /// cost — the same question <see cref="IsBelowCost(decimal,decimal,decimal?,decimal)"/> asks, but
+    /// asked about the price that will actually be charged rather than about the rate the formula yields.
+    /// </summary>
+    /// <remarks>
+    /// This is what makes an override subject to the same guard as everything else. Without it, a
+    /// per-nominal override would be the one way to sell under cost without the block firing, because the
+    /// guard would judge the rate while the customer was charged the override.
+    /// </remarks>
+    public static bool IsBelowCost(decimal? costPerLiter, decimal liters, decimal packagePrice)
+        => costPerLiter is { } cost
+           && cost > 0m
+           && liters > 0m
+           && packagePrice < cost * liters;
 }

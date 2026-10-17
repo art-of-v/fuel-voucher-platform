@@ -393,11 +393,13 @@ private readonly GetBrandsQueryHandler _getAll;
                 Id = Guid.CreateVersion7().ToString(),
                 OfferId = offer.Id,
                 Liters = liters,
-                // Frozen package total: what the customer pays for this package, not necessarily
-                // finalPerLiter × litres. The storefront's struck-through "before" price is recomputed
-                // from the pump price via FuelPricing.OriginalPackagePrice (planning #73), so it is
-                // never the supplier cost, which must not leak to anonymous callers.
-                PackagePrice = Math.Round(finalPerLiter * liters, 2, MidpointRounding.AwayFromZero),
+                // No price override: a fuel added through this screen is priced like itself, and the
+                // "before" price the storefront strikes through is recomputed from the pump price via
+                // FuelPricing.OriginalPackagePrice (planning #73), so the supplier cost never leaks to
+                // anonymous callers. An operator who wants one size priced by hand sets an override
+                // afterwards, and from then on it survives every reprice — which is what made this
+                // column worth having.
+                PriceOverrideUah = null,
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow,
             });
@@ -568,11 +570,10 @@ private readonly GetBrandsQueryHandler _getAll;
         // them was a second copy of the same number - and one the audit trail then compared against.
         offer.UpdatedAtUtc = DateTime.UtcNow;
 
-        foreach (var volume in volumes)
-        {
-            volume.PackagePrice = Math.Round(finalPerLiter * volume.Liters, 2, MidpointRounding.AwayFromZero);
-            volume.UpdatedAtUtc = DateTime.UtcNow;
-        }
+        // The loop that restated every volume's total after a reprice is gone, and its absence is the
+        // improvement rather than a gap: a volume's price is now the offer's rate x its litres unless
+        // somebody set an override, so there is nothing to restate - and an override is no longer erased
+        // by the next pump import, which is what made this endpoint dangerous to touch.
 
         // The history row, before the save that persists the offer - and it also stamps
         // price_updated_at / price_updated_by_user_id, which this endpoint previously left at their
@@ -808,10 +809,9 @@ private readonly GetBrandsQueryHandler _getAll;
 
                     if (kept is not null)
                     {
-                        // Same row, same id, same CreatedAtUtc - only the derived price is refreshed.
-                        // The per-litre columns are NOT rewritten here: they are the offer's, and
-                        // writing them per volume is the duplication this split removed.
-                        kept.PackagePrice = Math.Round(finalPrice * liters, 2, MidpointRounding.AwayFromZero);
+                        // Same row, same id, same CreatedAtUtc, and the same price: a kept nominal's
+                        // price follows its offer, so there is nothing to refresh. If it carries an override
+                        // that override survives, which is the one thing this endpoint used to undo.
                         kept.UpdatedAtUtc = now;
                         continue;
                     }
@@ -821,7 +821,7 @@ private readonly GetBrandsQueryHandler _getAll;
                         Id = Guid.CreateVersion7().ToString(),
                         OfferId = offer.Id,
                         Liters = liters,
-                        PackagePrice = Math.Round(finalPrice * liters, 2, MidpointRounding.AwayFromZero),
+                        PriceOverrideUah = null,   // priced from the offer like every other nominal
                         CreatedAtUtc = now,
                         UpdatedAtUtc = now,
                     });

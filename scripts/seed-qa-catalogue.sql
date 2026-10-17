@@ -119,13 +119,15 @@ ON CONFLICT (station_id, fuel_type_id, data_kind) DO NOTHING;
 -- that would breach ck_fuel_offer_volumes_id_length is refused loudly by that CHECK rather than
 -- silently truncated into a collision.
 INSERT INTO fuel_offer_volumes
-    (id, offer_id, liters, package_price,
+    (id, offer_id, liters, price_override_uah,
      created_at_utc, updated_at_utc, is_deleted, deleted_at_utc)
 SELECT
     'qa-' || live.id,
     live_offer.id || '-qa',
     live.liters,
-    live.package_price,
+    -- The mirror carries whatever exception the live nominal had. Most carry none: a volume's price is
+    -- its offer's rate x its litres, and the QA offer is a mirror of the live one, so null reproduces it.
+    live.price_override_uah,
     now(), now(), false, NULL
 FROM fuel_offer_volumes live
 JOIN fuel_offers live_offer ON live_offer.id = live.offer_id
@@ -206,7 +208,7 @@ ON CONFLICT DO NOTHING;
 
 \echo ''
 \echo 'QA catalogue seeded. Verify, as the QA account:'
-\echo '  select o.station_id, f.name, v.liters, v.package_price, o.data_kind'
+\echo '  select o.station_id, f.name, v.liters, v.price_override_uah, o.data_kind'
 \echo '    from fuel_offers o'
 \echo '    join fuel_offer_volumes v on v.offer_id = o.id'
 \echo '    join fuel_types f on f.id = o.fuel_type_id'

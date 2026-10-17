@@ -40,8 +40,11 @@ public sealed record SellablePackage
 
     public decimal Liters { get; init; }
 
-    /// <summary>What the whole package costs, in UAH. Was <c>FuelPackage.Price</c>.</summary>
-    public decimal PackagePrice { get; init; }
+    /// <summary>
+    /// This nominal's own price, or null to price it from the offer's rate. See
+    /// <see cref="FuelOfferVolume.PriceOverrideUah"/>.
+    /// </summary>
+    public decimal? PriceOverrideUah { get; init; }
 
     public decimal? PumpPricePerLiter { get; init; }
 
@@ -63,6 +66,24 @@ public sealed record SellablePackage
         FuelPricing.FinalPerLiterOrNull(
             SupplierPricePerLiter, MarginUahPerLiter, PumpPricePerLiter, MinDiscountPerLiter);
 
+    /// <summary>
+    /// What this nominal costs, through <see cref="FuelPricing.PackagePrice"/>: the override when there
+    /// is one, otherwise the offer's rate × these litres.
+    /// <para>
+    /// Throws when there is neither, which is the state of a fuel nobody has priced yet. Callers that can
+    /// meet it check <see cref="ComputedFinalPricePerLiter"/> first or handle the absence; this is
+    /// deliberately loud rather than returning zero, because a zero shelf price is a free fuel.
+    /// </para>
+    /// </summary>
+    public decimal ComputedPackagePrice =>
+        FuelPricing.PackagePrice(
+            SupplierPricePerLiter,
+            MarginUahPerLiter,
+            PumpPricePerLiter,
+            MinDiscountPerLiter,
+            Liters,
+            PriceOverrideUah);
+
     /// <summary>Which pool this came from. Carried so a caller can assert it matched what it asked for.</summary>
     public string DataKind { get; init; } = string.Empty;
 
@@ -74,7 +95,7 @@ public sealed record SellablePackage
         StationId = offer.StationId,
         FuelTypeId = offer.FuelTypeId,
         Liters = volume.Liters,
-        PackagePrice = volume.PackagePrice,
+        PriceOverrideUah = volume.PriceOverrideUah,
         PumpPricePerLiter = offer.PumpPricePerLiter,
         MinDiscountPerLiter = offer.MinDiscountPerLiter,
         SupplierPricePerLiter = offer.SupplierPricePerLiter,

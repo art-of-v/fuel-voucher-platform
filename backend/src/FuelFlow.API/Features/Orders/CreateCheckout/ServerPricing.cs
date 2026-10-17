@@ -9,6 +9,13 @@ namespace FuelFlow.Features.Orders.CreateCheckout;
 /// <see cref="FuelPricing.FinalPerLiter"/> so a checkout always reflects the current
 /// formula, then Price = round(final * liters, 2 dp) — decimal UAH to the kopeck
 /// (spec §12, #90; rounds half away from zero).
+/// <para>
+/// <b>A per-nominal override wins over the formula here, and is guarded here.</b> That is the whole
+/// point of making it an explicit, nullable column rather than a stored copy of the arithmetic: an
+/// operator can price one size by hand, the customer is charged that, and the below-cost check below is
+/// asked about the price that will actually be charged rather than about the rate the formula yields.
+/// Without that, an override would be the one way to sell under cost without the block firing.
+/// </para>
 /// </summary>
 public static class ServerPricing
 {
@@ -29,6 +36,15 @@ public static class ServerPricing
     /// </param>
     public static decimal PackagePrice(SellablePackage package, decimal liters, decimal discountPerLiter)
     {
+        // An override IS the price of this nominal, so it is the base the term discount comes off — not
+        // a fallback for when the offer has no rate. Discounting the formula instead and ignoring the
+        // override would make it a decoration: the shelf would show one number and the charge another.
+        if (package.PriceOverrideUah is { } @override)
+        {
+            var discountedOverride = Math.Max(0m, @override - Math.Max(0m, discountPerLiter) * liters);
+            return Math.Round(discountedOverride, 2, MidpointRounding.AwayFromZero);
+        }
+
         var perLiter = EffectivePricePerLiter(package);
         if (perLiter.HasValue)
         {
@@ -36,18 +52,11 @@ public static class ServerPricing
             return Math.Round(discounted * liters, 2, MidpointRounding.AwayFromZero);
         }
 
-        if (discountPerLiter <= 0m)
-        {
-            return package.PackagePrice;
-        }
-
-        // No per-liter price to discount against: scale the volume's own price by the same ratio the
-        // discount represents on the nominal, so a term still costs less. Reached only when the offer has
-        // no cost or no margin recorded, which on production is a catalogue-imported fuel nobody has
-        // priced yet; the below-cost guard still applies.
-        var nominalPerLiter = liters > 0m ? package.PackagePrice / liters : package.PackagePrice;
-        var reduced = Math.Max(0m, nominalPerLiter - Math.Max(0m, discountPerLiter));
-        return Math.Round(reduced * liters, 2, MidpointRounding.AwayFromZero);
+        // Neither an override nor a rate: there is nothing to charge. The checkout handlers resolve the
+        // package before pricing it and never reach here for an unpriced fuel, so this is a statement
+        // rather than a decision — and it refuses rather than quoting zero, because zero is a free fuel.
+        throw new InvalidOperationException(
+            "No per-litre price and no per-nominal override: there is nothing to charge.");
     }
 
     /// <summary>
@@ -86,6 +95,15 @@ public static class ServerPricing
     /// </remarks>
     public static decimal? DiscountedPricePerLiter(SellablePackage package, decimal discountPerLiter)
     {
+        if (package.PriceOverrideUah is { } @override)
+        {
+            // The guard asks about the per-litre figure the customer is charged, so it has to be the
+            // override's, discounted — not the formula's.
+            return package.Liters > 0m
+                ? Math.Max(0m, (@override - Math.Max(0m, discountPerLiter) * package.Liters) / package.Liters)
+                : null;
+        }
+
         var perLiter = EffectivePricePerLiter(package);
         if (perLiter is not { } price)
         {
@@ -135,6 +153,18 @@ public static class ServerPricing
         if (package.SupplierPricePerLiter is not { } cost || cost <= 0m)
         {
             return BelowCostVerdict.UnknownCost;
+        }
+
+        // An override IS the charged price, so the guard is asked about it rather than about the rate
+        // the formula would yield. Without this branch a per-nominal override would be the one route to
+        // selling under cost with the block green, which is the entire reason the override is an explicit
+        // column and not a second copy of the arithmetic.
+        if (package.PriceOverrideUah is { } @override)
+        {
+            var discounted = Math.Max(0m, @override - Math.Max(0m, discountPerLiter) * package.Liters);
+            return discounted < cost * package.Liters
+                ? BelowCostVerdict.BelowCost
+                : BelowCostVerdict.AboveCost;
         }
 
         var chargedPerLiter = DiscountedPricePerLiter(package, discountPerLiter);

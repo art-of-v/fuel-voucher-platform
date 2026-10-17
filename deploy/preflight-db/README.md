@@ -37,48 +37,42 @@ answer instead of an outage.
 **Both places kept the guard.** A precondition passing is not a promise, and the migration had to
 still refuse rather than pick a copy if the data changed between the preflight and the boot.
 
-## What `010` asks now
+## `010` is gone, and that is the point
 
-The file was renamed and rewritten when `DropFuelPackages` removed the table the original detector
-read. The question changed shape, not purpose.
+`010-offer-volume-price-agreement.sql` was deleted on 2026-10-17, together with its tests
+(`OfferVolumePriceAgreementTests`). It existed to answer one question — *does a volume's stored total
+disagree with its offer's rate, and by how much* — and there is no longer a stored total to disagree.
 
-The old detector counted how many distinct values a `(station, fuel, pool)` group held for each
-per-litre column on `fuel_packages`. Per-litre pricing then moved onto `fuel_offers`, and the unique
-index on `(station_id, fuel_type_id, data_kind)` makes one group exactly one row — so that
-disagreement is no longer representable and there would be nothing to count.
+The chain that made it necessary, in order:
 
-What is still expressible is the pair that holds a price in two places: an offer names a rate, a volume
-names what that nominal costs, and nothing ties them together. So `010` reports every live volume whose
-price disagrees with its offer by more than half a kopeck — **in UAH**, as `discrepancy_uah`, because that
-is what a customer would be over- or under-charged and it is the number a human resolving it needs.
+1. `SplitFuelPackagesIntoOffers` put the per-litre rate on `fuel_offers` and left each volume holding its
+   own total. One price, two copies, nothing tying them together: `010` was written for that.
+2. `DeriveTheOfferFinalPrice` (2026-10-17) dropped `fuel_offers.final_price_per_liter`, so the rate is
+   derived from the offer's knobs and the offer has a single source of truth for it. `010` was rewritten to
+   derive its rate too, and kept asking the same question.
+3. `PackagePriceOverrideOnNominals` (2026-10-17) replaced `fuel_offer_volumes.package_price` with a nullable
+   `price_override_uah`. Null means "the offer's rate × litres"; a number means an operator priced that size
+   on purpose. There is no longer a copy of the offer's price anywhere — `FuelPricing.PackagePrice` computes
+   the effective one, and every reader (shelf, quote, charge) uses that same function, so a drift between
+   what is shown and what is charged is not representable.
 
-The rate it compares against is now **derived**, not read. `DeriveTheOfferFinalPrice` (2026-10-17) dropped
-`fuel_offers.final_price_per_liter`, because it was `min(cost + margin, pump − minDiscount)` stored beside
-the three columns it is computed from and every write path computed it that way before writing it. The
-check mirrors `FuelPricing.FinalPerLiterOrNull` in SQL, nullability included, so it keeps comparing the
-same two numbers it always did.
-
-Offers with no supplier cost or no margin are skipped, not reported: there is no rate to disagree with, and
-that state is deliberate — it is what a fuel the catalogue import created and nobody has priced yet looks
-like. Firing on it would put a permanent warning on the deploy path.
-
-The tests are `OfferVolumePriceAgreementTests`, and they read this file from disk rather than
-repeating its SQL — so the two cannot drift apart.
+Deleting the check is therefore the intended outcome, not a gap. If a future change introduces a second
+copy of a price, it needs a check like this again — and `010`'s header, which is in the git history, says
+what to write.
 
 ## The files
 
 | File | Asks | Blocks |
 |---|---|---|
-| `010-offer-volume-price-agreement.sql` | Does any live volume's total disagree with its offer's rate, and by how much in UAH | yes |
 | `011-fuel-type-name-twins.sql` | Does any station have more than one **live** fuel row under one name | yes |
 | `012-offer-station-matches-its-fuel-type.sql` | Does any offer name a station its own fuel type does not | no — a question, not a gate (see its header) |
 
-`010` and `011` are preconditions their migrations refuse on: a failed deploy with the refusal on the
-box, versus thirty seconds and a list of rows to reconcile. `012` is different — it cannot be a
-precondition, because no constraint can span two tables, and it guards a state that is legal until
-proved otherwise. Both new files exist because `DropTheStationPrefixFromOfferKeys` (2026-10-17) keys an
-offer by its fuel type id alone: one live fuel per name per station is what makes the name identify a
-fuel, and an offer's station has to be its fuel type's for that key to mean anything.
+`011` is a precondition its migration refuses on: a failed deploy with the refusal on the box, versus
+thirty seconds and a list of rows to reconcile. `012` is different — it cannot be a precondition, because no
+constraint can span two tables, and it guards a state that is legal until proved otherwise. Both files exist
+because `DropTheStationPrefixFromOfferKeys` (2026-10-17) keys an offer by its fuel type id alone: one live
+fuel per name per station is what makes the name identify a fuel, and an offer's station has to be its fuel
+type's for that key to mean anything.
 
 ## Adding a file
 
@@ -98,11 +92,11 @@ fuel, and an offer's station has to be its fuel type's for that key to mean anyt
 production *did* violate it: two OKKO fuel types carried different per-litre prices across their
 volumes, and a blocking check would have stopped every deploy behind them. That was
 [planning #328](https://github.com/art-of-v/fuel-voucher-platform-planning/issues/328), and it is
-resolved. Run against production on 2026-10-16, both named fuel types reconcile to the kopeck across
-all six of their nominals, and this file returns zero rows:
+resolved — the check that caught it (`010`) has since been deleted along with the drift it watched for.
+The remaining gate, `011`, is strict and its data was clean when it was written:
 
 ```bash
-docker exec -i fuelflow-postgres psql -U fuelflow -d fuelflow -X -f - < deploy/preflight-db/010-offer-volume-price-agreement.sql
+docker exec -i fuelflow-postgres psql -U fuelflow -d fuelflow -X -f - < deploy/preflight-db/011-fuel-type-name-twins.sql
 ```
 
 So strict mode is available and is enabled.
@@ -119,5 +113,5 @@ worth having if the data is actually clean.
 Running one by hand:
 
 ```bash
-docker exec -i fuelflow-postgres psql -U fuelflow -d fuelflow -X -f - < deploy/preflight-db/010-offer-volume-price-agreement.sql
+docker exec -i fuelflow-postgres psql -U fuelflow -d fuelflow -X -f - < deploy/preflight-db/011-fuel-type-name-twins.sql
 ```

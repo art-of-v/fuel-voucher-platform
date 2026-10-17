@@ -103,12 +103,10 @@ public sealed class BlendedCostRecalculator
             offer.SupplierPricePerLiter = blendedCost;
             offer.UpdatedAtUtc = now;
 
-            foreach (var volume in volumes.Where(v => v.OfferId == offer.Id))
-            {
-                volume.PackagePrice = Math.Round(finalPerLiter * volume.Liters, 2, MidpointRounding.AwayFromZero);
-                volume.UpdatedAtUtc = now;
-            }
-
+            // The volumes are not restated. Their price is the offer's rate × litres unless an operator
+            // set an override on that nominal, and an override that a cost correction silently erased
+            // was not an override. They are still loaded and returned so the caller can report how many
+            // nominal totals moved with the cost.
             firstFinal = finalPerLiter;
             firstBase = pump ?? (finalPerLiter + minDiscount);
         }
