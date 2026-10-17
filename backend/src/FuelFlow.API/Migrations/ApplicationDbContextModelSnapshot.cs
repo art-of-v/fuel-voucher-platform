@@ -1554,6 +1554,8 @@ namespace FuelFlow.API.Migrations
 
                             t.HasCheckConstraint("ck_voucher_cost_non_negative", "cost_per_liter IS NULL OR cost_per_liter >= 0");
 
+                            t.HasCheckConstraint("ck_voucher_customer_term_within_supplier_term", "customer_expiration_date <= supplier_expiration_date");
+
                             t.HasCheckConstraint("ck_voucher_held_has_order", "status NOT IN ('Assigned', 'Used', 'Blocked') OR order_id IS NOT NULL");
 
                             t.HasCheckConstraint("ck_voucher_liters_positive", "liters > 0");

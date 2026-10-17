@@ -44,7 +44,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
             await ResetDataAsync(seed);
             SeedUser(seed, userId);
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
-            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "OKKO", "okko-95", 50m, oldExpiry));
+            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "OKKO", "okko-95", 50m, oldExpiry, supplierExpiry: today.AddMonths(12)));
             await seed.SaveChangesAsync();
         }
 
@@ -88,6 +88,63 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
             .Where(e => e.AggregateId == voucherId.ToString() && e.EventType == "VoucherRenewedByOperator")
             .ToListAsync();
         audit.Should().ContainSingle();
+    }
+
+    /// <summary>
+    /// The ceiling, on the operator path. The voucher's paper has five days left and the operator asked
+    /// for a month, so extending would promise fuel the pump stops honouring on day six.
+    ///
+    /// <para>
+    /// Refused rather than quietly downgraded to a replace: the operator chose this term, and silently
+    /// performing a different operation is the failure mode this codebase argues against elsewhere.
+    /// The same refusal, with the same code, is what the self-serve checkout does at
+    /// <c>RenewalCheckoutCommandHandler.cs:135</c>, and the database now enforces the rule underneath
+    /// both in <c>ck_voucher_customer_term_within_supplier_term</c>.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task Extend_BeyondTheSupplierTerm_IsRefused()
+    {
+        var userId = Guid.NewGuid();
+        var voucherId = Guid.NewGuid();
+        var actingUserId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var customerExpiry = today.AddDays(5);
+        // Deliberately NOT given a supplierExpiry override: both dates are the same, five days out.
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+            SeedUser(seed, userId);
+            var purchaseOrderId = SeedPurchaseOrder(seed, userId);
+            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "OKKO", "okko-95", 50m, customerExpiry));
+            await seed.SaveChangesAsync();
+        }
+
+        var act = async () =>
+        {
+            await using var ctx = CreateContext();
+            return await Handler(ctx).HandleAsync(new ConfirmOperatorRenewalCommand
+            {
+                VoucherId = voucherId,
+                TermCode = "1m",
+                SurchargeUah = 120.50m,
+                ActingUserId = actingUserId,
+                ActingUserName = "Op Erator"
+            });
+        };
+
+        var thrown = await act.Should().ThrowAsync<VoucherRenewalException>();
+        thrown.Which.Code.Should().Be("provider_term_exhausted");
+
+        using var verify = CreateContext();
+        var voucher = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == voucherId);
+        voucher.CustomerExpirationDate.Should().Be(customerExpiry,
+            "a refused renewal must leave the customer exactly where they were");
+        voucher.Status.Should().Be(VoucherStatus.Assigned);
+        (await verify.OperatorVoucherRenewals.AsNoTracking().AnyAsync(r => r.VoucherId == voucherId))
+            .Should().BeFalse("no settlement row for an operation that did not happen");
     }
 
     [Fact]
@@ -328,7 +385,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
             await ResetDataAsync(seed);
             SeedUser(seed, userId);
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
-            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "OKKO", "okko-95", 20m, today.AddDays(10)));
+            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "OKKO", "okko-95", 20m, today.AddDays(10), supplierExpiry: today.AddMonths(12)));
             await seed.SaveChangesAsync();
         }
 
@@ -418,7 +475,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
             await ResetDataAsync(seed);
             SeedUser(seed, userId);
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
-            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "OKKO", "okko-95", 50m, today.AddDays(5)));
+            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "OKKO", "okko-95", 50m, today.AddDays(5), supplierExpiry: today.AddMonths(12)));
             await seed.SaveChangesAsync();
         }
 
@@ -478,7 +535,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
             await ResetDataAsync(seed);
             SeedUser(seed, userId);
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
-            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "OKKO", "okko-95", 50m, today.AddDays(5)));
+            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "OKKO", "okko-95", 50m, today.AddDays(5), supplierExpiry: today.AddMonths(12)));
             await seed.SaveChangesAsync();
         }
 
@@ -555,15 +612,23 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
         return orderId;
     }
 
-    private static FuelVoucher CustomerVoucher(Guid id, Guid userId, Guid orderId, string brand, string fuelTypeId, decimal liters, DateOnly expiry)
+/// <param name="expiry">Both dates, unless <paramref name="supplierExpiry"/> says otherwise.</param>
+/// <param name="supplierExpiry">
+/// The supplier's own term, defaulted to the same date. Pass a later one for an Extend case: the
+/// ceiling rule (ck_voucher_customer_term_within_supplier_term) means a voucher whose paper runs out
+/// in five days cannot be extended by a month at all - that is a replace, and the handler refuses it.
+/// </param>
+    private static FuelVoucher CustomerVoucher(
+        Guid id, Guid userId, Guid orderId, string brand, string fuelTypeId, decimal liters,
+        DateOnly expiry, DateOnly? supplierExpiry = null)
         => new()
-        {
-            Id = id,
-            Brand = brand,
-            FuelTypeId = fuelTypeId,
-            Liters = liters,
-            SupplierExpirationDate = expiry,
-            CustomerExpirationDate = expiry,
+    {
+        Id = id,
+        Brand = brand,
+        FuelTypeId = fuelTypeId,
+        Liters = liters,
+        SupplierExpirationDate = supplierExpiry ?? expiry,
+        CustomerExpirationDate = expiry,
             VoucherNumber = $"CUS-{id:N}"[..16],
             QrPayload = $"qr-{id:N}",
             Status = VoucherStatus.Assigned,
