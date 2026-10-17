@@ -70,6 +70,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
                 TermCode = "1m",
                 CreatedAtUtc = DateTime.UtcNow
             });
+            MarkAsRenewalLine(seed, orderId, sourceId, termCode: "1m");
 
             await seed.SaveChangesAsync();
         }
@@ -95,6 +96,16 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         // History snapshot: the exact "valid from -> to" range this extend bought.
         item.PreviousCustomerExpiration.Should().Be(sourceExpiry);
         item.NewCustomerExpiration.Should().Be(sourceExpiry.AddMonths(1));
+
+        // And on the order line, which is where the renewal's record is moving to (D-13). Asserted on
+        // both sides because this is an expand step: the two are written from the same values in the
+        // same loop iteration, and the contract step drops the old one.
+        var lines = await verify.OrderLineItems.AsNoTracking().Where(l => l.OrderId == orderId).ToListAsync();
+        var line = lines.Should().ContainSingle(because: "a renewal order has one renewal line").Subject;
+        line.SourceVoucherId.Should().Be(sourceId);
+        line.RenewalBranch.Should().Be(VoucherRenewalBranchCodes.Extend);
+        line.PreviousCustomerExpiration.Should().Be(sourceExpiry);
+        line.NewCustomerExpiration.Should().Be(sourceExpiry.AddMonths(1));
 
         var fulfillments = await verify.Fulfillments.AsNoTracking().Where(f => f.OrderId == orderId).ToListAsync();
         fulfillments.Should().ContainSingle().Which.VoucherId.Should().Be(sourceId);
@@ -1336,6 +1347,26 @@ var exchangedId = Guid.NewGuid();
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };
+
+    /// <summary>
+    /// Turns a renewal order's line into the renewal line it is supposed to be.
+    /// </summary>
+    /// <remarks>
+    /// Since #1180 the order line carries the renewal's whole intent - source voucher, term, branch -
+    /// so a fixture that seeds a renewal order has to say so on the line, not only on
+    /// <c>voucher_renewal_items</c>, or it describes an order the application cannot produce.
+    /// Matched by order id, which is exact; the source voucher has to be passed in because nothing
+    /// else in a fixture knows it.
+    /// </remarks>
+    private static OrderLineItem MarkAsRenewalLine(
+        ApplicationDbContext seed, Guid orderId, Guid sourceVoucherId, string termCode)
+    {
+        var line = seed.OrderLineItems.Local.First(l => l.OrderId == orderId);
+        line.SourceVoucherId = sourceVoucherId;
+        line.TermCode = termCode;
+        line.RenewalBranch = VoucherRenewalBranchCodes.Extend;
+        return line;
+    }
 
     private static Order RenewalOrder(
         Guid orderId,

@@ -72,6 +72,12 @@ internal sealed class OrderLineItemConfiguration : IEntityTypeConfiguration<Orde
             .HasColumnName("renewal_branch")
             .HasMaxLength(16);
 
+        builder.Property(e => e.PreviousCustomerExpiration)
+            .HasColumnName("previous_customer_expiration");
+
+        builder.Property(e => e.NewCustomerExpiration)
+            .HasColumnName("new_customer_expiration");
+
         builder.Property(e => e.PricingBasis)
             .HasColumnName("pricing_basis")
             .HasColumnType("jsonb");
@@ -79,7 +85,13 @@ internal sealed class OrderLineItemConfiguration : IEntityTypeConfiguration<Orde
         builder.HasOne(e => e.Order)
             .WithMany(o => o.LineItems)
             .HasForeignKey(e => e.OrderId)
-            .OnDelete(DeleteBehavior.Cascade);
+            // RESTRICT, not Cascade, and this is the last table in the schema where a money line
+            // cascaded away with its order. It cost voucher_renewal_items.order_id its own RESTRICT
+            // when that table was dissolved: the renewal item was the only thing stopping an order a
+            // customer paid a renewal on from being deleted, and order_line_items.order_id cascaded in
+            // exactly the wrong direction. A line without its order is not a line, and neither is a
+            // renewal the customer paid for.
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(e => e.OrderId);
         builder.HasIndex(e => e.FuelTypeId);
@@ -121,6 +133,18 @@ internal sealed class OrderLineItemConfiguration : IEntityTypeConfiguration<Orde
             // purchase without stating what was bought for it.
             t.HasCheckConstraint("ck_order_line_renewal_has_term",
                 "renewal_branch IS NULL OR term_code IS NOT NULL");
+
+            // A renewal moves time forward, or it would not be one. Zero-length or backwards is a
+            // mis-parse, not a renewal, and the customer's history renders this pair as a date range.
+            t.HasCheckConstraint("ck_order_line_renewal_expirations_ordered",
+                "previous_customer_expiration IS NULL OR new_customer_expiration IS NULL " +
+                "OR new_customer_expiration > previous_customer_expiration");
+
+            // Both snapshots are written together, in one transaction, after fulfilment decides the
+            // branch. Half of them is the state where the customer's history shows a start with no
+            // end - or worse, a range that reads as if nothing happened yet.
+            t.HasCheckConstraint("ck_order_line_renewal_snapshots_are_paired",
+                "(previous_customer_expiration IS NULL) = (new_customer_expiration IS NULL)");
         });
     }
 }

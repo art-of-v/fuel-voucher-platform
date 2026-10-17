@@ -77,6 +77,35 @@ public class OrderLineItem
     /// </remarks>
     public string? RenewalBranch { get; set; }
 
+    /// <summary>
+    /// The customer's expiry on the source voucher BEFORE this renewal was applied. Null until
+    /// fulfilment, and null on every non-renewal line.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A snapshot, because there is nothing left to read it from afterwards. The extend branch
+    /// overwrites <c>fuel_vouchers.customer_expiration_date</c> in place through a compare-and-swap
+    /// UPDATE, and no history column survives it — so once the renewal is applied, the date the
+    /// customer started with exists only here.
+    /// </para>
+    /// <para>
+    /// It is what makes the customer's history able to say "valid 5 Nov → 20 Dec" rather than just
+    /// showing today's date, which is the question the renewal screen exists to answer.
+    /// </para>
+    /// </remarks>
+    public DateOnly? PreviousCustomerExpiration { get; set; }
+
+    /// <summary>
+    /// The expiry this renewal gave the customer. Null until fulfilment, and null on every non-renewal
+    /// line.
+    /// </summary>
+    /// <remarks>
+    /// <b>On a replace this is the PROMISE, not the replacement voucher's real life.</b> What the
+    /// customer bought is what they get to rely on; any longer real life on the stock voucher is a
+    /// hidden reserve they may extend again later, and showing it here would be selling twice.
+    /// </remarks>
+    public DateOnly? NewCustomerExpiration { get; set; }
+
     /// <summary>The voucher this line renews. Null unless <see cref="RenewalBranch"/> is set.</summary>
     public FuelVoucher? SourceVoucher { get; set; }
 

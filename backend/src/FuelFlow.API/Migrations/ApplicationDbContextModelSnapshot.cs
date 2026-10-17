@@ -1037,6 +1037,10 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("numeric(10,2)")
                         .HasColumnName("liters");
 
+                    b.Property<DateOnly?>("NewCustomerExpiration")
+                        .HasColumnType("date")
+                        .HasColumnName("new_customer_expiration");
+
                     b.Property<Guid>("OrderId")
                         .HasColumnType("uuid")
                         .HasColumnName("order_id");
@@ -1044,6 +1048,10 @@ namespace FuelFlow.API.Migrations
                     b.Property<decimal?>("OriginalLineTotal")
                         .HasColumnType("numeric(12,2)")
                         .HasColumnName("original_line_total");
+
+                    b.Property<DateOnly?>("PreviousCustomerExpiration")
+                        .HasColumnType("date")
+                        .HasColumnName("previous_customer_expiration");
 
                     b.Property<string>("PricingBasis")
                         .HasColumnType("jsonb")
@@ -1096,9 +1104,13 @@ namespace FuelFlow.API.Migrations
 
                             t.HasCheckConstraint("ck_order_line_renewal_branch", "renewal_branch IS NULL OR renewal_branch IN ('extend','replace')");
 
+                            t.HasCheckConstraint("ck_order_line_renewal_expirations_ordered", "previous_customer_expiration IS NULL OR new_customer_expiration IS NULL OR new_customer_expiration > previous_customer_expiration");
+
                             t.HasCheckConstraint("ck_order_line_renewal_has_term", "renewal_branch IS NULL OR term_code IS NOT NULL");
 
                             t.HasCheckConstraint("ck_order_line_renewal_pair_is_whole", "(renewal_branch IS NULL) = (source_voucher_id IS NULL)");
+
+                            t.HasCheckConstraint("ck_order_line_renewal_snapshots_are_paired", "(previous_customer_expiration IS NULL) = (new_customer_expiration IS NULL)");
                         });
                 });
 
@@ -3893,7 +3905,7 @@ namespace FuelFlow.API.Migrations
                     b.HasOne("FuelFlow.Features.Orders.SharedModels.Order", "Order")
                         .WithMany("LineItems")
                         .HasForeignKey("OrderId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", "SourceVoucher")
