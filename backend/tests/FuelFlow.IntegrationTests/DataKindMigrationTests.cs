@@ -37,7 +37,7 @@ public sealed class DataKindMigrationTests : IClassFixture<TestDatabaseFixture>
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(_fixture.ConnectionString)
-            .Options);
+            .Options, TestQrCipher.Instance);
 
     [Theory]
     [InlineData("fuel_vouchers")]

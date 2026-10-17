@@ -27,7 +27,7 @@ public sealed class ProcessMonobankWebhookCommandHandlerTests : IDisposable
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
 
-        _context = new ApplicationDbContext(options);
+        _context = new ApplicationDbContext(options, TestQrCipher.Instance);
         _backgroundJobClientMock = new Mock<IBackgroundJobClient>();
 
         _handler = new ProcessMonobankWebhookCommandHandler(

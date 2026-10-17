@@ -37,7 +37,7 @@ public sealed class QrParametersAndImportStatusIntegrityTests : IClassFixture<Te
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(_fixture.ConnectionString)
-            .Options);
+            .Options, TestQrCipher.Instance);
 
     /// <summary>
     /// The whole point. Two rows that differ only in their nullable columns are the same

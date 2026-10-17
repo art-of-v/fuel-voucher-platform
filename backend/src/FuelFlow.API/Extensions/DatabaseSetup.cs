@@ -84,6 +84,7 @@ internal static class DatabaseSetup
             // They are useful while debugging locally but must never enter production logs.
             if (environment.IsDevelopment())
                 options.EnableSensitiveDataLogging();
+
         });
 
         return services;

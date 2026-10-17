@@ -135,6 +135,7 @@ public sealed class FulfillmentOrderForeignKeyIntegrationTests : IClassFixture<T
         => new(
             new DbContextOptionsBuilder<ApplicationDbContext>()
                 .UseNpgsql(_fixture.ConnectionString)
-                .Options
+                .Options,
+            TestQrCipher.Instance
         );
 }

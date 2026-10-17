@@ -30,7 +30,7 @@ public sealed class GetRealizedMarginQueryHandlerTests : IDisposable
         _context = new ApplicationDbContext(
             new DbContextOptionsBuilder<ApplicationDbContext>()
                 .UseInMemoryDatabase(Guid.NewGuid().ToString())
-                .Options);
+                .Options, TestQrCipher.Instance);
     }
 
     public void Dispose()

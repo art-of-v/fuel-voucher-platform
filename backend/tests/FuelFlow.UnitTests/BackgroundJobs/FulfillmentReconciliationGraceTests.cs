@@ -34,7 +34,7 @@ public sealed class FulfillmentReconciliationGraceTests : IDisposable
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase($"grace-{Guid.NewGuid():N}")
             .Options;
-        _context = new ApplicationDbContext(options);
+        _context = new ApplicationDbContext(options, TestQrCipher.Instance);
 
         var monobankClientMock = new Mock<IMonobankClient>();
         var refundHandler = new RefundOrderCommandHandler(

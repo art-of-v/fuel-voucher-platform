@@ -96,6 +96,19 @@ internal static class ServiceSetup
         services.Configure<MonobankOptions>(config.GetSection(MonobankOptions.SectionName));
         services.Configure<DeviceAuthOptions>(config.GetSection(DeviceAuthOptions.SectionName));
         services.Configure<AuthOptions>(config.GetSection(AuthOptions.SectionName));
+
+        // The key that encrypts voucher QR payloads at rest. Bound from configuration and never
+        // defaulted: QrCipher's constructor throws when it is missing, because a default key is a
+        // key every deployment shares and a QR payload is what a verifier trusts.
+        //
+        // Registered as a singleton rather than scoped on purpose. EF caches the model per context
+        // type, so the value converter captures whatever instance it was handed; a scoped cipher
+        // would mean a per-request instance captured into a process-wide model. Singleton also means
+        // one key in memory for the process lifetime, matching how the QA access code is handled
+        // below.
+        services.Configure<QrCipherOptions>(config.GetSection(QrCipherOptions.SectionName));
+        services.AddSingleton<FuelFlow.Features.Vouchers.Security.IQrCipher,
+            FuelFlow.Features.Vouchers.Security.QrCipher>();
         // Runs after the section binding above: hash the plaintext QA code (supplied via the deploy
         // secret Auth__QaTestAccessCode) once at startup and drop the plaintext, so only the hash
         // lives in memory for the process lifetime — nothing plaintext is retained or committed. An

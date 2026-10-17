@@ -26,7 +26,7 @@ public sealed class OrderHistoryIntegrationTests : IClassFixture<TestDatabaseFix
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(_fixture.ConnectionString)
-            .Options);
+            .Options, TestQrCipher.Instance);
 
     [Fact]
     public async Task CreatingAnOrder_RecordsA_Created_Event()

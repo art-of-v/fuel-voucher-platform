@@ -1452,10 +1452,15 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("qr_parameters_id");
 
-                    b.Property<string>("QrPayload")
+                    b.Property<byte[]>("QrPayload")
                         .IsRequired()
-                        .HasColumnType("varchar(2000)")
+                        .HasColumnType("bytea")
                         .HasColumnName("qr_payload");
+
+                    b.Property<byte[]>("QrPayloadSha256")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("qr_payload_sha256");
 
                     b.Property<string>("RedemptionRules")
                         .HasMaxLength(1000)
@@ -1522,7 +1527,7 @@ namespace FuelFlow.API.Migrations
 
                     b.HasIndex("QrParametersId");
 
-                    b.HasIndex("QrPayload")
+                    b.HasIndex("QrPayloadSha256")
                         .IsUnique()
                         .HasFilter("is_deleted = false");
 

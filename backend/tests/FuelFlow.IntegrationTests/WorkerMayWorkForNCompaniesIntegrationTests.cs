@@ -183,5 +183,5 @@ public sealed class WorkerMayWorkForNCompaniesIntegrationTests : IClassFixture<T
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(_fixture.ConnectionString)
             .UseQueryTrackingBehavior(QueryTrackingBehavior.TrackAll)
-            .Options);
+            .Options, TestQrCipher.Instance);
 }

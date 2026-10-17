@@ -209,7 +209,7 @@ public sealed class XminConcurrencyTokenIntegrationTests : IClassFixture<TestDat
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(_fixture.ConnectionString)
             .UseQueryTrackingBehavior(QueryTrackingBehavior.TrackAll)
-            .Options);
+            .Options, TestQrCipher.Instance);
 }
 
 /// <summary>

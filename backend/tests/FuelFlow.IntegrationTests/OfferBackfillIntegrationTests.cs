@@ -34,7 +34,7 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(_fixture.ConnectionString)
-            .Options);
+            .Options, TestQrCipher.Instance);
 
     // `EveryPackageRow_BecameExactlyOneVolume` and `VolumesKeepTheIdOfThePackageRowThey_Replace`
     // are gone with `fuel_packages`. Both compared the old rows against the new ones directly -

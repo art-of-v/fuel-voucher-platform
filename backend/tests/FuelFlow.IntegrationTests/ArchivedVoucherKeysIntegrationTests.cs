@@ -120,6 +120,7 @@ public sealed class ArchivedVoucherKeysIntegrationTests : IClassFixture<TestData
         => new(
             new DbContextOptionsBuilder<ApplicationDbContext>()
                 .UseNpgsql(_fixture.ConnectionString)
-                .Options
+                .Options,
+            TestQrCipher.Instance
         );
 }

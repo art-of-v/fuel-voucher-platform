@@ -22,7 +22,7 @@ public sealed class ApiNotificationServiceTests : IDisposable
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
 
-        _context = new ApplicationDbContext(options);
+        _context = new ApplicationDbContext(options, TestQrCipher.Instance);
 
         // Default: the sender accepts everything. Individual tests override to exercise
         // DeviceNotRegistered handling or a thrown failure.
@@ -277,7 +277,7 @@ public sealed class JobsWorkerNotificationServiceTests : IDisposable
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
 
-        _context = new ApplicationDbContext(options);
+        _context = new ApplicationDbContext(options, TestQrCipher.Instance);
         _service = new FuelFlow.JobsWorker.Services.NotificationService(
             _context,
             new Mock<ILogger<FuelFlow.JobsWorker.Services.NotificationService>>().Object);

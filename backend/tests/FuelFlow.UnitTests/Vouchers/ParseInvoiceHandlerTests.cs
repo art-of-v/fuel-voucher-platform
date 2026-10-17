@@ -18,7 +18,7 @@ public sealed class ParseInvoiceHandlerTests : IDisposable
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
-        _context = new ApplicationDbContext(options);
+        _context = new ApplicationDbContext(options, TestQrCipher.Instance);
 
         _context.FuelTypes.AddRange(
             new FuelTypeEntity { Id = "okko-dp", Name = "Дизельне паливо ОККО", StationId = "okko", CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },

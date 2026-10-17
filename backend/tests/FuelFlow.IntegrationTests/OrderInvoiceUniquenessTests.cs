@@ -23,7 +23,7 @@ public sealed class OrderInvoiceUniquenessTests : IClassFixture<TestDatabaseFixt
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(_fixture.ConnectionString)
-            .Options);
+            .Options, TestQrCipher.Instance);
 
     [Fact]
     public async Task TwoOrders_CannotClaimTheSameInvoiceId()

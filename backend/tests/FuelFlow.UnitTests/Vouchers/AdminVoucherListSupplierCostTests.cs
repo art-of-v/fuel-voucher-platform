@@ -30,7 +30,7 @@ public sealed class AdminVoucherListSupplierCostTests : IDisposable
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
 
-        _context = new ApplicationDbContext(options);
+        _context = new ApplicationDbContext(options, TestQrCipher.Instance);
 
         _context.Suppliers.Add(new Supplier
         {

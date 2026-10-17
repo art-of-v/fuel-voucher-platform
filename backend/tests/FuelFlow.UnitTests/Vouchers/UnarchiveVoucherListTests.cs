@@ -29,7 +29,7 @@ public sealed class UnarchiveVoucherListTests : IDisposable
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
 
-        _context = new ApplicationDbContext(options);
+        _context = new ApplicationDbContext(options, TestQrCipher.Instance);
         SeedFuelTypes();
     }
 

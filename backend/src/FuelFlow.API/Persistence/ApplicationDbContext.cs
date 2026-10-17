@@ -16,6 +16,7 @@ using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Features.Vouchers.Renewal.Operator;
 using FuelFlow.Features.Vouchers.SharedModels;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 namespace FuelFlow.Persistence;
@@ -29,11 +30,27 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
     /// </summary>
     private readonly ILogger<ApplicationDbContext>? _logger;
 
+/// <summary>
+    /// Encrypts the voucher QR payload at rest. Required, and it is required because of what happens
+    /// when it is absent rather than what happens when it is present.
+    /// </summary>
+    /// <remarks>
+    /// EF caches one model per context type. A context built without a cipher produces a model whose
+    /// QR column maps to raw <c>bytea</c> with no converter, and that model is then reused by every
+    /// later context - so a single missing injection anywhere turns every voucher read in the process
+    /// into <c>42804: qr_payload cannot be cast to bytea</c>, which is at least loud but is a very
+    /// confusing place to learn it. Making the parameter mandatory means the compiler settles the
+    /// argument at every construction site instead of leaving it to whoever is refactoring.
+    /// </remarks>
+private readonly FuelFlow.Features.Vouchers.Security.IQrCipher _qrCipher;
+
     public ApplicationDbContext(
         DbContextOptions<ApplicationDbContext> options,
+        FuelFlow.Features.Vouchers.Security.IQrCipher qrCipher,
         ILogger<ApplicationDbContext>? logger = null) : base(options)
     {
         _logger = logger;
+        _qrCipher = qrCipher;
     }
 
     public DbSet<FuelVoucher> FuelVouchers => Set<FuelVoucher>();
@@ -97,6 +114,23 @@ public sealed class ApplicationDbContext : DbContext, IImportVouchersDbContext
         base.OnModelCreating(modelBuilder);
 
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
+
+        // The QR payload is encrypted on its way into the column and decrypted on the way out, so
+        // the ~19 call sites that read or write it are unchanged. Applied here rather than in
+        // FuelVoucherConfiguration because the converter needs the cipher instance and that
+        // configuration is discovered by assembly scan, which has no DI.
+        //
+        // The lambdas capture the instance, not the key material. EF caches the model per context
+        // type, so baking the key bytes into the model would freeze them at first use - and a
+        // rotated key would then silently fail to decrypt anything written since. Reading through
+        // the instance means the cached model keeps working when the key is rotated underneath it.
+var cipher = _qrCipher;
+        var voucherQr = modelBuilder.Entity<FuelVoucher>().Metadata.FindProperty(
+            nameof(FuelVoucher.QrPayload));
+
+        voucherQr!.SetValueConverter(new ValueConverter<string, byte[]>(
+            plain => cipher.Encrypt(plain),
+            stored => cipher.Decrypt(stored)));
 
         modelBuilder.Entity<Station>().HasData(SeedData.Stations);
         modelBuilder.Entity<FuelTypeEntity>().HasData(SeedData.FuelTypes);

@@ -41,7 +41,7 @@ public sealed class MonobankReconciliationServiceTests : IDisposable
             // even if the handler's load+Update path broke under the real default.
             .Options;
 
-        _context = new ApplicationDbContext(options);
+        _context = new ApplicationDbContext(options, TestQrCipher.Instance);
         _monobankClientFactory = new StubMonobankClientFactory(_monobankClientMock.Object);
 
         _handler = new ProcessMonobankWebhookCommandHandler(

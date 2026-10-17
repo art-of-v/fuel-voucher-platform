@@ -30,7 +30,7 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
         _context = new ApplicationDbContext(
             new DbContextOptionsBuilder<ApplicationDbContext>()
                 .UseInMemoryDatabase(Guid.NewGuid().ToString())
-                .Options);
+                .Options, TestQrCipher.Instance);
         _events = new AuditEventService(_context);
     }
 

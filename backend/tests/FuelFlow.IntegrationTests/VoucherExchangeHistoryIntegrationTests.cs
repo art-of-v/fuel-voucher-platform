@@ -240,7 +240,7 @@ new decimal?[] { 90.00m }, surchargePerPair: 10m, reset: false);
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(_fixture.ConnectionString)
-            .Options);
+            .Options, TestQrCipher.Instance);
 
     /// <summary>
     /// Seeds one confirm's worth of audit: a batch, its retired vouchers and their replacements, and

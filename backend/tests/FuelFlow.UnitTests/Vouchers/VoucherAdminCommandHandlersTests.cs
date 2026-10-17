@@ -44,7 +44,7 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
 
-        _context = new ApplicationDbContext(options);
+        _context = new ApplicationDbContext(options, TestQrCipher.Instance);
         SeedFuelTypes();
 
         _qrGeneratorMock = new Mock<IQrGenerator>();
@@ -733,7 +733,7 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
         IEnumerable<IVoucherProviderParser> parsers)
     {
         var logger = new Mock<ILogger<ImportVouchersCommandHandler>>().Object;
-        return new ImportVouchersCommandHandler(_context, pdfRenderer, detector, qrDecoder, parsers, logger, _backgroundJobClientMock.Object, new FuelFlow.SharedKernel.Observability.FuelFlowMetrics(), FuelFlow.SharedKernel.Observability.NotificationDispatcher.Disabled);
+        return new ImportVouchersCommandHandler(_context, pdfRenderer, detector, qrDecoder, parsers, logger, _backgroundJobClientMock.Object, new FuelFlow.SharedKernel.Observability.FuelFlowMetrics(), FuelFlow.SharedKernel.Observability.NotificationDispatcher.Disabled, new FuelFlow.Features.Vouchers.Security.QrCipher(Microsoft.Extensions.Options.Options.Create(new FuelFlow.SharedKernel.Options.QrCipherOptions { Key = Convert.ToBase64String(Enumerable.Repeat((byte)0x2A, 32).ToArray()) })));
     }
 
     /// <summary>

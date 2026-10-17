@@ -43,7 +43,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
-        _context = new ApplicationDbContext(options);
+        _context = new ApplicationDbContext(options, TestQrCipher.Instance);
 
         _controller = new BrandsController(
             new GetBrandsQueryHandler(_context),

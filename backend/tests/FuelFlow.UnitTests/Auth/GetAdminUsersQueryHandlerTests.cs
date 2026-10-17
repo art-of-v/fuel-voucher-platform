@@ -17,7 +17,7 @@ public sealed class GetAdminUsersQueryHandlerTests : IDisposable
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
 
-        _context = new ApplicationDbContext(options);
+        _context = new ApplicationDbContext(options, TestQrCipher.Instance);
         _handler = new GetAdminUsersQueryHandler(_context);
     }
 

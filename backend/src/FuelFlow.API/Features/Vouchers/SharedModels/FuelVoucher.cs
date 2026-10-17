@@ -31,7 +31,33 @@ public class FuelVoucher
     public DateOnly CustomerExpirationDate { get; set; }
 
     public string VoucherNumber { get; set; } = null!;
+
+    /// <summary>
+    /// The supplier's QR code, verbatim. Plaintext in memory only.
+    /// </summary>
+    /// <remarks>
+    /// Persisted as AES-GCM ciphertext by a value converter, so every read and write in the
+    /// application goes through this property unchanged and no caller needs to know. What sits in the
+    /// column is nonce, tag and ciphertext concatenated - see <c>QrCipher</c>.
+    /// </remarks>
     public string QrPayload { get; set; } = null!;
+
+    /// <summary>
+    /// SHA-256 of <see cref="QrPayload"/>, carrying the deduplication the ciphertext cannot.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The uniqueness index used to sit on <see cref="QrPayload"/> itself, which only worked because
+    /// the payload was plaintext. Encrypted bytes cannot be compared - AES-GCM produces a fresh
+    /// nonce every time, so the same QR encrypts differently every time - so the index moved here.
+    /// </para>
+    /// <para>
+    /// A hash is not reversible, so this gives up nothing the ciphertext was not already giving up.
+    /// It is still a fingerprint of a redeemable code, so it is not something to log or expose.
+    /// </para>
+    /// </remarks>
+    public byte[]? QrPayloadSha256 { get; set; }
+
     public DateTime CreatedAtUtc { get; set; }
 
     /// <summary>

@@ -26,7 +26,7 @@ public sealed class DeviceRebindTests : IDisposable
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
 
-        _context = new ApplicationDbContext(options);
+        _context = new ApplicationDbContext(options, TestQrCipher.Instance);
         _context.Devices.Add(new Device
         {
             Id = Guid.NewGuid(),

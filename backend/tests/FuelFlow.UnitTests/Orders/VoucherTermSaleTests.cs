@@ -49,7 +49,7 @@ public sealed class VoucherTermSaleTests : IDisposable
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
 
-        _context = new ApplicationDbContext(options);
+        _context = new ApplicationDbContext(options, TestQrCipher.Instance);
         _settings = new RuntimeSettingsService(_context);
 
         _monobank

@@ -41,7 +41,7 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
 
-        _context = new ApplicationDbContext(options);
+        _context = new ApplicationDbContext(options, TestQrCipher.Instance);
         SeedFuelTypes();
         SeedFuelPackages();
         SeedDefaultUser(); // active user for checkout tests

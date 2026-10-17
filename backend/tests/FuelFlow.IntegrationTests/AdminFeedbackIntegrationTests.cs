@@ -43,7 +43,7 @@ public sealed class AdminFeedbackIntegrationTests : IClassFixture<TestDatabaseFi
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(_fixture.ConnectionString)
-            .Options);
+            .Options, TestQrCipher.Instance);
 
     [Fact]
     public async Task TheListOpensOnKeptMessagesRatherThanOnWhateverArrived()

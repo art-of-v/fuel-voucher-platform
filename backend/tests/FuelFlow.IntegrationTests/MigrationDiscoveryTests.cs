@@ -26,7 +26,8 @@ public sealed class MigrationDiscoveryTests
         using var context = new ApplicationDbContext(
             new DbContextOptionsBuilder<ApplicationDbContext>()
                 .UseNpgsql("Host=localhost;Database=none;Username=none")
-                .Options
+                .Options,
+            TestQrCipher.Instance
         );
 
         return context.GetService<IMigrationsAssembly>().Migrations.Keys.ToList();

@@ -31,7 +31,7 @@ public sealed class RefundCancelListAttributionTests : IDisposable
             .UseInMemoryDatabase($"cancellist-{Guid.NewGuid():N}")
             .Options;
 
-        _context = new ApplicationDbContext(options);
+        _context = new ApplicationDbContext(options, TestQrCipher.Instance);
 
         _service = new RefundStatusSyncService(
             _context,
