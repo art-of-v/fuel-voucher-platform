@@ -1599,6 +1599,93 @@ namespace FuelFlow.API.Migrations
                         });
                 });
 
+            modelBuilder.Entity("FuelFlow.Features.Vouchers.Movements.VoucherMovement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("ActorPartyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_party_id");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_user_id");
+
+                    b.Property<decimal?>("AmountUah")
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("amount_uah");
+
+                    b.Property<Guid?>("BatchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("batch_id");
+
+                    b.Property<decimal?>("CostDeltaUah")
+                        .HasColumnType("numeric(14,2)")
+                        .HasColumnName("cost_delta_uah");
+
+                    b.Property<Guid?>("FromVoucherId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("from_voucher_id");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid?>("LineItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("line_item_id");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at_utc");
+
+                    b.Property<Guid?>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<Guid?>("ToVoucherId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("to_voucher_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BatchId")
+                        .HasDatabaseName("ix_voucher_movements_batch")
+                        .HasFilter("batch_id IS NOT NULL");
+
+                    b.HasIndex("LineItemId")
+                        .HasDatabaseName("ix_voucher_movements_line")
+                        .HasFilter("line_item_id IS NOT NULL");
+
+                    b.HasIndex("ToVoucherId")
+                        .HasDatabaseName("ix_voucher_movements_to")
+                        .HasFilter("to_voucher_id IS NOT NULL");
+
+                    b.HasIndex("FromVoucherId", "OccurredAtUtc")
+                        .HasDatabaseName("ix_voucher_movements_from");
+
+                    b.ToTable("voucher_movements", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_voucher_movements_amount_non_negative", "amount_uah IS NULL OR amount_uah >= 0");
+
+                            t.HasCheckConstraint("ck_voucher_movements_distinct_sides", "from_voucher_id IS DISTINCT FROM to_voucher_id");
+
+                            t.HasCheckConstraint("ck_voucher_movements_has_a_side", "from_voucher_id IS NOT NULL OR to_voucher_id IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_voucher_movements_kind", "kind IN ('deposit','activate','deactivate','archive','unarchive','issuance','redeem','unredeem','exchange_out','exchange_in','replace_out','restock','gift','recall','block','unblock','fire_worker','expire')");
+                        });
+                });
+
             modelBuilder.Entity("FuelFlow.Features.Vouchers.QrParameters", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3947,6 +4034,24 @@ namespace FuelFlow.API.Migrations
                     b.Navigation("Supplier");
 
                     b.Navigation("WorkerUser");
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Vouchers.Movements.VoucherMovement", b =>
+                {
+                    b.HasOne("FuelFlow.Features.Vouchers.Exchange.MovementBatch", null)
+                        .WithMany()
+                        .HasForeignKey("BatchId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", null)
+                        .WithMany()
+                        .HasForeignKey("FromVoucherId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", null)
+                        .WithMany()
+                        .HasForeignKey("ToVoucherId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Vouchers.Renewal.Operator.OperatorVoucherRenewal", b =>

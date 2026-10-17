@@ -11,6 +11,7 @@ using FuelFlow.SharedKernel.Domain;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Exchange;
 using FuelFlow.Features.Vouchers.Import;
+using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Acquiring;
 using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Features.Vouchers.Renewal.Operator;
@@ -63,6 +64,9 @@ private readonly FuelFlow.Features.Vouchers.Security.IQrCipher _qrCipher;
     // D-13 / #319: the parent voucher_exchanges.exchange_batch_id never had. Still additive - the
     // three movement tables are folded into one ledger in later stages of D-13.
     public DbSet<MovementBatch> MovementBatches => Set<MovementBatch>();
+    // D-13 / #319: the single ledger the three movement tables fold into. Also additive for now -
+    // nothing writes it until every writer is gated on its compare-and-swap actually changing a row.
+    public DbSet<VoucherMovement> VoucherMovements => Set<VoucherMovement>();
     public DbSet<MonobankStatementEntry> MonobankStatementEntries => Set<MonobankStatementEntry>();
     public DbSet<OperatorVoucherRenewal> OperatorVoucherRenewals => Set<OperatorVoucherRenewal>();
     public DbSet<User> Users => Set<User>();
