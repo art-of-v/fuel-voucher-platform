@@ -15,6 +15,19 @@ public sealed class User
     public DateOnly? Birthdate { get; set; }
     public string? ProfileImageUrl { get; set; }
 
+    /// <summary>
+    /// The user's party record (D-02, additive step 1). NULLABLE on purpose: the documented sequence
+    /// is insert, switch, reconcile, then retire, and this column is the insert. Nothing reads it yet
+    /// and no handler depends on it, so a user existing without one is not an error today - it becomes
+    /// one when the column is promoted to NOT NULL, and that is a separate migration with a test that
+    /// says so.
+    /// <para>
+    /// Back-filled for every existing user, and a BEFORE INSERT trigger creates one for every new user,
+    /// so the column is only ever null for a row inserted between them.
+    /// </para>
+    /// </summary>
+    public Guid? PartyId { get; set; }
+
     public string? ReferralCode { get; set; }
     public string? ReferredBy { get; set; }
     /// <summary>

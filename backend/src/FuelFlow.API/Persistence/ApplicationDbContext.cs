@@ -124,6 +124,8 @@ private readonly FuelFlow.Features.Vouchers.Security.IQrCipher _qrCipher;
     public DbSet<AuditEventOutbox> AuditEventOutbox => Set<AuditEventOutbox>();
     public DbSet<OperatorLegalEntity> OperatorLegalEntities => Set<OperatorLegalEntity>();
     public DbSet<BankAccount> BankAccounts => Set<BankAccount>();
+    public DbSet<Party> Parties => Set<Party>();
+    public DbSet<NaturalPerson> NaturalPersons => Set<NaturalPerson>();
     public DbSet<SupportMessage> SupportMessages => Set<SupportMessage>();
     public DbSet<ErrorLog> ErrorLogs => Set<ErrorLog>();
     public DbSet<FeedbackMessage> FeedbackMessages => Set<FeedbackMessage>();

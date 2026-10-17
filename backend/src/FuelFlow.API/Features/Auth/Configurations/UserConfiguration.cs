@@ -138,5 +138,13 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.HasIndex(e => e.ReferralCode)
             .IsUnique()
             .HasFilter("referral_code IS NOT NULL AND is_deleted = false");
+
+        // D-02 additive step 1. Nullable, and nothing reads it yet - see User.PartyId. Not unique:
+        // the 1:1 with a party is what the trigger guarantees, and a unique index here would also
+        // forbid the two NULLs that a partially-migrated table legitimately has.
+        builder.Property(e => e.PartyId)
+            .HasColumnName("party_id");
+
+        builder.HasIndex(e => e.PartyId);
     }
 }
