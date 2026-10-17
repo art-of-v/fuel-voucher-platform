@@ -19,13 +19,23 @@ internal static class SeedData
         new() { Id = "klo", SortOrder = 4, Name = "KLO", LogoText = "KLO", Color = "#eab308", Lat = 50.4101, Lng = 30.4034, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc }
     ];
 
+        // Only the OKKO fuels carry a brand fuel code, and that is a fact about evidence rather than a
+    // preference. OKKO publishes a machine-readable list (`scripts/fetch-okko-prices.mjs`,
+    // `/api/uk/fuels`) whose `fuel_code` values are the five below, so each one was read off that list
+    // and checked against the fuel it names. WOG gets none because nothing has ever shown us WOG's
+    // vocabulary: inventing "A-95" for WOG would be a guess about a supplier's naming that no list
+    // supports, and a guess here is an identity the unique index then enforces.
+    //
+    // With the codes, a freshly migrated catalogue is born keyed — so the catalogue import recognises
+    // these five instead of creating a second "А-95" beside "A-95" — and the seed script resolves by
+    // name against real rows in every environment.
     internal static FuelTypeEntity[] FuelTypes =>
     [
-        new() { Id = "okko-dp", Name = "ДП ЄВРО", StationId = "okko", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "okko-95", Name = "A-95", StationId = "okko", BasePrice = 54, DiscountPrice = 51, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "okko-p95", Name = "Pulls 95", StationId = "okko", BasePrice = 60, DiscountPrice = 56, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "okko-pulls-dp", Name = "ДП PULLS", StationId = "okko", BasePrice = 58, DiscountPrice = 55, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "okko-gas", Name = "ГАЗ", StationId = "okko", BasePrice = 29, DiscountPrice = 27, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
+        new() { Id = "okko-dp", Name = "ДП ЄВРО", StationId = "okko", BrandFuelCode = "DP", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
+        new() { Id = "okko-95", Name = "A-95", StationId = "okko", BrandFuelCode = "A-95", BasePrice = 54, DiscountPrice = 51, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
+        new() { Id = "okko-p95", Name = "Pulls 95", StationId = "okko", BrandFuelCode = "Pulls 95", BasePrice = 60, DiscountPrice = 56, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
+        new() { Id = "okko-pulls-dp", Name = "ДП PULLS", StationId = "okko", BrandFuelCode = "Pulls Diesel", BasePrice = 58, DiscountPrice = 55, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
+        new() { Id = "okko-gas", Name = "ГАЗ", StationId = "okko", BrandFuelCode = "SPBT", BasePrice = 29, DiscountPrice = 27, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
         new() { Id = "wog-dp", Name = "ДП Mustang", StationId = "wog", BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
         new() { Id = "wog-95", Name = "A-95 Mustang", StationId = "wog", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
         new() { Id = "wog-95-euro", Name = "A 95 EURO", StationId = "wog", BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
