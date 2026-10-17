@@ -3,6 +3,8 @@ using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers.Renewal.Checkout;
 using FuelFlow.Features.Vouchers.SharedModels;
+using FuelFlow.Features.Vouchers.Events;
+using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -154,6 +156,26 @@ public sealed class ConfirmOperatorRenewalCommandHandler
             voucher.CustomerExpirationDate = newExpiration;
             voucher.Status = VoucherStatus.Assigned; // keep it the customer's active voucher
             voucher.UpdatedAtUtc = now;
+
+            // D-13. `Extended`, exactly as the self-serve path records it, with the pair — the old
+            // customer expiry is overwritten on the line above, so without this the value before the
+            // renewal is unreconstructible. That is the whole reason this event type exists.
+            //
+            // No `StatusChanged`: `IsRenewableStatus` admits `Assigned`, so the voucher's status may well
+            // be `Assigned` before and after, and ck_voucher_events_status_changed would refuse
+            // from == to. An extend that changes only the term changed no status, so claiming one would
+            // be an invention rather than a record.
+            _context.VoucherEvents.Add(new VoucherEvent
+            {
+                Id = Guid.CreateVersion7(),
+                VoucherId = voucher.Id,
+                EventType = VoucherEventTypes.Extended,
+                PreviousCustomerExpiration = oldExpiration,
+                NewCustomerExpiration = newExpiration,
+                ActorKind = VoucherActorKinds.User,
+                ActorUserId = command.ActingUserId,
+                OccurredAtUtc = now
+            });
         }
         else
         {
@@ -188,15 +210,72 @@ public sealed class ConfirmOperatorRenewalCommandHandler
             stock.CustomerExpirationDate = promisedExpiration;
             stock.UpdatedAtUtc = now;
 
+            // D-13. The operator path's mirror of the self-serve renewal's two movements, and it is the
+            // same pair for the same reasons: the replacement leaves the pool for the customer, and the
+            // old paper comes back. `replace_out` rather than `issued` because the reason differs, which
+            // is the same split the self-serve writer uses for the identical physical fact.
+            _context.VoucherMovements.Add(new VoucherMovement
+            {
+                Id = Guid.CreateVersion7(),
+                Kind = VoucherMovementKinds.ReplaceOut,
+                VoucherId = stock.Id,
+                FromLocation = VoucherLocations.Pool,
+                ToLocation = VoucherLocations.Customer,
+                ActorKind = VoucherActorKinds.User,
+                ActorUserId = command.ActingUserId,
+                OccurredAtUtc = now
+            });
+
+            _context.VoucherEvents.Add(new VoucherEvent
+            {
+                Id = Guid.CreateVersion7(),
+                VoucherId = stock.Id,
+                EventType = VoucherEventTypes.StatusChanged,
+                // From the statuses the statements below set: the claim is Available -> Assigned.
+                FromStatus = nameof(VoucherStatus.Available),
+                ToStatus = nameof(VoucherStatus.Assigned),
+                ActorKind = VoucherActorKinds.User,
+                ActorUserId = command.ActingUserId,
+                OccurredAtUtc = now
+            });
+
             // Same release as the self-serve replace path: the voucher goes back into the sellable pool
             // (ownership, entity and any worker hand-off cleared) so whoever claims it next pays for it.
             // Its order_id is kept on purpose — that is the purchase this paper came from, and re-homing it
             // to the renewal order would rewrite the fuel's origin.
+            var releasedFromStatus = voucher.Status;
             voucher.Status = VoucherStatus.Available;
             voucher.AssignedToUserId = null;
             voucher.LegalEntityId = null;
             voucher.WorkerUserId = null;
             voucher.UpdatedAtUtc = now;
+
+            // And the customer's half of the round trip: the paper they handed over is stock again.
+            _context.VoucherMovements.Add(new VoucherMovement
+            {
+                Id = Guid.CreateVersion7(),
+                Kind = VoucherMovementKinds.Returned,
+                VoucherId = voucher.Id,
+                FromLocation = VoucherLocations.Customer,
+                ToLocation = VoucherLocations.Pool,
+                ActorKind = VoucherActorKinds.User,
+                ActorUserId = command.ActingUserId,
+                OccurredAtUtc = now
+            });
+
+            // `releasedFromStatus` rather than a literal: the voucher may be `Assigned` or `Expired`
+            // (both are renewable), and the history has to say which one it actually was.
+            _context.VoucherEvents.Add(new VoucherEvent
+            {
+                Id = Guid.CreateVersion7(),
+                VoucherId = voucher.Id,
+                EventType = VoucherEventTypes.StatusChanged,
+                FromStatus = releasedFromStatus.ToString(),
+                ToStatus = nameof(VoucherStatus.Available),
+                ActorKind = VoucherActorKinds.User,
+                ActorUserId = command.ActingUserId,
+                OccurredAtUtc = now
+            });
 
             replacementVoucherId = stock.Id;
             replacementVoucherNumber = stock.VoucherNumber;

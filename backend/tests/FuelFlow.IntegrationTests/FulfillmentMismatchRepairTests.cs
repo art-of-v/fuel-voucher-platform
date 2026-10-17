@@ -8,6 +8,8 @@ using FuelFlow.Features.Settings;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
+using FuelFlow.Features.Vouchers.Events;
+using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
@@ -143,6 +145,37 @@ public sealed class FulfillmentMismatchRepairTests : IClassFixture<TestDatabaseF
         backInStock.Should().ContainSingle("the released voucher's fuel goes back to stock, with no order claiming it");
         backInStock[0].OrderId.Should().BeNull();
         backInStock[0].AssignedToUserId.Should().BeNull();
+
+        // D-13. The repair is CUSTODY as well as state - `OrderId = null` above is the tell, because
+        // a voucher back in the warehouse belongs to no order. So it owes a `returned` movement as well
+        // as the status change, and writing only one would lose half of what happened.
+        //
+        // `system`, because a reconciliation found this and nobody pressed anything. The customer is
+        // the subject of the movement, not its author.
+        var movement = await verify.VoucherMovements.AsNoTracking()
+            .SingleOrDefaultAsync(m => m.VoucherId == backInStock[0].Id);
+        movement.Should().NotBeNull("the paper physically went back to the warehouse");
+        movement!.Kind.Should().Be(VoucherMovementKinds.Returned);
+        movement.FromLocation.Should().Be(VoucherLocations.Customer);
+        movement.ToLocation.Should().Be(VoucherLocations.Pool);
+        movement.OrderId.Should().Be(orderId, "the order is the reason the fuel came back");
+        movement.ActorKind.Should().Be(VoucherActorKinds.System);
+        movement.ActorUserId.Should().BeNull("a scheduler has nobody to name");
+
+        var repairEvent = await verify.VoucherEvents.AsNoTracking()
+            .SingleOrDefaultAsync(e => e.VoucherId == backInStock[0].Id);
+        repairEvent.Should().NotBeNull();
+        repairEvent!.EventType.Should().Be(VoucherEventTypes.StatusChanged);
+        repairEvent.ToStatus.Should().Be(nameof(VoucherStatus.Available));
+        repairEvent.FromStatus.Should().NotBe(repairEvent.ToStatus,
+            "ck_voucher_events_status_changed refuses from == to, so a genuine transition never records one");
+        repairEvent.ExternalRef.Should().Be(orderId.ToString(), "the order explains why the fuel came back");
+        repairEvent.ActorKind.Should().Be(VoucherActorKinds.System);
+
+        // And the voucher that was NOT released records nothing: the repair is per-voucher, not a
+        // statement about the order.
+        (await verify.VoucherMovements.CountAsync(m => m.VoucherId == voucherA || m.VoucherId == voucherB))
+            .Should().Be(1, "only the released voucher's paper moved");
 
         var repaired = await verify.Orders.AsNoTracking().FirstAsync(o => o.Id == orderId);
         // Fulfilled, not PartiallyFulfilled: the repair resets the order to "one delivered, one short",

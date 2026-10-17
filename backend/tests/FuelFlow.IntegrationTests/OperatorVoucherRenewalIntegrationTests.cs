@@ -5,6 +5,8 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Renewal.Checkout;
 using FuelFlow.Features.Vouchers.Renewal.Operator;
 using FuelFlow.Features.Vouchers.SharedModels;
+using FuelFlow.Features.Vouchers.Events;
+using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -88,6 +90,25 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
             .Where(e => e.AggregateId == voucherId.ToString() && e.EventType == "VoucherRenewedByOperator")
             .ToListAsync();
         audit.Should().ContainSingle();
+
+        // D-13. The operator path now records the same `Extended` event the self-serve checkout does,
+        // with the pair - the old expiry is overwritten in place two lines above, so without this the
+        // value before the renewal is gone.
+        //
+        // And no StatusChanged: `IsRenewableStatus` admits an already-`Assigned` voucher, so status may
+        // be identical before and after, and ck_voucher_events_status_changed would refuse from == to.
+        // An extend changes the term, not the state - saying otherwise would be an invention.
+        var events = await verify.VoucherEvents.AsNoTracking()
+            .Where(e => e.VoucherId == voucherId)
+            .ToListAsync();
+        var extended = events.Should().ContainSingle().Subject;
+        extended.EventType.Should().Be(VoucherEventTypes.Extended);
+        extended.PreviousCustomerExpiration.Should().Be(oldExpiry);
+        extended.NewCustomerExpiration.Should().Be(oldExpiry.AddMonths(1));
+        extended.FromStatus.Should().BeNull("an extend is not a status change");
+        extended.ToStatus.Should().BeNull();
+        extended.ActorKind.Should().Be(VoucherActorKinds.User);
+        extended.ActorUserId.Should().Be(actingUserId, "an operator pressed this, not a scheduler");
     }
 
     /// <summary>
@@ -155,6 +176,9 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
         var stockId = Guid.NewGuid();
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var originPurchaseId = Guid.NewGuid();
+        // Named so the D-13 assertions below can say WHO was recorded - an inline Guid.NewGuid()
+        // would make the actor unassertable.
+        var actingUserId = Guid.NewGuid();
 
         using (var seed = CreateContext())
         {
@@ -177,7 +201,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
                 VoucherId = voucherId,
                 TermCode = "1m",
                 SurchargeUah = 300m,
-                ActingUserId = Guid.NewGuid()
+                ActingUserId = actingUserId
             });
         }
 
@@ -206,6 +230,43 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
         row.Branch.Should().Be("replace");
         row.ReplacementVoucherId.Should().Be(stockId);
         row.NewExpiration.Should().Be(today.AddMonths(1));
+
+        // D-13. The same pair the self-serve renewal writes, for the same reason: a replace makes two
+        // statements, so one row would have recorded only one of them. `replace_out` for the replacement
+        // leaving the pool, `returned` for the customer's own paper coming back.
+        var movements = await verify.VoucherMovements.AsNoTracking()
+            .Where(m => m.VoucherId == stockId || m.VoucherId == voucherId)
+            .ToListAsync();
+        movements.Should().HaveCount(2, "a replace moves the replacement out and the old paper back");
+
+        var out_ = movements.Should().ContainSingle(m => m.Kind == VoucherMovementKinds.ReplaceOut).Subject;
+        out_.VoucherId.Should().Be(stockId, "the replacement is what left the pool");
+        out_.FromLocation.Should().Be(VoucherLocations.Pool);
+        out_.ToLocation.Should().Be(VoucherLocations.Customer);
+
+        var back = movements.Should().ContainSingle(m => m.Kind == VoucherMovementKinds.Returned).Subject;
+        back.VoucherId.Should().Be(voucherId, "the old paper is what came back");
+        back.FromLocation.Should().Be(VoucherLocations.Customer);
+        back.ToLocation.Should().Be(VoucherLocations.Pool);
+        movements.Should().OnlyContain(m => m.ActorUserId == actingUserId);
+
+        // Both transitions are recorded, and the source's from_status is the value it actually had -
+        // a renewable voucher may be Assigned or Expired, and the history has to say which.
+        var events = await verify.VoucherEvents.AsNoTracking()
+            .Where(e => e.VoucherId == stockId || e.VoucherId == voucherId)
+            .ToListAsync();
+        events.Should().HaveCount(2);
+
+        var claim = events.Should().ContainSingle(e => e.VoucherId == stockId).Subject;
+        claim.EventType.Should().Be(VoucherEventTypes.StatusChanged);
+        claim.FromStatus.Should().Be(nameof(VoucherStatus.Available));
+        claim.ToStatus.Should().Be(nameof(VoucherStatus.Assigned));
+
+        var release = events.Should().ContainSingle(e => e.VoucherId == voucherId).Subject;
+        release.EventType.Should().Be(VoucherEventTypes.StatusChanged);
+        release.ToStatus.Should().Be(nameof(VoucherStatus.Available));
+        release.FromStatus.Should().NotBe(release.ToStatus,
+            "ck_voucher_events_status_changed refuses from == to, so a genuine release never records one");
     }
 
     [Fact]
