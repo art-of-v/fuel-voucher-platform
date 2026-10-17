@@ -2,6 +2,7 @@ using FuelFlow.API.BackgroundJobs;
 using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.BackgroundJobs;
+using FuelFlow.Features.Pricing.BackfillBrandFuelCodes;
 using FuelFlow.Features.Pricing.ImportOkkoCatalogue;
 using FuelFlow.Features.Pricing.ScrapeOkkoPrices;
 using FuelFlow.Features.Admin.GetReconciliation;
@@ -465,6 +466,9 @@ services.AddScoped<TermQuoteQueryHandler>();
         // The catalogue half of the same fetch: creates the fuels OKKO sells that we do not carry yet,
         // and nothing else. Registered beside the sync because it is only ever called by it.
         services.AddScoped<ImportOkkoCatalogueCommandHandler>();
+        // Runs in the same job, between the catalogue import and the pricing: it is what lets the
+        // price step match by code the fuels an operator typed rather than by category.
+        services.AddScoped<BackfillBrandFuelCodesCommandHandler>();
     }
 
     private static void AddUpdateServices(IServiceCollection services)

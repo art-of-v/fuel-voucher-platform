@@ -1,3 +1,4 @@
+using FuelFlow.Features.Pricing.BackfillBrandFuelCodes;
 using FuelFlow.Features.Pricing.ImportOkkoCatalogue;
 using FuelFlow.Features.Pricing.ImportOkkoPumpPrices;
 using FuelFlow.Features.Pricing.ScrapeOkkoPrices;
@@ -34,6 +35,7 @@ public sealed class OkkoPriceSyncService
     private readonly IOkkoPriceClient _client;
     private readonly ImportOkkoPumpPricesCommandHandler _import;
     private readonly ImportOkkoCatalogueCommandHandler _catalogue;
+    private readonly BackfillBrandFuelCodesCommandHandler _backfill;
     private readonly OkkoPriceOptions _options;
     private readonly ILogger<OkkoPriceSyncService> _logger;
 
@@ -41,12 +43,14 @@ public sealed class OkkoPriceSyncService
         IOkkoPriceClient client,
         ImportOkkoPumpPricesCommandHandler import,
         ImportOkkoCatalogueCommandHandler catalogue,
+        BackfillBrandFuelCodesCommandHandler backfill,
         IOptions<OkkoPriceOptions> options,
         ILogger<OkkoPriceSyncService> logger)
     {
         _client = client;
         _import = import;
         _catalogue = catalogue;
+        _backfill = backfill;
         _options = options.Value;
         _logger = logger;
     }
@@ -104,6 +108,41 @@ public sealed class OkkoPriceSyncService
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "OKKO sync failed to add missing fuels; prices are still applied");
+        }
+
+        // Before pricing, and after the catalogue half above: the price step matches a fuel by its code
+        // where it has one, so the fuels an operator typed — which have none — are what is left
+        // resolving by category. Filling them from the same sheet is idempotent and, once done, does
+        // nothing; a fuel the catalogue import created a minute ago already carries its own code.
+        try
+        {
+            var backfill = await _backfill.ApplyAsync(
+                new BackfillBrandFuelCodesCommand(prices, DryRun: false),
+                Guid.Empty, SyncActorName, cancellationToken);
+
+            if (backfill.Filled > 0)
+            {
+                _logger.LogInformation(
+                    "OKKO sync matched {Count} fuel(s) to a published code: {Fuels}. Until now they "
+                    + "resolved by category, which cannot tell two fuels of one grade apart.",
+                    backfill.Filled, string.Join(", ", backfill.Fills.Select(f => $"{f.Name} → {f.Code}")));
+
+                if (backfill.Skipped.Count > 0)
+                {
+                    // Information, not Warning: a grade with no published code, or several, is a fact
+                    // about the catalogue rather than a fault, and it will say the same thing every
+                    // fifteen minutes until somebody codes it by hand.
+                    _logger.LogInformation(
+                        "OKKO sync left {Count} fuel(s) uncoded: {Fuels}. A fuel with a code resolves "
+                        + "exactly; without one, two fuels of the same grade are indistinguishable.",
+                        backfill.Skipped.Count,
+                        string.Join(" | ", backfill.Skipped.Select(s => $"{s.Name} ({s.Reason})")));
+                }
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "OKKO sync failed to match fuels to published codes; prices are still applied");
         }
 
         OkkoPumpApplyResult result;

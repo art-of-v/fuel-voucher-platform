@@ -1,6 +1,7 @@
 using FluentAssertions;
 using FuelFlow.BackgroundJobs;
 using FuelFlow.Features.Orders.CreateCheckout;
+using FuelFlow.Features.Pricing.BackfillBrandFuelCodes;
 using FuelFlow.Features.Pricing.ImportOkkoCatalogue;
 using FuelFlow.Features.Pricing.ImportOkkoPumpPrices;
 using FuelFlow.Features.Brands;
@@ -70,6 +71,7 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
             client,
             new ImportOkkoPumpPricesCommandHandler(_context, _events),
             new ImportOkkoCatalogueCommandHandler(_context, _events),
+            new BackfillBrandFuelCodesCommandHandler(_context, _events),
             Options.Create(new OkkoPriceOptions { Enabled = enabled }),
             logger ?? NullLogger<OkkoPriceSyncService>.Instance);
 
@@ -352,13 +354,27 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
         await service.SyncPricesAsync();
         _context.ChangeTracker.Clear();
 
+        // What the first pass wrote, by type: five pump rows (the pump moved) and five backfill rows
+        // (this fixture's fuels carry no code, which is the state production is in today).
+        var afterFirst = await _context.AuditEventOutbox.AsNoTracking()
+            .GroupBy(e => e.EventType)
+            .Select(g => new { Type = g.Key, Count = g.Count() })
+            .ToListAsync();
+
         var second = Service(new StubClient(() => Sheet), enabled: true);
         await second.SyncPricesAsync();
         _context.ChangeTracker.Clear();
 
         // No new audit rows on the second pass: the brand history must not fill with daily
-        // no-ops that say "nothing changed" every morning.
-        (await _context.AuditEventOutbox.AsNoTracking().CountAsync()).Should().Be(5);
+        // no-ops that say "nothing changed" every morning. The backfill is in this comparison because it
+        // runs in the same job — after pass one there is nothing left uncoded, so it must be silent too.
+        var afterSecond = await _context.AuditEventOutbox.AsNoTracking()
+            .GroupBy(e => e.EventType)
+            .Select(g => new { Type = g.Key, Count = g.Count() })
+            .ToListAsync();
+
+        afterSecond.Should().BeEquivalentTo(afterFirst,
+            "a second pass with the same sheet changes nothing and must say nothing");
     }
     /// <summary>
     /// The offer behind a seeded package. Every figure these tests assert on - pump, cost, margin - is
