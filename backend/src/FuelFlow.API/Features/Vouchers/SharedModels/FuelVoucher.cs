@@ -88,6 +88,20 @@ public class FuelVoucher
     public Guid? ImportJobId { get; set; }
 
     /// <summary>
+    /// Who holds this voucher, derived by the database from the three columns above. Never written by
+    /// the application - it is a STORED generated column.
+    /// <para>
+    /// The reason it is a column and not a helper method is that "who holds this voucher" was a
+    /// convention that every handler re-derived, slightly differently, and the disagreements were not
+    /// theoretical. The QR endpoints disagreed about who may redeem a voucher's payload: the wallet
+    /// list matched the owner while the PNG endpoint matched the worker, so the owner who had just
+    /// issued that fuel could still spend it. Expressing the answer once, in the database, is what
+    /// stops the next pair of endpoints from disagreeing again.
+    /// </para>
+    /// </summary>
+    public VoucherHolderKind HolderKind { get; private set; }
+
+    /// <summary>
     /// The order this voucher belongs to. Set whenever the voucher is placed in someone's hands
     /// (purchase, renewal replacement, company issuance) and left null while it is operator stock,
     /// because stock has not been handed to anyone yet.

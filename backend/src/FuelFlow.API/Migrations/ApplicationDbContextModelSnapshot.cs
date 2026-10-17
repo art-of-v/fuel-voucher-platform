@@ -1747,6 +1747,14 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("text")
                         .HasColumnName("fuel_type_id");
 
+                    b.Property<string>("HolderKind")
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("holder_kind")
+                        .HasComputedColumnSql("CASE\n    WHEN worker_user_id IS NOT NULL THEN 'Worker'\n    WHEN legal_entity_id IS NOT NULL AND assigned_to_user_id IS NOT NULL THEN 'Company'\n    WHEN assigned_to_user_id IS NOT NULL THEN 'Personal'\n    ELSE 'Stock'\nEND", true);
+
                     b.Property<string>("ImageUrl")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
@@ -1892,6 +1900,8 @@ namespace FuelFlow.API.Migrations
                             t.HasCheckConstraint("ck_voucher_customer_term_within_supplier_term", "customer_expiration_date <= supplier_expiration_date");
 
                             t.HasCheckConstraint("ck_voucher_held_has_order", "status NOT IN ('Assigned', 'Used', 'Blocked') OR order_id IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_voucher_holder", "(holder_kind = 'Stock'    AND assigned_to_user_id IS NULL)\nOR (holder_kind = 'Worker'   AND legal_entity_id IS NOT NULL AND worker_user_id IS NOT NULL)\nOR (holder_kind = 'Personal' AND worker_user_id IS NULL AND assigned_to_user_id IS NOT NULL)\nOR (holder_kind = 'Company'  AND worker_user_id IS NULL AND assigned_to_user_id IS NOT NULL)");
 
                             t.HasCheckConstraint("ck_voucher_liters_positive", "liters > 0");
 
