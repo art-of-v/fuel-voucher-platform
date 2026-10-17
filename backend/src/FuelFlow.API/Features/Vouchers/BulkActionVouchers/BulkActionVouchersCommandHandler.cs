@@ -1,6 +1,7 @@
 using FuelFlow.API.BackgroundJobs;
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using Hangfire;
@@ -98,6 +99,10 @@ if (command.Action == "delete_all")
             .Where(v => command.Ids.Contains(v.Id))
             .ToListAsync(cancellationToken);
 
+        var actor = TryGetActor(command);
+        var preImages = entities.ToDictionary(e => e.Id, e => e.Status);
+        var now = DateTime.UtcNow;
+
         switch (command.Action)
         {
             case "activate":
@@ -113,14 +118,14 @@ if (command.Action == "delete_all")
                         Success = false,
                         Error = $"Cannot activate — enter the cost (собівартість) first for {uncosted.Count} voucher(s): {string.Join(", ", uncosted.Take(10).Select(e => e.VoucherNumber))}"
                     };
-                foreach (var e in entities) { e.Status = VoucherStatus.Available; e.UpdatedAtUtc = DateTime.UtcNow; }
+                foreach (var e in entities) { e.Status = VoucherStatus.Available; e.UpdatedAtUtc = now; RecordStatusChange(e, preImages[e.Id], VoucherStatus.Available, now, actor); }
                 break;
             }
             case "expire":
-                foreach (var e in entities) { e.Status = VoucherStatus.Expired; e.UpdatedAtUtc = DateTime.UtcNow; }
+                foreach (var e in entities) { e.Status = VoucherStatus.Expired; e.UpdatedAtUtc = now; RecordStatusChange(e, preImages[e.Id], VoucherStatus.Expired, now, actor); }
                 break;
             case "deactivate":
-                foreach (var e in entities) { e.Status = VoucherStatus.Deactivated; e.UpdatedAtUtc = DateTime.UtcNow; }
+                foreach (var e in entities) { e.Status = VoucherStatus.Deactivated; e.UpdatedAtUtc = now; RecordStatusChange(e, preImages[e.Id], VoucherStatus.Deactivated, now, actor); }
                 break;
             case "assign":
                 return new BulkActionResult
@@ -157,7 +162,28 @@ if (command.Action == "delete_all")
                     };
                 }
 
-                foreach (var e in entities) { e.IsDeleted = true; e.UpdatedAtUtc = DateTime.UtcNow; }
+                foreach (var e in entities)
+                {
+                    e.IsDeleted = true;
+                    e.UpdatedAtUtc = now;
+
+                    // D-13. Archive is not a status change: `is_deleted` is a separate column from
+                    // `status` and a ticket can be archived while sitting in any state. So this is an
+                    // `Archived` event carrying no from/to at all — which is also why ck_voucher_events_
+                    // status_changed stays satisfied without knowing what the status was.
+                    if (actor is { } archiveActor)
+                    {
+                        _context.VoucherEvents.Add(new VoucherEvent
+                        {
+                            Id = Guid.CreateVersion7(),
+                            VoucherId = e.Id,
+                            EventType = VoucherEventTypes.Archived,
+                            ActorKind = VoucherActorKinds.User,
+                            ActorUserId = archiveActor,
+                            OccurredAtUtc = now
+                        });
+                    }
+                }
                 break;
             default:
                 return new BulkActionResult { Success = false, Error = $"Unknown action: {command.Action}" };
@@ -206,6 +232,62 @@ if (command.Action == "delete_all")
 
         return new BulkActionResult { Success = true, Count = entities.Count };
     }
+
+    /// <summary>
+    /// D-13. Records a status transition, or deliberately nothing when there was not one.
+    /// </summary>
+    /// <remarks>
+    /// The no-op filter is the reason this is a method rather than three lines in the branches.
+    /// <c>command.Ids</c> arrives from the admin UI with <b>no status filter at all</c>, so
+    /// "activate" on an already-<c>Available</c> voucher is entirely reachable — and
+    /// <c>ck_voucher_events_status_changed</c> refuses <c>from_status = to_status</c>. Left
+    /// unfiltered, that CHECK violation aborts the whole <c>SaveChangesAsync</c> and takes the
+    /// status write down with it: an admin clicking Activate on already-active stock would get an
+    /// error instead of a no-op. The pre-image is therefore captured before the switch and the
+    /// event is skipped rather than attempted.
+    /// </remarks>
+    private void RecordStatusChange(
+        FuelVoucher voucher,
+        VoucherStatus from,
+        VoucherStatus to,
+        DateTime occurredAtUtc,
+        Guid? actor)
+    {
+        if (from == to || actor is null)
+        {
+            return;
+        }
+        _context.VoucherEvents.Add(new VoucherEvent
+        {
+            Id = Guid.CreateVersion7(),
+            VoucherId = voucher.Id,
+            EventType = VoucherEventTypes.StatusChanged,
+            FromStatus = from.ToString(),
+            ToStatus = to.ToString(),
+            ActorKind = VoucherActorKinds.User,
+            ActorUserId = actor,
+            OccurredAtUtc = occurredAtUtc
+        });
+    }
+
+    /// <summary>
+    /// Who is performing this bulk action, or <c>null</c> when the platform cannot say.
+    /// </summary>
+    /// <remarks>
+    /// This is a judgement call and reviewers should see it as one.
+    /// <c>AdminVoucherController.GetUserId</c> returns <c>Guid.Empty</c> rather than null when the
+    /// <c>NameIdentifier</c> claim is missing. That value is NOT NULL, so it satisfies
+    /// <c>ck_voucher_events_actor_named</c> — the row would name a user who does not exist, which is
+    /// the exact thing the actor arrangement exists to prevent, so it is treated as no actor at all.
+    /// <para>
+    /// With no actor the event is skipped rather than written as <c>system</c>: an administrator
+    /// pressed this button, and attributing it to the scheduler would be a different falsehood rather
+    /// than a smaller one. This mirrors what <see cref="AuditEventService"/> already does with the
+    /// same id.
+    /// </para>
+    /// </remarks>
+    private static Guid? TryGetActor(BulkActionVouchersCommand command)
+        => command.ActingAdminUserId is { } id && id != Guid.Empty ? id : null;
 }
 
 public sealed class BulkActionResult

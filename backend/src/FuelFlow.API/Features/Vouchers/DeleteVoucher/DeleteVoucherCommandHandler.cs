@@ -1,4 +1,5 @@
 using FuelFlow.Features.Brands;
+using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
@@ -32,9 +33,28 @@ public sealed class DeleteVoucherCommandHandler
         if (VoucherDeletionGuard.IsPaidOrHeld(entity))
             return new DeleteVoucherResult { Success = false, Error = VoucherDeletionGuard.Reason(entity) };
 
+        var archivedAtUtc = DateTime.UtcNow;
         entity.IsDeleted = true;
-        entity.UpdatedAtUtc = DateTime.UtcNow;
+        entity.UpdatedAtUtc = archivedAtUtc;
         _context.FuelVouchers.Update(entity);
+
+        // D-13. `Archived`, not `StatusChanged` — the status is deliberately untouched here, and a
+        // ticket can be archived while sitting in any state, so from/to would be invented rather than
+        // recorded. Same event the bulk `delete` writes, for the same single reason: soft delete used
+        // to leave only a bulk row carrying a COUNT, never which vouchers.
+        if (command.ActingAdminUserId is { } archiveActor && archiveActor != Guid.Empty)
+        {
+            _context.VoucherEvents.Add(new VoucherEvent
+            {
+                Id = Guid.CreateVersion7(),
+                VoucherId = entity.Id,
+                EventType = VoucherEventTypes.Archived,
+                ActorKind = VoucherActorKinds.User,
+                ActorUserId = archiveActor,
+                OccurredAtUtc = archivedAtUtc
+            });
+        }
+
         await _context.SaveChangesAsync(cancellationToken);
 
         if (command.ActingAdminUserId.HasValue)

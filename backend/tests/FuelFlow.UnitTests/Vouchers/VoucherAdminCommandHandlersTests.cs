@@ -2,6 +2,7 @@ using FluentAssertions;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Vouchers.BulkActionVouchers;
 using FuelFlow.Features.Vouchers.DeleteVoucher;
@@ -313,7 +314,160 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         _context.AuditEventOutbox.Should().NotContain(e => e.EventType == "VoucherBulkAction");
     }
 
+    /// <summary>
+    /// D-13. Activation is the step that puts stock on sale, and until now it left no trace — so the
+    /// question the whole record exists for, "when did this voucher become sellable and who said so",
+    /// had no answer for the largest population in the system.
+    /// </summary>
+    [Fact]
+    public async Task BulkAction_Activate_RecordsTheStatusChange_NamingTheAdmin()
+    {
+        var importId = Guid.NewGuid();
+        var imported = CreateVoucher(status: VoucherStatus.Imported, importJobId: importId);
+        imported.CostPerLiter = 40m;
+        _context.FuelVouchers.Add(imported);
+        await _context.SaveChangesAsync();
+
+        var handler = new BulkActionVouchersCommandHandler(_context, _backgroundJobClientMock.Object, _eventService);
+        var result = await handler.HandleAsync(
+            new BulkActionVouchersCommand("activate", [imported.Id], null, UserId, "Admin User"));
+
+        result.Success.Should().BeTrue();
+
+        var statusChange = _context.VoucherEvents.Single(e => e.VoucherId == imported.Id);
+        statusChange.EventType.Should().Be(VoucherEventTypes.StatusChanged);
+        statusChange.FromStatus.Should().Be(nameof(VoucherStatus.Imported));
+        statusChange.ToStatus.Should().Be(nameof(VoucherStatus.Available));
+        statusChange.ActorKind.Should().Be(VoucherActorKinds.User);
+        statusChange.ActorUserId.Should().Be(UserId);
+    }
+
+    /// <summary>
+    /// The hazard this PR had to design around, pinned as a behaviour rather than as a comment.
+    /// <para>
+    /// <c>command.Ids</c> arrives from the admin UI with no status filter, so activating
+    /// already-<c>Available</c> stock is reachable. <c>ck_voucher_events_status_changed</c> refuses
+    /// <c>from_status = to_status</c>, and it would refuse it by aborting the whole
+    /// <c>SaveChangesAsync</c> — so an admin clicking Activate on already-active stock would get an
+    /// error instead of a harmless no-op. Capturing the pre-image and skipping is what keeps this a
+    /// no-op.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task BulkAction_Activate_OnAlreadyActiveStock_IsANoOp_NotAnError()
+    {
+        var importId = Guid.NewGuid();
+        var already = CreateVoucher(status: VoucherStatus.Available, importJobId: importId);
+        already.CostPerLiter = 40m;
+        _context.FuelVouchers.Add(already);
+        await _context.SaveChangesAsync();
+
+        var handler = new BulkActionVouchersCommandHandler(_context, _backgroundJobClientMock.Object, _eventService);
+        var result = await handler.HandleAsync(
+            new BulkActionVouchersCommand("activate", [already.Id], null, UserId, "Admin User"));
+
+        result.Success.Should().BeTrue("nothing to change is not a failure");
+
+        // And nothing claimed a transition that did not happen.
+        _context.VoucherEvents.Should().NotContain(e => e.VoucherId == already.Id);
+        (await _context.FuelVouchers.FirstAsync(v => v.Id == already.Id)).Status
+            .Should().Be(VoucherStatus.Available);
+    }
+
+    /// <summary>
+    /// Archive is not a status change. <c>is_deleted</c> is a separate column, so the event carries no
+    /// from/to at all — which is also why it satisfies <c>ck_voucher_events_status_changed</c> without
+    /// the handler needing to know what state the voucher was in.
+    /// </summary>
+    [Fact]
+    public async Task BulkAction_Delete_RecordsAnArchivedEvent_NotAStatusChange()
+    {
+        var voucher = CreateVoucher(status: VoucherStatus.Available);
+        _context.FuelVouchers.Add(voucher);
+        await _context.SaveChangesAsync();
+
+        var handler = new BulkActionVouchersCommandHandler(_context, _backgroundJobClientMock.Object, _eventService);
+        var result = await handler.HandleAsync(
+            new BulkActionVouchersCommand("delete", [voucher.Id], null, UserId, "Admin User"));
+
+        result.Success.Should().BeTrue();
+
+        var archived = _context.VoucherEvents.Single(e => e.VoucherId == voucher.Id);
+        archived.EventType.Should().Be(VoucherEventTypes.Archived);
+        archived.FromStatus.Should().BeNull();
+        archived.ToStatus.Should().BeNull();
+        archived.ActorUserId.Should().Be(UserId);
+
+        (await _context.FuelVouchers.IgnoreQueryFilters().FirstAsync(v => v.Id == voucher.Id)).IsDeleted
+            .Should().BeTrue();
+    }
+
     // ── 3. BulkActionVouchersCommandHandler ──────────────────────────────────
+
+    /// <summary>
+    /// D-13. The arbitrary-status editor is the back door around every instrumented flow: it is the
+    /// only writer that can set any of the nine statuses, so an event it skips is an event missing
+    /// everywhere. This is also the site where a no-op is most reachable — <c>request.Status</c> is a
+    /// raw string sent verbatim by the admin UI — and it is why the transition is compared rather than
+    /// assumed.
+    /// </summary>
+    [Fact]
+    public async Task UpdateVoucher_RecordsTheStatusChange_NamingTheAdmin()
+    {
+        var voucher = CreateVoucher(status: VoucherStatus.Available);
+        _context.FuelVouchers.Add(voucher);
+        await _context.SaveChangesAsync();
+
+        var handler = new UpdateVoucherCommandHandler(_context, _eventService);
+        var result = await handler.HandleAsync(
+            new UpdateVoucherCommand(voucher.Id, nameof(VoucherStatus.Deactivated), null, UserId, "Admin User"));
+
+        result.Should().NotBeNull();
+        result!.Success.Should().BeTrue();
+
+        var statusChange = _context.VoucherEvents.Single(e => e.VoucherId == voucher.Id);
+        statusChange.EventType.Should().Be(VoucherEventTypes.StatusChanged);
+        statusChange.FromStatus.Should().Be(nameof(VoucherStatus.Available));
+        statusChange.ToStatus.Should().Be(nameof(VoucherStatus.Deactivated));
+        statusChange.ActorUserId.Should().Be(UserId);
+    }
+
+    [Fact]
+    public async Task UpdateVoucher_WithTheStatusUnchanged_RecordsNothing()
+    {
+        var voucher = CreateVoucher(status: VoucherStatus.Available);
+        _context.FuelVouchers.Add(voucher);
+        await _context.SaveChangesAsync();
+
+        var handler = new UpdateVoucherCommandHandler(_context, _eventService);
+        var result = await handler.HandleAsync(
+            new UpdateVoucherCommand(voucher.Id, nameof(VoucherStatus.Available), null, UserId, "Admin User"));
+
+        result.Should().NotBeNull();
+        result!.Success.Should().BeTrue("re-saving the same status is not a failure");
+
+        _context.VoucherEvents.Should().NotContain(e => e.VoucherId == voucher.Id);
+    }
+
+    [Fact]
+    public async Task DeleteVoucher_RecordsAnArchivedEvent_NotAStatusChange()
+    {
+        var voucher = CreateVoucher(status: VoucherStatus.Available);
+        _context.FuelVouchers.Add(voucher);
+        await _context.SaveChangesAsync();
+
+        var handler = new DeleteVoucherCommandHandler(_context, _eventService);
+        var result = await handler.HandleAsync(new DeleteVoucherCommand(voucher.Id, UserId, "Admin User"));
+
+        result.Success.Should().BeTrue();
+
+        var archived = _context.VoucherEvents.Single(e => e.VoucherId == voucher.Id);
+        archived.EventType.Should().Be(VoucherEventTypes.Archived);
+        archived.FromStatus.Should().BeNull("is_deleted is a separate column, so there is no transition to record");
+        archived.ToStatus.Should().BeNull();
+        archived.ActorUserId.Should().Be(UserId);
+    }
+
 
     [Fact]
     public async Task BulkAction_Activate_ShouldSetAvailable()
