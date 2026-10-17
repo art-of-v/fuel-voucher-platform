@@ -1314,6 +1314,85 @@ var exchangedId = Guid.NewGuid();
         return (line, delivered);
     }
 
+    [Fact]
+    public async Task ReleasedFulfilment_OnARenewalLine_StillCountsAsDelivered()
+    {
+        // The renewal's done-marker used to be `VoucherRenewalItem.FulfilledVoucherId IS NOT NULL`,
+        // which had no query filter and so could not see the difference. It is now "this line has a
+        // fulfilment", and `Fulfillments` DOES carry a global `released_at_utc IS NULL` filter. This
+        // test is the reason both readers of that marker pass `IgnoreQueryFilters`.
+        //
+        // Nothing releases a renewal fulfilment today - `FixMismatchedFulfillmentsAsync` excludes
+        // `Kind == Renewal` (FulfillmentService.cs:104) and the replace path releases the SOURCE
+        // voucher's fulfilment, which belongs to the purchase order, not this one. So this is a pin,
+        // not a fix for a live bug: it is exactly the kind of "redundant" filter a later refactor
+        // would drop, and dropping it makes the retry sweep extend the same voucher a second time.
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        var sourceId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var originalExpiry = today.AddDays(5);
+        var onceRenewed = originalExpiry.AddMonths(1); // what the first, already-applied extend wrote
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+
+            SeedUser(seed, userId);
+            var purchaseOrderId = SeedPurchaseOrder(seed, userId);
+
+            // The voucher as the FIRST renewal left it: still the customer's, expiry already pushed.
+            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", 50m, onceRenewed));
+
+            seed.Orders.Add(RenewalOrder(orderId, userId, price: 500, monobankInvoiceId: null,
+                ("OKKO", "okko-95", 50m, 500)));
+            var line = MarkAsRenewalLine(seed, orderId, sourceId, termCode: "1m");
+            line.PreviousCustomerExpiration = originalExpiry;
+            line.NewCustomerExpiration = onceRenewed;
+
+            // The delivery, marked released - the state under test.
+            seed.Fulfillments.Add(new Fulfillment
+            {
+                OrderId = orderId,
+                VoucherId = sourceId,
+                LineItemId = line.Id,
+                FulfilledAtUtc = DateTime.UtcNow.AddMinutes(-10),
+                ReleasedAtUtc = DateTime.UtcNow.AddMinutes(-5),
+                ReleaseReason = "quantity_mismatch"
+            });
+
+            await seed.SaveChangesAsync();
+        }
+
+        // Deliberately left PendingFulfillment, which is what the per-minute retry sweep re-drives.
+        using (var ctx = CreateContext())
+        {
+            await BuildService(ctx, new Mock<IMonobankClient>().Object).ProcessRenewalOrderAsync(orderId);
+        }
+
+        using var verify = CreateContext();
+
+        // The point of the test: a second extend would push the expiry out again, and the snapshots
+        // would be overwritten with the wrong "previous" value - losing the record of what the
+        // customer actually bought.
+        var source = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == sourceId);
+        source.CustomerExpirationDate.Should().Be(onceRenewed,
+            "a released fulfilment still delivered the term, so it must not be delivered twice");
+
+        var (line2, delivered) = await LoadRenewalAsync(verify, orderId, sourceId);
+        line2.PreviousCustomerExpiration.Should().Be(originalExpiry);
+        line2.NewCustomerExpiration.Should().Be(onceRenewed);
+
+        (await verify.Fulfillments.IgnoreQueryFilters().CountAsync(f => f.LineItemId == line2.Id))
+            .Should().Be(1, "no second delivery row for an already-delivered line");
+
+        // And the order still finishes: treating the line as undelivered would leave it open forever,
+        // retrying every minute against a voucher's supplier term that no longer has room.
+        (await verify.Orders.AsNoTracking().FirstAsync(o => o.Id == orderId)).Status
+            .Should().Be(OrderStatus.Fulfilled);
+    }
+
     private static async Task ResetDataAsync(ApplicationDbContext context)
     {
         await context.Database.ExecuteSqlRawAsync(
