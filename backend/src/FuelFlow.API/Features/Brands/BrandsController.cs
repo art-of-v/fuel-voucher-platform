@@ -5,6 +5,7 @@ using FuelFlow.Features.Brands.GetProviderById;
 using FuelFlow.Features.Brands.GetProviderHistory;
 using FuelFlow.Features.Brands.GetProviders;
 using FuelFlow.Features.Brands.GetFuelPriceHistory;
+using FuelFlow.Features.Brands.GetFuelPriceAt;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
@@ -26,6 +27,7 @@ private readonly GetBrandsQueryHandler _getAll;
     private readonly GetBrandByIdQueryHandler _getById;
     private readonly GetBrandHistoryQueryHandler _getHistory;
     private readonly GetFuelPriceHistoryQueryHandler _getPriceHistory;
+    private readonly GetFuelPriceAtQueryHandler _getPriceAt;
     private readonly AuditEventService _eventService;
     private readonly ApplicationDbContext _context;
     private readonly NotificationDispatcher _notifications;
@@ -39,6 +41,7 @@ private readonly GetBrandsQueryHandler _getAll;
         GetBrandByIdQueryHandler getById,
         GetBrandHistoryQueryHandler getHistory,
         GetFuelPriceHistoryQueryHandler getPriceHistory,
+        GetFuelPriceAtQueryHandler getPriceAt,
         AuditEventService eventService,
         ApplicationDbContext context,
         NotificationDispatcher notifications,
@@ -48,6 +51,7 @@ private readonly GetBrandsQueryHandler _getAll;
         _getById = getById;
         _getHistory = getHistory;
         _getPriceHistory = getPriceHistory;
+        _getPriceAt = getPriceAt;
         _eventService = eventService;
         _context = context;
         _notifications = notifications;
@@ -85,6 +89,21 @@ private readonly GetBrandsQueryHandler _getAll;
         [FromQuery] int limit = 50,
         CancellationToken ct = default) =>
         Ok(await _getPriceHistory.HandleAsync(new GetFuelPriceHistoryQuery(fuelId, limit), ct));
+
+    /// <summary>
+    /// What one fuel was priced at at a given instant — the question an order line from last month asks,
+    /// which a series clamped to the newest <c>limit</c> rows cannot answer.
+    /// <para>
+    /// Returns null (200 with an empty body) when no price had taken effect by then, which is a real
+    /// answer: the fuel did not exist, or was not priced yet. Not a 404 — nothing is missing here.
+    /// </para>
+    /// </summary>
+    [HttpGet("fuels/{fuelId}/price-at")]
+    public async Task<IActionResult> GetFuelPriceAt(
+        [FromRoute] string fuelId,
+        [FromQuery] DateTime asOf,
+        CancellationToken ct = default) =>
+        Ok(await _getPriceAt.HandleAsync(new GetFuelPriceAtQuery(fuelId, asOf), ct));
 
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] BrandDto request, CancellationToken ct)

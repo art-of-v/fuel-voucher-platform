@@ -188,6 +188,7 @@ internal static class ServiceSetup
         // rather than best-effort. Registered next to its first caller because all five of them need it.
         services.AddScoped<FuelFlow.Features.Pricing.OfferPriceRecorder>();
         services.AddScoped<FuelFlow.Features.Brands.GetFuelPriceHistory.GetFuelPriceHistoryQueryHandler>();
+        services.AddScoped<FuelFlow.Features.Brands.GetFuelPriceAt.GetFuelPriceAtQueryHandler>();
         services.AddScoped<GetImportBatchCostsQueryHandler>();
         services.AddScoped<GetImportBatchPnlQueryHandler>();
         services.AddScoped<SetBatchCostCommandHandler>();
