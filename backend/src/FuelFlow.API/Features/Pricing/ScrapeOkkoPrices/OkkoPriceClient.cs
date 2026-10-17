@@ -138,10 +138,28 @@ public sealed class OkkoPriceClient : IOkkoPriceClient
             return false;
         }
 
+        // The label OKKO renders beside the code. Localized per request, so this is the Ukrainian
+        // spelling for the /uk/ endpoint the options point at - which is what the catalogue import
+        // needs, because a fuel it creates has to be named the way the brand names it rather than the
+        // way an operator typed it once.
+        //
+        // Optional: pricing does not need it, so a payload that drops the field still yields prices
+        // and only the catalogue import degrades (it reports the code and creates nothing).
+        var title = node.TryGetProperty("title", out var titleElement) && titleElement.ValueKind == JsonValueKind.String
+            ? CollapseWhitespace(titleElement.GetString())
+            : null;
+
         // First wins: OKKO publishes one row per fuel, so a duplicate means the tree repeats the
         // component and taking the later copy would make the result depend on tree order.
-        if (seen.Add(code)) into.Add(new OkkoPumpPrice(code, price));
+        if (seen.Add(code)) into.Add(new OkkoPumpPrice(code, price, title));
         return true;
+    }
+
+    /// <summary>Title runs arrive padded when read out of the payload; a name with runs of spaces is a name nobody typed.</summary>
+    private static string? CollapseWhitespace(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        return string.Join(' ', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
     }
 }
 

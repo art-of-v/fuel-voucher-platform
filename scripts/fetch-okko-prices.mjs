@@ -18,6 +18,12 @@
 // the `title` is translated per request. We emit the code, and the backend maps it onto the catalog
 // with OkkoFuelClassifier.CategoryFromSiteFuelCode.
 //
+// The title is dropped HERE only because this script's output is a CSV for the retired manual upload
+// endpoint (planning #289, disabled 2026-10-12). The backend's own fetch — OkkoPriceClient, on a
+// 15-minute schedule — reads the title and uses it to NAME a fuel the catalogue does not carry yet
+// (ImportOkkoCatalogueCommandHandler). A CSV produced by this script therefore carries codes without
+// labels, and the catalogue import cannot create anything from it; run the scheduled job, not this.
+//
 // Output is the CSV shape the admin importer accepts:
 //
 //   fuelCode, pricePerLiter
