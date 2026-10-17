@@ -119,7 +119,7 @@ check_data_preconditions() {
 
     checked=$((checked + 1))
     # Count lines carrying the field separator, NOT non-empty lines. psql writes its own output to
-    # stdout ΓÇö "BEGIN", "SET", "(0 rows)", "COMMIT" ΓÇö and counting those made this report
+    # stdout — "BEGIN", "SET", "(0 rows)", "COMMIT" — and counting those made this report
     # "VIOLATED - 3 row(s)" against a completely clean production database, then print "(0 rows)"
     # as the detail underneath. It shipped that way and fired on the first real deploy.
     #

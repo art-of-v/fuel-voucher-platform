@@ -33,7 +33,7 @@ namespace FuelFlow.IntegrationTests;
 /// (LINQ-only, unit-tested on InMemory), <see cref="FulfillmentService.ProcessRenewalOrderAsync"/>
 /// leans on raw-SQL atomic UPDATEs and a per-order advisory lock, so it only exercises faithfully
 /// against real Postgres. Each test drives ONE paid renewal order through the two-branch logic:
-/// extend-in-place, replace-from-stock, and the post-payment no-stock partial ΓåÆ auto-refund.
+/// extend-in-place, replace-from-stock, and the post-payment no-stock partial → auto-refund.
 /// </summary>
 [Collection("Integration Tests")]
 public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatabaseFixture>
@@ -53,7 +53,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         var sourceId = Guid.NewGuid();
         var itemId = Guid.NewGuid();
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var sourceExpiry = today.AddDays(5); // still valid ΓåÆ Extend
+        var sourceExpiry = today.AddDays(5); // still valid → Extend
 
         using (var seed = CreateContext())
         {
@@ -387,7 +387,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         var source = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == sourceId);
         source.CustomerExpirationDate.Should().Be(sourceExpiry, "the retired voucher's dates are left alone");
         source.Status.Should().Be(VoucherStatus.Available,
-            "the replaced voucher goes back into the sellable pool ΓÇö the customer walked away with a different one");
+            "the replaced voucher goes back into the sellable pool — the customer walked away with a different one");
         source.AssignedToUserId.Should().BeNull("and nobody owns it any more");
 
         var stock = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == stockId);
@@ -395,11 +395,11 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         stock.AssignedToUserId.Should().Be(userId);
         stock.SupplierExpirationDate.Should().Be(today.AddMonths(6), "the supplier term stays as printed");
         // The customer is promised what they paid for ON TOP of what they still held, and the stock was
-        // chosen to reach at least that date ΓÇö so this never needs clamping to the paper term.
+        // chosen to reach at least that date — so this never needs clamping to the paper term.
         stock.CustomerExpirationDate.Should().Be(sourceExpiry.AddMonths(1),
             "the replacement carries exactly the promise: leftover term + the month that was paid for");
 
-        // History snapshot: previous ΓåÆ paid, never the stock voucher's own (longer) term.
+        // History snapshot: previous → paid, never the stock voucher's own (longer) term.
         replaceLine.PreviousCustomerExpiration.Should().Be(sourceExpiry);
         replaceLine.NewCustomerExpiration.Should().Be(sourceExpiry.AddMonths(1));
     }
@@ -526,7 +526,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             SeedUser(seed, userId);
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
             originPurchaseId = purchaseOrderId;
-            // Source lapsed ΓåÆ Replace branch. Seeded Assigned so we can prove it goes back to stock.
+            // Source lapsed → Replace branch. Seeded Assigned so we can prove it goes back to stock.
             seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", 40m, today.AddDays(-3)));
             // Matching stock, valid well beyond today + 1 month.
             seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 40m, today.AddMonths(6)));
@@ -555,11 +555,11 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         source.Status.Should().Be(VoucherStatus.Available, // back in the sellable pool, not retired
             "the customer walked away with a different voucher, so this one is Fuel Flow's stock again");
         source.AssignedToUserId.Should().BeNull(
-            "ownership goes back to the operator ΓÇö the next claimer pays for it, so no double revenue");
+            "ownership goes back to the operator — the next claimer pays for it, so no double revenue");
         source.LegalEntityId.Should().BeNull();
         source.WorkerUserId.Should().BeNull();
         source.OrderId.Should().Be(originPurchaseId,
-            "the link to the purchase that delivered this paper is kept ΓÇö re-homing it would rewrite the origin");
+            "the link to the purchase that delivered this paper is kept — re-homing it would rewrite the origin");
 
         var (_, replacementDelivery) = await LoadRenewalAsync(verify, orderId, sourceId);
         replacementDelivery!.VoucherId.Should().Be(stockId); // points at the fresh voucher
@@ -595,7 +595,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
 
             // The lapsed voucher was originally delivered by a purchase, not by the renewal order
             // under test. Its PAPER has lapsed too, so once it is back in stock it is stock that is about
-            // to be written off ΓÇö which is exactly the case the operator's exchange list exists to surface.
+            // to be written off — which is exactly the case the operator's exchange list exists to surface.
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
 
             seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", 40m,
@@ -643,7 +643,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
     /// <summary>
     /// The owner's 9/14-days case, and the boundary that matters most: we may issue a voucher SHORTER than
     /// a longer one sitting in stock, but never one shorter than what was paid for. A customer paying for a
-    /// week is owed until day 9, so the 9-day voucher goes out and the 14-day one is kept ΓÇö and an 8-day
+    /// week is owed until day 9, so the 9-day voucher goes out and the 14-day one is kept — and an 8-day
     /// voucher (the number the owner first used) would have been REJECTED, because it cannot carry the week.
     /// </summary>
     [Fact]
@@ -693,7 +693,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
 
         (await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == eightDayId)).Status
             .Should().Be(VoucherStatus.Available,
-                "8 days cannot carry the week the customer paid for ΓÇö that is the floor, not a preference");
+                "8 days cannot carry the week the customer paid for — that is the floor, not a preference");
         (await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == fourteenDayId)).Status
             .Should().Be(VoucherStatus.Available, "it qualifies too, but the shorter voucher serves");
 
@@ -704,7 +704,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
     }
 
     /// <summary>
-    /// Two extends in a row on one voucher ΓÇö the owner's own ladder (bought 1 week, +1 week, +2 months).
+    /// Two extends in a row on one voucher — the owner's own ladder (bought 1 week, +1 week, +2 months).
     /// Every step must add the term to what the customer ALREADY holds, on the same voucher with the same
     /// code, and must not touch the paper term. The third step in the owner's story runs past the ceiling and
     /// replaces, which <see cref="Replace_PicksTheShortestStockThatStillCoversThePromise"/> covers.
@@ -765,7 +765,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         var final = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == sourceId);
         final.Status.Should().Be(VoucherStatus.Assigned);
         final.AssignedToUserId.Should().Be(userId);
-        final.QrPayload.Should().Be($"qr-{sourceId:N}", "still the same code ΓÇö no new voucher, no new QR");
+        final.QrPayload.Should().Be($"qr-{sourceId:N}", "still the same code — no new voucher, no new QR");
         final.SupplierExpirationDate.Should().Be(providerTerm);
         final.CustomerExpirationDate.Should().Be(boughtFor.AddDays(7).AddMonths(2),
             "2 months on top of the previous step, not on top of today");
@@ -786,14 +786,14 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
     }
 
     /// <summary>
-    /// The rule that decides WHICH stock voucher goes out: not "today + term", but the promise ΓÇö the
-    /// customer's leftover term plus what they just paid for ΓÇö and among everything that reaches that
+    /// The rule that decides WHICH stock voucher goes out: not "today + term", but the promise — the
+    /// customer's leftover term plus what they just paid for — and among everything that reaches that
     /// date, the SHORTEST one.
     ///
     /// The concrete case the owner described: on 13.03 a customer holds fuel until 27.03 and pays for
     /// 2 months, so they are owed until 27.05. A 2-month voucher (good to 13.05) misses by two weeks and
     /// must be rejected; the 3-month one (13.06) qualifies, and handing that over keeps Fuel Flow's
-    /// near-expiry stock from lapsing unused. The customer still only gets until 27.05 ΓÇö the extra real
+    /// near-expiry stock from lapsing unused. The customer still only gets until 27.05 — the extra real
     /// life stays a reserve they can spend on a later renewal.
     /// </summary>
     [Fact]
@@ -847,7 +847,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         var issued = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == threeMonthsId);
         issued.Status.Should().Be(VoucherStatus.Assigned);
         issued.CustomerExpirationDate.Should().Be(promise,
-            "the customer is given what they paid for on top of what they still held ΓÇö the rest is reserve");
+            "the customer is given what they paid for on top of what they still held — the rest is reserve");
         issued.SupplierExpirationDate.Should().Be(today.AddMonths(3), "the paper term itself is untouched");
 
         qualifiedLine.PreviousCustomerExpiration.Should().Be(sourceExpiry);
@@ -862,7 +862,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
 
     /// <summary>
     /// When nothing reaches the promise we must NOT ship a short voucher and must NOT quietly clamp the
-    /// promised date. The line simply stays open ΓÇö the same posture the no-stock case already had, now
+    /// promised date. The line simply stays open — the same posture the no-stock case already had, now
     /// reachable without an empty warehouse.
     /// </summary>
     [Fact]
@@ -920,7 +920,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
 
     /// <summary>
     /// The voucher a customer gave back is stock again, so the NEXT customer to need fuel at the same
-    /// price point gets that same voucher ΓÇö and pays for it. That is what makes the rule harmless: the
+    /// price point gets that same voucher — and pays for it. That is what makes the rule harmless: the
     /// returned paper is recycled through the till rather than written off.
     /// </summary>
     [Fact]
@@ -1019,10 +1019,10 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
     /// <summary>
     /// Two wallet guarantees at once, and they pull against each other.
     ///
-    /// The released voucher must NOT be shown ΓÇö it is Fuel Flow's stock again and the client has no status
+    /// The released voucher must NOT be shown — it is Fuel Flow's stock again and the client has no status
     /// reason to hide an Available voucher. But it must still be LOADED, because resolving a replacement's
     /// origin walks back to the root voucher and reads ITS order_id: filter it out of the lookup and the
-    /// replacement resolves to the RENEWAL order, which the wallet does not render ΓÇö the customer's fuel
+    /// replacement resolves to the RENEWAL order, which the wallet does not render — the customer's fuel
     /// then vanishes from their wallet entirely. So: hidden from the response, present for the chain.
     /// </summary>
     [Fact]
@@ -1047,7 +1047,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", 50m,
                 sourceExpiry, providerExpiry: sourceExpiry));
             // The purchase really did deliver this voucher, so the wallet can reach it. That row is what
-            // puts the source into the customer's voucher chain ΓÇö without it the origin walk has no root to
+            // puts the source into the customer's voucher chain — without it the origin walk has no root to
             // find and the replacement resolves to the renewal order, i.e. nowhere the wallet renders.
             seed.Fulfillments.Add(new Fulfillment
             {
@@ -1124,7 +1124,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
 
     /// <summary>
     /// Once the operator confirms the supplier exchange, the retired voucher has a voucher_exchanges row,
-    /// so the renewal is done. It must then drop off BOTH the attention list and the badge count ΓÇö not
+    /// so the renewal is done. It must then drop off BOTH the attention list and the badge count — not
     /// linger as a dead-end row whose only effect is that re-confirming it is rejected as "already
     /// exchanged", leaving the badge stuck (planning #183).
     /// </summary>
@@ -1183,7 +1183,7 @@ var exchangedId = Guid.NewGuid();
         // Only the voucher still owed to the supplier remains; the exchanged one is gone.
         attention.Data.Should().ContainSingle().Which.Id.Should().Be(stillOwedId);
         attention.Data.Should().NotContain(i => i.Id == exchangedId,
-            "a voucher with a voucher_exchanges row has been renewed with the supplier ΓÇö the job is done");
+            "a voucher with a voucher_exchanges row has been renewed with the supplier — the job is done");
 
         // The nav badge must agree with the list, or it stays lit over nothing.
         (await handler.CountAsync(CancellationToken.None)).Should().Be(1);
@@ -1211,13 +1211,13 @@ var exchangedId = Guid.NewGuid();
 
             SeedUser(seed, userId);
 
-            // One purchase order originally delivered BOTH source vouchers (quantity 2) ΓÇö it is not the
+            // One purchase order originally delivered BOTH source vouchers (quantity 2) — it is not the
             // renewal order under test, which the service creates and owns on its own.
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
 
-            // Line A: still-valid source ΓåÆ Extend, will succeed.
+            // Line A: still-valid source → Extend, will succeed.
             seed.FuelVouchers.Add(SourceVoucher(extendSourceId, userId, purchaseOrderId, "OKKO", "okko-95", 50m, today.AddDays(5)));
-            // Line B: lapsed source ΓåÆ Replace, but NO matching stock is seeded ΓåÆ stays unfulfilled.
+            // Line B: lapsed source → Replace, but NO matching stock is seeded → stays unfulfilled.
             seed.FuelVouchers.Add(SourceVoucher(replaceSourceId, userId, purchaseOrderId, "WOG", "wog-95", 40m, today.AddDays(-3)));
 
             seed.Orders.Add(RenewalOrder(orderId, userId, price: 980, monobankInvoiceId: $"test-invoice-{orderId:N}",
@@ -1280,7 +1280,7 @@ var exchangedId = Guid.NewGuid();
 
     /// <summary>
     /// The purchase that originally delivered a source voucher. A held voucher (Assigned/Used/Blocked)
-    /// must carry an <c>order_id</c> ΓÇö ck_voucher_held_has_order rejects the row otherwise ΓÇö and for a
+    /// must carry an <c>order_id</c> — ck_voucher_held_has_order rejects the row otherwise — and for a
     /// source voucher that order is the original purchase, never the renewal order under test (the
     /// service creates that one itself and writes its own order_id onto whatever it hands over).
     /// </summary>
@@ -1305,7 +1305,7 @@ var exchangedId = Guid.NewGuid();
     /// This path used to do the opposite: it subtracted the fee from <c>cost_per_liter</c> on every paid
     /// renewal, which made one column mean both "what we paid" and "what this is worth to us now". That
     /// column feeds <c>BlendedCostRecalculator</c>, the package prices and supplier invoicing, so the two
-    /// meanings leaked into each other ΓÇö a voucher a customer had fully paid off was priced as if it
+    /// meanings leaked into each other — a voucher a customer had fully paid off was priced as if it
     /// were free.
     /// </para>
     /// <para>
@@ -1353,14 +1353,14 @@ var exchangedId = Guid.NewGuid();
         using var verify = CreateContext();
         var stored = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == sourceId);
 
-        // Not 90 ΓêÆ (100 / 10). The fee is income; the purchase price is still the purchase price.
+        // Not 90 ≈ (100 / 10). The fee is income; the purchase price is still the purchase price.
         stored.CostPerLiter.Should().Be(originalCost);
         stored.Status.Should().Be(VoucherStatus.Assigned);
         stored.CustomerExpirationDate.Should().Be(sourceExpiry.AddMonths(1), "the renewal itself still happened");
     }
 
     /// <summary>
-    /// A customer paying far more than the fuel was worth must not touch the cost either ΓÇö not by
+    /// A customer paying far more than the fuel was worth must not touch the cost either — not by
     /// flooring it at zero, and certainly not by pushing it negative.
     /// </summary>
     [Fact]
