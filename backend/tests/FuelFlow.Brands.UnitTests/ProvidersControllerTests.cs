@@ -1,3 +1,4 @@
+using FuelFlow.Brands.UnitTests;
 using System.Security.Claims;
 using System.Text.Json;
 using FluentAssertions;
@@ -30,7 +31,7 @@ public sealed class BrandsControllerTests : IDisposable
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
 
-        _context = new ApplicationDbContext(options);
+        _context = new ApplicationDbContext(options, TestQrCipher.Instance);
         _context.Database.EnsureCreated();
 
         _user = new ClaimsPrincipal(new ClaimsIdentity(

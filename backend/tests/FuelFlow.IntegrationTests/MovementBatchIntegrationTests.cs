@@ -369,5 +369,5 @@ public sealed class MovementBatchIntegrationTests : IClassFixture<TestDatabaseFi
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(_fixture.ConnectionString + ";SSL Mode=Disable")
-            .Options);
+            .Options, TestQrCipher.Instance);
 }

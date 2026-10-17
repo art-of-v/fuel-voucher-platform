@@ -1,3 +1,4 @@
+using FuelFlow.Brands.UnitTests;
 using FluentAssertions;
 using FuelFlow.Features.Brands.GetProviders;
 using FuelFlow.Persistence;
@@ -17,7 +18,7 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
 
-        _context = new ApplicationDbContext(options);
+        _context = new ApplicationDbContext(options, TestQrCipher.Instance);
         _context.Database.EnsureCreated();
 
         _handler = new GetBrandsQueryHandler(_context);
