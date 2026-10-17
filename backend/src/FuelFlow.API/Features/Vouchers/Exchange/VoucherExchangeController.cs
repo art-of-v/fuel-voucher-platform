@@ -80,6 +80,13 @@ public sealed class VoucherExchangeController : ControllerBase
     [HttpPost("confirm")]
     public async Task<IActionResult> Confirm([FromBody] ConfirmVoucherExchangeRequest request, CancellationToken cancellationToken)
     {
+        // Refused rather than performed anonymously. An exchange is settlement: it retires vouchers,
+        // reprices stock and writes both a movement and a status event, all attributed to this id.
+        // With no id there is nothing to attribute it to, and the writers can only skip the record -
+        // which would leave the settlement done and unexplained.
+        var userId = GetUserId();
+        if (userId is null) return Unauthorized();
+
         var command = new ConfirmVoucherExchangeCommand(
             request.OldVoucherIds ?? new List<Guid>(),
             request.NewImportId,
@@ -87,14 +94,26 @@ public sealed class VoucherExchangeController : ControllerBase
                 .Select(c => new ExchangeFuelCost(c.FuelTypeId, c.CostPerLiter))
                 .ToList(),
             request.SurchargeUah,
-            GetUserId(),
+            userId.Value,
             GetUserName());
 
         var result = await _confirmHandler.HandleAsync(command, cancellationToken);
         return result.Success ? Ok(result) : BadRequest(new { error = result.Error, result });
     }
 
-    private Guid GetUserId()
+    /// <summary>
+    /// The authenticated operator's id, or <c>null</c> when the token carries none.
+    /// </summary>
+    /// <remarks>
+    /// Was <see cref="Guid.Empty"/>, which is NOT NULL and therefore satisfied
+    /// <c>ck_voucher_events_actor_named</c> on its own: an operator action with no authenticated actor
+    /// was recorded as <em>this user did it, and here is their id</em>, naming a user who does not
+    /// exist. That is the one author the actor CHECKs cannot catch, which is why the exchange writer
+    /// also tests for it — this removes the possibility rather than the symptom. Every token
+    /// <c>JwtTokenService</c> mints carries <c>sub</c>, so null here means a token this service did
+    /// not issue.
+    /// </remarks>
+    private Guid? GetUserId()
     {
         var claim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         return claim is not null && Guid.TryParse(claim, out var id) ? id : Guid.Empty;
