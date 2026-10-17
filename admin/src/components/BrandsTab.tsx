@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DecimalSettingInput } from "@/components/DecimalSettingInput";
+import { FuelPriceHistory } from "@/components/FuelPriceHistory";
 import { apiRequest } from "@/lib/api-client";
 import { resolveAllowBelowCost } from "@/lib/belowCostOptIn";
 import { toast } from "sonner";
@@ -156,6 +157,9 @@ export default function BrandsTab({
 
   const [editingNominals, setEditingNominals] = useState<string | null>(null);
   const [nominalInput, setNominalInput] = useState("");
+
+  // Which fuel's price history is open underneath the table, if any. One at a time on purpose.
+  const [priceHistoryFor, setPriceHistoryFor] = useState<string | null>(null);
 
   const { data: brands = [], isLoading } = useQuery<BrandDto[]>({
     queryKey: ["/api/admin/brands"],
@@ -1230,6 +1234,22 @@ className="w-24 h-8 text-right text-xs"
                                     </div>
                                   ) : (
                                     <>
+                                      {/* The price history is a whole panel, not a field of this row, so it
+                                          opens underneath rather than in a dialog: an operator comparing a
+                                          price against the row that shows it today needs both on screen. */}
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() =>
+                                          setPriceHistoryFor((current) =>
+                                            current === fuel.id ? null : fuel.id,
+                                          )
+                                        }
+                                        title={t("priceHistory.openHint")}
+                                        className="h-8"
+                                      >
+                                        <History className="w-3.5 h-3.5" />
+                                      </Button>
                                       <Button
                                         variant="ghost"
                                         size="sm"
@@ -1260,6 +1280,16 @@ className="w-24 h-8 text-right text-xs"
                             </tr>
                           );
                         })}
+                        {/* The open price history, as a full-width row under the fuel it belongs to.
+                            One fuel at a time: two open panels side by side would answer neither. */}
+                        {priceHistoryFor &&
+                          brand.fuels.some((fuel) => fuel.id === priceHistoryFor) && (
+                            <tr className="border-t border-border bg-muted/20">
+                              <td colSpan={8} className="p-3">
+                                <FuelPriceHistory fuelId={priceHistoryFor} />
+                              </td>
+                            </tr>
+                          )}
                         {/* Add Fuel Row */}
                         {addingFuel === brand.id && (
                           <tr className="border-t border-border bg-muted/30">
