@@ -96,14 +96,30 @@ public sealed class ImportOkkoCatalogueCommandHandler
         var unclassified = new List<string>();
         var unnamed = new List<string>();
 
-        // The codes we already carry, live rows only: an archived fuel must not stop a fresh one from
-        // being created for a grade the brand sells again.
-        var knownCodes = (await _context.FuelTypes
+        // What we already carry, live rows only: an archived fuel must not stop a fresh one from being
+        // created for a grade the brand sells again.
+        //
+        // BOTH the codes and the names, and the names are what made this necessary. Production carried
+        // fifteen fuels and not one code, so a code-only test said "every grade is missing" and the
+        // import tried to create "ГАЗ" beside the "ГАЗ" that was already there — refused by
+        // ux_fuel_types_station_name, every fifteen minutes, since the deploy. A name is not an identity
+        // (that is the whole point of the code), but on its own it is enough to say "we sell this grade
+        // already", and the code it lacks is the backfill's job, not this import's.
+        var carried = (await _context.FuelTypes
                 .AsNoTracking()
-                .Where(f => f.StationId == OkkoStationId && f.BrandFuelCode != null && !f.IsDeleted)
-                .Select(f => f.BrandFuelCode!)
-                .ToListAsync(ct))
+                .Where(f => f.StationId == OkkoStationId && !f.IsDeleted)
+                .ToListAsync(ct));
+
+        var knownCodes = carried
+            .Where(f => f.BrandFuelCode is not null)
+            .Select(f => f.BrandFuelCode!)
             .ToHashSet(StringComparer.Ordinal);
+
+        var knownNames = carried
+            .Select(f => FuelTypeEntity.NormaliseBrandFuelCode(f.Name))
+            .Where(name => name is not null)
+            .Select(name => name!)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         foreach (var row in command.Sheet)
         {
@@ -116,15 +132,17 @@ public sealed class ImportOkkoCatalogueCommandHandler
                 continue;
             }
 
-            if (knownCodes.Contains(code))
+            var name = FuelTypeEntity.NormaliseBrandFuelCode(row.FuelName) is { } rawName && rawName.Length > 0
+                ? rawName
+                : null;
+
+            // The code first: it is the stronger claim, and a fuel holding it needs nothing from us.
+            // The name second, which is how a grade we sell under our own spelling is left alone.
+            if (knownCodes.Contains(code) || (name is not null && knownNames.Contains(name)))
             {
                 alreadyKnown++;
                 continue;
             }
-
-            var name = FuelTypeEntity.NormaliseBrandFuelCode(row.FuelName) is { } rawName && rawName.Length > 0
-                ? rawName
-                : null;
 
             if (name is null)
             {
@@ -135,6 +153,7 @@ public sealed class ImportOkkoCatalogueCommandHandler
             }
 
             knownCodes.Add(code);
+            knownNames.Add(name);
 
             if (command.DryRun)
             {
