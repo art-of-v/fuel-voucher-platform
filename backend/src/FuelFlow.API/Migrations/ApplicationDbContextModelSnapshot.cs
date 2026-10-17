@@ -3179,6 +3179,46 @@ namespace FuelFlow.API.Migrations
                         });
                 });
 
+            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.FuelTypeProductCode", b =>
+                {
+                    b.Property<string>("FuelTypeId")
+                        .HasColumnType("text")
+                        .HasColumnName("fuel_type_id");
+
+                    b.Property<string>("ProductCode")
+                        .HasColumnType("text")
+                        .HasColumnName("product_code");
+
+                    b.Property<DateTime?>("LastSeenAtUtc")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("last_seen_at_utc");
+
+                    b.Property<string>("StationId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("station_id");
+
+                    b.HasKey("FuelTypeId", "ProductCode");
+
+                    b.HasIndex("ProductCode")
+                        .HasDatabaseName("ix_fuel_type_product_codes_code");
+
+                    b.HasIndex("StationId", "ProductCode")
+                        .IsUnique()
+                        .HasDatabaseName("ux_fuel_type_product_codes_station_code");
+
+                    b.ToTable("fuel_type_product_codes", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_fuel_type_product_codes_code_not_blank", "btrim(product_code) <> ''");
+
+                            t.HasCheckConstraint("ck_fuel_type_product_codes_fuel_type_id_length", "length(fuel_type_id) <= 100");
+
+                            t.HasCheckConstraint("ck_fuel_type_product_codes_product_code_length", "length(product_code) <= 32");
+
+                            t.HasCheckConstraint("ck_fuel_type_product_codes_station_id_length", "length(station_id) <= 100");
+                        });
+                });
+
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.OrderEvent", b =>
                 {
                     b.Property<Guid>("Id")

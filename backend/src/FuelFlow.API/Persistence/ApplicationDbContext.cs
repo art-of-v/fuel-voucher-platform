@@ -101,6 +101,11 @@ private readonly FuelFlow.Features.Vouchers.Security.IQrCipher _qrCipher;
     // constrained so the migration can be proved against a real database before any read path moves.
     public DbSet<FuelOffer> FuelOffers => Set<FuelOffer>();
     public DbSet<FuelOfferVolume> FuelOfferVolumes => Set<FuelOfferVolume>();
+
+    // The voucher side's crosswalk: which QR product code means which grade at which network. Read by
+    // the OKKO voucher parser to resolve a fuel by the one signal in a parsed voucher that is not a
+    // name. #349 step 3b.
+    public DbSet<FuelTypeProductCode> FuelTypeProductCodes => Set<FuelTypeProductCode>();
     public DbSet<Contract> Contracts => Set<Contract>();
     public DbSet<UserContract> UserContracts => Set<UserContract>();
     public DbSet<LegalEntity> LegalEntities => Set<LegalEntity>();
