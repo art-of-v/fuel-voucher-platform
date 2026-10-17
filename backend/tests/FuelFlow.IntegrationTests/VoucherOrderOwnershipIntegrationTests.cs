@@ -7,6 +7,8 @@ using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.Events;
+using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Features.Vouchers.Renewal.Operator;
 using FuelFlow.Features.Vouchers.SharedModels;
@@ -72,6 +74,72 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
         fulfillments.Should().ContainSingle().Which.VoucherId.Should().Be(delivered.Id);
     }
 
+    /// <summary>
+    /// D-13, sixth writer. The buy claim used to be the largest hole in the record: stock left the
+    /// warehouse for a named customer and only <c>fuel_vouchers.status</c> said so, so the paper's
+    /// custody history began at a redemption and its first 400 pages were missing.
+    /// <para>
+    /// Two rows, because the handover is two facts. The voucher changed place — that is
+    /// <see cref="VoucherMovementKinds.Issued"/>, pool to customer — and its status stopped being
+    /// Available, which a movement deliberately does not record. Neither row derives the other, so
+    /// writing only one loses half of what happened.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task ProcessPendingOrdersAsync_RecordsTheIssue_AndTheStatusChange_NamingWhoPaid()
+    {
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+
+            SeedUser(seed, userId);
+            seed.FuelVouchers.Add(StockVoucher(Guid.NewGuid(), "OKKO", "okko-95", 50m));
+            seed.Orders.Add(PurchaseOrder(orderId, userId, ("OKKO", "okko-95", 50m, 2500)));
+
+            await seed.SaveChangesAsync();
+        }
+
+        using (var ctx = CreateContext())
+        {
+            await BuildService(ctx).ProcessPendingOrdersAsync();
+        }
+
+        using var verify = CreateContext();
+
+        var delivered = await verify.FuelVouchers.AsNoTracking()
+            .SingleAsync(v => v.Status == VoucherStatus.Assigned);
+        var line = await verify.OrderLineItems.AsNoTracking()
+            .SingleAsync(l => l.OrderId == orderId);
+
+        var movement = await verify.VoucherMovements.AsNoTracking()
+            .SingleAsync(m => m.VoucherId == delivered.Id);
+        movement.Kind.Should().Be(VoucherMovementKinds.Issued);
+        movement.FromLocation.Should().Be(VoucherLocations.Pool);
+        movement.ToLocation.Should().Be(VoucherLocations.Customer);
+        movement.OrderId.Should().Be(orderId);
+        movement.LineItemId.Should().Be(line.Id);
+        movement.ActorKind.Should().Be(VoucherActorKinds.User);
+        movement.ActorUserId.Should().Be(userId);
+        movement.AmountUah.Should().BeNull("order_line_items.line_total already says what the customer paid");
+
+        var statusChange = await verify.VoucherEvents.AsNoTracking()
+            .SingleAsync(e => e.VoucherId == delivered.Id);
+        statusChange.EventType.Should().Be(VoucherEventTypes.StatusChanged);
+        statusChange.FromStatus.Should().Be(nameof(VoucherStatus.Available));
+        statusChange.ToStatus.Should().Be(nameof(VoucherStatus.Assigned));
+        statusChange.ExternalRef.Should().Be(orderId.ToString());
+        statusChange.ActorKind.Should().Be(VoucherActorKinds.User);
+        statusChange.ActorUserId.Should().Be(userId);
+
+        // One moment, two tables: the movement and the status change are the same handover and must
+        // not disagree about when it happened.
+        statusChange.OccurredAtUtc.Should().Be(movement.OccurredAtUtc);
+    }
+
     [Fact]
     public async Task ProcessPendingOrdersAsync_LeavesUndeliveredStockWithoutAnOrder()
     {
@@ -118,6 +186,20 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
             .ToListAsync();
 
         leftover.Should().ContainSingle().Which.OrderId.Should().BeNull();
+
+        // D-13: the same gate applies to the ledger. Stock nobody received must not appear in anyone's
+        // custody history - a movement here would put a voucher in the customer's hands that never
+        // got there, and the gate is what makes the recorded history trustworthy rather than merely
+        // populated.
+        (await verify.VoucherMovements.AsNoTracking()
+            .Where(m => m.VoucherId == leftover.Single().Id)
+            .CountAsync())
+            .Should().Be(0, "the spare was never handed over, so it was never issued");
+
+        (await verify.VoucherEvents.AsNoTracking()
+            .Where(e => e.VoucherId == leftover.Single().Id)
+            .CountAsync())
+            .Should().Be(0);
     }
 
     [Fact]

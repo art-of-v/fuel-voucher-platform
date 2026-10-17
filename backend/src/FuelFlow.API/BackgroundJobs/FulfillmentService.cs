@@ -760,6 +760,7 @@ if (!fullyAttributed && fulfillments.Count > 0)
                         break;
                     }
 
+                    var now = DateTime.UtcNow;
                     var assignedCount = await TryAssignVoucherAsync(availableVoucher.Id, order.UserId, order.LegalEntityId, order.Id, CustomerExpirationFor(lineItem), cancellationToken);
 
                     if (assignedCount == 0)
@@ -767,6 +768,52 @@ if (!fullyAttributed && fulfillments.Count > 0)
                         _logger.LogDebug("Voucher {VoucherId} already assigned by another instance, skipping", availableVoucher.Id);
                         continue;
                     }
+
+                    // This is the winning side of the CAS, which is the only reason the two records
+                    // below describe something that happened rather than something we intended. Above the
+                    // gate nothing moved, and a paper that stayed in the pool must not appear to have
+                    // reached a customer.
+                    //
+                    // Two facts, two owners. The voucher is now in the customer's hands - a change of
+                    // place, so a custody movement - and its status is no longer Available, which the
+                    // movement deliberately does not say. Neither row derives the other, so writing
+                    // only one loses half of the handover.
+                    //
+                    // `issued` is the plain buy. The renewal branch writes `replace_out` for the same
+                    // physical fact (pool -> customer) because the reason differs, and the locations
+                    // carry the physics; that split is why `issued` was sitting unwritten until now.
+                    //
+                    // amount_uah is deliberately NOT written, for the reason given in the renewal
+                    // branch: the money is order_line_items.line_total, and this movement points at
+                    // the same line through line_item_id, so a copy here is a second thing to keep in
+                    // step for no reader. The column is for movements with no order behind them.
+                    _context.VoucherMovements.Add(new VoucherMovement
+                    {
+                        Id = Guid.CreateVersion7(),
+                        Kind = VoucherMovementKinds.Issued,
+                        VoucherId = availableVoucher.Id,
+                        FromLocation = VoucherLocations.Pool,
+                        ToLocation = VoucherLocations.Customer,
+                        OrderId = order.Id,
+                        LineItemId = lineItem.Id,
+                        ActorKind = VoucherActorKinds.User,
+                        ActorUserId = order.UserId,
+                        OccurredAtUtc = now
+                    });
+
+                    _context.VoucherEvents.Add(new VoucherEvent
+                    {
+                        Id = Guid.CreateVersion7(),
+                        VoucherId = availableVoucher.Id,
+                        EventType = VoucherEventTypes.StatusChanged,
+                        // Taken from the CAS itself: it sets 'Assigned' WHERE status = 'Available'.
+                        FromStatus = nameof(VoucherStatus.Available),
+                        ToStatus = nameof(VoucherStatus.Assigned),
+                        ExternalRef = order.Id.ToString(),
+                        ActorKind = VoucherActorKinds.User,
+                        ActorUserId = order.UserId,
+                        OccurredAtUtc = now
+                    });
 
                     var fulfillment = new Fulfillment
                     {
@@ -1271,7 +1318,7 @@ var lastFailedAtUtc = await _context.Payments
                         // order_line_items.term_code - and repeating it here would be a second copy of a
                         // fact that already has an owner.
                         ExternalRef = orderId.ToString(),
-                    ActorKind = VoucherActorKinds.User,
+                        ActorKind = VoucherActorKinds.User,
                         ActorUserId = order.UserId,
                         OccurredAtUtc = now
                     });
@@ -1357,7 +1404,7 @@ var lastFailedAtUtc = await _context.Payments
                         ToLocation = VoucherLocations.Customer,
                         OrderId = orderId,
                         LineItemId = line.Id,
-                    ActorKind = VoucherActorKinds.User,
+                        ActorKind = VoucherActorKinds.User,
                         ActorUserId = order.UserId,
                         OccurredAtUtc = now
                     });
@@ -1371,7 +1418,7 @@ var lastFailedAtUtc = await _context.Payments
                         FromStatus = nameof(VoucherStatus.Available),
                         ToStatus = nameof(VoucherStatus.Assigned),
                         ExternalRef = orderId.ToString(),
-                    ActorKind = VoucherActorKinds.User,
+                        ActorKind = VoucherActorKinds.User,
                         ActorUserId = order.UserId,
                         OccurredAtUtc = now
                     });
@@ -1398,7 +1445,7 @@ var lastFailedAtUtc = await _context.Payments
                             ToLocation = VoucherLocations.Pool,
                             OrderId = orderId,
                             LineItemId = line.Id,
-                    ActorKind = VoucherActorKinds.User,
+                            ActorKind = VoucherActorKinds.User,
                             ActorUserId = order.UserId,
                             OccurredAtUtc = now
                         });
@@ -1412,7 +1459,7 @@ var lastFailedAtUtc = await _context.Payments
                             FromStatus = nameof(VoucherStatus.Assigned),
                             ToStatus = nameof(VoucherStatus.Available),
                             ExternalRef = orderId.ToString(),
-                    ActorKind = VoucherActorKinds.User,
+                            ActorKind = VoucherActorKinds.User,
                             ActorUserId = order.UserId,
                             OccurredAtUtc = now
                         });
