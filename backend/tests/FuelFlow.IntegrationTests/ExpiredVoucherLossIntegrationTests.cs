@@ -4,6 +4,7 @@ using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.PurchaseBatchCost;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
@@ -107,6 +108,76 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
         (await StatusOf(verify, "window-outside")).Should().Be(VoucherStatus.Expired);
     }
 
+    /// <summary>
+    /// D-13, eighth writer — and the first one with no person behind it. Every other recorded action is
+    /// a consequence of an order somebody placed, so <c>actor_kind = 'user'</c> was the only value any
+    /// writer had ever used, and <c>'system'</c> existed as a CHECK-constrained value that nothing wrote.
+    /// This is the first row to use it.
+    /// <para>
+    /// It runs against real PostgreSQL deliberately. The whole reason the value is legal is the pairing
+    /// CHECK — <c>(actor_kind = 'user') = (actor_user_id IS NOT NULL)</c> — which admits <c>'system'</c>
+    /// precisely because its id is NULL. The InMemory brand has no CHECK constraints and would happily
+    /// accept a row the production database rejects, so proving <c>'system'</c> works here is the point.
+    /// </para>
+    /// <para>
+    /// One event per retired voucher, each carrying the status that voucher actually had. The candidate
+    /// set spans <c>Imported</c>, <c>VerifiedWithWarnings</c> and <c>Available</c>, so a single hardcoded
+    /// from_status would tell the history that every stock expiry began at <c>Available</c> — false for
+    /// imported-but-never-activated stock, which is precisely the kind of voucher this job exists for.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task BookExpiredLoss_RecordsASystemAuthoredEvent_SayingTheStatusItRetiredFrom()
+    {
+        await SeedAsync(seed =>
+        {
+            Enable(seed);
+            SeedFixture(seed);
+        });
+
+        await RunAsync();
+
+        using var verify = CreateContext();
+
+        var events = await verify.VoucherEvents.AsNoTracking().ToListAsync();
+        events.Should().HaveCount(3, "one event per voucher the job actually retired");
+
+        events.Should().OnlyContain(e => e.EventType == VoucherEventTypes.StatusChanged);
+        events.Should().OnlyContain(e => e.ToStatus == nameof(VoucherStatus.Expired));
+        events.Should().OnlyContain(e => e.ActorKind == VoucherActorKinds.System);
+        events.Should().OnlyContain(e => e.ActorUserId == null,
+            "a scheduler has nobody to name, and the pairing CHECK admits 'system' only with a NULL id");
+        events.Should().OnlyContain(e => e.Reason != null && e.Reason.Contains("nightly loss sweep"),
+            "the grace window is why this happened today and not on the printed date");
+
+        async Task<string?> FromOf(string number)
+        {
+            var voucherId = await verify.FuelVouchers.AsNoTracking()
+                .Where(v => v.VoucherNumber == number)
+                .Select(v => v.Id)
+                .SingleAsync();
+            return events.Single(e => e.VoucherId == voucherId).FromStatus;
+        }
+
+        (await FromOf("instock-imported")).Should().Be(nameof(VoucherStatus.Imported));
+        (await FromOf("instock-warnings")).Should().Be(nameof(VoucherStatus.VerifiedWithWarnings));
+        (await FromOf("instock-available")).Should().Be(nameof(VoucherStatus.Available));
+
+        // Nothing that was kept may be recorded as retired. A voucher still inside the grace window is
+        // salvageable, and an event claiming it was written off would contradict the stock it still is.
+        foreach (var kept in new[] { "future-instock", "today-instock", "window-inside" })
+        {
+            var voucherId = await verify.FuelVouchers.AsNoTracking()
+                .Where(v => v.VoucherNumber == kept)
+                .Select(v => v.Id)
+                .FirstOrDefaultAsync();
+            if (voucherId != Guid.Empty)
+            {
+                events.Should().NotContain(e => e.VoucherId == voucherId);
+            }
+        }
+    }
+
     [Fact]
     public async Task BookExpiredLoss_WhenDisabled_MutatesNothing()
     {
@@ -123,6 +194,12 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
         (await StatusOf(verify, "instock-imported")).Should().Be(VoucherStatus.Imported);
         (await StatusOf(verify, "instock-available")).Should().Be(VoucherStatus.Available);
         (await StatusOf(verify, "instock-warnings")).Should().Be(VoucherStatus.VerifiedWithWarnings);
+
+        // D-13: a dry run that wrote events would book a write-off every night while the setting is off -
+        // and this job is off by default, so that would be the default behaviour. The log says what
+        // *would* be retired; the ledger must say nothing until it actually is.
+        (await verify.VoucherEvents.CountAsync()).Should().Be(0,
+            "the job only books a loss when enabled, so a dry run records no retirement");
     }
 
     [Fact]
