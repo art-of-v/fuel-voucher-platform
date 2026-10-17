@@ -7,28 +7,29 @@ using Xunit;
 namespace FuelFlow.IntegrationTests;
 
 /// <summary>
-/// <c>fuel_types.supplier_code</c> — the network's own code for a grade, unique per network among
-/// live rows. Planning #349, step 2: the stable half of a fuel's identity, before anything imports it.
+/// <c>fuel_types.brand_fuel_code</c> — the BRAND's own code for a grade, unique per brand among
+/// live rows. Planning #349, step 3: the stable half of a fuel's identity, which the price import now
+/// matches on.
 /// </summary>
 /// <remarks>
 /// <para>
 /// The database half of the guarantee belongs here rather than in a unit test, because the whole point
-/// is an index: <c>ux_fuel_types_station_supplier_code</c> refuses two live fuels claiming one code at
-/// one network, and nothing in C# has to be trusted to say so.
+/// is an index: <c>ux_fuel_types_station_brand_fuel_code</c> refuses two live fuels claiming one code at
+/// one brand, and nothing in C# has to be trusted to say so.
 /// </para>
 /// <para>
 /// Two properties that are easy to get wrong and expensive to discover late, so both are stated here:
 /// <b>null does not collide with null</b> (a fuel entered by hand has no code, and two of them at one
-/// station must both fit) and <b>the same code at two networks is fine</b> (WOG and OKKO both sell
-/// A-95; the code is per network because the network is what spells it).
+/// station must both fit) and <b>the same code at two brands is fine</b> (WOG and OKKO both sell
+/// A-95; the code is per brand because the brand is what spells it).
 /// </para>
 /// </remarks>
 [Collection("Integration Tests")]
-public sealed class FuelTypeSupplierCodeTests : IClassFixture<TestDatabaseFixture>
+public sealed class FuelTypeBrandFuelCodeTests : IClassFixture<TestDatabaseFixture>
 {
     private readonly TestDatabaseFixture _fixture;
 
-    public FuelTypeSupplierCodeTests(TestDatabaseFixture fixture) => _fixture = fixture;
+    public FuelTypeBrandFuelCodeTests(TestDatabaseFixture fixture) => _fixture = fixture;
 
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -41,7 +42,7 @@ public sealed class FuelTypeSupplierCodeTests : IClassFixture<TestDatabaseFixtur
             Id = id,
             StationId = stationId,
             Name = name,
-            SupplierCode = code,
+            BrandFuelCode = code,
             BasePrice = 50m,
             DiscountPrice = 48m,
             CreatedAtUtc = DateTime.UtcNow,
@@ -49,7 +50,7 @@ public sealed class FuelTypeSupplierCodeTests : IClassFixture<TestDatabaseFixtur
         };
 
     [Fact]
-    public async Task TwoLiveFuels_CannotClaimTheSameCodeAtOneNetwork()
+    public async Task TwoLiveFuels_CannotClaimTheSameCodeAtOneBrand()
     {
         // The ambiguity the import would otherwise resolve arbitrarily: one code, two fuels, and
         // whichever row it picks becomes the fuel a voucher gets priced against.
@@ -69,9 +70,9 @@ public sealed class FuelTypeSupplierCodeTests : IClassFixture<TestDatabaseFixtur
     }
 
     [Fact]
-    public async Task TheSameCode_AtTwoNetworks_IsNotADuplicate()
+    public async Task TheSameCode_AtTwoBrands_IsNotADuplicate()
     {
-        // "A-95" is OKKO's spelling and WOG's. The code identifies a fuel *within* a network, which
+        // "A-95" is OKKO's spelling and WOG's. The code identifies a fuel *within* a brand, which
         // is why the index leads with station_id and why a global unique on the code would be wrong.
         await using var context = CreateContext();
 
@@ -132,7 +133,7 @@ public sealed class FuelTypeSupplierCodeTests : IClassFixture<TestDatabaseFixtur
 
         var withCode = await context.FuelTypes
             .IgnoreQueryFilters()
-            .CountAsync(f => f.SupplierCode != null);
+            .CountAsync(f => f.BrandFuelCode != null);
 
         withCode.Should().Be(0, "the code is filled by hand or by the catalogue import, never derived from the name");
     }

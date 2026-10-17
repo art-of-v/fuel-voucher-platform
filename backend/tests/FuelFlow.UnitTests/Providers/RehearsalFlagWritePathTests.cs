@@ -346,7 +346,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         await _context.SaveChangesAsync();
 
         var existing = await _context.FuelTypes.FirstAsync(f => f.Id == "qa-a95");
-        existing.SupplierCode = "9018";
+        existing.BrandFuelCode = "9018";
         await _context.SaveChangesAsync();
 
         var result = await _controller.AddFuel(
@@ -359,14 +359,14 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
                 PumpPricePerLiter = 92.90m,
                 MinDiscountPerLiter = 4m,
                 IsTestData = true,
-                SupplierCode = "9018"
+                BrandFuelCode = "9018"
             },
             CancellationToken.None);
 
         var conflict = result.Should().BeOfType<ConflictObjectResult>().Subject;
         conflict.Value.Should().NotBeNull("the operator is told which fuel already holds the code");
 
-        (await _context.FuelTypes.CountAsync(f => f.SupplierCode == "9018"))
+        (await _context.FuelTypes.CountAsync(f => f.BrandFuelCode == "9018"))
             .Should().Be(1, "and no second fuel claims it");
     }
 
@@ -375,9 +375,9 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
     {
         // "" and null mean opposite things to a unique index: null is excluded from it, "" is a value.
         // One rule, on the entity, for every write path.
-        FuelTypeEntity.NormaliseSupplierCode("  A-95 ").Should().Be("A-95");
-        FuelTypeEntity.NormaliseSupplierCode("   ").Should().BeNull();
-        FuelTypeEntity.NormaliseSupplierCode(null).Should().BeNull();
+        FuelTypeEntity.NormaliseBrandFuelCode("  A-95 ").Should().Be("A-95");
+        FuelTypeEntity.NormaliseBrandFuelCode("   ").Should().BeNull();
+        FuelTypeEntity.NormaliseBrandFuelCode(null).Should().BeNull();
     }
 
     [Fact]
@@ -390,7 +390,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         await _context.SaveChangesAsync();
 
         var existing = await _context.FuelTypes.FirstAsync(f => f.Id == "qa-a95");
-        existing.SupplierCode = "9018";
+        existing.BrandFuelCode = "9018";
         await _context.SaveChangesAsync();
 
         await _controller.UpdateFuel(
@@ -405,12 +405,12 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
                 MinDiscountPerLiter = 4m,
                 AllowBelowCost = false,
                 IsTestData = true
-                // SupplierCode deliberately absent.
+                // BrandFuelCode deliberately absent.
             },
             CancellationToken.None);
 
         var reloaded = await _context.FuelTypes.FirstAsync(f => f.Id == "qa-a95");
-        reloaded.SupplierCode.Should().Be("9018");
+        reloaded.BrandFuelCode.Should().Be("9018");
     }
 
     [Fact]
@@ -420,7 +420,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         await _context.SaveChangesAsync();
 
         var existing = await _context.FuelTypes.FirstAsync(f => f.Id == "qa-a95");
-        existing.SupplierCode = "9018";
+        existing.BrandFuelCode = "9018";
         await _context.SaveChangesAsync();
 
         await _controller.UpdateFuel(
@@ -435,12 +435,12 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
                 MinDiscountPerLiter = 4m,
                 AllowBelowCost = false,
                 IsTestData = true,
-                SupplierCode = ""
+                BrandFuelCode = ""
             },
             CancellationToken.None);
 
         var reloaded = await _context.FuelTypes.FirstAsync(f => f.Id == "qa-a95");
-        reloaded.SupplierCode.Should().BeNull();
+        reloaded.BrandFuelCode.Should().BeNull();
     }
 
     private async Task SeedQaFuelAsync()
