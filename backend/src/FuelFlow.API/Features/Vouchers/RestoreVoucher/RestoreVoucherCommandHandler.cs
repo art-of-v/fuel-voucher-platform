@@ -41,16 +41,15 @@ public sealed class RestoreVoucherCommandHandler
             return new RestoreVoucherResponse(false, "Voucher not found", "NotFound");
         }
 
-        if (voucher.WorkerUserId.HasValue)
+        // Same rule, and the same wording, as MarkVoucherAsUsed and the endpoints that hand out the QR.
+        if (!VoucherHolder.CanRedeem(voucher.WorkerUserId, voucher.AssignedToUserId, command.UserId))
         {
-            if (voucher.WorkerUserId != command.UserId)
-            {
-                return new RestoreVoucherResponse(false, "Only the assigned worker can restore this voucher", "Forbidden");
-            }
-        }
-        else if (voucher.AssignedToUserId != command.UserId)
-        {
-            return new RestoreVoucherResponse(false, "Voucher is not assigned to this user", "Forbidden");
+            return new RestoreVoucherResponse(
+                false,
+                voucher.WorkerUserId.HasValue
+                    ? "Only the assigned worker can restore this voucher"
+                    : "Voucher is not assigned to this user",
+                "Forbidden");
         }
 
         if (voucher.Status == VoucherStatus.Assigned)

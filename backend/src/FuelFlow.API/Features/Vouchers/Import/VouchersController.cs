@@ -1,4 +1,5 @@
 using FuelFlow.Features.Brands;
+using FuelFlow.Features.Vouchers.SharedModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -171,19 +172,21 @@ public sealed class VouchersController : ControllerBase
         // Authorization must agree with MarkVoucherAsUsedCommandHandler, because both endpoints
         // hand out control of the same bearer instrument: the QR payload IS what a station scans.
         //
-        // The previous check tested AssignedToUserId only. GiftVouchersCommand transfers a company
-        // voucher by setting WorkerUserId and LEAVING AssignedToUserId on the owner, so that check
-        // was wrong in both directions at once: the worker the voucher now belongs to got 403 on
-        // their own QR, and the owner who gifted it away could still pull the redeemable QR and
-        // spend it at the pump - while mark-used refused to let that same owner mark it Used, so
-        // the worker's app went on showing Assigned for a voucher that was already burned.
+        // The previous check tested AssignedToUserId only. Issuing fuel to a worker sets
+        // WorkerUserId and LEAVES AssignedToUserId on the owner, so that check was wrong in both
+        // directions at once: the worker the voucher now belongs to got 403 on their own QR, and
+        // the owner who issued it could still pull the redeemable QR and spend it at the pump -
+        // while mark-used refused to let that same owner mark it Used, so the worker's app went on
+        // showing Assigned for a voucher that was already burned.
+        //
+        // The rule itself now lives in VoucherHolder, shared with the wallet list: the two
+        // endpoints disagreed once, and the list was the one that leaked.
         if (!User.IsInRole("Admin"))
         {
             if (!Guid.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var userId))
                 return Forbid();
 
-            var holder = voucher.WorkerUserId ?? voucher.AssignedToUserId;
-            if (holder != userId)
+            if (!VoucherHolder.CanRedeem(voucher.WorkerUserId, voucher.AssignedToUserId, userId))
                 return Forbid();
         }
 
