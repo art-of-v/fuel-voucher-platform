@@ -3,6 +3,7 @@ using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
@@ -1231,6 +1232,11 @@ var lastFailedAtUtc = await _context.Payments
                         source.SupplierExpirationDate,
                         newExpiration,
                         cancellationToken);
+
+                    // The gate. Everything below records something that happened, so it must not run
+                    // when the compare-and-swap changed nothing: a renewal that lost the race to another
+                    // worker or a retry must leave no trace saying the customer was given a term they
+                    // were not given.
                     if (extended == 0)
                     {
                         _logger.LogWarning(
@@ -1244,6 +1250,30 @@ var lastFailedAtUtc = await _context.Payments
                     // "previous" is one TryExtendVoucherAsync has already overwritten in place.
                     line.PreviousCustomerExpiration = source.CustomerExpirationDate;
                     line.NewCustomerExpiration = newExpiration;
+
+                    // D-13. The same fact as an EVENT rather than a movement, because that is what it
+                    // is: this pushed time forward and the paper did not go anywhere. It is the reason
+                    // voucher_movements has no extend kind, and the reason relaxing
+                    // ck_voucher_movements_distinct_locations would be the wrong fix.
+                    //
+                    // `source` was read before the CAS, so previous is the genuine before and new the
+                    // genuine after. The term is not repeated: order_line_items.term_code owns it, and
+                    // the order that paid is reachable through ExternalRef.
+                    _context.VoucherEvents.Add(new VoucherEvent
+                    {
+                        Id = Guid.CreateVersion7(),
+                        VoucherId = source.Id,
+                        EventType = VoucherEventTypes.Extended,
+                        PreviousCustomerExpiration = source.CustomerExpirationDate,
+                        NewCustomerExpiration = newExpiration,
+                        // The order that paid for it. The term is reachable through it -
+                        // order_line_items.term_code - and repeating it here would be a second copy of a
+                        // fact that already has an owner.
+                        ExternalRef = orderId.ToString(),
+                        ActorUserId = order.UserId,
+                        OccurredAtUtc = now
+                    });
+
                     // The fee is revenue, not a cost adjustment: cost_per_liter records what we PAID a
                     // supplier for this voucher and nothing else moves it. See VoucherCosting.
                     _context.Fulfillments.Add(new Fulfillment
