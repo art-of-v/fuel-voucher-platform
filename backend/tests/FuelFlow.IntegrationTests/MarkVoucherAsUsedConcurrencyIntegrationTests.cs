@@ -1,6 +1,7 @@
 using FluentAssertions;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.MarkVoucherAsUsed;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
@@ -62,6 +63,79 @@ public sealed class MarkVoucherAsUsedConcurrencyIntegrationTests : IClassFixture
     }
 
     /// <summary>
+    /// D-13, fifth writer. A redemption used to be invisible in the record: the status moved and
+    /// nothing said so, which left the one action a customer actually performs as the one action with
+    /// no author and no timestamp anywhere.
+    /// <para>
+    /// It is an event and not a movement, and that is the model's own distinction rather than a
+    /// preference: the paper does not change hands, it is spent in the customer's hand.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task MarkVoucherAsUsed_RecordsTheRedemption_NamingWhoDidIt()
+    {
+        var userId = Guid.NewGuid();
+        var voucherId = Guid.NewGuid();
+
+        await SeedAssignedVoucherAsync(userId, voucherId);
+
+        await using var context = CreateContext();
+        var handler = new MarkVoucherAsUsedCommandHandler(context);
+
+        await handler.HandleAsync(new MarkVoucherAsUsedCommand(voucherId, userId));
+
+        await using var verify = CreateContext();
+        var redemption = await verify.VoucherEvents
+            .AsNoTracking()
+            .Where(e => e.VoucherId == voucherId)
+            .Select(e => new { e.EventType, e.FromStatus, e.ToStatus, e.ActorKind, e.ActorUserId, e.OccurredAtUtc })
+            .SingleAsync();
+        var usedAt = await verify.FuelVouchers
+            .Where(v => v.Id == voucherId)
+            .Select(v => v.UsedAtUtc)
+            .SingleAsync();
+
+        redemption.EventType.Should().Be(VoucherEventTypes.StatusChanged);
+        redemption.FromStatus.Should().Be(nameof(VoucherStatus.Assigned));
+        redemption.ToStatus.Should().Be(nameof(VoucherStatus.Used));
+        redemption.ActorKind.Should().Be(VoucherActorKinds.User);
+        redemption.ActorUserId.Should().Be(userId);
+        redemption.OccurredAtUtc.Should().Be(usedAt!.Value,
+            "the event and the voucher's own stamp are the same instant - one moment, two tables");
+    }
+
+    /// <summary>
+    /// The idempotent branch must stay silent. Marking an already-marked voucher is the same handover
+    /// seen twice, not two redemptions, and an event per call would put a row on one tank of fuel.
+    /// </summary>
+    [Fact]
+    public async Task MarkVoucherAsUsed_Twice_RecordsOneEvent()
+    {
+        var userId = Guid.NewGuid();
+        var voucherId = Guid.NewGuid();
+
+        await SeedAssignedVoucherAsync(userId, voucherId);
+
+        await using (var first = CreateContext())
+        {
+            var handler = new MarkVoucherAsUsedCommandHandler(first);
+            (await handler.HandleAsync(new MarkVoucherAsUsedCommand(voucherId, userId))).Success
+                .Should().BeTrue();
+        }
+
+        await using (var second = CreateContext())
+        {
+            var handler = new MarkVoucherAsUsedCommandHandler(second);
+            (await handler.HandleAsync(new MarkVoucherAsUsedCommand(voucherId, userId))).Message
+                .Should().Be("Voucher already marked as used");
+        }
+
+        await using var verify = CreateContext();
+        (await verify.VoucherEvents.CountAsync(e => e.VoucherId == voucherId))
+            .Should().Be(1, "a second mark-as-used is the same redemption, not a new one");
+    }
+
+    /// <summary>
     /// The regression test for WP-4, made deterministic without a seam in production code.
     ///
     /// A holder transaction redeems the voucher and does not commit, so it keeps the row lock. The
@@ -113,6 +187,13 @@ public sealed class MarkVoucherAsUsedConcurrencyIntegrationTests : IClassFixture
             .SingleAsync();
 
         status.Should().Be(VoucherStatus.Used);
+
+        // The loser of the race performed no transition, so it may claim none. Without this the CAS
+        // would still be correct and the record would not be: two callers, one redemption, and a
+        // second row attributing a handover that never happened.
+        await using var verifyEvents = CreateContext();
+        (await verifyEvents.VoucherEvents.CountAsync(e => e.VoucherId == voucherId))
+            .Should().Be(0, "the handler that lost the CAS did not redeem anything, so it records nothing");
     }
 
     private async Task SeedAssignedVoucherAsync(Guid userId, Guid voucherId)

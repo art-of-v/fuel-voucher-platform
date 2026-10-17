@@ -1,6 +1,7 @@
 using FluentAssertions;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.RestoreVoucher;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
@@ -61,6 +62,38 @@ public sealed class RestoreVoucherIntegrationTests : IClassFixture<TestDatabaseF
         stored.Status.Should().Be(VoucherStatus.Assigned);
         stored.UsedAtUtc.Should().BeNull("a restored voucher was not redeemed, so it has no redemption time");
         stored.UpdatedAtUtc.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(10));
+    }
+
+    /// <summary>
+    /// D-13, and the exact inverse of the redemption event. Undoing a redemption moves no paper
+    /// either - the customer never gave the ticket up - so this writes an event and not a
+    /// <c>returned</c> movement, and records who undid it.
+    /// </summary>
+    [Fact]
+    public async Task RestoreVoucher_RecordsTheUndo_NamingWhoDidIt()
+    {
+        var userId = Guid.NewGuid();
+        var voucherId = Guid.NewGuid();
+
+        await SeedUsedVoucherAsync(userId, voucherId);
+
+        await using var context = CreateContext();
+        var handler = new RestoreVoucherCommandHandler(context);
+
+        await handler.HandleAsync(new RestoreVoucherCommand(voucherId, userId));
+
+        await using var verify = CreateContext();
+        var undo = await verify.VoucherEvents
+            .AsNoTracking()
+            .Where(e => e.VoucherId == voucherId)
+            .Select(e => new { e.EventType, e.FromStatus, e.ToStatus, e.ActorKind, e.ActorUserId })
+            .SingleAsync();
+
+        undo.EventType.Should().Be(VoucherEventTypes.StatusChanged);
+        undo.FromStatus.Should().Be(nameof(VoucherStatus.Used));
+        undo.ToStatus.Should().Be(nameof(VoucherStatus.Assigned));
+        undo.ActorKind.Should().Be(VoucherActorKinds.User);
+        undo.ActorUserId.Should().Be(userId);
     }
 
     /// <summary>
@@ -125,6 +158,11 @@ public sealed class RestoreVoucherIntegrationTests : IClassFixture<TestDatabaseF
             .SingleAsync();
 
         stored.Should().Be(VoucherStatus.Used);
+
+        // A refusal changes nothing, so it records nothing. An event here would name a person for an
+        // action the system just declined to take.
+        (await verify.VoucherEvents.CountAsync(e => e.VoucherId == voucherId))
+            .Should().Be(0);
     }
 
     private async Task SeedUsedVoucherAsync(Guid userId, Guid voucherId, bool archived = false)
