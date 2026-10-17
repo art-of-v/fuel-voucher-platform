@@ -1,6 +1,9 @@
 using FuelFlow.API.Features.Orders.SharedServices;
 using FuelFlow.Features.Company.SharedModels;
 using FuelFlow.Features.Vouchers.SharedModels;
+using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.Events;
+using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Observability;
 using Microsoft.EntityFrameworkCore;
@@ -68,12 +71,52 @@ var member = await _context.CompanyMembers
 
         foreach (var voucher in assignedWorkerVouchers)
         {
+            // Captured before the rewrite below, for the movement's order_id: the recall is a
+            // consequence of the handover that put this voucher in the worker's hands, not of the
+            // purchase it now goes back to.
+            var issuanceOrderId = voucher.OrderId;
+            var firedAtUtc = DateTime.UtcNow;
+
             voucher.WorkerUserId = null;
             voucher.Status = VoucherStatus.Blocked;
             if (restored.TryGetValue(voucher.Id, out var orderId))
                 voucher.OrderId = orderId;
-            voucher.UpdatedAtUtc = DateTime.UtcNow;
+            voucher.UpdatedAtUtc = firedAtUtc;
             _context.Update(voucher);
+
+            // D-13, and the one place in this flow that is BOTH a movement and an event — which is the
+            // distinction the whole record turns on. The paper physically leaves the worker for the
+            // company, so `recall` is owed; and it stops being redeemable, so the status changes too.
+            // Neither row derives from the other.
+            //
+            // `recall` rather than `returned`, because the voucher returns to the company rather than
+            // to the warehouse — the same reason the gift went company -> worker.
+            _context.VoucherMovements.Add(new VoucherMovement
+            {
+                Id = Guid.CreateVersion7(),
+                Kind = VoucherMovementKinds.Recall,
+                VoucherId = voucher.Id,
+                FromLocation = VoucherLocations.Worker,
+                ToLocation = VoucherLocations.Company,
+                OrderId = issuanceOrderId,
+                ActorKind = VoucherActorKinds.User,
+                ActorUserId = command.OwnerUserId,
+                ActorPartyId = legalEntityId,
+                OccurredAtUtc = firedAtUtc
+            });
+
+            _context.VoucherEvents.Add(new VoucherEvent
+            {
+                Id = Guid.CreateVersion7(),
+                VoucherId = voucher.Id,
+                EventType = VoucherEventTypes.StatusChanged,
+                FromStatus = nameof(VoucherStatus.Assigned),
+                ToStatus = nameof(VoucherStatus.Blocked),
+                ActorKind = VoucherActorKinds.User,
+                ActorUserId = command.OwnerUserId,
+                ActorPartyId = legalEntityId,
+                OccurredAtUtc = firedAtUtc
+            });
         }
 
         // Soft delete, not Remove. A membership is employment history: under the owner policy (#217)

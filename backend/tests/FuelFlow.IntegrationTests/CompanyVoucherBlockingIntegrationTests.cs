@@ -8,6 +8,8 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.GetUserVouchers;
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.SharedModels;
+using FuelFlow.Features.Vouchers.Events;
+using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
@@ -67,6 +69,22 @@ public sealed class CompanyVoucherBlockingIntegrationTests : IClassFixture<TestD
         var stored = await verify.FuelVouchers.SingleAsync(v => v.Id == voucherId);
         stored.Status.Should().Be(VoucherStatus.Blocked);
         stored.WorkerUserId.Should().Be(workerId, "block freezes the voucher but keeps it with the worker");
+
+        // D-13. A block is an EVENT and not a movement, and that is the whole distinction: the worker
+        // still holds the paper. Recording a movement here would say custody changed hands when the
+        // point of a freeze is precisely that it did not. (Recall, which does take the voucher back,
+        // writes a movement - and the difference is now readable in the data.)
+        var events = await verify.VoucherEvents.AsNoTracking().Where(e => e.VoucherId == voucherId).ToListAsync();
+        var frozen = events.Should().ContainSingle().Subject;
+        frozen.EventType.Should().Be(VoucherEventTypes.StatusChanged);
+        frozen.FromStatus.Should().Be(nameof(VoucherStatus.Assigned));
+        frozen.ToStatus.Should().Be(nameof(VoucherStatus.Blocked));
+        frozen.ActorKind.Should().Be(VoucherActorKinds.User);
+        frozen.ActorUserId.Should().Be(ownerId);
+        frozen.ActorPartyId.Should().Be(legalEntityId, "the company is the acting party, not only its owner");
+
+        (await verify.VoucherMovements.CountAsync(m => m.VoucherId == voucherId))
+            .Should().Be(0, "a freeze does not move the paper");
     }
 
     [Fact]
@@ -98,6 +116,17 @@ public sealed class CompanyVoucherBlockingIntegrationTests : IClassFixture<TestD
         var stored = await verify.FuelVouchers.SingleAsync(v => v.Id == voucherId);
         stored.Status.Should().Be(VoucherStatus.Assigned);
         stored.WorkerUserId.Should().Be(workerId, "unblock returns the voucher to redeemable, still with the worker");
+
+        var thawed = (await verify.VoucherEvents.AsNoTracking()
+            .Where(e => e.VoucherId == voucherId)
+            .ToListAsync()).Should().ContainSingle().Subject;
+        thawed.EventType.Should().Be(VoucherEventTypes.StatusChanged);
+        thawed.FromStatus.Should().Be(nameof(VoucherStatus.Blocked));
+        thawed.ToStatus.Should().Be(nameof(VoucherStatus.Assigned));
+        thawed.ActorUserId.Should().Be(ownerId);
+
+        (await verify.VoucherMovements.CountAsync(m => m.VoucherId == voucherId))
+            .Should().Be(0, "the worker never lost custody, so nothing moved");
     }
 
     [Fact]
@@ -213,6 +242,13 @@ public sealed class CompanyVoucherBlockingIntegrationTests : IClassFixture<TestD
 
         await using var verify = CreateContext();
         var status = await verify.FuelVouchers.Where(v => v.Id == voucherId).Select(v => v.Status).SingleAsync();
+
+        // D-13, and the reason the block's event is written only after `affected != 0`: the handler
+        // performed no freeze, so it must not claim one. A row here would put a Blocked transition on
+        // a voucher that was redeemed instead - and the loser is exactly the caller whose name is
+        // available to write it, which is what makes the gate worth asserting.
+        (await verify.VoucherEvents.CountAsync(e => e.VoucherId == voucherId))
+            .Should().Be(0, "the block lost the CAS, so it records nothing");
         status.Should().Be(VoucherStatus.Used, "the redemption must stand; block must not overwrite it");
     }
 
