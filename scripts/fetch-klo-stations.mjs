@@ -10,9 +10,10 @@
 //
 // Output is the CSV shape the admin importer already accepts:
 //
-//   id, stationId, name, address, phone, city, stationType, lat, lng
+//   externalId, brandId (the network's SLUG), name, address, phone, city, stationType, lat, lng
 //
-// (POST /api/admin/station-nodes/import — see StationNodeImportParser.)
+// (POST /api/admin/brand-stations/import — see ImportBrandStationsCommandHandler.) The importer
+// resolves the slug to the brand's uuid; the row is keyed by externalId within that brand.
 //
 // Usage:
 //   node scripts/fetch-klo-stations.mjs                        # fetch live, write ./klo-stations.csv
@@ -28,7 +29,9 @@ import { collapse, writeStationCsv } from "./lib/station-csv.mjs";
 
 const DEFAULT_SOURCE = "https://www.klo.ua/";
 const DEFAULT_OUT = "klo-stations.csv";
-const STATION_ID = "klo";
+// The importer takes the network's slug, not its uuid - a supplier file says "klo", never a
+// uuid, and the slug is what it resolves.
+const BRAND_SLUG = "klo";
 const CACHE_FILE = "klo-details.json";
 const UA = "Mozilla/5.0 (compatible; FuelFlow station import)";
 
@@ -219,7 +222,7 @@ function toCsvCells(pin) {
   const { address, city } = splitAddress(pin.address);
   return [
     `klo-${pin.id}`,
-    STATION_ID,
+    BRAND_SLUG,
     toName(pin.title, city),
     address,
     pin.telephone, // real, published — KLO is the one brand that gives a number per site

@@ -9,7 +9,7 @@
 -- mirrors `fuel_types.brand_id`: a fuel type belongs to exactly one station, so its id already
 -- determines which station the offer is at.
 --
--- No constraint can hold that up. `fuel_offers.brand_id` is a plain text column and its
+-- No constraint can hold that up. `fuel_offers.brand_id` is a uuid column and its
 -- agreement with `fuel_types.brand_id` is a fact about two tables, which is precisely the
 -- class of thing a CHECK cannot see. So the premise is asked here instead, where a row is a
 -- sentence a human can act on rather than an exception at boot.

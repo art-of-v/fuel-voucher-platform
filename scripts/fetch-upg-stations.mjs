@@ -6,9 +6,10 @@
 // region, services and live fuel prices. We take the location half of it and emit the CSV
 // shape the admin importer already accepts:
 //
-//   id, stationId, name, address, phone, city, stationType, lat, lng
+//   externalId, brandId (the network's SLUG), name, address, phone, city, stationType, lat, lng
 //
-// (POST /api/admin/station-nodes/import — see StationNodeImportParser).
+// (POST /api/admin/brand-stations/import — see ImportBrandStationsCommandHandler). The importer
+// resolves the slug to the brand's uuid; the row is keyed by externalId within that brand.
 //
 // Usage:
 //   node scripts/fetch-upg-stations.mjs                        # fetch live, write ./upg-stations.csv
@@ -29,7 +30,9 @@ import { collapse, writeStationCsv } from "./lib/station-csv.mjs";
 
 const DEFAULT_SOURCE = "https://upg.ua/merezha_azk/";
 const DEFAULT_OUT = "upg-stations.csv";
-const STATION_ID = "upg";
+// The importer takes the network's slug, not its uuid - a supplier file says "upg", never a
+// uuid, and the slug is what it resolves.
+const BRAND_SLUG = "upg";
 
 function parseArgs(argv) {
   const args = { source: DEFAULT_SOURCE, out: DEFAULT_OUT, fromFile: null };
@@ -211,7 +214,7 @@ export function toName(fullName) {
 function toCsvCells(station) {
   return [
     `upg-${station.id}`,
-    STATION_ID,
+    BRAND_SLUG,
     station.name,
     station.address,
     "", // phone — UPG does not publish it per site
