@@ -73,7 +73,7 @@ public sealed class SuppliersController : ControllerBase
         var rows = await query
             .OrderBy(s => s.Name)
             .Select(s => new SupplierDto(
-                s.Id, s.Name, s.LegalForm, s.Phone, s.Email, s.EdrIpn, s.Rnkrr, s.Address, s.Notes, s.IsActive))
+                s.Id, s.Name, s.AcquisitionSource, s.LegalForm, s.Phone, s.Email, s.EdrIpn, s.Rnkrr, s.Address, s.Notes, s.IsActive))
             .ToListAsync(ct);
 
         return Ok(rows);
@@ -82,6 +82,13 @@ public sealed class SuppliersController : ControllerBase
     /// <summary>The accepted legal forms, so the UI never invents one we cannot validate.</summary>
     [HttpGet("legal-forms")]
     public ActionResult<IReadOnlyList<string>> LegalFormOptions() => Ok(LegalForms);
+
+    /// <summary>
+    /// The accepted supply routes, on the same terms as <see cref="LegalFormOptions"/>: the UI picks
+    /// from what the server validates against rather than hardcoding a second list that can drift.
+    /// </summary>
+    [HttpGet("acquisition-sources")]
+    public ActionResult<IReadOnlyList<string>> AcquisitionSourceOptions() => Ok(AcquisitionSources.All);
 
     [HttpPost]
     public async Task<ActionResult<SupplierDto>> Create(CreateSupplierRequest request, CancellationToken ct = default)
@@ -103,6 +110,11 @@ public sealed class SuppliersController : ControllerBase
         {
             Id = Guid.CreateVersion7(),
             Name = name,
+            // Stated once, here, and never again: the import copies this onto every voucher it creates
+            // from this supplier, so this is the only moment the route is decided.
+            AcquisitionSource = string.IsNullOrWhiteSpace(request.AcquisitionSource)
+                ? AcquisitionSources.Default
+                : request.AcquisitionSource.Trim().ToLowerInvariant(),
             LegalForm = request.LegalForm?.Trim(),
             Phone = request.Phone?.Trim(),
             Email = request.Email?.Trim(),
@@ -137,6 +149,28 @@ public sealed class SuppliersController : ControllerBase
 
         var supplier = await _context.Suppliers.AsTracking().FirstOrDefaultAsync(s => s.Id == id, ct);
         if (supplier is null) return NotFound();
+
+        // UpdateSupplierRequest inherits from CreateSupplierRequest, so this endpoint can be handed a
+        // route whether or not the caller means to. The column is immutable - the database would
+        // refuse with a raw exception, which is a 500 and a stack trace in the Error Logs rather than
+        // an answer. So it is refused here, by name, and the sentence says why a supplier cannot move:
+        // every voucher already imported from it holds a copy.
+        //
+        // Sent and equal is a no-op rather than an error, because a client that echoes back what it
+        // read should not be punished for it.
+        if (!string.IsNullOrWhiteSpace(request.AcquisitionSource)
+            && !string.Equals(
+                request.AcquisitionSource.Trim().ToLowerInvariant(),
+                supplier.AcquisitionSource,
+                StringComparison.Ordinal))
+        {
+            return BadRequest(new
+            {
+                error = $"The supply route of a supplier cannot change: it is fixed when the supplier is created, " +
+                        $"because every voucher already imported from them carries a copy. " +
+                        $"'{supplier.AcquisitionSource}' stays. Add a new supplier if the arrangement has changed."
+            });
+        }
 
         var name = request.Name!.Trim();
         if (await _context.Suppliers.AnyAsync(s => s.Id != id && s.Name == name, ct))
@@ -207,7 +241,7 @@ public sealed class SuppliersController : ControllerBase
     }
 
     private static SupplierDto ToDto(Supplier s) => new(
-        s.Id, s.Name, s.LegalForm, s.Phone, s.Email, s.EdrIpn, s.Rnkrr, s.Address, s.Notes, s.IsActive);
+        s.Id, s.Name, s.AcquisitionSource, s.LegalForm, s.Phone, s.Email, s.EdrIpn, s.Rnkrr, s.Address, s.Notes, s.IsActive);
 
     /// <summary>
     /// Only the name is mandatory. Everything else depends on the legal form — an ФОП has an ІПН and an
@@ -235,6 +269,15 @@ public sealed class SuppliersController : ControllerBase
         if (!string.IsNullOrWhiteSpace(request.Phone) && !PhonePattern.IsMatch(request.Phone.Trim()))
             return "Phone must be a number: digits with an optional +, spaces, dashes, dots or parentheses.";
 
+        // Case-insensitively accepted and normalised by the caller, because the CHECK constraint is not:
+        // 'Partner' would otherwise reach the database and come back as a 23514 with a stack trace in
+        // the Error Logs. Rejecting it here names the valid set instead.
+        if (!string.IsNullOrWhiteSpace(request.AcquisitionSource)
+            && !AcquisitionSources.IsKnown(request.AcquisitionSource.Trim().ToLowerInvariant()))
+        {
+            return $"Unknown supply route '{request.AcquisitionSource}'. Expected one of: {string.Join(", ", AcquisitionSources.All)}.";
+        }
+
         return null;
     }
 
@@ -253,6 +296,10 @@ public sealed class SuppliersController : ControllerBase
         {
             supplier.Id,
             supplier.Name,
+            // Never changes, but recorded anyway: the question an audit asks about a supplier is
+            // usually "what did we buy from them and through which arrangement", and the route is the
+            // half of that answer that is not in the name.
+            supplier.AcquisitionSource,
             supplier.LegalForm,
             supplier.Phone,
             supplier.Email,
@@ -271,6 +318,7 @@ public sealed class SuppliersController : ControllerBase
 public sealed record SupplierDto(
     Guid Id,
     string Name,
+    string AcquisitionSource,
     string? LegalForm,
     string? Phone,
     string? Email,
@@ -283,6 +331,20 @@ public sealed record SupplierDto(
 public class CreateSupplierRequest
 {
     public string? Name { get; set; }
+
+    /// <summary>
+    /// Which supply route this supplier sells on - <c>direct</c> or <c>partner</c>. Settable only at
+    /// creation: it is immutable afterwards, because every voucher imported from this supplier carries a
+    /// copy of it, and an editable value would let a correction made today retroactively disagree with
+    /// vouchers bought months ago.
+    /// <para>
+    /// Absent means <c>direct</c>, which is what every supplier in the database already is. That default
+    /// is not a shrug - it is the reason this field can be optional without leaving the second route
+    /// unreachable, and the reason it has to be stated deliberately to use it.
+    /// </para>
+    /// </summary>
+    public string? AcquisitionSource { get; set; }
+
     public string? LegalForm { get; set; }
     public string? Phone { get; set; }
     public string? Email { get; set; }

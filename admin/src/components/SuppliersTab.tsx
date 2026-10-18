@@ -12,6 +12,8 @@ import { toast } from "sonner";
 interface Supplier {
     id: string;
     name: string;
+    /** Read-only. Fixed at creation, because every voucher imported from them carries a copy. */
+    acquisitionSource: string;
     legalForm: string | null;
     phone: string | null;
     email: string | null;
@@ -31,10 +33,13 @@ interface SupplierForm {
     rnkrr: string;
     address: string;
     notes: string;
+    /** Only sent when creating: the route is fixed once the supplier exists. */
+    acquisitionSource: string;
 }
 
 const EMPTY: SupplierForm = {
     name: "", legalForm: "", phone: "", email: "", edrIpn: "", rnkrr: "", address: "", notes: "",
+    acquisitionSource: "direct",
 };
 
 // A duplicate name comes back as 409 { code, message }. The code is the stable half, so localise from
@@ -61,6 +66,10 @@ export default function SuppliersTab() {
         queryKey: ["suppliers", "legalForms"],
         queryFn: () => apiRequest<any, string[]>("GET", "/api/admin/suppliers/legal-forms"),
     });
+    const { data: acquisitionSources = [] } = useQuery({
+        queryKey: ["suppliers", "acquisitionSources"],
+        queryFn: () => apiRequest<any, string[]>("GET", "/api/admin/suppliers/acquisition-sources"),
+    });
 
     const [showInactive, setShowInactive] = useState(true);
     const [editing, setEditing] = useState<Supplier | null>(null);
@@ -74,9 +83,13 @@ export default function SuppliersTab() {
             // Pass the object, not a pre-serialised string: apiRequest runs JSON.stringify(data) itself,
             // so handing it a string double-encodes the body and ASP.NET rejects it with
             // "One or more validation errors occurred" — a JSON string cannot bind to the request type.
-            return editing
-                ? apiRequest<unknown, Supplier>("PUT", `/api/admin/suppliers/${editing.id}`, form)
-                : apiRequest<unknown, Supplier>("POST", "/api/admin/suppliers", form);
+            if (editing) {
+                // The route is stripped rather than sent: the backend refuses a change outright, and a
+                // PUT that echoes back what it read would be relying on that leniency for no reason.
+                const { acquisitionSource: _fixed, ...editable } = form;
+                return apiRequest<unknown, Supplier>("PUT", `/api/admin/suppliers/${editing.id}`, editable);
+            }
+            return apiRequest<unknown, Supplier>("POST", "/api/admin/suppliers", form);
         },
         onSuccess: () => {
             invalidate();
@@ -114,6 +127,9 @@ export default function SuppliersTab() {
         setForm({
             name: s.name, legalForm: s.legalForm ?? "", phone: s.phone ?? "", email: s.email ?? "",
             edrIpn: s.edrIpn ?? "", rnkrr: s.rnkrr ?? "", address: s.address ?? "", notes: s.notes ?? "",
+            // Carried into the form so the read-only display shows what this supplier already is,
+            // rather than whatever the create default happens to be.
+            acquisitionSource: s.acquisitionSource,
         });
     };
 
@@ -163,6 +179,23 @@ export default function SuppliersTab() {
                                 </SelectContent>
                             </Select>
                         </label>
+                        {/* Creation only. Once the supplier exists the route is fixed - every voucher
+                            imported from them carries a copy of it - so editing shows it disabled rather
+                            than offering a control whose only possible outcome is a refusal. */}
+                        <label className="text-sm">
+                            {t("suppliers.acquisitionSource")}
+                            {editing ? (
+                                <Input value={form.acquisitionSource} disabled
+                                    title={t("suppliers.acquisitionSourceFixedHint")} />
+                            ) : (
+                                <Select value={form.acquisitionSource} onValueChange={set("acquisitionSource")}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        {acquisitionSources.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            )}
+                        </label>
                         <label className="text-sm">
                             {t("suppliers.phone")}
                             <Input value={form.phone} onChange={(e) => set("phone")(e.target.value)} />
@@ -206,6 +239,7 @@ export default function SuppliersTab() {
                         <tr className="border-b border-border text-left">
                             <th className="p-3">{t("suppliers.name")}</th>
                             <th className="p-3">{t("suppliers.legalForm")}</th>
+                            <th className="p-3">{t("suppliers.acquisitionSource")}</th>
                             <th className="p-3">{t("suppliers.contacts")}</th>
                             <th className="p-3">{t("suppliers.requisites")}</th>
                             <th className="p-3">{t("suppliers.status")}</th>
@@ -213,14 +247,22 @@ export default function SuppliersTab() {
                         </tr>
                     </thead>
                     <tbody>
-                        {isLoading && <tr><td className="p-3" colSpan={6}>{t("common.loading")}</td></tr>}
+                        {isLoading && <tr><td className="p-3" colSpan={7}>{t("common.loading")}</td></tr>}
                         {!isLoading && visible.length === 0 && (
-                            <tr><td className="p-3" colSpan={6}>{t("suppliers.empty")}</td></tr>
+                            <tr><td className="p-3" colSpan={7}>{t("suppliers.empty")}</td></tr>
                         )}
                         {visible.map((s) => (
                             <tr key={s.id} className="border-b border-border/50">
                                 <td className="p-3 font-medium">{s.name}</td>
                                 <td className="p-3">{s.legalForm ?? "—"}</td>
+                                <td className="p-3">
+                                    <span
+                                        className="inline-flex items-center px-1.5 py-0.5 rounded bg-muted font-mono text-xs font-semibold text-foreground"
+                                        title={t("suppliers.acquisitionSourceFixedHint")}
+                                    >
+                                        {s.acquisitionSource}
+                                    </span>
+                                </td>
                                 <td className="p-3">
                                     {s.phone ?? "—"}{s.phone && s.email ? " · " : ""}{s.email ?? ""}
                                 </td>
