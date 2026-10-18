@@ -21,4 +21,11 @@ public sealed record GetAdminVouchersQuery(
     /// does not exist at the station, so an operator looking at real stock needs to be able to take
     /// those rows out of the picture without deleting them mid-session.
     /// </summary>
-    string? TestData = null);
+    string? TestData = null,
+      /// <summary>
+      /// Which supply route to show: <c>direct</c>, <c>partner</c>, or unset for both. Unset means both
+      /// so an operator sees exactly what they saw before the column existed, on the same terms as
+      /// <see cref="TestData"/> - and because this is a filter on how the stock was BOUGHT, not on who
+      /// holds it or how it was paid for, a single route is expected to be the minority of any list.
+      /// </summary>
+      string? AcquisitionSource = null);

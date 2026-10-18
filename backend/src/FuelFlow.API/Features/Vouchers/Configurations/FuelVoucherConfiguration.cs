@@ -1,5 +1,6 @@
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -178,6 +179,16 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
             .HasMaxLength(10)
             .IsRequired();
 
+        // HasDefaultValue as well as the CLR default: the value has to reach the database for the
+        // write paths that never mention this axis (every existing import path among them), and EF
+        // omits an unset column from the INSERT. Without the database-side default the column would
+        // arrive as NULL and the NOT NULL would reject it.
+        builder.Property(e => e.AcquisitionSource)
+            .HasColumnName("acquisition_source")
+            .HasMaxLength(10)
+            .HasDefaultValue(AcquisitionSources.Default)
+            .IsRequired();
+
         builder.Property(e => e.IsDeleted)
             .HasColumnName("is_deleted")
             .HasDefaultValue(false)
@@ -197,6 +208,8 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
             t.HasCheckConstraint("ck_voucher_cost_non_negative", "cost_per_liter IS NULL OR cost_per_liter >= 0");
             // The value set DataKinds.All documents - see DataKinds.
             t.HasCheckConstraint("ck_fuel_vouchers_data_kind", "data_kind IN ('real', 'qa')");
+            // The value set AcquisitionSources.All documents - see AcquisitionSources.
+            t.HasCheckConstraint("ck_fuel_vouchers_acquisition_source", "acquisition_source IN ('direct', 'partner')");
 
             // The value set VoucherStatus defines. varchar(20) was exactly the length of
             // VerifiedWithWarnings, so the column had zero headroom and the next member added to
