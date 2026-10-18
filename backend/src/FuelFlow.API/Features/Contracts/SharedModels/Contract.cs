@@ -7,7 +7,7 @@ public sealed class Contract
     public Guid Id { get; set; }
     public Guid UserId { get; set; }
     public Guid LegalEntityId { get; set; }
-    public string BrandId { get; set; } = null!;
+    public Guid BrandId { get; set; }
     public DateTime CreatedAtUtc { get; set; }
 
     public User? User { get; set; }

@@ -1,4 +1,5 @@
 using FuelFlow.API.Features.Orders;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Persistence;
@@ -20,16 +21,21 @@ public sealed class TermQuoteQueryHandler
 {
     private readonly ApplicationDbContext _context;
     private readonly RuntimeSettingsService _settings;
+    private readonly BrandSlugResolver _brands;
 
-    public TermQuoteQueryHandler(ApplicationDbContext context, RuntimeSettingsService settings)
+    public TermQuoteQueryHandler(
+        ApplicationDbContext context,
+        RuntimeSettingsService settings,
+        BrandSlugResolver brands)
     {
         _context = context;
         _settings = settings;
+        _brands = brands;
     }
 
     public async Task<TermQuoteResponse> HandleAsync(
         bool isTestAccount,
-        string BrandId, string fuelTypeId, decimal liters, CancellationToken cancellationToken = default)
+        Guid BrandId, string fuelTypeId, decimal liters, CancellationToken cancellationToken = default)
     {
         var config = await _settings.GetVoucherTermConfigAsync(cancellationToken);
         var pool = DataKinds.ForPool(isTestAccount);
@@ -48,7 +54,11 @@ var row = await (
             select new { Offer = offer, Fuel = offer.FuelType! })
             .FirstOrDefaultAsync(cancellationToken);
 
-        var package = row is null ? null : SellablePackage.From(row.Offer, row.Fuel, liters);
+// The stock check below needs the network's NAME, not its id - see StockKey. Taken from the
+        // package we just resolved; a null package means no stock to look for anyway.
+        var brandSlug = row is null ? null : await _brands.SlugOfAsync(row.Offer.BrandId, cancellationToken);
+
+        var package = row is null ? null : SellablePackage.From(row.Offer, row.Fuel, liters, brandSlug ?? string.Empty);
 
         // The below-cost guard needs the fuel's opt-in flag. The fuel is already joined above - the
         // package's margin is its margin - so this no longer costs a second query per quote.
@@ -59,7 +69,7 @@ var row = await (
         // gate exists to prevent, so a term with no backing stock is simply not on the ladder.
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var bestStockExpiration = await TermStockCoverage.BestStockExpirationAsync(
-            _context, BrandId, fuelTypeId, liters, cancellationToken);
+            _context, brandSlug ?? string.Empty, fuelTypeId, liters, cancellationToken);
 
         var terms = new List<TermQuoteItem>();
         foreach (var tier in config.Tiers)

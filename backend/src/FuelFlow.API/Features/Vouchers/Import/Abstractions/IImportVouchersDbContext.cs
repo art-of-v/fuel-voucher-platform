@@ -30,6 +30,14 @@ public interface IImportVouchersDbContext
     /// </summary>
     DbSet<FuelTypeEntity> FuelTypes { get; }
 
+    /// <summary>
+    /// Read for the same check, and only for it: <c>fuel_types.brand_id</c> is a uuid since planning
+    /// D-21 while the paper says a name, so the id has to be resolved to a slug before the two can be
+    /// compared. Added rather than resolved by <c>BrandSlugResolver</c>, which would have meant handing
+    /// this interface the whole <c>ApplicationDbContext</c> — the narrowing this file exists to protect.
+    /// </summary>
+    DbSet<Brand> Brands { get; }
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
 

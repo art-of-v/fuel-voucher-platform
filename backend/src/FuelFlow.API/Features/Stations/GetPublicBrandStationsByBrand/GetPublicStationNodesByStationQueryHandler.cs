@@ -15,6 +15,6 @@ public sealed class GetPublicBrandStationsByBrandQueryHandler
             .Where(x => x.BrandId == query.BrandId)
             .OrderBy(x => x.Name)
             .Select(x => new PublicBrandStationResponse(
-                x.Id, x.BrandId, x.Name, x.Address, x.Phone, x.City, x.StationType, x.Lat, x.Lng))
+                x.Id, x.BrandId, x.Brand!.Slug, x.Name, x.Address, x.Phone, x.City, x.StationType, x.Lat, x.Lng))
             .ToListAsync(ct);
 }

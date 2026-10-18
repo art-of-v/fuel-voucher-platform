@@ -42,7 +42,7 @@ public sealed class FuelTypeProductCode
     /// codes share a numbering space we cannot prove they do not — and the uniqueness rule needs the
     /// network in the index to say that.
     /// </summary>
-    public string BrandId { get; set; } = null!;
+    public Guid BrandId { get; set; }
 
     /// <summary>The code as it appears in the voucher's QR: <c>"9018"</c>, <c>"45290"</c>.</summary>
     public string ProductCode { get; set; } = null!;

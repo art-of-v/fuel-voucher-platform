@@ -31,7 +31,7 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
 
         builder.Property(e => e.BrandId)
             .HasColumnName("brand_id")
-            .HasColumnType("text")
+            .HasColumnType("uuid")
             .IsRequired();
 
         builder.Property(e => e.BrandFuelCode)
@@ -96,14 +96,12 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
             .HasFilter("brand_fuel_code IS NOT NULL AND NOT is_deleted")
             .HasDatabaseName("ux_fuel_types_brand_brand_fuel_code");
 
-        // Natural key ("okko-95"), deliberately not a UUID. Bounded by CHECK rather than by a type
-        // change - see BrandConfiguration for why converting a natural key is not worth the
-        // refactor, and what the CHECK buys instead.
+        // Natural key ("okko-95"), deliberately not a UUID — planning D-21 moves this one in the
+        // follow-up slice, and a fuel's slug is what every importer resolves a PDF row by.
         builder.ToTable(t =>
         {
             t.HasCheckConstraint("ck_fuel_types_id_length", "length(id) <= 100");
             t.HasCheckConstraint("ck_fuel_types_name_length", "length(name) <= 200");
-            t.HasCheckConstraint("ck_fuel_types_brand_id_length", "length(brand_id) <= 100");
 
             // 50 for a brand's own code for a grade - "A-95", "Pulls 95", "SPBT", a QR product
             // code. Generous for what it is, bounded because it is indexed and unique per Brand.

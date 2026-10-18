@@ -92,7 +92,7 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
             // `Provider` field that the handler overwrote with this same value. Validating the one
             // the handler actually reads is what keeps a blank Brand a 400 instead of the 500 the
             // handler's own guard would raise.
-            if (string.IsNullOrWhiteSpace(item.BrandId))
+            if (item.BrandId is null || item.BrandId == Guid.Empty)
                 return BadRequest("BrandId is required for every item");
 
             if (string.IsNullOrWhiteSpace(item.FuelTypeId))
@@ -177,12 +177,12 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetTermQuote(
-        [FromQuery] string BrandId,
+        [FromQuery] Guid BrandId,
         [FromQuery] string fuelTypeId,
         [FromQuery] decimal liters,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(BrandId) || string.IsNullOrWhiteSpace(fuelTypeId) || liters <= 0m)
+        if (BrandId == Guid.Empty || string.IsNullOrWhiteSpace(fuelTypeId) || liters <= 0m)
             return BadRequest("BrandId, fuelTypeId and a positive liters are required.");
 
         // The ladder is priced off a catalogue package, so the quote has to be priced off the SAME
@@ -310,7 +310,7 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
     public async Task<IActionResult> CreatePurchase([FromBody] CreateCheckoutCommand command, CancellationToken cancellationToken)
     {
         // The brand is BrandId - see the note on the bulk path above.
-        if (string.IsNullOrWhiteSpace(command.BrandId))
+        if (command.BrandId is null || command.BrandId == Guid.Empty)
             return BadRequest("BrandId is required");
 
         if (string.IsNullOrWhiteSpace(command.FuelTypeId))

@@ -27,7 +27,13 @@ public sealed class CreateCheckoutCommand
     /// ignored on deserialisation, which keeps 1.0.1 and the 1.1.0 build working against this
     /// contract.
     /// </para>
+    /// <para>
+    /// A <see cref="Guid"/>, not the network's code: brands are keyed by uuid (planning D-21), and the
+    /// order line's <c>Brand</c> column is still written as the code for the reason the remarks below
+    /// describe - a voucher, a paper and an order line all carry a readable brand, and only the join
+    /// needs the id.
+    /// </para>
     /// </remarks>
-    public string? BrandId { get; set; }
+    public Guid? BrandId { get; set; }
     public string? BrandName { get; set; }
 }

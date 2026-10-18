@@ -53,14 +53,24 @@ public sealed record BackfillBrandFuelCodesResult(
 /// </remarks>
 public sealed class BackfillBrandFuelCodesCommandHandler
 {
-    private const string OkkoBrandId = "okko";
+    /// <summary>
+    /// The network this backfill reads, as the name a supplier publishes it under. Resolved to an id
+    /// per run - brands are keyed by uuid (planning D-21) - and the slug itself still names the audit
+    /// scope, because that is what the scope column has always held.
+    /// </summary>
+    private const string OkkoSlug = "okko";
 
     private readonly ApplicationDbContext _context;
+    private readonly BrandSlugResolver _brands;
     private readonly AuditEventService _events;
 
-    public BackfillBrandFuelCodesCommandHandler(ApplicationDbContext context, AuditEventService events)
+    public BackfillBrandFuelCodesCommandHandler(
+        ApplicationDbContext context,
+        BrandSlugResolver brands,
+        AuditEventService events)
     {
         _context = context;
+        _brands = brands;
         _events = events;
     }
 
@@ -70,6 +80,13 @@ public sealed class BackfillBrandFuelCodesCommandHandler
         string? actingUserName,
         CancellationToken ct = default)
     {
+        // Nothing to backfill into a network that is not in the catalogue. Silent success would be
+        // worse than a skip: the job would report "0 filled" every night and read as done.
+        var okkoId = await _brands.ResolveAsync(OkkoSlug, ct);
+        if (okkoId is null)
+            throw new InvalidOperationException(
+                $"No live brand carries the slug '{OkkoSlug}', so there is no OKKO catalogue to backfill.");
+
         // The codes the brand publishes, grouped by the category each one means. Two codes in one
         // category is not an error here — diesel genuinely has several papers — it is simply a code we
         // cannot choose between, and it is reported as such per fuel.
@@ -93,14 +110,14 @@ public sealed class BackfillBrandFuelCodesCommandHandler
         // a handful either way.
         var uncoded = (await _context.FuelTypes
                 .AsTracking()
-                .Where(f => f.BrandId == OkkoBrandId && f.BrandFuelCode == null && !f.IsDeleted)
+                .Where(f => f.BrandId == okkoId.Value && f.BrandFuelCode == null && !f.IsDeleted)
                 .ToListAsync(ct))
             .OrderBy(f => f.Id, StringComparer.Ordinal)
             .ToList();
 
         var taken = (await _context.FuelTypes
                 .AsNoTracking()
-                .Where(f => f.BrandId == OkkoBrandId && f.BrandFuelCode != null && !f.IsDeleted)
+                .Where(f => f.BrandId == okkoId.Value && f.BrandFuelCode != null && !f.IsDeleted)
                 .Select(f => f.BrandFuelCode!)
                 .ToListAsync(ct))
             .ToHashSet(StringComparer.Ordinal);
@@ -165,7 +182,7 @@ public sealed class BackfillBrandFuelCodesCommandHandler
                     actingUserId == Guid.Empty ? Guid.Empty : actingUserId,
                     actingUserName,
                     $"{fill.Name}: matched OKKO's published code {fill.Code}",
-                    OkkoBrandId,
+                    OkkoSlug,
                     ct);
             }
         }

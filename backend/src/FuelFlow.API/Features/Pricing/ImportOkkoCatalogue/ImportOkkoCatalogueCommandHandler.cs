@@ -92,18 +92,22 @@ public sealed record OkkoCatalogueApplyResult(
 /// </remarks>
 public sealed class ImportOkkoCatalogueCommandHandler
 {
-    private const string OkkoBrandId = "okko";
+    /// <summary>See <see cref="BackfillBrandFuelCodesCommandHandler"/> for why this is a slug.</summary>
+    private const string OkkoSlug = "okko";
 
     private readonly ApplicationDbContext _context;
+    private readonly BrandSlugResolver _brands;
     private readonly AuditEventService _events;
     private readonly OfferPriceRecorder _priceRecorder;
 
     public ImportOkkoCatalogueCommandHandler(
         ApplicationDbContext context,
+        BrandSlugResolver brands,
         AuditEventService events,
         OfferPriceRecorder priceRecorder)
     {
         _context = context;
+        _brands = brands;
         _events = events;
         _priceRecorder = priceRecorder;
     }
@@ -114,6 +118,15 @@ public sealed class ImportOkkoCatalogueCommandHandler
         string? actingUserName,
         CancellationToken ct = default)
     {
+        // Thrown, not returned: this handler already refuses an empty sheet outright rather than
+        // treating it as nothing to do, and a catalogue that cannot be written because the network it
+        // names is not in ours belongs in the same class of mistake. Reporting "0 created" would let
+        // the fifteen-minute schedule look like a working one.
+        var okkoId = await _brands.ResolveAsync(OkkoSlug, ct);
+        if (okkoId is null)
+            throw new InvalidOperationException(
+                $"No live brand carries the slug '{OkkoSlug}', so the catalogue cannot be imported.");
+
         if (command.Sheet.Count == 0)
         {
             throw new InvalidOperationException(
@@ -135,7 +148,7 @@ public sealed class ImportOkkoCatalogueCommandHandler
         // created for a grade the brand sells again.
         var carried = (await _context.FuelTypes
                 .AsNoTracking()
-                .Where(f => f.BrandId == OkkoBrandId && !f.IsDeleted)
+                .Where(f => f.BrandId == okkoId.Value && !f.IsDeleted)
                 .ToListAsync(ct));
 
         var knownCodes = carried
@@ -247,7 +260,7 @@ if (knownCodes.Contains(code))
             var fuel = new FuelTypeEntity
             {
                 Id = Guid.CreateVersion7().ToString(),
-                BrandId = OkkoBrandId,
+                BrandId = okkoId.Value,
                 Name = name,
                 BrandFuelCode = code,
                 // Zero, not the pump: the headline is the customer's price, and there is none until an
@@ -265,7 +278,7 @@ if (knownCodes.Contains(code))
             var offer = new FuelOffer
             {
                 Id = OfferKeys.For(fuel.Id, DataKinds.Real),
-                BrandId = OkkoBrandId,
+                BrandId = okkoId.Value,
                 FuelTypeId = fuel.Id,
                 DataKind = DataKinds.Real,
                 // The one supplier-owned figure on the offer. Cost, margin and final stay null, and no
@@ -300,7 +313,7 @@ if (knownCodes.Contains(code))
                     actingUserName,
                     $"{c.Name} ({c.BrandFuelCode}): added from OKKO's published list at {c.PumpPricePerLiter:F2} UAH/L pump, "
                     + "unpriced and not on sale until a margin is set",
-                    OkkoBrandId,
+                    OkkoSlug,
                     ct);
             }
         }
@@ -316,7 +329,7 @@ if (knownCodes.Contains(code))
                 .DistinctBy(c => (c.Name, c.SiteFuelCode))
                 .ToList(),
             UnclassifiedSiteFuels: unclassified.Distinct(StringComparer.Ordinal).ToList(),
-            ArchivedFuels: await ArchiveDroppedFuelsAsync(seenFuelIds, actingUserId, actingUserName, command.DryRun, ct),
+            ArchivedFuels: await ArchiveDroppedFuelsAsync(okkoId.Value, seenFuelIds, actingUserId, actingUserName, command.DryRun, ct),
             DryRun: command.DryRun);
     }
 
@@ -351,7 +364,8 @@ if (knownCodes.Contains(code))
     /// admin endpoint enforces the same voucher check there.
     /// </para>
     /// </remarks>
-private async Task<IReadOnlyList<OkkoCatalogueArchived>> ArchiveDroppedFuelsAsync(
+    private async Task<IReadOnlyList<OkkoCatalogueArchived>> ArchiveDroppedFuelsAsync(
+        Guid brandId,
         IReadOnlySet<string> seenFuelIds,
         Guid actingUserId,
         string? actingUserName,
@@ -362,7 +376,7 @@ private async Task<IReadOnlyList<OkkoCatalogueArchived>> ArchiveDroppedFuelsAsyn
 
         var absent = await _context.FuelTypes
             .IgnoreQueryFilters()
-            .Where(f => f.BrandId == OkkoBrandId
+            .Where(f => f.BrandId == brandId
                 && !f.IsDeleted
                 && f.BrandFuelCode != null
                 && !seenFuelIds.Contains(f.Id))
@@ -422,7 +436,7 @@ private async Task<IReadOnlyList<OkkoCatalogueArchived>> ArchiveDroppedFuelsAsyn
                     actingUserId == Guid.Empty ? Guid.Empty : actingUserId,
                     actingUserName,
                     $"{fuel.Name}: archived — OKKO no longer publishes this grade and it has no live vouchers",
-                    OkkoBrandId,
+                    OkkoSlug,
                     ct);
             }
 

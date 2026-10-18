@@ -24,18 +24,21 @@ public static class TermStockCoverage
 {
     /// <summary>
     /// The latest paper expiry among <see cref="VoucherStatus.Available"/> vouchers matching the brand,
-    /// fuel type and nominal, or null when nothing is in stock. Brand is matched case-insensitively:
-    /// order lines and the catalog carry <c>okko</c> while imported stock carries <c>OKKO</c>, and the
-    /// fulfilment matcher compares the same way.
+    /// fuel type and nominal, or null when nothing is in stock.
     /// </summary>
+    /// <param name="brandSlug">
+    /// The network's slug, not its id. Vouchers store the brand <em>name</em> ("OKKO") and the two
+    /// agree only because a slug is the lower-cased name; see <see cref="StockKey"/> for that
+    /// assumption written down. The id stopped being usable here when planning D-21 gave it a uuid.
+    /// </param>
     public static async Task<DateOnly?> BestStockExpirationAsync(
         ApplicationDbContext context,
-        string BrandId,
+        string brandSlug,
         string fuelTypeId,
         decimal liters,
         CancellationToken cancellationToken = default)
     {
-        var brand = BrandId.ToLower();
+        var brand = brandSlug.ToLower();
 
         return await context.FuelVouchers
             .AsNoTracking()

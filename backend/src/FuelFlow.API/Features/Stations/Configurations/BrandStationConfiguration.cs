@@ -14,11 +14,16 @@ internal sealed class BrandStationConfiguration : IEntityTypeConfiguration<Brand
 
         builder.Property(e => e.Id)
             .HasColumnName("id")
-            .HasColumnType("text");
+            .HasColumnType("uuid");
+
+        builder.Property(e => e.ExternalId)
+            .HasColumnName("external_id")
+            .HasMaxLength(100)
+            .IsRequired();
 
         builder.Property(e => e.BrandId)
             .HasColumnName("brand_id")
-            .HasColumnType("text")
+            .HasColumnType("uuid")
             .IsRequired();
 
         builder.Property(e => e.Name)
@@ -68,18 +73,18 @@ internal sealed class BrandStationConfiguration : IEntityTypeConfiguration<Brand
         // Restrict: deleting a brand must never delete every physical location that belonged to
         // it. The catalog is archived via IsDeleted instead; this is the seatbelt for a DELETE
         // that arrives from anywhere else - including a hand-written psql session.
-        builder.HasOne<Brand>()
-            .WithMany()
+        builder.HasOne(e => e.Brand)
+            .WithMany(b => b.Stations)
             .HasForeignKey(e => e.BrandId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(e => e.BrandId);
 
-        // Natural key, bounded by CHECK rather than a type change - see BrandConfiguration.
-        builder.ToTable(t =>
-        {
-            t.HasCheckConstraint("ck_brand_stations_id_length", "length(id) <= 100");
-            t.HasCheckConstraint("ck_brand_stations_brand_id_length", "length(brand_id) <= 100");
-        });
+        // The re-import's identity. Per brand rather than global because the same external id at two
+        // networks is two different АЗК, and a source file that carries its own ids should not have
+        // to make them unique across every network we sell.
+        builder.HasIndex(e => new { e.BrandId, e.ExternalId })
+            .IsUnique()
+            .HasDatabaseName("ux_brand_stations_brand_external");
     }
 }

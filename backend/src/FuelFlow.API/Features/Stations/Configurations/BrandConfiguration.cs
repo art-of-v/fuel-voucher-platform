@@ -14,7 +14,17 @@ internal sealed class BrandConfiguration : IEntityTypeConfiguration<Brand>
 
         builder.Property(e => e.Id)
             .HasColumnName("id")
-            .HasColumnType("text");
+            .HasColumnType("uuid");
+
+        // The natural key, demoted from primary key to a unique column (planning D-21). It is still
+        // the name an importer, an invoice and an operator writes, so it stays bounded rather than
+        // becoming free text.
+        builder.Property(e => e.Slug)
+            .HasColumnName("slug")
+            .HasMaxLength(100)
+            .IsRequired();
+
+        builder.HasIndex(e => e.Slug).IsUnique();
 
         builder.Property(e => e.Name)
             .HasColumnName("name")
@@ -64,18 +74,20 @@ internal sealed class BrandConfiguration : IEntityTypeConfiguration<Brand>
         builder.HasQueryFilter(e => !e.IsDeleted);
 
         builder.HasIndex(e => e.Name);
-        // dropping and recreating every foreign key that points at it, across seven tables, and
-        // the gain would be cosmetic. A CHECK gets the guarantee that actually matters - a slug
-        // cannot silently become a paragraph - for the cost of one line and zero refactoring.
+        // The natural key is a column of bounded length rather than a type of its own: it is what an
+        // importer resolves a PDF row by, so it must stay readable, and a CHECK is enough to stop it
+        // becoming a paragraph.
         builder.ToTable(t =>
         {
-            t.HasCheckConstraint("ck_brands_id_length", "length(id) <= 100");
+            t.HasCheckConstraint("ck_brands_slug_length", "length(slug) <= 100");
             t.HasCheckConstraint("ck_brands_name_length", "length(name) <= 200");
         });
 
-        builder.HasMany<BrandStation>()
-            .WithOne()
-            .HasForeignKey(e => e.BrandId)
-            .OnDelete(DeleteBehavior.Cascade);
+        // The stations relation is configured once, on BrandStationConfiguration, where the foreign key
+        // and the Restrict live. Declaring it here as well used to be harmless — with no navigation on
+        // either side EF folded the two into one relationship — and stopped being harmless the moment
+        // BrandStation.Brand existed: EF then saw two configurations of the same relationship and
+        // invented a second foreign key, `brand_stations."BrandId1"`, to satisfy one of them. Two
+        // configurations, one FK, is the shape that produces a phantom column.
     }
 }

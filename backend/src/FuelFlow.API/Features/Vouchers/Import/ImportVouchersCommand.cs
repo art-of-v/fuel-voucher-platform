@@ -164,9 +164,22 @@ public sealed class ImportVouchersCommandHandler
         // Which brand each fuel type belongs to, loaded once. A PDF carries hundreds of vouchers and the
         // brand/fuel pairing is checked per voucher, so a query each time would be the dominant cost of
         // the import.
-        var brandByFuelType = await _context.FuelTypes
-            .Where(f => f.BrandId != null)
-            .ToDictionaryAsync(f => f.Id, f => f.BrandId!, cancellationToken);
+        // The catalogue's brand, by SLUG. `fuel_types.brand_id` is a uuid since planning D-21 and the
+        // paper says a name, so the ids are resolved once here rather than compared as ids - see
+        // BrandFuelPairing.
+        var catalogBrandByFuelType = await _context.FuelTypes
+            .AsNoTracking()
+            .Select(f => new { f.Id, f.BrandId })
+            .ToListAsync(cancellationToken);
+        var slugByBrandId = (await _context.Brands.AsNoTracking()
+                .Select(b => new { b.Id, b.Slug })
+                .ToListAsync(cancellationToken))
+            .ToDictionary(b => b.Id, b => b.Slug);
+        var brandSlugByFuelType = catalogBrandByFuelType
+            .Where(f => f.BrandId != Guid.Empty)
+            .ToDictionary(
+                f => f.Id,
+                f => slugByBrandId.TryGetValue(f.BrandId, out var slug) ? slug : null);
 
         var import = new VoucherImport
         {
@@ -313,7 +326,7 @@ public sealed class ImportVouchersCommandHandler
                         //
                         // A fuel type with no row at all is left alone: that is an unresolved SKU, already
                         // reported above, and the foreign key is what catches it.
-                        if (brandByFuelType.TryGetValue(parsed.FuelTypeId!, out var fuelBrand) &&
+                        if (brandSlugByFuelType.TryGetValue(parsed.FuelTypeId!, out var fuelBrand) &&
                             !BrandFuelPairing.IsConsistent(parsed.Brand, fuelBrand))
                         {
                             var errMsg = $"Brand '{parsed.Brand}' does not sell fuel '{parsed.FuelTypeId}', " +

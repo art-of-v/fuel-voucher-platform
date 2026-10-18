@@ -43,12 +43,12 @@ public sealed class AdminBrandStationController : ControllerBase
     public async Task<IActionResult> GetAll(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50,
-        [FromQuery] string? BrandId = null,
+        [FromQuery] Guid? BrandId = null,
         CancellationToken ct = default) =>
         Ok(await _getAll.HandleAsync(new GetAdminBrandStationsQuery(page, pageSize, BrandId), ct));
 
     [HttpGet("{id}")]
-    public async Task<IActionResult> GetById([FromRoute] string id, CancellationToken ct)
+    public async Task<IActionResult> GetById([FromRoute] Guid id, CancellationToken ct)
     {
         var result = await _getById.HandleAsync(new GetAdminBrandStationByIdQuery(id), ct);
         return result is null ? NotFound() : Ok(result);
@@ -66,7 +66,7 @@ public sealed class AdminBrandStationController : ControllerBase
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update([FromRoute] string id, [FromBody] BrandStation request, CancellationToken ct)
+    public async Task<IActionResult> Update([FromRoute] Guid id, [FromBody] BrandStation request, CancellationToken ct)
     {
         var result = await _update.HandleAsync(new UpdateBrandStationCommand(id, request), ct);
         if (result.NotFound) return NotFound();
@@ -75,7 +75,7 @@ public sealed class AdminBrandStationController : ControllerBase
     }
 
     [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete([FromRoute] string id, CancellationToken ct)
+    public async Task<IActionResult> Delete([FromRoute] Guid id, CancellationToken ct)
     {
         var success = await _delete.HandleAsync(new DeleteBrandStationCommand(id), ct);
         return success ? Ok(new { success = true }) : NotFound();

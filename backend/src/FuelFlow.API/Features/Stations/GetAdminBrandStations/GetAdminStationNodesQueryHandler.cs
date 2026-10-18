@@ -15,8 +15,8 @@ public sealed class GetAdminBrandStationsQueryHandler
         var paged = new PagedRequest(query.Page, query.PageSize);
         var source = _context.BrandStations.AsNoTracking();
 
-        if (!string.IsNullOrWhiteSpace(query.BrandId))
-            source = source.Where(n => n.BrandId == query.BrandId);
+        if (query.BrandId is { } brandId && brandId != Guid.Empty)
+            source = source.Where(n => n.BrandId == brandId);
 
         return await source
             .OrderBy(n => n.BrandId)

@@ -36,6 +36,7 @@ private readonly GetBrandsQueryHandler _getAll;
     // Every price this controller writes goes through here, so the history cannot be missed by the one
     // endpoint that forgets. See OfferPriceRecorder for why that is a service rather than a comment.
     private readonly OfferPriceRecorder _priceRecorder;
+    private readonly BrandSlugResolver _brands;
 
     public BrandsController(
         GetBrandsQueryHandler getAll,
@@ -46,7 +47,8 @@ private readonly GetBrandsQueryHandler _getAll;
         AuditEventService eventService,
         ApplicationDbContext context,
         NotificationDispatcher notifications,
-        OfferPriceRecorder priceRecorder)
+        OfferPriceRecorder priceRecorder,
+        BrandSlugResolver brands)
     {
         _getAll = getAll;
         _getById = getById;
@@ -57,6 +59,7 @@ private readonly GetBrandsQueryHandler _getAll;
         _context = context;
         _notifications = notifications;
         _priceRecorder = priceRecorder;
+        _brands = brands;
     }
 
     private static readonly List<int> DefaultNominals = new() { 2, 3, 5, 10, 20, 50 };
@@ -66,28 +69,52 @@ private readonly GetBrandsQueryHandler _getAll;
         Ok(await _getAll.HandleAsync(new GetBrandsQuery(), ct));
 
     [HttpGet("{id}")]
-    public async Task<IActionResult> GetById([FromRoute] string id, CancellationToken ct)
+    public async Task<IActionResult> GetById([FromRoute] Guid id, CancellationToken ct)
     {
         var result = await _getById.HandleAsync(new GetBrandByIdQuery(id), ct);
         return result is null ? NotFound() : Ok(result);
     }
 
+    /// <summary>
+    /// The audit trail for one brand.
+    /// </summary>
+    /// <remarks>
+    /// Scoped by <b>slug</b>, not id, and that is what keeps the history intact across the uuid
+    /// migration: <c>audit_event_outbox.scope_id</c> has always held the network's own code, so the
+    /// rows written before the id changed still resolve. Only <c>aggregate_id</c> held the old text
+    /// id, and that is a label on the audit screen rather than the lookup - which is why nothing had
+    /// to be rewritten to keep this endpoint working.
+    /// </remarks>
     [HttpGet("{id}/history")]
     public async Task<IActionResult> GetHistory(
-        [FromRoute] string id,
+        [FromRoute] Guid id,
         [FromQuery] int limit = 50,
-        CancellationToken ct = default) =>
-        Ok(await _getHistory.HandleAsync(new GetBrandHistoryQuery(id, limit), ct));
+        CancellationToken ct = default)
+    {
+        var slug = await _brands.SlugOfAsync(id, ct);
+        if (slug is null) return NotFound();
+
+        return Ok(await _getHistory.HandleAsync(new GetBrandHistoryQuery(slug, limit), ct));
+    }
+
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] BrandDto request, CancellationToken ct)
     {
-        var exists = await _context.Brands.AnyAsync(s => s.Id == request.Id, ct);
-        if (exists)
-            return Conflict(new { error = "Brand with this ID already exists" });
+        var slug = (request.Slug ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(slug))
+            return BadRequest(new { error = "Slug is required" });
 
+        var exists = await _context.Brands.AnyAsync(s => s.Slug == slug, ct);
+        if (exists)
+            return Conflict(new { error = "Brand with this slug already exists" });
+
+        // The id is the server's to assign. A caller that sent one is ignored rather than rejected:
+        // the admin form posts back the row it was editing, and refusing that would break the one
+        // screen that creates brands.
         var Brand = new Brand
         {
-            Id = request.Id,
+            Id = Guid.CreateVersion7(),
+            Slug = slug,
             Name = request.Name,
             LogoText = request.LogoText,
             Color = request.Color,
@@ -99,19 +126,19 @@ private readonly GetBrandsQueryHandler _getAll;
         await _context.SaveChangesAsync(ct);
 
         var userId = GetUserId();
-        var newValue = JsonSerializer.Serialize(new { Brand.Id, Brand.Name });
+        var newValue = JsonSerializer.Serialize(new { Brand.Slug, Brand.Name });
         await _eventService.RecordEventAsync(
-            "Brand", Brand.Id, "BrandCreated",
+            "Brand", Brand.Id.ToString(), "BrandCreated",
             null, newValue, userId, GetUserName(),
             $"Created brand {Brand.Name}",
-            Brand.Id,
+            Brand.Slug,
             ct);
 
         return CreatedAtAction(nameof(GetById), new { id = Brand.Id }, Brand);
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update([FromRoute] string id, [FromBody] BrandDto request, CancellationToken ct)
+    public async Task<IActionResult> Update([FromRoute] Guid id, [FromBody] BrandDto request, CancellationToken ct)
     {
         var Brand = await _context.Brands.FirstOrDefaultAsync(s => s.Id == id, ct);
         if (Brand is null) return NotFound();
@@ -120,8 +147,12 @@ private readonly GetBrandsQueryHandler _getAll;
         var oldLogoText = Brand.LogoText;
         var oldColor = Brand.Color;
         var oldSortOrder = Brand.SortOrder;
-        var oldValue = JsonSerializer.Serialize(new { Brand.Name, Brand.LogoText, Brand.Color, Brand.SortOrder });
+        var oldValue = JsonSerializer.Serialize(new { Brand.Slug, Brand.Name, Brand.LogoText, Brand.Color, Brand.SortOrder });
 
+        // The slug is immutable over HTTP. It is the importer's crosswalk key and every external
+        // reference to this network resolves through it, so renaming it here would silently re-point
+        // an import file at nothing. Changing a slug is a data operation with a crosswalk, not a form
+        // field - and the uniqueness index is the only thing that would have caught the damage.
         Brand.Name = request.Name;
         Brand.LogoText = request.LogoText;
         Brand.Color = request.Color;
@@ -141,27 +172,28 @@ private readonly GetBrandsQueryHandler _getAll;
             changes.Add($"sort order {oldSortOrder}  {request.SortOrder}");
 
         var userId = GetUserId();
-        var newValue = JsonSerializer.Serialize(new { Brand.Name, Brand.LogoText, Brand.Color, Brand.SortOrder });
+        var newValue = JsonSerializer.Serialize(new { Brand.Slug, Brand.Name, Brand.LogoText, Brand.Color, Brand.SortOrder });
         var summary = changes.Count > 0
             ? $"{Brand.Name}: {string.Join(", ", changes)}"
             : $"Updated brand {Brand.Name}";
         await _eventService.RecordEventAsync(
-            "Brand", id, "BrandUpdated",
+            "Brand", id.ToString(), "BrandUpdated",
             oldValue, newValue, userId, GetUserName(),
             summary,
-            id,
+            Brand.Slug,
             ct);
 
         return Ok(new { success = true });
     }
 
     [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete([FromRoute] string id, CancellationToken ct)
+    public async Task<IActionResult> Delete([FromRoute] Guid id, CancellationToken ct)
     {
         var Brand = await _context.Brands.FirstOrDefaultAsync(s => s.Id == id, ct);
         if (Brand is null) return NotFound();
 
         var name = Brand.Name;
+        var slug = Brand.Slug;
         var fuelTypes = await _context.FuelTypes.Where(f => f.BrandId == id).ToListAsync(ct);
         var fuelIds = fuelTypes.Select(f => f.Id).ToList();
         // Archive-the-offers view of the same question as the brand list above: this deletion path needs
@@ -198,10 +230,10 @@ private readonly GetBrandsQueryHandler _getAll;
 
         var userId = GetUserId();
         await _eventService.RecordEventAsync(
-            "Brand", id, "BrandDeleted",
-            JsonSerializer.Serialize(new { name }), "{}", userId, GetUserName(),
+            "Brand", id.ToString(), "BrandDeleted",
+            JsonSerializer.Serialize(new { name, slug }), "{}", userId, GetUserName(),
             $"Deleted brand {name}",
-            id,
+            slug,
             ct);
 
         return Ok(new { success = true });

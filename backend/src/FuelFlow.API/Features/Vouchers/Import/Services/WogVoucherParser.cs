@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.Persistence;
@@ -12,12 +13,20 @@ namespace FuelFlow.Features.Vouchers.Import;
 
 public sealed class WogVoucherParser : IVoucherProviderParser
 {
+    /// <summary>See <see cref="OkkoVoucherParser"/> for why this is a slug and not an id.</summary>
+    private const string BrandSlug = "wog";
+
     private readonly ApplicationDbContext _context;
+    private readonly BrandSlugResolver _brands;
     private readonly ILogger<WogVoucherParser> _logger;
 
-    public WogVoucherParser(ApplicationDbContext context, ILogger<WogVoucherParser> logger)
+    public WogVoucherParser(
+        ApplicationDbContext context,
+        BrandSlugResolver brands,
+        ILogger<WogVoucherParser> logger)
     {
         _context = context;
+        _brands = brands;
         _logger = logger;
     }
 
@@ -38,8 +47,16 @@ public sealed class WogVoucherParser : IVoucherProviderParser
         var parsedVouchers = new List<ParsedVoucher>();
         var regions = context.VoucherRegions.ToList();
 
+        var wogId = await _brands.ResolveAsync(BrandSlug, cancellationToken);
+        if (wogId is null)
+        {
+            _logger.LogWarning(
+                "Skipping the WOG page: no live brand carries the slug {Slug}.", BrandSlug);
+            return parsedVouchers;
+        }
+
         var wogFuelTypes = await _context.FuelTypes
-            .Where(f => f.BrandId == "wog")
+            .Where(f => f.BrandId == wogId.Value)
             .ToListAsync(cancellationToken);
 
         foreach (var region in regions)

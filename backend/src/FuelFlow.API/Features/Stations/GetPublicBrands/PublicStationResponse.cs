@@ -9,9 +9,16 @@ namespace FuelFlow.Features.Brands.GetPublicBrands;
 /// below are exactly those the mobile client declares in <c>mobile/src/core/types/api.ts</c> (plus
 /// <c>sortOrder</c>, added alongside the client's type), so the wire format only grows deliberately;
 /// audit timestamps, which no client reads, are dropped.
-/// </summary>
+/// </para>
+/// <para>
+/// <see cref="Slug"/> was added when the id became a uuid (planning D-21). The client still needs a
+/// stable, human-readable handle for a network — to label cached stock, to group a shelf offline, and
+/// to read a log — and the id alone cannot serve any of those.
+/// </para>
+/// </remarks>
 public sealed record PublicBrandResponse(
-    string Id,
+    Guid Id,
+    string Slug,
     string Name,
     string Color,
     string LogoText,

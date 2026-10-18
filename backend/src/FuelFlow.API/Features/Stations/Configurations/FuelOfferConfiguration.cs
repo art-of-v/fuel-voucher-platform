@@ -17,11 +17,13 @@ internal sealed class FuelOfferConfiguration : IEntityTypeConfiguration<FuelOffe
         builder.HasKey(e => e.Id);
 
         builder.Property(e => e.Id).HasColumnName("id").HasColumnType("text").IsRequired();
-        builder.Property(e => e.BrandId).HasColumnName("brand_id").HasColumnType("text").IsRequired();
+        builder.Property(e => e.BrandId).HasColumnName("brand_id").HasColumnType("uuid").IsRequired();
         builder.Property(e => e.FuelTypeId).HasColumnName("fuel_type_id").HasColumnType("text").IsRequired();
 
         builder.Property(e => e.SupplierPricePerLiter).HasColumnName("supplier_price_per_liter").HasColumnType("numeric(10,4)");
+        // The offer's own copy of the margin: no reader, no writer, kept only until the migration that drops
         // the column. Nothing to Ignore any more - FinalPerLiterWith is a method, not a property.
+        builder.Property(e => e.MarginUahPerLiter).HasColumnName("margin_uah_per_liter").HasColumnType("numeric(10,4)");
         builder.Property(e => e.MarginPercent).HasColumnName("margin_percent").HasColumnType("numeric(10,4)");
         builder.Property(e => e.PumpPricePerLiter).HasColumnName("pump_price_per_liter").HasColumnType("numeric(10,4)");
         builder.Property(e => e.MinDiscountPerLiter).HasColumnName("min_discount_per_liter").HasColumnType("numeric(10,4)");
@@ -74,16 +76,16 @@ internal sealed class FuelOfferConfiguration : IEntityTypeConfiguration<FuelOffe
             // ck_fuel_types_id_length - plus the '-qa' suffix. OfferKeyTests states the same arithmetic,
             // so a tightened column bound cannot silently start rejecting a legal offer at write time.
             t.HasCheckConstraint("ck_fuel_offers_id_length", "length(id) <= 103");
-            t.HasCheckConstraint("ck_fuel_offers_brand_id_length", "length(brand_id) <= 100");
             t.HasCheckConstraint("ck_fuel_offers_fuel_type_id_length", "length(fuel_type_id) <= 100");
 
             // The value set DataKinds.All documents.
             t.HasCheckConstraint("ck_fuel_offers_data_kind", "data_kind IN ('real', 'qa')");
 
             // The same sign constraints fuel_packages carries, on the columns that are money here.
-            // A negative cost is not a cheap mistake to make: the dashboard and reconciliation
-            // both multiply this straight into revenue. The margin's sign is enforced on
-            // fuel_types now, where the margin lives.
+            // A negative margin is not a cheap mistake to make: the dashboard and reconciliation
+            // both multiply this straight into revenue.
+            t.HasCheckConstraint("ck_fuel_offers_margin_signs",
+                "margin_uah_per_liter IS NULL OR margin_uah_per_liter >= 0");
             t.HasCheckConstraint("ck_fuel_offers_prices_non_negative",
                 "(supplier_price_per_liter IS NULL OR supplier_price_per_liter >= 0) AND " +
                 "(pump_price_per_liter IS NULL OR pump_price_per_liter >= 0) AND " +

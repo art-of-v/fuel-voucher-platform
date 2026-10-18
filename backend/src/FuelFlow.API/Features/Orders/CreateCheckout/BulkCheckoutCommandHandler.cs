@@ -91,8 +91,14 @@ private readonly RuntimeSettingsService _runtimeSettings;
             }
         }
 
-        var BrandIds = command.Items.Select(i => i.BrandId!).Distinct().ToList();
+        var BrandIds = command.Items.Select(i => i.BrandId!.Value).Distinct().ToList();
         var fuelTypeIds = command.Items.Select(i => i.FuelTypeId).ToList();
+
+        // Id to slug for the whole cart, once. Everything below that keys on a brand name - the stock
+        // key, the order line, the expiry check - needs it, and the cart names its brands by id.
+        var brandSlugs = await _context.Brands.AsNoTracking()
+            .Where(b => BrandIds.Contains(b.Id))
+            .ToDictionaryAsync(b => b.Id, b => b.Slug, cancellationToken);
 
         var fuelTypes = await _context.FuelTypes
             .Where(f => BrandIds.Contains(f.BrandId) && fuelTypeIds.Contains(f.Id))
@@ -127,7 +133,7 @@ private readonly RuntimeSettingsService _runtimeSettings;
         // (Brand, fuel, liters) triple the package lookup uses, so a line can never be priced off a
         // package whose stock is then found missing.
         var wantedStock = command.Items
-            .Select(i => StockKey.For(i.BrandId!, i.FuelTypeId, i.Liters))
+            .Select(i => StockKey.For(brandSlugs[i.BrandId!.Value], i.FuelTypeId, i.Liters))
             .ToHashSet();
         var inStock = await _stock.AvailableKeysAsync(wantedStock, isTestAccount, cancellationToken);
 
@@ -147,7 +153,7 @@ private readonly RuntimeSettingsService _runtimeSettings;
                 throw new ArgumentException(
                     $"Invalid fuel type ID: {item.FuelTypeId} for Brand {item.BrandId}");
 
-            var package = packages.GetValueOrDefault(StockKey.For(item.BrandId!, item.FuelTypeId, item.Liters));
+            var package = packages.GetValueOrDefault(StockKey.For(brandSlugs[item.BrandId!.Value], item.FuelTypeId, item.Liters));
 
             if (package == null)
                 throw new ArgumentException(
@@ -157,8 +163,8 @@ private readonly RuntimeSettingsService _runtimeSettings;
             // fundamental answer, and refusing there means the below-cost alert is not fired for a sale
             // that could never have completed anyway. One blocked line fails the whole bulk order, matching
             // the below-cost behaviour — a customer who cannot buy one line cannot check out with it.
-            if (!inStock.Contains(StockKey.For(item.BrandId!, item.FuelTypeId, item.Liters)))
-                throw new PackageOutOfStockException(item.BrandId!, item.FuelTypeId, item.Liters);
+            if (!inStock.Contains(StockKey.For(brandSlugs[item.BrandId!.Value], item.FuelTypeId, item.Liters)))
+                throw new PackageOutOfStockException(brandSlugs[item.BrandId!.Value], item.FuelTypeId, item.Liters);
 
             var (discountPerLiter, termCode) = ResolveTerm(item, termConfig, command.UserId.Value);
 
@@ -172,7 +178,7 @@ private readonly RuntimeSettingsService _runtimeSettings;
                 // Same as the single-line path: a blocked basket tells nobody unless we say so.
                 // Throttled per fuel inside the dispatcher, so one customer's retry loop is one message.
                 await _notifications.BelowCostAsync(
-                    item.BrandId!, fuelType.Name,
+                    brandSlugs[item.BrandId!.Value], fuelType.Name,
                     package.SupplierPricePerLiter ?? 0m, discountPerLiter, deliberate: false, cancellationToken);
                 throw new BelowCostSaleBlockedException(item.FuelTypeId);
             }
@@ -188,7 +194,7 @@ private readonly RuntimeSettingsService _runtimeSettings;
                 && VoucherRenewalTerms.TryFromCode(termCode, out var purchasedTerm))
             {
                 var bestStockExpiration = await TermStockCoverage.BestStockExpirationAsync(
-                    _context, item.BrandId!, item.FuelTypeId, item.Liters, cancellationToken);
+                    _context, brandSlugs[item.BrandId!.Value], item.FuelTypeId, item.Liters, cancellationToken);
 
                 if (!TermStockCoverage.CanHonour(bestStockExpiration, DateOnly.FromDateTime(DateTime.UtcNow), purchasedTerm))
                 {
@@ -323,7 +329,7 @@ private readonly RuntimeSettingsService _runtimeSettings;
             {
                 Id = Guid.CreateVersion7(),
                 OrderId = order.Id,
-                Brand = item.BrandId!,
+                Brand = brandSlugs[item.BrandId!.Value],
                 FuelTypeId = item.FuelTypeId,
                 Liters = item.Liters,
                 Quantity = item.Quantity,

@@ -25,7 +25,7 @@ internal sealed class ContractConfiguration : IEntityTypeConfiguration<Contract>
 
         builder.Property(e => e.BrandId)
             .HasColumnName("brand_id")
-            .HasColumnType("text")
+            .HasColumnType("uuid")
             .IsRequired();
 
         builder.Property(e => e.CreatedAtUtc)
@@ -53,12 +53,5 @@ internal sealed class ContractConfiguration : IEntityTypeConfiguration<Contract>
         builder.HasIndex(e => e.UserId);
         builder.HasIndex(e => e.LegalEntityId);
         builder.HasIndex(e => e.BrandId);
-
-        // brand_id is a natural key on the catalog ("okko"), bounded by CHECK rather than a type
-        // change - see BrandConfiguration.
-        builder.ToTable(t =>
-        {
-            t.HasCheckConstraint("ck_contracts_brand_id_length", "length(brand_id) <= 100");
-        });
     }
 }

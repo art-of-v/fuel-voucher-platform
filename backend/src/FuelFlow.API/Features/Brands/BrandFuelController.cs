@@ -103,7 +103,7 @@ public sealed class BrandFuelController : ControllerBase
         CancellationToken ct = default) =>
         Ok(await _getPriceAt.HandleAsync(new GetFuelPriceAtQuery(fuelId, asOf), ct));
     [HttpPost("brands/{id}/fuels")]
-    public async Task<IActionResult> AddFuel([FromRoute] string id, [FromBody] CreateFuelRequest request, CancellationToken ct)
+    public async Task<IActionResult> AddFuel([FromRoute] Guid id, [FromBody] CreateFuelRequest request, CancellationToken ct)
     {
         // Required for the same reason as on UpdateFuel: every package created below inherits it,
         // so an unstated flag would default to "sell this".
@@ -293,7 +293,7 @@ public sealed class BrandFuelController : ControllerBase
             "Fuel", fuel.Id, "FuelAdded",
             null, newValue, userId, GetUserName(),
             $"{Brand.Name} / {fuel.Name}: added at {finalPerLiter:F2} UAH/L",
-            id,
+            Brand!.Slug,
             ct);
 
         // Record the deliberate loss-leader decision (we only reach here below-cost when opted in).
@@ -557,7 +557,7 @@ var seededNominals = await _context.FuelNominals
             "Fuel", fuelId, "PriceChanged",
             oldValue, newValue, userId, GetUserName(),
             summary,
-            fuel.BrandId,
+            Brand!.Slug,
             ct);
 
         // Record the deliberate loss-leader decision (we only reach here below-cost when opted in).
@@ -639,14 +639,14 @@ var seededNominals = await _context.FuelNominals
             JsonSerializer.Serialize(new { fuelName, BrandName }), "{}",
             userId, GetUserName(),
             $"{BrandName} / {fuelName}: removed",
-            fuel.BrandId,
+            Brand!.Slug,
             ct);
 
         return Ok(new { success = true });
     }
 
     [HttpPut("brands/{id}/nominals")]
-    public async Task<IActionResult> UpdateNominals([FromRoute] string id, [FromBody] List<int> nominals, CancellationToken ct)
+    public async Task<IActionResult> UpdateNominals([FromRoute] Guid id, [FromBody] List<int> nominals, CancellationToken ct)
     {
         // Rejected here rather than left to ck_fuel_packages_liters_positive. The request body binds
         // List<int> straight off the wire, so -10 used to create a package priced at -10 x the
@@ -726,10 +726,10 @@ var BrandFuels = await _context.FuelTypes.Where(f => f.BrandId == id).ToListAsyn
         var userId = GetUserId();
         var newValue = JsonSerializer.Serialize(nominals.OrderBy(n => n).ToList());
         await _eventService.RecordEventAsync(
-            "Nominal", id, "NominalSetChanged",
+            "Nominal", id.ToString(), "NominalSetChanged",
             oldValue, newValue, userId, GetUserName(),
             $"{Brand.Name}: nominals changed [{string.Join(", ", nominals.OrderBy(n => n))}]",
-            id,
+            Brand.Slug,
             ct);
 
         return Ok(new { success = true });

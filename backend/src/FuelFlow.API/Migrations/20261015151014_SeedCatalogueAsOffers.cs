@@ -66,6 +66,22 @@ namespace FuelFlow.API.Migrations
     /// </para>
     public partial class SeedCatalogueAsOffers : Migration
     {
+        /// <summary>
+        /// The <c>station_id</c> this migration's offer rows carried: the seeded network's own code.
+        /// </summary>
+        /// <remarks>
+        /// Added 2026-10-18 for the third time, and for the same reason as the two edits above: planning
+        /// D-21 gave <c>brands</c> a uuid id, so <c>FuelOffer.BrandId</c> is a <c>Guid</c> and can no
+        /// longer be quoted as the string the <c>station_id</c> column held. That column is still a
+        /// <c>text</c> natural key at this point in history and still wants the network's CODE.
+        /// Formatting the id instead would write a uuid into a natural-key column — a different
+        /// statement, and a key the next migration in the chain does not expect. The mapping comes from
+        /// <see cref="SeedData.Brands"/> because the seed is already the one source of truth this file
+        /// trusts.
+        /// </remarks>
+        private static string StationId(FuelOffer offer)
+            => SeedData.Brands.First(b => b.Id == offer.BrandId).Slug;
+
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             var (offers, volumes) = SeedData.Catalogue;
@@ -77,7 +93,7 @@ namespace FuelFlow.API.Migrations
             // keys have since changed.
             var historicalKey = offers.ToDictionary(
                 o => o.Id,
-                o => $"{o.BrandId}-{o.FuelTypeId}" + (o.DataKind == DataKinds.Qa ? "-qa" : ""));
+                o => $"{StationId(o)}-{o.FuelTypeId}" + (o.DataKind == DataKinds.Qa ? "-qa" : ""));
 
             foreach (var offer in offers)
             {
@@ -88,7 +104,7 @@ namespace FuelFlow.API.Migrations
                          pump_price_per_liter, min_discount_per_liter, is_deleted, deleted_at_utc,
                          price_updated_at, price_updated_by_user_id, created_at_utc, updated_at_utc)
                     VALUES
-                        ({Quote(historicalKey[offer.Id])}, {Quote(offer.BrandId)}, {Quote(offer.FuelTypeId)}, {Quote(offer.DataKind)},
+                        ({Quote(historicalKey[offer.Id])}, {Quote(StationId(offer))}, {Quote(offer.FuelTypeId)}, {Quote(offer.DataKind)},
                          {Num(offer.SupplierPricePerLiter)}, {Num(offer.FinalPerLiterWith(0m) - 0m)}, {Num(offer.MarginPercent)},
                          {Num(offer.FinalPerLiterWith(offer.FinalPerLiterWith(0m) - 0m))}, NULL, NULL, FALSE, NULL, NULL, NULL,
                          {Ts(offer.CreatedAtUtc)}, {Ts(offer.UpdatedAtUtc)})
@@ -150,7 +166,7 @@ namespace FuelFlow.API.Migrations
 
             var historicalKey = offers.ToDictionary(
                 o => o.Id,
-                o => $"{o.BrandId}-{o.FuelTypeId}" + (o.DataKind == DataKinds.Qa ? "-qa" : ""));
+                o => $"{StationId(o)}-{o.FuelTypeId}" + (o.DataKind == DataKinds.Qa ? "-qa" : ""));
 
             foreach (var volume in volumes.Reverse())
                 migrationBuilder.Sql($"DELETE FROM fuel_offer_volumes WHERE id = {Quote(volume.Id)};");

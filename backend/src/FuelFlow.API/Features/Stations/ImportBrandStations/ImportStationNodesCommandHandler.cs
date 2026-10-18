@@ -5,7 +5,8 @@ using Microsoft.EntityFrameworkCore;
 namespace FuelFlow.Features.Brands.ImportBrandStations;
 
 /// <summary>
-/// Bulk-loads АЗК for the price radar. Upserts by id (explicit, else coordinate-derived) so a
+/// Bulk-loads АЗК for the price radar. Upserts by (brand, external id) — the explicit id the file
+/// supplies, else the one <see cref="BrandStationCoordinates"/> derives from the coordinates — so a
 /// re-import of the same brand file heals rows instead of duplicating them. Every row is validated
 /// against the same rules as the single create; a bad row is reported, never silently dropped.
 /// </summary>
@@ -21,11 +22,15 @@ public sealed class ImportBrandStationsCommandHandler
         var parsed = BrandStationImportParser.Parse(command.Content, command.Format);
         result.Errors.AddRange(parsed.Errors);
 
-        var brandIds = await _context.Brands.Select(s => s.Id).ToListAsync(ct);
-        var brands = brandIds.ToHashSet(StringComparer.Ordinal);
+        // Slug -> id: the file names its network the way a supplier does, and the database no longer
+        // stores that as the id. Archived rows are excluded by the entity's query filter, so a
+        // re-import heals nothing that was deliberately archived and adds it back fresh instead.
+        var brandIdsBySlug = await _context.Brands
+            .AsNoTracking()
+            .ToDictionaryAsync(b => b.Slug, b => b.Id, StringComparer.OrdinalIgnoreCase, ct);
 
         // Resolve + validate into a keyed map so a later row for the same node wins (last-wins).
-        var pending = new Dictionary<string, BrandStation>(StringComparer.Ordinal);
+        var pending = new Dictionary<(Guid BrandId, string ExternalId), BrandStation>();
         foreach (var row in parsed.Rows)
         {
             if (string.IsNullOrWhiteSpace(row.BrandId) || string.IsNullOrWhiteSpace(row.Name))
@@ -42,20 +47,20 @@ public sealed class ImportBrandStationsCommandHandler
                 continue;
             }
 
-            if (!brands.Contains(row.BrandId))
+            if (!brandIdsBySlug.TryGetValue(row.BrandId, out var brandId))
             {
                 result.Errors.Add(new BrandStationImportError(row.Line, $"Brand (brand) '{row.BrandId}' does not exist"));
                 continue;
             }
 
-            var id = string.IsNullOrWhiteSpace(row.Id)
+            var externalId = string.IsNullOrWhiteSpace(row.Id)
                 ? BrandStationCoordinates.DeriveId(row.BrandId, row.Lat.Value, row.Lng.Value)
                 : row.Id!;
 
-            pending[id] = new BrandStation
+            pending[(brandId, externalId)] = new BrandStation
             {
-                Id = id,
-                BrandId = row.BrandId,
+                ExternalId = externalId,
+                BrandId = brandId,
                 Name = row.Name,
                 Address = row.Address,
                 Phone = row.Phone,
@@ -68,17 +73,19 @@ public sealed class ImportBrandStationsCommandHandler
 
         if (pending.Count == 0) return result;
 
-        var ids = pending.Keys.ToList();
+        var pairs = pending.Keys.ToList();
+        var brandFilter = pairs.Select(p => p.BrandId).Distinct().ToList();
+        var externalFilter = pairs.Select(p => p.ExternalId).Distinct().ToList();
         var existing = await _context.BrandStations
-            .Where(n => ids.Contains(n.Id))
-            .ToDictionaryAsync(n => n.Id, StringComparer.Ordinal, ct);
+            .Where(n => brandFilter.Contains(n.BrandId) && externalFilter.Contains(n.ExternalId))
+            .ToListAsync(ct);
+        var existingByKey = existing.ToDictionary(n => (n.BrandId, n.ExternalId));
 
         var now = DateTime.UtcNow;
-        foreach (var (id, incoming) in pending)
+        foreach (var (key, incoming) in pending)
         {
-            if (existing.TryGetValue(id, out var entity))
+            if (existingByKey.TryGetValue(key, out var entity))
             {
-                entity.BrandId = incoming.BrandId;
                 entity.Name = incoming.Name;
                 entity.Address = incoming.Address;
                 entity.Phone = incoming.Phone;
