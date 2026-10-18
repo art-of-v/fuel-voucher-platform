@@ -6,7 +6,7 @@ import { useI18n } from "@/lib/i18n";
 import { formatMoney } from "@/lib/money";
 
 /**
- * One row of `GET /api/admin/brands/fuels/{fuelId}/price-history` (#1229).
+ * One row of `GET /api/admin/brand-fuels/{fuelId}/price-history` (#1229).
  *
  * `finalPricePerLiter` is what a customer paid per litre at that instant, so it is the column that
  * answers "what did this cost them". The three numbers behind it - what we paid, what we added and the
@@ -28,7 +28,7 @@ export interface FuelPriceHistoryEntry {
 }
 
 /**
- * The single row of `GET /api/admin/brands/fuels/{fuelId}/price-at?asOf=...` - what one fuel was
+ * The single row of `GET /api/admin/brand-fuels/{fuelId}/price-at?asOf=...` - what one fuel was
  * priced at at a given instant, which a series clamped to the newest 200 rows cannot answer.
  */
 export interface FuelPriceAt {
@@ -85,21 +85,21 @@ export function FuelPriceHistory({ fuelId }: { fuelId: string }) {
   const [asOfDate, setAsOfDate] = useState("");
 
   const log = useQuery<FuelPriceHistoryEntry[]>({
-    queryKey: ["/api/admin/brands/fuels", fuelId, "price-history"],
+    queryKey: [`/api/admin/brand-fuels/${fuelId}`, "price-history"],
     queryFn: () =>
       apiRequest<any, FuelPriceHistoryEntry[]>(
         "GET",
-        `/api/admin/brands/fuels/${fuelId}/price-history?limit=200`,
+        `/api/admin/brand-fuels/${fuelId}/price-history?limit=200`,
       ),
     staleTime: 30_000,
   });
 
   const asOf = useQuery<FuelPriceAt | null>({
-    queryKey: ["/api/admin/brands/fuels", fuelId, "price-at", asOfDate],
+    queryKey: [`/api/admin/brand-fuels/${fuelId}`, "price-at", asOfDate],
     queryFn: () =>
       apiRequest<any, FuelPriceAt | null>(
         "GET",
-        `/api/admin/brands/fuels/${fuelId}/price-at?asOf=${encodeURIComponent(endOfDayUtc(asOfDate))}`,
+        `/api/admin/brand-fuels/${fuelId}/price-at?asOf=${encodeURIComponent(endOfDayUtc(asOfDate))}`,
       ),
     // Only asked for once a date is given: an empty box is not a question.
     enabled: asOfDate !== "",
