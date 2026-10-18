@@ -78,7 +78,7 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
     [Fact]
     public async Task Handle_CarriesTheBrandFuelCode_AndNullWhenThereIsNone()
     {
-        _context.Stations.Add(new Station
+        _context.Brands.Add(new Brand
         {
             Id = "test-okko",
             Name = "OKKO",
@@ -88,8 +88,8 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
             UpdatedAtUtc = DateTime.UtcNow
         });
         _context.FuelTypes.AddRange(
-            new FuelTypeEntity { Id = "test-coded", Name = "А-95", StationId = "test-okko", BrandFuelCode = "A-95", BasePrice = 92.9m, DiscountPrice = 89.06m, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "test-uncoded", Name = "А 92", StationId = "test-okko", BrandFuelCode = null, BasePrice = 85m, DiscountPrice = 84.5m, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
+            new FuelTypeEntity { Id = "test-coded", Name = "А-95", BrandId = "test-okko", BrandFuelCode = "A-95", BasePrice = 92.9m, DiscountPrice = 89.06m, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = "test-uncoded", Name = "А 92", BrandId = "test-okko", BrandFuelCode = null, BasePrice = 85m, DiscountPrice = 84.5m, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
         await _context.SaveChangesAsync();
 
         var providers = await _handler.HandleAsync(new GetBrandsQuery());
