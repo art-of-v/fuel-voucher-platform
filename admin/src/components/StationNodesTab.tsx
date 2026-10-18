@@ -33,7 +33,7 @@ const PAGE_SIZE = 50;
 
 type NodeForm = {
   id: string;
-  stationId: string;
+  brandId: string;
   name: string;
   address: string;
   phone: string;
@@ -44,7 +44,7 @@ type NodeForm = {
 };
 
 const EMPTY_FORM: NodeForm = {
-  id: "", stationId: "", name: "", address: "", phone: "",
+  id: "", brandId: "", name: "", address: "", phone: "",
   city: "", stationType: "", lat: "", lng: "",
 };
 
@@ -53,7 +53,7 @@ function toNodePayload(form: NodeForm): StationNode {
   const lng = form.lng.trim() === "" ? null : parseFloat(form.lng);
   return {
     id: form.id.trim(),
-    stationId: form.stationId.trim(),
+    brandId: form.brandId.trim(),
     name: form.name.trim(),
     address: form.address.trim() || null,
     phone: form.phone.trim() || null,
@@ -67,7 +67,7 @@ function toNodePayload(form: NodeForm): StationNode {
 function nodeToForm(n: StationNode): NodeForm {
   return {
     id: n.id,
-    stationId: n.stationId,
+    brandId: n.brandId,
     name: n.name,
     address: n.address ?? "",
     phone: n.phone ?? "",
@@ -83,7 +83,7 @@ export default function StationNodesTab() {
   const queryClient = useQueryClient();
 
   const [page, setPage] = useState(1);
-  const [stationFilter, setStationFilter] = useState<string>("");
+  const [brandFilter, setStationFilter] = useState<string>("");
 
   const [isCreating, setIsCreating] = useState(false);
   const [form, setForm] = useState<NodeForm>(EMPTY_FORM);
@@ -106,10 +106,10 @@ export default function StationNodesTab() {
   const brandName = (id: string) => brands.find((b) => b.id === id)?.name ?? id;
 
   const { data: paged, isLoading } = useQuery<PagedResult<StationNode>>({
-    queryKey: ["/api/admin/brand-stations", page, stationFilter],
+    queryKey: ["/api/admin/brand-stations", page, brandFilter],
     queryFn: async () => {
       const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
-      if (stationFilter) params.set("stationId", stationFilter);
+      if (brandFilter) params.set("brandId", brandFilter);
       return apiRequest<unknown, PagedResult<StationNode>>("GET", `/api/admin/brand-stations?${params.toString()}`);
     },
   });
@@ -154,7 +154,7 @@ export default function StationNodesTab() {
   const latNum = form.lat.trim() === "" ? NaN : parseFloat(form.lat);
   const lngNum = form.lng.trim() === "" ? NaN : parseFloat(form.lng);
   const coordsValid = isValidCoordinate(latNum, lngNum);
-  const formValid = !!form.stationId.trim() && !!form.name.trim() && coordsValid;
+  const formValid = !!form.brandId.trim() && !!form.name.trim() && coordsValid;
 
   const startCreate = () => {
     setEditingId(null);
@@ -175,8 +175,8 @@ export default function StationNodesTab() {
   };
 
   const autoDeriveId = () => {
-    if (!form.stationId.trim() || !coordsValid) return;
-    setForm((f) => ({ ...f, id: deriveNodeId(f.stationId.trim(), latNum, lngNum) }));
+    if (!form.brandId.trim() || !coordsValid) return;
+    setForm((f) => ({ ...f, id: deriveNodeId(f.brandId.trim(), latNum, lngNum) }));
   };
 
   const submitForm = () => {
@@ -186,7 +186,7 @@ export default function StationNodesTab() {
       updateMutation.mutate({ ...payload, id: editingId });
     } else {
       // Single create needs an explicit id (the server does not derive it here).
-      if (!payload.id) payload.id = deriveNodeId(payload.stationId, latNum, lngNum);
+      if (!payload.id) payload.id = deriveNodeId(payload.brandId, latNum, lngNum);
       createMutation.mutate(payload);
     }
   };
@@ -220,7 +220,7 @@ export default function StationNodesTab() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Select
-            value={stationFilter || "__all__"}
+            value={brandFilter || "__all__"}
             onValueChange={(v) => { setStationFilter(v === "__all__" ? "" : v); setPage(1); }}
           >
             <SelectTrigger className="h-8 w-56">
@@ -326,7 +326,7 @@ export default function StationNodesTab() {
           <div className="flex items-end gap-3 flex-wrap">
             <div className="flex flex-col gap-1">
               <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{t("stationNodes.brand")}</label>
-              <Select value={form.stationId} onValueChange={(v) => setForm((f) => ({ ...f, stationId: v }))}>
+              <Select value={form.brandId} onValueChange={(v) => setForm((f) => ({ ...f, brandId: v }))}>
                 <SelectTrigger className="h-8 w-48"><SelectValue placeholder={t("stationNodes.brand")} /></SelectTrigger>
                 <SelectContent>
                   {brands.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
@@ -372,7 +372,7 @@ export default function StationNodesTab() {
               <Input value={form.id} onChange={(e) => setForm((f) => ({ ...f, id: e.target.value }))} disabled={!!editingId} className="h-8 w-72 font-mono text-xs" placeholder={t("stationNodes.idHint")} />
             </div>
             {!editingId && (
-              <Button variant="ghost" size="sm" className="h-8" onClick={autoDeriveId} disabled={!form.stationId.trim() || !coordsValid} title={t("stationNodes.autoIdHint")}>
+              <Button variant="ghost" size="sm" className="h-8" onClick={autoDeriveId} disabled={!form.brandId.trim() || !coordsValid} title={t("stationNodes.autoIdHint")}>
                 {t("stationNodes.autoId")}
               </Button>
             )}
@@ -426,7 +426,7 @@ export default function StationNodesTab() {
                       <span className="font-medium">{n.name}</span>
                       {n.address && <div className="text-xs text-muted-foreground">{n.address}</div>}
                     </td>
-                    <td className="p-3 text-muted-foreground">{brandName(n.stationId)}</td>
+                    <td className="p-3 text-muted-foreground">{brandName(n.brandId)}</td>
                     <td className="p-3 text-muted-foreground">{n.city ?? "—"}</td>
                     <td className="p-3 text-right tabular-nums text-xs text-muted-foreground whitespace-nowrap">
                       {n.lat != null && n.lng != null ? `${n.lat.toFixed(5)}, ${n.lng.toFixed(5)}` : "—"}

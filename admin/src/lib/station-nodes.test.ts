@@ -28,7 +28,7 @@ describe("station-nodes WGS84 validation", () => {
   });
 });
 
-describe("deriveNodeId — parity with backend {stationId}-{lat:F5}-{lng:F5}", () => {
+describe("deriveNodeId — parity with backend {brandId}-{lat:F5}-{lng:F5}", () => {
   it("formats coordinates to 5 decimals", () => {
     expect(deriveNodeId("wog", 50.4501, 30.5234)).toBe("wog-50.45010-30.52340");
   });

@@ -209,7 +209,7 @@ export default function AdminScreen() {
   const [importSupplierId, setImportSupplierId] = useState<string>("");
   const { data: suppliers } = useQuery({
     queryKey: ['suppliers'],
-    queryFn: () => apiRequest<any, { id: string; name: string; stationId: string | null; isActive: boolean }[]>("GET", "/api/admin/suppliers"),
+    queryFn: () => apiRequest<any, { id: string; name: string; isActive: boolean }[]>("GET", "/api/admin/suppliers"),
   });
   const [isImporting, setIsImporting] = useState(false);
   const [importStatus, setImportStatus] = useState<'idle' | 'processing' | 'completed' | 'error'>('idle');

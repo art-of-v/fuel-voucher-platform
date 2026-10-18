@@ -199,7 +199,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "stationNodes.import": "Import",
     "stationNodes.selectedFile": "Selected file",
     "stationNodes.importHint":
-      "CSV or JSON. Columns: id, stationId, name, address, phone, city, stationType, lat, lng (stationId, name, lat, lng required).",
+      "CSV or JSON. Columns: id, brandId, name, address, phone, city, stationType, lat, lng (brandId, name, lat, lng required).",
     "stationNodes.upload": "Upload",
     "stationNodes.importedAdded": "Added",
     "stationNodes.importedUpdated": "Updated",
@@ -604,7 +604,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // Forms
     "forms.selectStation": "Select Station",
     "forms.selectFuel": "Select Fuel",
-    "forms.stationIdPlaceholder": "Station ID (e.g. okko)",
+    "forms.brandIdPlaceholder": "Station ID (e.g. okko)",
     "forms.stationNamePlaceholder": "Station Name (e.g. OKKO)",
     "forms.logoTextPlaceholder": "Logo Text",
     "forms.fuelIdPlaceholder": "Fuel ID (e.g. a95)",
@@ -1261,7 +1261,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "stationNodes.import": "Імпорт",
     "stationNodes.selectedFile": "Обраний файл",
     "stationNodes.importHint":
-      "CSV або JSON. Колонки: id, stationId, name, address, phone, city, stationType, lat, lng (stationId, name, lat, lng — обовʼязкові).",
+      "CSV або JSON. Колонки: id, brandId, name, address, phone, city, stationType, lat, lng (brandId, name, lat, lng — обовʼязкові).",
     "stationNodes.upload": "Завантажити",
     "stationNodes.importedAdded": "Додано",
     "stationNodes.importedUpdated": "Оновлено",
@@ -1668,7 +1668,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // Forms
     "forms.selectStation": "Оберіть станцію",
     "forms.selectFuel": "Оберіть пальне",
-    "forms.stationIdPlaceholder": "ID Станції (напр. okko)",
+    "forms.brandIdPlaceholder": "ID Станції (напр. okko)",
     "forms.stationNamePlaceholder": "Назва Станції (напр. OKKO)",
     "forms.logoTextPlaceholder": "Текст Логотипу",
     "forms.fuelIdPlaceholder": "ID Пального (напр. a95)",
@@ -2319,7 +2319,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "stationNodes.import": "Import",
     "stationNodes.selectedFile": "Ausgewählte Datei",
     "stationNodes.importHint":
-      "CSV oder JSON. Spalten: id, stationId, name, address, phone, city, stationType, lat, lng (stationId, name, lat, lng erforderlich).",
+      "CSV oder JSON. Spalten: id, brandId, name, address, phone, city, stationType, lat, lng (brandId, name, lat, lng erforderlich).",
     "stationNodes.upload": "Hochladen",
     "stationNodes.importedAdded": "Hinzugefügt",
     "stationNodes.importedUpdated": "Aktualisiert",
@@ -2657,7 +2657,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // Forms
     "forms.selectStation": "Station auswählen",
     "forms.selectFuel": "Kraftstoff auswählen",
-    "forms.stationIdPlaceholder": "Stations-ID (z.B. okko)",
+    "forms.brandIdPlaceholder": "Stations-ID (z.B. okko)",
     "forms.stationNamePlaceholder": "Stationsname (z.B. OKKO)",
     "forms.logoTextPlaceholder": "Logo-Text",
     "forms.fuelIdPlaceholder": "Kraftstoff-ID (z.B. a95)",
@@ -3383,7 +3383,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "stationNodes.import": "Importar",
     "stationNodes.selectedFile": "Archivo seleccionado",
     "stationNodes.importHint":
-      "CSV o JSON. Columnas: id, stationId, name, address, phone, city, stationType, lat, lng (stationId, name, lat, lng obligatorios).",
+      "CSV o JSON. Columnas: id, brandId, name, address, phone, city, stationType, lat, lng (brandId, name, lat, lng obligatorios).",
     "stationNodes.upload": "Subir",
     "stationNodes.importedAdded": "Añadidos",
     "stationNodes.importedUpdated": "Actualizados",
@@ -3719,7 +3719,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // Forms
     "forms.selectStation": "Seleccionar Estación",
     "forms.selectFuel": "Seleccionar Combustible",
-    "forms.stationIdPlaceholder": "ID de Estación (e.g. okko)",
+    "forms.brandIdPlaceholder": "ID de Estación (e.g. okko)",
     "forms.stationNamePlaceholder": "Nombre de Estación (e.g. OKKO)",
     "forms.logoTextPlaceholder": "Texto del Logo",
     "forms.fuelIdPlaceholder": "ID de Combustible (e.g. a95)",
