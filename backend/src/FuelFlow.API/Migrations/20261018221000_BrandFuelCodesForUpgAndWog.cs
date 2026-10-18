@@ -38,6 +38,14 @@ namespace FuelFlow.API.Migrations;
 /// KLO is absent by the same reasoning: it has a stations fetcher but no published fuel price list,
 /// so nothing in this repository knows its tokens. Its five fuels stay uncoded.
 /// </para>
+///
+/// <para>
+/// <b>The brand is named by its slug, resolved in the statement.</b> This migration sorts after
+/// 20261018191320_CatalogueBrandsBecomeUuid, which made <c>fuel_types.brand_id</c> a uuid; the two
+/// predicates below used to spell <c>'upg'</c> and <c>'wog'</c> directly, which is now an invalid
+/// uuid literal and aborts the deploy. A brand that is not in the catalogue matches nothing, which
+/// is the right answer for a backfill.
+/// </para>
 /// </remarks>
 [DbContext(typeof(ApplicationDbContext))]
 [Migration("20261018221000_BrandFuelCodesForUpgAndWog")]
@@ -65,14 +73,14 @@ public partial class BrandFuelCodesForUpgAndWog : Migration
             $"""
              UPDATE fuel_types
              SET brand_fuel_code = btrim(name)
-             WHERE brand_id = 'upg'
+             WHERE brand_id = (SELECT id FROM brands WHERE slug = 'upg')
                AND brand_fuel_code IS NULL
                AND NOT is_deleted
                AND btrim(name) = ANY (ARRAY[{Quoted(UpgTokens)}]);
 
              UPDATE fuel_types
              SET brand_fuel_code = btrim(name)
-             WHERE brand_id = 'wog'
+             WHERE brand_id = (SELECT id FROM brands WHERE slug = 'wog')
                AND brand_fuel_code IS NULL
                AND NOT is_deleted
                AND btrim(name) = ANY (ARRAY[{Quoted(WogTokens)}]);
@@ -85,13 +93,13 @@ public partial class BrandFuelCodesForUpgAndWog : Migration
             $"""
              UPDATE fuel_types
              SET brand_fuel_code = NULL
-             WHERE brand_id = 'upg'
+             WHERE brand_id = (SELECT id FROM brands WHERE slug = 'upg')
                AND brand_fuel_code IS NOT NULL
                AND brand_fuel_code = ANY (ARRAY[{Quoted(UpgTokens)}]);
 
              UPDATE fuel_types
              SET brand_fuel_code = NULL
-             WHERE brand_id = 'wog'
+             WHERE brand_id = (SELECT id FROM brands WHERE slug = 'wog')
                AND brand_fuel_code IS NOT NULL
                AND brand_fuel_code = ANY (ARRAY[{Quoted(WogTokens)}]);
              """);

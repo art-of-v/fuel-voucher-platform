@@ -224,14 +224,14 @@ public sealed class FuelTypeBrandFuelCodeTests : IClassFixture<TestDatabaseFixtu
         var now = DateTime.UtcNow;
 
         context.FuelTypes.AddRange(
-            new FuelTypeEntity { Id = "wog-dp-e5", Name = "ДП Євро5", BrandId = "wog", BasePrice = 103.5m, DiscountPrice = 100m, CreatedAtUtc = now, UpdatedAtUtc = now },
-            new FuelTypeEntity { Id = "wog-95-e5-e10", Name = "95 Євро5-Е10", BrandId = "wog", BasePrice = 92.9m, DiscountPrice = 90m, CreatedAtUtc = now, UpdatedAtUtc = now });
+            new FuelTypeEntity { Id = "wog-dp-e5", Name = "ДП Євро5", BrandId = BrandIds.Wog, BasePrice = 103.5m, DiscountPrice = 100m, CreatedAtUtc = now, UpdatedAtUtc = now },
+            new FuelTypeEntity { Id = "wog-95-e5-e10", Name = "95 Євро5-Е10", BrandId = BrandIds.Wog, BasePrice = 92.9m, DiscountPrice = 90m, CreatedAtUtc = now, UpdatedAtUtc = now });
         await context.SaveChangesAsync();
 
         await context.Database.ExecuteSqlRawAsync(
-            """
+            $"""
             UPDATE fuel_types SET brand_fuel_code = btrim(name)
-            WHERE brand_id = 'wog' AND brand_fuel_code IS NULL AND NOT is_deleted
+            WHERE brand_id = '{BrandIds.Wog}' AND brand_fuel_code IS NULL AND NOT is_deleted
               AND btrim(name) IN ('ДП Євро5', 'ДП Mustang+', '95 Євро5-Е10', '95 Mustang Євро5-Е10', '100 Mustang Євро5-Е0', 'ГАЗ', 'AdBlue')
             """);
 

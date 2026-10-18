@@ -31,8 +31,8 @@ public sealed class ImportUpgWogPricesTests : IDisposable
 
         _context = new ApplicationDbContext(options, TestQrCipher.Instance);
         _context.Brands.AddRange(
-            new Brand { Id = "upg", Name = "UPG", Color = "#06b6d4", LogoText = "UPG" },
-            new Brand { Id = "wog", Name = "WOG", Color = "#000000", LogoText = "WOG" });
+            new Brand { Id = BrandIds.Upg, Slug = "upg", Name = "UPG", Color = "#06b6d4", LogoText = "UPG" },
+            new Brand { Id = BrandIds.Wog, Slug = "wog", Name = "WOG", Color = "#000000", LogoText = "WOG" });
     }
 
     public void Dispose()
@@ -41,7 +41,7 @@ public sealed class ImportUpgWogPricesTests : IDisposable
         _context.Dispose();
     }
 
-    private ImportUpgWogPricesCommandHandler Handler() => new(_context, new OfferPriceRecorder(_context));
+    private ImportUpgWogPricesCommandHandler Handler() => new(_context, new OfferPriceRecorder(_context), new BrandSlugResolver(_context));
 
     private static string Sheet(params (string Code, decimal Price)[] rows)
     {
@@ -57,7 +57,7 @@ public sealed class ImportUpgWogPricesTests : IDisposable
         return sb.ToString();
     }
 
-    private FuelTypeEntity SeedFuel(string id, string brandId, string name, string? code, decimal cost, decimal profit, decimal pump)
+    private FuelTypeEntity SeedFuel(string id, Guid brandId, string name, string? code, decimal cost, decimal profit, decimal pump)
     {
         var fuel = new FuelTypeEntity
         {
@@ -168,8 +168,8 @@ public sealed class ImportUpgWogPricesTests : IDisposable
         // UPG publishes A-95 at 88.90 and upg95 at 91.90. These are two products, not one row typed
         // twice, and a name-based or category-based fallback would hand both prices to whichever one
         // the query returned first.
-        SeedFuel("upg-a95", "upg", "A-95", "A-95", cost: 83.90m, profit: 5m, pump: 89.00m);
-        SeedFuel("upg-95", "upg", "upg95", "upg95", cost: 86.90m, profit: 5m, pump: 92.00m);
+        SeedFuel("upg-a95", BrandIds.Upg, "A-95", "A-95", cost: 83.90m, profit: 5m, pump: 89.00m);
+        SeedFuel("upg-95", BrandIds.Upg, "upg95", "upg95", cost: 86.90m, profit: 5m, pump: 92.00m);
         await _context.SaveChangesAsync();
 
         var result = await Handler().HandleAsync(
@@ -187,7 +187,7 @@ public sealed class ImportUpgWogPricesTests : IDisposable
     [Fact]
     public async Task AnExistingFuelKeepsItsNameAndMargin()
     {
-        var fuel = SeedFuel("wog-dp", "wog", "ДП Євро5", "ДП Євро5", cost: 93.80m, profit: 5m, pump: 103.50m);
+        var fuel = SeedFuel("wog-dp", BrandIds.Wog, "ДП Євро5", "ДП Євро5", cost: 93.80m, profit: 5m, pump: 103.50m);
         await _context.SaveChangesAsync();
 
         await Handler().HandleAsync(
@@ -204,7 +204,7 @@ public sealed class ImportUpgWogPricesTests : IDisposable
     [Fact]
     public async Task AnUnchangedSheet_WritesNothingAtAll()
     {
-        SeedFuel("upg-95", "upg", "upg95", "upg95", cost: 86.90m, profit: 5m, pump: 91.90m);
+        SeedFuel("upg-95", BrandIds.Upg, "upg95", "upg95", cost: 86.90m, profit: 5m, pump: 91.90m);
         await _context.SaveChangesAsync();
 
         await Handler().HandleAsync(
@@ -228,7 +228,7 @@ public sealed class ImportUpgWogPricesTests : IDisposable
     [Fact]
     public async Task APumpThatWouldSellBelowCost_IsSkippedUnlessTheFuelOptsIn()
     {
-        SeedFuel("upg-95", "upg", "upg95", "upg95", cost: 86.90m, profit: 5m, pump: 91.90m);
+        SeedFuel("upg-95", BrandIds.Upg, "upg95", "upg95", cost: 86.90m, profit: 5m, pump: 91.90m);
         await _context.SaveChangesAsync();
 
         // A brand crashing its own price must not be able to take the fuel below what we pay.
@@ -262,13 +262,13 @@ public sealed class ImportUpgWogPricesTests : IDisposable
 
         result.Created.Should().HaveCount(7);
         result.DryRun.Should().BeTrue();
-        (await _context.FuelTypes.CountAsync(f => f.BrandId == "upg")).Should().Be(0);
+        (await _context.FuelTypes.CountAsync(f => f.BrandId == BrandIds.Upg)).Should().Be(0);
     }
 
     [Fact]
     public async Task OneBrandIsNeverPricedFromAnothersSheet()
     {
-        SeedFuel("wog-dp", "wog", "ДП Євро5", "ДП Євро5", cost: 93.80m, profit: 5m, pump: 103.50m);
+        SeedFuel("wog-dp", BrandIds.Wog, "ДП Євро5", "ДП Євро5", cost: 93.80m, profit: 5m, pump: 103.50m);
         await _context.SaveChangesAsync();
 
         // The UPG sheet has no `ДП Євро5`, so WOG must come out untouched rather than half-matched.
@@ -276,9 +276,9 @@ public sealed class ImportUpgWogPricesTests : IDisposable
             new ImportUpgWogPricesCommand(Sheet(UpgSheet), "upg", DryRun: false), Guid.Empty, null);
 
         _context.ChangeTracker.Clear();
-        var wog = await _context.FuelTypes.SingleAsync(f => f.BrandId == "wog");
+        var wog = await _context.FuelTypes.SingleAsync(f => f.BrandId == BrandIds.Wog);
         wog.BasePrice.Should().Be(103.50m);
-        (await _context.FuelTypes.CountAsync(f => f.BrandId == "upg")).Should().Be(7);
+        (await _context.FuelTypes.CountAsync(f => f.BrandId == BrandIds.Upg)).Should().Be(7);
     }
 
     [Fact]

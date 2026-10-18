@@ -71,13 +71,16 @@ public sealed class ImportUpgWogPricesCommandHandler
 
     private readonly ApplicationDbContext _context;
     private readonly OfferPriceRecorder _priceRecorder;
+    private readonly BrandSlugResolver _brands;
 
     public ImportUpgWogPricesCommandHandler(
         ApplicationDbContext context,
-        OfferPriceRecorder priceRecorder)
+        OfferPriceRecorder priceRecorder,
+        BrandSlugResolver brands)
     {
         _context = context;
         _priceRecorder = priceRecorder;
+        _brands = brands;
     }
 
     public async Task<UpgWogPriceImportResult> HandleAsync(
@@ -86,14 +89,28 @@ public sealed class ImportUpgWogPricesCommandHandler
         string? actingUserName,
         CancellationToken ct = default)
     {
-        var brandId = command.BrandId.Trim().ToLowerInvariant();
-        if (!SupportedBrandIds.Contains(brandId))
+        // The sheet names the network by its code, which is still how an operator and a supplier file
+        // spell it; the row is keyed by a uuid since planning D-21. Resolved once here so the rest of
+        // the import speaks the database's language.
+        var brandSlug = command.BrandId.Trim().ToLowerInvariant();
+        if (!SupportedBrandIds.Contains(brandSlug))
         {
             return new UpgWogPriceImportResult(
                 [], [], [],
                 [new OkkoPriceSheetError(0, $"Unsupported brand '{command.BrandId}'")],
                 command.DryRun);
         }
+
+        var brandId = await _brands.ResolveAsync(brandSlug, ct);
+        if (brandId is null)
+        {
+            return new UpgWogPriceImportResult(
+                [], [], [],
+                [new OkkoPriceSheetError(0, $"Brand '{brandSlug}' is not in the catalogue")],
+                command.DryRun);
+        }
+
+        var brandKey = brandId.Value;
 
         var parsed = OkkoPriceSheetParser.Parse(command.Content);
         if (parsed.Errors.Count > 0)
@@ -106,7 +123,7 @@ public sealed class ImportUpgWogPricesCommandHandler
         // category-based fallback is exactly what would hand both prices to whichever row sorted first.
         var byCode = (await _context.FuelTypes
                 .AsTracking()
-                .Where(f => f.BrandId == brandId && !f.IsDeleted)
+                .Where(f => f.BrandId == brandKey && !f.IsDeleted)
                 .ToListAsync(ct))
             .Where(f => FuelTypeEntity.NormaliseBrandFuelCode(f.BrandFuelCode) is not null)
             .GroupBy(f => FuelTypeEntity.NormaliseBrandFuelCode(f.BrandFuelCode)!, StringComparer.Ordinal)
@@ -136,7 +153,7 @@ public sealed class ImportUpgWogPricesCommandHandler
 
             if (!byCode.TryGetValue(code, out var fuel))
             {
-                var made = await CreateAsync(brandId, code, row.PricePerLiter, actor, now, command.DryRun, ct);
+                var made = await CreateAsync(brandKey, code, row.PricePerLiter, actor, now, command.DryRun, ct);
                 created.Add(made);
                 continue;
             }
@@ -223,7 +240,7 @@ public sealed class ImportUpgWogPricesCommandHandler
     /// carries the pump and no supplier cost, which is the honest description of what we know.
     /// </remarks>
     private async Task<UpgWogFuelCreated> CreateAsync(
-        string brandId,
+        Guid brandId,
         string code,
         decimal pump,
         Guid? actor,
@@ -285,6 +302,6 @@ public sealed class ImportUpgWogPricesCommandHandler
             await _context.SaveChangesAsync(ct);
         }
 
-        return new UpgWogFuelCreated(brandId, code, code, Math.Round(pump, 2, MidpointRounding.AwayFromZero));
+        return new UpgWogFuelCreated(brandId.ToString(), code, code, Math.Round(pump, 2, MidpointRounding.AwayFromZero));
     }
 }
