@@ -350,6 +350,10 @@ private readonly GetBrandsQueryHandler _getAll;
             // round to 2dp, never store kopecks-as-integer (that once made the app show 8492.00).
             BasePrice = Math.Round(baseUahPerLiter, 2, MidpointRounding.AwayFromZero),
             DiscountPrice = Math.Round(finalPerLiter, 2, MidpointRounding.AwayFromZero),
+            // The margin is born on the fuel. It used to be written only to the offer below, because the
+            // offer was where every reader found it; now the fuel is where every reader looks, and a fuel
+            // created without one prices at cost - silently, and correctly by the formula.
+            MarginUahPerLiter = request.MarginUahPerLiter,
             AllowBelowCost = request.AllowBelowCost,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
