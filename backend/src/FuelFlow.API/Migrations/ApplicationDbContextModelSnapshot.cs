@@ -3738,6 +3738,10 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
 
+                    b.Property<decimal?>("MarginUahPerLiter")
+                        .HasColumnType("numeric")
+                        .HasColumnName("margin_uah_per_liter");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text")

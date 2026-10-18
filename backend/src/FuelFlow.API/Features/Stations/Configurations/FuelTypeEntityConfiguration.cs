@@ -37,6 +37,11 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
         builder.Property(e => e.BrandFuelCode)
             .HasColumnName("brand_fuel_code")
             .HasColumnType("text");
+        // Snake case like every other column here. Left unmapped, EF would scaffold
+        // "MarginUahPerLiter" — a second spelling of one column in the same table, invisible until a
+        // hand-written migration or a query names the other one.
+        builder.Property(e => e.MarginUahPerLiter)
+            .HasColumnName("margin_uah_per_liter");
 
         builder.Property(e => e.BasePrice)
             .HasColumnName("base_price")

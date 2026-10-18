@@ -580,6 +580,16 @@ private readonly GetBrandsQueryHandler _getAll;
         // volume only carries the frozen package total, which is a function of litres - and litres
         // never change when the price does, so this recomputes cleanly.
         offer.SupplierPricePerLiter = request.SupplierPricePerLiter;
+        // The margin's home is the fuel, and it is written there first. A margin is a fact about a
+        // fuel rather than about a sale of it — the same diesel carries the same margin whether we
+        // sell two litres or a hundred — so on the offer it was per (brand × fuel × pool), which meant
+        // two pools of one fuel could quote two prices.
+        fuel.MarginUahPerLiter = request.MarginUahPerLiter;
+        // ...and it is mirrored onto the offer in the same breath, because the storefront, checkout,
+        // the dashboard and the renewal guard all read it from there and none of them changes in this
+        // step. ONE writer sets both, so the copy cannot drift; dropping the offer's column is the
+        // following migration (planning #360), and until then this line is the only thing keeping the
+        // two in agreement.
         offer.MarginUahPerLiter = request.MarginUahPerLiter;
         offer.MarginPercent = request.MarginPercent;
         offer.PumpPricePerLiter = request.PumpPricePerLiter;
