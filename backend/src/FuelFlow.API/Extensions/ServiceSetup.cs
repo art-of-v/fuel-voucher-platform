@@ -78,6 +78,7 @@ using FuelFlow.Features.Vouchers.RestoreVoucher;
 using FuelFlow.Features.Vouchers.UnarchiveVoucher;
 using FuelFlow.Features.Vouchers.UpdateVoucher;
 using FuelFlow.Features.Settings;
+using FuelFlow.Features.Settlement;
 using FuelFlow.Middleware;
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.SharedKernel.Notifications.Email;
@@ -152,6 +153,7 @@ internal static class ServiceSetup
         AddNotificationServices(services);
         AddSupportServices(services, config);
         AddFeedbackServices(services, config);
+        AddSettlementServices(services, config);
         AddBackgroundJobServices(services);
         AddOkkoPriceServices(services, config);
         AddUpdateServices(services);
@@ -458,6 +460,26 @@ services.AddScoped<TermQuoteQueryHandler>();
         // Scoped rather than singleton: the router writes through the request-scoped DbContext.
         services.AddScoped<FeedbackUpdateRouter>();
         services.AddScoped<FeedbackTriageService>();
+    }
+
+    /// <summary>
+    /// The settlement channel. Registered unconditionally and gated at runtime by
+    /// <see cref="TelegramSettlementOptions.IsConfigured"/> rather than by not registering at all:
+    /// an endpoint that vanishes when a setting is missing is an endpoint that 404s instead of
+    /// answering, and Telegram's response to a 404 is to retry forever. It stays registered, answers,
+    /// and declines to write.
+    /// <para>
+    /// No <c>HttpClient</c> here yet. The feedback bot sends; this one receives, so it has nothing to
+    /// call until it needs to acknowledge or reply. Adding an unused client with a base address would
+    /// be a dependency that does nothing until someone wires it up.
+    /// </para>
+    /// </summary>
+    private static void AddSettlementServices(IServiceCollection services, IConfiguration config)
+    {
+        services.Configure<TelegramSettlementOptions>(
+            config.GetSection(TelegramSettlementOptions.SectionName));
+
+        services.AddScoped<SettlementUpdateHandler>();
     }
 
     private static void AddBackgroundJobServices(IServiceCollection services)

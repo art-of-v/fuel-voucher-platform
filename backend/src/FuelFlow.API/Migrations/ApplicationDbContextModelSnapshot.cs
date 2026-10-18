@@ -1743,6 +1743,92 @@ namespace FuelFlow.API.Migrations
                     b.ToTable("app_settings", (string)null);
                 });
 
+            modelBuilder.Entity("FuelFlow.Features.Settlement.SharedModels.SettlementMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal?>("AmountUah")
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("amount_uah");
+
+                    b.Property<long>("ChatId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("chat_id");
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("code");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<long>("MessageId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("message_id");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("outcome");
+
+                    b.Property<Guid?>("PaymentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("payment_id");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("rejection_reason");
+
+                    b.Property<Guid?>("ResolvedUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("resolved_user_id");
+
+                    b.Property<DateTime>("SentAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at_utc");
+
+                    b.Property<string>("TelegramDisplayName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("telegram_display_name");
+
+                    b.Property<long>("TelegramUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("telegram_user_id");
+
+                    b.Property<string>("Text")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SentAtUtc")
+                        .HasDatabaseName("ix_settlement_messages_refusals")
+                        .HasFilter("outcome <> 'accepted'");
+
+                    b.HasIndex("ChatId", "MessageId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_settlement_messages_chat_message");
+
+                    b.HasIndex("TelegramUserId", "SentAtUtc")
+                        .HasDatabaseName("ix_settlement_messages_sender_time");
+
+                    b.ToTable("settlement_messages", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_settlement_messages_amount_positive", "amount_uah IS NULL OR amount_uah > 0");
+
+                            t.HasCheckConstraint("ck_settlement_messages_outcome", "outcome IN ('accepted','unallocated','unparseable','rejected_sender','rejected_chat')");
+                        });
+                });
+
             modelBuilder.Entity("FuelFlow.Features.Support.SharedModels.SupportMessage", b =>
                 {
                     b.Property<Guid>("Id")
