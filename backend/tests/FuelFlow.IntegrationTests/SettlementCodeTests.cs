@@ -271,6 +271,30 @@ public class SettlementCodeTests : WebApplicationFactory<Program>, IClassFixture
         }
     }
 
+    [Fact]
+    public async Task The_column_is_not_null_in_the_database()
+    {
+        // The EF model deliberately does NOT declare this property required - see
+        // UserConfiguration - so that EF's InMemory provider stops enforcing a database invariant on
+        // the client, where no trigger exists to satisfy it. The column really is NOT NULL, and this
+        // is the test that holds that claim: without it, the model's silence would quietly become
+        // the schema's reality on the next hand-written migration.
+        using var context = NewContext();
+
+        var isNullable = await context.Database
+            .SqlQueryRaw<string>(
+                """
+                SELECT is_nullable
+                FROM information_schema.columns
+                WHERE table_name = 'users'
+                  AND column_name = 'settlement_code'
+                """)
+            .ToListAsync();
+
+        isNullable.Should().ContainSingle()
+            .Which.Should().Be("NO", "a NULL settlement_code means a customer nobody can pay");
+    }
+
     // --------------------------------------------------------------------------------------------
     // Staff-only visibility
     // --------------------------------------------------------------------------------------------

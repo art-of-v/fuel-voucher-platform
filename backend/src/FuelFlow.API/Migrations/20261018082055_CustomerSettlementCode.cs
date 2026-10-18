@@ -22,8 +22,8 @@ namespace FuelFlow.API.Migrations
             // The alphabet omits 0, O, 1, I and L. That is the whole point of the column: the code is
             // read off a screen and typed by hand into a chat, and those pairs are the ones people
             // misread. A mistyped code does not fail - it credits money to the wrong customer, or
-            // fails to match and leaves the payment stranded for an operator. 31^8 is still ~8.5e11
-            // values, so legibility costs nothing that matters at this volume.
+            // leaves the payment stranded for an operator. 31^8 is still ~8.5e11 values, so legibility
+            // costs nothing that matters at this volume.
             //
             // Not sequential for the same reason: A1E00001 / A1E00002 differ by one character, which
             // is exactly the mistake a hand-typed code can make.

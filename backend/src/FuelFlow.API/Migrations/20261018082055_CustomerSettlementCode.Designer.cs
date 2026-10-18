@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FuelFlow.API.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20261018080121_CustomerSettlementCode")]
+    [Migration("20261018082055_CustomerSettlementCode")]
     partial class CustomerSettlementCode
     {
         /// <inheritdoc />
@@ -4485,7 +4485,7 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("role_id");
 
                     b.Property<string>("SettlementCode")
-                        .IsRequired()
+                        .ValueGeneratedOnAdd()
                         .HasMaxLength(8)
                         .HasColumnType("character varying(8)")
                         .HasColumnName("settlement_code");
