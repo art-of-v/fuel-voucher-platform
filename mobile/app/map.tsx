@@ -422,7 +422,10 @@ export default function MapScreen() {
   // A route needs a real position: a node without coordinates used to deep-link to 0,0 — Null
   // Island in the Atlantic — so the button reports that instead of routing nowhere.
   const routeDestination = React.useMemo(
-    () => (selectedStation ? routeTarget((selectedStation as StationNode).lat, (selectedStation as StationNode).lng) : null),
+    () =>
+      selectedStation
+        ? routeTarget((selectedStation as StationNode).lat, (selectedStation as StationNode).lng)
+        : null,
     [selectedStation],
   );
 
@@ -1075,7 +1078,7 @@ export default function MapScreen() {
                       }}
                       numberOfLines={1}
                     >
-                  {formatShortAddress(selectedStation as StationNode) || t('map.country')}
+                      {formatShortAddress(selectedStation as StationNode) || t('map.country')}
                     </Text>
                   </View>
                 </View>
@@ -1139,7 +1142,7 @@ export default function MapScreen() {
                   {t('map.address')}
                 </Text>
                 <Text style={[styles.detailText, { color: tokens.colors.text.secondary }]}>
-                    {formatShortAddress(selectedStation as StationNode) || t('map.noAddress')}
+                  {formatShortAddress(selectedStation as StationNode) || t('map.noAddress')}
                 </Text>
               </View>
 
