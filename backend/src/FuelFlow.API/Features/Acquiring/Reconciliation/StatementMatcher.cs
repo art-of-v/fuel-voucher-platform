@@ -87,13 +87,18 @@ public static class StatementMatcher
 
             if (invoiceId is not null && refundsByInvoice.TryGetValue(invoiceId, out var refund))
             {
-                var reference = referenceByOrderId.TryGetValue(refund.OrderId, out var known)
+                // A refund reverses a capture, and a capture always has an order. Said here so the
+                // null-forgiving reads below are a stated invariant rather than a silenced null: an
+                // orderless refund would mean the domain broke, and a reconciliation row with a null
+                // order id would hide it behind a tidy "Reversal of refund …" message.
+                var refundOrderId = refund.OrderId!.Value;
+                var reference = referenceByOrderId.TryGetValue(refundOrderId, out var known)
                     ? known
-                    : refund.OrderId.ToString();
+                    : refundOrderId.ToString();
 
                 rows.Add(new StatementMatchRow(
                     entry.StatementId, StatementMatchStatus.RefundMatch, invoiceId, entry.Reference,
-                    entry.AmountKopecks, amount, refund.OrderId, refund.AmountKopecks / 100m,
+                    entry.AmountKopecks, amount, refundOrderId, refund.AmountKopecks / 100m,
                     refund.ProviderInvoiceId, null, entry.AcquirerCreatedAtUtc,
                     $"Reversal of refund {refund.Id:N} on {reference}"));
                 continue;

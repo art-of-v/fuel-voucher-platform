@@ -2677,7 +2677,7 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("merchant");
 
-                    b.Property<Guid>("OrderId")
+                    b.Property<Guid?>("OrderId")
                         .HasColumnType("uuid")
                         .HasColumnName("order_id");
 
@@ -2723,6 +2723,10 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at_utc");
 
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
                     b.Property<Guid?>("WebhookEventId")
                         .HasColumnType("uuid")
                         .HasColumnName("webhook_event_id");
@@ -2735,6 +2739,10 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CreatedAtUtc")
+                        .HasDatabaseName("ix_payments_unallocated")
+                        .HasFilter("order_id IS NULL AND status = 'Succeeded'");
+
                     b.HasIndex("CreatedByUserId");
 
                     b.HasIndex("OrderId")
@@ -2744,6 +2752,8 @@ namespace FuelFlow.API.Migrations
 
                     b.HasIndex("ParentPaymentId")
                         .HasDatabaseName("ix_payments_parent_payment_id");
+
+                    b.HasIndex("UserId");
 
                     b.HasIndex("WebhookEventId")
                         .HasDatabaseName("ix_payments_webhook_event_id");
@@ -2772,7 +2782,7 @@ namespace FuelFlow.API.Migrations
 
                             t.HasCheckConstraint("ck_payments_provider_length", "length(provider) > 0 AND length(provider) <= 20");
 
-                            t.HasCheckConstraint("ck_payments_refund_audit_only_on_refund", "kind = 'Refund' OR (created_by_user_id IS NULL AND created_by_user_name IS NULL AND NOT is_automatic AND error_message IS NULL)");
+                            t.HasCheckConstraint("ck_payments_refund_audit_only_on_refund", "kind = 'Refund' OR provider <> 'monobank' OR (created_by_user_id IS NULL AND created_by_user_name IS NULL AND NOT is_automatic AND error_message IS NULL)");
 
                             t.HasCheckConstraint("ck_payments_refund_shape", "(kind = 'Refund' AND parent_payment_id IS NOT NULL) OR (kind = 'Capture')");
 
@@ -5039,15 +5049,21 @@ namespace FuelFlow.API.Migrations
                     b.HasOne("FuelFlow.Features.Orders.SharedModels.Order", "Order")
                         .WithMany()
                         .HasForeignKey("OrderId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("FuelFlow.Payments.SharedModels.Payment", null)
                         .WithMany()
                         .HasForeignKey("ParentPaymentId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("FuelFlow.SharedKernel.Domain.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Order");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.FuelOfferPrice", b =>

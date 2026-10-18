@@ -26,9 +26,13 @@ internal sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
 
         builder.Property(e => e.Id).HasColumnName("id");
 
+        // Nullable: money can arrive before the order it is for. See Payment.OrderId for why a NULL here is
+        // an advance rather than a defect - and for why it must never reach a sales account.
         builder.Property(e => e.OrderId)
-            .HasColumnName("order_id")
-            .IsRequired();
+            .HasColumnName("order_id");
+
+        builder.Property(e => e.UserId)
+            .HasColumnName("user_id");
 
         builder.Property(e => e.Kind)
             .HasColumnName("kind")
@@ -153,6 +157,22 @@ builder.Property(e => e.ProviderAmountKopecks)
             .HasForeignKey(e => e.OrderId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // Who the money is for, when we know. Restrict for the same reason as the order FK: a
+        // customer's own payment ledger has to keep naming a real customer, so hard-deleting one must
+        // fail loudly rather than leave balances pointing at nobody.
+        builder.HasOne(e => e.User)
+            .WithMany()
+            .HasForeignKey(e => e.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // The operator's worklist. An unallocated payment is money we hold that belongs to nobody yet,
+        // and nothing else in the system goes looking for it: it has no order, so no order report, no
+        // reconciliation and no lifecycle job will ever surface it. Without this index it is found by
+        // remembering to look, which is how held money goes missing for a month.
+        builder.HasIndex(e => e.CreatedAtUtc)
+            .HasDatabaseName("ix_payments_unallocated")
+            .HasFilter("order_id IS NULL AND status = 'Succeeded'");
+
         builder.HasOne<Payment>()
             .WithMany()
             .HasForeignKey(e => e.ParentPaymentId)
@@ -219,9 +239,16 @@ builder.Property(e => e.ProviderAmountKopecks)
             // "who authorised this?" and gets two answers. is_automatic is included in the test
             // because false is its default: a capture must assert its value is the default, not
             // merely leave it unset.
+            //
+            // Scoped to the acquirer, and that scoping is the point. An acquirer-driven capture is
+            // evidence the acquirer produced and no human touched, so "carries an approver" is
+            // genuinely wrong for it. A DECLARED capture is the opposite case: a person stated that
+            // money arrived, so an author is required and a row without one is unattributable money.
+            // The original constraint would have refused exactly the payments that most need an audit
+            // trail, and would have said nothing useful about the ones it was written for.
             t.HasCheckConstraint("ck_payments_refund_audit_only_on_refund",
-                "kind = 'Refund' OR (created_by_user_id IS NULL AND created_by_user_name IS NULL " +
-                "AND NOT is_automatic AND error_message IS NULL)");
+                "kind = 'Refund' OR provider <> 'monobank' OR (created_by_user_id IS NULL " +
+                "AND created_by_user_name IS NULL AND NOT is_automatic AND error_message IS NULL)");
 
             // Deliberately NO constraint pairing created_by_user_name with created_by_user_id. An
             // automatic refund has no approver at all, and a webhook-driven one carries a name the
