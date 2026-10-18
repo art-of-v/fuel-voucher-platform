@@ -1,6 +1,5 @@
 using FuelFlow.Features.Pricing;
 using FluentAssertions;
-using FuelFlow.Features.Brands.CreateFuelType;
 using FuelFlow.Features.Brands.CreateBrand;
 using FuelFlow.Features.Brands.DeleteFuelType;
 using FuelFlow.Features.Brands.DeleteBrand;

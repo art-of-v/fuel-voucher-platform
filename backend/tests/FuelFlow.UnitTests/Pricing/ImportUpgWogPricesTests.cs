@@ -89,10 +89,9 @@ public sealed class ImportUpgWogPricesTests : IDisposable
 
         foreach (var liters in new[] { 10, 20, 50 })
         {
-            _context.FuelOfferVolumes.Add(new FuelOfferVolume
+            _context.FuelNominals.Add(new FuelNominal
             {
-                Id = $"{id}-{liters}",
-                OfferId = offer.Id,
+                FuelTypeId = offer.FuelTypeId,
                 Liters = liters,
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow
@@ -158,8 +157,8 @@ public sealed class ImportUpgWogPricesTests : IDisposable
         offer.PumpPricePerLiter.Should().Be(99.90m);
         offer.SupplierPricePerLiter.Should().BeNull();
 
-        var liters = await _context.FuelOfferVolumes
-            .Where(v => v.OfferId == offer.Id).Select(v => v.Liters).OrderBy(l => l).ToListAsync();
+        var liters = await _context.FuelNominals
+            .Where(v => v.FuelTypeId == offer.FuelTypeId).Select(v => v.Liters).OrderBy(l => l).ToListAsync();
         liters.Should().BeEquivalentTo([10, 20, 50]);
     }
 

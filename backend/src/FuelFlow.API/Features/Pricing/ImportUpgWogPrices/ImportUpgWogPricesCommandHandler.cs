@@ -174,9 +174,12 @@ public sealed class ImportUpgWogPricesCommandHandler
                 }
 
                 changedAny |= changed;
-                volumesRepriced += await _context.FuelOfferVolumes
-                    .Where(v => v.OfferId == offer.Id && !v.IsDeleted)
-                    .CountAsync(ct);
+        // A nominal has no stored price, so a pump change rewrites nothing per size - it moves
+        // the offer's rate and every size follows. The count the report gives back is the
+        // fuel's nominal count, because the sizes belong to the fuel rather than to one
+        // pool's offer.
+        volumesRepriced += await _context.FuelNominals
+            .CountAsync(n => n.FuelTypeId == offer.FuelTypeId, ct);
             }
 
             // The headline figures follow the offers, exactly as the operator write path does, and only
@@ -269,18 +272,16 @@ public sealed class ImportUpgWogPricesCommandHandler
             // rather than at the first time an operator edited it.
             await _priceRecorder.RecordAsync(offer, OfferPriceReasons.PumpImport, actor, now, ct);
 
-            foreach (var liters in DefaultNominals)
+        foreach (var liters in DefaultNominals)
+        {
+            _context.FuelNominals.Add(new FuelNominal
             {
-                _context.FuelOfferVolumes.Add(new FuelOfferVolume
-                {
-                    Id = Guid.CreateVersion7().ToString(),
-                    OfferId = offer.Id,
-                    Liters = liters,
-                    CreatedAtUtc = now,
-                    UpdatedAtUtc = now
-                });
-            }
-
+                FuelTypeId = offer.FuelTypeId,
+                Liters = liters,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now
+            });
+        }
             await _context.SaveChangesAsync(ct);
         }
 
