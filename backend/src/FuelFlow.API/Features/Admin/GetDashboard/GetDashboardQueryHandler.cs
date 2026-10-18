@@ -56,8 +56,11 @@ public sealed class GetDashboardQueryHandler
         var fpLookup = await (
             from v in _context.FuelOfferVolumes.AsNoTracking()
             join o in _context.FuelOffers.AsNoTracking() on v.OfferId equals o.Id
+            // The margin is the fuel's, so the fuel joins too. Handing back the offer entity would load
+            // every offer column for every volume in the catalogue to answer one question.
+            join f in _context.FuelTypes.AsNoTracking() on o.FuelTypeId equals f.Id
             where o.DataKind == DataKinds.Real
-            select new { o.StationId, o.FuelTypeId, v.Liters, o.MarginUahPerLiter })
+            select new { o.StationId, o.FuelTypeId, v.Liters, MarginUahPerLiter = f.MarginUahPerLiter })
             .ToDictionaryAsync(
                 x => (x.StationId, x.FuelTypeId, x.Liters),
                 x => x.MarginUahPerLiter,

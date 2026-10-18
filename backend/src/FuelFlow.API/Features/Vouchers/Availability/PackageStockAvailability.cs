@@ -144,10 +144,10 @@ public sealed class PackageStockAvailability
             // if the constraint is ever dropped, the order is what keeps the pick stable.
             .OrderByDescending(v => v.UpdatedAtUtc)
             .ThenBy(v => v.Id)
-            .Select(v => new { Volume = v, Offer = v.Offer })
+            .Select(v => new { Volume = v, Offer = v.Offer, Fuel = v.Offer.FuelType! })
             .FirstOrDefaultAsync(cancellationToken);
 
-        return row is null ? null : SellablePackage.From(row.Offer, row.Volume);
+        return row is null ? null : SellablePackage.From(row.Offer, row.Volume, row.Fuel);
     }
 
     /// <summary>
@@ -183,7 +183,7 @@ public sealed class PackageStockAvailability
             // different row than the same line ordered on its own.
             .OrderByDescending(v => v.UpdatedAtUtc)
             .ThenBy(v => v.Id)
-            .Select(v => new { Volume = v, Offer = v.Offer })
+            .Select(v => new { Volume = v, Offer = v.Offer, Fuel = v.Offer.FuelType! })
             .ToListAsync(cancellationToken);
 
         var resolved = new Dictionary<StockKey, SellablePackage>(wanted.Count);
@@ -195,7 +195,7 @@ public sealed class PackageStockAvailability
 
             // First write wins, and the ordering above means "first" is the same row the single-line
             // path would have taken.
-            resolved.TryAdd(key, SellablePackage.From(row.Offer, row.Volume));
+            resolved.TryAdd(key, SellablePackage.From(row.Offer, row.Volume, row.Fuel));
         }
 
         return resolved;

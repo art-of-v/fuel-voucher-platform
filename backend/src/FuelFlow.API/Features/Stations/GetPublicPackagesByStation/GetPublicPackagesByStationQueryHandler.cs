@@ -54,7 +54,7 @@ public sealed class GetPublicPackagesByStationQueryHandler
                 // the same query narrowed to one station.
                 volume.PriceOverrideUah,
                 offer.SupplierPricePerLiter,
-                offer.MarginUahPerLiter,
+                fuel.MarginUahPerLiter,
                 offer.PumpPricePerLiter,
                 offer.MinDiscountPerLiter,
             })

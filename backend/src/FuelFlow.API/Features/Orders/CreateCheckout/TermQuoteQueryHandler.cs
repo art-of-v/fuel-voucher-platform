@@ -45,18 +45,14 @@ public sealed class TermQuoteQueryHandler
                      && v.Offer.DataKind == pool)
             .OrderByDescending(v => v.UpdatedAtUtc)
             .ThenBy(v => v.Id)
-            .Select(v => new { Volume = v, Offer = v.Offer })
+            .Select(v => new { Volume = v, Offer = v.Offer, Fuel = v.Offer.FuelType! })
             .FirstOrDefaultAsync(cancellationToken);
 
-        var package = row is null ? null : SellablePackage.From(row.Offer, row.Volume);
+        var package = row is null ? null : SellablePackage.From(row.Offer, row.Volume, row.Fuel);
 
-        // The below-cost guard needs the fuel's opt-in flag, so read it once with the package. A fuel that
-        // is allowed to sell under cost can still offer the tier.
-        var allowBelowCost = package is null || await _context.FuelTypes
-            .AsNoTracking()
-            .Where(f => f.Id == fuelTypeId)
-            .Select(f => f.AllowBelowCost)
-            .FirstOrDefaultAsync(cancellationToken);
+        // The below-cost guard needs the fuel's opt-in flag. The fuel is already joined above - the
+        // package's margin is its margin - so this no longer costs a second query per quote.
+        var allowBelowCost = package is null || row!.Fuel.AllowBelowCost;
 
         // The ladder must not offer a term the station cannot honour. Charging the long-term price and
         // then clamping the delivered validity down to the stock's paper term is exactly the mis-sell this

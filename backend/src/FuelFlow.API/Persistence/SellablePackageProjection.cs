@@ -40,7 +40,10 @@ internal static class SellablePackageProjection
             PumpPricePerLiter = v.Offer.PumpPricePerLiter,
             MinDiscountPerLiter = v.Offer.MinDiscountPerLiter,
             SupplierPricePerLiter = v.Offer.SupplierPricePerLiter,
-            MarginUahPerLiter = v.Offer.MarginUahPerLiter,
+            // The fuel's margin, not the offer's: a margin is a fact about the grade, so the two pools
+            // of one fuel cannot quote two prices. The join is the same server-side projection the rest
+            // of this query already is - no extra round trip, no Include.
+            MarginUahPerLiter = v.Offer.FuelType!.MarginUahPerLiter,
             MarginPercent = v.Offer.MarginPercent,
             DataKind = v.Offer.DataKind,
         });

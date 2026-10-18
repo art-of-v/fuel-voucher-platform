@@ -28,23 +28,24 @@ namespace FuelFlow.Persistence;
 internal static class PackageProjection
 {
     /// <summary>
-    /// Rebuild the entity view. Takes the fuel's name because it is not on the offer: station and fuel
-    /// are natural keys in this schema, so the offer carries no navigation to load it from.
+/// Rebuild the entity view. Takes the fuel rather than just its name: the margin moved to
+    /// <c>fuel_types</c>, and passing the name alone would have left this method reading the fuel twice
+    /// over - once for what it is called and once for what it costs.
     /// </summary>
-    public static FuelPackage ToPackage(this FuelOfferVolume volume, string fuelName)
+    public static FuelPackage ToPackage(this FuelOfferVolume volume, FuelTypeEntity fuel)
         => new()
         {
             Id = volume.Id,
             StationId = volume.Offer.StationId,
             FuelTypeId = volume.Offer.FuelTypeId,
-            FuelName = fuelName,
+            FuelName = fuel.Name,
             Liters = volume.Liters,
-            // Computed, not read: the override when the operator set one, the offer's rate × litres
-            // otherwise. Zero when there is neither — the admin listing still shows that the nominal
+            // Computed, not read: the override when the operator set one, the offer's rate x litres
+            // otherwise. Zero when there is neither - the admin listing still shows that the nominal
             // exists and is not priced yet, where the storefront skips it and checkout refuses it.
             Price = FuelPricing.TryPackagePrice(
                     volume.Offer.SupplierPricePerLiter,
-                    volume.Offer.MarginUahPerLiter,
+                    fuel.MarginUahPerLiter,
                     volume.Offer.PumpPricePerLiter,
                     volume.Offer.MinDiscountPerLiter,
                     volume.Liters,
@@ -55,17 +56,22 @@ internal static class PackageProjection
                 volume.Liters,
                 FuelPricing.TryPackagePrice(
                     volume.Offer.SupplierPricePerLiter,
-                    volume.Offer.MarginUahPerLiter,
+                    fuel.MarginUahPerLiter,
                     volume.Offer.PumpPricePerLiter,
                     volume.Offer.MinDiscountPerLiter,
                     volume.Liters,
                     volume.PriceOverrideUah) ?? 0m),
             SupplierPricePerLiter = volume.Offer.SupplierPricePerLiter,
-            MarginUahPerLiter = volume.Offer.MarginUahPerLiter,
+            MarginUahPerLiter = fuel.MarginUahPerLiter,
             MarginPercent = volume.Offer.MarginPercent,
-            // Computed, not read: the admin JSON keeps the field (the panel renders it), but the offer no
-            // longer stores it.
-            FinalPricePerLiter = volume.Offer.ComputedFinalPricePerLiter,
+            // Computed, not read: the admin JSON keeps the field (the panel renders it), and it is derived
+            // from the fuel's margin here rather than off `offer.ComputedFinalPricePerLiter`, which still
+            // reads the offer's own copy of a number nothing writes any more.
+            FinalPricePerLiter = FuelPricing.FinalPerLiterOrNull(
+                volume.Offer.SupplierPricePerLiter,
+                fuel.MarginUahPerLiter,
+                volume.Offer.PumpPricePerLiter,
+                volume.Offer.MinDiscountPerLiter) ?? 0m,
             PumpPricePerLiter = volume.Offer.PumpPricePerLiter,
             MinDiscountPerLiter = volume.Offer.MinDiscountPerLiter,
             DataKind = volume.Offer.DataKind,
@@ -76,11 +82,25 @@ internal static class PackageProjection
         };
 
     /// <summary>
-    /// Rebuild the entity view for a list, resolving fuel names in one lookup rather than per row.
+    /// Rebuild the entity view for a list, resolving fuels in one lookup rather than per row.
     /// </summary>
     public static List<FuelPackage> ToPackages(
         this IReadOnlyCollection<FuelOfferVolume> volumes,
-        IReadOnlyDictionary<string, string> fuelNames)
-        => volumes.Select(v => v.ToPackage(fuelNames.TryGetValue(v.Offer.FuelTypeId, out var name) ? name : string.Empty))
+        IReadOnlyDictionary<string, FuelTypeEntity> fuels)
+        => volumes.Select(v => v.ToPackage(
+                fuels.TryGetValue(v.Offer.FuelTypeId, out var fuel) ? fuel : MissingFuel))
                   .ToList();
+
+    /// <summary>
+    /// Stands in for a fuel that is not in the lookup, so a missing one renders as an unnamed,
+    /// unpriced package instead of throwing halfway through the list. Reaching here means an offer
+    /// names a fuel that does not exist, which the FK added in 20261018104336 now refuses at write
+    /// time - the fallback is for a lookup that was simply not asked for the whole table.
+    /// </summary>
+    private static readonly FuelTypeEntity MissingFuel = new()
+    {
+        Id = string.Empty,
+        Name = string.Empty,
+        StationId = string.Empty
+    };
 }

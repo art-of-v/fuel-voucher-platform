@@ -184,7 +184,7 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         // which is precisely what this test exists to catch.
         var offer = await _context.FuelOffers.FirstAsync(o => o.FuelTypeId == "okko-dp");
         offer.SupplierPricePerLiter.Should().Be(25m);
-        offer.ComputedFinalPricePerLiter.Should().Be(27m);   // 25 cost + 2 margin
+        offer.FinalPerLiterWith(await MarginFor(offer)).Should().Be(27m);   // 25 cost + 2 margin
 
         var volumes = await _context.FuelOfferVolumes
             .Where(v => v.OfferId == offer.Id).OrderBy(v => v.Liters).ToListAsync();
@@ -323,7 +323,7 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         result.BlendedCostPerLiter.Should().Be(25m);   // (100×20 + 100×30) / 200
         var offer = await _context.FuelOffers.FirstAsync(o => o.FuelTypeId == "okko-dp");
         offer.SupplierPricePerLiter.Should().Be(25m); // priced off blended, not the just-entered 30
-        offer.ComputedFinalPricePerLiter.Should().Be(27m);
+        offer.FinalPerLiterWith(await MarginFor(offer)).Should().Be(27m);
     }
 
     /// <summary>
@@ -482,4 +482,15 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         row.CostPerLiter.Should().BeNull();
         row.BlendedCostPerLiter.Should().BeNull();   // nothing costed yet
     }
+
+    /// <summary>
+    /// The margin an offer sells at, which is its fuel's - the same place production reads it since
+    /// the offer stopped carrying a copy. A test that asserted the offer's own column would have been
+    /// asserting a number nothing writes.
+    /// </summary>
+    private async Task<decimal?> MarginFor(FuelOffer offer)
+        => await _context.FuelTypes
+            .Where(f => f.Id == offer.FuelTypeId)
+            .Select(f => f.MarginUahPerLiter)
+            .FirstOrDefaultAsync();
 }

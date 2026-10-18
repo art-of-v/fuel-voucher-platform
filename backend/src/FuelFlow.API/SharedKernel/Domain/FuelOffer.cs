@@ -80,30 +80,37 @@ public sealed class FuelOffer
     // sent — which is not a price, it is a request. Reads call
     // `FuelPricing.FinalPerLiterOrNull`, or the [NotMapped] property below.
     public decimal? SupplierPricePerLiter { get; set; }   // cost/л (собівартість)
-    public decimal? MarginUahPerLiter { get; set; }       // profit/л (заробіток)
-    public decimal? MarginPercent { get; set; }
 
     /// <summary>
-    /// The customer price per litre this offer's knobs produce, or <c>null</c> while no cost or no
-    /// margin is recorded. Not a column and not a stored value: this is
-    /// <see cref="FuelPricing.FinalPerLiterOrNull"/> over the four properties above, spelled as a
-    /// property so a read path cannot get the argument order wrong.
-    /// <para>
-    /// <b>In memory only.</b> It cannot be translated into SQL, so a LINQ projection has to select
-    /// the four columns and compute after materialising — which is what every handler reading it
-    /// does.
-    /// </para>
+    /// The offer's own copy of the margin. <b>Nothing writes or reads it any more</b> — the margin
+    /// belongs to <see cref="FuelTypeEntity.MarginUahPerLiter"/> and every read path has moved there.
+    /// The column goes in the migration that follows; the property stays until then so the entity and
+    /// that migration agree on the shape of the table.
     /// </summary>
-    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
-    public decimal? ComputedFinalPricePerLiter =>
-        FuelPricing.FinalPerLiterOrNull(
-            SupplierPricePerLiter, MarginUahPerLiter, PumpPricePerLiter, MinDiscountPerLiter);
+    public decimal? MarginUahPerLiter { get; set; }       // profit/л (заробіток)
+    public decimal? MarginPercent { get; set; }
 
     // Slice 1a pricing knobs. Pump (колонка) is the ceiling; MinDiscount is the
     // guaranteed gap under it. final = min(cost + profit, pump − minDiscount).
     // Pump null ⇒ fall back to cost + profit (legacy cost-plus).
     public decimal? PumpPricePerLiter { get; set; }
     public decimal? MinDiscountPerLiter { get; set; }
+
+    /// <summary>
+    /// The customer price per litre this offer's knobs produce once the margin is supplied, or
+    /// <c>null</c> while no cost or no margin is recorded.
+    /// <para>
+    /// <b>A method, not a property, and that is the whole point.</b> This was
+    /// <c>ComputedFinalPricePerLiter</c>, reading <see cref="MarginUahPerLiter"/> itself — which is
+    /// correct only while the offer holds a margin that something writes. It no longer does, so that
+    /// property would have answered cost-plus-nothing on every read path that had not moved yet, and
+    /// every path that had would have had to remember to derive the number itself and get the argument
+    /// order right. Taking the margin as an argument is the one shape that cannot be called wrong.
+    /// </para>
+    /// </summary>
+    public decimal? FinalPerLiterWith(decimal? marginUahPerLiter) =>
+        FuelPricing.FinalPerLiterOrNull(
+            SupplierPricePerLiter, marginUahPerLiter, PumpPricePerLiter, MinDiscountPerLiter);
 
     /// <summary>
 /// What the per-litre pricing last changed, for the price-change audit trail.</summary>

@@ -562,10 +562,19 @@ private readonly GetBrandsQueryHandler _getAll;
         // audit then reads "supplier  -> 100.00" and the operator has no record of what they changed.
         var previousOffer = offer ?? otherOffer;
         var oldSupplierPrice = previousOffer?.SupplierPricePerLiter;
-        var oldMarginPrice = previousOffer?.MarginUahPerLiter;
-        // Computed from the offer's own knobs rather than read from a column: the audit payload records
-        // what the customer paid per litre, and that number is still a fact even though nothing stores it.
-        var oldFinalPrice = previousOffer?.ComputedFinalPricePerLiter;
+        // The fuel already carries its current margin at this point - the snapshot below runs before any
+        // write - and the offer's copy is no longer written, so this is the only "old" that still exists.
+        var oldMarginPrice = fuel.MarginUahPerLiter;
+        // Computed from the offer's own knobs and the fuel's margin rather than read from a column: the
+        // audit payload records what the customer paid per litre, and that number is still a fact even
+        // though nothing stores it.
+        var oldFinalPrice = previousOffer is null
+            ? null
+            : FuelPricing.FinalPerLiterOrNull(
+                previousOffer.SupplierPricePerLiter,
+                oldMarginPrice,
+                previousOffer.PumpPricePerLiter,
+                previousOffer.MinDiscountPerLiter);
         var oldValue = JsonSerializer.Serialize(new
         {
             fuel.Name,
@@ -586,12 +595,9 @@ private readonly GetBrandsQueryHandler _getAll;
         // sell two litres or a hundred — so on the offer it was per (brand × fuel × pool), which meant
         // two pools of one fuel could quote two prices.
         fuel.MarginUahPerLiter = request.MarginUahPerLiter;
-        // ...and it is mirrored onto the offer in the same breath, because the storefront, checkout,
-        // the dashboard and the renewal guard all read it from there and none of them changes in this
-        // step. ONE writer sets both, so the copy cannot drift; dropping the offer's column is the
-        // following migration (planning #360), and until then this line is the only thing keeping the
-        // two in agreement.
-        offer.MarginUahPerLiter = request.MarginUahPerLiter;
+        // The offer's copy of the margin is gone as of this change: every reader - storefront, checkout,
+        // dashboard, below-cost guard and the price recorder - takes it from the fuel, so a second
+        // column holding it would be a number nobody reads and one writer could forget.
         offer.MarginPercent = request.MarginPercent;
         offer.PumpPricePerLiter = request.PumpPricePerLiter;
         offer.MinDiscountPerLiter = request.MinDiscountPerLiter;
@@ -842,8 +848,8 @@ private readonly GetBrandsQueryHandler _getAll;
         // package an order referenced was never the package in the catalog. Reusing a package that
         // stays keeps its id, so historical rows keep resolving to the thing they bought.
         //
-        // Pricing is unchanged: the per-litre knobs come from the fuel's offer, and only the derived
-        // package total is rewritten on each volume.
+        // Pricing is unchanged: the cost and the pump are the offer's, the margin is the fuel's, and only the
+        // derived package total is rewritten on each volume.
         var wanted = nominals.Distinct().ToHashSet();
         var now = DateTime.UtcNow;
 
@@ -860,7 +866,7 @@ private readonly GetBrandsQueryHandler _getAll;
             foreach (var offer in offers.Where(o => o.FuelTypeId == fuel.Id))
             {
                 var supplierPrice = offer.SupplierPricePerLiter ?? 0;
-                var marginUah = offer.MarginUahPerLiter ?? 0;
+                var marginUah = fuel.MarginUahPerLiter ?? 0;
                 var finalPrice = FuelPricing.FinalPerLiter(
                     supplierPrice, marginUah, offer.PumpPricePerLiter, offer.MinDiscountPerLiter ?? 0);
 
