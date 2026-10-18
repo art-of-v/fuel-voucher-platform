@@ -4,7 +4,7 @@ import { marginWarningFor, type VoucherTermFuelDto } from "./marginWarning";
 const fuel = (name: string, marginPerLiterUah: number): VoucherTermFuelDto => ({
   fuelTypeId: name.toLowerCase(),
   name,
-  stationId: "okko",
+  brandId: "okko",
   marginPerLiterUah,
 });
 
@@ -73,5 +73,29 @@ describe("marginWarningFor", () => {
     expect(marginWarningFor(0.1, FLOOR, [fuel("Газ", 0)])?.tone).toBe(
       "blocked",
     );
+  });
+
+  // The regression: the stations-to-brands rename moved this field to `brandId` on the server and in
+  // the C# DTO, but not here, so `worst.stationId.toUpperCase()` threw and the React error boundary
+  // took the entire admin panel down instead of one label. This asserts the label names the brand.
+  it("names the brand on the worst fuel", () => {
+    expect(marginWarningFor(5, FLOOR, [fuel("А95", 0.2)])?.worst).toBe(
+      "А95 (OKKO)",
+    );
+  });
+
+  // A missing field must degrade the label, never the page. The payload is untyped JSON from the
+  // API, so nothing stops the next server-side rename from arriving here the same way.
+  it("still describes the warning when the brand is absent", () => {
+    const nameless = {
+      fuelTypeId: "x",
+      name: "А95",
+      marginPerLiterUah: 0.2,
+    } as unknown as VoucherTermFuelDto;
+
+    const warning = marginWarningFor(5, FLOOR, [nameless]);
+
+    expect(warning?.tone).toBe("blocked");
+    expect(warning?.worst).toBe("А95 ()");
   });
 });
