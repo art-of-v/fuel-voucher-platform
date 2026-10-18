@@ -583,9 +583,7 @@ describe('Basket - stock that ran out while the basket was open', () => {
     // A package can leave the catalog entirely (archived, or a brand no longer listed). Absent is not
     // the same as unavailable, and guessing "unavailable" here would strand a legitimate basket.
     stocked();
-    mockCatalog = [
-      { brandId: 'other-station', fuelTypeId: 'ft-9', liters: 5, isAvailable: true },
-    ];
+    mockCatalog = [{ brandId: 'other-station', fuelTypeId: 'ft-9', liters: 5, isAvailable: true }];
 
     render(<BasketScreen />);
 
