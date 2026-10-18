@@ -36,12 +36,9 @@ public sealed class UpdateNominalsReuseTests : IDisposable
 
     public void Dispose() => _context.Dispose();
 
-    private BrandsController CreateController()
+    private BrandFuelController CreateController()
     {
-        var controller = new BrandsController(
-            new GetBrandsQueryHandler(_context),
-            new GetBrandByIdQueryHandler(_context),
-            new GetBrandHistoryQueryHandler(_context),
+        var controller = new BrandFuelController(
             new GetFuelPriceHistoryQueryHandler(_context),
             new GetFuelPriceAtQueryHandler(_context),
             new AuditEventService(_context),

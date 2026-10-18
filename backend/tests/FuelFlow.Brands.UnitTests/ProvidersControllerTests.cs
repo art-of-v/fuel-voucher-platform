@@ -22,13 +22,13 @@ using Moq;
 
 namespace FuelFlow.Providers.UnitTests;
 
-public sealed class BrandsControllerTests : IDisposable
+public sealed class BrandFuelControllerTests : IDisposable
 {
     private readonly ApplicationDbContext _context;
-    private readonly BrandsController _controller;
+    private readonly BrandFuelController _controller;
     private readonly ClaimsPrincipal _user;
 
-    public BrandsControllerTests()
+    public BrandFuelControllerTests()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
@@ -50,11 +50,8 @@ public sealed class BrandsControllerTests : IDisposable
 
     // Builds a controller sharing _context + the admin principal; the dispatcher is swappable so the
     // below-cost tests can assert the loss-leader Telegram alert through a Moq IAlertNotifier.
-    private BrandsController BuildController(NotificationDispatcher notifications) =>
+    private BrandFuelController BuildController(NotificationDispatcher notifications) =>
         new(
-            new GetBrandsQueryHandler(_context),
-            new GetBrandByIdQueryHandler(_context),
-            new GetBrandHistoryQueryHandler(_context),
             new GetFuelPriceHistoryQueryHandler(_context),
             new GetFuelPriceAtQueryHandler(_context),
             new AuditEventService(_context),
@@ -206,7 +203,7 @@ public sealed class BrandsControllerTests : IDisposable
             FuelRequest("ttt", 100m, 0.5m, 100.5m),
             CancellationToken.None);
 
-        result.Should().BeOfType<CreatedAtActionResult>();
+        result.Should().BeOfType<CreatedResult>();
 
         var fuel = await _context.FuelTypes.SingleAsync(f => f.StationId == "test-klo");
         var liters = await _context.FuelOfferVolumes
@@ -234,7 +231,7 @@ public sealed class BrandsControllerTests : IDisposable
             FuelRequest("B", 50m, 2m, 52m),
             CancellationToken.None);
 
-        result.Should().BeOfType<CreatedAtActionResult>();
+        result.Should().BeOfType<CreatedResult>();
 
         var newFuel = await _context.FuelTypes.SingleAsync(f => f.StationId == "test-okko" && f.Id != "test-fuel-a");
         var liters = await _context.FuelOfferVolumes
@@ -269,7 +266,7 @@ public sealed class BrandsControllerTests : IDisposable
             FuelRequest("ДП ЄВРО", 95m, 2.86m, 97.86m, 10),
             CancellationToken.None);
 
-        result.Should().BeOfType<CreatedAtActionResult>();
+        result.Should().BeOfType<CreatedResult>();
 
         var fuel = await _context.FuelTypes.SingleAsync(f => f.StationId == "test-okko");
         fuel.BasePrice.Should().Be(97.86m);
@@ -502,7 +499,7 @@ public sealed class BrandsControllerTests : IDisposable
             BelowCostCreate("ДП збиток-add-ok", allowBelowCost: true),
             CancellationToken.None);
 
-        result.Should().BeOfType<CreatedAtActionResult>();
+        result.Should().BeOfType<CreatedResult>();
 
         var fuel = await _context.FuelTypes.SingleAsync(f => f.StationId == "test-okko");
         fuel.AllowBelowCost.Should().BeTrue();

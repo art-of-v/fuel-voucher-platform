@@ -292,10 +292,10 @@ export default function BrandsTab({
       fuelId: string;
       data: BrandFuelDto;
     }) => {
-      await apiRequest("PUT", `/api/admin/brands/fuels/${fuelId}`, data);
+      await apiRequest("PUT", `/api/admin/brand-fuels/${fuelId}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/brands"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/brands", `/api/admin/brand-fuels/${fuelId}`] });
       setEditingFuel(null);
       toast.success(t("common.saved"));
     },
@@ -304,10 +304,10 @@ export default function BrandsTab({
 
   const deleteFuelMutation = useMutation({
     mutationFn: async (fuelId: string) => {
-      await apiRequest("DELETE", `/api/admin/brands/fuels/${fuelId}`);
+      await apiRequest("DELETE", `/api/admin/brand-fuels/${fuelId}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/brands"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/brands", `/api/admin/brand-fuels/${fuelId}`] });
       toast.success(t("common.deleted"));
     },
     onError: (e: Error) => toast.error(e.message),
@@ -323,7 +323,7 @@ export default function BrandsTab({
     }) => {
       await apiRequest(
         "POST",
-        `/api/admin/brands/${brandId}/fuels`,
+        `/api/admin/brand-fuels/brands/${brandId}/fuels`,
         data,
       );
     },
@@ -352,7 +352,7 @@ export default function BrandsTab({
     }) => {
       await apiRequest(
         "PUT",
-        `/api/admin/brands/${brandId}/nominals`,
+        `/api/admin/brand-fuels/brands/${brandId}/nominals`,
         nominals,
       );
     },

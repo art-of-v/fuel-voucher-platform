@@ -39,7 +39,7 @@ namespace FuelFlow.UnitTests.Providers;
 public sealed class RehearsalFlagWritePathTests : IDisposable
 {
     private readonly ApplicationDbContext _context;
-    private readonly BrandsController _controller;
+    private readonly BrandFuelController _controller;
 
     public RehearsalFlagWritePathTests()
     {
@@ -48,10 +48,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
             .Options;
         _context = new ApplicationDbContext(options, TestQrCipher.Instance);
 
-        _controller = new BrandsController(
-            new GetBrandsQueryHandler(_context),
-            new GetBrandByIdQueryHandler(_context),
-            new GetBrandHistoryQueryHandler(_context),
+        _controller = new BrandFuelController(
             new GetFuelPriceHistoryQueryHandler(_context),
             new GetFuelPriceAtQueryHandler(_context),
             new AuditEventService(_context),
@@ -185,7 +182,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
             },
             CancellationToken.None);
 
-        result.Should().BeOfType<CreatedAtActionResult>(
+        result.Should().BeOfType<CreatedResult>(
             "the flag is the control; the name is only a second opinion");
     }
 
@@ -205,7 +202,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
             },
             CancellationToken.None);
 
-        result.Should().BeOfType<CreatedAtActionResult>();
+        result.Should().BeOfType<CreatedResult>();
     }
 
     /// <summary>
@@ -238,7 +235,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
             },
             CancellationToken.None);
 
-        result.Should().BeOfType<CreatedAtActionResult>(
+        result.Should().BeOfType<CreatedResult>(
             "a false positive here would block a real product from being published");
     }
 
@@ -310,7 +307,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
             },
             CancellationToken.None);
 
-        result.Should().BeOfType<CreatedAtActionResult>();
+        result.Should().BeOfType<CreatedResult>();
     }
 
     [Fact]
@@ -339,7 +336,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
             },
             CancellationToken.None);
 
-        result.Should().BeOfType<CreatedAtActionResult>();
+        result.Should().BeOfType<CreatedResult>();
     }
 
     [Fact]
