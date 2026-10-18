@@ -19,7 +19,7 @@ namespace FuelFlow.Features.Vouchers.PurchaseBatchCost;
 /// its share of the surcharge (<see cref="VoucherCosting.AfterExchange"/>), so a plain re-entry would
 /// refuse and an operator had no way to correct a price they had entered wrongly. The flag existed for
 /// that, and it existed to <em>rewrite vouchers that were already bought</em> — which contradicts the
-/// rule settled on 2026-10-17 and recorded in README (`purchase_batches`) and planning #360: what a lot
+/// rule settled on 2026-10-17 and recorded in CODEBASE.md (`purchase_batches`) and planning #360: what a lot
 /// cost is a purchase fact and stays one.
 /// </para>
 /// <para>

@@ -262,7 +262,7 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
     /// A second price for the same batch is refused, and the first one stands. This used to be the
     /// opposite test: it drove the <c>ForceOverwrite</c> flag and asserted that a second entry restamped
     /// the voucher and repriced the pool. The flag is gone — what a lot cost is a purchase fact, and a
-    /// correction is a new recorded entry rather than a rewrite of vouchers already bought (README
+    /// correction is a new recorded entry rather than a rewrite of vouchers already bought (CODEBASE.md
     /// `purchase_batches`, planning #360).
     /// </summary>
     [Fact]

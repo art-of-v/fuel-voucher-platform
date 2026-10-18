@@ -139,7 +139,8 @@ public sealed class MigrationDiscoveryTests
     /// that already has those tables — killing the one gate that tests a migration against
     /// production's rows instead of seeded ones. It also deletes the id that
     /// <c>DataKindBackfillTests</c> migrates *to</c> in order to assert what a past backfill
-    /// produced. See README.md, "The history is append-only — never squashed".
+    /// produced. See AGENTS.md, and "The history is append-only — never squashed" in
+    /// docs/CODEBASE.md (private docs repo).
     /// </para>
     /// </remarks>
     [Fact]

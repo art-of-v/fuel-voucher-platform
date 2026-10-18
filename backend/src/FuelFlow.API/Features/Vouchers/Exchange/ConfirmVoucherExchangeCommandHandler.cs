@@ -267,7 +267,7 @@ public sealed class ConfirmVoucherExchangeCommandHandler
 
         // The blended cost is *measured and reported*, never applied.
         //
-        // The operator's rule, settled 2026-10-17 and recorded in README (`purchase_batches`) and
+        // The operator's rule, settled 2026-10-17 and recorded in CODEBASE.md (`purchase_batches`) and
         // planning #360: **a sold voucher does not move the price.** The moving average is recomputed
         // when a lot arrives and at no other time. This used to call RepriceAsync, so every sale
         // moved the quoted price by however much stock it happened to consume - and the direction

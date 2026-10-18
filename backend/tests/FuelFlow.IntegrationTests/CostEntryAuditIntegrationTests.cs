@@ -142,7 +142,7 @@ public sealed class CostEntryAuditIntegrationTests : IClassFixture<TestDatabaseF
     /// <summary>
     /// A batch's price is stamped once. This used to be the opposite test: it drove the
     /// <c>ForceOverwrite</c> flag and asserted that a second entry rewrote every voucher and left an
-    /// audit row carrying both figures. The flag is gone (README `purchase_batches`, planning #360) —
+    /// audit row carrying both figures. The flag is gone (CODEBASE.md `purchase_batches`, planning #360) —
     /// what a lot cost is a purchase fact, and rewriting vouchers that were already bought is how a
     /// correction would silently restate money that was spent.
     /// </summary>
