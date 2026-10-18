@@ -100,6 +100,127 @@ var result = await _controller.Create(new CreateSupplierRequest { Name = "ФОП
     }
 
     [Fact]
+    public async Task Create_WithNoRoute_StoresDirect()
+    {
+        // Every supplier in the database today is direct, so the absent case is the common one and
+        // must not be an error - a required field here would have made every existing form fail.
+        var result = await _controller.Create(new CreateSupplierRequest { Name = "ФОП Стретович Микола" });
+
+        var dto = result.Result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeOfType<SupplierDto>().Subject;
+        dto.AcquisitionSource.Should().Be(AcquisitionSources.Direct);
+        (await _context.Suppliers.SingleAsync()).AcquisitionSource.Should().Be(AcquisitionSources.Direct);
+    }
+
+    [Fact]
+    public async Task Create_WithAPartnerRoute_StoresPartner()
+    {
+        // This is the case that was unreachable before: the column is immutable, so if the create
+        // endpoint cannot state the route, a secondary-route supplier can never exist at all.
+        var result = await _controller.Create(new CreateSupplierRequest
+        {
+            Name = "ТОВ Постачання Плюс",
+            AcquisitionSource = AcquisitionSources.Partner,
+        });
+
+        var dto = result.Result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeOfType<SupplierDto>().Subject;
+        dto.AcquisitionSource.Should().Be(AcquisitionSources.Partner);
+        (await _context.Suppliers.SingleAsync()).AcquisitionSource.Should().Be(AcquisitionSources.Partner);
+    }
+
+    [Fact]
+    public async Task Create_NormalisesTheRouteCase()
+    {
+        // The CHECK is case-sensitive, so 'Partner' unnormalised reaches the database and comes back as
+        // a 23514 - a 500 and a stack trace. Normalising here is what turns a typo into an answer.
+        var result = await _controller.Create(new CreateSupplierRequest
+        {
+            Name = "ТОВ Постачання Плюс",
+            AcquisitionSource = "  PARTNER  ",
+        });
+
+        result.Result.Should().BeOfType<OkObjectResult>();
+        (await _context.Suppliers.SingleAsync()).AcquisitionSource.Should().Be(AcquisitionSources.Partner);
+    }
+
+    /// <summary>
+    /// Reads the <c>{ error }</c> body the controller returns. Serialised rather than cast: the value is
+    /// an anonymous object, and this project already reads those as JSON for the same reason - an
+    /// unserialised string in a jsonb column is a 22P02 at SaveChanges.
+    /// </summary>
+    private static string ErrorOf(ActionResult<SupplierDto> result)
+    {
+        var bad = result.Result.Should().BeOfType<BadRequestObjectResult>().Subject;
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(bad.Value));
+        return doc.RootElement.GetProperty("error").GetString()!;
+    }
+
+    [Fact]
+    public async Task Create_RejectsAnUnknownRoute_AndNamesTheValidOnes()
+    {
+        var result = await _controller.Create(new CreateSupplierRequest
+        {
+            Name = "ТОВ Постачання Плюс",
+            AcquisitionSource = "grey",
+        });
+
+        var error = ErrorOf(result);
+        error.Should().Contain("grey").And.Contain(AcquisitionSources.Direct).And.Contain(AcquisitionSources.Partner);
+        (await _context.Suppliers.CountAsync()).Should().Be(0, "a refused route must not leave a row behind");
+    }
+
+    [Fact]
+    public async Task Update_RefusesToMoveASupplierBetweenRoutes()
+    {
+        // UpdateSupplierRequest inherits CreateSupplierRequest, so this endpoint can be handed a route
+        // whether or not the caller means to. Left to the database it would be a 500 with a stack trace
+        // in the Error Logs; the answer belongs here and should say why a supplier cannot move.
+        var supplier = Seed("ТОВ Постачання Плюс", isActive: true);
+        _context.Entry(supplier).Property(s => s.AcquisitionSource)
+            .CurrentValue = AcquisitionSources.Partner;
+        await _context.SaveChangesAsync();
+
+        var result = await _controller.Update(supplier.Id, new UpdateSupplierRequest
+        {
+            Name = supplier.Name,
+            AcquisitionSource = AcquisitionSources.Direct,
+        });
+
+        var error = ErrorOf(result);
+        error.Should().Contain(AcquisitionSources.Partner)
+            .And.Contain("every voucher already imported", "the refusal should say why a supplier cannot move");
+    }
+
+    [Fact]
+    public async Task Update_AcceptsARouteEchoedBackUnchanged()
+    {
+        // A client that PUTs what it read should not be punished for it. Only a genuine change is refused.
+        var supplier = Seed("ТОВ Постачання Плюс", isActive: true);
+        _context.Entry(supplier).Property(s => s.AcquisitionSource)
+            .CurrentValue = AcquisitionSources.Partner;
+        await _context.SaveChangesAsync();
+
+        var result = await _controller.Update(supplier.Id, new UpdateSupplierRequest
+        {
+            Name = supplier.Name,
+            Phone = "+380501234567",
+            AcquisitionSource = AcquisitionSources.Partner,
+        });
+
+        result.Result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task AcquisitionSourceOptions_AreTheOnesTheRouteAccepts()
+    {
+        // The UI must not carry its own list. This is the same contract legal-forms has.
+        var options = _controller.AcquisitionSourceOptions();
+
+        // The handler returns Ok(...), so the payload is on Result rather than Value.
+        var payload = options.Result.Should().BeOfType<OkObjectResult>().Subject.Value;
+        payload.Should().BeAssignableTo<IEnumerable<string>>().Which.Should().BeEquivalentTo(AcquisitionSources.All);
+    }
+
+    [Fact]
     public async Task Create_ShouldTrimWhitespaceFromRequisites()
     {
         var request = ValidRequest();
