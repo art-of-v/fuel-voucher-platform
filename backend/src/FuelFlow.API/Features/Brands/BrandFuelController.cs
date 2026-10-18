@@ -680,28 +680,19 @@ public sealed class BrandFuelController : ControllerBase
         var Brand = await _context.Brands.FirstOrDefaultAsync(s => s.Id == id, ct);
         if (Brand is null) return NotFound();
 
-        var BrandFuels = await _context.FuelTypes.Where(f => f.BrandId == id).ToListAsync(ct);
-        var fuelIds = BrandFuels.Select(f => f.Id).ToList();
-        // AsTracking: the volumes below are updated in place now, and the context defaults to
-        // NoTracking - without it the edit would persist nothing (NoTrackingMutationGuardTests).
-        //
-        // Offers are tracked alongside volumes because the per-litre knobs this used to read off "the
-        // fuel's first existing package" are the offer's, once. Reading them per package meant N copies
-        // of one price, and the copy that happened to sort first was the one the whole fuel was
-        // repriced from.
-        var offers = await _context.FuelOffers
-            .AsTracking()
-            .Where(o => fuelIds.Contains(o.FuelTypeId))
-            .ToListAsync(ct);
+var BrandFuels = await _context.FuelTypes.Where(f => f.BrandId == id).ToListAsync(ct);
+    var fuelIds = BrandFuels.Select(f => f.Id).ToList();
 
-        var offerIds = offers.Select(o => o.Id).ToList();
-        var existingVolumes = await _context.FuelOfferVolumes
-            .AsTracking()
-            .Where(v => offerIds.Contains(v.OfferId))
-            .ToListAsync(ct);
+    // The sizes a fuel is sold in are the operator's answer, written once per fuel rather than once
+    // per offer. Read AsTracking: the rows below are updated in place, and the context defaults to
+    // NoTracking - without it the edit would persist nothing (NoTrackingMutationGuardTests).
+    var existingNominals = await _context.FuelNominals
+        .AsTracking()
+        .Where(n => fuelIds.Contains(n.FuelTypeId))
+        .ToListAsync(ct);
 
-        var oldValue = JsonSerializer.Serialize(
-            existingVolumes.Where(v => !v.IsDeleted).Select(v => (int)v.Liters).Distinct().OrderBy(l => l).ToList());
+    var oldValue = JsonSerializer.Serialize(
+        existingNominals.Select(n => (int)n.Liters).Distinct().OrderBy(l => l).ToList());
 
         // #217: keep what survives, archive what leaves, add what is new.
         //
@@ -716,76 +707,29 @@ public sealed class BrandFuelController : ControllerBase
         var wanted = nominals.Distinct().ToHashSet();
         var now = DateTime.UtcNow;
 
-        // The sizes a fuel is sold in are the operator's answer, written once per fuel rather than once
-        // per offer. The volume loops below then follow it, which is the right way round: a size the
-        // operator did not ask for has no row here, so no pool can quietly keep selling it.
-        var existingNominals = await _context.FuelNominals
-            .AsTracking()
-            .Where(n => BrandFuels.Select(f => f.Id).Contains(n.FuelTypeId))
-            .ToListAsync(ct);
-
-        foreach (var fuel in BrandFuels)
+// The sizes a fuel is sold in are the operator's answer, written once per fuel rather than once
+    // per offer. The volume loops that used to follow are gone: `fuel_offer_volumes` was a second
+    // copy of this same answer, and keeping both in step was the whole cost of having it.
+    foreach (var fuel in BrandFuels)
+    {
+        foreach (var leaving in existingNominals.Where(n => n.FuelTypeId == fuel.Id && !wanted.Contains((int)n.Liters)))
         {
-            foreach (var leaving in existingNominals.Where(n => n.FuelTypeId == fuel.Id && !wanted.Contains((int)n.Liters)))
-            {
-                _context.FuelNominals.Remove(leaving);
-            }
-
-            foreach (var liters in wanted.Where(l => existingNominals.All(n => n.FuelTypeId != fuel.Id || n.Liters != l)))
-            {
-                _context.FuelNominals.Add(new FuelNominal
-                {
-                    FuelTypeId = fuel.Id,
-                    Liters = liters,
-                    CreatedAtUtc = now,
-                    UpdatedAtUtc = now
-                });
-            }
+            _context.FuelNominals.Remove(leaving);
         }
 
-        foreach (var leaving in existingVolumes.Where(v => !wanted.Contains((int)v.Liters)))
+        foreach (var liters in wanted.Where(l => existingNominals.All(n => n.FuelTypeId != fuel.Id || n.Liters != l)))
         {
-            leaving.IsDeleted = true;
-            leaving.DeletedAtUtc = now;
-        }
-
-        foreach (var fuel in BrandFuels)
-        {
-            // A fuel can own an offer per pool now rather than one flagged set of packages, so the
-            // nominals are applied to each of its offers: both catalogues should offer the same sizes.
-            foreach (var offer in offers.Where(o => o.FuelTypeId == fuel.Id))
+            _context.FuelNominals.Add(new FuelNominal
             {
-                var supplierPrice = offer.SupplierPricePerLiter ?? 0;
-                var marginUah = fuel.MarginUahPerLiter ?? 0;
-                var finalPrice = FuelPricing.FinalPerLiter(
-                    supplierPrice, marginUah, offer.PumpPricePerLiter, offer.MinDiscountPerLiter ?? 0);
-
-                foreach (var liters in wanted)
-                {
-                    var kept = existingVolumes.FirstOrDefault(
-                        v => v.OfferId == offer.Id && (int)v.Liters == liters);
-
-                    if (kept is not null)
-                    {
-                        // Same row, same id, same CreatedAtUtc, and the same price: a kept nominal's
-                        // price follows its offer, so there is nothing to refresh. If it carries an override
-                        // that override survives, which is the one thing this endpoint used to undo.
-                        kept.UpdatedAtUtc = now;
-                        continue;
-                    }
-
-                    _context.FuelOfferVolumes.Add(new FuelOfferVolume
-                    {
-                        Id = Guid.CreateVersion7().ToString(),
-                        OfferId = offer.Id,
-                        Liters = liters,
-                        CreatedAtUtc = now,
-                        UpdatedAtUtc = now,
-                    });
-                }
-            }
+                FuelTypeId = fuel.Id,
+                Liters = liters,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now
+            });
         }
-        await _context.SaveChangesAsync(ct);
+    }
+
+    await _context.SaveChangesAsync(ct);
 
         var userId = GetUserId();
         var newValue = JsonSerializer.Serialize(nominals.OrderBy(n => n).ToList());

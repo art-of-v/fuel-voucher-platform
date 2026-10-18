@@ -419,11 +419,13 @@ public sealed class BrandFuelControllerTests : IDisposable
 
         result.Should().BeOfType<OkObjectResult>();
 
+        // The sizes are the fuel's, so both fuels of the brand end up with the same list and the
+        // volume table is not the answer to "what does this brand sell in" any more.
         foreach (var fuelId in new[] { "test-fuel-a", "test-fuel-b" })
         {
-            var liters = await _context.FuelOfferVolumes
-                .Where(p => p.Offer.FuelTypeId == fuelId)
-                .Select(p => (int)p.Liters)
+            var liters = await _context.FuelNominals
+                .Where(n => n.FuelTypeId == fuelId)
+                .Select(n => (int)n.Liters)
                 .OrderBy(l => l)
                 .ToListAsync();
             liters.Should().Equal(5, 10);
@@ -431,7 +433,7 @@ public sealed class BrandFuelControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task UpdateNominals_PreservesPerLiterPricingFromOldPackages()
+    public async Task UpdateNominals_LeavesTheOffersPricingAlone()
     {
         await AddBrandAsync("test-okko", "OKKO");
         await AddFuelAsync("test-fuel-a", "test-okko", "A-95");
@@ -450,8 +452,14 @@ public sealed class BrandFuelControllerTests : IDisposable
         // The margin is the fuel's; the offer's own copy is never written any more.
         (await MarginFor(offer)).Should().Be(2m);
 
-        var volume = await _context.FuelOfferVolumes.SingleAsync(v => v.OfferId == offer.Id);
-        volume.Liters.Should().Be(20m);
+        // The new size exists, and the old one is gone from the fuel's list. What this endpoint no
+        // longer does is touch the volume table: it wrote a second copy of the same answer there,
+        // once per pool, and keeping the two in step was the cost of having it.
+        var liters = await _context.FuelNominals
+            .Where(n => n.FuelTypeId == "test-fuel-a")
+            .Select(n => (int)n.Liters)
+            .ToListAsync();
+        liters.Should().Equal(20);
     }
 
     [Fact]
