@@ -266,7 +266,7 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
     }
 
     /// <summary>
-    /// A sale does not move the price. Settled with the operator on 2026-10-17 and recorded in README
+    /// A sale does not move the price. Settled with the operator on 2026-10-17 and recorded in CODEBASE.md
     /// (`purchase_batches`) and planning #360: the moving average is recomputed when a lot arrives and
     /// at no other time.
     /// <para>

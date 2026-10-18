@@ -28,8 +28,8 @@ namespace FuelFlow.IntegrationTests;
 /// model and the snapshot agreed with each other and both disagreed with the database.
 /// </para>
 /// <para>
-/// The failure mode is therefore silence, twice over: no migration, no failing test, and a README
-/// that tells the reader to reason from the model. So this asserts the thing that was never
+/// The failure mode is therefore silence, twice over: no migration, no failing test, and a schema
+/// document that tells the reader to reason from the model. So this asserts the thing that was never
 /// asserted — not that the refund constraint is right (one hand-written assertion would do that, and
 /// <c>DatabaseIntegrityTests</c> has it) but that <b>no</b> CHECK anywhere names a column that is not
 /// there. That is a property of the whole schema rather than of one constraint, and it is the part
@@ -112,7 +112,7 @@ public sealed class CheckConstraintColumnDriftTests : IClassFixture<TestDatabase
         }
 
         missing.Should().BeEmpty(
-            "the model is what the README tells a reader to reason from, so it cannot name a column "
+            "the model is what the schema doc tells a reader to reason from, so it cannot name a column "
             + "the database does not have");
     }
 

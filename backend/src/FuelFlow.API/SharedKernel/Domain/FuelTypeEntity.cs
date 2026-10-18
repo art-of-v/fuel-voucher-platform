@@ -76,7 +76,8 @@ public sealed class FuelTypeEntity
     /// </para>
     /// <para>
     /// The cost it is added to is derived, never stored here — it is the litres-weighted average of
-    /// unspent cost-bearing vouchers (README, <c>purchase_batches</c>, planning #360).
+    /// unspent cost-bearing vouchers (CODEBASE.md in the private docs repo, <c>purchase_batches</c>,
+    /// planning #360).
     /// </para>
     /// </remarks>
     public decimal? MarginUahPerLiter { get; set; }

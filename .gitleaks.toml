@@ -173,7 +173,8 @@ regexes = [
   # (`gitleaks dir`) mode, which the CI gate uses. Both are literal non-secret strings,
   # verified by reading each line:
   #   - "DevBypass=true": the name of a boolean dev feature flag, documented in
-  #     README.md and docs/SECURITY.md (private docs repo); its only value is the dev-only
+  #     docs/CODEBASE.md and docs/SECURITY.md (both in the private docs repo); its only value is
+  #     the dev-only
   #     literal OTP 000000.
   #   - "key/signature": a fragment of a source comment in VerifyChallengeCommandHandler.cs
   #     that explains log verbosity and states "None of it is secret".
