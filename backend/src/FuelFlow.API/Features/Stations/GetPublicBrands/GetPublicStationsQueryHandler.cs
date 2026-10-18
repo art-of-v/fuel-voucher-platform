@@ -17,11 +17,6 @@ public sealed class GetPublicBrandsQueryHandler
                 x.Name,
                 x.Color,
                 x.LogoText,
-                x.Address,
-                x.Phone,
-                x.StationType,
-                x.Lat,
-                x.Lng,
                 x.SortOrder))
             .ToListAsync(ct);
 }

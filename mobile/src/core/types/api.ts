@@ -3,11 +3,6 @@ export interface Station {
   name: string;
   color: string;
   logoText: string;
-  address?: string;
-  phone?: string;
-  stationType?: string;
-  lat?: string;
-  lng?: string;
   /** Admin-managed display priority; lower = higher. 999 = end of the list. */
   sortOrder: number;
 }

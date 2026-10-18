@@ -35,25 +35,10 @@ internal sealed class BrandConfiguration : IEntityTypeConfiguration<Brand>
             .HasMaxLength(64)
             .IsRequired();
 
-        builder.Property(e => e.Address)
-            .HasColumnName("address")
-            .HasMaxLength(500);
-
-        builder.Property(e => e.Phone)
-            .HasColumnName("phone")
-            .HasMaxLength(45);
-
-        builder.Property(e => e.StationType)
-            .HasColumnName("station_type")
-            .HasMaxLength(64);
-
-        builder.Property(e => e.Lat)
-            .HasColumnName("lat")
-            .HasColumnType("double precision");
-
-        builder.Property(e => e.Lng)
-            .HasColumnName("lng")
-            .HasColumnType("double precision");
+        // Everything that describes a place - address, phone, station_type, lat, lng - belongs to a
+        // row in `brand_stations`, not here. A network is not somewhere you can stand: OKKO has twenty
+        // of those and no single one of them is "the OKKO address". The columns sat here all NULL, and
+        // `IX_brands_station_type` indexed four NULLs.
 
         builder.Property(e => e.SortOrder)
             .HasColumnName("sort_order")
@@ -79,11 +64,6 @@ internal sealed class BrandConfiguration : IEntityTypeConfiguration<Brand>
         builder.HasQueryFilter(e => !e.IsDeleted);
 
         builder.HasIndex(e => e.Name);
-        builder.HasIndex(e => e.StationType);
-
-        // The catalog keys are natural strings ("okko", "wog"), not UUIDs - readable in a row
-        // and meaningful to the operator. That is a deliberate choice, and this constraint is the
-        // only thing bounding them: `id` stays `text` because converting a primary key's type means
         // dropping and recreating every foreign key that points at it, across seven tables, and
         // the gain would be cosmetic. A CHECK gets the guarantee that actually matters - a slug
         // cannot silently become a paragraph - for the cost of one line and zero refactoring.
