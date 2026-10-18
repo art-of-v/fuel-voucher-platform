@@ -65,7 +65,7 @@ public class PricingRuleTests : IClassFixture<TestDatabaseFixture>
         context.FuelOffers.Add(new FuelOffer
         {
             Id = id,
-            StationId = fuel.StationId,
+            BrandId = fuel.BrandId,
             FuelTypeId = fuel.Id,
             CreatedAtUtc = now,
             UpdatedAtUtc = now,

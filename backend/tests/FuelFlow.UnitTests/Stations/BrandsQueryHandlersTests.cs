@@ -9,13 +9,18 @@ using FuelFlow.Features.Brands.GetAdminBrands;
 using FuelFlow.Features.Brands.GetPackageSuggestions;
 using FuelFlow.Features.Brands.GetPublicPackages;
 using FuelFlow.Features.Brands.GetPublicPackagesByBrand;
-using FuelFlow.Features.Brands.GetPublicStationNodes;
-using FuelFlow.Features.Brands.GetPublicStationNodesByBrand;
+using FuelFlow.Features.Brands.GetPublicBrandStations;
+using FuelFlow.Features.Brands.GetPublicBrandStationsByBrand;
 using FuelFlow.Features.Brands.GetPublicBrands;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Availability;
 using Microsoft.Extensions.Configuration;
 using FuelFlow.Features.Vouchers.SharedModels;
+using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
+using Microsoft.EntityFrameworkCore;
+
+
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -112,32 +117,32 @@ public sealed class BrandsQueryHandlersTests : IDisposable
     }
 
     [Fact]
-    public async Task GetPublicStationNodes_ShouldReturnAllNodes()
+    public async Task GetPublicBrandStations_ShouldReturnAllNodes()
     {
-        _context.StationNodes.AddRange(
-            CreateStationNode("node-1", "Brand-a", "Node A"),
-            CreateStationNode("node-2", "Brand-b", "Node B"));
+        _context.BrandStations.AddRange(
+CreateBrandStation("node-1", "Brand-a", "Node A"),
+                CreateBrandStation("node-2", "Brand-b", "Node B"));
         await _context.SaveChangesAsync();
 
-        var handler = new GetPublicStationNodesQueryHandler(_context);
+        var handler = new GetPublicBrandStationsQueryHandler(_context);
 
-        var result = await handler.HandleAsync(new GetPublicStationNodesQuery());
+        var result = await handler.HandleAsync(new GetPublicBrandStationsQuery());
 
         result.Should().HaveCount(2);
     }
 
     [Fact]
-    public async Task GetPublicStationNodesByBrand_ShouldFilterByBrandId()
+    public async Task GetPublicBrandStationsByBrand_ShouldFilterByBrandId()
     {
-        _context.StationNodes.AddRange(
-            CreateStationNode("node-1", "Brand-a", "Node A1"),
-            CreateStationNode("node-2", "Brand-a", "Node A2"),
-            CreateStationNode("node-3", "Brand-b", "Node B"));
+        _context.BrandStations.AddRange(
+            CreateBrandStation("node-1", "Brand-a", "Node A1"),
+            CreateBrandStation("node-2", "Brand-a", "Node A2"),
+            CreateBrandStation("node-3", "Brand-b", "Node B"));
         await _context.SaveChangesAsync();
 
-        var handler = new GetPublicStationNodesByBrandQueryHandler(_context);
+        var handler = new GetPublicBrandStationsByBrandQueryHandler(_context);
 
-        var result = await handler.HandleAsync(new GetPublicStationNodesByBrandQuery("Brand-a"));
+        var result = await handler.HandleAsync(new GetPublicBrandStationsByBrandQuery("Brand-a"));
 
         result.Should().HaveCount(2);
         result.Should().OnlyContain(n => n.BrandId == "Brand-a");
@@ -644,9 +649,9 @@ public sealed class BrandsQueryHandlersTests : IDisposable
         };
     }
 
-    private static StationNode CreateStationNode(string id, string BrandId, string name)
+    private static BrandStation CreateBrandStation(string id, string BrandId, string name)
     {
-        return new StationNode
+        return new BrandStation
         {
             Id = id,
             BrandId = BrandId,

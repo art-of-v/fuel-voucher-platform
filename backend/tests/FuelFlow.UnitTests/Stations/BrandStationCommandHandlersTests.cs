@@ -1,22 +1,22 @@
 using FluentAssertions;
 using FuelFlow.Features.Brands;
-using FuelFlow.Features.Brands.CreateStationNode;
-using FuelFlow.Features.Brands.DeleteStationNode;
-using FuelFlow.Features.Brands.GetAdminStationNodeById;
-using FuelFlow.Features.Brands.GetAdminStationNodes;
-using FuelFlow.Features.Brands.ImportStationNodes;
-using FuelFlow.Features.Brands.UpdateStationNode;
+using FuelFlow.Features.Brands.CreateBrandStation;
+using FuelFlow.Features.Brands.DeleteBrandStation;
+using FuelFlow.Features.Brands.GetAdminBrandStationById;
+using FuelFlow.Features.Brands.GetAdminBrandStations;
+using FuelFlow.Features.Brands.ImportBrandStations;
+using FuelFlow.Features.Brands.UpdateBrandStation;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.UnitTests.Brands;
 
-public sealed class StationNodeCommandHandlersTests : IDisposable
+public sealed class BrandStationCommandHandlersTests : IDisposable
 {
     private readonly ApplicationDbContext _context;
 
-    public StationNodeCommandHandlersTests()
+    public BrandStationCommandHandlersTests()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
@@ -32,68 +32,68 @@ public sealed class StationNodeCommandHandlersTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateStationNode_ShouldAdd()
+    public async Task CreateBrandStation_ShouldAdd()
     {
         await AddBrandAsync("okko");
         var node = Node("okko-1", "okko", "OKKO Центр", 50.45, 30.52);
 
-        var result = await new CreateStationNodeCommandHandler(_context).HandleAsync(new CreateStationNodeCommand(node));
+        var result = await new CreateBrandStationCommandHandler(_context).HandleAsync(new CreateBrandStationCommand(node));
 
         result.Success.Should().BeTrue();
         result.Node.Should().BeSameAs(node);
-        var persisted = await _context.StationNodes.FindAsync("okko-1");
+        var persisted = await _context.BrandStations.FindAsync("okko-1");
         persisted.Should().NotBeNull();
         persisted!.CreatedAtUtc.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
     }
 
     [Fact]
-    public async Task CreateStationNode_ShouldReturnConflict_WhenIdExists()
+    public async Task CreateBrandStation_ShouldReturnConflict_WhenIdExists()
     {
         await AddBrandAsync("okko");
-        _context.StationNodes.Add(Node("okko-1", "okko", "Existing", 50.45, 30.52));
+        _context.BrandStations.Add(Node("okko-1", "okko", "Existing", 50.45, 30.52));
         await _context.SaveChangesAsync();
 
-        var result = await new CreateStationNodeCommandHandler(_context)
-            .HandleAsync(new CreateStationNodeCommand(Node("okko-1", "okko", "Dup", 50.45, 30.52)));
+        var result = await new CreateBrandStationCommandHandler(_context)
+            .HandleAsync(new CreateBrandStationCommand(Node("okko-1", "okko", "Dup", 50.45, 30.52)));
 
         result.Conflict.Should().BeTrue();
         result.Error.Should().Contain("already exists");
     }
 
     [Fact]
-    public async Task CreateStationNode_ShouldReject_WhenBrandMissing()
+    public async Task CreateBrandStation_ShouldReject_WhenBrandMissing()
     {
-        var result = await new CreateStationNodeCommandHandler(_context)
-            .HandleAsync(new CreateStationNodeCommand(Node("x-1", "ghost", "X", 50.45, 30.52)));
+        var result = await new CreateBrandStationCommandHandler(_context)
+            .HandleAsync(new CreateBrandStationCommand(Node("x-1", "ghost", "X", 50.45, 30.52)));
 
         result.Success.Should().BeFalse();
         result.Error.Should().Contain("does not exist");
     }
 
     [Fact]
-    public async Task CreateStationNode_ShouldReject_WhenCoordinatesInvalid()
+    public async Task CreateBrandStation_ShouldReject_WhenCoordinatesInvalid()
     {
         await AddBrandAsync("okko");
-        var result = await new CreateStationNodeCommandHandler(_context)
-            .HandleAsync(new CreateStationNodeCommand(Node("okko-1", "okko", "X", 999, 30.52)));
+        var result = await new CreateBrandStationCommandHandler(_context)
+            .HandleAsync(new CreateBrandStationCommand(Node("okko-1", "okko", "X", 999, 30.52)));
 
         result.Success.Should().BeFalse();
         result.Error.Should().Contain("Lat");
     }
 
     [Fact]
-    public async Task UpdateStationNode_ShouldUpdateFields()
+    public async Task UpdateBrandStation_ShouldUpdateFields()
     {
         await AddBrandAsync("okko");
         await AddBrandAsync("wog");
-        _context.StationNodes.Add(Node("n-1", "okko", "Old", 50.0, 30.0));
+        _context.BrandStations.Add(Node("n-1", "okko", "Old", 50.0, 30.0));
         await _context.SaveChangesAsync();
 
-        var result = await new UpdateStationNodeCommandHandler(_context)
-            .HandleAsync(new UpdateStationNodeCommand("n-1", Node("n-1", "wog", "New", 49.0, 24.0, city: "Львів")));
+        var result = await new UpdateBrandStationCommandHandler(_context)
+            .HandleAsync(new UpdateBrandStationCommand("n-1", Node("n-1", "wog", "New", 49.0, 24.0, city: "Львів")));
 
         result.Success.Should().BeTrue();
-        var persisted = await _context.StationNodes.FindAsync("n-1");
+        var persisted = await _context.BrandStations.FindAsync("n-1");
         persisted!.BrandId.Should().Be("wog");
         persisted.Name.Should().Be("New");
         persisted.City.Should().Be("Львів");
@@ -101,81 +101,81 @@ public sealed class StationNodeCommandHandlersTests : IDisposable
     }
 
     [Fact]
-    public async Task UpdateStationNode_ShouldReturnNotFound()
+    public async Task UpdateBrandStation_ShouldReturnNotFound()
     {
         await AddBrandAsync("okko");
-        var result = await new UpdateStationNodeCommandHandler(_context)
-            .HandleAsync(new UpdateStationNodeCommand("missing", Node("missing", "okko", "X", 50.0, 30.0)));
+        var result = await new UpdateBrandStationCommandHandler(_context)
+            .HandleAsync(new UpdateBrandStationCommand("missing", Node("missing", "okko", "X", 50.0, 30.0)));
 
         result.NotFound.Should().BeTrue();
     }
 
     [Fact]
-    public async Task UpdateStationNode_ShouldReject_WhenBrandMissing()
+    public async Task UpdateBrandStation_ShouldReject_WhenBrandMissing()
     {
         await AddBrandAsync("okko");
-        _context.StationNodes.Add(Node("n-1", "okko", "Old", 50.0, 30.0));
+        _context.BrandStations.Add(Node("n-1", "okko", "Old", 50.0, 30.0));
         await _context.SaveChangesAsync();
 
-        var result = await new UpdateStationNodeCommandHandler(_context)
-            .HandleAsync(new UpdateStationNodeCommand("n-1", Node("n-1", "ghost", "New", 50.0, 30.0)));
+        var result = await new UpdateBrandStationCommandHandler(_context)
+            .HandleAsync(new UpdateBrandStationCommand("n-1", Node("n-1", "ghost", "New", 50.0, 30.0)));
 
         result.Success.Should().BeFalse();
         result.Error.Should().Contain("does not exist");
     }
 
     [Fact]
-    public async Task DeleteStationNode_ShouldRemove()
+    public async Task DeleteBrandStation_ShouldRemove()
     {
         await AddBrandAsync("okko");
-        _context.StationNodes.Add(Node("n-1", "okko", "X", 50.0, 30.0));
+        _context.BrandStations.Add(Node("n-1", "okko", "X", 50.0, 30.0));
         await _context.SaveChangesAsync();
 
-        var result = await new DeleteStationNodeCommandHandler(_context).HandleAsync(new DeleteStationNodeCommand("n-1"));
+        var result = await new DeleteBrandStationCommandHandler(_context).HandleAsync(new DeleteBrandStationCommand("n-1"));
 
         result.Should().BeTrue();
-        var archived = await _context.StationNodes.IgnoreQueryFilters().SingleAsync(n => n.Id == "n-1");
+        var archived = await _context.BrandStations.IgnoreQueryFilters().SingleAsync(n => n.Id == "n-1");
            archived.IsDeleted.Should().BeTrue();
            archived.DeletedAtUtc.Should().NotBeNull();
-           (await _context.StationNodes.CountAsync(n => n.Id == "n-1")).Should().Be(0,
+           (await _context.BrandStations.CountAsync(n => n.Id == "n-1")).Should().Be(0,
                "#217: a node is part of the Brand map other rows point at, so it is archived not removed");
     }
 
     [Fact]
-    public async Task DeleteStationNode_ShouldReturnFalse_WhenNotFound()
+    public async Task DeleteBrandStation_ShouldReturnFalse_WhenNotFound()
     {
-        var result = await new DeleteStationNodeCommandHandler(_context).HandleAsync(new DeleteStationNodeCommand("missing"));
+        var result = await new DeleteBrandStationCommandHandler(_context).HandleAsync(new DeleteBrandStationCommand("missing"));
         result.Should().BeFalse();
     }
 
     [Fact]
-    public async Task GetAdminStationNodes_ShouldFilterByBrandId()
+    public async Task GetAdminBrandStations_ShouldFilterByBrandId()
     {
         await AddBrandAsync("okko");
         await AddBrandAsync("wog");
-        _context.StationNodes.AddRange(
+        _context.BrandStations.AddRange(
             Node("o-1", "okko", "A", 50.0, 30.0),
             Node("o-2", "okko", "B", 50.1, 30.1),
             Node("w-1", "wog", "C", 50.2, 30.2));
         await _context.SaveChangesAsync();
 
-        var result = await new GetAdminStationNodesQueryHandler(_context)
-            .HandleAsync(new GetAdminStationNodesQuery(1, 50, "okko"));
+        var result = await new GetAdminBrandStationsQueryHandler(_context)
+            .HandleAsync(new GetAdminBrandStationsQuery(1, 50, "okko"));
 
         result.TotalCount.Should().Be(2);
         result.Items.Should().OnlyContain(n => n.BrandId == "okko");
     }
 
     [Fact]
-    public async Task GetAdminStationNodeById_ShouldReturnNode_OrNull()
+    public async Task GetAdminBrandStationById_ShouldReturnNode_OrNull()
     {
         await AddBrandAsync("okko");
-        _context.StationNodes.Add(Node("n-1", "okko", "X", 50.0, 30.0));
+        _context.BrandStations.Add(Node("n-1", "okko", "X", 50.0, 30.0));
         await _context.SaveChangesAsync();
 
-        var handler = new GetAdminStationNodeByIdQueryHandler(_context);
-        (await handler.HandleAsync(new GetAdminStationNodeByIdQuery("n-1"))).Should().NotBeNull();
-        (await handler.HandleAsync(new GetAdminStationNodeByIdQuery("missing"))).Should().BeNull();
+        var handler = new GetAdminBrandStationByIdQueryHandler(_context);
+        (await handler.HandleAsync(new GetAdminBrandStationByIdQuery("n-1"))).Should().NotBeNull();
+        (await handler.HandleAsync(new GetAdminBrandStationByIdQuery("missing"))).Should().BeNull();
     }
 
     [Fact]
@@ -189,14 +189,14 @@ public sealed class StationNodeCommandHandlersTests : IDisposable
         ]
         """;
 
-        var result = await new ImportStationNodesCommandHandler(_context)
-            .HandleAsync(new ImportStationNodesCommand(json, StationNodeImportFormat.Json));
+        var result = await new ImportBrandStationsCommandHandler(_context)
+            .HandleAsync(new ImportBrandStationsCommand(json, BrandStationImportFormat.Json));
 
         result.Added.Should().Be(2);
         result.Updated.Should().Be(0);
         result.Errors.Should().BeEmpty();
         // The id-less row got a coordinate-derived id.
-        (await _context.StationNodes.FindAsync(StationNodeCoordinates.DeriveId("okko", 50.40, 30.50))).Should().NotBeNull();
+        (await _context.BrandStations.FindAsync(BrandStationCoordinates.DeriveId("okko", 50.40, 30.50))).Should().NotBeNull();
     }
 
     [Fact]
@@ -205,16 +205,16 @@ public sealed class StationNodeCommandHandlersTests : IDisposable
         await AddBrandAsync("okko");
         var original = Node("okko-1", "okko", "Old", 50.45, 30.52);
         original.CreatedAtUtc = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-        _context.StationNodes.Add(original);
+        _context.BrandStations.Add(original);
         await _context.SaveChangesAsync();
 
         var json = """[ { "id": "okko-1", "BrandId": "okko", "name": "New Name", "lat": 50.45, "lng": 30.52 } ]""";
-        var result = await new ImportStationNodesCommandHandler(_context)
-            .HandleAsync(new ImportStationNodesCommand(json, StationNodeImportFormat.Json));
+        var result = await new ImportBrandStationsCommandHandler(_context)
+            .HandleAsync(new ImportBrandStationsCommand(json, BrandStationImportFormat.Json));
 
         result.Added.Should().Be(0);
         result.Updated.Should().Be(1);
-        var persisted = await _context.StationNodes.FindAsync("okko-1");
+        var persisted = await _context.BrandStations.FindAsync("okko-1");
         persisted!.Name.Should().Be("New Name");
         persisted.CreatedAtUtc.Should().Be(new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc));
     }
@@ -232,8 +232,8 @@ public sealed class StationNodeCommandHandlersTests : IDisposable
         ]
         """;
 
-        var result = await new ImportStationNodesCommandHandler(_context)
-            .HandleAsync(new ImportStationNodesCommand(json, StationNodeImportFormat.Json));
+        var result = await new ImportBrandStationsCommandHandler(_context)
+            .HandleAsync(new ImportBrandStationsCommand(json, BrandStationImportFormat.Json));
 
         result.Added.Should().Be(1);
         result.Errors.Should().HaveCount(3);
@@ -251,11 +251,11 @@ public sealed class StationNodeCommandHandlersTests : IDisposable
         ]
         """;
 
-        var result = await new ImportStationNodesCommandHandler(_context)
-            .HandleAsync(new ImportStationNodesCommand(json, StationNodeImportFormat.Json));
+        var result = await new ImportBrandStationsCommandHandler(_context)
+            .HandleAsync(new ImportBrandStationsCommand(json, BrandStationImportFormat.Json));
 
         result.Added.Should().Be(1);
-        (await _context.StationNodes.FindAsync("okko-1"))!.Name.Should().Be("Second");
+        (await _context.BrandStations.FindAsync("okko-1"))!.Name.Should().Be("Second");
     }
 
     [Fact]
@@ -265,18 +265,18 @@ public sealed class StationNodeCommandHandlersTests : IDisposable
         var csv = "id,BrandId,name,address,lat,lng\n" +
                   "okko-1,okko,Центр,\"Проспект Перемоги, 98\",50.45,30.52\n";
 
-        var result = await new ImportStationNodesCommandHandler(_context)
-            .HandleAsync(new ImportStationNodesCommand(csv, StationNodeImportFormat.Csv));
+        var result = await new ImportBrandStationsCommandHandler(_context)
+            .HandleAsync(new ImportBrandStationsCommand(csv, BrandStationImportFormat.Csv));
 
         result.Added.Should().Be(1);
-        (await _context.StationNodes.FindAsync("okko-1"))!.Address.Should().Be("Проспект Перемоги, 98");
+        (await _context.BrandStations.FindAsync("okko-1"))!.Address.Should().Be("Проспект Перемоги, 98");
     }
 
     [Fact]
     public void Parser_ShouldReportError_ForInvalidCsvCoordinate()
     {
         var csv = "id,BrandId,name,lat,lng\nokko-1,okko,Центр,not-a-number,30.52\n";
-        var parsed = StationNodeImportParser.Parse(csv, StationNodeImportFormat.Csv);
+        var parsed = BrandStationImportParser.Parse(csv, BrandStationImportFormat.Csv);
 
         parsed.Rows.Should().BeEmpty();
         parsed.Errors.Should().ContainSingle().Which.Line.Should().Be(2);
@@ -285,7 +285,7 @@ public sealed class StationNodeCommandHandlersTests : IDisposable
     [Fact]
     public void Parser_ShouldReportError_ForMalformedJson()
     {
-        var parsed = StationNodeImportParser.Parse("{ not json", StationNodeImportFormat.Json);
+        var parsed = BrandStationImportParser.Parse("{ not json", BrandStationImportFormat.Json);
         parsed.Errors.Should().NotBeEmpty();
     }
 
@@ -295,7 +295,7 @@ public sealed class StationNodeCommandHandlersTests : IDisposable
         await _context.SaveChangesAsync();
     }
 
-    private static StationNode Node(string id, string BrandId, string name, double lat, double lng, string? city = null) =>
+    private static BrandStation Node(string id, string BrandId, string name, double lat, double lng, string? city = null) =>
         new()
         {
             Id = id,
