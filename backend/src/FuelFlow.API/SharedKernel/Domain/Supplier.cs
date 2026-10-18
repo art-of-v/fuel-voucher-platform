@@ -41,4 +41,25 @@ public sealed class Supplier
 
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
+
+    /// <summary>
+    /// Which supply route this supplier sells on: <see cref="AcquisitionSources.Direct"/> or
+    /// <see cref="AcquisitionSources.Partner"/>. The source of truth for
+    /// <c>FuelVoucher.AcquisitionSource</c>, which the import copies from here rather than asking the
+    /// operator to state the same fact twice on the same upload.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Immutable, like the voucher's, and for the same reason from the opposite direction. A supplier
+    /// that moves between routes is a different supply relationship, and a voucher bought last quarter
+    /// has to keep reporting in the bucket it was bought into - which is precisely why the voucher
+    /// column is a copy rather than a join. An editable value here would silently drag historical
+    /// vouchers into another bucket the day somebody corrected it.
+    /// </para>
+    /// <para>
+    /// Defaults to <see cref="AcquisitionSources.Direct"/> because every supplier in the database
+    /// today sells on that route, so the back-fill is a statement of fact rather than an assumption.
+    /// </para>
+    /// </remarks>
+    public string AcquisitionSource { get; set; } = AcquisitionSources.Default;
 }

@@ -324,9 +324,14 @@ public class VoucherAcquisitionSourceTests : WebApplicationFactory<Program>, ICl
 
         try
         {
+            // Scaffold FIRST, then roll back. voucher_imports, suppliers and fuel_types are untouched
+            // by every migration between here and head, so the rows survive the downgrade - whereas
+            // seeding them afterwards goes through EF's model, which already carries acquisition_source
+            // on both tables and would ask for columns the old schema does not have.
+            var (importId, fuelTypeId, supplierId) = await SeedScaffoldingAsync();
+
             await migrator.MigrateAsync(BeforeThisMigration);
 
-            var (importId, fuelTypeId, supplierId) = await SeedScaffoldingAsync();
             preExisting = Guid.NewGuid();
             var voucherNumber = "ACQ-PRE-" + Guid.NewGuid().ToString("N");
             var qrPayload = "ACQ-PRE-QR-" + Guid.NewGuid().ToString("N");

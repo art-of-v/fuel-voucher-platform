@@ -150,6 +150,13 @@ public sealed class ImportVouchersCommandHandler
         }
         var supplierId = supplier.Id;
 
+        // The route the vouchers are acquired on, taken from the supplier rather than from the upload.
+        // One PDF is one supplier's delivery, so the operator has already stated the supply relationship
+        // by choosing the supplier; asking for the route as well would let the two disagree, and would
+        // allow the same supplier to appear in both buckets. Read once here because it is fixed for the
+        // whole job and every voucher in it carries the same value.
+        var acquisitionSource = supplier.AcquisitionSource;
+
         // Per-brand tally for the imported-vouchers metric. Brand is a small,
         // bounded set, unlike the file name, so it is safe as a metric label.
         var importedVouchersByProvider = new Dictionary<string, int>();
@@ -439,6 +446,10 @@ public sealed class ImportVouchersCommandHandler
                             // Who issued this paper. One PDF is one supplier's delivery, so it is decided
                             // once by the operator before upload rather than guessed per voucher.
                             SupplierId = supplierId,
+                            // Copied from the supplier above, not chosen here. It is immutable on the
+                            // voucher, so this is the moment it is decided: correcting a wrong route
+                            // afterwards means replacing the vouchers, not editing them.
+                            AcquisitionSource = acquisitionSource,
                             QrParametersId = qrParams.Id,
                             UpdatedAtUtc = DateTime.UtcNow
                         };

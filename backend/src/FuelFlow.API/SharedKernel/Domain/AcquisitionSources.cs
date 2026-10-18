@@ -22,11 +22,16 @@ namespace FuelFlow.SharedKernel.Domain;
 /// about what a bare boolean defaults to.
 /// </para>
 /// <para>
-/// <b>Why the values are named for the relationship rather than for the party.</b> A voucher's route
-/// is a property of the supply arrangement, and the party behind it is already recorded - on the
-/// supplier, and on the legal entity that owns the stock. Naming the value after the counterparty
-/// would duplicate that reference and put a second, independently-updatable copy of a supplier fact
-/// on a table that holds tens of thousands of rows.
+/// <b>Where the fact lives.</b> On <c>Supplier.AcquisitionSource</c> - the supply relationship is the
+/// thing that has a route, and the import copies it onto each voucher. The voucher column is a copy
+/// and not a join, because a voucher's cost has to stay in the bucket it was bought into even if the
+/// supplier is ever reclassified.
+/// </para>
+/// <para>
+/// <b>Why the values are neutral rather than named after the party.</b> The party is already recorded
+/// - on the supplier row, and on the legal entity that owns the stock. A value like
+/// <c>acquisition_source = 'okko'</c> would duplicate that reference on a table that holds tens of
+/// thousands of rows, and adding a supplier would mean adding a value to a CHECK constraint.
 /// </para>
 /// </remarks>
 public static class AcquisitionSources

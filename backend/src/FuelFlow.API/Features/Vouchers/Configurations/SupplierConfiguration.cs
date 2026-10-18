@@ -64,6 +64,19 @@ internal sealed class SupplierConfiguration : IEntityTypeConfiguration<Supplier>
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 
+        // HasDefaultValue as well as the CLR default: the value has to reach the database for the
+        // supplier-creation paths that do not think in terms of routes at all, and EF omits an unset
+        // column from the INSERT.
+        builder.Property(e => e.AcquisitionSource)
+            .HasColumnName("acquisition_source")
+            .HasMaxLength(10)
+            .HasDefaultValue(AcquisitionSources.Default)
+            .IsRequired();
+
+        // The value set AcquisitionSources.All documents - see AcquisitionSources.
+        builder.ToTable(t =>
+            t.HasCheckConstraint("ck_suppliers_acquisition_source", "acquisition_source IN ('direct', 'partner')"));
+
         // The operator picks a supplier by name; duplicate names would make that ambiguous.
         builder.HasIndex(e => e.Name)
             .IsUnique();
