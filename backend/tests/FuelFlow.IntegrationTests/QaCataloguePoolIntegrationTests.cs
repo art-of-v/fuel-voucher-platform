@@ -35,8 +35,15 @@ namespace FuelFlow.IntegrationTests;
 [Collection("Integration Tests")]
 public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture>
 {
-    /// <summary>One Brand, one fuel, one nominal — sold in both pools.</summary>
-    private const string Brand = "qa-pool-okko";
+/// <summary>
+    /// A brand of this test's own. It has to be one: the assertions below are <c>Assert.Single</c> on
+    /// the packages a brand sells, and the seeded OKKO catalogue would answer that with rows this test
+    /// never wrote. Fixed rather than generated so a second seeding finds the row the first left.
+    /// </summary>
+    private static readonly Guid Brand = new("9f3c1d20-7a54-4c1e-9b6d-2f0c8a1e5b71");
+
+    /// <summary>The network's own code, and what a voucher's brand NAME is matched against.</summary>
+    private const string BrandSlug = "qa-pool-okko";
     private const string FuelType = "qa-pool-95";
 
     /// <summary>
@@ -72,6 +79,23 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
         using var scope = _fixture.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var now = DateTime.UtcNow;
+
+        // The public catalogue joins the brand row for the slug, so a package whose brand was never
+        // seeded would silently vanish from the response instead of failing the test.
+        if (!await context.Brands.AnyAsync(b => b.Id == Brand, CancellationToken.None))
+        {
+            context.Brands.Add(new Brand
+            {
+                Id = Brand,
+                Slug = BrandSlug,
+                Name = "QA pool",
+                LogoText = "QA",
+                Color = "#00ff80",
+                SortOrder = 999,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now
+            });
+        }
 
         if (!await context.FuelTypes.AnyAsync(f => f.Id == FuelType, CancellationToken.None))
         {
@@ -123,10 +147,10 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
     private static FuelVoucher SellableVoucher(decimal liters, bool isTestData) => new()
     {
         Id = Guid.CreateVersion7(),
-        // Brand is the Brand id, compared case-insensitively - StockKey is
-        // (Brand, fuel type, nominal), so a row keyed to the network name instead of the Brand
-        // would never match its own package.
-        Brand = Brand,
+        // Brand is the network's NAME, compared case-insensitively against the slug -
+        // StockKey is (brand, fuel type, nominal), so a row keyed to the brand's id instead would
+        // never match its own package. See StockKey for why those two have always been the same string.
+        Brand = BrandSlug,
         FuelTypeId = FuelType,
         Liters = liters,
         CostPerLiter = 45m,
@@ -170,9 +194,12 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
         return client;
     }
 
-    private async Task<List<PublicPackageResponse>> PackagesAsync(HttpClient client, bool byBrand, string brand = Brand)
+    private async Task<List<PublicPackageResponse>> PackagesAsync(HttpClient client, bool byBrand, Guid? brand = null)
     {
-        var route = byBrand ? $"/api/packages/{brand}" : "/api/packages";
+        // `brand` defaults to null rather than to `Brand` because a static readonly Guid is not a
+        // compile-time constant and cannot be a default parameter value; the route uses whichever it
+        // was handed, and the filter below is what these tests actually assert on.
+        var route = byBrand ? $"/api/packages/{brand ?? Brand}" : "/api/packages";
         var response = await client.GetAsync(route);
         response.EnsureSuccessStatusCode();
         var packages = await response.Content.ReadFromJsonAsync<List<PublicPackageResponse>>();

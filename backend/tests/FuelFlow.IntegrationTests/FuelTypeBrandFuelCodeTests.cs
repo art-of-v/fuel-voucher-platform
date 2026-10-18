@@ -1,3 +1,4 @@
+using FuelFlow.Features.Brands;
 using FluentAssertions;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
@@ -50,11 +51,11 @@ public sealed class FuelTypeBrandFuelCodeTests : IClassFixture<TestDatabaseFixtu
         ["okko-gas"] = "SPBT",
     };
 
-    private static FuelTypeEntity Fuel(string id, string BrandId, string name, string? code)
+    private static FuelTypeEntity Fuel(string id, Guid brandId, string name, string? code)
         => new()
         {
             Id = id,
-            BrandId = BrandId,
+            BrandId = brandId,
             Name = name,
             BrandFuelCode = code,
             BasePrice = 50m,
@@ -71,11 +72,11 @@ public sealed class FuelTypeBrandFuelCodeTests : IClassFixture<TestDatabaseFixtu
         await using var context = CreateContext();
         var now = DateTime.UtcNow;
 
-        context.FuelTypes.Add(Fuel("code-a", "okko", "ДП ЄВРО (code test)", "9018"));
+        context.FuelTypes.Add(Fuel("$1", BrandIds.Okko, "ДП ЄВРО (code test)", "9018"));
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
 
-        context.FuelTypes.Add(Fuel("code-b", "okko", "ДП ЄВРО (code test 2)", "9018"));
+        context.FuelTypes.Add(Fuel("$1", BrandIds.Okko, "ДП ЄВРО (code test 2)", "9018"));
 
         var act = async () => await context.SaveChangesAsync();
         await act.Should().ThrowAsync<DbUpdateException>();
@@ -94,8 +95,8 @@ public sealed class FuelTypeBrandFuelCodeTests : IClassFixture<TestDatabaseFixtu
         // which is how a test stops testing what its name says.
         await using var context = CreateContext();
 
-        context.FuelTypes.Add(Fuel("net-a", "okko", "A-95 (code test)", "A-95 EXTRA"));
-        context.FuelTypes.Add(Fuel("net-b", "wog", "A-95 Mustang (code test)", "A-95 EXTRA"));
+        context.FuelTypes.Add(Fuel("$1", BrandIds.Okko, "A-95 (code test)", "A-95 EXTRA"));
+        context.FuelTypes.Add(Fuel("$1", BrandIds.Wog, "A-95 Mustang (code test)", "A-95 EXTRA"));
 
         var act = async () => await context.SaveChangesAsync();
         await act.Should().NotThrowAsync();
@@ -110,8 +111,8 @@ public sealed class FuelTypeBrandFuelCodeTests : IClassFixture<TestDatabaseFixtu
         // hand-entered fuel and a rehearsal fuel are both legitimately code-less.
         await using var context = CreateContext();
 
-        context.FuelTypes.Add(Fuel("nocode-a", "upg", "Паливо без коду (code test)", null));
-        context.FuelTypes.Add(Fuel("nocode-b", "upg", "Ще одне без коду (code test)", null));
+        context.FuelTypes.Add(Fuel("nocode-a", BrandIds.Upg, "Паливо без коду (code test)", null));
+        context.FuelTypes.Add(Fuel("nocode-b", BrandIds.Upg, "Ще одне без коду (code test)", null));
 
         var act = async () => await context.SaveChangesAsync();
         await act.Should().NotThrowAsync();
@@ -126,13 +127,13 @@ public sealed class FuelTypeBrandFuelCodeTests : IClassFixture<TestDatabaseFixtu
         // fuel out of the catalogue releases its code for the fuel that replaces it.
         await using var context = CreateContext();
 
-        context.FuelTypes.Add(Fuel("arch-code-a", "klo", "ДП (code reuse test)", "9018"));
+        context.FuelTypes.Add(Fuel("arch-code-a", BrandIds.Klo, "ДП (code reuse test)", "9018"));
         await context.SaveChangesAsync();
         await context.Database.ExecuteSqlRawAsync(
             "UPDATE fuel_types SET is_deleted = true, deleted_at_utc = now() WHERE id = 'arch-code-a'");
 
         context.ChangeTracker.Clear();
-        context.FuelTypes.Add(Fuel("arch-code-b", "klo", "ДП (code reuse test)", "9018"));
+        context.FuelTypes.Add(Fuel("arch-code-b", BrandIds.Klo, "ДП (code reuse test)", "9018"));
 
         var act = async () => await context.SaveChangesAsync();
         await act.Should().NotThrowAsync();
@@ -169,7 +170,7 @@ public sealed class FuelTypeBrandFuelCodeTests : IClassFixture<TestDatabaseFixtu
         await using var context = CreateContext();
 
         var seeded = (await context.FuelTypes
-                .Where(f => f.BrandId == "okko")
+                .Where(f => f.BrandId == BrandIds.Okko)
                 .ToListAsync())
             .Where(f => SeedCodeMap.ContainsKey(f.Id))
             .ToDictionary(f => f.Id, f => f.BrandFuelCode);
@@ -198,7 +199,7 @@ public sealed class FuelTypeBrandFuelCodeTests : IClassFixture<TestDatabaseFixtu
         await using var context = CreateContext();
 
         var wog = await context.FuelTypes
-            .Where(f => f.BrandId == "wog")
+.Where(f => f.BrandId == BrandIds.Wog)
             .Select(f => new { f.Name, f.BrandFuelCode })
             .ToListAsync();
 
@@ -250,7 +251,7 @@ public sealed class FuelTypeBrandFuelCodeTests : IClassFixture<TestDatabaseFixtu
         // is bounded rather than free text — the same call as every other catalog column (F-24).
         await using var context = CreateContext();
 
-        context.FuelTypes.Add(Fuel("long-code", "okko", "Довгий код (code test)", new string('x', 51)));
+        context.FuelTypes.Add(Fuel("$1", BrandIds.Okko, "Довгий код (code test)", new string('x', 51)));
 
         var act = async () => await context.SaveChangesAsync();
         await act.Should().ThrowAsync<DbUpdateException>();

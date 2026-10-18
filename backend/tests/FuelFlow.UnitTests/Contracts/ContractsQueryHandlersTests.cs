@@ -57,7 +57,7 @@ public sealed class ContractsQueryHandlersTests : IDisposable
     {
         return new Brand
         {
-            Id = "okko",
+            Id = BrandIds.Okko, Slug = "okko",
             Name = "OKKO",
             LogoText = "OKKO",
             Color = "#22c55e",

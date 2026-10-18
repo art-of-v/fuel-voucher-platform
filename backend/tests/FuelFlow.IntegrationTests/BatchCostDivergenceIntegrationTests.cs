@@ -203,7 +203,7 @@ seed.FuelTypes.Add(new FuelTypeEntity
             {
                 Id = "okko-dp",
                 Name = "Дизель",
-                BrandId = "okko",
+                BrandId = BrandIds.Okko,
                 BasePrice = 60m,
                 DiscountPrice = 60m,
                 CreatedAtUtc = DateTime.UtcNow,

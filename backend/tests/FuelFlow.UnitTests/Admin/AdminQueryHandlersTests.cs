@@ -40,8 +40,8 @@ public sealed class AdminQueryHandlersTests : IDisposable
         // (Brand, fuel, litres) -> offer, so a fixture left in fuel_packages leaves every margin
         // lookup empty and every margin assertion reading zero - which looks like a broken report
         // rather than a broken fixture.
-        _context.SeedPackage("okko-95-50", "okko", "okko-95", 50m, 1000m, marginUahPerLiter: 2.0m);
-        _context.SeedPackage("wog-dp-20", "wog", "wog-dp", 20m, 1000m, marginUahPerLiter: 2.0m);
+        _context.SeedPackage("okko-95-50", BrandIds.Okko, "okko-95", 50m, 1000m, marginUahPerLiter: 2.0m);
+        _context.SeedPackage("wog-dp-20", BrandIds.Wog, "wog-dp", 20m, 1000m, marginUahPerLiter: 2.0m);
         _context.SaveChanges();
     }
 

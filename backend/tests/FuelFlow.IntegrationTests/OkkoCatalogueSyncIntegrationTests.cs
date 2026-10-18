@@ -39,7 +39,7 @@ namespace FuelFlow.IntegrationTests;
 [Collection("Integration Tests")]
 public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDatabaseFixture>
 {
-    private const string OkkoBrandId = "okko";
+    private static readonly Guid OkkoBrandId = BrandIds.Okko;
 
     private readonly TestDatabaseFixture _fixture;
 
@@ -65,9 +65,9 @@ public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDataba
         var priceRecorder = new OfferPriceRecorder(context);
         return new OkkoPriceSyncService(
             new StubClient(sheet),
-            new ImportOkkoPumpPricesCommandHandler(context, events, priceRecorder),
-            new ImportOkkoCatalogueCommandHandler(context, events, priceRecorder),
-            new BackfillBrandFuelCodesCommandHandler(context, events),
+            new ImportOkkoPumpPricesCommandHandler(context, new BrandSlugResolver(context), events, priceRecorder),
+            new ImportOkkoCatalogueCommandHandler(context, new BrandSlugResolver(context), events, priceRecorder),
+            new BackfillBrandFuelCodesCommandHandler(context, new BrandSlugResolver(context), events),
             context,
             Options.Create(new OkkoPriceOptions { Enabled = true }),
             logger ?? NullLogger<OkkoPriceSyncService>.Instance);

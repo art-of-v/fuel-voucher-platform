@@ -75,7 +75,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
 
         _context.Brands.Add(new Brand
         {
-            Id = "okko", Name = "OKKO", Color = "#22c55e", LogoText = "OKKO",
+            Id = BrandIds.Okko, Slug = "okko", Name = "OKKO", Color = "#22c55e", LogoText = "OKKO",
             CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
         });
         _context.SaveChanges();
@@ -117,7 +117,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
     public async Task AddFuel_WithoutTheFlag_IsRefused()
     {
         var result = await _controller.AddFuel(
-            "okko",
+            BrandIds.Okko,
             new CreateFuelRequest
             {
                 Name = "А95 ЄВРО",
@@ -149,7 +149,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
     public async Task ARehearsalLookingFuel_CannotBeSavedAsLive(string name, bool? _)
     {
         var result = await _controller.AddFuel(
-            "okko",
+            BrandIds.Okko,
             new CreateFuelRequest
             {
                 Name = name,
@@ -170,7 +170,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
     {
         // The guard must not make rehearsal naming impossible - the seeds name rows exactly like this.
         var result = await _controller.AddFuel(
-            "okko",
+            BrandIds.Okko,
             new CreateFuelRequest
             {
                 Name = "А95 ЄВРО (ТЕСТ 1ГРН)",
@@ -190,7 +190,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
     public async Task AnOrdinaryFuel_IsUnaffected()
     {
         var result = await _controller.AddFuel(
-            "okko",
+            BrandIds.Okko,
             new CreateFuelRequest
             {
                 Name = "А95 ЄВРО",
@@ -223,7 +223,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
     public async Task OrdinaryFuelNames_AreNotMistakenForRehearsal(string name)
     {
         var result = await _controller.AddFuel(
-            "okko",
+            BrandIds.Okko,
             new CreateFuelRequest
             {
                 Name = name,
@@ -259,7 +259,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         await _context.SaveChangesAsync(); // the guard reads the row, not the change tracker
 
         var result = await _controller.AddFuel(
-            "okko",
+            BrandIds.Okko,
             new CreateFuelRequest
             {
                 Name = "А95 ЄВРО(QA)",
@@ -273,7 +273,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
 
         var conflict = result.Should().BeOfType<ConflictObjectResult>().Subject;
 
-        (await _context.FuelTypes.CountAsync(f => f.BrandId == "okko" && f.Name == "А95 ЄВРО(QA)"))
+        (await _context.FuelTypes.CountAsync(f => f.BrandId == BrandIds.Okko && f.Name == "А95 ЄВРО(QA)"))
             .Should().Be(1, "a second row for the same fuel is a second offer the storefront would list twice");
 
         (await _context.FuelOffers.CountAsync()).Should().Be(1, "and it must not have created one");
@@ -289,13 +289,13 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
 
         _context.Brands.Add(new Brand
         {
-            Id = "wog", Name = "WOG", Color = "#10b981", LogoText = "WOG",
+            Id = BrandIds.Wog, Slug = "wog", Name = "WOG", Color = "#10b981", LogoText = "WOG",
             CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
         });
         await _context.SaveChangesAsync();
 
         var result = await _controller.AddFuel(
-            "wog",
+            BrandIds.Wog,
             new CreateFuelRequest
             {
                 Name = "А95 ЄВРО(QA)",
@@ -324,7 +324,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         await _context.SaveChangesAsync();
 
         var result = await _controller.AddFuel(
-            "okko",
+            BrandIds.Okko,
             new CreateFuelRequest
             {
                 Name = "А95 ЄВРО(QA)",
@@ -353,7 +353,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         await _context.SaveChangesAsync();
 
         var result = await _controller.AddFuel(
-            "okko",
+            BrandIds.Okko,
             new CreateFuelRequest
             {
                 Name = "ДП (code guard test)",
@@ -450,7 +450,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
     {
         _context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = "qa-a95", BrandId = "okko", Name = "А95 ЄВРО(QA)",
+            Id = "qa-a95", BrandId = BrandIds.Okko, Name = "А95 ЄВРО(QA)",
             BasePrice = 92.90m, DiscountPrice = 72.34m,
             CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
         });
@@ -460,7 +460,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         // screens read back.
         var offer = new FuelOffer
         {
-            Id = "qa-offer-a95", BrandId = "okko", FuelTypeId = "qa-a95",
+            Id = "qa-offer-a95", BrandId = BrandIds.Okko, FuelTypeId = "qa-a95",
             IsTestData = true,
             CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
         };

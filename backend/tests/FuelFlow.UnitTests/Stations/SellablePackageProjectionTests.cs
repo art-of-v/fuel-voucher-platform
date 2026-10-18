@@ -44,7 +44,7 @@ public sealed class SellablePackageProjectionTests : IDisposable
         {
             Id = "projection-fuel",
             Name = "А-95 (projection fixture)",
-            BrandId = "okko",
+            BrandId = BrandIds.Okko,
             BasePrice = 0m,
             DiscountPrice = 0m,
             MarginUahPerLiter = 2m,
@@ -54,7 +54,7 @@ public sealed class SellablePackageProjectionTests : IDisposable
         var offer = new FuelOffer
         {
             Id = "projection-fuel",
-            BrandId = "okko",
+            BrandId = BrandIds.Okko,
             FuelTypeId = fuel.Id,
             DataKind = DataKinds.Real,
             SupplierPricePerLiter = 49m,
@@ -87,7 +87,9 @@ public sealed class SellablePackageProjectionTests : IDisposable
             await _context.FuelOffers.SingleAsync(o => o.Id == offer.Id),
             // Third of the join, for the same reason the projection takes it: the margin is the fuel's.
             await _context.FuelTypes.SingleAsync(f => f.Id == offer.FuelTypeId),
-            nominal.Liters);
+// The slug is the fourth half of the identity: it is what the storefront groups and labels
+            // by, and what the stock key matches a voucher's brand NAME against.
+            nominal.Liters, "okko");
 
         projected.Should().BeEquivalentTo(composed);
 

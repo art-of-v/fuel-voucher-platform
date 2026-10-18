@@ -35,25 +35,25 @@ public sealed class FuelTypeProductCodeTests : IClassFixture<TestDatabaseFixture
             .UseNpgsql(_fixture.ConnectionString)
             .Options, TestQrCipher.Instance);
 
-    private static FuelTypeProductCode Code(string fuelTypeId, string BrandId, string productCode)
-        => new() { FuelTypeId = fuelTypeId, BrandId = BrandId, ProductCode = productCode };
+    private static FuelTypeProductCode Code(string fuelTypeId, Guid brandId, string productCode)
+        => new() { FuelTypeId = fuelTypeId, BrandId = brandId, ProductCode = productCode };
 
     [Fact]
     public async Task TwoFuelsAtOneNetwork_CannotClaimOneProductCode()
     {
         await using var context = CreateContext();
 
-        context.FuelTypeProductCodes.Add(Code("okko-dp", "okko", "9018"));
+        context.FuelTypeProductCodes.Add(Code("okko-dp", BrandIds.Okko, "9018"));
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
 
-        context.FuelTypeProductCodes.Add(Code("okko-dp-euro", "okko", "9018"));
+        context.FuelTypeProductCodes.Add(Code("okko-dp-euro", BrandIds.Okko, "9018"));
 
         var act = async () => await context.SaveChangesAsync();
         await act.Should().ThrowAsync<DbUpdateException>(
             "the voucher's QR is the only exact signal in a parsed voucher, and two answers to one code is no answer");
 
-        await CleanupAsync("okko", "9018");
+        await CleanupAsync(BrandIds.Okko, "9018");
     }
 
     [Fact]
@@ -64,10 +64,10 @@ public sealed class FuelTypeProductCodeTests : IClassFixture<TestDatabaseFixture
         await using var context = CreateContext();
 
         context.FuelTypeProductCodes.AddRange(
-            Code("okko-dp", "okko", "9018"),
-            Code("okko-dp", "okko", "9518"),
-            Code("okko-95", "okko", "9015"),
-            Code("okko-95", "okko", "9016"));
+            Code("okko-dp", BrandIds.Okko, "9018"),
+            Code("okko-dp", BrandIds.Okko, "9518"),
+            Code("okko-95", BrandIds.Okko, "9015"),
+            Code("okko-95", BrandIds.Okko, "9016"));
 
         var act = async () => await context.SaveChangesAsync();
         await act.Should().NotThrowAsync();
@@ -90,14 +90,14 @@ public sealed class FuelTypeProductCodeTests : IClassFixture<TestDatabaseFixture
         // voucher against an OKKO fuel if they ever did.
         await using var context = CreateContext();
 
-        context.FuelTypeProductCodes.Add(Code("okko-dp", "okko", "7701"));
-        context.FuelTypeProductCodes.Add(Code("klo-dp", "klo", "7701"));
+        context.FuelTypeProductCodes.Add(Code("okko-dp", BrandIds.Okko, "7701"));
+        context.FuelTypeProductCodes.Add(Code("klo-dp", BrandIds.Klo, "7701"));
 
         var act = async () => await context.SaveChangesAsync();
         await act.Should().NotThrowAsync();
 
-        await CleanupAsync("okko", "7701");
-        await CleanupAsync("klo", "7701");
+        await CleanupAsync(BrandIds.Okko, "7701");
+        await CleanupAsync(BrandIds.Klo, "7701");
     }
 
     [Fact]
@@ -106,16 +106,16 @@ public sealed class FuelTypeProductCodeTests : IClassFixture<TestDatabaseFixture
         // The primary key. The unique index above only catches two *different* fuels claiming one code.
         await using var context = CreateContext();
 
-        context.FuelTypeProductCodes.Add(Code("okko-gas", "okko", "9019"));
+        context.FuelTypeProductCodes.Add(Code("okko-gas", BrandIds.Okko, "9019"));
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
 
-        context.FuelTypeProductCodes.Add(Code("okko-gas", "okko", "9019"));
+        context.FuelTypeProductCodes.Add(Code("okko-gas", BrandIds.Okko, "9019"));
 
         var act = async () => await context.SaveChangesAsync();
         await act.Should().ThrowAsync<DbUpdateException>();
 
-        await CleanupAsync("okko", "9019");
+        await CleanupAsync(BrandIds.Okko, "9019");
     }
 
     [Fact]
@@ -125,7 +125,7 @@ public sealed class FuelTypeProductCodeTests : IClassFixture<TestDatabaseFixture
         // case where the caller has nothing to resolve.
         await using var context = CreateContext();
 
-        context.FuelTypeProductCodes.Add(Code("okko-gas", "okko", "   "));
+        context.FuelTypeProductCodes.Add(Code("okko-gas", BrandIds.Okko, "   "));
 
         var act = async () => await context.SaveChangesAsync();
         await act.Should().ThrowAsync<DbUpdateException>();
@@ -138,7 +138,7 @@ public sealed class FuelTypeProductCodeTests : IClassFixture<TestDatabaseFixture
         // field, and the column is indexed and unique per network.
         await using var context = CreateContext();
 
-        context.FuelTypeProductCodes.Add(Code("okko-gas", "okko", new string('9', 33)));
+        context.FuelTypeProductCodes.Add(Code("okko-gas", BrandIds.Okko, new string('9', 33)));
 
         var act = async () => await context.SaveChangesAsync();
         await act.Should().ThrowAsync<DbUpdateException>();
@@ -156,11 +156,11 @@ public sealed class FuelTypeProductCodeTests : IClassFixture<TestDatabaseFixture
         rows.Should().Be(0, "the codes are what paper in the wild carries, and only paper knows them");
     }
 
-    private async Task CleanupAsync(string BrandId, string productCode)
+    private async Task CleanupAsync(Guid brandId, string productCode)
     {
         await using var context = CreateContext();
         await context.Database.ExecuteSqlRawAsync(
             "DELETE FROM fuel_type_product_codes WHERE brand_id = {0} AND product_code = {1}",
-            BrandId, productCode);
+            brandId, productCode);
     }
 }

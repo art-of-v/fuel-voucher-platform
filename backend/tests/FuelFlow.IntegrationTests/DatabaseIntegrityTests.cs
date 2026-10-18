@@ -235,7 +235,7 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
         context.FuelTypes.Add(new FuelTypeEntity
         {
             Id = $"ft-neg-{basePrice}-{discountPrice}",
-            BrandId = "okko",
+            BrandId = BrandIds.Okko,
             Name = $"Negative {basePrice}/{discountPrice}",
             BasePrice = (decimal)basePrice,
             DiscountPrice = (decimal)discountPrice,
@@ -301,7 +301,7 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
         {
             Id = $"{id}-fuel",
             Name = $"Test fuel for {id}",
-            BrandId = "okko",
+            BrandId = BrandIds.Okko,
             BasePrice = 0m,
             DiscountPrice = 0m,
             CreatedAtUtc = DateTime.UtcNow,
@@ -311,7 +311,7 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
         var offer = new FuelOffer
         {
             Id = id,
-            BrandId = "okko",
+            BrandId = BrandIds.Okko,
             FuelTypeId = fuel.Id,
             SupplierPricePerLiter = supplierPricePerLiter,
             CreatedAtUtc = DateTime.UtcNow,
@@ -661,7 +661,7 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
             Id = contractId,
             UserId = userId,
             LegalEntityId = entityId,
-            BrandId = "okko",
+            BrandId = BrandIds.Okko,
             CreatedAtUtc = DateTime.UtcNow
         };
         var signature = new UserContract

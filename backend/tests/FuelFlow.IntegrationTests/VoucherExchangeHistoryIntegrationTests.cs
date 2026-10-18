@@ -286,7 +286,7 @@ private async Task SeedExchangeAsync(
             {
                 Id = "okko-dp",
                 Name = "ДП ЄВРО",
-                BrandId = "okko",
+                BrandId = BrandIds.Okko,
                 BasePrice = 60m,
                 DiscountPrice = 60m,
                 CreatedAtUtc = DateTime.UtcNow,

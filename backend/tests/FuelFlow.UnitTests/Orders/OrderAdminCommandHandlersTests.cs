@@ -1,3 +1,4 @@
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Settings;
 using FluentAssertions;
 using FuelFlow.API.Features.Orders.CreateCheckout.Models;
@@ -69,7 +70,7 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
             new RuntimeSettingsService(_context),
             new Mock<ILogger<BulkCheckoutCommandHandler>>().Object,
             NotificationDispatcher.Disabled,
-            new FuelFlow.Features.Vouchers.Availability.PackageStockAvailability(_context, new ConfigurationBuilder().Build()));
+            new FuelFlow.Features.Vouchers.Availability.PackageStockAvailability(_context, new ConfigurationBuilder().Build(), new BrandSlugResolver(_context)));
 
         _deleteOrderHandler = new DeleteOrderCommandHandler(_context);
         _updateOrderStatusHandler = new UpdateOrderStatusCommandHandler(_context);
@@ -82,11 +83,11 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
     {
         var fuelTypes = new[]
         {
-            new FuelTypeEntity { Id = "okko-dp", Name = "ДП ЄВРО", BrandId = "okko", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "okko-95", Name = "A-95", BrandId = "okko", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "okko-p95", Name = "Pulls 95", BrandId = "okko", BasePrice = 62, DiscountPrice = 58, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "wog-dp", Name = "ДП Mustang", BrandId = "wog", BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "wog-95", Name = "A-95 Mustang", BrandId = "wog", BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow }
+            new FuelTypeEntity { Id = "okko-dp", Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = "okko-95", Name = "A-95", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = "okko-p95", Name = "Pulls 95", BrandId = BrandIds.Okko, BasePrice = 62, DiscountPrice = 58, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = "wog-dp", Name = "ДП Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = "wog-95", Name = "A-95 Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow }
         };
         _context.FuelTypes.AddRange(fuelTypes);
         _context.SaveChanges();
@@ -95,9 +96,9 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
     private void SeedFuelPackages()
     {
         // Seeded as offers plus volumes: the order handlers price and resolve against the offer.
-        _context.SeedPackage("pkg-okko-95-50", "okko", "okko-95", 50m, 2500m,
+        _context.SeedPackage("pkg-okko-95-50", BrandIds.Okko, "okko-95", 50m, 2500m,
             supplierPricePerLiter: 49m, marginUahPerLiter: 1m, finalPricePerLiter: 50m);
-        _context.SeedPackage("pkg-okko-p95-50", "okko", "okko-p95", 50m, 2900m,
+        _context.SeedPackage("pkg-okko-p95-50", BrandIds.Okko, "okko-p95", 50m, 2900m,
             supplierPricePerLiter: 57m, marginUahPerLiter: 1m, finalPricePerLiter: 58m);
         _context.SaveChanges();
     }
@@ -155,14 +156,17 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
         }
     };
 
-    private static CheckoutItem CheckoutItem(string fuelTypeId, int price, string? BrandId = "okko") => new()
+    // `brandId` rather than a default of `BrandIds.Okko`: a static readonly Guid is not a
+    // compile-time constant, so it cannot be a default parameter value. Callers that omit it get
+    // the same brand the helper always meant.
+    private static CheckoutItem CheckoutItem(string fuelTypeId, int price, Guid? brandId = null) => new()
     {
         
         FuelTypeId = fuelTypeId,
         Liters = 50,
         Quantity = 1,
         Price = price,
-        BrandId = BrandId,
+        BrandId = brandId ?? BrandIds.Okko,
         BrandName = "OKKO"
     };
 

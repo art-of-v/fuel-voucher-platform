@@ -47,7 +47,7 @@ public sealed class BackfillBrandFuelCodesTests : IDisposable
         _context.Dispose();
     }
 
-    private BackfillBrandFuelCodesCommandHandler Handler() => new(_context, _events);
+    private BackfillBrandFuelCodesCommandHandler Handler() => new(_context, new BrandSlugResolver(_context), _events);
 
     /// <summary>What OKKO publishes, in the shape the fetch returns it.</summary>
     private static readonly OkkoPumpPrice[] Published =
@@ -62,10 +62,10 @@ public sealed class BackfillBrandFuelCodesTests : IDisposable
 
     private async Task SeedAsync(params FuelTypeEntity[] fuels)
     {
-        _context.Brands.Add(new Brand { Id = "okko", Name = "OKKO", Color = "#000", LogoText = "OKKO" });
+        _context.Brands.Add(new Brand { Id = BrandIds.Okko, Slug = "okko", Name = "OKKO", Color = "#000", LogoText = "OKKO" });
         foreach (var fuel in fuels)
         {
-            fuel.BrandId = "okko";
+            fuel.BrandId = BrandIds.Okko;
             fuel.CreatedAtUtc = DateTime.UtcNow;
             fuel.UpdatedAtUtc = DateTime.UtcNow;
             _context.FuelTypes.Add(fuel);
@@ -76,7 +76,7 @@ public sealed class BackfillBrandFuelCodesTests : IDisposable
     }
 
     private static FuelTypeEntity Fuel(string id, string name, string? code = null)
-        => new() { Id = id, Name = name, BrandId = "okko", BrandFuelCode = code, BasePrice = 50m, DiscountPrice = 48m };
+        => new() { Id = id, Name = name, BrandId = BrandIds.Okko, BrandFuelCode = code, BasePrice = 50m, DiscountPrice = 48m };
 
     [Fact]
     public async Task AHandTypedFuel_GetsTheCodeTheBrandPublishesForItsGrade()
