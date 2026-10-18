@@ -2057,6 +2057,14 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("AcquisitionSource")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasDefaultValue("direct")
+                        .HasColumnName("acquisition_source");
+
                     b.Property<Guid?>("AssignedToUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("assigned_to_user_id");
@@ -2240,6 +2248,8 @@ namespace FuelFlow.API.Migrations
 
                     b.ToTable("fuel_vouchers", null, t =>
                         {
+                            t.HasCheckConstraint("ck_fuel_vouchers_acquisition_source", "acquisition_source IN ('direct', 'partner')");
+
                             t.HasCheckConstraint("ck_fuel_vouchers_data_kind", "data_kind IN ('real', 'qa')");
 
                             t.HasCheckConstraint("ck_fuel_vouchers_fuel_type_id_length", "length(fuel_type_id) <= 100");

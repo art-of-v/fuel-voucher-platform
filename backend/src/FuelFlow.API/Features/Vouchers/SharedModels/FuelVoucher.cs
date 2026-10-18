@@ -150,6 +150,24 @@ public class FuelVoucher
     public string DataKind { get; set; } = DataKinds.Real;
 
     /// <summary>
+    /// Which supply route this voucher was acquired on: <see cref="AcquisitionSources.Direct"/> or
+    /// <see cref="AcquisitionSources.Partner"/>. See <see cref="AcquisitionSources"/>.
+    /// </summary>
+    /// <remarks>
+    /// Immutable, and enforced by a database trigger rather than left to convention. The cost of a
+    /// voucher is a function of where it came from, so an edited value does not merely relabel a row
+    /// - it moves real money between two reports that are supposed to be separate. There is no edit
+    /// path in the admin for this, and the trigger is what makes that a property of the schema rather
+    /// than of the current UI.
+    /// <para>
+    /// Defaults to <see cref="AcquisitionSources.Direct"/> because that is what every voucher
+    /// acquired so far was, which is what lets the column be <c>NOT NULL</c> while the write paths
+    /// that do not care about this axis stay silent.
+    /// </para>
+    /// </remarks>
+    public string AcquisitionSource { get; set; } = AcquisitionSources.Default;
+
+    /// <summary>
     /// Whether this voucher is emulated rehearsal data. A view over <see cref="DataKind"/> so the
     /// pool reads as a pool at the call site; assigning it still works and is how the admin write
     /// paths state their intent.

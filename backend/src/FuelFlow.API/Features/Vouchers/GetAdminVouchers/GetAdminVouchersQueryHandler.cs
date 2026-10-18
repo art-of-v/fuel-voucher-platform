@@ -56,6 +56,19 @@ public sealed class GetAdminVouchersQueryHandler
             _ => q
         };
 
+        // Same "unset means both" contract as TestData above, and for a sharper reason: the column
+        // existed for a while before any voucher was acquired on the secondary route, so a filter
+        // that defaulted to one arm would have hidden the entire inventory until someone noticed.
+        // Compared against the mapped column rather than a NotMapped shim, for the same reason the
+        // TestData arms are: a computed getter is not translatable.
+        if (!string.IsNullOrWhiteSpace(query.AcquisitionSource))
+        {
+            var requested = query.AcquisitionSource.Trim().ToLowerInvariant();
+            q = AcquisitionSources.IsKnown(requested)
+                ? q.Where(v => v.AcquisitionSource == requested)
+                : q;
+        }
+
         var total = await q.CountAsync(cancellationToken);
 
         // Every arm ends in the same tie-break on Id. None of these sort keys is unique - sorting by
@@ -131,6 +144,7 @@ public sealed class GetAdminVouchersQueryHandler
             CreatedAtUtc = v.CreatedAtUtc,
             ImageUrl = v.ImageUrl,
             IsTestData = v.DataKind == DataKinds.Qa,
+            AcquisitionSource = v.AcquisitionSource,
             IsDeleted = v.IsDeleted
         }).ToList();
 

@@ -44,6 +44,13 @@ public sealed class AdminVoucherListItemDto
     public bool IsTestData { get; set; }
 
     /// <summary>
+    /// Which supply route this voucher was acquired on - <c>direct</c> or <c>partner</c>. Immutable
+    /// and stated at acquisition; the cost of a voucher is a function of it, which is why an operator
+    /// needs to be able to filter stock by route rather than discover it from a total.
+    /// </summary>
+    public string AcquisitionSource { get; set; } = null!;
+
+    /// <summary>
     /// Archived by the soft delete (#217). The query behind this list calls
     /// <c>IgnoreQueryFilters</c> so an archived voucher is still listed - that is the only way an
     /// operator can find it again to un-archive it - which meant archived rows were being rendered
