@@ -108,7 +108,7 @@ export function StationMarker({
             {point.name}
           </Text>
           <Text style={[styles.calloutText, { color: tokens.colors.text.dim }]}>
-              {formatShortAddress(point as StationNode) || t('map.noAddress')}
+            {formatShortAddress(point as StationNode) || t('map.noAddress')}
           </Text>
           {price && (
             <Text style={[styles.calloutPrice, { color: tokens.colors.primary }]}>
