@@ -56,6 +56,31 @@ public sealed class FuelTypeEntity
     /// </summary>
     public bool AllowBelowCost { get; set; }
 
+    /// <summary>
+    /// What we add per litre on top of what we paid, and the only knob of the customer price an
+    /// operator sets directly. The customer price is <c>min(cost + this, pump)</c> — the pump is the
+    /// ceiling and there is no second discount knob, because two caps on one number is one too many.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Why it lives here and not on the offer.</b> A margin is a fact about the fuel, not about a
+    /// sale of it: OKKO's diesel carries the same margin whether we hold it as stock, sell five litres
+    /// or hundred. While it lived on <c>fuel_offers</c> it was per (brand × fuel × pool), which meant
+    /// two places to set one number and a price that could differ depending on which pool answered —
+    /// the same class of defect as two rows for one grade.
+    /// </para>
+    /// <para>
+    /// <b>Nullable, and null means "not priced yet".</b> A fuel with a cost but no margin has no
+    /// customer price and must show none: treating the missing margin as zero would publish a free
+    /// fuel. That is also what the shelf reads to decide between the pump price and a real price.
+    /// </para>
+    /// <para>
+    /// The cost it is added to is derived, never stored here — it is the litres-weighted average of
+    /// unspent cost-bearing vouchers (README, <c>purchase_batches</c>, planning #360).
+    /// </para>
+    /// </remarks>
+    public decimal? MarginUahPerLiter { get; set; }
+
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
 
