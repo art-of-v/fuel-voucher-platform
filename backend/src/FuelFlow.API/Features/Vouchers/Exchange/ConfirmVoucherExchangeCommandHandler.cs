@@ -265,6 +265,14 @@ public sealed class ConfirmVoucherExchangeCommandHandler
 
         await _context.SaveChangesAsync(ct);
 
+        // The blended cost a sale produced is *reported*, not applied.
+        //
+        // The operator's rule, settled 2026-10-17 and recorded in README (`purchase_batches`) and
+        // planning #360: **a sold voucher does not move the price.** The moving average is recomputed
+        // when a lot arrives and at no other time, so a sale must not reprice the fuel. This block
+        // still calls RepriceAsync, which contradicts that rule — it is step 3 of #360 and this comment
+        // is the marker, not the fix. Until it is removed, every exchange moves the price by however
+        // much stock it happened to consume.
         var blendedByFuel = new List<ExchangeFuelBlended>();
         foreach (var fuel in newFuels)
         {
