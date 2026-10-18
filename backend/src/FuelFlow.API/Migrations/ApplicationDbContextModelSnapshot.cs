@@ -3131,6 +3131,8 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("FuelTypeId");
+
                     b.HasIndex("StationId");
 
                     b.HasIndex("IsDeleted", "DataKind");
@@ -5064,6 +5066,17 @@ namespace FuelFlow.API.Migrations
                     b.Navigation("Order");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.FuelOffer", b =>
+                {
+                    b.HasOne("FuelFlow.SharedKernel.Domain.FuelTypeEntity", "FuelType")
+                        .WithMany()
+                        .HasForeignKey("FuelTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("FuelType");
                 });
 
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.FuelOfferPrice", b =>
