@@ -597,9 +597,7 @@ export default function MapScreen() {
               // Pins carry each network's own logo (and colour as the border /
               // fallback — data, not theme, see BRAND_LOGOS / BRAND_COLORS).
               const brandColor = (brandId && BRAND_COLORS[brandId]) || tokens.colors.primary;
-              const logo = brandId
-                ? (BRAND_SYMBOLS[brandId] ?? BRAND_LOGOS[brandId])
-                : undefined;
+              const logo = brandId ? (BRAND_SYMBOLS[brandId] ?? BRAND_LOGOS[brandId]) : undefined;
               const price = brandId ? (priceByBrand.get(brandId) ?? null) : null;
 
               return (
