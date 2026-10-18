@@ -141,16 +141,47 @@ check "a quoted bcrypt hash is accepted" 0 "$?"
 FIXTURE="$TMP/preflight-fixture"
 mkdir -p "$FIXTURE"
 cp "$PREFLIGHT" "$FIXTURE/preflight.sh"
-cat > "$FIXTURE/.env" <<EOF
-ROOT_DOMAIN=palne.shop
-STAGING_BASICAUTH_HASH=$DOUBLED
-EOF
-cat > "$FIXTURE/.env.staging" <<'EOF'
-# FuelFlow STAGING env (gitignored, box-only).
-ROOT_DOMAIN=staging-app.palne.shop
-POSTGRES_PASSWORD=whatever
-JWT_SECRET=abc123
-EOF
+# The compose files get parse-checked too, so they have to exist here. Copying the REAL
+# ones rather than writing a stub makes every fixture run an actual assertion that the
+# repo's compose files parse - which is the defect this suite exists to catch.
+cp "$SCRIPT_DIR/docker-compose.prod.yml" "$SCRIPT_DIR/docker-compose.staging.yml" "$FIXTURE/"
+# Compose exits non-zero BOTH for an unparseable file and for an unset ${VAR:?}, so a
+# non-zero exit only means "did not load" once every required variable is satisfied.
+# Derive them from the files themselves so this cannot drift as compose grows. Matching only the
+# alphanumeric run after `${` and stopping there is deliberate: a BRE like `\${NAME:\?` relies on
+# `\?` meaning "optional", which silently yields the name without its `:?` guard and leaves a
+# stray `:` on the end of half of them.
+grep -hoE '\$\{[A-Za-z0-9_]+' "$FIXTURE"/docker-compose.*.yml \
+  | sed 's/^\${//' | sort -u > "$TMP/required-vars"
+# The env files have to stay COMPLETE. preflight.sh parse-checks the compose files on every
+# run, and compose resolves ${VAR:?} against .env, so a deliberately minimal .env - which most of
+# the assertions below want - would make the compose step fail and take the exit code with it. So
+# the fixture carries every required variable, and the tests that need one absent remove it
+# temporarily and restore GOOD_ENV afterwards.
+{
+  echo "ROOT_DOMAIN=palne.shop"
+  echo "STAGING_BASICAUTH_HASH=$DOUBLED"
+  while read -r var; do
+    [[ -n "$var" ]] && printf '%s=dummy-for-parse-check\n' "$var"
+  done < "$TMP/required-vars"
+} > "$FIXTURE/.env"
+{
+  echo "ROOT_DOMAIN=staging-app.palne.shop"
+  while read -r var; do
+    [[ -n "$var" ]] && printf '%s=dummy-for-parse-check\n' "$var"
+  done < "$TMP/required-vars"
+} > "$FIXTURE/.env.staging"
+# A variable that is both set above and listed by compose ends up here twice, and check_env_file
+# reads the FIRST occurrence - so the dummy would win and STAGING_BASICAUTH_HASH would be
+# rejected as "not a bcrypt hash". Keep the first line for each key, which is the explicit one.
+for envfile in "$FIXTURE/.env" "$FIXTURE/.env.staging"; do
+  awk -F= '!seen[$1]++' "$envfile" > "$envfile.tmp" && mv "$envfile.tmp" "$envfile"
+done
+GOOD_ENV="$TMP/env-complete"
+GOOD_ENV_STAGING="$TMP/env-staging-complete"
+cp "$FIXTURE/.env" "$GOOD_ENV"
+cp "$FIXTURE/.env.staging" "$GOOD_ENV_STAGING"
+
 out=$(cd "$FIXTURE" && bash ./preflight.sh --env-only 2>&1); rc=$?
 check "a defaults run with a valid prod .env passes" 0 "$rc"
 # .env.staging SHOULD still be scanned - for structure. It is caddy's credential
@@ -166,10 +197,9 @@ check "a defaults run with a valid prod .env passes" 0 "$rc"
   || { echo "  FAIL  the credential check does not name .env: $out"; fail=$((fail+1)); }
 
 # The converse must still hold, or the fix would have silenced a real warning.
-cat > "$FIXTURE/.env" <<'EOF'
-ROOT_DOMAIN=palne.shop
-EOF
+sed -i '/^STAGING_BASICAUTH_HASH=/d' "$FIXTURE/.env"
 out=$(cd "$FIXTURE" && bash ./preflight.sh --env-only 2>&1); rc=$?
+cp "$GOOD_ENV" "$FIXTURE/.env"
 check "a prod .env missing the hash still warns" 0 "$rc"
 [[ "$out" == *".env"* && "$out" == *"not set"* ]] \
   && { echo "  PASS  the warning names .env, the file caddy actually reads"; pass=$((pass+1)); } \
@@ -191,6 +221,67 @@ out=$("$PREFLIGHT" --no-defaults --env-only --env-file "$TMP/hash-garbage2.env" 
 [[ "$out" == *"base64-encoded plaintext"* ]] \
   && { echo "  PASS  names what caddy will actually try to do with the value"; pass=$((pass+1)); } \
   || { echo "  FAIL  does not name the real consequence: $out"; fail=$((fail+1)); }
+
+# ------------------------------------------------------------------------------
+# The compose files must be proven to PARSE, not merely to exist.
+#
+# `QrCipher__Key` was added at eight spaces into a block whose siblings sit at six.
+# go-yaml then refused the entire file, staging deploy failed, the chained production
+# deploy was skipped, and main stayed red across two merges. Every C# test stayed
+# green, and so did the preflight, because until now it only ever read the .env.
+#
+# The gate is worthless if it cannot fail, so assert that it fires - and that the
+# message names the real cause rather than something invented.
+#
+# Skipped, loudly, where Compose cannot run at all. A skip here is not a green: the CI job runs on
+# ubuntu-latest with Docker, so if this prints SKIP there, the gate is unverified and the run
+# should be treated as unverified too.
+# ------------------------------------------------------------------------------
+if ! docker compose version >/dev/null 2>&1; then
+  echo "  SKIP  docker compose cannot run here, so the compose parse gate is UNVERIFIED on this machine"
+else
+GOOD_COMPOSE="$FIXTURE/docker-compose.prod.yml"
+cp "$SCRIPT_DIR/docker-compose.prod.yml" "$GOOD_COMPOSE"
+out=$(cd "$FIXTURE" && bash ./preflight.sh --env-only 2>&1)
+[[ "$out" == *"docker-compose.prod.yml: parses"* ]] \
+  && { echo "  PASS  the parse gate reports a good compose file"; pass=$((pass+1)); } \
+  || { echo "  FAIL  the parse gate did not confirm a file that is valid: $out"; fail=$((fail+1)); }
+
+# A broken docker must not be reported as a broken compose file. This is the assertion that keeps
+# the gate honest: `command -v docker` is satisfied by a WSL shim and an unreachable daemon, and a
+# non-zero exit from either is indistinguishable from bad YAML unless the gate probes the binary.
+# Shadow `docker` rather than clearing PATH - an empty PATH also hides `bash`, which fails for a
+# reason that has nothing to do with what is being tested.
+FAKE_DOCKER_BIN="$TMP/fake-docker-bin"
+mkdir -p "$FAKE_DOCKER_BIN"
+printf '#!/bin/sh\necho "Cannot connect to the Docker daemon at unix:///var/run/docker.sock." >&2\nexit 1\n' \
+  > "$FAKE_DOCKER_BIN/docker"
+chmod +x "$FAKE_DOCKER_BIN/docker"
+out=$(cd "$FIXTURE" && PATH="$FAKE_DOCKER_BIN:$PATH" bash ./preflight.sh --env-only 2>&1); rc=$?
+check "an unusable docker does not fail the preflight" 0 "$rc"
+[[ "$out" != *"does not load"* ]] \
+  && { echo "  PASS  an unusable docker is not blamed on the compose file"; pass=$((pass+1)); } \
+  || { echo "  FAIL  the gate blamed the compose file for a docker that cannot run: $out"; fail=$((fail+1)); }
+[[ "$out" == *"NOT parse-checked"* ]] \
+  && { echo "  PASS  the gate says plainly that it did not check"; pass=$((pass+1)); } \
+  || { echo "  FAIL  the gate did not admit it skipped the check: $out"; fail=$((fail+1)); }
+
+# The real defect, reproduced exactly: one mapping line at the wrong indent.
+printf 'services:\n  api:\n    image: x\n    environment:\n      GOOD: "1"\n        BAD: "2"\n' \
+  > "$FIXTURE/docker-compose.prod.yml"
+out=$(cd "$FIXTURE" && bash ./preflight.sh --env-only 2>&1); rc=$?
+check "a misindented compose file fails the preflight" 1 "$rc"
+[[ "$out" == *"docker-compose.prod.yml: parses"* ]] \
+  && { echo "  FAIL  a file go-yaml rejects was reported as parsing"; fail=$((fail+1)); } \
+  || { echo "  PASS  a file go-yaml rejects is not reported as parsing"; pass=$((pass+1)); }
+# "indented", not "indentation" - the message says which mistake to look for, and an assertion
+# that did not match the message it was written against would have been a false green.
+[[ "$out" == *"indented"* ]] \
+  && { echo "  PASS  the failure points at the cause (a wrongly indented line)"; pass=$((pass+1)); } \
+  || { echo "  FAIL  the failure does not mention an indented line: $out"; fail=$((fail+1)); }
+# Restore it, or the remaining assertions below inherit a broken file.
+cp "$SCRIPT_DIR/docker-compose.prod.yml" "$GOOD_COMPOSE"
+fi
 
 echo
 echo "  $pass passed, $fail failed"
