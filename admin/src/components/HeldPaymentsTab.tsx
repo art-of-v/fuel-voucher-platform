@@ -37,7 +37,15 @@ interface HeldPaymentsResponse {
 interface CustomerHit {
     id: string;
     phoneNumber: string | null;
-    settlementCode: string;
+    settlementCode: string | null;
+    name: string | null;
+}
+
+/** One row in the picker. `phoneNumber` is what an operator reads when two names are alike. */
+interface CustomerOption {
+    id: string;
+    phoneNumber: string | null;
+    settlementCode: string | null;
     name: string | null;
 }
 
@@ -59,6 +67,8 @@ export default function HeldPaymentsTab() {
 
     const [codeLookup, setCodeLookup] = useState("");
     const [lookedUp, setLookedUp] = useState<CustomerHit | null | undefined>(undefined);
+    const [ownerSearch, setOwnerSearch] = useState("");
+    const [chosenOwner, setChosenOwner] = useState<CustomerOption | null>(null);
     const [orderChoice, setOrderChoice] = useState<Record<string, string>>({});
 
     const { data, isLoading, isFetching, refetch } = useQuery({
@@ -97,6 +107,16 @@ export default function HeldPaymentsTab() {
             setLookedUp(null);
             toast.error(e instanceof Error ? e.message : String(e));
         },
+    });
+
+    // Search-as-you-type. Enabled at two characters because that is where the endpoint starts
+    // answering, and a disabled query that returns nothing looks like "no such customer".
+    const ownerOptions = useQuery({
+        queryKey: ["admin", "customerSearch", ownerSearch],
+        queryFn: () => apiRequest<any, CustomerOption[]>(
+            "GET", `/api/admin/payments/customers?search=${encodeURIComponent(ownerSearch.trim())}`),
+        enabled: ownerSearch.trim().length >= 2,
+        staleTime: 30_000,
     });
 
     const openOrdersByUser = useMemo(() => {
@@ -204,15 +224,55 @@ export default function HeldPaymentsTab() {
                                     </td>
                                     <td className="p-4">
                                         {!payment.userId ? (
-                                            <div className="space-y-1">
+                                            <div className="space-y-2 min-w-72">
                                                 <p className="text-xs text-muted-foreground">{t("heldPayments.needsOwner")}</p>
-                                                {lookedUp && (
+                                                {chosenOwner ? (
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-sm font-semibold">
+                                                            {chosenOwner.name || t("heldPayments.noName")}
+                                                        </span>
+                                                        {chosenOwner.phoneNumber && (
+                                                            <span className="text-xs text-muted-foreground">{chosenOwner.phoneNumber}</span>
+                                                        )}
+                                                        <Button size="sm" variant="ghost"
+                                                            onClick={() => setChosenOwner(null)}>
+                                                            {t("common.cancel")}
+                                                        </Button>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <Input
+                                                            value={ownerSearch}
+                                                            onChange={(e) => setOwnerSearch(e.target.value)}
+                                                            placeholder={t("heldPayments.searchCustomer")}
+                                                        />
+                                                        {ownerSearch.trim().length >= 2 && (
+                                                            <div className="max-h-40 overflow-y-auto border border-input rounded-md">
+                                                                {(ownerOptions.data ?? []).length === 0
+                                                                    ? <p className="p-2 text-xs text-muted-foreground">{t("heldPayments.noCustomers")}</p>
+                                                                    : (ownerOptions.data ?? []).map(c => (
+                                                                        <button
+                                                                            key={c.id}
+                                                                            type="button"
+                                                                            className="w-full text-left px-2 py-1 text-sm hover:bg-foreground/5"
+                                                                            onClick={() => setChosenOwner(c)}
+                                                                        >
+                                                                            <span className="font-medium">{c.name || t("heldPayments.noName")}</span>
+                                                                            {c.phoneNumber && <span className="text-muted-foreground"> · {c.phoneNumber}</span>}
+                                                                            {c.settlementCode && <span className="font-mono text-xs text-muted-foreground"> · {c.settlementCode}</span>}
+                                                                        </button>
+                                                                    ))}
+                                                            </div>
+                                                        )}
+                                                    </>
+                                                )}
+                                                {chosenOwner && (
                                                     <Button
                                                         size="sm"
                                                         disabled={busy}
-                                                        onClick={() => attach.mutate({ paymentId: payment.id, userId: lookedUp.id })}
+                                                        onClick={() => attach.mutate({ paymentId: payment.id, userId: chosenOwner.id })}
                                                     >
-                                                        {t("heldPayments.giveTo")} {lookedUp.name || t("heldPayments.noName")}
+                                                        {t("heldPayments.giveTo")} {chosenOwner.name || t("heldPayments.noName")}
                                                     </Button>
                                                 )}
                                             </div>

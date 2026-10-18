@@ -95,6 +95,59 @@ public sealed class AdminPaymentsController : ControllerBase
     }
 
     /// <summary>
+    /// Searches customers by name, phone or settlement code, bounded.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately not the existing <c>GET /api/admin/users</c>. That one materialises the whole
+    /// table — its handler ends in <c>ToList()</c> with no limit — which is fine for a screen that
+    /// shows everyone once and unusable as a search-as-you-type backing query. Fixing that endpoint
+    /// properly is a separate change with its own callers; this is a bounded query for one picker.
+    /// <para>
+    /// The same fields are searched as the users screen, plus the settlement code, because the
+    /// operator arriving at this screen has one of the two in front of them.
+    /// </para>
+    /// </remarks>
+    [HttpGet("customers")]
+    public async Task<ActionResult<IReadOnlyList<CustomerSearchHit>>> Customers(
+        [FromQuery] string search,
+        [FromQuery] int limit = 20,
+        CancellationToken ct = default)
+    {
+        var term = (search ?? string.Empty).Trim().ToLowerInvariant();
+        if (term.Length < 2)
+        {
+            // Two characters minimum. A one-character search matches most of the table, and the
+            // point of a bounded query is defeated the moment the bound is the result set.
+            return Ok(Array.Empty<CustomerSearchHit>());
+        }
+
+        var capped = Math.Clamp(limit, 1, 50);
+
+        var hits = await _context.Users
+            .AsNoTracking()
+            .Where(u =>
+                (u.PhoneNumber != null && u.PhoneNumber.ToLower().Contains(term)) ||
+                (u.FirstName != null && u.FirstName.ToLower().Contains(term)) ||
+                (u.LastName != null && u.LastName.ToLower().Contains(term)) ||
+                (u.SettlementCode != null && u.SettlementCode.ToLower().Contains(term)))
+            // Settlement code first, then a name, then the phone: an exact code is the most certain
+            // match a person can type, and an exact match should not sit below a lucky substring.
+            .OrderByDescending(u => u.SettlementCode == term.ToUpperInvariant())
+            .ThenBy(u => u.FirstName).ThenBy(u => u.LastName)
+            .Take(capped)
+            .Select(u => new CustomerSearchHit(
+                u.Id,
+                u.PhoneNumber,
+                u.SettlementCode,
+                string.IsNullOrEmpty(u.FirstName) && string.IsNullOrEmpty(u.LastName)
+                    ? null
+                    : (u.FirstName + " " + u.LastName).Trim()))
+            .ToListAsync(ct);
+
+        return Ok(hits);
+    }
+
+    /// <summary>
     /// Finds the customer a settlement code names, or says plainly that it names nobody.
     /// </summary>
     /// <remarks>
@@ -260,6 +313,9 @@ public sealed record UnallocatedPaymentsResponse(
 
 /// <summary>One order still waiting for money. The price is here so the operator can match it to the amount.</summary>
 public sealed record OpenOrderRefDto(Guid Id, Guid UserId, decimal Price, DateTime CreatedAtUtc);
+
+/// <summary>A customer offered by the picker. The settlement code is shown because it is what identifies them on the channel.</summary>
+public sealed record CustomerSearchHit(Guid Id, string? PhoneNumber, string? SettlementCode, string? Name);
 
 /// <summary>
 /// One payment waiting to be placed. Carries what finance actually typed: the operator is resolving a
