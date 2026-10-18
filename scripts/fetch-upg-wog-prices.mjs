@@ -16,6 +16,20 @@
 // will refuse loudly rather than write an empty file. Treat WOG as "read half only, needs a look at
 // why" until it answers on consecutive days.
 //
+// 2026-10-18, and that is now settled: WOG did not serve the blob intermittently, it moved. The page
+// is a Next.js app and the prices live in its Redux state under __NEXT_DATA__ instead - a completely
+// different shape, with the grade split across two fields and the price in kopecks. The blob reader
+// below is kept because UPG still publishes it verbatim; the Redux reader is kept because WOG now
+// does the other. Both produce the same two CSV columns, which is the only contract that matters to
+// the importer.
+//
+// WHAT EACH SHAPE CARRIES. The blob gives `{Title, Price}` where the title is the brand's own slug
+// (`upg95`, `A-95`, `EURO DIESEL`, `Газ`) and the price is UAH with float noise
+// (`49.899999999999999` for 49.90). WOG's Redux state gives `{type, brand, price}` where the grade
+// is `type` + `brand` (`ДП` + `Mustang+` = `ДП Mustang+`) and the price is KOPECKS (`10650` for
+// 106.50). That factor of 100 is the dangerous part: read as UAH it makes every grade a hundred
+// times dearer, and nothing about the number looks wrong.
+//
 // THE SOURCE. Not a JSON API like OKKO's `/api/uk/fuels`: these two publish the prices inside the
 // HTML, as a JavaScript literal the page reads to draw its price list. The blob is found by walking
 // the document for the assignment rather than at a fixed path, the same reason the OKKO fetcher walks
@@ -125,10 +139,148 @@ export function toRow(item) {
   return { row: [code, price.toFixed(2)] };
 }
 
+/**
+ * WOG's current shape: a Next.js page whose prices sit in the Redux state under `__NEXT_DATA__`.
+ *
+ * <p>Three differences from the blob, and the third is the one that bites: the grade is split across
+ * `type` and `brand`, the key is lowercase `price`, and the price is in KOPECKS. `10650` read as UAH
+ * makes the catalogue a hundred times too dear and every downstream guard still passes, because a
+ * higher price is never "below cost". Hence {@link KOPECKS_PER_UAH} and its own test.
+ *
+ * @param {string} html the fetched page
+ * @returns {{ items: object[] } | null} null when the page is neither shape
+ */
+export function extractNextPageFuels(html) {
+  const marker = /__NEXT_DATA__[^>]*>/;
+  const tag = marker.exec(html);
+  if (!tag) return null;
+
+  const start = html.indexOf("{", tag.index + tag[0].length);
+  if (start < 0) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = start; i < html.length; i++) {
+    const c = html[i];
+
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (c === "\\") escaped = true;
+      else if (c === '"') inString = false;
+      continue;
+    }
+
+    if (c === '"') inString = true;
+    else if (c === "{") depth++;
+    else if (c === "}") {
+      depth--;
+      if (depth === 0) {
+        try {
+          return { items: collectFuelItems(JSON.parse(html.slice(start, i + 1))) };
+        } catch {
+          return null;
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+/** The kopeck divisor, named so that the 100 has to be argued with rather than typed. */
+const KOPECKS_PER_UAH = 100;
+
+/**
+ * Walks the whole Redux state for the price-list entries.
+ *
+ * <p>Found by content rather than by path: `pageReducer.elements[].block.items[]` is one of several
+ * block layouts on the site, and a next.js release can insert a sibling. Every price row carries
+ * `i_am_page_element: "block.fuels_fuel"`, which is the same self-describing marker the rest of the
+ * page uses for its blocks, so it survives a re-layout that a fixed path would not.
+ */
+function collectFuelItems(state) {
+  const found = [];
+  const seen = new Set();
+
+  const walk = (node) => {
+    if (node === null || typeof node !== "object") return;
+    if (Array.isArray(node)) {
+      for (const child of node) walk(child);
+      return;
+    }
+    if (node.i_am_page_element === "block.fuels_fuel" && !seen.has(node)) {
+      seen.add(node);
+      found.push(node);
+    }
+    for (const value of Object.values(node)) walk(value);
+  };
+
+  walk(state);
+  return found;
+}
+
+/**
+ * Turns one Redux fuel entry into a CSV row.
+ *
+ * <p>The grade is `type` and `brand` joined, because that is how WOG writes it: `ДП` + `Mustang+`
+ * is `ДП Mustang+`, `95` + `Євро5-Е10` is `95 Євро5-Е10`. Either half alone is not the name the brand
+ * shows its customers, so neither is usable as the code.
+ */
+export function reduxRowToRow(item) {
+  const type = collapse(item?.type);
+  const brand = collapse(item?.brand);
+  const code = collapse([type, brand].filter(Boolean).join(" "));
+
+  if (!code) return { skip: { code: "<none>", reason: "no type and no brand" } };
+
+  if (typeof item?.price !== "number" || !Number.isFinite(item.price)) {
+    return { skip: { code, reason: `unparseable price "${item?.price}"` } };
+  }
+
+  const price = item.price / KOPECKS_PER_UAH;
+  if (price <= 0) return { skip: { code, reason: `non-positive price ${price}` } };
+
+  return { row: [code, price.toFixed(2)] };
+}
+
 /** Every usable row of a page, with what was dropped and why. */
 export function parsePrices(html) {
   const blob = extractAveragePrices(html);
-  if (blob === null) return { rows: [], skipped: [], missing: true };
+
+  // Two shapes, two brands. The blob is tried first because UPG publishes it verbatim and it is
+  // the older, simpler reader; WOG's page no longer carries it at all, so falling through to the
+  // Redux state is not a fallback for a broken read - it is the only shape that brand has now.
+  const redux = extractNextPageFuels(html);
+  if (blob === null && redux === null) return { rows: [], skipped: [], missing: true };
+
+  if (blob === null) {
+    const rows = [];
+    const skipped = [];
+    const seen = new Set();
+
+    for (const item of redux.items) {
+      const parsed = reduxRowToRow(item);
+      if (parsed.skip) {
+        skipped.push(parsed.skip);
+        continue;
+      }
+
+      const code = parsed.row[0];
+      if (seen.has(code)) {
+        // Same rule as the blob reader: the page repeating a component is not a second grade, but a
+        // repeat at a DIFFERENT price is worth saying out loud rather than silently keeping the first.
+        skipped.push({ code, reason: `duplicate grade, price ${item?.price}` });
+        continue;
+      }
+
+      seen.add(code);
+      rows.push(parsed.row);
+    }
+
+    return { rows, skipped, missing: false };
+  }
 
   let data;
   try {
