@@ -487,6 +487,15 @@ jobs:
       - name: Test the disk pressure check
         run: bash deploy/disk-check.test.sh
 
+      # The preflight's compose parse gate, which is the only thing standing between a
+      # misindented docker-compose file and a deploy that dies after staging. On 2026-10-17 that
+      # happened: go-yaml rejected the whole file, staging failed, the chained production deploy
+      # was skipped, and main stayed red across two merges - with every C# test green, because
+      # none of them read the compose files. This job already has Docker, so the gate runs for real
+      # here rather than skipping.
+      - name: Test the preflight (includes the compose parse gate)
+        run: bash deploy/preflight.test.sh
+
 # The migration dry run's dump step, which lives in this same file and runs only on the
       # production box. It had been red since it first shipped and nothing here could see it.
       - name: Test the migration dry-run dump

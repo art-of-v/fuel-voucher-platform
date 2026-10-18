@@ -279,6 +279,64 @@ else
   done
 fi
 
+# ------------------------------------------------------------------------------
+# The compose files actually parse
+#
+# check_env_file proves the .env is well-formed. It says nothing about the YAML, and
+# the YAML is where the 2026-10-17 deploy died: `QrCipher__Key` was added at eight
+# spaces into a block whose siblings sit at six, and go-yaml rejected the whole file
+# with "did not find expected key". Staging failed, so the chained production deploy
+# was skipped, and main sat red for two merges.
+#
+# Nothing upstream could catch it. Every unit and integration test passed - they
+# compile C#, they never read the compose files - and this script passed too, because
+# checking an env file is not the same thing as parsing the compose file that consumes
+# it. The step is named "Check the box env files are readable by Compose" and passed
+# immediately before Compose failed on the very next step, which is the clearest
+# statement of the gap this closes.
+#
+# `config --quiet` renders and validates without touching a container or a network, so
+# it is safe in --env-only and costs a second.
+#
+# The verdict is the EXIT CODE, not the message. Compose v5 exits 1 on an unparseable
+# file while printing nothing at all, and prints a go-yaml error on other builds, so
+# keying on the text makes the gate work on the box and silently pass in CI. Compose
+# also exits 1 for an unset `${VAR:?}`, which is why every required variable has to be
+# satisfied before a non-zero exit can be read as "did not load" - and it must be,
+# because an unset required variable is just as fatal to `up -d`.
+# ------------------------------------------------------------------------------
+check_compose_parses() {
+  local file="$1" env_file="$2" out rc=0
+  # `command -v docker` is not enough. A WSL shim, an installed client with an unreachable daemon,
+  # and a rootless setup all satisfy it and then fail on first use - and a non-zero exit from those
+  # is indistinguishable from "this YAML is broken". Probing the binary catches all three, and the
+  # difference matters: the first case means the gate could not run, the second means the file is
+  # bad. Reporting a docker problem as a broken compose file sends whoever reads it to fix the wrong
+  # file, which is the specific failure this gate exists to prevent.
+  if ! docker compose version >/dev/null 2>&1; then
+    warn "docker compose could not run here (not installed, or the daemon is unreachable), so $file was NOT parse-checked. Every deploy step needs Compose; fix that before trusting a green preflight."
+    return 0
+  fi
+  if [[ ! -f "$file" ]]; then
+    fail "$file is missing - the deploy would fail, but Compose would say so later and less clearly."
+  fi
+  out=$(docker compose --env-file "$env_file" -f "$file" config --quiet 2>&1) || rc=$?
+  if [[ $rc -ne 0 ]]; then
+    fail "$file does not load (compose exited $rc): ${out:-compose printed no message}. Compose cannot build its model from this file at all, so 'docker compose up' fails before a single container is touched - and because staging deploys before production, that skips production too. A mapping line indented to the wrong depth does exactly this: it is not a value, so only the YAML parser notices, and it takes the whole file with it."
+  fi
+  echo "  $file: parses"
+}
+
+# Part of the defaults scan, not of the targeted one. --no-defaults means "check only the files I
+# named", and it skips .env/.env.staging - so resolving ${VAR:?} here would fail against a .env
+# this run never claimed to look at, and the gate would report a broken compose file for a run that
+# never intended to deploy it.
+if [[ "$NO_DEFAULTS" -eq 0 ]]; then
+  echo "== compose files =="
+  check_compose_parses docker-compose.prod.yml .env
+  check_compose_parses docker-compose.staging.yml .env.staging
+fi
+
 if [[ "$ENV_ONLY" -eq 1 ]]; then
   echo "env-only run: stopping after step 1"
   [[ ${#warnings[@]} -gt 0 ]] && echo "Preflight passed with ${#warnings[@]} warning(s)." || echo "Preflight passed."
