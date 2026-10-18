@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isValidLat, isValidLng, isValidCoordinate, deriveNodeId } from "./station-nodes";
+import { isValidLat, isValidLng, isValidCoordinate, deriveExternalId } from "./station-nodes";
 
 describe("station-nodes WGS84 validation", () => {
   it("accepts in-range latitudes and rejects out-of-range", () => {
@@ -28,12 +28,17 @@ describe("station-nodes WGS84 validation", () => {
   });
 });
 
-describe("deriveNodeId — parity with backend {brandId}-{lat:F5}-{lng:F5}", () => {
+describe("deriveExternalId — parity with backend {brandSlug}-{lat:F5}-{lng:F5}", () => {
   it("formats coordinates to 5 decimals", () => {
-    expect(deriveNodeId("wog", 50.4501, 30.5234)).toBe("wog-50.45010-30.52340");
+    expect(deriveExternalId("wog", 50.4501, 30.5234)).toBe("wog-50.45010-30.52340");
   });
 
   it("pads and rounds to exactly 5 decimals", () => {
-    expect(deriveNodeId("okko", 49.8, -24.123456)).toBe("okko-49.80000--24.12346");
+    expect(deriveExternalId("okko", 49.8, -24.123456)).toBe("okko-49.80000--24.12346");
+  });
+
+  it("is keyed by the slug, so the same network file re-derives the same id", () => {
+    // The uuid is what the row is joined on now; the slug is what keeps a re-import idempotent.
+    expect(deriveExternalId("okko", 50.4501, 30.5234)).not.toContain("11111111");
   });
 });

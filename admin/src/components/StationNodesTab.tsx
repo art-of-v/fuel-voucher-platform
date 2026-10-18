@@ -13,11 +13,12 @@ import {
 import { apiRequest } from "@/lib/api-client";
 import { toast } from "sonner";
 import {
-  StationNode, PagedResult, isValidCoordinate, deriveNodeId,
+  StationNode, PagedResult, isValidCoordinate, deriveExternalId,
 } from "@/lib/station-nodes";
 
 interface Brand {
   id: string;
+  slug: string;
   name: string;
   logoText?: string;
   color?: string;
@@ -32,8 +33,8 @@ interface ImportResult {
 const PAGE_SIZE = 50;
 
 type NodeForm = {
-  id: string;
   brandId: string;
+  externalId: string;
   name: string;
   address: string;
   phone: string;
@@ -44,16 +45,16 @@ type NodeForm = {
 };
 
 const EMPTY_FORM: NodeForm = {
-  id: "", brandId: "", name: "", address: "", phone: "",
+  brandId: "", externalId: "", name: "", address: "", phone: "",
   city: "", stationType: "", lat: "", lng: "",
 };
 
-function toNodePayload(form: NodeForm): StationNode {
+function toNodePayload(form: NodeForm): Omit<StationNode, "id"> {
   const lat = form.lat.trim() === "" ? null : parseFloat(form.lat);
   const lng = form.lng.trim() === "" ? null : parseFloat(form.lng);
   return {
-    id: form.id.trim(),
     brandId: form.brandId.trim(),
+    externalId: form.externalId.trim(),
     name: form.name.trim(),
     address: form.address.trim() || null,
     phone: form.phone.trim() || null,
@@ -66,8 +67,8 @@ function toNodePayload(form: NodeForm): StationNode {
 
 function nodeToForm(n: StationNode): NodeForm {
   return {
-    id: n.id,
     brandId: n.brandId,
+    externalId: n.externalId,
     name: n.name,
     address: n.address ?? "",
     phone: n.phone ?? "",
@@ -83,7 +84,7 @@ export default function StationNodesTab() {
   const queryClient = useQueryClient();
 
   const [page, setPage] = useState(1);
-  const [brandFilter, setStationFilter] = useState<string>("");
+  const [brandFilter, setBrandFilter] = useState<string>("");
 
   const [isCreating, setIsCreating] = useState(false);
   const [form, setForm] = useState<NodeForm>(EMPTY_FORM);
@@ -95,12 +96,12 @@ export default function StationNodesTab() {
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [importError, setImportError] = useState<string>("");
 
+  // GET /api/admin/brands answers with the full list, not a page — the `?pageSize` query and the
+  // `res.items` unwrap this used to do both returned nothing, which left the brand filter and the
+  // brand column permanently empty.
   const { data: brands = [] } = useQuery<Brand[]>({
     queryKey: ["/api/admin/brands", "for-nodes"],
-    queryFn: async () => {
-      const res = await apiRequest<any, PagedResult<Brand>>("GET", "/api/admin/brands?pageSize=100");
-      return res.items ?? [];
-    },
+    queryFn: () => apiRequest<unknown, Brand[]>("GET", "/api/admin/brands"),
   });
 
   const brandName = (id: string) => brands.find((b) => b.id === id)?.name ?? id;
@@ -109,7 +110,7 @@ export default function StationNodesTab() {
     queryKey: ["/api/admin/brand-stations", page, brandFilter],
     queryFn: async () => {
       const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
-      if (brandFilter) params.set("brandId", brandFilter);
+      if (brandFilter) params.set("BrandId", brandFilter);
       return apiRequest<unknown, PagedResult<StationNode>>("GET", `/api/admin/brand-stations?${params.toString()}`);
     },
   });
@@ -120,7 +121,7 @@ export default function StationNodesTab() {
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["/api/admin/brand-stations"] });
 
   const createMutation = useMutation({
-    mutationFn: (n: StationNode) => apiRequest("POST", "/api/admin/brand-stations", n),
+    mutationFn: (n: Omit<StationNode, "id">) => apiRequest("POST", "/api/admin/brand-stations", n),
     onSuccess: () => {
       invalidate();
       setIsCreating(false);
@@ -131,7 +132,8 @@ export default function StationNodesTab() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: (n: StationNode) => apiRequest("PUT", `/api/admin/brand-stations/${encodeURIComponent(n.id)}`, n),
+    mutationFn: (n: StationNode) =>
+      apiRequest("PUT", `/api/admin/brand-stations/${encodeURIComponent(n.id)}`, n),
     onSuccess: () => {
       invalidate();
       setEditingId(null);
@@ -156,6 +158,8 @@ export default function StationNodesTab() {
   const coordsValid = isValidCoordinate(latNum, lngNum);
   const formValid = !!form.brandId.trim() && !!form.name.trim() && coordsValid;
 
+  const selectedBrandSlug = brands.find((b) => b.id === form.brandId)?.slug;
+
   const startCreate = () => {
     setEditingId(null);
     setForm(EMPTY_FORM);
@@ -175,8 +179,8 @@ export default function StationNodesTab() {
   };
 
   const autoDeriveId = () => {
-    if (!form.brandId.trim() || !coordsValid) return;
-    setForm((f) => ({ ...f, id: deriveNodeId(f.brandId.trim(), latNum, lngNum) }));
+    if (!selectedBrandSlug || !coordsValid) return;
+    setForm((f) => ({ ...f, externalId: deriveExternalId(selectedBrandSlug, latNum, lngNum) }));
   };
 
   const submitForm = () => {
@@ -185,8 +189,9 @@ export default function StationNodesTab() {
     if (editingId) {
       updateMutation.mutate({ ...payload, id: editingId });
     } else {
-      // Single create needs an explicit id (the server does not derive it here).
-      if (!payload.id) payload.id = deriveNodeId(payload.brandId, latNum, lngNum);
+      // A blank external id is fine: the server derives the same value from the brand's slug
+      // and the coordinates, so the form and an imported file cannot mint two identities for
+      // one physical station.
       createMutation.mutate(payload);
     }
   };
@@ -221,7 +226,7 @@ export default function StationNodesTab() {
         <div className="flex items-center gap-2">
           <Select
             value={brandFilter || "__all__"}
-            onValueChange={(v) => { setStationFilter(v === "__all__" ? "" : v); setPage(1); }}
+            onValueChange={(v) => { setBrandFilter(v === "__all__" ? "" : v); setPage(1); }}
           >
             <SelectTrigger className="h-8 w-56">
               <SelectValue placeholder={t("stationNodes.allBrands")} />
@@ -363,16 +368,17 @@ export default function StationNodesTab() {
             </div>
           </div>
 
-          {/* Id row — required on create (server does not derive); fixed on edit.
-              The numeric lat/lng above are the authoritative source; a visual map
-              picker will sync into them in a follow-up without changing this contract. */}
+          {/* External id row — the importer's crosswalk key, optional on create (the server derives it
+              from the brand's slug + the coordinates) and fixed on edit. The numeric lat/lng above
+              are the authoritative source; a visual map picker will sync into them in a follow-up
+              without changing this contract. */}
           <div className="flex items-end gap-3 flex-wrap mt-3 pt-3 border-t border-border">
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">ID</label>
-              <Input value={form.id} onChange={(e) => setForm((f) => ({ ...f, id: e.target.value }))} disabled={!!editingId} className="h-8 w-72 font-mono text-xs" placeholder={t("stationNodes.idHint")} />
+              <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{t("stationNodes.externalId")}</label>
+              <Input value={form.externalId} onChange={(e) => setForm((f) => ({ ...f, externalId: e.target.value }))} disabled={!!editingId} className="h-8 w-72 font-mono text-xs" placeholder={t("stationNodes.externalIdHint")} />
             </div>
             {!editingId && (
-              <Button variant="ghost" size="sm" className="h-8" onClick={autoDeriveId} disabled={!form.brandId.trim() || !coordsValid} title={t("stationNodes.autoIdHint")}>
+              <Button variant="ghost" size="sm" className="h-8" onClick={autoDeriveId} disabled={!selectedBrandSlug || !coordsValid} title={t("stationNodes.autoIdHint")}>
                 {t("stationNodes.autoId")}
               </Button>
             )}

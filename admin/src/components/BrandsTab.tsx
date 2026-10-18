@@ -56,6 +56,12 @@ interface BrandFuelDto {
 
 interface BrandDto {
   id: string;
+  /**
+   * The network's own code ("okko"). This is what the API and the importers key on; `id` is the
+   * uuid the database joins on and nothing outside it needs to know it. Server-assigned on create,
+   * immutable afterwards — renaming it here would re-point every import file at nothing.
+   */
+  slug: string;
   name: string;
   logoText: string;
   color: string;
@@ -186,7 +192,7 @@ export default function BrandsTab({
 
   const createBrandMutation = useMutation({
     mutationFn: async (data: {
-      id: string;
+      slug: string;
       name: string;
       logoText: string;
       color: string;
@@ -211,14 +217,17 @@ export default function BrandsTab({
   const handleCreateBrand = () => {
     const name = newBrand.name.trim();
     if (!name) return;
-    const id =
+    // The slug is derived here, not on the server: it is the network's own code, and an operator
+    // typing "OKKO" means "okko". The server owns the uuid and rejects a duplicate slug with a 409.
+    const slug =
       name
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-+|-+$/g, "")
-        .slice(0, 32) || crypto.randomUUID();
+        .slice(0, 100);
+    if (!slug) return;
     createBrandMutation.mutate({
-      id,
+      slug,
       name,
       logoText: newBrand.logoText.trim(),
       color: newBrand.color,
@@ -235,7 +244,7 @@ export default function BrandsTab({
     }: {
       id: string;
       data: {
-        id: string;
+        slug: string;
         name: string;
         logoText: string;
         color: string;
@@ -265,10 +274,11 @@ export default function BrandsTab({
   const handleSaveBrand = () => {
     const id = editingBrandId;
     if (!id || !editBrand.name.trim()) return;
+    const brand = brands.find((b) => b.id === id);
     updateBrandMutation.mutate({
       id,
       data: {
-        id,
+        slug: brand?.slug ?? "",
         name: editBrand.name.trim(),
         logoText: editBrand.logoText.trim(),
         color: editBrand.color,

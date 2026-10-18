@@ -2,8 +2,17 @@
 // Kept out of the component so they can be unit-tested without rendering
 // (this worktree can't run the admin dev deps — see CI for the type/build gate).
 
+/** Mirrors the server's BrandStation entity, which the admin endpoint returns as-is. */
 export interface StationNode {
+  /** Surrogate key. Server-assigned; the row cannot be renamed through the API. */
   id: string;
+  /**
+   * The importer's crosswalk key, unique per brand. It was the primary key until the
+   * uuid migration, which is why re-importing a network's file still heals its rows.
+   * The server derives it from the coordinates when a caller leaves it blank.
+   */
+  externalId: string;
+  /** The owning network's uuid. */
   brandId: string;
   name: string;
   address?: string | null;
@@ -44,9 +53,11 @@ export function isValidCoordinate(lat: number, lng: number): boolean {
   return isValidLat(lat) && isValidLng(lng);
 }
 
-// Convenience-only mirror of backend StationNodeCoordinates.DeriveId
-// ({brandId}-{lat:F5}-{lng:F5}). The server is authoritative on import and
-// requires an explicit id on single create; this just pre-fills that field.
-export function deriveNodeId(brandId: string, lat: number, lng: number): string {
-  return `${brandId}-${lat.toFixed(5)}-${lng.toFixed(5)}`;
+// Convenience-only mirror of backend BrandStationCoordinates.DeriveId
+// ({brandSlug}-{lat:F5}-{lng:F5}). The server is authoritative and derives the same
+// value when a create leaves the external id blank; this only pre-fills that field.
+// It takes the brand's SLUG, not its uuid — seeding the uuid here would write a key
+// no import file could ever produce.
+export function deriveExternalId(brandSlug: string, lat: number, lng: number): string {
+  return `${brandSlug}-${lat.toFixed(5)}-${lng.toFixed(5)}`;
 }

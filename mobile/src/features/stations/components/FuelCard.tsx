@@ -22,7 +22,9 @@ interface FuelCardProps {
 export function FuelCard({ fuel, station, index, onPress }: FuelCardProps) {
   const tokens = useDesignTokens();
   const soft = tokens.surface.soft;
-  const brandColor = BRAND_COLORS[station.id] || tokens.colors.primary;
+  // Keyed by slug, not by id: the palette holds the networks we carry, and the id is a uuid
+  // that would miss every entry.
+  const brandColor = BRAND_COLORS[station.slug] || tokens.colors.primary;
 
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const tiltX = useRef(new Animated.Value(0)).current;
