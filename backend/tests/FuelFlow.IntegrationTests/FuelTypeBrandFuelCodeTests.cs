@@ -182,21 +182,65 @@ public sealed class FuelTypeBrandFuelCodeTests : IClassFixture<TestDatabaseFixtu
     }
 
     [Fact]
-    public async Task TheSeededWogFuels_CarryNoCode()
+    public async Task ASeededWogFuelWhoseNameIsNotWogsVocabulary_CarriesNoCode()
     {
-        // The restraint, asserted as carefully as the mapping: nobody has ever shown us WOG's
-        // vocabulary, so a code here would be a guess about a supplier's naming — and a guess is an
-        // identity the unique index would then enforce. They price by category until a WOG source is
-        // proven.
+        // The restraint, restated for a world where we finally have WOG's vocabulary.
+        //
+        // It used to read "nobody has ever shown us WOG's vocabulary", which was true and is now
+        // false — the brand publishes one. But knowing the vocabulary is not the same as having our
+        // rows named after it: WOG prints `ДП Mustang+`, `95 Mustang Євро5-Е10` and
+        // `100 Mustang Євро5-Е0`, while the seeded fuels are named `ДП Mustang`, `A-95 Mustang`,
+        // `A 95 EURO` and `Mustang 100`. Coding from the name would write four codes WOG has never
+        // published, and the unique index would then enforce those guesses as identities.
+        //
+        // So the rule is the same, with the reason corrected: a fuel is coded when its name is a
+        // token the brand actually publishes, and is not otherwise. The seeded ones mostly are not.
         await using var context = CreateContext();
 
         var wog = await context.FuelTypes
             .Where(f => f.BrandId == "wog")
-            .Select(f => f.BrandFuelCode)
+            .Select(f => new { f.Name, f.BrandFuelCode })
             .ToListAsync();
 
         wog.Should().NotBeEmpty("the seed still installs them");
-        wog.Should().AllSatisfy(code => code.Should().BeNull());
+
+        // WOG publishes this one verbatim, so it is coded — and only it.
+        wog.Where(f => f.Name == "ГАЗ")
+            .Should().AllSatisfy(f => f.BrandFuelCode.Should().Be("ГАЗ"));
+
+        // The rest of the seed is not WOG's vocabulary, and stays uncoded.
+        wog.Where(f => f.Name != "ГАЗ")
+            .Should().AllSatisfy(f => f.BrandFuelCode.Should().BeNull(
+                "coding a name the brand does not publish is a guess the index would then enforce"));
+    }
+
+    [Fact]
+    public async Task AHandTypedWogFuelNamedAsPublished_CarriesThatCode()
+    {
+        // The production shape, and the reason the migration above can exist at all: an operator
+        // typed these off WOG's own sheet, so the name already is the token.
+        await using var context = CreateContext();
+        var now = DateTime.UtcNow;
+
+        context.FuelTypes.AddRange(
+            new FuelTypeEntity { Id = "wog-dp-e5", Name = "ДП Євро5", BrandId = "wog", BasePrice = 103.5m, DiscountPrice = 100m, CreatedAtUtc = now, UpdatedAtUtc = now },
+            new FuelTypeEntity { Id = "wog-95-e5-e10", Name = "95 Євро5-Е10", BrandId = "wog", BasePrice = 92.9m, DiscountPrice = 90m, CreatedAtUtc = now, UpdatedAtUtc = now });
+        await context.SaveChangesAsync();
+
+        await context.Database.ExecuteSqlRawAsync(
+            """
+            UPDATE fuel_types SET brand_fuel_code = btrim(name)
+            WHERE brand_id = 'wog' AND brand_fuel_code IS NULL AND NOT is_deleted
+              AND btrim(name) IN ('ДП Євро5', 'ДП Mustang+', '95 Євро5-Е10', '95 Mustang Євро5-Е10', '100 Mustang Євро5-Е0', 'ГАЗ', 'AdBlue')
+            """);
+
+        context.ChangeTracker.Clear();
+        var coded = await context.FuelTypes
+            .Where(f => f.Id == "wog-dp-e5" || f.Id == "wog-95-e5-e10")
+            .Select(f => new { f.Name, f.BrandFuelCode })
+            .ToListAsync();
+
+        coded.Select(f => f.BrandFuelCode).Should().BeEquivalentTo(["ДП Євро5", "95 Євро5-Е10"]);
     }
 
     [Fact]
