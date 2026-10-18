@@ -141,35 +141,23 @@ public sealed class UpdateNominalsReuseTests : IDisposable
     }
 
     [Fact]
-    public async Task A_Nominal_That_Stays_Keeps_Its_Id_And_Its_CreatedAt()
+    public async Task A_Nominal_That_Leaves_Is_Removed_Not_Archived()
     {
-        var seeded = await SeedAsync(10, 20);
-        var tenL = seeded.Single(p => p.Liters == 10m);
-        var createdAt = tenL.CreatedAtUtc;
-
-        await CreateController().UpdateNominals("okko", new List<int> { 10, 20, 30 }, default);
-
-        // The 10 L package must be the SAME row. If it were removed and recreated the id would
-        // change, and every order_line_item pointing at it would stop resolving.
-        var after = await _context.FuelOfferVolumes.IgnoreQueryFilters().SingleAsync(p => p.Id == tenL.Id);
-        after.Liters.Should().Be(10m);
-        after.CreatedAtUtc.Should().Be(createdAt, "a package that stayed is the same package");
-    }
-
-    [Fact]
-    public async Task A_Nominal_That_Leaves_Is_Archived_Not_Removed()
-    {
-        var seeded = await SeedAsync(10, 20);
-        var twentyL = seeded.Single(p => p.Liters == 20m);
+        await SeedAsync(10, 20);
 
         await CreateController().UpdateNominals("okko", new List<int> { 10 }, default);
 
-        var archived = await _context.FuelOfferVolumes.IgnoreQueryFilters().SingleAsync(p => p.Id == twentyL.Id);
-        archived.IsDeleted.Should().BeTrue("#217: the row an order may reference must survive");
-        archived.DeletedAtUtc.Should().NotBeNull();
+        var sizes = await _context.FuelNominals.AsNoTracking()
+            .Where(n => n.FuelTypeId == "okko-a95")
+            .Select(n => n.Liters)
+            .ToListAsync();
 
-        (await _context.FuelOfferVolumes.CountAsync()).Should().Be(1,
-            "the global filter hides the archived one, so the catalog shows just the 10 L");
+        // Straight removal, not the archive #217 insisted on, and the reason is that a nominal is no
+        // longer a row anything points at: `order_line_items` carries brand, fuel, litres and the
+        // prices paid, and no table in the schema holds a nominal or package id. Archiving existed to
+        // keep the row an order referenced resolvable; there is no such row. What an order line still
+        // has to survive - deleting a FUEL that vouchers were sold against - is untouched by this.
+        sizes.Should().Equal(10m);
     }
 
     [Fact]
@@ -179,12 +167,12 @@ public sealed class UpdateNominalsReuseTests : IDisposable
 
         var controller = CreateController();
         await controller.UpdateNominals("okko", new List<int> { 10, 20 }, default);
-        var afterFirst = await _context.FuelOfferVolumes.IgnoreQueryFilters()
-            .Select(p => new { p.Id, p.Liters }).ToListAsync();
+        var afterFirst = await _context.FuelNominals.AsNoTracking()
+            .Select(n => new { n.FuelTypeId, n.Liters }).ToListAsync();
 
         await controller.UpdateNominals("okko", new List<int> { 10, 20 }, default);
-        var afterSecond = await _context.FuelOfferVolumes.IgnoreQueryFilters()
-            .Select(p => new { p.Id, p.Liters }).ToListAsync();
+        var afterSecond = await _context.FuelNominals.AsNoTracking()
+            .Select(n => new { n.FuelTypeId, n.Liters }).ToListAsync();
 
         // Under the old code this grew by two rows on every save - archived duplicates piling up on
         // each price edit.
@@ -193,11 +181,10 @@ public sealed class UpdateNominalsReuseTests : IDisposable
     }
 
     /// <summary>
-    /// The body binds <c>List&lt;int&gt;</c> straight off the wire, so a nominal of <c>-10</c> used
-    /// to create a package priced at <c>-10 ×</c> the per-litre rate and the storefront listed it.
-    /// <c>ck_fuel_packages_liters_positive</c> now stops it at the database, but a bare 23514 names
-    /// neither the offending value nor this endpoint - so the rejection happens here, where the
-    /// answer can say which nominal and why.
+    /// The endpoint takes the size list straight off the wire and writes it, so a non-positive value
+    /// has to be rejected before anything is touched: a bare 23514 from the database names neither the
+    /// offending value nor this endpoint, and a single bad entry in the list must not take the
+    /// surviving sizes down on its way out.
     /// </summary>
     [Theory]
     [InlineData(new[] { 10, 0 })]
@@ -206,7 +193,7 @@ public sealed class UpdateNominalsReuseTests : IDisposable
     public async Task A_NonPositive_Nominal_Is_Rejected_Without_Touching_The_Catalogue(int[] nominals)
     {
         await SeedAsync(10, 20);
-        var before = await _context.FuelOfferVolumes.IgnoreQueryFilters().CountAsync();
+        var before = await _context.FuelNominals.AsNoTracking().CountAsync();
 
         var result = await CreateController().UpdateNominals("okko", nominals.ToList(), default);
 
@@ -214,9 +201,7 @@ public sealed class UpdateNominalsReuseTests : IDisposable
         bad.Should().NotBeNull("a negative volume is not a product");
         bad!.Value.Should().NotBeNull();
 
-        // The strongest part: the rejection happens before any of the archive-then-add logic runs,
-        // so a single bad value in the list cannot archive the surviving volumes on its way out.
-        (await _context.FuelOfferVolumes.IgnoreQueryFilters().CountAsync()).Should().Be(before,
+        (await _context.FuelNominals.AsNoTracking().CountAsync()).Should().Be(before,
             "a rejected request must not archive anything");
     }
 }
