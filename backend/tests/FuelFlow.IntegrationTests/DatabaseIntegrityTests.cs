@@ -221,7 +221,9 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
     public async Task A_Negative_Offer_Price_Is_Refused()
     {
         await using var context = CreateContext();
-        context.FuelOffers.Add(NewOffer("offer-negative-final", -1m));
+        var (negativeFuel, negativeOffer) = NewOfferWithFuel("offer-negative-final", -1m);
+        context.FuelTypes.Add(negativeFuel);
+        context.FuelOffers.Add(negativeOffer);
 
         var act = async () => await context.SaveChangesAsync();
         await act.Should().ThrowAsync<DbUpdateException>();
@@ -267,7 +269,8 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
     {
         await using (var seed = CreateContext())
         {
-            var offer = NewOffer("offer-free-giveaway", 0m);
+            var (giveawayFuel, offer) = NewOfferWithFuel("offer-free-giveaway", 0m);
+            seed.FuelTypes.Add(giveawayFuel);
             seed.FuelOffers.Add(offer);
             seed.FuelOfferVolumes.Add(new FuelOfferVolume
             {
@@ -294,17 +297,42 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
     /// An offer to hang a volume off. Only the sign-constraint tests need one, so it carries the
     /// bare minimum the column constraints demand and nothing else - a negative cost is the point, and
     /// the margin rides along so the offer still has a derivable price.
+    /// <para>
+    /// The fuel is generated per offer rather than shared, because an offer is unique per
+    /// (brand, fuel, pool) and this class shares one database: two offers hanging off one fuel would
+    /// trip <c>ix_fuel_offers_station_fuel_pool</c> before either test got to assert the thing it
+    /// came for. Sharing one phantom fuel id also let these tests pass without the fuel existing at
+    /// all, which the FK from 20261018104336 no longer allows.
+    /// </para>
     /// </summary>
-    private static FuelOffer NewOffer(string id, decimal supplierPricePerLiter) => new()
+    private static (FuelTypeEntity Fuel, FuelOffer Offer) NewOfferWithFuel(
+        string id,
+        decimal supplierPricePerLiter)
     {
-        Id = id,
-        StationId = "okko",
-        FuelTypeId = "okko-a95",
-        SupplierPricePerLiter = supplierPricePerLiter,
-        MarginUahPerLiter = 1m,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
-    };
+        var fuel = new FuelTypeEntity
+        {
+            Id = $"{id}-fuel",
+            Name = $"Test fuel for {id}",
+            StationId = "okko",
+            BasePrice = 0m,
+            DiscountPrice = 0m,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+
+        var offer = new FuelOffer
+        {
+            Id = id,
+            StationId = "okko",
+            FuelTypeId = fuel.Id,
+            SupplierPricePerLiter = supplierPricePerLiter,
+            MarginUahPerLiter = 1m,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+
+        return (fuel, offer);
+    }
 
     /// <summary>
     /// A volume with no offer behind it. That is deliberate and load-bearing: the point of these

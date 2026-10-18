@@ -37,6 +37,20 @@ public sealed class PackagePriceOverrideIntegrationTests : IClassFixture<TestDat
         decimal? overrideUah = null)
     {
         var fuelId = $"override-fuel-{suffix}-{Guid.CreateVersion7()}";
+
+        // The offer may not name a fuel that does not exist (FK from 20261018104336), and this id is
+        // generated per call, so the fuel is created alongside the offer it is there to carry.
+        context.FuelTypes.Add(new FuelTypeEntity
+        {
+            Id = fuelId,
+            Name = $"Override test fuel {suffix}",
+            StationId = "okko",
+            BasePrice = 0m,
+            DiscountPrice = 0m,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+
         var offer = new FuelOffer
         {
             Id = fuelId,
@@ -141,6 +155,19 @@ public sealed class PackagePriceOverrideIntegrationTests : IClassFixture<TestDat
         await using var context = CreateContext();
 
         var fuelId = $"unpriced-fuel-{Guid.CreateVersion7()}";
+
+        // Same reason as SeedAsync: the offer names this fuel, so the fuel has to exist before it.
+        context.FuelTypes.Add(new FuelTypeEntity
+        {
+            Id = fuelId,
+            Name = "Unpriced test fuel",
+            StationId = "okko",
+            BasePrice = 0m,
+            DiscountPrice = 0m,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+
         var offer = new FuelOffer
         {
             Id = fuelId,

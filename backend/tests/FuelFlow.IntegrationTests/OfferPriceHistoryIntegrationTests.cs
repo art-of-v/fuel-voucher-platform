@@ -281,6 +281,21 @@ public sealed class OfferPriceHistoryIntegrationTests : IClassFixture<TestDataba
         decimal margin)
     {
         var fuelId = $"fuel-{suffix}-{Guid.CreateVersion7()}";
+
+        // The offer and the fuel it sells. Since 20261018104336 an offer may not name a fuel that
+        // does not exist, and these ids are generated per call, so the fuel has to be born with the
+        // offer rather than seeded from a list that would go stale the moment a suffix changed.
+        context.FuelTypes.Add(new FuelTypeEntity
+        {
+            Id = fuelId,
+            Name = $"Test fuel {suffix}",
+            StationId = "okko",
+            BasePrice = 0m,
+            DiscountPrice = 0m,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+
         var offer = new FuelOffer
         {
             Id = fuelId,

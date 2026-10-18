@@ -145,8 +145,8 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
 
         var availability = CreateAvailability();
 
-        (await availability.FindPackageAsync(false, "okko", "okko-a95", 10m))!.PackageId.Should().Be("real-10l");
-        (await availability.FindPackageAsync(true, "okko", "okko-a95", 10m))!.PackageId.Should().Be("qa-mirror-10l");
+        (await availability.FindPackageAsync(false, "okko", "okko-95", 10m))!.PackageId.Should().Be("real-10l");
+        (await availability.FindPackageAsync(true, "okko", "okko-95", 10m))!.PackageId.Should().Be("qa-mirror-10l");
     }
 
     /// <summary>
@@ -188,12 +188,12 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
         // And with the duplicate refused, the key resolves to the one row that exists - no ordering
         // involved, because there is nothing to order.
         var availability = CreateAvailability();
-        var chosen = await availability.FindPackageAsync(false, "okko", "okko-a95", 20m);
+        var chosen = await availability.FindPackageAsync(false, "okko", "okko-95", 20m);
         chosen!.PackageId.Should().Be("first");
 
         var bulk = await availability.FindPackagesAsync(
-            false, new[] { StockKey.For("okko", "okko-a95", 20m) });
-        bulk[StockKey.For("okko", "okko-a95", 20m)].PackageId.Should().Be(chosen.PackageId);
+            false, new[] { StockKey.For("okko", "okko-95", 20m) });
+        bulk[StockKey.For("okko", "okko-95", 20m)].PackageId.Should().Be(chosen.PackageId);
     }
 
     /// <summary>
@@ -211,7 +211,7 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
 
         var availability = CreateAvailability();
 
-        (await availability.FindPackageAsync(false, "okko", "okko-a95", 5m)).Should().BeNull(
+        (await availability.FindPackageAsync(false, "okko", "okko-95", 5m)).Should().BeNull(
             "a real customer must not be priced off a rehearsal package");
     }
 
@@ -232,8 +232,8 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
 
         var wanted = new[]
         {
-            StockKey.For("okko", "okko-a95", 2m),
-            StockKey.For("okko", "okko-a95", 5m),
+            StockKey.For("okko", "okko-95", 2m),
+            StockKey.For("okko", "okko-95", 5m),
             StockKey.For("wog", "wog-95", 10m),   // nothing at all behind this one
         };
         await seed.SaveChangesAsync();
@@ -241,7 +241,7 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
         var resolved = await CreateAvailability().FindPackagesAsync(false, wanted);
 
         resolved.Keys.Should().BeEquivalentTo(
-            new[] { StockKey.For("okko", "okko-a95", 2m), StockKey.For("okko", "okko-a95", 5m) });
+            new[] { StockKey.For("okko", "okko-95", 2m), StockKey.For("okko", "okko-95", 5m) });
         resolved.Should().NotContainKey(StockKey.For("wog", "wog-95", 10m),
             "an absent key is what makes the line refuse rather than fall through");
     }
@@ -267,7 +267,7 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
         int updatedMinutesAgo)
     {
         var pool = DataKinds.ForPool(isTestData);
-        var offerId = OfferKeys.For("okko-a95", pool);
+        var offerId = OfferKeys.For("okko-95", pool);
 
         if (!seed.FuelOffers.Local.Any(o => o.Id == offerId) && !seed.FuelOffers.Any(o => o.Id == offerId))
         {
@@ -275,7 +275,7 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
             {
                 Id = offerId,
                 StationId = "okko",
-                FuelTypeId = "okko-a95",
+                FuelTypeId = "okko-95",
                 DataKind = pool,
                 // A flat cost and margin, independent of the volume's own price: what these tests
                 // assert is which keys come back and what each volume costs, and deriving a margin from
