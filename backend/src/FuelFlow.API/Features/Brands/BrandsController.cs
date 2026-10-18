@@ -15,6 +15,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 using FuelFlow.Features.Stations;
+using FuelFlow.Features.Vouchers.SharedModels;
 
 namespace FuelFlow.Features.Brands;
 
@@ -709,6 +710,38 @@ private readonly GetBrandsQueryHandler _getAll;
     {
         var fuel = await _context.FuelTypes.FirstOrDefaultAsync(f => f.Id == fuelId, ct);
         if (fuel is null) return NotFound();
+
+        // A fuel may only be archived once it is idle: every one of its vouchers spent or expired.
+        //
+        // Settled with the operator, 2026-10-17. The two conditions are separate and both matter. The
+        // brand dropping a fuel says it is no longer sold, which only the price sheet can establish —
+        // that half is `ImportOkkoCatalogueCommandHandler`'s to prove, and it never guesses. This half
+        // is the one that protects the money: a fuel archived while customers still hold its vouchers
+        // leaves those vouchers pointing at a row the catalogue no longer shows, so they cannot be
+        // priced (#217). Refusing here is the cheap place to catch it — after the fact, the vouchers
+        // are already unusable and the only repair is un-archiving and reconciling by hand.
+        var blockingStatuses = VoucherStatuses.Blocking;
+        var liveVouchers = await _context.FuelVouchers
+            .IgnoreQueryFilters()
+            .Where(v => v.FuelTypeId == fuelId && !v.IsDeleted && blockingStatuses.Contains(v.Status))
+            .Select(v => new { v.Id, v.Status, v.VoucherNumber, v.Liters })
+            .Take(6)
+            .ToListAsync(ct);
+
+        if (liveVouchers.Count > 0)
+        {
+            var total = await _context.FuelVouchers
+                .IgnoreQueryFilters()
+                .CountAsync(v => v.FuelTypeId == fuelId && !v.IsDeleted && blockingStatuses.Contains(v.Status), ct);
+
+            return Conflict(new
+            {
+                error = $"«{fuel.Name}» не можна архівувати: {total} талон(ів) ще активні. " +
+                        "Архівувати можна лише пальне, у якого всі талони використані або прострочені.",
+                activeVoucherCount = total,
+                examples = liveVouchers.Select(v => new { v.VoucherNumber, status = v.Status.ToString(), v.Liters }),
+            });
+        }
 
         var station = await _context.Stations.FirstOrDefaultAsync(s => s.Id == fuel.StationId, ct);
         var stationName = station?.Name ?? "?";

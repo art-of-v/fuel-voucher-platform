@@ -2,6 +2,7 @@ using System.Text.Json;
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Pricing.ImportOkkoPumpPrices;
 using FuelFlow.Features.Vouchers.Import;
+using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -23,6 +24,8 @@ public sealed record OkkoCatalogueGradeHeld(string SiteFuelCode, OkkoFuelCategor
 /// <summary>Two grades wanting one name; reported rather than resolved by renaming something by guesswork.</summary>
 public sealed record OkkoCatalogueNameCollision(string Name, string SiteFuelCode);
 
+public sealed record OkkoCatalogueArchived(string FuelTypeId, string Name, int LiveVouchers, bool Archived);
+
 public sealed record OkkoCatalogueApplyResult(
     int Created,
     int AlreadyKnown,
@@ -33,6 +36,8 @@ public sealed record OkkoCatalogueApplyResult(
     IReadOnlyList<OkkoCatalogueNameCollision> NameCollisions,
     /// <summary>Site rows the catalogue has no counterpart for and no category we sell (jet fuel, AdBlue).</summary>
     IReadOnlyList<string> UnclassifiedSiteFuels,
+    /// <summary>Fuels OKKO no longer publishes: archived when their stock is finished, reported when it is not.</summary>
+    IReadOnlyList<OkkoCatalogueArchived> ArchivedFuels,
     bool DryRun);
 
 /// <summary>
@@ -121,6 +126,9 @@ public sealed class ImportOkkoCatalogueCommandHandler
         var alreadyKnown = 0;
         var unclassified = new List<string>();
         var gradesHeld = new List<OkkoCatalogueGradeHeld>();
+        // Which of our fuels the sheet still publishes. A fuel missing from this set is a candidate
+        // for archiving - subject to the voucher check, which is what actually decides.
+        var seenFuelIds = new HashSet<string>(StringComparer.Ordinal);
         var nameCollisions = new List<OkkoCatalogueNameCollision>();
 
         // What we already carry, live rows only: an archived fuel must not stop a fresh one from being
@@ -148,14 +156,24 @@ public sealed class ImportOkkoCatalogueCommandHandler
         // Code first, name second, because our own catalogue holds both spellings - "ДП" and "DP",
         // "А-95" and "А95 ЄВРО" - and each pair is one fuel. A fuel whose code is unmapped still holds
         // its grade if its name classifies.
-        var gradeHolder = new Dictionary<OkkoFuelCategory, string>();
+var gradeHolder = new Dictionary<OkkoFuelCategory, (string Id, string Name)>();
+        // Every fuel holding a grade, not only the one that "represents" it. One row per grade is the
+        // rule, but until the duplicates are gone a second row must not be archived as "dropped by
+        // the brand" while the brand is plainly still publishing that grade.
+        var byGrade = new Dictionary<OkkoFuelCategory, List<FuelTypeEntity>>();
         foreach (var fuel in carried)
         {
             var held = OkkoFuelClassifier.CategoryFromSiteFuelCode(fuel.BrandFuelCode)
                 ?? OkkoFuelClassifier.CategoryFromName(fuel.Name);
 
-            if (held is { } grade && !gradeHolder.ContainsKey(grade))
-                gradeHolder[grade] = fuel.Name;
+            if (held is not { } grade) continue;
+
+            if (!gradeHolder.ContainsKey(grade))
+                gradeHolder[grade] = (fuel.Id, fuel.Name);
+
+            if (!byGrade.TryGetValue(grade, out var sameGrade))
+                byGrade[grade] = sameGrade = [];
+            sameGrade.Add(fuel);
         }
 
         foreach (var row in command.Sheet)
@@ -171,8 +189,15 @@ public sealed class ImportOkkoCatalogueCommandHandler
 
             // Code first: a live fuel already holding the brand's own code for this grade is the whole job
             // done, and there is nothing for an operator to act on.
-            if (knownCodes.Contains(code))
+if (knownCodes.Contains(code))
             {
+                // Seen, so not a candidate for archiving at the end of this run. `First` rather than a
+                // lookup because the live (station, code) index already guarantees there is one - and
+                // the whole grade group with it, since the brand is plainly still publishing that grade.
+                seenFuelIds.Add(carried.First(f => f.BrandFuelCode == code).Id);
+                if (byGrade.TryGetValue(grade, out var sameGrade))
+                    foreach (var sibling in sameGrade) seenFuelIds.Add(sibling.Id);
+
                 alreadyKnown++;
                 continue;
             }
@@ -186,7 +211,12 @@ public sealed class ImportOkkoCatalogueCommandHandler
             // human still has work to do: our fuel needs the brand's code to resolve exactly.
             if (gradeHolder.TryGetValue(grade, out var holder))
             {
-                gradesHeld.Add(new OkkoCatalogueGradeHeld(code, grade, holder));
+                if (byGrade.TryGetValue(grade, out var sameGrade))
+                    foreach (var sibling in sameGrade) seenFuelIds.Add(sibling.Id);
+                else
+                    seenFuelIds.Add(holder.Id);
+
+                gradesHeld.Add(new OkkoCatalogueGradeHeld(code, grade, holder.Name));
                 continue;
             }
 
@@ -206,7 +236,7 @@ public sealed class ImportOkkoCatalogueCommandHandler
 
             knownCodes.Add(code);
             knownNames.Add(name);
-            gradeHolder[grade] = name;
+            // The id is recorded below, once the fuel exists: a dry run has no row to point at.
 
             if (command.DryRun)
             {
@@ -228,6 +258,9 @@ public sealed class ImportOkkoCatalogueCommandHandler
                 UpdatedAtUtc = now
             };
             _context.FuelTypes.Add(fuel);
+            // The brand publishes it - we just learned that from this very sheet - so it must not be a
+            // candidate for archiving at the end of this same run.
+            seenFuelIds.Add(fuel.Id);
 
             var offer = new FuelOffer
             {
@@ -283,6 +316,129 @@ public sealed class ImportOkkoCatalogueCommandHandler
                 .DistinctBy(c => (c.Name, c.SiteFuelCode))
                 .ToList(),
             UnclassifiedSiteFuels: unclassified.Distinct(StringComparer.Ordinal).ToList(),
+            ArchivedFuels: await ArchiveDroppedFuelsAsync(seenFuelIds, actingUserId, actingUserName, command.DryRun, ct),
             DryRun: command.DryRun);
+    }
+
+    /// <summary>
+    /// Archives the fuels OKKO no longer publishes, and only those whose stock is finished.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This used to archive nothing at all, on the reasoning that "not on the site this morning" is not
+    /// "remove it from the catalogue" — a broken selector, an anti-bot page or a locale change would
+    /// empty the storefront of every fuel at once. That reasoning is kept, and made safe by the second
+    /// condition: a fuel can only go when there is nothing left to sell.
+    /// </para>
+    /// <para>
+    /// <b>Both conditions, and the operator's rule for them</b> (2026-10-17): the brand must no longer
+    /// publish the grade, and every one of its vouchers must be spent or expired. The sheet proves the
+    /// first; the voucher table proves the second. Neither alone is enough — absence from the sheet
+    /// says nothing about stock we paid for, and an idle fuel the brand still sells is simply one we
+    /// happen not to carry.
+    /// </para>
+/// <para>
+    /// A fuel whose vouchers are still live is <b>reported, not archived</b>, and keeps trading against
+    /// stock we have already paid for. That is the safe failure: it stays on the shelf until the
+    /// vouchers are used up, and the next tick — fifteen minutes later — tries again.
+    /// </para>
+    /// <para>
+    /// <b>Only fuels that carry the brand's own code are candidates.</b> Absence from the sheet proves
+    /// something about a grade the brand publishes; it proves nothing about a row an operator typed,
+    /// which is our own naming and may not correspond to anything the brand sells. Retiring those
+    /// automatically would remove fuels nobody asked to remove — and the catalogue is full of them
+    /// precisely because operators name fuels in their own words. They are archived by hand, and the
+    /// admin endpoint enforces the same voucher check there.
+    /// </para>
+    /// </remarks>
+private async Task<IReadOnlyList<OkkoCatalogueArchived>> ArchiveDroppedFuelsAsync(
+        IReadOnlySet<string> seenFuelIds,
+        Guid actingUserId,
+        string? actingUserName,
+        bool dryRun,
+        CancellationToken ct)
+    {
+        var blocking = VoucherStatuses.Blocking;
+
+        var absent = await _context.FuelTypes
+            .IgnoreQueryFilters()
+            .Where(f => f.StationId == OkkoStationId
+                && !f.IsDeleted
+                && f.BrandFuelCode != null
+                && !seenFuelIds.Contains(f.Id))
+            .Select(f => new { f.Id, f.Name })
+            .ToListAsync(ct);
+
+        if (absent.Count == 0)
+            return [];
+
+        var dropped = new List<OkkoCatalogueArchived>();
+
+        foreach (var fuel in absent)
+        {
+            var live = await _context.FuelVouchers
+                .IgnoreQueryFilters()
+                .CountAsync(v => v.FuelTypeId == fuel.Id && !v.IsDeleted && blocking.Contains(v.Status), ct);
+
+            if (live > 0)
+            {
+                // Reported so the reason is visible rather than inferred from a fuel that quietly
+                // stopped being imported.
+                dropped.Add(new OkkoCatalogueArchived(fuel.Id, fuel.Name, live, Archived: false));
+                continue;
+            }
+
+            if (!dryRun)
+            {
+                var fuelRow = await _context.FuelTypes.IgnoreQueryFilters()
+                    .FirstAsync(f => f.Id == fuel.Id, ct);
+                fuelRow.IsDeleted = true;
+                fuelRow.DeletedAtUtc = DateTime.UtcNow;
+                fuelRow.UpdatedAtUtc = DateTime.UtcNow;
+
+                // Tracked writes rather than ExecuteUpdateAsync: the latter is a relational-only
+                // operator, and this handler is unit-tested on the in-memory provider where it throws
+                // at translation time. One fuel per fifteen minutes is not a volume problem.
+                var now = DateTime.UtcNow;
+                var offers = await _context.FuelOffers.IgnoreQueryFilters()
+                    .Where(o => o.FuelTypeId == fuel.Id && !o.IsDeleted)
+                    .ToListAsync(ct);
+                var offerIds = offers.Select(o => o.Id).ToList();
+
+                var volumes = await _context.FuelOfferVolumes.IgnoreQueryFilters()
+                    .Where(v => offerIds.Contains(v.OfferId) && !v.IsDeleted)
+                    .ToListAsync(ct);
+
+                foreach (var volume in volumes)
+                {
+                    volume.IsDeleted = true;
+                    volume.DeletedAtUtc = now;
+                    volume.UpdatedAtUtc = now;
+                }
+
+                foreach (var offer in offers)
+                {
+                    offer.IsDeleted = true;
+                    offer.DeletedAtUtc = now;
+                    offer.UpdatedAtUtc = now;
+                }
+
+                await _context.SaveChangesAsync(ct);
+
+                await _events.RecordEventAsync(
+                    "Fuel", fuel.Id, "FuelArchivedByImport",
+                    null,
+                    JsonSerializer.Serialize(new { fuel.Name, Reason = "no longer published by OKKO" }),
+                    actingUserId == Guid.Empty ? Guid.Empty : actingUserId,
+                    actingUserName,
+                    $"{fuel.Name}: archived — OKKO no longer publishes this grade and it has no live vouchers",
+                    OkkoStationId,
+                    ct);
+            }
+
+            dropped.Add(new OkkoCatalogueArchived(fuel.Id, fuel.Name, 0, Archived: !dryRun));
+        }
+
+        return dropped;
     }
 }
