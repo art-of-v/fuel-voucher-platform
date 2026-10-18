@@ -1,3 +1,3 @@
-namespace FuelFlow.Features.Stations.GetAdminFuelTypes;
+namespace FuelFlow.Features.Brands.GetAdminFuelTypes;
 
 public sealed record GetAdminFuelTypesQuery;

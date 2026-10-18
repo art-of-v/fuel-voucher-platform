@@ -1,5 +1,5 @@
 using FuelFlow.SharedKernel.Domain;
 
-namespace FuelFlow.Features.Stations.UpdatePackage;
+namespace FuelFlow.Features.Brands.UpdatePackage;
 
 public sealed record UpdatePackageCommand(string Id, FuelPackage Updated);

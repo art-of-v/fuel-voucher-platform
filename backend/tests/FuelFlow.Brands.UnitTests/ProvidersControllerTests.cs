@@ -110,9 +110,9 @@ public sealed class BrandFuelControllerTests : IDisposable
         _context.Dispose();
     }
 
-    private async Task AddStationAsync(string id, string name)
+    private async Task AddBrandAsync(string id, string name)
     {
-        _context.Stations.Add(new Station
+        _context.Brands.Add(new Brand
         {
             Id = id,
             Name = name,
@@ -125,12 +125,12 @@ public sealed class BrandFuelControllerTests : IDisposable
         _context.ChangeTracker.Clear();
     }
 
-    private async Task AddFuelAsync(string id, string stationId, string name)
+    private async Task AddFuelAsync(string id, string BrandId, string name)
     {
         _context.FuelTypes.Add(new FuelTypeEntity
         {
             Id = id,
-            StationId = stationId,
+            BrandId = BrandId,
             Name = name,
             BasePrice = 100,
             DiscountPrice = 100,
@@ -149,11 +149,11 @@ public sealed class BrandFuelControllerTests : IDisposable
     /// old way, every assertion below would read a table no handler touches and fail as "the fuel was
     /// not priced" rather than as a broken fixture.
     /// </remarks>
-    private async Task AddPackageAsync(string fuelId, string stationId, decimal liters, decimal final, decimal supplier, decimal margin)
+    private async Task AddPackageAsync(string fuelId, string BrandId, decimal liters, decimal final, decimal supplier, decimal margin)
     {
         _context.SeedPackage(
             id: $"{fuelId}-{liters}",
-            stationId: stationId,
+            BrandId: BrandId,
             fuelTypeId: fuelId,
             liters: liters,
             price: Math.Round(final * liters, 2),
@@ -196,7 +196,7 @@ public sealed class BrandFuelControllerTests : IDisposable
     [Fact]
     public async Task AddFuel_ProviderWithoutAnyNominals_CreatesDefaultPackages()
     {
-        await AddStationAsync("test-klo", "KLO");
+        await AddBrandAsync("test-klo", "KLO");
 
         var result = await _controller.AddFuel(
             "test-klo",
@@ -205,7 +205,7 @@ public sealed class BrandFuelControllerTests : IDisposable
 
         result.Should().BeOfType<CreatedResult>();
 
-        var fuel = await _context.FuelTypes.SingleAsync(f => f.StationId == "test-klo");
+        var fuel = await _context.FuelTypes.SingleAsync(f => f.BrandId == "test-klo");
         var liters = await _context.FuelOfferVolumes
             .Where(p => p.Offer.FuelTypeId == fuel.Id)
             .Select(p => (int)p.Liters)
@@ -221,7 +221,7 @@ public sealed class BrandFuelControllerTests : IDisposable
     [Fact]
     public async Task AddFuel_ProviderWithExistingNominals_UsesThoseNominals()
     {
-        await AddStationAsync("test-okko", "OKKO");
+        await AddBrandAsync("test-okko", "OKKO");
         await AddFuelAsync("test-fuel-a", "test-okko", "A-95");
         await AddPackageAsync("test-fuel-a", "test-okko", 10m, 51m, 49m, 2m);
         await AddPackageAsync("test-fuel-a", "test-okko", 20m, 51m, 49m, 2m);
@@ -233,7 +233,7 @@ public sealed class BrandFuelControllerTests : IDisposable
 
         result.Should().BeOfType<CreatedResult>();
 
-        var newFuel = await _context.FuelTypes.SingleAsync(f => f.StationId == "test-okko" && f.Id != "test-fuel-a");
+        var newFuel = await _context.FuelTypes.SingleAsync(f => f.BrandId == "test-okko" && f.Id != "test-fuel-a");
         var liters = await _context.FuelOfferVolumes
             .Where(p => p.Offer.FuelTypeId == newFuel.Id)
             .Select(p => (int)p.Liters)
@@ -259,7 +259,7 @@ public sealed class BrandFuelControllerTests : IDisposable
     [Fact]
     public async Task AddFuel_FractionalPerLiterPrice_PreservesKopecksOnHeadlineAndPackage()
     {
-        await AddStationAsync("test-okko", "OKKO");
+        await AddBrandAsync("test-okko", "OKKO");
 
         var result = await _controller.AddFuel(
             "test-okko",
@@ -268,7 +268,7 @@ public sealed class BrandFuelControllerTests : IDisposable
 
         result.Should().BeOfType<CreatedResult>();
 
-        var fuel = await _context.FuelTypes.SingleAsync(f => f.StationId == "test-okko");
+        var fuel = await _context.FuelTypes.SingleAsync(f => f.BrandId == "test-okko");
         fuel.BasePrice.Should().Be(97.86m);
         fuel.DiscountPrice.Should().Be(97.86m);
 
@@ -279,7 +279,7 @@ public sealed class BrandFuelControllerTests : IDisposable
     [Fact]
     public async Task UpdateFuel_FuelWithoutPackages_SeedsDefaultPackagesAndSavesPrice()
     {
-        await AddStationAsync("test-klo", "KLO");
+        await AddBrandAsync("test-klo", "KLO");
         await AddFuelAsync("test-fuel-ttt", "test-klo", "ttt");
 
         var result = await _controller.UpdateFuel(
@@ -303,7 +303,7 @@ public sealed class BrandFuelControllerTests : IDisposable
     [Fact]
     public async Task UpdateFuel_AppendsTheNewPrice_ToTheOfferHistory_WithTheOperatorAsActor()
     {
-        await AddStationAsync("test-okko", "OKKO");
+        await AddBrandAsync("test-okko", "OKKO");
         await AddFuelAsync("test-fuel-h", "test-okko", "A-95");
         await AddPackageAsync("test-fuel-h", "test-okko", 10m, 51m, 49m, 2m);
 
@@ -341,7 +341,7 @@ public sealed class BrandFuelControllerTests : IDisposable
     [Fact]
     public async Task UpdateFuel_WithExistingPackages_UpdatesAllPrices()
     {
-        await AddStationAsync("test-okko", "OKKO");
+        await AddBrandAsync("test-okko", "OKKO");
         await AddFuelAsync("test-fuel-a", "test-okko", "A-95");
         await AddPackageAsync("test-fuel-a", "test-okko", 10m, 51m, 49m, 2m);
         await AddPackageAsync("test-fuel-a", "test-okko", 20m, 51m, 49m, 2m);
@@ -368,7 +368,7 @@ public sealed class BrandFuelControllerTests : IDisposable
     [Fact]
     public async Task UpdateFuel_RecordsOldToNewValuesInAuditSummary()
     {
-        await AddStationAsync("test-okko", "OKKO");
+        await AddBrandAsync("test-okko", "OKKO");
         await AddFuelAsync("test-fuel-a", "test-okko", "A-95");
         await AddPackageAsync("test-fuel-a", "test-okko", 10m, 51m, 49m, 2m);
 
@@ -404,7 +404,7 @@ public sealed class BrandFuelControllerTests : IDisposable
     [Fact]
     public async Task UpdateNominals_ReplacesPackagesForAllFuels()
     {
-        await AddStationAsync("test-okko", "OKKO");
+        await AddBrandAsync("test-okko", "OKKO");
         await AddFuelAsync("test-fuel-a", "test-okko", "A-95");
         await AddFuelAsync("test-fuel-b", "test-okko", "B");
         await AddPackageAsync("test-fuel-a", "test-okko", 10m, 51m, 49m, 2m);
@@ -431,7 +431,7 @@ public sealed class BrandFuelControllerTests : IDisposable
     [Fact]
     public async Task UpdateNominals_PreservesPerLiterPricingFromOldPackages()
     {
-        await AddStationAsync("test-okko", "OKKO");
+        await AddBrandAsync("test-okko", "OKKO");
         await AddFuelAsync("test-fuel-a", "test-okko", "A-95");
         await AddPackageAsync("test-fuel-a", "test-okko", 10m, 51m, 49m, 2m);
 
@@ -469,7 +469,7 @@ public sealed class BrandFuelControllerTests : IDisposable
     [Fact]
     public async Task AddFuel_BelowCostNotOptedIn_Returns400_AndPersistsNothing()
     {
-        await AddStationAsync("test-okko", "OKKO");
+        await AddBrandAsync("test-okko", "OKKO");
 
         var result = await _controller.AddFuel(
             "test-okko",
@@ -479,18 +479,18 @@ public sealed class BrandFuelControllerTests : IDisposable
         var bad = result.Should().BeOfType<BadRequestObjectResult>().Subject;
         JsonSerializer.Serialize(bad.Value).Should().Contain("below_cost");
 
-        (await _context.FuelTypes.AnyAsync(f => f.StationId == "test-okko")).Should().BeFalse();
+        (await _context.FuelTypes.AnyAsync(f => f.BrandId == "test-okko")).Should().BeFalse();
         // Deleting a brand archives its offers AND their volumes now, so "no live package at this
-        // station" has to be asked of the volumes behind them - the offer alone would still answer.
-        (await _context.FuelOfferVolumes.AnyAsync(v => v.Offer.StationId == "test-okko")).Should().BeFalse();
-        (await _context.FuelOffers.IgnoreQueryFilters().AnyAsync(o => o.StationId == "test-okko" && !o.IsDeleted))
+        // Brand" has to be asked of the volumes behind them - the offer alone would still answer.
+        (await _context.FuelOfferVolumes.AnyAsync(v => v.Offer.BrandId == "test-okko")).Should().BeFalse();
+        (await _context.FuelOffers.IgnoreQueryFilters().AnyAsync(o => o.BrandId == "test-okko" && !o.IsDeleted))
             .Should().BeFalse();
     }
 
     [Fact]
     public async Task AddFuel_BelowCostOptedIn_SavesPrice_AndFiresDeliberateWarningAlert()
     {
-        await AddStationAsync("test-okko", "OKKO");
+        await AddBrandAsync("test-okko", "OKKO");
         var alerts = new Mock<IAlertNotifier>();
         var controller = BuildController(DispatcherWith(alerts));
 
@@ -501,7 +501,7 @@ public sealed class BrandFuelControllerTests : IDisposable
 
         result.Should().BeOfType<CreatedResult>();
 
-        var fuel = await _context.FuelTypes.SingleAsync(f => f.StationId == "test-okko");
+        var fuel = await _context.FuelTypes.SingleAsync(f => f.BrandId == "test-okko");
         fuel.AllowBelowCost.Should().BeTrue();
         var pricedOffer = await _context.FuelOffers.SingleAsync(o => o.FuelTypeId == fuel.Id);
         pricedOffer.FinalPerLiterWith(await MarginFor(pricedOffer)).Should().Be(48.5m);   // min(cost 50 + margin 2, pump 49 − minDisc 0.5)
@@ -515,7 +515,7 @@ public sealed class BrandFuelControllerTests : IDisposable
     [Fact]
     public async Task UpdateFuel_BelowCostNotOptedIn_Returns400_AndLeavesPriceUnchanged()
     {
-        await AddStationAsync("test-okko", "OKKO");
+        await AddBrandAsync("test-okko", "OKKO");
         await AddFuelAsync("test-fuel-a", "test-okko", "A-95");
         await AddPackageAsync("test-fuel-a", "test-okko", 10m, 51m, 49m, 2m);
 
@@ -536,7 +536,7 @@ public sealed class BrandFuelControllerTests : IDisposable
     [Fact]
     public async Task UpdateFuel_BelowCostOptedIn_SavesPrice_AndFiresDeliberateWarningAlert()
     {
-        await AddStationAsync("test-okko", "OKKO");
+        await AddBrandAsync("test-okko", "OKKO");
         await AddFuelAsync("test-fuel-a", "test-okko", "A-95");
         await AddPackageAsync("test-fuel-a", "test-okko", 10m, 51m, 49m, 2m);
         var alerts = new Mock<IAlertNotifier>();

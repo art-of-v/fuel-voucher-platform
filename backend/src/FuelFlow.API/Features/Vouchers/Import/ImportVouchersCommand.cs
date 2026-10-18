@@ -165,8 +165,8 @@ public sealed class ImportVouchersCommandHandler
         // brand/fuel pairing is checked per voucher, so a query each time would be the dominant cost of
         // the import.
         var brandByFuelType = await _context.FuelTypes
-            .Where(f => f.StationId != null)
-            .ToDictionaryAsync(f => f.Id, f => f.StationId!, cancellationToken);
+            .Where(f => f.BrandId != null)
+            .ToDictionaryAsync(f => f.Id, f => f.BrandId!, cancellationToken);
 
         var import = new VoucherImport
         {
@@ -276,11 +276,11 @@ public sealed class ImportVouchersCommandHandler
                                 // The QR product code (digits before the first '$') is a fuel-SKU
                                 // indicator, not redeemable bearer material, so it is safe to surface
                                 // for triage. When present but unresolved it means the code has no
-                                // matching fuel_types row for this station.
+                                // matching fuel_types row for this Brand.
                                 var productCode = OkkoFuelClassifier.TryGetProductCode(parsed.QrPayload);
                                 reason = productCode is null
                                     ? "Fuel type could not be determined from voucher text or QR code."
-                                    : $"Fuel type could not be determined: QR product code '{productCode}' has no matching fuel type for this station.";
+                                    : $"Fuel type could not be determined: QR product code '{productCode}' has no matching fuel type for this Brand.";
                             }
                             else
                             {
@@ -304,7 +304,7 @@ public sealed class ImportVouchersCommandHandler
                         }
 
                         // Hard integrity check: the brand printed on the paper and the fuel it sells must
-                        // agree. `brand` is the brand and `fuel_types.station_id` is the same fact, so a
+                        // agree. `brand` is the brand and `fuel_types.brand_id` is the same fact, so a
                         // mismatch means one of the two was mis-read — and it would otherwise be stored as
                         // truth, because `brand` is free text with nothing in the schema to contradict
                         // it. Such a voucher matches nothing on renewal (the two fields are compared

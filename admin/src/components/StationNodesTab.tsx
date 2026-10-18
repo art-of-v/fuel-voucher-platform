@@ -96,9 +96,9 @@ export default function StationNodesTab() {
   const [importError, setImportError] = useState<string>("");
 
   const { data: brands = [] } = useQuery<Brand[]>({
-    queryKey: ["/api/admin/stations", "for-nodes"],
+    queryKey: ["/api/admin/brands", "for-nodes"],
     queryFn: async () => {
-      const res = await apiRequest<any, PagedResult<Brand>>("GET", "/api/admin/stations?pageSize=100");
+      const res = await apiRequest<any, PagedResult<Brand>>("GET", "/api/admin/brands?pageSize=100");
       return res.items ?? [];
     },
   });
@@ -106,21 +106,21 @@ export default function StationNodesTab() {
   const brandName = (id: string) => brands.find((b) => b.id === id)?.name ?? id;
 
   const { data: paged, isLoading } = useQuery<PagedResult<StationNode>>({
-    queryKey: ["/api/admin/station-nodes", page, stationFilter],
+    queryKey: ["/api/admin/brand-stations", page, stationFilter],
     queryFn: async () => {
       const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
       if (stationFilter) params.set("stationId", stationFilter);
-      return apiRequest<unknown, PagedResult<StationNode>>("GET", `/api/admin/station-nodes?${params.toString()}`);
+      return apiRequest<unknown, PagedResult<StationNode>>("GET", `/api/admin/brand-stations?${params.toString()}`);
     },
   });
 
   const nodes = paged?.items ?? [];
   const totalPages = paged?.totalPages ?? 1;
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["/api/admin/station-nodes"] });
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["/api/admin/brand-stations"] });
 
   const createMutation = useMutation({
-    mutationFn: (n: StationNode) => apiRequest("POST", "/api/admin/station-nodes", n),
+    mutationFn: (n: StationNode) => apiRequest("POST", "/api/admin/brand-stations", n),
     onSuccess: () => {
       invalidate();
       setIsCreating(false);
@@ -131,7 +131,7 @@ export default function StationNodesTab() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: (n: StationNode) => apiRequest("PUT", `/api/admin/station-nodes/${encodeURIComponent(n.id)}`, n),
+    mutationFn: (n: StationNode) => apiRequest("PUT", `/api/admin/brand-stations/${encodeURIComponent(n.id)}`, n),
     onSuccess: () => {
       invalidate();
       setEditingId(null);
@@ -142,7 +142,7 @@ export default function StationNodesTab() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("DELETE", `/api/admin/station-nodes/${encodeURIComponent(id)}`),
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/admin/brand-stations/${encodeURIComponent(id)}`),
     onSuccess: () => {
       invalidate();
       toast.success(t("common.deleted"));
@@ -200,7 +200,7 @@ export default function StationNodesTab() {
       const fd = new FormData();
       fd.append("file", importFile);
       const res = await apiRequest<any, ImportResult>(
-        "POST", "/api/admin/station-nodes/import", fd, undefined, 300_000, 0,
+        "POST", "/api/admin/brand-stations/import", fd, undefined, 300_000, 0,
       );
       setImportResult({ added: res.added ?? 0, updated: res.updated ?? 0, errors: res.errors ?? [] });
       invalidate();

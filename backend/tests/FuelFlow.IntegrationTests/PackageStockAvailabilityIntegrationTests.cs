@@ -122,7 +122,7 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
     /// <summary>
     /// The condition measured on production 2026-10-14: every sellable triple carries two live
     /// rows, because <c>seed-qa-catalogue.sql</c> mirrors each real package into the QA pool on
-    /// the same station, fuel and nominal (13 offers, 58 real rows, 58 QA rows, no duplicates
+    /// the same Brand, fuel and nominal (13 offers, 58 real rows, 58 QA rows, no duplicates
     /// inside either pool).
     ///
     /// Checkout resolved that key with a bare <c>FirstOrDefaultAsync</c> - no pool filter, no
@@ -153,12 +153,12 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
     /// Two volumes on one key cannot coexist any more, and the database is what says so.
     /// </summary>
     /// <remarks>
-    /// This test used to seed two rows for the same (station, fuel, litres) in the same pool and assert
+    /// This test used to seed two rows for the same (Brand, fuel, litres) in the same pool and assert
     /// that the resolver picked the newer one deterministically. That was guarding against a real defect
     /// - <c>BrandsController</c> added a nominal through a read-then-write with no lock, so two
     /// concurrent PUTs could both insert - and the ordering was the mitigation.
     /// <para>
-    /// The split removed the possibility rather than the symptom. <c>UNIQUE (station_id, fuel_type_id,
+    /// The split removed the possibility rather than the symptom. <c>UNIQUE (brand_id, fuel_type_id,
     /// data_kind)</c> on fuel_offers times <c>UNIQUE (offer_id, liters)</c> on fuel_offer_volumes makes
     /// the triple unique inside a pool, so the race that produced two rows now fails at the constraint.
     /// Asserting "the newer one wins" would be asserting a tie-break that can never be reached, and it
@@ -178,7 +178,7 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
         SeedPackage(seed, "first", isTestData: false, liters: 20m, price: 1780m, updatedMinutesAgo: 120);
         await seed.SaveChangesAsync();
 
-        // Same offer (same station, fuel and pool) and the same nominal - the exact row the old
+        // Same offer (same Brand, fuel and pool) and the same nominal - the exact row the old
         // read-then-write race produced.
         SeedPackage(seed, "second", isTestData: false, liters: 20m, price: 1781m, updatedMinutesAgo: 1);
 
@@ -274,7 +274,7 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
             seed.FuelOffers.Add(new FuelOffer
             {
                 Id = offerId,
-                StationId = "okko",
+                BrandId = "okko",
                 FuelTypeId = "okko-95",
                 DataKind = pool,
                 // A flat cost and margin, independent of the volume's own price: what these tests

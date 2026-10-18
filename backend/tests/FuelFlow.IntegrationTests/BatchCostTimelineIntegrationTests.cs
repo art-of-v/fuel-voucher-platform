@@ -251,7 +251,7 @@ public sealed class BatchCostTimelineIntegrationTests : IClassFixture<TestDataba
             {
                 Id = "okko-dp",
                 Name = "ДП ЄВРО",
-                StationId = "okko",
+                BrandId = "okko",
                 BasePrice = 60m,
                 DiscountPrice = 60m,
                 CreatedAtUtc = DateTime.UtcNow,

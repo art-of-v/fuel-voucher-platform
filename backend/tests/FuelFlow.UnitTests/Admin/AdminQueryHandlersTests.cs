@@ -37,7 +37,7 @@ public sealed class AdminQueryHandlersTests : IDisposable
     private void SeedFuelPackages()
     {
         // Margin lives on the offer now, so that is what gets seeded. The reports resolve
-        // (station, fuel, litres) -> offer, so a fixture left in fuel_packages leaves every margin
+        // (Brand, fuel, litres) -> offer, so a fixture left in fuel_packages leaves every margin
         // lookup empty and every margin assertion reading zero - which looks like a broken report
         // rather than a broken fixture.
         _context.SeedPackage("okko-95-50", "okko", "okko-95", 50m, 1000m, marginUahPerLiter: 2.0m);

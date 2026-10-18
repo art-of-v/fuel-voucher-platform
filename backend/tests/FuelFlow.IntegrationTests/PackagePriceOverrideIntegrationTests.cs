@@ -44,7 +44,7 @@ public sealed class PackagePriceOverrideIntegrationTests : IClassFixture<TestDat
         {
             Id = fuelId,
             Name = $"Override test fuel {suffix}",
-            StationId = "okko",
+            BrandId = "okko",
             BasePrice = 0m,
             DiscountPrice = 0m,
             MarginUahPerLiter = 2m,
@@ -55,7 +55,7 @@ public sealed class PackagePriceOverrideIntegrationTests : IClassFixture<TestDat
         var offer = new FuelOffer
         {
             Id = fuelId,
-            StationId = "okko",
+            BrandId = "okko",
             FuelTypeId = fuelId,
             DataKind = DataKinds.Real,
             SupplierPricePerLiter = 50m,
@@ -162,7 +162,7 @@ public sealed class PackagePriceOverrideIntegrationTests : IClassFixture<TestDat
         {
             Id = fuelId,
             Name = "Unpriced test fuel",
-            StationId = "okko",
+            BrandId = "okko",
             BasePrice = 0m,
             DiscountPrice = 0m,
             CreatedAtUtc = DateTime.UtcNow,
@@ -172,7 +172,7 @@ public sealed class PackagePriceOverrideIntegrationTests : IClassFixture<TestDat
         var offer = new FuelOffer
         {
             Id = fuelId,
-            StationId = "okko",
+            BrandId = "okko",
             FuelTypeId = fuelId,
             DataKind = DataKinds.Real,
             // What the OKKO catalogue import leaves behind: an offer exists, nobody has priced it.

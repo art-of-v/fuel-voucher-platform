@@ -1,5 +1,5 @@
 using FluentAssertions;
-using FuelFlow.Features.Stations.DeleteFuelType;
+using FuelFlow.Features.Brands.DeleteFuelType;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
@@ -7,7 +7,7 @@ using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
-namespace FuelFlow.UnitTests.Stations;
+namespace FuelFlow.UnitTests.Brands;
 
 /// <summary>
 /// Deleting a fuel type used to REMOVE the row, and <c>fuel_vouchers.fuel_type_id</c> CASCADEs from
@@ -34,7 +34,7 @@ public sealed class DeleteFuelTypeSoftDeleteTests : IDisposable
         {
             Id = "okko-a95",
             Name = "А95",
-            StationId = "okko",
+            BrandId = "okko",
             BasePrice = 50m,
             DiscountPrice = 45m,
             CreatedAtUtc = DateTime.UtcNow,

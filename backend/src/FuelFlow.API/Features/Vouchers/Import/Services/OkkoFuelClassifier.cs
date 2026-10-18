@@ -160,7 +160,7 @@ public static class OkkoFuelClassifier
     /// stable signal; raw OCR text is the fallback when the QR is missing or its code is unmapped.
     /// <para>
     /// Returns null (rather than guessing a default) when neither signal yields a category the
-    /// station catalog actually contains, so the caller rejects the row with a clear message
+    /// Brand catalog actually contains, so the caller rejects the row with a clear message
     /// instead of silently importing it under the wrong fuel type.
     /// </para>
     /// <para>

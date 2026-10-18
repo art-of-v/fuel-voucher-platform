@@ -1,12 +1,12 @@
 namespace FuelFlow.SharedKernel.Domain;
 
 /// <summary>
-/// One commercial offer: a fuel sold by one station, priced per litre, offered in several volumes.
+/// One commercial offer: a fuel sold by one Brand, priced per litre, offered in several volumes.
 /// </summary>
 /// <remarks>
 /// <para>
 /// <b>Why this table exists.</b> Before it, <c>fuel_packages</c> modelled a <em>volume</em> as a
-/// product: a row per (station, fuel type, litres), each row carrying its own copy of the per-litre
+/// product: a row per (Brand, fuel type, litres), each row carrying its own copy of the per-litre
 /// pricing. A95 Euro at OKKO is one offer sold in 2/3/5/10/20/50 L, so the six per-litre facts were
 /// stored six times. Measured on production 2026-10-14: 13 offers producing 58 live rows, with
 /// <c>final_price_per_liter</c> varying across volumes in <b>0</b> of them — one fact, 58 copies.
@@ -39,19 +39,19 @@ public sealed class FuelOffer
 {
     /// <summary>
     /// Key of the offer: its <see cref="FuelTypeId"/>, with <c>-qa</c> appended for the rehearsal
-    /// pool, derived by <see cref="OfferKeys"/>. The station is deliberately not spelled out — a fuel
-    /// type belongs to exactly one station, so its id already determines it, and writing both produced
+    /// pool, derived by <see cref="OfferKeys"/>. The Brand is deliberately not spelled out — a fuel
+    /// type belongs to exactly one Brand, so its id already determines it, and writing both produced
     /// <c>okko-okko-95</c>. Bounded by CHECK at 103 rather than at the 100 the single-column keys use.
     /// </summary>
     public string Id { get; set; } = null!;
 
     /// <summary>
-    /// The network selling it. Mirrors <c>fuel_types.station_id</c> — which is what lets the id above
+    /// The network selling it. Mirrors <c>fuel_types.brand_id</c> — which is what lets the id above
     /// omit it — and is carried separately because the storefront groups and resolves on the pair: a
     /// fuel type that a supplier lists under two networks must be able to say so.
     /// <c>deploy/preflight-db/012</c> reports the case where the two disagree.
     /// </summary>
-    public string StationId { get; set; } = null!;
+    public string BrandId { get; set; } = null!;
 
     /// <summary>Natural key of the fuel, as read from supplier PDFs. See <c>fuel_types.id</c>.</summary>
     public string FuelTypeId { get; set; } = null!;

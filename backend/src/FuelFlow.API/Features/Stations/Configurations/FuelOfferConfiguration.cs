@@ -2,7 +2,7 @@ using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace FuelFlow.Features.Stations.Configurations;
+namespace FuelFlow.Features.Brands.Configurations;
 
 /// <summary>
 /// <c>fuel_offers</c> — the per-litre facts of one commercial offer, stored once. Planning #318,
@@ -17,7 +17,7 @@ internal sealed class FuelOfferConfiguration : IEntityTypeConfiguration<FuelOffe
         builder.HasKey(e => e.Id);
 
         builder.Property(e => e.Id).HasColumnName("id").HasColumnType("text").IsRequired();
-        builder.Property(e => e.StationId).HasColumnName("station_id").HasColumnType("text").IsRequired();
+        builder.Property(e => e.BrandId).HasColumnName("brand_id").HasColumnType("text").IsRequired();
         builder.Property(e => e.FuelTypeId).HasColumnName("fuel_type_id").HasColumnType("text").IsRequired();
 
         builder.Property(e => e.SupplierPricePerLiter).HasColumnName("supplier_price_per_liter").HasColumnType("numeric(10,4)");
@@ -51,10 +51,10 @@ internal sealed class FuelOfferConfiguration : IEntityTypeConfiguration<FuelOffe
         builder.HasQueryFilter(e => !e.IsDeleted);
 
         // The storefront reads "the offers of this pool, not archived", and the admin reads by
-        // station. Leading with is_deleted matches fuel_packages' own index.
+        // Brand. Leading with is_deleted matches fuel_packages' own index.
         builder.HasIndex(e => new { e.IsDeleted, e.DataKind });
-        builder.HasIndex(e => e.StationId);
-        builder.HasIndex(e => new { e.StationId, e.FuelTypeId });
+        builder.HasIndex(e => e.BrandId);
+        builder.HasIndex(e => new { e.BrandId, e.FuelTypeId });
 
         // The way to the fuel, so a read path can take the margin from there rather than from a copy
         // of it on the offer. Restrict, like every other relation here.
@@ -73,11 +73,11 @@ internal sealed class FuelOfferConfiguration : IEntityTypeConfiguration<FuelOffe
             .OnDelete(DeleteBehavior.Restrict);
 
         // The natural key, stated once more by the database. This is the guarantee that a second
-        // offer cannot appear for the same (station, fuel, pool) - the precondition for grouping the
+        // offer cannot appear for the same (Brand, fuel, pool) - the precondition for grouping the
         // old rows into one price.
-        builder.HasIndex(e => new { e.StationId, e.FuelTypeId, e.DataKind })
+        builder.HasIndex(e => new { e.BrandId, e.FuelTypeId, e.DataKind })
             .IsUnique()
-            .HasDatabaseName("ix_fuel_offers_station_fuel_pool");
+            .HasDatabaseName("ix_fuel_offers_brand_fuel_pool");
 
         builder.ToTable(t =>
         {
@@ -85,7 +85,7 @@ internal sealed class FuelOfferConfiguration : IEntityTypeConfiguration<FuelOffe
             // ck_fuel_types_id_length - plus the '-qa' suffix. OfferKeyTests states the same arithmetic,
             // so a tightened column bound cannot silently start rejecting a legal offer at write time.
             t.HasCheckConstraint("ck_fuel_offers_id_length", "length(id) <= 103");
-            t.HasCheckConstraint("ck_fuel_offers_station_id_length", "length(station_id) <= 100");
+            t.HasCheckConstraint("ck_fuel_offers_brand_id_length", "length(brand_id) <= 100");
             t.HasCheckConstraint("ck_fuel_offers_fuel_type_id_length", "length(fuel_type_id) <= 100");
 
             // The value set DataKinds.All documents.

@@ -59,7 +59,7 @@ public sealed record SyncOkkoPumpPricesCommand(
 /// </summary>
 public sealed class ImportOkkoPumpPricesCommandHandler
 {
-    private const string OkkoStationId = "okko";
+    private const string OkkoBrandId = "okko";
 
     private readonly ApplicationDbContext _context;
     private readonly AuditEventService _events;
@@ -129,7 +129,7 @@ public sealed class ImportOkkoPumpPricesCommandHandler
         // is not translatable by EF, and the row count here is a handful of fuel types either way.
         var okkoFuelTypes = (await _context.FuelTypes
                 .AsTracking()
-                .Where(ft => ft.StationId == OkkoStationId)
+                .Where(ft => ft.BrandId == OkkoBrandId)
                 .ToListAsync(ct))
             .OrderBy(ft => ft.Id, StringComparer.Ordinal)
             .ToList();
@@ -376,7 +376,7 @@ public sealed class ImportOkkoPumpPricesCommandHandler
             await _events.RecordEventAsync(
                 "Fuel", a.FuelTypeId, "PumpPriceImported",
                 oldValue, newValue, actorId ?? Guid.Empty, actorName,
-                summary, OkkoStationId, ct);
+                summary, OkkoBrandId, ct);
         }
     }
 }

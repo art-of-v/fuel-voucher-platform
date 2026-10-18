@@ -1,10 +1,10 @@
 using System.Security.Claims;
-using FuelFlow.Features.Stations.GetPublicPackages;
-using FuelFlow.Features.Stations.GetPublicPackagesByStation;
+using FuelFlow.Features.Brands.GetPublicPackages;
+using FuelFlow.Features.Brands.GetPublicPackagesByBrand;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace FuelFlow.Features.Stations;
+namespace FuelFlow.Features.Brands;
 
 [ApiController]
 // Explicit opt-out of the global FallbackPolicy (AuthSetup): the store front has to be browsable
@@ -22,14 +22,14 @@ namespace FuelFlow.Features.Stations;
 public sealed class PackageController : ControllerBase
 {
     private readonly GetPublicPackagesQueryHandler _getAll;
-    private readonly GetPublicPackagesByStationQueryHandler _getByStation;
+    private readonly GetPublicPackagesByBrandQueryHandler _getByBrand;
 
     public PackageController(
         GetPublicPackagesQueryHandler getAll,
-        GetPublicPackagesByStationQueryHandler getByStation)
+        GetPublicPackagesByBrandQueryHandler getByBrand)
     {
         _getAll = getAll;
-        _getByStation = getByStation;
+        _getByBrand = getByBrand;
     }
 
     [HttpGet]
@@ -37,10 +37,10 @@ public sealed class PackageController : ControllerBase
     public async Task<IActionResult> GetAll(CancellationToken ct) =>
         Ok(await _getAll.HandleAsync(new GetPublicPackagesQuery(CallerUserId()), ct));
 
-    [HttpGet("station/{stationId}")]
+    [HttpGet("{brandId}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetByStation([FromRoute] string stationId, CancellationToken ct) =>
-        Ok(await _getByStation.HandleAsync(new GetPublicPackagesByStationQuery(stationId, CallerUserId()), ct));
+    public async Task<IActionResult> GetByBrand([FromRoute] string BrandId, CancellationToken ct) =>
+        Ok(await _getByBrand.HandleAsync(new GetPublicPackagesByBrandQuery(BrandId, CallerUserId()), ct));
 
     /// <summary>
     /// The caller, or null when nobody is signed in. Same claim lookup the purchase controller uses, and

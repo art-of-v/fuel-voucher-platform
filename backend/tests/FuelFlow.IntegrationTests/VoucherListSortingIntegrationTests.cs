@@ -101,7 +101,7 @@ public sealed class VoucherListSortingIntegrationTests : IClassFixture<TestDatab
         {
             Id = fuelTypeId,
             Name = $"A-95 {tag}",
-            StationId = "okko",
+            BrandId = "okko",
             BasePrice = 55,
             DiscountPrice = 52,
             CreatedAtUtc = DateTime.UtcNow,

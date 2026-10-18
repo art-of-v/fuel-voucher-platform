@@ -88,12 +88,12 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
         // hands out vouchers for the positive lines, so this is a money-integrity check.
         foreach (var item in command.Items)
         {
-            // The brand is StationId and nothing else - the request used to carry a second, required
+            // The brand is BrandId and nothing else - the request used to carry a second, required
             // `Provider` field that the handler overwrote with this same value. Validating the one
-            // the handler actually reads is what keeps a blank station a 400 instead of the 500 the
+            // the handler actually reads is what keeps a blank Brand a 400 instead of the 500 the
             // handler's own guard would raise.
-            if (string.IsNullOrWhiteSpace(item.StationId))
-                return BadRequest("StationId is required for every item");
+            if (string.IsNullOrWhiteSpace(item.BrandId))
+                return BadRequest("BrandId is required for every item");
 
             if (string.IsNullOrWhiteSpace(item.FuelTypeId))
                 return BadRequest("FuelTypeId is required for every item");
@@ -177,13 +177,13 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetTermQuote(
-        [FromQuery] string stationId,
+        [FromQuery] string BrandId,
         [FromQuery] string fuelTypeId,
         [FromQuery] decimal liters,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(stationId) || string.IsNullOrWhiteSpace(fuelTypeId) || liters <= 0m)
-            return BadRequest("stationId, fuelTypeId and a positive liters are required.");
+        if (string.IsNullOrWhiteSpace(BrandId) || string.IsNullOrWhiteSpace(fuelTypeId) || liters <= 0m)
+            return BadRequest("BrandId, fuelTypeId and a positive liters are required.");
 
         // The ladder is priced off a catalogue package, so the quote has to be priced off the SAME
         // pool the checkout will sell from. This endpoint used to resolve its package without a pool
@@ -195,7 +195,7 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
         var isTestAccount = await _stock.IsTestAccountAsync(
             Guid.TryParse(userId, out var parsedUserId) ? parsedUserId : null, cancellationToken);
 
-        var quote = await _termQuoteHandler.HandleAsync(isTestAccount, stationId, fuelTypeId, liters, cancellationToken);
+        var quote = await _termQuoteHandler.HandleAsync(isTestAccount, BrandId, fuelTypeId, liters, cancellationToken);
         return Ok(quote);
     }
 
@@ -309,9 +309,9 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> CreatePurchase([FromBody] CreateCheckoutCommand command, CancellationToken cancellationToken)
     {
-        // The brand is StationId - see the note on the bulk path above.
-        if (string.IsNullOrWhiteSpace(command.StationId))
-            return BadRequest("StationId is required");
+        // The brand is BrandId - see the note on the bulk path above.
+        if (string.IsNullOrWhiteSpace(command.BrandId))
+            return BadRequest("BrandId is required");
 
         if (string.IsNullOrWhiteSpace(command.FuelTypeId))
             return BadRequest("FuelTypeId is required");

@@ -1,3 +1,3 @@
-namespace FuelFlow.Features.Stations.DeleteFuelType;
+namespace FuelFlow.Features.Brands.DeleteFuelType;
 
 public sealed record DeleteFuelTypeCommand(string Id);

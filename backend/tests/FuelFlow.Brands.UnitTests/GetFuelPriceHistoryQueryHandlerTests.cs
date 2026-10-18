@@ -114,7 +114,7 @@ public sealed class GetFuelPriceHistoryQueryHandlerTests : IDisposable
         {
             Id = Guid.CreateVersion7(),
             OfferId = offerId,
-            StationId = "okko",
+            BrandId = "okko",
             FuelTypeId = fuelTypeId,
             DataKind = dataKind ?? DataKinds.Real,
             SupplierPricePerLiter = 50m,

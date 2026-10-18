@@ -11,12 +11,12 @@ public sealed class CreateCheckoutCommand
     public decimal Price { get; set; }
 
     /// <summary>
-    /// The fuel brand, as a station id. This is what the line's brand is written from.
+    /// The fuel brand, as a Brand id. This is what the line's brand is written from.
     /// </summary>
     /// <remarks>
     /// <para>
     /// The brand used to be a second field named <c>Provider</c>, required, and then ignored:
-    /// <c>CreateCheckoutCommandHandler</c> wrote <c>Brand = command.StationId</c>. Two clients
+    /// <c>CreateCheckoutCommandHandler</c> wrote <c>Brand = command.BrandId</c>. Two clients
     /// disagreed with each other and with the server - the app sent <c>provider: 'MONOBANK'</c>, a
     /// payment provider, to satisfy a 400 whose reason it could not see, while Postman sent
     /// <c>provider: "okko"</c>, a brand. The validation rejected requests the handler would have
@@ -28,6 +28,6 @@ public sealed class CreateCheckoutCommand
     /// contract.
     /// </para>
     /// </remarks>
-    public string? StationId { get; set; }
-    public string? StationName { get; set; }
+    public string? BrandId { get; set; }
+    public string? BrandName { get; set; }
 }

@@ -11,7 +11,7 @@ public sealed class GetBrandsQueryHandler
 
     public async Task<List<BrandDto>> HandleAsync(GetBrandsQuery query, CancellationToken ct = default)
     {
-        var stations = await _context.Stations.AsNoTracking()
+        var Brands = await _context.Brands.AsNoTracking()
             .OrderBy(s => s.SortOrder).ThenBy(s => s.Name)
             .ToListAsync(ct);
         var fuels = await _context.FuelTypes.AsNoTracking().ToListAsync(ct);
@@ -19,20 +19,20 @@ public sealed class GetBrandsQueryHandler
         // figure belongs to the offer. Projected in one query so the card is not assembled N times.
         var packages = await _context.FuelOfferVolumes.Project().ToListAsync(ct);
 
-        return stations.Select(station =>
+        return Brands.Select(Brand =>
         {
-            var stationFuels = fuels.Where(f => f.StationId == station.Id).ToList();
-            var fuelDtos = stationFuels
+            var BrandFuels = fuels.Where(f => f.BrandId == Brand.Id).ToList();
+            var fuelDtos = BrandFuels
                 .Select(f => BrandFuelCard.Build(f, packages.Where(p => p.FuelTypeId == f.Id).ToList()))
                 .OrderBy(f => f.Name).ToList();
 
             return new BrandDto
             {
-                Id = station.Id,
-                Name = station.Name,
-                LogoText = station.LogoText,
-                Color = station.Color,
-                SortOrder = station.SortOrder,
+                Id = Brand.Id,
+                Name = Brand.Name,
+                LogoText = Brand.LogoText,
+                Color = Brand.Color,
+                SortOrder = Brand.SortOrder,
                 Fuels = fuelDtos,
                 Nominals = fuelDtos.SelectMany(f => f.PackageLiters).Distinct().OrderBy(l => l).ToList()
             };

@@ -404,6 +404,11 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("BrandId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("brand_id");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
@@ -412,26 +417,21 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("legal_entity_id");
 
-                    b.Property<string>("StationId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("station_id");
-
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid")
                         .HasColumnName("user_id");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("LegalEntityId");
+                    b.HasIndex("BrandId");
 
-                    b.HasIndex("StationId");
+                    b.HasIndex("LegalEntityId");
 
                     b.HasIndex("UserId");
 
                     b.ToTable("contracts", null, t =>
                         {
-                            t.HasCheckConstraint("ck_contracts_station_id_length", "length(station_id) <= 100");
+                            t.HasCheckConstraint("ck_contracts_brand_id_length", "length(brand_id) <= 100");
                         });
                 });
 
@@ -3170,6 +3170,218 @@ namespace FuelFlow.API.Migrations
                     b.ToTable("provider_event_outbox", (string)null);
                 });
 
+            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.Brand", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("address");
+
+                    b.Property<string>("Color")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("#00ff80")
+                        .HasColumnName("color");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at_utc");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<double?>("Lat")
+                        .HasColumnType("double precision")
+                        .HasColumnName("lat");
+
+                    b.Property<double?>("Lng")
+                        .HasColumnType("double precision")
+                        .HasColumnName("lng");
+
+                    b.Property<string>("LogoText")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("logo_text");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(45)
+                        .HasColumnType("character varying(45)")
+                        .HasColumnName("phone");
+
+                    b.Property<int>("SortOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(999)
+                        .HasColumnName("sort_order");
+
+                    b.Property<string>("StationType")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("station_type");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name");
+
+                    b.HasIndex("StationType");
+
+                    b.ToTable("brands", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_brands_id_length", "length(id) <= 100");
+
+                            t.HasCheckConstraint("ck_brands_name_length", "length(name) <= 200");
+                        });
+
+                    b.HasData(
+                        new
+                        {
+                            Id = "okko",
+                            Color = "#22c55e",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Lat = 50.485100000000003,
+                            Lng = 30.473400000000002,
+                            LogoText = "OKKO",
+                            Name = "OKKO",
+                            SortOrder = 1,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "wog",
+                            Color = "#10b981",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Lat = 50.450099999999999,
+                            Lng = 30.523399999999999,
+                            LogoText = "WOG",
+                            Name = "WOG",
+                            SortOrder = 2,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "upg",
+                            Color = "#06b6d4",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Lat = 50.400100000000002,
+                            Lng = 30.613399999999999,
+                            LogoText = "UPG",
+                            Name = "UPG",
+                            SortOrder = 3,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = "klo",
+                            Color = "#eab308",
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IsDeleted = false,
+                            Lat = 50.4101,
+                            Lng = 30.403400000000001,
+                            LogoText = "KLO",
+                            Name = "KLO",
+                            SortOrder = 4,
+                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        });
+                });
+
+            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.BrandStation", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("address");
+
+                    b.Property<string>("BrandId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("brand_id");
+
+                    b.Property<string>("City")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("city");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at_utc");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<double?>("Lat")
+                        .HasColumnType("double precision")
+                        .HasColumnName("lat");
+
+                    b.Property<double?>("Lng")
+                        .HasColumnType("double precision")
+                        .HasColumnName("lng");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(45)
+                        .HasColumnType("character varying(45)")
+                        .HasColumnName("phone");
+
+                    b.Property<string>("StationType")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("station_type");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BrandId");
+
+                    b.ToTable("brand_stations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_brand_stations_brand_id_length", "length(brand_id) <= 100");
+
+                            t.HasCheckConstraint("ck_brand_stations_id_length", "length(id) <= 100");
+                        });
+                });
+
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.ErrorLog", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3266,6 +3478,11 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("text")
                         .HasColumnName("id");
 
+                    b.Property<string>("BrandId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("brand_id");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamptz")
                         .HasColumnName("created_at_utc");
@@ -3313,11 +3530,6 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("numeric(10,4)")
                         .HasColumnName("pump_price_per_liter");
 
-                    b.Property<string>("StationId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("station_id");
-
                     b.Property<decimal?>("SupplierPricePerLiter")
                         .HasColumnType("numeric(10,4)")
                         .HasColumnName("supplier_price_per_liter");
@@ -3328,20 +3540,22 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("BrandId");
+
                     b.HasIndex("FuelTypeId");
 
-                    b.HasIndex("StationId");
+                    b.HasIndex("BrandId", "FuelTypeId");
 
                     b.HasIndex("IsDeleted", "DataKind");
 
-                    b.HasIndex("StationId", "FuelTypeId");
-
-                    b.HasIndex("StationId", "FuelTypeId", "DataKind")
+                    b.HasIndex("BrandId", "FuelTypeId", "DataKind")
                         .IsUnique()
-                        .HasDatabaseName("ix_fuel_offers_station_fuel_pool");
+                        .HasDatabaseName("ix_fuel_offers_brand_fuel_pool");
 
                     b.ToTable("fuel_offers", null, t =>
                         {
+                            t.HasCheckConstraint("ck_fuel_offers_brand_id_length", "length(brand_id) <= 100");
+
                             t.HasCheckConstraint("ck_fuel_offers_data_kind", "data_kind IN ('real', 'qa')");
 
                             t.HasCheckConstraint("ck_fuel_offers_fuel_type_id_length", "length(fuel_type_id) <= 100");
@@ -3351,128 +3565,126 @@ namespace FuelFlow.API.Migrations
                             t.HasCheckConstraint("ck_fuel_offers_margin_signs", "margin_uah_per_liter IS NULL OR margin_uah_per_liter >= 0");
 
                             t.HasCheckConstraint("ck_fuel_offers_prices_non_negative", "(supplier_price_per_liter IS NULL OR supplier_price_per_liter >= 0) AND (pump_price_per_liter IS NULL OR pump_price_per_liter >= 0) AND (min_discount_per_liter IS NULL OR min_discount_per_liter >= 0)");
-
-                            t.HasCheckConstraint("ck_fuel_offers_station_id_length", "length(station_id) <= 100");
                         });
 
                     b.HasData(
                         new
                         {
                             Id = "okko-dp",
+                            BrandId = "okko",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DataKind = "real",
                             FuelTypeId = "okko-dp",
                             IsDeleted = false,
                             MarginUahPerLiter = 2.0m,
-                            StationId = "okko",
                             SupplierPricePerLiter = 50.0m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
                         {
                             Id = "okko-95",
+                            BrandId = "okko",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DataKind = "real",
                             FuelTypeId = "okko-95",
                             IsDeleted = false,
                             MarginUahPerLiter = 2.0m,
-                            StationId = "okko",
                             SupplierPricePerLiter = 49.0m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
                         {
                             Id = "okko-p95",
+                            BrandId = "okko",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DataKind = "real",
                             FuelTypeId = "okko-p95",
                             IsDeleted = false,
                             MarginUahPerLiter = 3.0m,
-                            StationId = "okko",
                             SupplierPricePerLiter = 53.0m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
                         {
                             Id = "okko-pulls-dp",
+                            BrandId = "okko",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DataKind = "real",
                             FuelTypeId = "okko-pulls-dp",
                             IsDeleted = false,
                             MarginUahPerLiter = 2.5m,
-                            StationId = "okko",
                             SupplierPricePerLiter = 52.5m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
                         {
                             Id = "okko-gas",
+                            BrandId = "okko",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DataKind = "real",
                             FuelTypeId = "okko-gas",
                             IsDeleted = false,
                             MarginUahPerLiter = 1.5m,
-                            StationId = "okko",
                             SupplierPricePerLiter = 25.5m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
                         {
                             Id = "wog-dp",
+                            BrandId = "wog",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DataKind = "real",
                             FuelTypeId = "wog-dp",
                             IsDeleted = false,
                             MarginUahPerLiter = 2.0m,
-                            StationId = "wog",
                             SupplierPricePerLiter = 51.0m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
                         {
                             Id = "wog-95",
+                            BrandId = "wog",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DataKind = "real",
                             FuelTypeId = "wog-95",
                             IsDeleted = false,
                             MarginUahPerLiter = 2.0m,
-                            StationId = "wog",
                             SupplierPricePerLiter = 50.0m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
                         {
                             Id = "wog-95-euro",
+                            BrandId = "wog",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DataKind = "real",
                             FuelTypeId = "wog-95-euro",
                             IsDeleted = false,
                             MarginUahPerLiter = 2.5m,
-                            StationId = "wog",
                             SupplierPricePerLiter = 50.5m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
                         {
                             Id = "wog-100",
+                            BrandId = "wog",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DataKind = "real",
                             FuelTypeId = "wog-100",
                             IsDeleted = false,
                             MarginUahPerLiter = 3.0m,
-                            StationId = "wog",
                             SupplierPricePerLiter = 58.0m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
                         {
                             Id = "wog-gas",
+                            BrandId = "wog",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DataKind = "real",
                             FuelTypeId = "wog-gas",
                             IsDeleted = false,
                             MarginUahPerLiter = 1.5m,
-                            StationId = "wog",
                             SupplierPricePerLiter = 25.5m,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         });
@@ -3484,6 +3696,11 @@ namespace FuelFlow.API.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<string>("BrandId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("brand_id");
 
                     b.Property<Guid?>("ChangedByUserId")
                         .HasColumnType("uuid")
@@ -3539,11 +3756,6 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("timestamptz")
                         .HasColumnName("recorded_at_utc");
 
-                    b.Property<string>("StationId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("station_id");
-
                     b.Property<decimal?>("SupplierPricePerLiter")
                         .HasColumnType("numeric(10,4)")
                         .HasColumnName("supplier_price_per_liter");
@@ -3560,6 +3772,8 @@ namespace FuelFlow.API.Migrations
 
                     b.ToTable("fuel_offer_prices", null, t =>
                         {
+                            t.HasCheckConstraint("ck_fuel_offer_prices_brand_id_length", "length(brand_id) <= 100");
+
                             t.HasCheckConstraint("ck_fuel_offer_prices_data_kind", "data_kind IN ('real', 'qa')");
 
                             t.HasCheckConstraint("ck_fuel_offer_prices_fuel_type_id_length", "length(fuel_type_id) <= 100");
@@ -3571,8 +3785,6 @@ namespace FuelFlow.API.Migrations
                             t.HasCheckConstraint("ck_fuel_offer_prices_prices_non_negative", "(final_price_per_liter IS NULL OR final_price_per_liter >= 0) AND (pump_price_per_liter IS NULL OR pump_price_per_liter >= 0) AND (min_discount_per_liter IS NULL OR min_discount_per_liter >= 0)");
 
                             t.HasCheckConstraint("ck_fuel_offer_prices_reason", "reason IN ('operator', 'pump-import', 'catalogue-import', 'batch-cost', 'exchange-release', 'backfill')");
-
-                            t.HasCheckConstraint("ck_fuel_offer_prices_station_id_length", "length(station_id) <= 100");
                         });
                 });
 
@@ -3941,6 +4153,11 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("text")
                         .HasColumnName("brand_fuel_code");
 
+                    b.Property<string>("BrandId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("brand_id");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
@@ -3966,42 +4183,37 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("text")
                         .HasColumnName("name");
 
-                    b.Property<string>("StationId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("station_id");
-
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at_utc");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("BrandId");
+
                     b.HasIndex("Name");
 
-                    b.HasIndex("StationId");
-
-                    b.HasIndex("StationId", "BrandFuelCode")
+                    b.HasIndex("BrandId", "BrandFuelCode")
                         .IsUnique()
-                        .HasDatabaseName("ux_fuel_types_station_brand_fuel_code")
+                        .HasDatabaseName("ux_fuel_types_brand_brand_fuel_code")
                         .HasFilter("brand_fuel_code IS NOT NULL AND NOT is_deleted");
 
-                    b.HasIndex("StationId", "Name")
+                    b.HasIndex("BrandId", "Name")
                         .IsUnique()
-                        .HasDatabaseName("ux_fuel_types_station_name")
+                        .HasDatabaseName("ux_fuel_types_brand_name")
                         .HasFilter("NOT is_deleted");
 
                     b.ToTable("fuel_types", null, t =>
                         {
                             t.HasCheckConstraint("ck_fuel_types_brand_fuel_code_length", "brand_fuel_code IS NULL OR length(brand_fuel_code) <= 50");
 
+                            t.HasCheckConstraint("ck_fuel_types_brand_id_length", "length(brand_id) <= 100");
+
                             t.HasCheckConstraint("ck_fuel_types_id_length", "length(id) <= 100");
 
                             t.HasCheckConstraint("ck_fuel_types_name_length", "length(name) <= 200");
 
                             t.HasCheckConstraint("ck_fuel_types_prices_non_negative", "base_price >= 0 AND discount_price >= 0");
-
-                            t.HasCheckConstraint("ck_fuel_types_station_id_length", "length(station_id) <= 100");
                         });
 
                     b.HasData(
@@ -4011,11 +4223,11 @@ namespace FuelFlow.API.Migrations
                             AllowBelowCost = false,
                             BasePrice = 55m,
                             BrandFuelCode = "DP",
+                            BrandId = "okko",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DiscountPrice = 52m,
                             IsDeleted = false,
                             Name = "ДП ЄВРО",
-                            StationId = "okko",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
@@ -4024,11 +4236,11 @@ namespace FuelFlow.API.Migrations
                             AllowBelowCost = false,
                             BasePrice = 54m,
                             BrandFuelCode = "A-95",
+                            BrandId = "okko",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DiscountPrice = 51m,
                             IsDeleted = false,
                             Name = "A-95",
-                            StationId = "okko",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
@@ -4037,11 +4249,11 @@ namespace FuelFlow.API.Migrations
                             AllowBelowCost = false,
                             BasePrice = 60m,
                             BrandFuelCode = "Pulls 95",
+                            BrandId = "okko",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DiscountPrice = 56m,
                             IsDeleted = false,
                             Name = "Pulls 95",
-                            StationId = "okko",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
@@ -4050,11 +4262,11 @@ namespace FuelFlow.API.Migrations
                             AllowBelowCost = false,
                             BasePrice = 58m,
                             BrandFuelCode = "Pulls Diesel",
+                            BrandId = "okko",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DiscountPrice = 55m,
                             IsDeleted = false,
                             Name = "ДП PULLS",
-                            StationId = "okko",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
@@ -4063,11 +4275,11 @@ namespace FuelFlow.API.Migrations
                             AllowBelowCost = false,
                             BasePrice = 29m,
                             BrandFuelCode = "SPBT",
+                            BrandId = "okko",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DiscountPrice = 27m,
                             IsDeleted = false,
                             Name = "ГАЗ",
-                            StationId = "okko",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
@@ -4075,11 +4287,11 @@ namespace FuelFlow.API.Migrations
                             Id = "wog-dp",
                             AllowBelowCost = false,
                             BasePrice = 56m,
+                            BrandId = "wog",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DiscountPrice = 53m,
                             IsDeleted = false,
                             Name = "ДП Mustang",
-                            StationId = "wog",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
@@ -4087,11 +4299,11 @@ namespace FuelFlow.API.Migrations
                             Id = "wog-95",
                             AllowBelowCost = false,
                             BasePrice = 55m,
+                            BrandId = "wog",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DiscountPrice = 52m,
                             IsDeleted = false,
                             Name = "A-95 Mustang",
-                            StationId = "wog",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
@@ -4099,11 +4311,11 @@ namespace FuelFlow.API.Migrations
                             Id = "wog-95-euro",
                             AllowBelowCost = false,
                             BasePrice = 56m,
+                            BrandId = "wog",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DiscountPrice = 53m,
                             IsDeleted = false,
                             Name = "A 95 EURO",
-                            StationId = "wog",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
@@ -4111,11 +4323,11 @@ namespace FuelFlow.API.Migrations
                             Id = "wog-100",
                             AllowBelowCost = false,
                             BasePrice = 65m,
+                            BrandId = "wog",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DiscountPrice = 61m,
                             IsDeleted = false,
                             Name = "Mustang 100",
-                            StationId = "wog",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
@@ -4123,11 +4335,11 @@ namespace FuelFlow.API.Migrations
                             Id = "wog-gas",
                             AllowBelowCost = false,
                             BasePrice = 29m,
+                            BrandId = "wog",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DiscountPrice = 27m,
                             IsDeleted = false,
                             Name = "ГАЗ",
-                            StationId = "wog",
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         });
                 });
@@ -4142,33 +4354,33 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("text")
                         .HasColumnName("product_code");
 
+                    b.Property<string>("BrandId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("brand_id");
+
                     b.Property<DateTime?>("LastSeenAtUtc")
                         .HasColumnType("timestamptz")
                         .HasColumnName("last_seen_at_utc");
-
-                    b.Property<string>("StationId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("station_id");
 
                     b.HasKey("FuelTypeId", "ProductCode");
 
                     b.HasIndex("ProductCode")
                         .HasDatabaseName("ix_fuel_type_product_codes_code");
 
-                    b.HasIndex("StationId", "ProductCode")
+                    b.HasIndex("BrandId", "ProductCode")
                         .IsUnique()
-                        .HasDatabaseName("ux_fuel_type_product_codes_station_code");
+                        .HasDatabaseName("ux_fuel_type_product_codes_brand_code");
 
                     b.ToTable("fuel_type_product_codes", null, t =>
                         {
+                            t.HasCheckConstraint("ck_fuel_type_product_codes_brand_id_length", "length(brand_id) <= 100");
+
                             t.HasCheckConstraint("ck_fuel_type_product_codes_code_not_blank", "btrim(product_code) <> ''");
 
                             t.HasCheckConstraint("ck_fuel_type_product_codes_fuel_type_id_length", "length(fuel_type_id) <= 100");
 
                             t.HasCheckConstraint("ck_fuel_type_product_codes_product_code_length", "length(product_code) <= 32");
-
-                            t.HasCheckConstraint("ck_fuel_type_product_codes_station_id_length", "length(station_id) <= 100");
                         });
                 });
 
@@ -4313,218 +4525,6 @@ namespace FuelFlow.API.Migrations
                         .IsUnique();
 
                     b.ToTable("roles", (string)null);
-                });
-
-            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.Station", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasColumnType("text")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Address")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("address");
-
-                    b.Property<string>("Color")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasDefaultValue("#00ff80")
-                        .HasColumnName("color");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<DateTime?>("DeletedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at_utc");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
-
-                    b.Property<double?>("Lat")
-                        .HasColumnType("double precision")
-                        .HasColumnName("lat");
-
-                    b.Property<double?>("Lng")
-                        .HasColumnType("double precision")
-                        .HasColumnName("lng");
-
-                    b.Property<string>("LogoText")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("logo_text");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("name");
-
-                    b.Property<string>("Phone")
-                        .HasMaxLength(45)
-                        .HasColumnType("character varying(45)")
-                        .HasColumnName("phone");
-
-                    b.Property<int>("SortOrder")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(999)
-                        .HasColumnName("sort_order");
-
-                    b.Property<string>("StationType")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("station_type");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Name");
-
-                    b.HasIndex("StationType");
-
-                    b.ToTable("stations", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_stations_id_length", "length(id) <= 100");
-
-                            t.HasCheckConstraint("ck_stations_name_length", "length(name) <= 200");
-                        });
-
-                    b.HasData(
-                        new
-                        {
-                            Id = "okko",
-                            Color = "#22c55e",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            IsDeleted = false,
-                            Lat = 50.485100000000003,
-                            Lng = 30.473400000000002,
-                            LogoText = "OKKO",
-                            Name = "OKKO",
-                            SortOrder = 1,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "wog",
-                            Color = "#10b981",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            IsDeleted = false,
-                            Lat = 50.450099999999999,
-                            Lng = 30.523399999999999,
-                            LogoText = "WOG",
-                            Name = "WOG",
-                            SortOrder = 2,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "upg",
-                            Color = "#06b6d4",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            IsDeleted = false,
-                            Lat = 50.400100000000002,
-                            Lng = 30.613399999999999,
-                            LogoText = "UPG",
-                            Name = "UPG",
-                            SortOrder = 3,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = "klo",
-                            Color = "#eab308",
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            IsDeleted = false,
-                            Lat = 50.4101,
-                            Lng = 30.403400000000001,
-                            LogoText = "KLO",
-                            Name = "KLO",
-                            SortOrder = 4,
-                            UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        });
-                });
-
-            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.StationNode", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasColumnType("text")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Address")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("address");
-
-                    b.Property<string>("City")
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)")
-                        .HasColumnName("city");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<DateTime?>("DeletedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at_utc");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
-
-                    b.Property<double?>("Lat")
-                        .HasColumnType("double precision")
-                        .HasColumnName("lat");
-
-                    b.Property<double?>("Lng")
-                        .HasColumnType("double precision")
-                        .HasColumnName("lng");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("name");
-
-                    b.Property<string>("Phone")
-                        .HasMaxLength(45)
-                        .HasColumnType("character varying(45)")
-                        .HasColumnName("phone");
-
-                    b.Property<string>("StationId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("station_id");
-
-                    b.Property<string>("StationType")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("station_type");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("StationId");
-
-                    b.ToTable("station_nodes", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_station_nodes_id_length", "length(id) <= 100");
-
-                            t.HasCheckConstraint("ck_station_nodes_station_id_length", "length(station_id) <= 100");
-                        });
                 });
 
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.Supplier", b =>
@@ -4824,15 +4824,15 @@ namespace FuelFlow.API.Migrations
 
             modelBuilder.Entity("FuelFlow.Features.Contracts.SharedModels.Contract", b =>
                 {
-                    b.HasOne("FuelFlow.Features.Contracts.SharedModels.LegalEntity", "Entity")
+                    b.HasOne("FuelFlow.SharedKernel.Domain.Brand", "Brand")
                         .WithMany()
-                        .HasForeignKey("LegalEntityId")
+                        .HasForeignKey("BrandId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("FuelFlow.SharedKernel.Domain.Station", "Station")
+                    b.HasOne("FuelFlow.Features.Contracts.SharedModels.LegalEntity", "Entity")
                         .WithMany()
-                        .HasForeignKey("StationId")
+                        .HasForeignKey("LegalEntityId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -4842,9 +4842,9 @@ namespace FuelFlow.API.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.Navigation("Entity");
+                    b.Navigation("Brand");
 
-                    b.Navigation("Station");
+                    b.Navigation("Entity");
 
                     b.Navigation("User");
                 });
@@ -5314,6 +5314,15 @@ namespace FuelFlow.API.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.BrandStation", b =>
+                {
+                    b.HasOne("FuelFlow.SharedKernel.Domain.Brand", null)
+                        .WithMany()
+                        .HasForeignKey("BrandId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.FuelOffer", b =>
                 {
                     b.HasOne("FuelFlow.SharedKernel.Domain.FuelTypeEntity", "FuelType")
@@ -5373,15 +5382,6 @@ namespace FuelFlow.API.Migrations
                         .IsRequired();
 
                     b.Navigation("Supplier");
-                });
-
-            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.StationNode", b =>
-                {
-                    b.HasOne("FuelFlow.SharedKernel.Domain.Station", null)
-                        .WithMany()
-                        .HasForeignKey("StationId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
                 });
 
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.User", b =>

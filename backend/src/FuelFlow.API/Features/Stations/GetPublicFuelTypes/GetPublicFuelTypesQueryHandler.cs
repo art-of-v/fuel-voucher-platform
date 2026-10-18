@@ -1,7 +1,7 @@
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace FuelFlow.Features.Stations.GetPublicFuelTypes;
+namespace FuelFlow.Features.Brands.GetPublicFuelTypes;
 
 public sealed class GetPublicFuelTypesQueryHandler
 {
@@ -15,7 +15,7 @@ public sealed class GetPublicFuelTypesQueryHandler
             .Select(x => new PublicFuelTypeResponse(
                 x.Id,
                 x.Name,
-                x.StationId,
+                x.BrandId,
                 x.BasePrice,
                 x.DiscountPrice))
             .ToListAsync(ct);

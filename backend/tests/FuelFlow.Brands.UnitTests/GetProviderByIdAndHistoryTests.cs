@@ -35,7 +35,7 @@ public sealed class GetProviderByIdAndHistoryTests : IDisposable
     public async Task GetProviderById_ShouldReturnProvider()
     {
         var now = DateTime.UtcNow;
-        _context.Stations.Add(new Station
+        _context.Brands.Add(new Brand
         {
             Id = "test-okko",
             Name = "OKKO",
@@ -45,8 +45,8 @@ public sealed class GetProviderByIdAndHistoryTests : IDisposable
             UpdatedAtUtc = now
         });
         _context.FuelTypes.AddRange(
-            new FuelTypeEntity { Id = "test-fuel-a", Name = "A-95", StationId = "test-okko", BasePrice = 100, DiscountPrice = 100, CreatedAtUtc = now, UpdatedAtUtc = now },
-            new FuelTypeEntity { Id = "test-fuel-b", Name = "DP", StationId = "test-okko", BasePrice = 100, DiscountPrice = 100, CreatedAtUtc = now, UpdatedAtUtc = now });
+            new FuelTypeEntity { Id = "test-fuel-a", Name = "A-95", BrandId = "test-okko", BasePrice = 100, DiscountPrice = 100, CreatedAtUtc = now, UpdatedAtUtc = now },
+            new FuelTypeEntity { Id = "test-fuel-b", Name = "DP", BrandId = "test-okko", BasePrice = 100, DiscountPrice = 100, CreatedAtUtc = now, UpdatedAtUtc = now });
         _context.SeedPackage("test-fuel-a-10", "test-okko", "test-fuel-a", 10m, 510m,
             supplierPricePerLiter: 49m, marginUahPerLiter: 2m, finalPricePerLiter: 51m,
             createdAtUtc: now, updatedAtUtc: now);
@@ -78,7 +78,7 @@ public sealed class GetProviderByIdAndHistoryTests : IDisposable
     }
 
     [Fact]
-    public async Task GetProviderById_ShouldReturnNull_WhenStationMissing()
+    public async Task GetProviderById_ShouldReturnNull_WhenBrandMissing()
     {
         var handler = new GetBrandByIdQueryHandler(_context);
         var result = await handler.HandleAsync(new GetBrandByIdQuery("missing"), CancellationToken.None);

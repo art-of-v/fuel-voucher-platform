@@ -200,7 +200,7 @@ public sealed class OfferPriceRecorder
         {
             Id = Guid.CreateVersion7(),
             OfferId = offer.Id,
-            StationId = offer.StationId,
+            BrandId = offer.BrandId,
             FuelTypeId = offer.FuelTypeId,
             DataKind = offer.DataKind,
             SupplierPricePerLiter = offer.SupplierPricePerLiter,

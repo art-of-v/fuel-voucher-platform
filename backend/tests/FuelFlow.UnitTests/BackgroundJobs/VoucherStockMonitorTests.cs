@@ -39,7 +39,7 @@ public sealed class VoucherStockMonitorTests : IDisposable
         {
             Id = "test-expiring-dp",
             Name = "ДП ЄВРО",
-            StationId = "okko",
+            BrandId = "okko",
             BasePrice = 100,
             DiscountPrice = 95,
             CreatedAtUtc = DateTime.UtcNow,

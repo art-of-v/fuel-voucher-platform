@@ -1310,7 +1310,7 @@ var lastFailedAtUtc = await _context.Payments
 
                     // Backstop, not the decision: the branch above already proved the term fits under the
                     // supplier term, so reaching here means the source row changed under us mid-transaction.
-                    // Writing a customer date past the real term would promise validity the station may
+                    // Writing a customer date past the real term would promise validity the Brand may
                     // never honour, so we refuse rather than over-extend.
                     if (newExpiration > source.SupplierExpirationDate)
                     {

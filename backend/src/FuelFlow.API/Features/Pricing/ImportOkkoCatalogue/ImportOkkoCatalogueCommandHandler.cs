@@ -92,7 +92,7 @@ public sealed record OkkoCatalogueApplyResult(
 /// </remarks>
 public sealed class ImportOkkoCatalogueCommandHandler
 {
-    private const string OkkoStationId = "okko";
+    private const string OkkoBrandId = "okko";
 
     private readonly ApplicationDbContext _context;
     private readonly AuditEventService _events;
@@ -135,7 +135,7 @@ public sealed class ImportOkkoCatalogueCommandHandler
         // created for a grade the brand sells again.
         var carried = (await _context.FuelTypes
                 .AsNoTracking()
-                .Where(f => f.StationId == OkkoStationId && !f.IsDeleted)
+                .Where(f => f.BrandId == OkkoBrandId && !f.IsDeleted)
                 .ToListAsync(ct));
 
         var knownCodes = carried
@@ -192,7 +192,7 @@ var gradeHolder = new Dictionary<OkkoFuelCategory, (string Id, string Name)>();
 if (knownCodes.Contains(code))
             {
                 // Seen, so not a candidate for archiving at the end of this run. `First` rather than a
-                // lookup because the live (station, code) index already guarantees there is one - and
+                // lookup because the live (Brand, code) index already guarantees there is one - and
                 // the whole grade group with it, since the brand is plainly still publishing that grade.
                 seenFuelIds.Add(carried.First(f => f.BrandFuelCode == code).Id);
                 if (byGrade.TryGetValue(grade, out var sameGrade))
@@ -247,7 +247,7 @@ if (knownCodes.Contains(code))
             var fuel = new FuelTypeEntity
             {
                 Id = Guid.CreateVersion7().ToString(),
-                StationId = OkkoStationId,
+                BrandId = OkkoBrandId,
                 Name = name,
                 BrandFuelCode = code,
                 // Zero, not the pump: the headline is the customer's price, and there is none until an
@@ -265,7 +265,7 @@ if (knownCodes.Contains(code))
             var offer = new FuelOffer
             {
                 Id = OfferKeys.For(fuel.Id, DataKinds.Real),
-                StationId = OkkoStationId,
+                BrandId = OkkoBrandId,
                 FuelTypeId = fuel.Id,
                 DataKind = DataKinds.Real,
                 // The one supplier-owned figure on the offer. Cost, margin and final stay null, and no
@@ -300,7 +300,7 @@ if (knownCodes.Contains(code))
                     actingUserName,
                     $"{c.Name} ({c.BrandFuelCode}): added from OKKO's published list at {c.PumpPricePerLiter:F2} UAH/L pump, "
                     + "unpriced and not on sale until a margin is set",
-                    OkkoStationId,
+                    OkkoBrandId,
                     ct);
             }
         }
@@ -362,7 +362,7 @@ private async Task<IReadOnlyList<OkkoCatalogueArchived>> ArchiveDroppedFuelsAsyn
 
         var absent = await _context.FuelTypes
             .IgnoreQueryFilters()
-            .Where(f => f.StationId == OkkoStationId
+            .Where(f => f.BrandId == OkkoBrandId
                 && !f.IsDeleted
                 && f.BrandFuelCode != null
                 && !seenFuelIds.Contains(f.Id))
@@ -432,7 +432,7 @@ private async Task<IReadOnlyList<OkkoCatalogueArchived>> ArchiveDroppedFuelsAsyn
                     actingUserId == Guid.Empty ? Guid.Empty : actingUserId,
                     actingUserName,
                     $"{fuel.Name}: archived — OKKO no longer publishes this grade and it has no live vouchers",
-                    OkkoStationId,
+                    OkkoBrandId,
                     ct);
             }
 

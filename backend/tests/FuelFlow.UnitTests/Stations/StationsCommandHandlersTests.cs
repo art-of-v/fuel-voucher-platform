@@ -1,25 +1,25 @@
 using FuelFlow.Features.Pricing;
 using FluentAssertions;
-using FuelFlow.Features.Stations.CreateFuelType;
-using FuelFlow.Features.Stations.CreatePackage;
-using FuelFlow.Features.Stations.CreateStation;
-using FuelFlow.Features.Stations.DeleteFuelType;
-using FuelFlow.Features.Stations.DeletePackage;
-using FuelFlow.Features.Stations.DeleteStation;
-using FuelFlow.Features.Stations.UpdateFuelType;
-using FuelFlow.Features.Stations.UpdatePackage;
-using FuelFlow.Features.Stations.UpdateStation;
+using FuelFlow.Features.Brands.CreateFuelType;
+using FuelFlow.Features.Brands.CreatePackage;
+using FuelFlow.Features.Brands.CreateBrand;
+using FuelFlow.Features.Brands.DeleteFuelType;
+using FuelFlow.Features.Brands.DeletePackage;
+using FuelFlow.Features.Brands.DeleteBrand;
+using FuelFlow.Features.Brands.UpdateFuelType;
+using FuelFlow.Features.Brands.UpdatePackage;
+using FuelFlow.Features.Brands.UpdateBrand;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 
-namespace FuelFlow.UnitTests.Stations;
+namespace FuelFlow.UnitTests.Brands;
 
-public sealed class StationsCommandHandlersTests : IDisposable
+public sealed class BrandsCommandHandlersTests : IDisposable
 {
     private readonly ApplicationDbContext _context;
 
-    public StationsCommandHandlersTests()
+    public BrandsCommandHandlersTests()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
@@ -35,49 +35,49 @@ public sealed class StationsCommandHandlersTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateStation_ShouldAddStation()
+    public async Task CreateBrand_ShouldAddBrand()
     {
-        var station = CreateStation("station-1", "Test Station", "#00ff80", "TS");
+        var Brand = CreateBrand("Brand-1", "Test Brand", "#00ff80", "TS");
 
-        var handler = new CreateStationCommandHandler(_context);
+        var handler = new CreateBrandCommandHandler(_context);
 
-        var result = await handler.HandleAsync(new CreateStationCommand(station));
+        var result = await handler.HandleAsync(new CreateBrandCommand(Brand));
 
         result.Success.Should().BeTrue();
         result.Conflict.Should().BeFalse();
         result.Error.Should().BeNull();
-        result.Station.Should().BeSameAs(station);
+        result.Brand.Should().BeSameAs(Brand);
 
-        var persisted = await _context.Stations.FindAsync("station-1");
+        var persisted = await _context.Brands.FindAsync("Brand-1");
         persisted.Should().NotBeNull();
         persisted!.CreatedAtUtc.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
     }
 
     [Fact]
-    public async Task CreateStation_ShouldReturnConflict_WhenIdExists()
+    public async Task CreateBrand_ShouldReturnConflict_WhenIdExists()
     {
-        var station = CreateStation("station-1", "Test Station", "#00ff80", "TS");
-        _context.Stations.Add(station);
+        var Brand = CreateBrand("Brand-1", "Test Brand", "#00ff80", "TS");
+        _context.Brands.Add(Brand);
         await _context.SaveChangesAsync();
 
-        var handler = new CreateStationCommandHandler(_context);
+        var handler = new CreateBrandCommandHandler(_context);
 
-        var result = await handler.HandleAsync(new CreateStationCommand(station));
+        var result = await handler.HandleAsync(new CreateBrandCommand(Brand));
 
         result.Success.Should().BeFalse();
         result.Conflict.Should().BeTrue();
         result.Error.Should().Contain("already exists");
-        result.Station.Should().BeNull();
+        result.Brand.Should().BeNull();
     }
 
     [Fact]
-    public async Task CreateStation_ShouldReturnError_WhenRequiredFieldsMissing()
+    public async Task CreateBrand_ShouldReturnError_WhenRequiredFieldsMissing()
     {
-        var station = CreateStation("", "", "#00ff80", "");
+        var Brand = CreateBrand("", "", "#00ff80", "");
 
-        var handler = new CreateStationCommandHandler(_context);
+        var handler = new CreateBrandCommandHandler(_context);
 
-        var result = await handler.HandleAsync(new CreateStationCommand(station));
+        var result = await handler.HandleAsync(new CreateBrandCommand(Brand));
 
         result.Success.Should().BeFalse();
         result.Conflict.Should().BeFalse();
@@ -85,15 +85,15 @@ public sealed class StationsCommandHandlersTests : IDisposable
     }
 
     [Fact]
-    public async Task UpdateStation_ShouldUpdateFields()
+    public async Task UpdateBrand_ShouldUpdateFields()
     {
-        var station = CreateStation("station-1", "Old Name", "#000000", "OLD");
-        _context.Stations.Add(station);
+        var Brand = CreateBrand("Brand-1", "Old Name", "#000000", "OLD");
+        _context.Brands.Add(Brand);
         await _context.SaveChangesAsync();
 
-        var updated = new Station
+        var updated = new Brand
         {
-            Id = "station-1",
+            Id = "Brand-1",
             Name = "New Name",
             Color = "#ffffff",
             LogoText = "NEW",
@@ -103,13 +103,13 @@ public sealed class StationsCommandHandlersTests : IDisposable
             Lat = 50.5,
             Lng = 30.5
         };
-        var handler = new UpdateStationCommandHandler(_context);
+        var handler = new UpdateBrandCommandHandler(_context);
 
-        var result = await handler.HandleAsync(new UpdateStationCommand("station-1", updated));
+        var result = await handler.HandleAsync(new UpdateBrandCommand("Brand-1", updated));
 
         result.Should().BeTrue();
 
-        var persisted = await _context.Stations.FindAsync("station-1");
+        var persisted = await _context.Brands.FindAsync("Brand-1");
         persisted!.Name.Should().Be("New Name");
         persisted.Color.Should().Be("#ffffff");
         persisted.LogoText.Should().Be("NEW");
@@ -121,40 +121,40 @@ public sealed class StationsCommandHandlersTests : IDisposable
     }
 
     [Fact]
-    public async Task UpdateStation_ShouldReturnFalse_WhenNotFound()
+    public async Task UpdateBrand_ShouldReturnFalse_WhenNotFound()
     {
-        var handler = new UpdateStationCommandHandler(_context);
+        var handler = new UpdateBrandCommandHandler(_context);
 
-        var result = await handler.HandleAsync(new UpdateStationCommand("missing", CreateStation("missing", "X")));
+        var result = await handler.HandleAsync(new UpdateBrandCommand("missing", CreateBrand("missing", "X")));
 
         result.Should().BeFalse();
     }
 
     [Fact]
-    public async Task DeleteStation_ShouldRemove()
+    public async Task DeleteBrand_ShouldRemove()
     {
-        var station = CreateStation("station-1", "Test Station", "#00ff80", "TS");
-        _context.Stations.Add(station);
+        var Brand = CreateBrand("Brand-1", "Test Brand", "#00ff80", "TS");
+        _context.Brands.Add(Brand);
         await _context.SaveChangesAsync();
 
-        var handler = new DeleteStationCommandHandler(_context);
+        var handler = new DeleteBrandCommandHandler(_context);
 
-        var result = await handler.HandleAsync(new DeleteStationCommand("station-1"));
+        var result = await handler.HandleAsync(new DeleteBrandCommand("Brand-1"));
 
         result.Should().BeTrue();
-        var persisted = await _context.Stations.IgnoreQueryFilters().SingleAsync(s => s.Id == "station-1");
+        var persisted = await _context.Brands.IgnoreQueryFilters().SingleAsync(s => s.Id == "Brand-1");
         persisted.IsDeleted.Should().BeTrue();
         persisted.DeletedAtUtc.Should().NotBeNull();
-        (await _context.Stations.CountAsync(s => s.Id == "station-1")).Should().Be(0,
+        (await _context.Brands.CountAsync(s => s.Id == "Brand-1")).Should().Be(0,
             "#217: a delete archives rather than removes - hidden from the catalog, row intact");
     }
 
     [Fact]
-    public async Task DeleteStation_ShouldReturnFalse_WhenNotFound()
+    public async Task DeleteBrand_ShouldReturnFalse_WhenNotFound()
     {
-        var handler = new DeleteStationCommandHandler(_context);
+        var handler = new DeleteBrandCommandHandler(_context);
 
-        var result = await handler.HandleAsync(new DeleteStationCommand("missing"));
+        var result = await handler.HandleAsync(new DeleteBrandCommand("missing"));
 
         result.Should().BeFalse();
     }
@@ -162,7 +162,7 @@ public sealed class StationsCommandHandlersTests : IDisposable
     [Fact]
     public async Task CreateFuelType_ShouldAdd()
     {
-        var fuelType = CreateFuelType("ft-1", "A-95", "station-1");
+        var fuelType = CreateFuelType("ft-1", "A-95", "Brand-1");
 
         var handler = new CreateFuelTypeCommandHandler(_context);
 
@@ -181,7 +181,7 @@ public sealed class StationsCommandHandlersTests : IDisposable
     [Fact]
     public async Task CreateFuelType_ShouldReturnConflict_WhenExists()
     {
-        var fuelType = CreateFuelType("ft-1", "A-95", "station-1");
+        var fuelType = CreateFuelType("ft-1", "A-95", "Brand-1");
         _context.FuelTypes.Add(fuelType);
         await _context.SaveChangesAsync();
 
@@ -206,17 +206,17 @@ public sealed class StationsCommandHandlersTests : IDisposable
 
         result.Success.Should().BeFalse();
         result.Conflict.Should().BeFalse();
-        result.Error.Should().Be("Id, StationId and Name are required");
+        result.Error.Should().Be("Id, BrandId and Name are required");
     }
 
     [Fact]
     public async Task UpdateFuelType_ShouldUpdate()
     {
-        var fuelType = CreateFuelType("ft-1", "A-95", "station-1", 50, 48);
+        var fuelType = CreateFuelType("ft-1", "A-95", "Brand-1", 50, 48);
         _context.FuelTypes.Add(fuelType);
         await _context.SaveChangesAsync();
 
-        var updated = CreateFuelType("ft-1", "A-95 Euro", "station-2", 60, 55);
+        var updated = CreateFuelType("ft-1", "A-95 Euro", "Brand-2", 60, 55);
         var handler = new UpdateFuelTypeCommandHandler(_context);
 
         var result = await handler.HandleAsync(new UpdateFuelTypeCommand("ft-1", updated, Guid.NewGuid()));
@@ -225,7 +225,7 @@ public sealed class StationsCommandHandlersTests : IDisposable
 
         var persisted = await _context.FuelTypes.FindAsync("ft-1");
         persisted!.Name.Should().Be("A-95 Euro");
-        persisted.StationId.Should().Be("station-2");
+        persisted.BrandId.Should().Be("Brand-2");
         persisted.BasePrice.Should().Be(60);
         persisted.DiscountPrice.Should().Be(55);
     }
@@ -235,7 +235,7 @@ public sealed class StationsCommandHandlersTests : IDisposable
     {
         var handler = new UpdateFuelTypeCommandHandler(_context);
 
-        var result = await handler.HandleAsync(new UpdateFuelTypeCommand("missing", CreateFuelType("missing", "X", "station-1"), Guid.NewGuid()));
+        var result = await handler.HandleAsync(new UpdateFuelTypeCommand("missing", CreateFuelType("missing", "X", "Brand-1"), Guid.NewGuid()));
 
         result.Should().BeFalse();
     }
@@ -243,7 +243,7 @@ public sealed class StationsCommandHandlersTests : IDisposable
     [Fact]
     public async Task DeleteFuelType_ShouldRemove()
     {
-        var fuelType = CreateFuelType("ft-1", "A-95", "station-1");
+        var fuelType = CreateFuelType("ft-1", "A-95", "Brand-1");
         _context.FuelTypes.Add(fuelType);
         await _context.SaveChangesAsync();
 
@@ -272,7 +272,7 @@ public sealed class StationsCommandHandlersTests : IDisposable
     [Fact]
     public async Task CreatePackage_ShouldAdd()
     {
-        var package = CreatePackage("pkg-1", "station-1", "ft-1", "A-95", 20m, 1000, 980);
+        var package = CreatePackage("pkg-1", "Brand-1", "ft-1", "A-95", 20m, 1000, 980);
 
         var handler = new CreatePackageCommandHandler(_context, new OfferPriceRecorder(_context));
 
@@ -287,7 +287,7 @@ public sealed class StationsCommandHandlersTests : IDisposable
         // entitled to rely on that - the volume never existed as a detached entity to be handed back.
         result.Package.Should().NotBeNull();
         result.Package!.Id.Should().Be("pkg-1");
-        result.Package.StationId.Should().Be("station-1");
+        result.Package.BrandId.Should().Be("Brand-1");
         result.Package.FuelTypeId.Should().Be("ft-1");
         result.Package.Liters.Should().Be(20m);
         result.Package.Price.Should().Be(1000);
@@ -300,7 +300,7 @@ public sealed class StationsCommandHandlersTests : IDisposable
     [Fact]
     public async Task CreatePackage_ShouldReturnConflict_WhenExists()
     {
-        var package = CreatePackage("pkg-1", "station-1", "ft-1", "A-95", 20m, 1000, 980);
+        var package = CreatePackage("pkg-1", "Brand-1", "ft-1", "A-95", 20m, 1000, 980);
         SeedFromPackage(package);
         await _context.SaveChangesAsync();
 
@@ -325,7 +325,7 @@ public sealed class StationsCommandHandlersTests : IDisposable
 
         result.Success.Should().BeFalse();
         result.Conflict.Should().BeFalse();
-        result.Error.Should().Be("Id, StationId and FuelTypeId are required");
+        result.Error.Should().Be("Id, BrandId and FuelTypeId are required");
     }
 
     // The incident this guards: a 0.01 L test package priced at 5.00/L was added inside a live fuel
@@ -335,13 +335,13 @@ public sealed class StationsCommandHandlersTests : IDisposable
     [Fact]
     public async Task CreatePackage_ShouldRefuse_WhenCostDisagreesWithTheFuel()
     {
-        SeedFromPackage(CreatePackage("existing", "station-1", "ft-1", "ДП ЄВРО", 10m, costPerLiter: 100m));
-        SeedFromPackage(CreatePackage("existing-2", "station-1", "ft-1", "ДП ЄВРО", 2m, costPerLiter: 100m));
+        SeedFromPackage(CreatePackage("existing", "Brand-1", "ft-1", "ДП ЄВРО", 10m, costPerLiter: 100m));
+        SeedFromPackage(CreatePackage("existing-2", "Brand-1", "ft-1", "ДП ЄВРО", 2m, costPerLiter: 100m));
         await _context.SaveChangesAsync();
 
         var handler = new CreatePackageCommandHandler(_context, new OfferPriceRecorder(_context));
         var result = await handler.HandleAsync(new CreatePackageCommand(
-            CreatePackage("qa-1kop", "station-1", "ft-1", "QA 1 коп", 0.01m, costPerLiter: 5m)));
+            CreatePackage("qa-1kop", "Brand-1", "ft-1", "QA 1 коп", 0.01m, costPerLiter: 5m)));
 
         result.Success.Should().BeFalse();
         result.Conflict.Should().BeTrue();
@@ -354,12 +354,12 @@ public sealed class StationsCommandHandlersTests : IDisposable
     [Fact]
     public async Task CreatePackage_ShouldAdd_WhenCostMatchesTheFuel()
     {
-        SeedFromPackage(CreatePackage("existing", "station-1", "ft-1", "ДП ЄВРО", 10m, costPerLiter: 94.9m));
+        SeedFromPackage(CreatePackage("existing", "Brand-1", "ft-1", "ДП ЄВРО", 10m, costPerLiter: 94.9m));
         await _context.SaveChangesAsync();
 
         var handler = new CreatePackageCommandHandler(_context, new OfferPriceRecorder(_context));
         var result = await handler.HandleAsync(new CreatePackageCommand(
-            CreatePackage("new-nominal", "station-1", "ft-1", "ДП ЄВРО", 5m, costPerLiter: 94.9m)));
+            CreatePackage("new-nominal", "Brand-1", "ft-1", "ДП ЄВРО", 5m, costPerLiter: 94.9m)));
 
         result.Success.Should().BeTrue();
         result.Conflict.Should().BeFalse();
@@ -370,12 +370,12 @@ public sealed class StationsCommandHandlersTests : IDisposable
     [Fact]
     public async Task CreatePackage_ShouldAdd_WhenCostDiffersOnlyPastTheColumnScale()
     {
-        SeedFromPackage(CreatePackage("existing", "station-1", "ft-1", "A-95", 10m, costPerLiter: 94.9000m));
+        SeedFromPackage(CreatePackage("existing", "Brand-1", "ft-1", "A-95", 10m, costPerLiter: 94.9000m));
         await _context.SaveChangesAsync();
 
         var handler = new CreatePackageCommandHandler(_context, new OfferPriceRecorder(_context));
         var result = await handler.HandleAsync(new CreatePackageCommand(
-            CreatePackage("rounding", "station-1", "ft-1", "A-95", 5m, costPerLiter: 94.90001m)));
+            CreatePackage("rounding", "Brand-1", "ft-1", "A-95", 5m, costPerLiter: 94.90001m)));
 
         result.Success.Should().BeTrue();
     }
@@ -383,12 +383,12 @@ public sealed class StationsCommandHandlersTests : IDisposable
     [Fact]
     public async Task CreatePackage_ShouldAdd_WhenItIsTheFirstPricedPackageOfTheFuel()
     {
-        SeedFromPackage(CreatePackage("existing", "station-1", "ft-1", "A-95", 10m));
+        SeedFromPackage(CreatePackage("existing", "Brand-1", "ft-1", "A-95", 10m));
         await _context.SaveChangesAsync();
 
         var handler = new CreatePackageCommandHandler(_context, new OfferPriceRecorder(_context));
         var result = await handler.HandleAsync(new CreatePackageCommand(
-            CreatePackage("priced", "station-1", "ft-1", "A-95", 5m, costPerLiter: 87.9m)));
+            CreatePackage("priced", "Brand-1", "ft-1", "A-95", 5m, costPerLiter: 87.9m)));
 
         result.Success.Should().BeTrue();
     }
@@ -398,12 +398,12 @@ public sealed class StationsCommandHandlersTests : IDisposable
     [Fact]
     public async Task CreatePackage_ShouldAdd_WhenTheFuelHasCostsButTheNewOneHasNone()
     {
-        SeedFromPackage(CreatePackage("existing", "station-1", "ft-1", "A-95", 10m, costPerLiter: 87.9m));
+        SeedFromPackage(CreatePackage("existing", "Brand-1", "ft-1", "A-95", 10m, costPerLiter: 87.9m));
         await _context.SaveChangesAsync();
 
         var handler = new CreatePackageCommandHandler(_context, new OfferPriceRecorder(_context));
         var result = await handler.HandleAsync(new CreatePackageCommand(
-            CreatePackage("uncosted", "station-1", "ft-1", "A-95", 5m)));
+            CreatePackage("uncosted", "Brand-1", "ft-1", "A-95", 5m)));
 
         result.Success.Should().BeTrue();
     }
@@ -411,12 +411,12 @@ public sealed class StationsCommandHandlersTests : IDisposable
     [Fact]
     public async Task CreatePackage_ShouldAdd_WhenItBelongsToADifferentFuel()
     {
-        SeedFromPackage(CreatePackage("existing", "station-1", "ft-1", "A-95", 10m, costPerLiter: 87.9m));
+        SeedFromPackage(CreatePackage("existing", "Brand-1", "ft-1", "A-95", 10m, costPerLiter: 87.9m));
         await _context.SaveChangesAsync();
 
         var handler = new CreatePackageCommandHandler(_context, new OfferPriceRecorder(_context));
         var result = await handler.HandleAsync(new CreatePackageCommand(
-            CreatePackage("other-fuel", "station-1", "ft-2", "ДП ЄВРО", 10m, costPerLiter: 94.9m)));
+            CreatePackage("other-fuel", "Brand-1", "ft-2", "ДП ЄВРО", 10m, costPerLiter: 94.9m)));
 
         result.Success.Should().BeTrue();
     }
@@ -425,12 +425,12 @@ public sealed class StationsCommandHandlersTests : IDisposable
     /// A package owns its litres and its frozen total; the offer owns everything else.
     /// </summary>
     /// <remarks>
-    /// This test used to assert that <c>PUT</c> re-keys a package onto a different station and fuel,
+    /// This test used to assert that <c>PUT</c> re-keys a package onto a different Brand and fuel,
     /// and that expectation was correct for the old schema. It is wrong now, and for a reason worth
-    /// stating: station and fuel are part of the OFFER's identity - <c>UNIQUE (station_id,
-    /// fuel_type_id, data_kind)</c> - so "update this package's station" is not an update, it is a move
+    /// stating: Brand and fuel are part of the OFFER's identity - <c>UNIQUE (brand_id,
+    /// fuel_type_id, data_kind)</c> - so "update this package's Brand" is not an update, it is a move
     /// to another offer, and it would drag that offer's other volumes with it. Re-keying a whole fuel
-    /// between stations is what the brand screen does; this endpoint cannot do it half-way.
+    /// between Brands is what the brand screen does; this endpoint cannot do it half-way.
     /// <para>
     /// So the handler applies the two facts a package genuinely owns and ignores the rest. Silently
     /// ignoring beats corrupting the offer, but it is a behaviour change and this test is where it is
@@ -440,13 +440,13 @@ public sealed class StationsCommandHandlersTests : IDisposable
     [Fact]
     public async Task UpdatePackage_ShouldUpdateLitersAndPrice_AndLeaveTheOfferAlone()
     {
-        var package = CreatePackage("pkg-1", "station-1", "ft-1", "A-95", 20m, 1000, 980);
+        var package = CreatePackage("pkg-1", "Brand-1", "ft-1", "A-95", 20m, 1000, 980);
         SeedFromPackage(package);
         await _context.SaveChangesAsync();
 
         var offerIdBefore = (await _context.FuelOfferVolumes.FindAsync("pkg-1"))!.OfferId;
 
-        var updated = CreatePackage("pkg-1", "station-2", "ft-2", "Diesel", 50m, 3000, 2900);
+        var updated = CreatePackage("pkg-1", "Brand-2", "ft-2", "Diesel", 50m, 3000, 2900);
         var handler = new UpdatePackageCommandHandler(_context);
 
         var result = await handler.HandleAsync(new UpdatePackageCommand("pkg-1", updated));
@@ -464,7 +464,7 @@ public sealed class StationsCommandHandlersTests : IDisposable
         persisted.OfferId.Should().Be(offerIdBefore);
 
         var offer = await _context.FuelOffers.FindAsync(offerIdBefore);
-        offer!.StationId.Should().Be("station-1");
+        offer!.BrandId.Should().Be("Brand-1");
         offer.FuelTypeId.Should().Be("ft-1");
     }
 
@@ -473,7 +473,7 @@ public sealed class StationsCommandHandlersTests : IDisposable
     {
         var handler = new UpdatePackageCommandHandler(_context);
 
-        var result = await handler.HandleAsync(new UpdatePackageCommand("missing", CreatePackage("missing", "station-1", "ft-1", "A-95", 20m)));
+        var result = await handler.HandleAsync(new UpdatePackageCommand("missing", CreatePackage("missing", "Brand-1", "ft-1", "A-95", 20m)));
 
         result.Should().BeFalse();
     }
@@ -481,7 +481,7 @@ public sealed class StationsCommandHandlersTests : IDisposable
     [Fact]
     public async Task DeletePackage_ShouldRemove()
     {
-        var package = CreatePackage("pkg-1", "station-1", "ft-1", "A-95", 20m);
+        var package = CreatePackage("pkg-1", "Brand-1", "ft-1", "A-95", 20m);
         SeedFromPackage(package);
         await _context.SaveChangesAsync();
 
@@ -507,9 +507,9 @@ public sealed class StationsCommandHandlersTests : IDisposable
         result.Should().BeFalse();
     }
 
-    private static Station CreateStation(string id, string name, string color = "#00ff80", string logoText = "LOGO")
+    private static Brand CreateBrand(string id, string name, string color = "#00ff80", string logoText = "LOGO")
     {
-        return new Station
+        return new Brand
         {
             Id = id,
             Name = name,
@@ -518,24 +518,24 @@ public sealed class StationsCommandHandlersTests : IDisposable
         };
     }
 
-    private static FuelTypeEntity CreateFuelType(string id, string name, string stationId, int basePrice = 50, int discountPrice = 45)
+    private static FuelTypeEntity CreateFuelType(string id, string name, string BrandId, int basePrice = 50, int discountPrice = 45)
     {
         return new FuelTypeEntity
         {
             Id = id,
             Name = name,
-            StationId = stationId,
+            BrandId = BrandId,
             BasePrice = basePrice,
             DiscountPrice = discountPrice
         };
     }
 
-    private static FuelPackage CreatePackage(string id, string stationId, string fuelTypeId, string fuelName, decimal liters, int price = 500, int originalPrice = 480, decimal? costPerLiter = null)
+    private static FuelPackage CreatePackage(string id, string BrandId, string fuelTypeId, string fuelName, decimal liters, int price = 500, int originalPrice = 480, decimal? costPerLiter = null)
     {
         return new FuelPackage
         {
             Id = id,
-            StationId = stationId,
+            BrandId = BrandId,
             FuelTypeId = fuelTypeId,
             FuelName = fuelName,
             Liters = liters,
@@ -561,7 +561,7 @@ public sealed class StationsCommandHandlersTests : IDisposable
     private FuelOfferVolume SeedFromPackage(FuelPackage package)
         => _context.SeedPackage(
             id: package.Id,
-            stationId: package.StationId,
+            BrandId: package.BrandId,
             fuelTypeId: package.FuelTypeId,
             liters: package.Liters,
             price: package.Price,

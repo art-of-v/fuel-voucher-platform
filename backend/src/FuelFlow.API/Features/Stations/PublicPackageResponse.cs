@@ -1,8 +1,8 @@
-namespace FuelFlow.Features.Stations;
+namespace FuelFlow.Features.Brands;
 
 /// <summary>
 /// Explicit allow-list projection of <see cref="FuelFlow.SharedKernel.Domain.FuelPackage"/> for the
-/// anonymous <c>GET /api/packages</c> endpoint (planning #52). The per-station variant that
+/// anonymous <c>GET /api/packages</c> endpoint (planning #52). The per-Brand variant that
 /// served the same projection was removed as client-less; the rule below applies to whatever
 /// reads this type.
 ///
@@ -21,7 +21,7 @@ namespace FuelFlow.Features.Stations;
 /// </summary>
 public sealed record PublicPackageResponse(
     string Id,
-    string StationId,
+    string BrandId,
     string FuelTypeId,
     string FuelName,
     decimal Liters,

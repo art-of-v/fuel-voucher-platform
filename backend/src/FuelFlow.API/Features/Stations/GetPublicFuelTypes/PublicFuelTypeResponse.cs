@@ -1,8 +1,8 @@
-namespace FuelFlow.Features.Stations.GetPublicFuelTypes;
+namespace FuelFlow.Features.Brands.GetPublicFuelTypes;
 
 /// <summary>
 /// Explicit allow-list projection of <see cref="FuelFlow.SharedKernel.Domain.FuelTypeEntity"/> for the
-/// anonymous, publicly cacheable <c>GET /api/stations/fuel-types</c> endpoint (FF-31).
+/// anonymous, publicly cacheable <c>GET /api/Brands/fuel-types</c> endpoint (FF-31).
 ///
 /// That endpoint previously reused <c>GetAdminFuelTypesQueryHandler</c> and returned the entity, so any
 /// column later added to the table would have been published to unauthenticated callers and cached for
@@ -13,6 +13,6 @@ namespace FuelFlow.Features.Stations.GetPublicFuelTypes;
 public sealed record PublicFuelTypeResponse(
     string Id,
     string Name,
-    string StationId,
+    string BrandId,
     decimal BasePrice,
     decimal DiscountPrice);

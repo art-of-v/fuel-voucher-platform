@@ -8,7 +8,7 @@ namespace FuelFlow.Features.Orders.CreateCheckout;
 
 /// <summary>
 /// Answers the one question the buy-flow term ladder must settle before it offers a term: is there stock
-/// whose paper term actually reaches that far? A term the station cannot honour must never be on the
+/// whose paper term actually reaches that far? A term the Brand cannot honour must never be on the
 /// ladder, because the customer would pay the long-term price and receive the shorter validity the stock
 /// allows (the clamp in <c>FulfillmentService.TryAssignVoucherAsync</c>).
 /// </summary>
@@ -30,12 +30,12 @@ public static class TermStockCoverage
     /// </summary>
     public static async Task<DateOnly?> BestStockExpirationAsync(
         ApplicationDbContext context,
-        string stationId,
+        string BrandId,
         string fuelTypeId,
         decimal liters,
         CancellationToken cancellationToken = default)
     {
-        var brand = stationId.ToLower();
+        var brand = BrandId.ToLower();
 
         return await context.FuelVouchers
             .AsNoTracking()

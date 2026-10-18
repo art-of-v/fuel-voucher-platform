@@ -3,7 +3,7 @@ namespace FuelFlow.Features.Orders.GetSavingsReport;
 /// <summary>
 /// What the customer sees about their own fuel purchases. Cost, margin and any operator loss are
 /// deliberately absent — this projection carries only the customer's own paid amount, litres and
-/// saving vs the pump. "Redeemed at station" is not included in the MVP (depends on a station
+/// saving vs the pump. "Redeemed at Brand" is not included in the MVP (depends on a Brand
 /// redemption feed that does not exist yet); only the owned-but-unredeemed remaining balance is shown.
 /// </summary>
 public sealed record SavingsReportDto
@@ -24,7 +24,7 @@ public sealed record SavingsReportDto
     /// </summary>
     public decimal TotalSavings { get; init; }
 
-    /// <summary>Vouchers the customer still owns and has not redeemed at a station.</summary>
+    /// <summary>Vouchers the customer still owns and has not redeemed at a Brand.</summary>
     public int RemainingVouchers { get; init; }
 
     /// <summary>Litres still owned and unredeemed.</summary>

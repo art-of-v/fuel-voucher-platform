@@ -39,7 +39,7 @@ public sealed class AdminVoucherListItemDto
     public string? ImageUrl { get; set; }
     /// <summary>
     /// Emulated test data rather than fuel the operator paid a supplier for. The code does not exist
-    /// at the station, so this row must never reach a paying customer.
+    /// at the Brand, so this row must never reach a paying customer.
     /// </summary>
     public bool IsTestData { get; set; }
 

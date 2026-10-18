@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -77,7 +77,7 @@ namespace FuelFlow.API.Migrations
             // keys have since changed.
             var historicalKey = offers.ToDictionary(
                 o => o.Id,
-                o => $"{o.StationId}-{o.FuelTypeId}" + (o.DataKind == DataKinds.Qa ? "-qa" : ""));
+                o => $"{o.BrandId}-{o.FuelTypeId}" + (o.DataKind == DataKinds.Qa ? "-qa" : ""));
 
             foreach (var offer in offers)
             {
@@ -88,7 +88,7 @@ namespace FuelFlow.API.Migrations
                          pump_price_per_liter, min_discount_per_liter, is_deleted, deleted_at_utc,
                          price_updated_at, price_updated_by_user_id, created_at_utc, updated_at_utc)
                     VALUES
-                        ({Quote(historicalKey[offer.Id])}, {Quote(offer.StationId)}, {Quote(offer.FuelTypeId)}, {Quote(offer.DataKind)},
+                        ({Quote(historicalKey[offer.Id])}, {Quote(offer.BrandId)}, {Quote(offer.FuelTypeId)}, {Quote(offer.DataKind)},
                          {Num(offer.SupplierPricePerLiter)}, {Num(offer.MarginUahPerLiter)}, {Num(offer.MarginPercent)},
                          {Num(offer.FinalPerLiterWith(offer.MarginUahPerLiter))}, NULL, NULL, FALSE, NULL, NULL, NULL,
                          {Ts(offer.CreatedAtUtc)}, {Ts(offer.UpdatedAtUtc)})
@@ -150,7 +150,7 @@ namespace FuelFlow.API.Migrations
 
             var historicalKey = offers.ToDictionary(
                 o => o.Id,
-                o => $"{o.StationId}-{o.FuelTypeId}" + (o.DataKind == DataKinds.Qa ? "-qa" : ""));
+                o => $"{o.BrandId}-{o.FuelTypeId}" + (o.DataKind == DataKinds.Qa ? "-qa" : ""));
 
             foreach (var volume in volumes.Reverse())
                 migrationBuilder.Sql($"DELETE FROM fuel_offer_volumes WHERE id = {Quote(volume.Id)};");

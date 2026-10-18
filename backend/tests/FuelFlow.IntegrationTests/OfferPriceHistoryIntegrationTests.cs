@@ -210,7 +210,7 @@ public sealed class OfferPriceHistoryIntegrationTests : IClassFixture<TestDataba
             {
                 Id = Guid.CreateVersion7(),
                 OfferId = "no-such-offer",
-                StationId = "okko",
+                BrandId = "okko",
                 FuelTypeId = "no-such-fuel",
                 EffectiveFromUtc = DateTime.UtcNow,
                 RecordedAtUtc = DateTime.UtcNow,
@@ -232,7 +232,7 @@ public sealed class OfferPriceHistoryIntegrationTests : IClassFixture<TestDataba
         {
             Id = Guid.CreateVersion7(),
             OfferId = offer.Id,
-            StationId = offer.StationId,
+            BrandId = offer.BrandId,
             FuelTypeId = offer.FuelTypeId,
             DataKind = offer.DataKind,
             EffectiveFromUtc = DateTime.UtcNow,
@@ -293,7 +293,7 @@ public sealed class OfferPriceHistoryIntegrationTests : IClassFixture<TestDataba
         {
             Id = fuelId,
             Name = $"Test fuel {suffix}",
-            StationId = "okko",
+            BrandId = "okko",
             BasePrice = 0m,
             DiscountPrice = 0m,
             MarginUahPerLiter = margin,
@@ -304,7 +304,7 @@ public sealed class OfferPriceHistoryIntegrationTests : IClassFixture<TestDataba
         var offer = new FuelOffer
         {
             Id = fuelId,
-            StationId = "okko",
+            BrandId = "okko",
             FuelTypeId = fuelId,
             DataKind = DataKinds.Real,
             SupplierPricePerLiter = supplierPrice,

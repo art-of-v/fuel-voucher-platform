@@ -2,7 +2,7 @@ using FuelFlow.SharedKernel.Domain;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace FuelFlow.Features.Stations.GetAdminFuelTypeById;
+namespace FuelFlow.Features.Brands.GetAdminFuelTypeById;
 
 public sealed class GetAdminFuelTypeByIdQueryHandler
 {

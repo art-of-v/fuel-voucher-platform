@@ -18,7 +18,7 @@ using Xunit;
 namespace FuelFlow.UnitTests.Providers;
 
 /// <summary>
-/// <c>UpdateNominals</c> used to RemoveRange the station's packages and recreate the whole set with
+/// <c>UpdateNominals</c> used to RemoveRange the Brand's packages and recreate the whole set with
 /// fresh ids. That destroyed packages an order_line_item points at, and meant the package a customer
 /// bought was never the package in the catalog (#217).
 /// </summary>
@@ -67,7 +67,7 @@ public sealed class UpdateNominalsReuseTests : IDisposable
 
     private async Task<List<FuelOfferVolume>> SeedAsync(params int[] nominals)
     {
-        _context.Stations.Add(new Station
+        _context.Brands.Add(new Brand
         {
             Id = "okko",
             Name = "OKKO",
@@ -82,7 +82,7 @@ public sealed class UpdateNominalsReuseTests : IDisposable
         {
             Id = "okko-a95",
             Name = "А95",
-            StationId = "okko",
+            BrandId = "okko",
             BasePrice = 50m,
             DiscountPrice = 45m,
             CreatedAtUtc = DateTime.UtcNow,

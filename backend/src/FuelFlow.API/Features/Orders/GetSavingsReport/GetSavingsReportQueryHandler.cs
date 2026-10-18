@@ -79,7 +79,7 @@ public sealed class GetSavingsReportQueryHandler
             .ToList();
 
         // Remaining = vouchers fulfilled to this user's orders that they still own and have not
-        // redeemed at a station (Assigned). Used/Expired/Blocked/Deactivated all leave the pool.
+        // redeemed at a Brand (Assigned). Used/Expired/Blocked/Deactivated all leave the pool.
         // This is a current "now" snapshot, deliberately NOT period-scoped — you still hold those
         // litres today regardless of when they were bought.
         var remainingOrderIds = await _context.Orders

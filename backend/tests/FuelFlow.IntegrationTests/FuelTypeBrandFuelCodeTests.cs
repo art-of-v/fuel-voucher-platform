@@ -14,13 +14,13 @@ namespace FuelFlow.IntegrationTests;
 /// <remarks>
 /// <para>
 /// The database half of the guarantee belongs here rather than in a unit test, because the whole point
-/// is an index: <c>ux_fuel_types_station_brand_fuel_code</c> refuses two live fuels claiming one code at
+/// is an index: <c>ux_fuel_types_Brand_brand_fuel_code</c> refuses two live fuels claiming one code at
 /// one brand, and nothing in C# has to be trusted to say so.
 /// </para>
 /// <para>
 /// Two properties that are easy to get wrong and expensive to discover late, so both are stated here:
 /// <b>null does not collide with null</b> (a fuel entered by hand has no code, and two of them at one
-/// station must both fit) and <b>the same code at two brands is fine</b> (WOG and OKKO both sell
+/// Brand must both fit) and <b>the same code at two brands is fine</b> (WOG and OKKO both sell
 /// A-95; the code is per brand because the brand is what spells it).
 /// </para>
 /// </remarks>
@@ -50,11 +50,11 @@ public sealed class FuelTypeBrandFuelCodeTests : IClassFixture<TestDatabaseFixtu
         ["okko-gas"] = "SPBT",
     };
 
-    private static FuelTypeEntity Fuel(string id, string stationId, string name, string? code)
+    private static FuelTypeEntity Fuel(string id, string BrandId, string name, string? code)
         => new()
         {
             Id = id,
-            StationId = stationId,
+            BrandId = BrandId,
             Name = name,
             BrandFuelCode = code,
             BasePrice = 50m,
@@ -87,7 +87,7 @@ public sealed class FuelTypeBrandFuelCodeTests : IClassFixture<TestDatabaseFixtu
     public async Task TheSameCode_AtTwoBrands_IsNotADuplicate()
     {
         // "A-95" is OKKO's spelling and WOG's. The code identifies a fuel *within* a brand, which
-        // is why the index leads with station_id and why a global unique on the code would be wrong.
+        // is why the index leads with brand_id and why a global unique on the code would be wrong.
         //
         // "A-95 EXTRA" rather than "A-95": the seeded OKKO A-95 now carries "A-95" (step 6), and a test
         // that reused it would be refused by the index for the right reason at the wrong moment —
@@ -122,7 +122,7 @@ public sealed class FuelTypeBrandFuelCodeTests : IClassFixture<TestDatabaseFixtu
     [Fact]
     public async Task AnArchivedFuel_FreesItsCode()
     {
-        // Same shape as ux_fuel_types_station_name: the index is partial on NOT is_deleted, so taking a
+        // Same shape as ux_fuel_types_Brand_name: the index is partial on NOT is_deleted, so taking a
         // fuel out of the catalogue releases its code for the fuel that replaces it.
         await using var context = CreateContext();
 
@@ -169,7 +169,7 @@ public sealed class FuelTypeBrandFuelCodeTests : IClassFixture<TestDatabaseFixtu
         await using var context = CreateContext();
 
         var seeded = (await context.FuelTypes
-                .Where(f => f.StationId == "okko")
+                .Where(f => f.BrandId == "okko")
                 .ToListAsync())
             .Where(f => SeedCodeMap.ContainsKey(f.Id))
             .ToDictionary(f => f.Id, f => f.BrandFuelCode);
@@ -191,7 +191,7 @@ public sealed class FuelTypeBrandFuelCodeTests : IClassFixture<TestDatabaseFixtu
         await using var context = CreateContext();
 
         var wog = await context.FuelTypes
-            .Where(f => f.StationId == "wog")
+            .Where(f => f.BrandId == "wog")
             .Select(f => f.BrandFuelCode)
             .ToListAsync();
 

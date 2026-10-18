@@ -1,13 +1,13 @@
 using System.Globalization;
 
-namespace FuelFlow.Features.Stations;
+namespace FuelFlow.Features.Brands;
 
 /// <summary>
-/// Shared coordinate rules for station-node writes (single create/update and bulk import).
+/// Shared coordinate rules for Brand-node writes (single create/update and bulk import).
 /// A price radar is useless without a real position, so every written node MUST carry a
 /// lat/lng inside valid WGS84 bounds — the same guard runs on the manual form and the importer.
 /// </summary>
-public static class StationNodeCoordinates
+public static class BrandStationCoordinates
 {
     public static bool IsValidLat(double lat) => lat is >= -90 and <= 90;
 
@@ -18,6 +18,6 @@ public static class StationNodeCoordinates
     /// same brand file updates the same rows instead of duplicating them. Coordinates are the
     /// natural key of a physical АЗК; rounded to 5 dp (~1 m) and rendered invariant.
     /// </summary>
-    public static string DeriveId(string stationId, double lat, double lng) =>
-        string.Create(CultureInfo.InvariantCulture, $"{stationId}-{lat:F5}-{lng:F5}");
+    public static string DeriveId(string BrandId, double lat, double lng) =>
+        string.Create(CultureInfo.InvariantCulture, $"{BrandId}-{lat:F5}-{lng:F5}");
 }

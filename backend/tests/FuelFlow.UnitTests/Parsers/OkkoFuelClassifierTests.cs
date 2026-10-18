@@ -11,18 +11,18 @@ public class OkkoFuelClassifierTests
     // and "ДП ЄВРО" — the exact rows that caused every non-diesel voucher to be rejected.
     private static readonly FuelTypeEntity[] ProductionOkkoFuelTypes =
     [
-        new() { Id = "okko-95", Name = "А95 ЄВРО", StationId = "okko", BasePrice = 54, DiscountPrice = 51 },
-        new() { Id = "okko-dp", Name = "ДП ЄВРО", StationId = "okko", BasePrice = 55, DiscountPrice = 52 }
+        new() { Id = "okko-95", Name = "А95 ЄВРО", BrandId = "okko", BasePrice = 54, DiscountPrice = 51 },
+        new() { Id = "okko-dp", Name = "ДП ЄВРО", BrandId = "okko", BasePrice = 55, DiscountPrice = 52 }
     ];
 
     // Full seed catalog, to prove premium (PULLS) variants stay distinct from their base grades.
     private static readonly FuelTypeEntity[] SeedOkkoFuelTypes =
     [
-        new() { Id = "okko-dp", Name = "ДП ЄВРО", StationId = "okko", BasePrice = 55, DiscountPrice = 52 },
-        new() { Id = "okko-95", Name = "A-95", StationId = "okko", BasePrice = 54, DiscountPrice = 51 },
-        new() { Id = "okko-p95", Name = "Pulls 95", StationId = "okko", BasePrice = 60, DiscountPrice = 56 },
-        new() { Id = "okko-pulls-dp", Name = "ДП PULLS", StationId = "okko", BasePrice = 58, DiscountPrice = 55 },
-        new() { Id = "okko-gas", Name = "ГАЗ", StationId = "okko", BasePrice = 29, DiscountPrice = 27 }
+        new() { Id = "okko-dp", Name = "ДП ЄВРО", BrandId = "okko", BasePrice = 55, DiscountPrice = 52 },
+        new() { Id = "okko-95", Name = "A-95", BrandId = "okko", BasePrice = 54, DiscountPrice = 51 },
+        new() { Id = "okko-p95", Name = "Pulls 95", BrandId = "okko", BasePrice = 60, DiscountPrice = 56 },
+        new() { Id = "okko-pulls-dp", Name = "ДП PULLS", BrandId = "okko", BasePrice = 58, DiscountPrice = 55 },
+        new() { Id = "okko-gas", Name = "ГАЗ", BrandId = "okko", BasePrice = 29, DiscountPrice = 27 }
     ];
 
     [Theory]
@@ -226,8 +226,8 @@ public class OkkoFuelClassifierTests
         // still decides, because a code cannot be spelled wrong.
         var fuels = new[]
         {
-            new FuelTypeEntity { Id = "okko-95-euro", Name = "А95 ЄВРО", StationId = "okko", BasePrice = 56, DiscountPrice = 53 },
-            new FuelTypeEntity { Id = "okko-95", Name = "А-95", StationId = "okko", BasePrice = 54, DiscountPrice = 51 }
+            new FuelTypeEntity { Id = "okko-95-euro", Name = "А95 ЄВРО", BrandId = "okko", BasePrice = 56, DiscountPrice = 53 },
+            new FuelTypeEntity { Id = "okko-95", Name = "А-95", BrandId = "okko", BasePrice = 54, DiscountPrice = 51 }
         };
         var byCode = new Dictionary<string, FuelTypeEntity> { ["9015"] = fuels[0] };
 

@@ -53,7 +53,7 @@ public sealed class AdminVoucherDetailSupplierCostTests : IDisposable
         {
             Id = "okko-95",
             Name = "A-95",
-            StationId = "okko",
+            BrandId = "okko",
             BasePrice = 55,
             DiscountPrice = 52,
             CreatedAtUtc = DateTime.UtcNow,
@@ -145,6 +145,6 @@ public sealed class AdminVoucherDetailSupplierCostTests : IDisposable
         // Was silently always false: the DTO declared the field and the handler never assigned it.
         var detail = await DetailAsync(Voucher(50m, SupplierId, isTestData: true));
 
-        detail.IsTestData.Should().BeTrue("a voucher's code does not exist at the station and must not read like paid-for stock");
+        detail.IsTestData.Should().BeTrue("a voucher's code does not exist at the Brand and must not read like paid-for stock");
     }
 }

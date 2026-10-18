@@ -10,7 +10,7 @@ using FuelFlow.Features.Orders.CreateCheckout;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using FuelFlow.Features.Stations;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers.SharedModels;
 
 using System.Security.Claims;
@@ -24,7 +24,7 @@ using FuelFlow.Features.Pricing;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using FuelFlow.Features.Stations;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers.SharedModels;
 
 namespace FuelFlow.Features.Brands;
@@ -34,8 +34,8 @@ namespace FuelFlow.Features.Brands;
 /// <para>
 /// <b>Split out of <see cref="BrandsController"/>, which is about the brand itself.</b> For nine
 /// endpoints the file was called <c>BrandsController</c> while half of it priced fuel - the same name
-/// covering "this network exists" and "this litre sells for 54.90", which is how <c>stations</c> ended
-/// up read as a filling station rather than a brand. A margin written here is a decision about a grade,
+/// covering "this network exists" and "this litre sells for 54.90", which is how <c>Brands</c> ended
+/// up read as a filling Brand rather than a brand. A margin written here is a decision about a grade,
 /// not about a network, so the routes and the name say so.
 /// </para>
 /// <para>
@@ -115,18 +115,18 @@ public sealed class BrandFuelController : ControllerBase
                 field = nameof(request.IsTestData)
             });
 
-        var station = await _context.Stations.FirstOrDefaultAsync(s => s.Id == id, ct);
-        if (station is null) return NotFound();
+        var Brand = await _context.Brands.FirstOrDefaultAsync(s => s.Id == id, ct);
+        if (Brand is null) return NotFound();
 
-        // One fuel type per name per station, refused rather than accepted as a second row. This fuel
+        // One fuel type per name per Brand, refused rather than accepted as a second row. This fuel
         // id is generated here, so nothing about the write collides on a duplicate the way it did when
         // the id was the brand-encoded 'okko-95' - and a twin is not a cosmetic duplicate: it becomes a
         // second offer, the storefront lists one fuel at two prices, and the voucher importer resolves
         // the fuel by name with FirstOrDefault (OkkoFuelClassifier/WogFuelClassifier), so the twin
         // without the imported pump price is the one a real voucher can land on. The database refuses
-        // the same thing with ux_fuel_types_station_name; this says which fuel already owns the name.
+        // the same thing with ux_fuel_types_Brand_name; this says which fuel already owns the name.
         var duplicate = await _context.FuelTypes
-            .Where(f => f.StationId == id && f.Name == request.Name)
+            .Where(f => f.BrandId == id && f.Name == request.Name)
             .Select(f => f.Id)
             .FirstOrDefaultAsync(ct);
 
@@ -134,7 +134,7 @@ public sealed class BrandFuelController : ControllerBase
         {
             return Conflict(new
             {
-                message = $"'{request.Name}' already exists at {station.Name}. Price it with PUT "
+                message = $"'{request.Name}' already exists at {Brand.Name}. Price it with PUT "
                           + $"fuels/{duplicate} instead of adding it twice: a second row for the same "
                           + "fuel is a second offer, and a voucher can then be priced against whichever "
                           + "of the two the importer happens to pick.",
@@ -151,7 +151,7 @@ public sealed class BrandFuelController : ControllerBase
         if (brandFuelCode is not null)
         {
             var codeOwner = await _context.FuelTypes
-                .Where(f => f.StationId == id && f.BrandFuelCode == brandFuelCode)
+                .Where(f => f.BrandId == id && f.BrandFuelCode == brandFuelCode)
                 .Select(f => f.Id)
                 .FirstOrDefaultAsync(ct);
 
@@ -159,7 +159,7 @@ public sealed class BrandFuelController : ControllerBase
             {
                 return Conflict(new
                 {
-                    message = $"Brand fuel code '{brandFuelCode}' is already taken at {station.Name} by fuel "
+                    message = $"Brand fuel code '{brandFuelCode}' is already taken at {Brand.Name} by fuel "
                               + $"{codeOwner}. A code identifies one fuel per network: two fuels claiming "
                               + "it is what makes a catalogue import pick the wrong row.",
                     fuelTypeId = codeOwner,
@@ -202,7 +202,7 @@ public sealed class BrandFuelController : ControllerBase
         var fuel = new FuelTypeEntity
         {
             Id = Guid.CreateVersion7().ToString(),
-            StationId = id,
+            BrandId = id,
             Name = request.Name,
             BrandFuelCode = brandFuelCode,
             // base_price / discount_price are UAH per liter, decimal to the kopeck (spec §12, #90):
@@ -224,7 +224,7 @@ public sealed class BrandFuelController : ControllerBase
         if (litersToCreate.Count == 0)
         {
             var existingFuelIds = await _context.FuelTypes
-                .Where(f => f.StationId == id && f.Id != fuel.Id)
+                .Where(f => f.BrandId == id && f.Id != fuel.Id)
                 .Select(f => f.Id).ToListAsync(ct);
             litersToCreate = await _context.FuelOfferVolumes
                 .Where(v => existingFuelIds.Contains(v.Offer.FuelTypeId))
@@ -241,14 +241,14 @@ public sealed class BrandFuelController : ControllerBase
 
         // One offer and N volumes, not N packages. Every per-litre knob the request carries is a
         // property of WHAT IS BEING SOLD, not of how much of it: a 5 L bottle and a 50 L canister of
-        // the same fuel at the same station have one price per litre and therefore one offer. The old
+        // the same fuel at the same Brand have one price per litre and therefore one offer. The old
         // row-per-volume shape wrote that same price N times and could not stop the copies drifting -
         // which is what the backfill had to reconcile when the split landed.
         var pool = DataKinds.ForPool(request.IsTestData.Value);
         var offer = new FuelOffer
         {
             Id = OfferKeys.For(fuel.Id, pool),
-            StationId = id,
+            BrandId = id,
             FuelTypeId = fuel.Id,
             SupplierPricePerLiter = request.SupplierPricePerLiter,
             MarginUahPerLiter = request.MarginUahPerLiter,
@@ -294,13 +294,13 @@ public sealed class BrandFuelController : ControllerBase
         await _eventService.RecordEventAsync(
             "Fuel", fuel.Id, "FuelAdded",
             null, newValue, userId, GetUserName(),
-            $"{station.Name} / {fuel.Name}: added at {finalPerLiter:F2} UAH/L",
+            $"{Brand.Name} / {fuel.Name}: added at {finalPerLiter:F2} UAH/L",
             id,
             ct);
 
         // Record the deliberate loss-leader decision (we only reach here below-cost when opted in).
         if (belowCost)
-            await _notifications.BelowCostAsync(station.Name, fuel.Name, request.SupplierPricePerLiter, finalPerLiter, deliberate: true, ct);
+            await _notifications.BelowCostAsync(Brand.Name, fuel.Name, request.SupplierPricePerLiter, finalPerLiter, deliberate: true, ct);
 
         return Created($"/api/admin/brand-fuels/{fuel.Id}", new { id = fuel.Id });
     }
@@ -371,8 +371,8 @@ public sealed class BrandFuelController : ControllerBase
         var offer = await _context.FuelOffers.FirstOrDefaultAsync(o => o.Id == offerId, ct);
 
         // Flipping isTestData is not an update any more, and pretending otherwise is the bug this shape
-        // removes. `data_kind` is part of the offer's identity - UNIQUE (station_id, fuel_type_id,
-        // data_kind) - so the same fuel at the same station has TWO offers, one per pool, and they are
+        // removes. `data_kind` is part of the offer's identity - UNIQUE (brand_id, fuel_type_id,
+        // data_kind) - so the same fuel at the same Brand has TWO offers, one per pool, and they are
         // different rows rather than one row with a flag. Moving a fuel from real to rehearsal
         // therefore means moving its volumes onto the rehearsal offer and archiving the real one.
         var otherPool = pool == DataKinds.Real ? DataKinds.Qa : DataKinds.Real;
@@ -384,7 +384,7 @@ public sealed class BrandFuelController : ControllerBase
             offer = new FuelOffer
             {
                 Id = offerId,
-                StationId = fuel.StationId,
+                BrandId = fuel.BrandId,
                 FuelTypeId = fuel.Id,
                 DataKind = pool,
                 CreatedAtUtc = DateTime.UtcNow,
@@ -416,8 +416,8 @@ public sealed class BrandFuelController : ControllerBase
             foreach (var volume in volumes) volume.OfferId = offerId;
         }
 
-        var station = await _context.Stations.FirstOrDefaultAsync(s => s.Id == fuel.StationId, ct);
-        var stationName = station?.Name ?? "?";
+        var Brand = await _context.Brands.FirstOrDefaultAsync(s => s.Id == fuel.BrandId, ct);
+        var BrandName = Brand?.Name ?? "?";
 
         // Snapshot BEFORE anything is written below. Reading "old" from `otherOffer` looks right when the
         // edit is flipping a fuel between pools - the other pool's offer is what it had - and silently
@@ -508,7 +508,7 @@ public sealed class BrandFuelController : ControllerBase
             if (wanted != fuel.BrandFuelCode)
             {
                 var codeOwner = await _context.FuelTypes
-                    .Where(f => f.StationId == fuel.StationId && f.BrandFuelCode == wanted && f.Id != fuel.Id)
+                    .Where(f => f.BrandId == fuel.BrandId && f.BrandFuelCode == wanted && f.Id != fuel.Id)
                     .Select(f => f.Id)
                     .FirstOrDefaultAsync(ct);
 
@@ -516,7 +516,7 @@ public sealed class BrandFuelController : ControllerBase
                 {
                     return Conflict(new
                     {
-                        message = $"Brand fuel code '{wanted}' is already taken at {fuel.StationId} by fuel "
+                        message = $"Brand fuel code '{wanted}' is already taken at {fuel.BrandId} by fuel "
                                   + $"{codeOwner}. A code identifies one fuel per network.",
                         fuelTypeId = codeOwner,
                         field = nameof(request.BrandFuelCode)
@@ -557,19 +557,19 @@ public sealed class BrandFuelController : ControllerBase
             changes.Add($"final {oldFinalPrice:F2} → {finalPerLiter:F2}");
 
         var summary = changes.Count > 0
-            ? $"{stationName} / {fuel.Name}: {string.Join(", ", changes)}"
-            : $"{stationName} / {fuel.Name}: updated";
+            ? $"{BrandName} / {fuel.Name}: {string.Join(", ", changes)}"
+            : $"{BrandName} / {fuel.Name}: updated";
 
         await _eventService.RecordEventAsync(
             "Fuel", fuelId, "PriceChanged",
             oldValue, newValue, userId, GetUserName(),
             summary,
-            fuel.StationId,
+            fuel.BrandId,
             ct);
 
         // Record the deliberate loss-leader decision (we only reach here below-cost when opted in).
         if (belowCost)
-            await _notifications.BelowCostAsync(stationName, fuel.Name, request.SupplierPricePerLiter, finalPerLiter, deliberate: true, ct);
+            await _notifications.BelowCostAsync(BrandName, fuel.Name, request.SupplierPricePerLiter, finalPerLiter, deliberate: true, ct);
 
         return Ok(new { success = true });
     }
@@ -612,8 +612,8 @@ public sealed class BrandFuelController : ControllerBase
             });
         }
 
-        var station = await _context.Stations.FirstOrDefaultAsync(s => s.Id == fuel.StationId, ct);
-        var stationName = station?.Name ?? "?";
+        var Brand = await _context.Brands.FirstOrDefaultAsync(s => s.Id == fuel.BrandId, ct);
+        var BrandName = Brand?.Name ?? "?";
         var fuelName = fuel.Name;
 
         // Same as the brand branch: this path archives rows rather than reading them.
@@ -650,10 +650,10 @@ public sealed class BrandFuelController : ControllerBase
         var userId = GetUserId();
         await _eventService.RecordEventAsync(
             "Fuel", fuelId, "FuelRemoved",
-            JsonSerializer.Serialize(new { fuelName, stationName }), "{}",
+            JsonSerializer.Serialize(new { fuelName, BrandName }), "{}",
             userId, GetUserName(),
-            $"{stationName} / {fuelName}: removed",
-            fuel.StationId,
+            $"{BrandName} / {fuelName}: removed",
+            fuel.BrandId,
             ct);
 
         return Ok(new { success = true });
@@ -677,11 +677,11 @@ public sealed class BrandFuelController : ControllerBase
             });
         }
 
-        var station = await _context.Stations.FirstOrDefaultAsync(s => s.Id == id, ct);
-        if (station is null) return NotFound();
+        var Brand = await _context.Brands.FirstOrDefaultAsync(s => s.Id == id, ct);
+        if (Brand is null) return NotFound();
 
-        var stationFuels = await _context.FuelTypes.Where(f => f.StationId == id).ToListAsync(ct);
-        var fuelIds = stationFuels.Select(f => f.Id).ToList();
+        var BrandFuels = await _context.FuelTypes.Where(f => f.BrandId == id).ToListAsync(ct);
+        var fuelIds = BrandFuels.Select(f => f.Id).ToList();
         // AsTracking: the volumes below are updated in place now, and the context defaults to
         // NoTracking - without it the edit would persist nothing (NoTrackingMutationGuardTests).
         //
@@ -722,7 +722,7 @@ public sealed class BrandFuelController : ControllerBase
             leaving.DeletedAtUtc = now;
         }
 
-        foreach (var fuel in stationFuels)
+        foreach (var fuel in BrandFuels)
         {
             // A fuel can own an offer per pool now rather than one flagged set of packages, so the
             // nominals are applied to each of its offers: both catalogues should offer the same sizes.
@@ -766,7 +766,7 @@ public sealed class BrandFuelController : ControllerBase
         await _eventService.RecordEventAsync(
             "Nominal", id, "NominalSetChanged",
             oldValue, newValue, userId, GetUserName(),
-            $"{station.Name}: nominals changed [{string.Join(", ", nominals.OrderBy(n => n))}]",
+            $"{Brand.Name}: nominals changed [{string.Join(", ", nominals.OrderBy(n => n))}]",
             id,
             ct);
 

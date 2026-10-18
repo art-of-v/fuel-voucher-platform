@@ -23,7 +23,7 @@ namespace FuelFlow.Persistence;
 internal static class CatalogueTestData
 {
     /// <summary>
-    /// Find-or-create the offer for <c>(station, fuel, pool)</c> and apply the per-litre knobs to it.
+    /// Find-or-create the offer for <c>(Brand, fuel, pool)</c> and apply the per-litre knobs to it.
     /// </summary>
     /// <remarks>
     /// Split from <see cref="SeedPackage"/> because a test fixture that builds its volumes as local
@@ -38,7 +38,7 @@ internal static class CatalogueTestData
     /// </remarks>
     public static FuelOffer SeedOffer(
         this ApplicationDbContext context,
-        string stationId,
+        string BrandId,
         string fuelTypeId,
         bool isTestData = false,
         decimal? supplierPricePerLiter = null,
@@ -62,7 +62,7 @@ internal static class CatalogueTestData
             offer = new FuelOffer
             {
                 Id = offerId,
-                StationId = stationId,
+                BrandId = BrandId,
                 FuelTypeId = fuelTypeId,
                 DataKind = pool,
                 CreatedAtUtc = createdAtUtc ?? now,
@@ -89,7 +89,7 @@ internal static class CatalogueTestData
                 {
                     Id = fuelTypeId,
                     Name = fuelTypeId,
-                    StationId = stationId,
+                    BrandId = BrandId,
                     CreatedAtUtc = createdAtUtc ?? DateTime.UtcNow,
                     UpdatedAtUtc = updatedAtUtc ?? DateTime.UtcNow
                 };
@@ -136,7 +136,7 @@ internal static class CatalogueTestData
 
     /// <summary>
     /// Seed one sellable package: find-or-create the offer for
-    /// <c>(station, fuel, pool)</c> and attach a volume carrying the package's id and frozen total.
+    /// <c>(Brand, fuel, pool)</c> and attach a volume carrying the package's id and frozen total.
     /// </summary>
     /// <remarks>
     /// The offer is found rather than created blindly because two packages in one pool are two VOLUMES
@@ -153,7 +153,7 @@ internal static class CatalogueTestData
     public static FuelOfferVolume SeedPackage(
         this ApplicationDbContext context,
         string id,
-        string stationId,
+        string BrandId,
         string fuelTypeId,
         decimal liters,
         decimal price,
@@ -168,7 +168,7 @@ internal static class CatalogueTestData
         DateTime? updatedAtUtc = null)
     {
 var offer = context.SeedOffer(
-            stationId, fuelTypeId, isTestData,
+            BrandId, fuelTypeId, isTestData,
             supplierPricePerLiter, marginUahPerLiter, marginPercent,
             finalPricePerLiter, pumpPricePerLiter, minDiscountPerLiter,
             createdAtUtc, updatedAtUtc);
@@ -212,7 +212,7 @@ var offer = context.SeedOffer(
     public static void SeedPackageInBothPools(
         this ApplicationDbContext context,
         string idPrefix,
-        string stationId,
+        string BrandId,
         string fuelTypeId,
         decimal liters,
         decimal realPrice,
@@ -222,12 +222,12 @@ var offer = context.SeedOffer(
         decimal? finalPricePerLiter = null)
     {
         context.SeedPackage(
-            $"{idPrefix}-real", stationId, fuelTypeId, liters, realPrice,
+            $"{idPrefix}-real", BrandId, fuelTypeId, liters, realPrice,
             isTestData: false, supplierPricePerLiter: supplierPricePerLiter,
             marginUahPerLiter: marginUahPerLiter,
             finalPricePerLiter: finalPricePerLiter ?? realPrice / liters);
         context.SeedPackage(
-            $"{idPrefix}-qa", stationId, fuelTypeId, liters, qaPrice,
+            $"{idPrefix}-qa", BrandId, fuelTypeId, liters, qaPrice,
             isTestData: true, supplierPricePerLiter: supplierPricePerLiter,
             marginUahPerLiter: marginUahPerLiter,
             finalPricePerLiter: finalPricePerLiter ?? qaPrice / liters);

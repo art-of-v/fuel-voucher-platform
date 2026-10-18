@@ -178,7 +178,7 @@ public sealed class FuelFlowMetrics : IDisposable
 
     /// <summary>
     /// Registers an observable gauge reporting remaining pool vouchers per
-    /// station/fuel type. The callback is polled by the metrics exporter, so it must
+    /// Brand/fuel type. The callback is polled by the metrics exporter, so it must
     /// be cheap and must not throw.
     /// </summary>
     public void RegisterVoucherPoolGauge(Func<IEnumerable<Measurement<int>>> observe)
@@ -187,7 +187,7 @@ public sealed class FuelFlowMetrics : IDisposable
             "fuelflow.vouchers.pool_available",
             observe,
             "vouchers",
-            "Unassigned vouchers remaining per station and fuel type. Primary business alert.");
+            "Unassigned vouchers remaining per Brand and fuel type. Primary business alert.");
     }
 
     /// <summary>

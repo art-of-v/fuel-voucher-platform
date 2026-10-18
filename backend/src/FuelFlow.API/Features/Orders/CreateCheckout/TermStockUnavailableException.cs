@@ -2,7 +2,7 @@ namespace FuelFlow.Features.Orders.CreateCheckout;
 
 /// <summary>
 /// A checkout was refused because the line asked for a validity term no in-stock voucher can cover. The
-/// station cannot deliver the term, so the sale must not complete at that term's (higher) price and then
+/// Brand cannot deliver the term, so the sale must not complete at that term's (higher) price and then
 /// hand back a shorter validity.
 /// </summary>
 /// <remarks>

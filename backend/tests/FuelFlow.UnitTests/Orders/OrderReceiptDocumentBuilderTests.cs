@@ -96,7 +96,7 @@ public sealed class OrderReceiptDocumentBuilderTests
 
         // Read the shipped bytes back through Skia rather than a hand-rolled cmap parser, which
         // would only prove the parser's own arithmetic was right. The native library behind this
-        // call is what made the first version of this test pass on a Windows workstation and fail
+        // call is what made the first version of this test pass on a Windows workBrand and fail
         // on the Linux runner, so the test project now carries the native assets for both - a font
         // assertion that only runs on the machine it was written on is not an assertion.
         var missing = RequiredCharacters

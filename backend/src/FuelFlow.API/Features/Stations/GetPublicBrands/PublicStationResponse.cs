@@ -1,0 +1,23 @@
+namespace FuelFlow.Features.Brands.GetPublicBrands;
+
+/// <summary>
+/// Explicit allow-list projection of <see cref="FuelFlow.SharedKernel.Domain.Brand"/> for the
+/// anonymous, publicly cacheable <c>GET /api/Brands</c> endpoint (FF-31).
+///
+/// Returning the entity directly meant any column later added to the table would be published to
+/// unauthenticated callers - and cached for 300 seconds - with no code change to review. The fields
+/// below are exactly those the mobile client declares in <c>mobile/src/core/types/api.ts</c> (plus
+/// <c>sortOrder</c>, added alongside the client's type), so the wire format only grows deliberately;
+/// audit timestamps, which no client reads, are dropped.
+/// </summary>
+public sealed record PublicBrandResponse(
+    string Id,
+    string Name,
+    string Color,
+    string LogoText,
+    string? Address,
+    string? Phone,
+    string? StationType,
+    double? Lat,
+    double? Lng,
+    int SortOrder);

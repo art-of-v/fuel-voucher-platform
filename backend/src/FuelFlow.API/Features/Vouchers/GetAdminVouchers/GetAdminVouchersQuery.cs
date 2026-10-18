@@ -18,7 +18,7 @@ public sealed record GetAdminVouchersQuery(
     Guid? WorkerUserId = null,
     /// <summary>
     /// Emulated test data: <c>only</c>, <c>exclude</c>, or unset for both. An emulated voucher's code
-    /// does not exist at the station, so an operator looking at real stock needs to be able to take
+    /// does not exist at the Brand, so an operator looking at real stock needs to be able to take
     /// those rows out of the picture without deleting them mid-session.
     /// </summary>
     string? TestData = null,

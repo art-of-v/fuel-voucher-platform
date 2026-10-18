@@ -70,10 +70,10 @@ public class JwtTokenServiceTests
     {
         var service = CreateService();
 
-        var token = service.GenerateAccessToken(Guid.NewGuid(), "+380991234567", "StationOwner");
+        var token = service.GenerateAccessToken(Guid.NewGuid(), "+380991234567", "BrandOwner");
 
         var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
-        jwt.Claims.Should().Contain(c => c.Type == ClaimTypes.Role && c.Value == "StationOwner");
+        jwt.Claims.Should().Contain(c => c.Type == ClaimTypes.Role && c.Value == "BrandOwner");
     }
 
     [Fact]

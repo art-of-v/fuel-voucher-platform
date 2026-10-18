@@ -37,19 +37,19 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
     /// <summary>The production seed catalog: five OKKO fuel types with their pump/cost/margin knobs.</summary>
     private async Task SeedCatalogAsync()
     {
-        _context.Stations.AddRange(
-            new Station { Id = "okko", Name = "OKKO", Color = "#000000", LogoText = "OKKO" },
-            new Station { Id = "wog", Name = "WOG", Color = "#000000", LogoText = "WOG" });
+        _context.Brands.AddRange(
+            new Brand { Id = "okko", Name = "OKKO", Color = "#000000", LogoText = "OKKO" },
+            new Brand { Id = "wog", Name = "WOG", Color = "#000000", LogoText = "WOG" });
         _context.FuelTypes.AddRange(
-            new FuelTypeEntity { Id = "okko-95", Name = "A-95", StationId = "okko", BasePrice = 54, DiscountPrice = 51 },
-            new FuelTypeEntity { Id = "okko-dp", Name = "ДП ЄВРО", StationId = "okko", BasePrice = 55, DiscountPrice = 52 },
-            new FuelTypeEntity { Id = "okko-gas", Name = "ГАЗ", StationId = "okko", BasePrice = 29, DiscountPrice = 27 },
-            new FuelTypeEntity { Id = "okko-p95", Name = "Pulls 95", StationId = "okko", BasePrice = 60, DiscountPrice = 56 },
-            new FuelTypeEntity { Id = "okko-pulls-dp", Name = "ДП PULLS", StationId = "okko", BasePrice = 58, DiscountPrice = 55 });
+            new FuelTypeEntity { Id = "okko-95", Name = "A-95", BrandId = "okko", BasePrice = 54, DiscountPrice = 51 },
+            new FuelTypeEntity { Id = "okko-dp", Name = "ДП ЄВРО", BrandId = "okko", BasePrice = 55, DiscountPrice = 52 },
+            new FuelTypeEntity { Id = "okko-gas", Name = "ГАЗ", BrandId = "okko", BasePrice = 29, DiscountPrice = 27 },
+            new FuelTypeEntity { Id = "okko-p95", Name = "Pulls 95", BrandId = "okko", BasePrice = 60, DiscountPrice = 56 },
+            new FuelTypeEntity { Id = "okko-pulls-dp", Name = "ДП PULLS", BrandId = "okko", BasePrice = 58, DiscountPrice = 55 });
 
         // A competitor fuel the import must not touch.
         _context.FuelTypes.Add(new FuelTypeEntity
-            { Id = "wog-95", Name = "A-95 Mustang", StationId = "wog", BasePrice = 56, DiscountPrice = 53 });
+            { Id = "wog-95", Name = "A-95 Mustang", BrandId = "wog", BasePrice = 56, DiscountPrice = 53 });
 
         AddPackages("okko-95", "A-95", 10, 54, 5, 56);
         AddPackages("okko-dp", "ДП ЄВРО", 10, 55, 5, 57);
@@ -68,7 +68,7 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
         {
             _context.SeedPackage(
                 id: $"{fuelTypeId}-{nominal}",
-                stationId: fuelTypeId.StartsWith("okko") ? "okko" : "wog",
+                BrandId: fuelTypeId.StartsWith("okko") ? "okko" : "wog",
                 fuelTypeId: fuelTypeId,
                 liters: nominal,
                 // The price these knobs produce, not cost + profit: for WOG the pump ceiling binds, and
@@ -359,7 +359,7 @@ var (wogVolume, wogOffer) = await ReadAsync("wog-95-20");
         {
             Id = "okko-95-euro",
             Name = "A-95 EURO",
-            StationId = "okko",
+            BrandId = "okko",
             BasePrice = 56,
             DiscountPrice = 53,
             BrandFuelCode = "A-95"
@@ -411,7 +411,7 @@ var (wogVolume, wogOffer) = await ReadAsync("wog-95-20");
         prices.Should().HaveCount(5, "one opening row per offer the import repriced");
         prices.Should().OnlyContain(p => p.Reason == OfferPriceReasons.PumpImport);
         prices.Should().OnlyContain(p => p.ChangedByUserId == null, "no person typed these");
-        prices.Should().OnlyContain(p => p.StationId == "okko" && p.DataKind == DataKinds.Real);
+        prices.Should().OnlyContain(p => p.BrandId == "okko" && p.DataKind == DataKinds.Real);
 
         // Each row holds what its offer now holds - the invariant the history rests on, checked here at
         // the path that writes most rows rather than only in the schema-level suite.

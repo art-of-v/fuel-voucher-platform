@@ -4,7 +4,7 @@ namespace FuelFlow.Features.Vouchers.Import;
 /// Whether the brand printed on a voucher agrees with the brand the fuel it claims belongs to.
 /// </summary>
 /// <remarks>
-/// <c>brand</c> and <c>fuel_types.station_id</c> are the same fact written twice — the brand on the
+/// <c>brand</c> and <c>fuel_types.brand_id</c> are the same fact written twice — the brand on the
 /// paper and the brand in the catalog — and only one of them is constrained. A voucher whose two copies
 /// disagree is invisible in practice rather than visibly wrong: renewal matching compares both fields
 /// together, so it finds no replacement, and fuel-type pricing is keyed by the catalog brand, so nothing
@@ -19,7 +19,7 @@ public static class BrandFuelPairing
 {
     /// <param name="parsedProvider">The brand as read off the voucher's paper.</param>
     /// <param name="catalogBrand">
-    /// The fuel type's <c>station_id</c>, or <c>null</c> when the fuel type has no brand recorded — in
+    /// The fuel type's <c>brand_id</c>, or <c>null</c> when the fuel type has no brand recorded — in
     /// which case there is nothing to contradict and the voucher is judged on its own merits.
     /// </param>
     public static bool IsConsistent(string? parsedProvider, string? catalogBrand)

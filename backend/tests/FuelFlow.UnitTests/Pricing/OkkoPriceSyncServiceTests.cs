@@ -80,13 +80,13 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
     /// <summary>The production seed shape: five OKKO fuels, each with a cost/margin/pump already set.</summary>
     private async Task SeedAsync(decimal pump = 50m)
     {
-        _context.Stations.Add(new Station { Id = "okko", Name = "OKKO", Color = "#000", LogoText = "OKKO" });
+        _context.Brands.Add(new Brand { Id = "okko", Name = "OKKO", Color = "#000", LogoText = "OKKO" });
         _context.FuelTypes.AddRange(
-            new FuelTypeEntity { Id = "okko-95", Name = "A-95", StationId = "okko" },
-            new FuelTypeEntity { Id = "okko-dp", Name = "ДП ЄВРО", StationId = "okko" },
-            new FuelTypeEntity { Id = "okko-gas", Name = "ГАЗ", StationId = "okko" },
-            new FuelTypeEntity { Id = "okko-p95", Name = "Pulls 95", StationId = "okko" },
-            new FuelTypeEntity { Id = "okko-pulls-dp", Name = "ДП PULLS", StationId = "okko" });
+            new FuelTypeEntity { Id = "okko-95", Name = "A-95", BrandId = "okko" },
+            new FuelTypeEntity { Id = "okko-dp", Name = "ДП ЄВРО", BrandId = "okko" },
+            new FuelTypeEntity { Id = "okko-gas", Name = "ГАЗ", BrandId = "okko" },
+            new FuelTypeEntity { Id = "okko-p95", Name = "Pulls 95", BrandId = "okko" },
+            new FuelTypeEntity { Id = "okko-pulls-dp", Name = "ДП PULLS", BrandId = "okko" });
 
         foreach (var (fuelTypeId, fuelName) in new[]
                  {
@@ -98,7 +98,7 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
             {
                 _context.SeedPackage(
                     id: $"{fuelTypeId}-{liters}",
-                    stationId: "okko",
+                    BrandId: "okko",
                     fuelTypeId: fuelTypeId,
                     liters: liters,
                     price: Math.Round((40m + 3m) * liters, 2, MidpointRounding.AwayFromZero),
@@ -266,10 +266,10 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
         // The ordering is the contract: a fuel that does not exist yet has nowhere to hold a pump
         // price, so the catalogue half runs first and the pricing half then sees the new fuel. One pass
         // has to leave the catalogue complete AND priced, or a grade sits unpriced until the next run.
-        _context.Stations.Add(new Station { Id = "okko", Name = "OKKO", Color = "#000", LogoText = "OKKO" });
+        _context.Brands.Add(new Brand { Id = "okko", Name = "OKKO", Color = "#000", LogoText = "OKKO" });
         _context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = "okko-95", Name = "A-95", StationId = "okko", BrandFuelCode = "A-95",
+            Id = "okko-95", Name = "A-95", BrandId = "okko", BrandFuelCode = "A-95",
             BasePrice = 54, DiscountPrice = 51
         });
         await _context.SaveChangesAsync();
@@ -298,7 +298,7 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
         (await _context.FuelOfferVolumes.CountAsync(v => v.OfferId == offer.Id)).Should().Be(0);
 
         // And the fuel that already existed was priced, not recreated.
-        (await _context.FuelTypes.CountAsync(f => f.StationId == "okko")).Should().Be(2);
+        (await _context.FuelTypes.CountAsync(f => f.BrandId == "okko")).Should().Be(2);
     }
 
     [Fact]

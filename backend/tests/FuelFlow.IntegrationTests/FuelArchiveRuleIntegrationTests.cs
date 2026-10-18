@@ -64,17 +64,17 @@ public sealed class FuelArchiveRuleIntegrationTests : IClassFixture<TestDatabase
         VoucherStatus status)
     {
         var now = DateTime.UtcNow;
-        // Under the real OKKO station: the catalogue import only ever looks at that one brand, so a
+        // Under the real OKKO Brand: the catalogue import only ever looks at that one brand, so a
         // fuel parked elsewhere would be invisible to it and the test would pass for the wrong reason.
-        const string station = "okko";
+        const string Brand = "okko";
         var fuelId = $"arch-fuel-{suffix}";
         context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = fuelId, Name = name, StationId = station,
+            Id = fuelId, Name = name, BrandId = Brand,
             // A code the sheet does not carry: the brand published it once and does not any more.
             // Without a code there is nothing saying this row was ever one of the brand's grades,
             // and absence from the sheet would prove nothing. Unique per test because the live
-            // (station, code) index allows one, and every test in this class seeds a dropped grade.
+            // (Brand, code) index allows one, and every test in this class seeds a dropped grade.
             BrandFuelCode = $"Dropped-{suffix}",
             CreatedAtUtc = now, UpdatedAtUtc = now,
         });

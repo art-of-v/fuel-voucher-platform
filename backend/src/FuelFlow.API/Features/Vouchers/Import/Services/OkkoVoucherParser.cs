@@ -40,7 +40,7 @@ public sealed class OkkoVoucherParser : IVoucherProviderParser
         var parsedVouchers = new List<ParsedVoucher>();
 
         var okkoFuelTypes = await _context.FuelTypes
-            .Where(f => f.StationId == "okko")
+            .Where(f => f.BrandId == "okko")
             .ToListAsync(cancellationToken);
 
         // One query per import, not per voucher: the QR product code resolves a fuel exactly, and
@@ -48,7 +48,7 @@ public sealed class OkkoVoucherParser : IVoucherProviderParser
         // fuel the brand sells. Empty until somebody fills the table in, which is why the classifier
         // still has its category path underneath.
         var byProductCode = (await _context.FuelTypeProductCodes
-                .Where(c => c.StationId == "okko")
+                .Where(c => c.BrandId == "okko")
                 .ToListAsync(cancellationToken))
             .Where(c => okkoFuelTypes.Any(ft => ft.Id == c.FuelTypeId))
             .GroupBy(c => c.ProductCode)

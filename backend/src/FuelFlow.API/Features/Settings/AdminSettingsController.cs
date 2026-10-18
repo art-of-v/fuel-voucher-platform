@@ -138,8 +138,8 @@ public sealed class AdminSettingsController : ControllerBase
     private async Task<List<VoucherTermFuelMarginDto>> TermMarginsAsync(CancellationToken cancellationToken)
     {
         // Joined to the fuel table explicitly rather than through a navigation: an offer carries no FuelType
-        // navigation - station and fuel are natural keys in this schema - and the fuel's station is what
-        // makes a name readable when several stations sell the same grade.
+        // navigation - Brand and fuel are natural keys in this schema - and the fuel's Brand is what
+        // makes a name readable when several Brands sell the same grade.
         //
         // This reads the OFFER, not the volume: the margin shown against a term ladder is a per-litre
         // figure, and it now exists once per fuel rather than once per package. The `Min(...)` over a
@@ -159,7 +159,7 @@ public sealed class AdminSettingsController : ControllerBase
                     {
                         offer,
                         fuel.Name,
-                        fuel.StationId,
+                        fuel.BrandId,
                         MarginUahPerLiter = fuel.MarginUahPerLiter
                     })
                 .ToListAsync(cancellationToken))
@@ -168,7 +168,7 @@ public sealed class AdminSettingsController : ControllerBase
             {
                 row.offer.FuelTypeId,
                 row.Name,
-                row.StationId,
+                row.BrandId,
                 Supplier = row.offer.SupplierPricePerLiter!.Value,
                 // From the fuel's margin, joined above: the offer's own copy is no longer written.
                 Final = FuelPricing.FinalPerLiterOrNull(
@@ -181,12 +181,12 @@ public sealed class AdminSettingsController : ControllerBase
             .ToList();
 
         return priced
-            .GroupBy(row => new { row.FuelTypeId, row.Name, row.StationId })
+            .GroupBy(row => new { row.FuelTypeId, row.Name, row.BrandId })
             .Select(g => new VoucherTermFuelMarginDto
             {
                 FuelTypeId = g.Key.FuelTypeId,
                 Name = g.Key.Name,
-                StationId = g.Key.StationId,
+                BrandId = g.Key.BrandId,
                 // Per offer, then the tightest across pools — the same two steps the SQL did, and the
                 // reason they are not merged: `final - cost` pairs figures from the SAME offer.
                 MarginPerLiterUah = g.Min(row => row.Final!.Value - row.Supplier)
@@ -603,7 +603,7 @@ public sealed class VoucherTermFuelMarginDto
 {
     public string FuelTypeId { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
-    public string StationId { get; set; } = string.Empty;
+    public string BrandId { get; set; } = string.Empty;
     /// <summary>Least margin across this fuel's packages, in UAH per litre. Zero means it has none.</summary>
     public decimal MarginPerLiterUah { get; set; }
 }

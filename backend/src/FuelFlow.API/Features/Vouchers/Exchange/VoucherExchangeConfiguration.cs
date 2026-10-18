@@ -125,7 +125,7 @@ internal sealed class VoucherExchangeConfiguration : IEntityTypeConfiguration<Vo
                 "cost_per_liter_applied IS NULL OR cost_per_liter_applied >= 0");
             t.HasCheckConstraint("ck_voucher_exchange_not_self",
                 "old_voucher_id IS DISTINCT FROM new_voucher_id");
-            // fuel_type_id is a catalog natural key, bounded by CHECK - see StationConfiguration.
+            // fuel_type_id is a catalog natural key, bounded by CHECK - see BrandConfiguration.
             t.HasCheckConstraint("ck_voucher_exchanges_fuel_type_id_length", "length(fuel_type_id) <= 100");
         });
     }

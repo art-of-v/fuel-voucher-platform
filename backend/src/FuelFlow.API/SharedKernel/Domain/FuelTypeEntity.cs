@@ -4,7 +4,7 @@ public sealed class FuelTypeEntity
 {
     public string Id { get; set; } = null!;
     public string Name { get; set; } = null!;
-    public string StationId { get; set; } = null!;
+    public string BrandId { get; set; } = null!;
 
     /// <summary>
     /// The grade's code in the <b>brand's</b> own spelling, as the brand publishes it on its price
@@ -15,7 +15,7 @@ public sealed class FuelTypeEntity
     /// <remarks>
     /// <para>
     /// <b>The brand's code, not the supplier's.</b> Those are different things here and the column name
-    /// says which: a <b>brand</b> is a network (<c>stations</c>: okko, wog, klo) whose fuel we sell,
+    /// says which: a <b>brand</b> is a network (<c>Brands</c>: okko, wog, klo) whose fuel we sell,
     /// and a <b>supplier</b> is a third party we buy that fuel from (<c>suppliers</c>,
     /// <c>purchase_batches.supplier_id</c>, <c>supplier_price_per_liter</c> - our cost). One brand's
     /// fuel can come from many suppliers, so a supplier cannot identify a grade and this code is
@@ -51,7 +51,7 @@ public sealed class FuelTypeEntity
     /// Manager standing opt-in: allow this brand+fuel to be priced and sold BELOW blended
     /// cost (deliberate loss-leader). Default false, so the slice-3 hard block refuses below-cost
     /// pricing/sales until a manager consciously flips it. A per brand+fuel decision — the fuel type
-    /// row already belongs to one brand (<c>station_id</c>), and <see cref="BrandFuelCode"/> is that
+    /// row already belongs to one brand (<c>brand_id</c>), and <see cref="BrandFuelCode"/> is that
     /// brand's own code for the grade.
     /// </summary>
     public bool AllowBelowCost { get; set; }

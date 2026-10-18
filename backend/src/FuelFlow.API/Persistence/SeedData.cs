@@ -4,14 +4,14 @@ namespace FuelFlow.Persistence;
 
 internal static class SeedData
 {
-    // StationNode intentionally has no seed rows. The four demo АЗК that used to live here were
+    // BrandStation intentionally has no seed rows. The four demo АЗК that used to live here were
     // fabricated pins (UPG alone is a 498-pump network), so every fresh database dropped a phantom
     // marker onto the map. Real networks load through the admin import, which upserts by id -
     // see scripts/fetch-upg-stations.mjs for the UPG source.
 
     internal static readonly DateTime CreatedAtUtc = new(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
-    internal static Station[] Stations =>
+    internal static Brand[] Brands =>
     [
         new() { Id = "okko", SortOrder = 1, Name = "OKKO", LogoText = "OKKO", Color = "#22c55e", Lat = 50.4851, Lng = 30.4734, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
         new() { Id = "wog", SortOrder = 2, Name = "WOG", LogoText = "WOG", Color = "#10b981", Lat = 50.4501, Lng = 30.5234, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
@@ -31,16 +31,16 @@ internal static class SeedData
     // name against real rows in every environment.
     internal static FuelTypeEntity[] FuelTypes =>
     [
-        new() { Id = "okko-dp", Name = "ДП ЄВРО", StationId = "okko", BrandFuelCode = "DP", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "okko-95", Name = "A-95", StationId = "okko", BrandFuelCode = "A-95", BasePrice = 54, DiscountPrice = 51, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "okko-p95", Name = "Pulls 95", StationId = "okko", BrandFuelCode = "Pulls 95", BasePrice = 60, DiscountPrice = 56, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "okko-pulls-dp", Name = "ДП PULLS", StationId = "okko", BrandFuelCode = "Pulls Diesel", BasePrice = 58, DiscountPrice = 55, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "okko-gas", Name = "ГАЗ", StationId = "okko", BrandFuelCode = "SPBT", BasePrice = 29, DiscountPrice = 27, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "wog-dp", Name = "ДП Mustang", StationId = "wog", BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "wog-95", Name = "A-95 Mustang", StationId = "wog", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "wog-95-euro", Name = "A 95 EURO", StationId = "wog", BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "wog-100", Name = "Mustang 100", StationId = "wog", BasePrice = 65, DiscountPrice = 61, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "wog-gas", Name = "ГАЗ", StationId = "wog", BasePrice = 29, DiscountPrice = 27, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc }
+        new() { Id = "okko-dp", Name = "ДП ЄВРО", BrandId = "okko", BrandFuelCode = "DP", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
+        new() { Id = "okko-95", Name = "A-95", BrandId = "okko", BrandFuelCode = "A-95", BasePrice = 54, DiscountPrice = 51, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
+        new() { Id = "okko-p95", Name = "Pulls 95", BrandId = "okko", BrandFuelCode = "Pulls 95", BasePrice = 60, DiscountPrice = 56, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
+        new() { Id = "okko-pulls-dp", Name = "ДП PULLS", BrandId = "okko", BrandFuelCode = "Pulls Diesel", BasePrice = 58, DiscountPrice = 55, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
+        new() { Id = "okko-gas", Name = "ГАЗ", BrandId = "okko", BrandFuelCode = "SPBT", BasePrice = 29, DiscountPrice = 27, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
+        new() { Id = "wog-dp", Name = "ДП Mustang", BrandId = "wog", BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
+        new() { Id = "wog-95", Name = "A-95 Mustang", BrandId = "wog", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
+        new() { Id = "wog-95-euro", Name = "A 95 EURO", BrandId = "wog", BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
+        new() { Id = "wog-100", Name = "Mustang 100", BrandId = "wog", BasePrice = 65, DiscountPrice = 61, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
+        new() { Id = "wog-gas", Name = "ГАЗ", BrandId = "wog", BasePrice = 29, DiscountPrice = 27, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc }
     ];
 
     /// <summary>
@@ -92,7 +92,7 @@ internal static class SeedData
                 var offer = new FuelOffer
                 {
                     Id = OfferKeys.For(ft.Id, DataKinds.Real),
-                    StationId = ft.StationId,
+                    BrandId = ft.BrandId,
                     FuelTypeId = ft.Id,
                     DataKind = DataKinds.Real,
                     SupplierPricePerLiter = supplierPrice,

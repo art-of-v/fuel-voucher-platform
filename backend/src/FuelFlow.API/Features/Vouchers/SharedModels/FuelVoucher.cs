@@ -140,7 +140,7 @@ public class FuelVoucher
     /// <remarks>
     /// <see cref="DataKinds.Qa"/> marks an emulated voucher rather than fuel the operator actually
     /// paid a supplier for. Never set on imported stock: an emulated voucher's code does not exist
-    /// at the station, so one that reaches a customer is fuel nobody can redeem. The value exists so
+    /// at the Brand, so one that reaches a customer is fuel nobody can redeem. The value exists so
     /// test runs can be found, cleaned up and kept out of the numbers a real batch produces.
     /// <para>
     /// Replaces the <c>is_test_data boolean</c> this used to be; see <see cref="DataKinds"/> for why

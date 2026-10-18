@@ -53,9 +53,9 @@ public sealed class ContractsQueryHandlersTests : IDisposable
         };
     }
 
-    private static Station CreateStation()
+    private static Brand CreateBrand()
     {
-        return new Station
+        return new Brand
         {
             Id = "okko",
             Name = "OKKO",
@@ -71,18 +71,18 @@ public sealed class ContractsQueryHandlersTests : IDisposable
     {
         var user = CreateUser(UserId, "+380991111111");
         var legalEntity = CreateLegalEntity(Guid.NewGuid(), user.Id);
-        var station = CreateStation();
+        var Brand = CreateBrand();
 
         _context.Users.Add(user);
         _context.LegalEntities.Add(legalEntity);
-        _context.Stations.Add(station);
+        _context.Brands.Add(Brand);
 
         var earlier = new Contract
         {
             Id = Guid.NewGuid(),
             UserId = user.Id,
             LegalEntityId = legalEntity.Id,
-            StationId = station.Id,
+            BrandId = Brand.Id,
             CreatedAtUtc = DateTime.UtcNow.AddHours(-1)
         };
         var later = new Contract
@@ -90,7 +90,7 @@ public sealed class ContractsQueryHandlersTests : IDisposable
             Id = Guid.NewGuid(),
             UserId = user.Id,
             LegalEntityId = legalEntity.Id,
-            StationId = station.Id,
+            BrandId = Brand.Id,
             CreatedAtUtc = DateTime.UtcNow
         };
 
@@ -105,10 +105,10 @@ public sealed class ContractsQueryHandlersTests : IDisposable
         contracts.Should().HaveCount(2);
         contracts[0].Id.Should().Be(later.Id);
         contracts[1].Id.Should().Be(earlier.Id);
-        contracts.Should().OnlyContain(c => c.User != null && c.Entity != null && c.Station != null);
+        contracts.Should().OnlyContain(c => c.User != null && c.Entity != null && c.Brand != null);
         contracts[0].User!.Id.Should().Be(user.Id);
         contracts[0].Entity!.Name.Should().Be(legalEntity.Name);
-        contracts[0].Station!.Name.Should().Be(station.Name);
+        contracts[0].Brand!.Name.Should().Be(Brand.Name);
     }
 
     [Fact]
@@ -127,19 +127,19 @@ public sealed class ContractsQueryHandlersTests : IDisposable
     {
         var user = CreateUser(UserId, "+380991111111");
         var legalEntity = CreateLegalEntity(Guid.NewGuid(), user.Id);
-        var station = CreateStation();
+        var Brand = CreateBrand();
         var contract = new Contract
         {
             Id = Guid.NewGuid(),
             UserId = user.Id,
             LegalEntityId = legalEntity.Id,
-            StationId = station.Id,
+            BrandId = Brand.Id,
             CreatedAtUtc = DateTime.UtcNow
         };
 
         _context.Users.Add(user);
         _context.LegalEntities.Add(legalEntity);
-        _context.Stations.Add(station);
+        _context.Brands.Add(Brand);
         _context.Contracts.Add(contract);
 
         var earlier = new UserContract

@@ -4,7 +4,7 @@ namespace FuelFlow.SharedKernel.Domain;
 public sealed class FuelPackage
 {
     public string Id { get; set; } = null!;
-    public string StationId { get; set; } = null!;
+    public string BrandId { get; set; } = null!;
     public string FuelTypeId { get; set; } = null!;
     public string FuelName { get; set; } = null!;
     public decimal Liters { get; set; }
@@ -61,7 +61,7 @@ public sealed class FuelPackage
     /// nothing in the schema could object, because a boolean cannot express "nobody said".
     /// <para>
     /// Not the same thing as <see cref="FuelVoucher.DataKind"/>. On a voucher the value means
-    /// "emulated: this code does not exist at the station". Here it means "do not sell this". A
+    /// "emulated: this code does not exist at the Brand". Here it means "do not sell this". A
     /// package is a catalogue entry, not paper, so it needs its own name for its own rule - but both
     /// now draw the line in the same place.
     /// </para>

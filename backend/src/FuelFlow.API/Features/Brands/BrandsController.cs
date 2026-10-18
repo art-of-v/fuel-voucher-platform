@@ -14,7 +14,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-using FuelFlow.Features.Stations;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers.SharedModels;
 
 namespace FuelFlow.Features.Brands;
@@ -81,11 +81,11 @@ private readonly GetBrandsQueryHandler _getAll;
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] BrandDto request, CancellationToken ct)
     {
-        var exists = await _context.Stations.AnyAsync(s => s.Id == request.Id, ct);
+        var exists = await _context.Brands.AnyAsync(s => s.Id == request.Id, ct);
         if (exists)
             return Conflict(new { error = "Brand with this ID already exists" });
 
-        var station = new Station
+        var Brand = new Brand
         {
             Id = request.Id,
             Name = request.Name,
@@ -95,39 +95,39 @@ private readonly GetBrandsQueryHandler _getAll;
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };
-        _context.Stations.Add(station);
+        _context.Brands.Add(Brand);
         await _context.SaveChangesAsync(ct);
 
         var userId = GetUserId();
-        var newValue = JsonSerializer.Serialize(new { station.Id, station.Name });
+        var newValue = JsonSerializer.Serialize(new { Brand.Id, Brand.Name });
         await _eventService.RecordEventAsync(
-            "Brand", station.Id, "BrandCreated",
+            "Brand", Brand.Id, "BrandCreated",
             null, newValue, userId, GetUserName(),
-            $"Created brand {station.Name}",
-            station.Id,
+            $"Created brand {Brand.Name}",
+            Brand.Id,
             ct);
 
-        return CreatedAtAction(nameof(GetById), new { id = station.Id }, station);
+        return CreatedAtAction(nameof(GetById), new { id = Brand.Id }, Brand);
     }
 
     [HttpPut("{id}")]
     public async Task<IActionResult> Update([FromRoute] string id, [FromBody] BrandDto request, CancellationToken ct)
     {
-        var station = await _context.Stations.FirstOrDefaultAsync(s => s.Id == id, ct);
-        if (station is null) return NotFound();
+        var Brand = await _context.Brands.FirstOrDefaultAsync(s => s.Id == id, ct);
+        if (Brand is null) return NotFound();
 
-        var oldName = station.Name;
-        var oldLogoText = station.LogoText;
-        var oldColor = station.Color;
-        var oldSortOrder = station.SortOrder;
-        var oldValue = JsonSerializer.Serialize(new { station.Name, station.LogoText, station.Color, station.SortOrder });
+        var oldName = Brand.Name;
+        var oldLogoText = Brand.LogoText;
+        var oldColor = Brand.Color;
+        var oldSortOrder = Brand.SortOrder;
+        var oldValue = JsonSerializer.Serialize(new { Brand.Name, Brand.LogoText, Brand.Color, Brand.SortOrder });
 
-        station.Name = request.Name;
-        station.LogoText = request.LogoText;
-        station.Color = request.Color;
-        station.SortOrder = request.SortOrder;
-        station.UpdatedAtUtc = DateTime.UtcNow;
-        _context.Stations.Update(station);
+        Brand.Name = request.Name;
+        Brand.LogoText = request.LogoText;
+        Brand.Color = request.Color;
+        Brand.SortOrder = request.SortOrder;
+        Brand.UpdatedAtUtc = DateTime.UtcNow;
+        _context.Brands.Update(Brand);
         await _context.SaveChangesAsync(ct);
 
         var changes = new List<string>();
@@ -141,10 +141,10 @@ private readonly GetBrandsQueryHandler _getAll;
             changes.Add($"sort order {oldSortOrder}  {request.SortOrder}");
 
         var userId = GetUserId();
-        var newValue = JsonSerializer.Serialize(new { station.Name, station.LogoText, station.Color, station.SortOrder });
+        var newValue = JsonSerializer.Serialize(new { Brand.Name, Brand.LogoText, Brand.Color, Brand.SortOrder });
         var summary = changes.Count > 0
-            ? $"{station.Name}: {string.Join(", ", changes)}"
-            : $"Updated brand {station.Name}";
+            ? $"{Brand.Name}: {string.Join(", ", changes)}"
+            : $"Updated brand {Brand.Name}";
         await _eventService.RecordEventAsync(
             "Brand", id, "BrandUpdated",
             oldValue, newValue, userId, GetUserName(),
@@ -158,11 +158,11 @@ private readonly GetBrandsQueryHandler _getAll;
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete([FromRoute] string id, CancellationToken ct)
     {
-        var station = await _context.Stations.FirstOrDefaultAsync(s => s.Id == id, ct);
-        if (station is null) return NotFound();
+        var Brand = await _context.Brands.FirstOrDefaultAsync(s => s.Id == id, ct);
+        if (Brand is null) return NotFound();
 
-        var name = station.Name;
-        var fuelTypes = await _context.FuelTypes.Where(f => f.StationId == id).ToListAsync(ct);
+        var name = Brand.Name;
+        var fuelTypes = await _context.FuelTypes.Where(f => f.BrandId == id).ToListAsync(ct);
         var fuelIds = fuelTypes.Select(f => f.Id).ToList();
         // Archive-the-offers view of the same question as the brand list above: this deletion path needs
         // the rows to mutate, not the read projection the card is built from.
@@ -200,8 +200,8 @@ private readonly GetBrandsQueryHandler _getAll;
             fuelType.IsDeleted = true;
             fuelType.DeletedAtUtc = archivedAt;
         }
-        station.IsDeleted = true;
-        station.DeletedAtUtc = archivedAt;
+        Brand.IsDeleted = true;
+        Brand.DeletedAtUtc = archivedAt;
         await _context.SaveChangesAsync(ct);
 
         var userId = GetUserId();

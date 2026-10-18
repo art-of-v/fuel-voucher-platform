@@ -53,7 +53,7 @@ public sealed record BrandFuelDto
     /// <summary>
     /// Rehearsal flag for this fuel's packages, propagated to every package on save. Set it when
     /// adding or editing a fuel that exists only to rehearse a flow - a QA grade, a dry run against
-    /// a real station. Flagged packages are never served to the storefront, so they cannot be bought,
+    /// a real Brand. Flagged packages are never served to the storefront, so they cannot be bought,
     /// but they stay in the admin.
     /// </summary>
     /// <remarks>
@@ -112,7 +112,7 @@ public sealed record CreateFuelRequest
 
     /// <summary>
     /// The fuel's own code at the network ("A-95", "DP", "Pulls 95"). Optional: a fuel can exist
-    /// without one, and two hand-entered fuels at one station must not collide over a value neither
+    /// without one, and two hand-entered fuels at one Brand must not collide over a value neither
     /// has. Unique among the live fuels of the same network that do have one.
     /// </summary>
     public string? BrandFuelCode { get; init; }

@@ -40,27 +40,27 @@ public sealed class GetFuelPriceAtIntegrationTests : IClassFixture<TestDatabaseF
         ApplicationDbContext context,
         string suffix)
     {
-        var station = $"at-{suffix}";
+        var Brand = $"at-{suffix}";
         var fuelTypeId = $"at-fuel-{suffix}";
         var offerId = $"at-offer-{suffix}";
 
         var now = DateTime.UtcNow;
-        context.Stations.Add(new Station
+        context.Brands.Add(new Brand
         {
-            Id = station, Name = $"AT {suffix}", Color = "#000", LogoText = "AT",
+            Id = Brand, Name = $"AT {suffix}", Color = "#000", LogoText = "AT",
         });
         context.FuelTypes.Add(new FuelTypeEntity
         {
             Id = fuelTypeId,
             Name = $"AT {suffix}",
-            StationId = station,
+            BrandId = Brand,
             CreatedAtUtc = now,
             UpdatedAtUtc = now,
         });
         context.FuelOffers.Add(new FuelOffer
         {
             Id = offerId,
-            StationId = station,
+            BrandId = Brand,
             FuelTypeId = fuelTypeId,
             DataKind = DataKinds.Real,
             PumpPricePerLiter = 50m,
@@ -81,7 +81,7 @@ public sealed class GetFuelPriceAtIntegrationTests : IClassFixture<TestDatabaseF
         {
             Id = Guid.CreateVersion7(),
             OfferId = offerId,
-            StationId = "at-x",
+            BrandId = "at-x",
             FuelTypeId = fuelTypeId,
             DataKind = DataKinds.Real,
             PumpPricePerLiter = pump,
