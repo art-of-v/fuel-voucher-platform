@@ -78,7 +78,7 @@ public sealed class UnpricedPackageIntegrationTests : IClassFixture<TestDatabase
         context.FuelOfferVolumes.Add(volume);
         await context.SaveChangesAsync();
 
-        var package = AsPackage(offer, volume, fuel);
+        var package = AsPackage(offer, fuel, volume.Liters);
 
         package.ComputedFinalPricePerLiter.Should().BeNull();
         FuelPricing.TryPackagePrice(50m, null, 92.90m, 1m, 10m).Should().BeNull();
@@ -108,6 +108,6 @@ public sealed class UnpricedPackageIntegrationTests : IClassFixture<TestDatabase
         exists.Should().Be("0");
     }
 
-    private static SellablePackage AsPackage(FuelOffer offer, FuelOfferVolume volume, FuelTypeEntity fuel)
-        => SellablePackage.From(offer, volume, fuel);
+private static SellablePackage AsPackage(FuelOffer offer, FuelTypeEntity fuel, decimal liters)
+    => SellablePackage.From(offer, fuel, liters);
 }

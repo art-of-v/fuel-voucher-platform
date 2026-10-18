@@ -175,7 +175,7 @@ CreateBrandStation("node-1", "Brand-a", "Node A"),
         var result = await handler.HandleAsync(new GetPublicPackagesQuery(CallerUserId: null));
 
         result.Should().ContainSingle("a rehearsal package reaching the store front is purchasable");
-        result[0].Id.Should().Be("pkg-real");
+        result[0].Id.Should().Be(PackageIds.For(OfferKeys.For("ft-a", DataKinds.Real), 10m));
     }
 
     /// <summary>
@@ -195,7 +195,7 @@ CreateBrandStation("node-1", "Brand-a", "Node A"),
         var result = await handler.HandleAsync(new GetPublicPackagesByBrandQuery("Brand-a", CallerUserId: null));
 
         result.Should().ContainSingle();
-        result[0].Id.Should().Be("pkg-real");
+        result[0].Id.Should().Be(PackageIds.For(OfferKeys.For("ft-a", DataKinds.Real), 10m));
     }
 
     /// <summary>
@@ -258,7 +258,10 @@ CreateBrandStation("node-1", "Brand-a", "Node A"),
         var result = await handler.HandleAsync(new GetPublicPackagesQuery(CallerUserId: null));
 
         var pkg = result.Should().ContainSingle().Which;
-        pkg.Id.Should().Be("pkg-1");
+        // The id is derived from the offer and the size, because a package is not a row any more.
+        // Asserted through PackageIds rather than spelled out, so a change to the format fails here
+        // instead of quietly splitting the shelf from the checkout resolver.
+        pkg.Id.Should().Be(PackageIds.For(OfferKeys.For("ft-a", DataKinds.Real), 10m));
         pkg.BrandId.Should().Be("Brand-a");
         pkg.FuelTypeId.Should().Be("ft-a");
         pkg.FuelName.Should().Be("A-95");
@@ -311,10 +314,12 @@ CreateBrandStation("node-1", "Brand-a", "Node A"),
 
         var result = await handler.HandleAsync(new GetPublicPackagesQuery(CallerUserId: null));
 
-        result.Should().HaveCount(2, "an empty shelf is greyed out, not removed from the catalog");
-        result.Single(p => p.Id == "pkg-in-stock").IsAvailable.Should().BeTrue();
-        result.Single(p => p.Id == "pkg-empty").IsAvailable.Should().BeFalse();
-    }
+result.Should().HaveCount(2, "an empty shelf is greyed out, not removed from the catalog");
+    var inStock = PackageIds.For(OfferKeys.For("ft-a", DataKinds.Real), 10m);
+    var empty = PackageIds.For(OfferKeys.For("ft-a", DataKinds.Real), 20m);
+    result.Single(p => p.Id == inStock).IsAvailable.Should().BeTrue();
+    result.Single(p => p.Id == empty).IsAvailable.Should().BeFalse();
+}
 
     /// <summary>
     /// Imported stock is not sellable stock. A freshly imported batch sits in <c>Imported</c> until a
@@ -423,10 +428,12 @@ CreateBrandStation("node-1", "Brand-a", "Node A"),
 
         var result = await handler.HandleAsync(new GetPublicPackagesByBrandQuery("Brand-a", CallerUserId: null));
 
-        result.Should().HaveCount(2);
-        result.Single(p => p.Id == "pkg-in-stock").IsAvailable.Should().BeTrue();
-        result.Single(p => p.Id == "pkg-empty").IsAvailable.Should().BeFalse();
-    }
+result.Should().HaveCount(2);
+    var inStock = PackageIds.For(OfferKeys.For("ft-a", DataKinds.Real), 10m);
+    var empty = PackageIds.For(OfferKeys.For("ft-a", DataKinds.Real), 20m);
+    result.Single(p => p.Id == inStock).IsAvailable.Should().BeTrue();
+    result.Single(p => p.Id == empty).IsAvailable.Should().BeFalse();
+}
 
     /// <summary>
     /// The literal reason the shop may not advertise it is operational, not commercial: the supplier
@@ -697,6 +704,18 @@ CreateBrandStation("node-1", "Brand-a", "Node A"),
     // unpriced. Tests about availability must not depend on that.
     var offer = _context.SeedOffer(
         BrandId, fuelTypeId, isTestData, supplierPricePerLiter: 49m, marginUahPerLiter: 7m);
+
+    // The shelf reads its sizes from fuel_nominals, so a fixture has to state the size there too.
+    // Both rows are seeded while the volume table still exists; the volume is what carries the
+    // pool-scoped id today, and the nominal is what the storefront will read once it is gone.
+    var fuel = _context.FuelTypes.Local.FirstOrDefault(f => f.Id == fuelTypeId)
+        ?? _context.FuelTypes.FirstOrDefault(f => f.Id == fuelTypeId);
+    if (fuel is not null
+        && !_context.FuelNominals.Local.Any(n => n.FuelTypeId == fuelTypeId && n.Liters == liters)
+        && !_context.FuelNominals.Any(n => n.FuelTypeId == fuelTypeId && n.Liters == liters))
+    {
+        _context.FuelNominals.Add(new FuelNominal { FuelTypeId = fuelTypeId, Liters = liters });
+    }
 
         return new FuelOfferVolume
         {

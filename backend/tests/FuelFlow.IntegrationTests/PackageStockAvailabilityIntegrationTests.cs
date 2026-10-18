@@ -146,8 +146,10 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
 
         var availability = CreateAvailability();
 
-        (await availability.FindPackageAsync(false, "okko", "okko-95", 10m))!.PackageId.Should().Be("real-10l");
-        (await availability.FindPackageAsync(true, "okko", "okko-95", 10m))!.PackageId.Should().Be("qa-mirror-10l");
+        (await availability.FindPackageAsync(false, "okko", "okko-95", 10m))!.PackageId
+    .Should().Be(PackageIds.For(OfferKeys.For("okko-95", DataKinds.Real), 10m));
+        (await availability.FindPackageAsync(true, "okko", "okko-95", 10m))!.PackageId
+            .Should().Be(PackageIds.For(OfferKeys.For("okko-95", DataKinds.Qa), 10m));
     }
 
     /// <summary>
@@ -190,7 +192,7 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
         // involved, because there is nothing to order.
         var availability = CreateAvailability();
         var chosen = await availability.FindPackageAsync(false, "okko", "okko-95", 20m);
-        chosen!.PackageId.Should().Be("first");
+        chosen!.PackageId.Should().Be(PackageIds.For(OfferKeys.For("okko-95", DataKinds.Real), 20m));
 
         var bulk = await availability.FindPackagesAsync(
             false, new[] { StockKey.For("okko", "okko-95", 20m) });
@@ -302,6 +304,14 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow.AddMinutes(-updatedMinutesAgo),
         });
+
+        // Availability resolves sizes from fuel_nominals, so a volume without one is a package the
+        // resolver cannot see. Stated once per (fuel, size): both pools of a fuel sell the same sizes.
+        if (!seed.FuelNominals.Local.Any(n => n.FuelTypeId == "okko-95" && n.Liters == liters)
+            && !seed.FuelNominals.Any(n => n.FuelTypeId == "okko-95" && n.Liters == liters))
+        {
+            seed.FuelNominals.Add(new FuelNominal { FuelTypeId = "okko-95", Liters = liters });
+        }
     }
 
     private PackageStockAvailability CreateAvailability()

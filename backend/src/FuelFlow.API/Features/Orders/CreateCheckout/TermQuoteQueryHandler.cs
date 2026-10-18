@@ -37,18 +37,17 @@ public sealed class TermQuoteQueryHandler
         // A missing package is not an error: the catalog can change between browsing and checkout, and the
         // line gets rejected properly at checkout. Returning the bare ladder lets the picker render without
         // prices rather than failing the whole screen.
-        var row = await _context.FuelOfferVolumes
-            .AsNoTracking()
-            .Where(v => v.Offer.BrandId == BrandId
-                     && v.Offer.FuelTypeId == fuelTypeId
-                     && v.Liters == liters
-                     && v.Offer.DataKind == pool)
-            .OrderByDescending(v => v.UpdatedAtUtc)
-            .ThenBy(v => v.Id)
-            .Select(v => new { Volume = v, Offer = v.Offer, Fuel = v.Offer.FuelType! })
+var row = await (
+            from offer in _context.FuelOffers.AsNoTracking()
+            join nominal in _context.FuelNominals.AsNoTracking() on offer.FuelTypeId equals nominal.FuelTypeId
+            where offer.BrandId == BrandId
+                  && offer.FuelTypeId == fuelTypeId
+                  && nominal.Liters == liters
+                  && offer.DataKind == pool
+            select new { Offer = offer, Fuel = offer.FuelType! })
             .FirstOrDefaultAsync(cancellationToken);
 
-        var package = row is null ? null : SellablePackage.From(row.Offer, row.Volume, row.Fuel);
+        var package = row is null ? null : SellablePackage.From(row.Offer, row.Fuel, liters);
 
         // The below-cost guard needs the fuel's opt-in flag. The fuel is already joined above - the
         // package's margin is its margin - so this no longer costs a second query per quote.
