@@ -265,6 +265,85 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
         result.BlendedCostPerLiter.Should().Be(expectedBlended + surchargePerLiter);
     }
 
+    /// <summary>
+    /// A sale does not move the price. Settled with the operator on 2026-10-17 and recorded in README
+    /// (`purchase_batches`) and planning #360: the moving average is recomputed when a lot arrives and
+    /// at no other time.
+    /// <para>
+    /// This used to call <c>RepriceAsync</c>, so every exchange moved the quoted price by however much
+    /// stock it happened to consume — and in which direction depended on which vouchers the sale took.
+    /// Both halves are asserted here: the offer's own cost column, and the absence of a price-history
+    /// row with the <c>exchange-release</c> reason. The second is the sharper one — it says no price
+    /// event happened, rather than that one happened and happened to land on the same number.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task AnExchange_MovesThePriceOfNothing()
+    {
+        var actingUserId = Guid.NewGuid();
+        var supplierId = Guid.NewGuid();
+        var importId = Guid.NewGuid();
+        var oldIds = Enumerable.Range(0, 3).Select(_ => Guid.NewGuid()).ToList();
+        var newIds = Enumerable.Range(0, 3).Select(_ => Guid.NewGuid()).ToList();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        decimal costBefore;
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+
+            SeedUser(seed, actingUserId);
+            SeedSupplier(seed, supplierId);
+            SeedImport(seed, importId);
+
+            for (var i = 0; i < 3; i++)
+            {
+                seed.FuelVouchers.Add(Stock(oldIds[i], "okko", "okko-95", 10m,
+                    today.AddDays(1 + i), VoucherStatus.Available,
+                    supplierId: supplierId, costPerLiter: 60m));
+                seed.FuelVouchers.Add(Stock(newIds[i], "okko", "okko-95", 10m,
+                    today.AddMonths(6), VoucherStatus.Imported, importId,
+                    supplierId: supplierId));
+            }
+
+            await seed.SaveChangesAsync();
+
+            costBefore = (await seed.FuelOffers.AsNoTracking()
+                .Where(o => o.FuelTypeId == "okko-95")
+                .Select(o => o.SupplierPricePerLiter)
+                .FirstAsync())!.Value;
+        }
+
+        using (var ctx = CreateContext())
+        {
+            var result = await BuildHandler(ctx).HandleAsync(new ConfirmVoucherExchangeCommand(
+                OldVoucherIds: oldIds,
+                NewImportId: importId,
+                Costs: new List<ExchangeFuelCost> { new("okko-95", 60m) },
+                SurchargeUah: 300m,
+                ActingUserId: actingUserId,
+                ActingUserName: "Operator"));
+            result.Success.Should().BeTrue(result.Error);
+        }
+
+        using var verify = CreateContext();
+
+        (await verify.FuelOffers.AsNoTracking()
+            .Where(o => o.FuelTypeId == "okko-95")
+            .Select(o => o.SupplierPricePerLiter)
+            .FirstAsync()).Should().Be(
+            costBefore,
+            "three vouchers left the stock, but a sale is not a purchase and moves nothing");
+
+        (await verify.FuelOfferPrices.AsNoTracking()
+            .Where(p => p.FuelTypeId == "okko-95"
+                && p.Reason == SharedKernel.Domain.OfferPriceReasons.ExchangeRelease)
+            .CountAsync()).Should().Be(
+            0,
+            "and no price event was recorded for it either - the rule is that the price did not move");
+    }
+
     [Fact]
     public async Task Exchange_MixingTwoSuppliers_IsRefusedAndNamesBoth()
     {

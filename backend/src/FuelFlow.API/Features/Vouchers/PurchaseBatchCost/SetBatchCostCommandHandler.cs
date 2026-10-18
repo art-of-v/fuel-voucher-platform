@@ -9,23 +9,37 @@ using Microsoft.EntityFrameworkCore;
 namespace FuelFlow.Features.Vouchers.PurchaseBatchCost;
 
 /// <summary>
-/// Enter/update the cost/liter for one batch (import × fuel). The rate is stamped onto the batch's vouchers
-/// — cost lives per voucher, not per batch — and the fuel is then repriced off the new blended pool.
+/// Enter the cost/liter for one batch (import × fuel). The rate is stamped onto the batch's vouchers —
+/// cost lives per voucher, not per batch — and the fuel is then repriced off the new blended pool.
 /// </summary>
 /// <remarks>
-/// <see cref="ForceOverwrite"/> exists because a voucher's cost moves after it is stamped: an exchange
-/// raises it by that voucher's share of the surcharge (VoucherCosting.AfterExchange), which the batch
-/// timeline shows the operator. A plain re-entry therefore only fills in vouchers that have no cost yet,
-/// so correcting one batch's price cannot silently wipe an exchange's uplift. Restamping everything is a
-/// deliberate, separate action.
+/// <para>
+/// <b>A batch's price is stamped once and is not rewritten.</b> This used to carry a
+/// <c>ForceOverwrite</c> flag for a deliberate "restamp everything": an exchange raises a voucher's cost by
+/// its share of the surcharge (<see cref="VoucherCosting.AfterExchange"/>), so a plain re-entry would
+/// refuse and an operator had no way to correct a price they had entered wrongly. The flag existed for
+/// that, and it existed to <em>rewrite vouchers that were already bought</em> — which contradicts the
+/// rule settled on 2026-10-17 and recorded in README (`purchase_batches`) and planning #360: what a lot
+/// cost is a purchase fact and stays one.
+/// </para>
+/// <para>
+/// It was also unreachable. The only caller,
+/// <c>AdminVoucherImportController.SetBatchCost</c>, built this command without it and nothing in
+/// <c>admin/</c> sent it, so the flag had no scenario behind it at all — it was a door with no handle,
+/// waiting for the first caller to walk through it.
+/// </para>
+/// <para>
+/// So it is gone. A price entered in error is corrected by a <b>new recorded entry</b>, not by rewriting
+/// the old one, and the exchange uplift is the only thing that moves a voucher's cost after it is
+/// stamped.
+/// </para>
 /// </remarks>
 public sealed record SetBatchCostCommand(
     Guid ImportJobId,
     string FuelTypeId,
     decimal CostPerLiter,
     Guid ActingUserId,
-    string? ActingUserName,
-    bool ForceOverwrite = false);
+    string? ActingUserName);
 
 public sealed record SetBatchCostResult(
     bool Success,
@@ -89,15 +103,11 @@ public sealed class SetBatchCostCommandHandler
             .Where(v => v.ImportJobId == command.ImportJobId && v.FuelTypeId == command.FuelTypeId && !v.IsDeleted)
             .ToListAsync(cancellationToken);
 
-        // Writing a cost into every voucher of the batch is the operator entering what that lot was
-        // bought for - it is the arrival that moves the average, which is why the recompute below is
-        // correct here and wrong on the sale path. What is NOT settled is `ForceOverwrite`: it rewrites
-        // vouchers that were already bought at another figure, and the rule as agreed on 2026-10-17 is
-        // that a lot's price is immutable in history. Step 3 of planning #360 decides what a correction
-        // writes instead; until then this flag is the one path that can contradict it.
-        var targets = command.ForceOverwrite
-            ? vouchers
-            : vouchers.Where(v => v.CostPerLiter is null).ToList();
+        // Only vouchers that carry no cost yet. A batch is stamped once; what it cost is a purchase fact
+        // and stays one (see the record's remarks on the removed ForceOverwrite flag). The one thing
+        // that legitimately moves a voucher's cost afterwards is an exchange, which writes the uplift
+        // itself.
+        var targets = vouchers.Where(v => v.CostPerLiter is null).ToList();
 
         if (targets.Count == 0)
         {
