@@ -94,12 +94,12 @@ public sealed class GetReportQueryHandler
         // Projects the margin alone. Handing back the offer entity would load every offer column for
         // every volume in the catalogue to answer one question.
         var fpLookup = await (
-            from v in _context.FuelOfferVolumes.AsNoTracking()
-            join o in _context.FuelOffers.AsNoTracking() on v.OfferId equals o.Id
+    from o in _context.FuelOffers.AsNoTracking()
             // The margin is the fuel's, so the fuel joins too - see GetDashboardQueryHandler.
             join f in _context.FuelTypes.AsNoTracking() on o.FuelTypeId equals f.Id
-            where o.DataKind == DataKinds.Real
-            select new { o.BrandId, o.FuelTypeId, v.Liters, MarginUahPerLiter = f.MarginUahPerLiter })
+    from n in _context.FuelNominals.AsNoTracking() where n.FuelTypeId == f.Id
+    where o.DataKind == DataKinds.Real
+    select new { o.BrandId, o.FuelTypeId, Liters = n.Liters, MarginUahPerLiter = f.MarginUahPerLiter })
             .ToDictionaryAsync(
                 x => (x.BrandId, x.FuelTypeId, x.Liters),
                 x => x.MarginUahPerLiter,

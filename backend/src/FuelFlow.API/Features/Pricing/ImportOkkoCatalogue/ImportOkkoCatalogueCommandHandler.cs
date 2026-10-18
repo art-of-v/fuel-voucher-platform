@@ -405,16 +405,6 @@ private async Task<IReadOnlyList<OkkoCatalogueArchived>> ArchiveDroppedFuelsAsyn
                     .ToListAsync(ct);
                 var offerIds = offers.Select(o => o.Id).ToList();
 
-                var volumes = await _context.FuelOfferVolumes.IgnoreQueryFilters()
-                    .Where(v => offerIds.Contains(v.OfferId) && !v.IsDeleted)
-                    .ToListAsync(ct);
-
-                foreach (var volume in volumes)
-                {
-                    volume.IsDeleted = true;
-                    volume.DeletedAtUtc = now;
-                    volume.UpdatedAtUtc = now;
-                }
 
                 foreach (var offer in offers)
                 {

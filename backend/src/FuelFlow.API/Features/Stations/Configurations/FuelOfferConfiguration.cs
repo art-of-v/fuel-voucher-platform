@@ -61,15 +61,6 @@ internal sealed class FuelOfferConfiguration : IEntityTypeConfiguration<FuelOffe
             .HasForeignKey(e => e.FuelTypeId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasMany(e => e.Volumes)
-            .WithOne(v => v.Offer)
-            .HasForeignKey(v => v.OfferId)
-            // Restrict, not Cascade. Cascade is what the issue proposed; every other relation in
-            // this schema restricts, and AGENTS.md lists the trade-off as deliberate - the archive
-            // path is in code, and a cascading delete would let one bad FuelOffers.RemoveRange take
-            // the volumes of a live offer with it.
-            .OnDelete(DeleteBehavior.Restrict);
-
         // The natural key, stated once more by the database. This is the guarantee that a second
         // offer cannot appear for the same (Brand, fuel, pool) - the precondition for grouping the
         // old rows into one price.

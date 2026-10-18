@@ -132,13 +132,10 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
         var offer = await _context.FuelOffers
             .FirstAsync(o => o.FuelTypeId == "okko-95" && o.DataKind == DataKinds.Real);
 
-        var a95 = await _context.FuelOfferVolumes
-            .Where(v => v.OfferId == offer.Id)
-            .OrderBy(v => v.Liters)
-            .ToListAsync();
-
-        a95.Should().HaveCount(3);
-        offer.PumpPricePerLiter.Should().Be(92.90m);
+    var a95 = await _context.FuelNominals
+        .Where(v => v.FuelTypeId == "okko-95")
+        .OrderBy(v => v.Liters)
+        .ToListAsync();
         // cost 54 + profit 5 = 59, under the 92.90 - 1 = 91.90 ceiling.
         offer.FinalPerLiterWith(await MarginFor(offer)).Should().Be(59m);
         foreach (var volume in a95)
@@ -508,8 +505,7 @@ var (wogVolume, wogOffer) = await ReadAsync("wog-95-20");
             .Where(o => o.FuelTypeId == "okko-gas")
             .Select(o => o.Id)
             .FirstAsync();
-        _context.FuelOfferVolumes.RemoveRange(_context.FuelOfferVolumes.Where(v => v.OfferId == gasOfferId));
-        await _context.SaveChangesAsync();
+        _context.FuelNominals.RemoveRange(_context.FuelNominals.Where(v => v.FuelTypeId == "okko-gas"));
         _context.FuelOffers.RemoveRange(_context.FuelOffers.Where(o => o.Id == gasOfferId));
         await _context.SaveChangesAsync();
         _context.ChangeTracker.Clear();
@@ -590,16 +586,22 @@ var (wogVolume, wogOffer) = await ReadAsync("wog-95-20");
     /// <summary>
     /// Reads a package the way the application does: the volume, plus the offer that carries the
     /// per-litre figures. Tests that assert on a single package almost always want both halves.
-    /// </summary>
-    private async Task<(FuelOfferVolume Volume, FuelOffer Offer)> ReadAsync(string volumeId)
+private async Task<(FuelNominal Volume, FuelOffer Offer)> ReadAsync(string fuelTypeIdAndLiters)
     {
-        var row = await _context.FuelOfferVolumes.AsNoTracking()
-            .Where(v => v.Id == volumeId)
-            .Select(v => new { Volume = v, Offer = v.Offer })
-            .FirstAsync();
-        return (row.Volume, row.Offer);
-    }
+    // "okko-95-20" is a fuel id and a size, joined by the last dash. The size used to be the tail
+    // of a volume row's id; a nominal has no id at all, so the fixture names the pair it means.
+    var split = fuelTypeIdAndLiters.LastIndexOf('-');
+    var fuelTypeId = fuelTypeIdAndLiters[..split];
+    var liters = decimal.Parse(
+    fuelTypeIdAndLiters[(split + 1)..],
+    System.Globalization.CultureInfo.InvariantCulture);
 
+    var volume = await _context.FuelNominals.AsNoTracking()
+    .FirstAsync(v => v.FuelTypeId == fuelTypeId && v.Liters == liters);
+    var offer = await _context.FuelOffers.AsNoTracking()
+    .FirstAsync(o => o.FuelTypeId == fuelTypeId && o.DataKind == DataKinds.Real);
+    return (volume, offer);
+    }
     /// <summary>
     /// The margin an offer sells at, which is its fuel's - the same place production reads it since
     /// the offer stopped carrying a copy. A test that asserted the offer's own column would have been

@@ -98,7 +98,7 @@ public sealed class UpdateNominalsReuseTests : IDisposable
 
         sizes.Should().Equal(10m);
     }
-    private async Task<List<FuelOfferVolume>> SeedAsync(params int[] nominals)
+    private async Task<List<FuelNominal>> SeedAsync(params int[] nominals)
     {
         _context.Brands.Add(new Brand
         {
@@ -124,20 +124,19 @@ public sealed class UpdateNominalsReuseTests : IDisposable
 // Seeded as one offer plus a volume per nominal, and returned so the tests can assert on volume ids -
         // that is what the nominals edit now reuses instead of the package rows. The per-litre figures
         // go on the offer: the edit restates each volume's total from them.
-        var volumes = nominals.Select(l => new FuelOfferVolume
+        _context.SeedOffer("okko", "okko-a95",
+            supplierPricePerLiter: 90m, marginUahPerLiter: 10m, finalPricePerLiter: 100m);
+        var rows = nominals.Select(l => new FuelNominal
         {
-            Id = Guid.NewGuid().ToString(),
-            OfferId = _context.SeedOffer(
-                "okko", "okko-a95",
-                supplierPricePerLiter: 90m, marginUahPerLiter: 10m, finalPricePerLiter: 100m).Id,
+            FuelTypeId = "okko-a95",
             Liters = l,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
         }).ToList();
 
-        _context.FuelOfferVolumes.AddRange(volumes);
+        _context.FuelNominals.AddRange(rows);
         await _context.SaveChangesAsync();
-        return volumes;
+        return rows;
     }
 
     [Fact]

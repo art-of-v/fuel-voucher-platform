@@ -145,4 +145,55 @@ internal static class SeedData
             return (offers.ToArray(), volumes.ToArray());
         }
     }
+
+    /// <summary>
+    /// The seeded catalogue's sizes, as the rows <c>fuel_nominals</c> holds them.
+    /// </summary>
+    /// <remarks>
+    /// This is what a fresh database is seeded with today. <see cref="Catalogue"/> above still
+    /// returns volume rows, and is read only by <c>20261015151014_SeedCatalogueAsOffers</c> - the
+    /// migration history is append-only, so that file keeps the shape it applied in production and
+    /// the type it needs still exists. Two views of one seed, not two answers: the litres here are
+    /// exactly the litres it writes, keyed by fuel rather than by offer, which is the only thing that
+    /// changed when a size stopped belonging to a pool.
+    /// </remarks>
+    internal static FuelNominal[] CatalogueNominals
+    {
+        get
+        {
+            var nominals = new List<FuelNominal>();
+
+            foreach (var ft in FuelTypes)
+            {
+                foreach (var liters in new[] { 10m, 20m, 50m })
+                {
+                    nominals.Add(new FuelNominal
+                    {
+                        FuelTypeId = ft.Id,
+                        Liters = liters,
+                        CreatedAtUtc = CreatedAtUtc,
+                        UpdatedAtUtc = CreatedAtUtc,
+                    });
+                }
+            }
+
+            // The two extra small nominals for okko-dp, carried over verbatim from the old seed.
+            nominals.Add(new FuelNominal
+            {
+                FuelTypeId = "okko-dp",
+                Liters = 2m,
+                CreatedAtUtc = CreatedAtUtc,
+                UpdatedAtUtc = CreatedAtUtc,
+            });
+            nominals.Add(new FuelNominal
+            {
+                FuelTypeId = "okko-dp",
+                Liters = 3m,
+                CreatedAtUtc = CreatedAtUtc,
+                UpdatedAtUtc = CreatedAtUtc,
+            });
+
+            return nominals.ToArray();
+        }
+    }
 }

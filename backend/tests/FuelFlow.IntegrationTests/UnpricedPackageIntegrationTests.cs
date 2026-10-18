@@ -65,17 +65,16 @@ public sealed class UnpricedPackageIntegrationTests : IClassFixture<TestDatabase
             UpdatedAtUtc = DateTime.UtcNow
         };
 
-        var volume = new FuelOfferVolume
+        var volume = new FuelNominal
         {
-            Id = $"unpriced-vol-{Guid.CreateVersion7()}",
-            OfferId = fuelId,
+            FuelTypeId = fuelId,
             Liters = 10m,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };
 
         context.FuelOffers.Add(offer);
-        context.FuelOfferVolumes.Add(volume);
+        context.FuelNominals.Add(volume);
         await context.SaveChangesAsync();
 
         var package = AsPackage(offer, fuel, volume.Liters);

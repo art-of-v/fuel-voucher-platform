@@ -88,20 +88,20 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
         }
 
 // One nominal, sold in both pools. The offer carries the cost, so the two pools price it
-    // differently - which is what makes the pool observable at all now that the size list is shared.
-    if (!await context.FuelOfferVolumes.AnyAsync(p => p.Id == "qa-pool-real-10", CancellationToken.None))
-    {
-        context.SeedPackage("qa-pool-real-10", Brand, FuelType, Liters, 470m * Liters,
-            supplierPricePerLiter: RealCostPerLiter, marginUahPerLiter: 2m, finalPricePerLiter: 47m,
-            isTestData: false, createdAtUtc: now, updatedAtUtc: now);
-    }
+        // differently - which is what makes the pool observable at all now that the size list is shared.
+        if (!await context.FuelNominals.AnyAsync(p => p.FuelTypeId == FuelType && p.Liters == Liters, CancellationToken.None))
+        {
+            context.SeedPackage("qa-pool-real-10", Brand, FuelType, Liters, 470m * Liters,
+                supplierPricePerLiter: RealCostPerLiter, marginUahPerLiter: 2m, finalPricePerLiter: 47m,
+                isTestData: false, createdAtUtc: now, updatedAtUtc: now);
+        }
 
-    if (!await context.FuelOfferVolumes.AnyAsync(p => p.Id == "qa-pool-qa-10", CancellationToken.None))
-    {
-        context.SeedPackage("qa-pool-qa-10", Brand, FuelType, Liters, 420m * Liters,
-            supplierPricePerLiter: QaCostPerLiter, marginUahPerLiter: 2m, finalPricePerLiter: 42m,
-            isTestData: true, createdAtUtc: now, updatedAtUtc: now);
-    }
+        if (!await context.FuelOffers.AnyAsync(p => p.FuelTypeId == FuelType && p.DataKind == DataKinds.Qa, CancellationToken.None))
+        {
+            context.SeedPackage("qa-pool-qa-10", Brand, FuelType, Liters, 420m * Liters,
+                supplierPricePerLiter: QaCostPerLiter, marginUahPerLiter: 2m, finalPricePerLiter: 42m,
+                isTestData: true, createdAtUtc: now, updatedAtUtc: now);
+        }
 
     // One sellable voucher per pool, seeded once. Without both, "QA can see the QA package" would
     // pass on a row that is merely visible but dark, which is not what the reviewer needs.

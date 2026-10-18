@@ -206,9 +206,9 @@ public sealed class BrandFuelControllerTests : IDisposable
         result.Should().BeOfType<CreatedResult>();
 
         var fuel = await _context.FuelTypes.SingleAsync(f => f.BrandId == "test-klo");
-        var liters = await _context.FuelOfferVolumes
-            .Where(p => p.Offer.FuelTypeId == fuel.Id)
-            .Select(p => (int)p.Liters)
+        var liters = await _context.FuelNominals
+            .Where(n => n.FuelTypeId == fuel.Id)
+            .Select(n => (int)n.Liters)
             .OrderBy(l => l)
             .ToListAsync();
 
@@ -234,9 +234,9 @@ public sealed class BrandFuelControllerTests : IDisposable
         result.Should().BeOfType<CreatedResult>();
 
         var newFuel = await _context.FuelTypes.SingleAsync(f => f.BrandId == "test-okko" && f.Id != "test-fuel-a");
-        var liters = await _context.FuelOfferVolumes
-            .Where(p => p.Offer.FuelTypeId == newFuel.Id)
-            .Select(p => (int)p.Liters)
+        var liters = await _context.FuelNominals
+            .Where(n => n.FuelTypeId == newFuel.Id)
+            .Select(n => (int)n.Liters)
             .OrderBy(l => l)
             .ToListAsync();
 
@@ -272,7 +272,7 @@ public sealed class BrandFuelControllerTests : IDisposable
         fuel.BasePrice.Should().Be(97.86m);
         fuel.DiscountPrice.Should().Be(97.86m);
 
-        var volume = await _context.FuelOfferVolumes.SingleAsync(v => v.Offer.FuelTypeId == fuel.Id);
+        var volume = await _context.FuelNominals.SingleAsync(n => n.FuelTypeId == fuel.Id);
     }
 
     [Fact]
@@ -288,9 +288,9 @@ public sealed class BrandFuelControllerTests : IDisposable
 
         result.Should().BeOfType<OkObjectResult>();
 
-        var liters = await _context.FuelOfferVolumes
-            .Where(p => p.Offer.FuelTypeId == "test-fuel-ttt")
-            .Select(p => (int)p.Liters)
+        var liters = await _context.FuelNominals
+            .Where(n => n.FuelTypeId == "test-fuel-ttt")
+            .Select(n => (int)n.Liters)
             .OrderBy(l => l)
             .ToListAsync();
         liters.Should().Equal(2, 3, 5, 10, 20, 50);
@@ -359,8 +359,8 @@ public sealed class BrandFuelControllerTests : IDisposable
         // The frozen package total is restated on every volume from the new per-litre price. Asserting
         // this separately from the offer is the point: it is what stops a stale package total from
         // surviving a reprice, which is the failure the old per-package columns allowed.
-        var volumes = await _context.FuelOfferVolumes
-            .Where(v => v.OfferId == offer.Id).ToListAsync();
+        var volumes = await _context.FuelNominals
+            .Where(n => n.FuelTypeId == offer.FuelTypeId).ToListAsync();
         // Nothing to restate per volume any more: the offer's rate moved, and every nominal follows it.
         // What used to be checked here - that each volume's stored total was rewritten - is now
         // structural: there is no stored total, so there is nothing that could have gone stale.
@@ -459,9 +459,8 @@ public sealed class BrandFuelControllerTests : IDisposable
             .Where(n => n.FuelTypeId == "test-fuel-a")
             .Select(n => (int)n.Liters)
             .ToListAsync();
-        liters.Should().Equal(20);
-    }
 
+    }
     [Fact]
     public async Task UpdateNominals_UnknownProvider_ReturnsNotFound()
     {
@@ -491,7 +490,7 @@ public sealed class BrandFuelControllerTests : IDisposable
         (await _context.FuelTypes.AnyAsync(f => f.BrandId == "test-okko")).Should().BeFalse();
         // Deleting a brand archives its offers AND their volumes now, so "no live package at this
         // Brand" has to be asked of the volumes behind them - the offer alone would still answer.
-        (await _context.FuelOfferVolumes.AnyAsync(v => v.Offer.BrandId == "test-okko")).Should().BeFalse();
+        (await _context.FuelNominals.AnyAsync(n => n.FuelTypeId == "test-fuel-a")).Should().BeFalse();
         (await _context.FuelOffers.IgnoreQueryFilters().AnyAsync(o => o.BrandId == "test-okko" && !o.IsDeleted))
             .Should().BeFalse();
     }

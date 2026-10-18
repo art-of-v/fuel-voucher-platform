@@ -86,14 +86,14 @@ public sealed class BlendedCostRecalculator
             .FirstOrDefaultAsync(f => f.Id == fuelTypeId, ct);
         var margin = fuel?.MarginUahPerLiter ?? 0m;
 
-        // The volumes are loaded only to restate each package's frozen total from the new per-litre
-        // price. The cost is the offer's, once.
-        var offerIds = offers.Select(o => o.Id).ToList();
-        var volumes = await _context.FuelOfferVolumes
-            .Where(v => offerIds.Contains(v.OfferId) && !v.IsDeleted)
-            .ToListAsync(ct);
+// How many sizes this fuel is sold in: what the cost correction moved the price of. A nominal
+    // carries no stored total, so there is nothing to rewrite here - every size follows its fuel's
+    // rate automatically - but the count is what the caller reports back to the operator.
+    var nominalCount = await _context.FuelNominals
+    .AsNoTracking()
+    .CountAsync(n => n.FuelTypeId == fuelTypeId, ct);
 
-        var now = DateTime.UtcNow;
+    var now = DateTime.UtcNow;
         var actingUser = actingUserId == Guid.Empty ? (Guid?)null : actingUserId;
         decimal firstFinal = 0m, firstBase = 0m;
 
@@ -111,16 +111,11 @@ public sealed class BlendedCostRecalculator
             offer.SupplierPricePerLiter = blendedCost;
             offer.UpdatedAtUtc = now;
 
-            // The volumes are not restated. Their price is the offer's rate × litres unless an operator
-            // set an override on that nominal, and an override that a cost correction silently erased
-            // was not an override. They are still loaded and returned so the caller can report how many
-            // nominal totals moved with the cost.
             firstFinal = finalPerLiter;
             firstBase = pump ?? (finalPerLiter + minDiscount);
         }
 
         _context.FuelOffers.UpdateRange(offers);
-        if (volumes.Count > 0) _context.FuelOfferVolumes.UpdateRange(volumes);
 
         // The history, in one call for every pool's offer: the recorder stamps
         // price_updated_at / price_updated_by_user_id (this method used to) and appends a row per offer
@@ -137,6 +132,6 @@ public sealed class BlendedCostRecalculator
             _context.FuelTypes.Update(fuelType);
         }
 
-        return volumes.Count;
+    return nominalCount;
     }
 }
