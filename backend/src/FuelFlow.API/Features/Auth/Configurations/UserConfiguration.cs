@@ -65,10 +65,16 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(e => e.SettlementCode)
             .HasColumnName("settlement_code")
             .HasMaxLength(8)
-            .IsRequired()
-            // Store-generated. Without this EF includes the column in every INSERT and writes the
-            // CLR default, so trg_users_assign_settlement_code never sees NULL and every row gets
-            // the same code. See User.SettlementCode.
+            // NOT store-enforced in the model on purpose. The column IS NOT NULL in Postgres - the
+            // migration says so and `The_column_is_not_null_in_the_database` asserts it - but the
+            // value is store-generated, so from the application's point of view the property is
+            // nullable: null means "not yet issued", which is true for the whole window between
+            // `new User()` and the INSERT.
+            //
+            // Marking it required here would make EF's InMemory provider enforce NOT NULL on the
+            // client, where there is no trigger to fill it. Every unit test that seeds a user would
+            // then fail on a column the application never sets - which is the InMemory provider
+            // asserting a database invariant it cannot possibly know about, not a real defect.
             .ValueGeneratedOnAdd();
 
         // Unique across every row, soft-deleted ones included - the opposite of phone_number and

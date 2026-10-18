@@ -4482,7 +4482,7 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("role_id");
 
                     b.Property<string>("SettlementCode")
-                        .IsRequired()
+                        .ValueGeneratedOnAdd()
                         .HasMaxLength(8)
                         .HasColumnType("character varying(8)")
                         .HasColumnName("settlement_code");
