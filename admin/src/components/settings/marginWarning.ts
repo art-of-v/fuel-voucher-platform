@@ -9,7 +9,12 @@
 export interface VoucherTermFuelDto {
   fuelTypeId: string;
   name: string;
-  stationId: string;
+  /**
+   * The network this fuel belongs to. Renamed from `stationId` when the `stations` table became
+   * `brands` - and the client was missed by that rename, which made this label throw
+   * `undefined.toUpperCase()` and take the whole admin panel down with it on every Settings load.
+   */
+  brandId: string;
   /** Least margin across this fuel's packages, UAH per litre. Zero means it has none. */
   marginPerLiterUah: number;
 }
@@ -77,7 +82,10 @@ function describe(
     tone,
     fuelCount: affected.length,
     totalFuels,
-    worst: `${worst.name} (${worst.stationId.toUpperCase()})`,
+    // Null-safe on purpose. This string is a label, and a label must not be able to take the panel
+    // down: the payload arrives untyped from the API, so a rename on the server reaches this file
+    // without the compiler objecting. The one place that happened took out every screen.
+    worst: `${worst.name} (${(worst.brandId ?? "").toUpperCase()})`,
     remaining: worst.marginPerLiterUah - discountPerLiter,
   };
 }
