@@ -1,5 +1,5 @@
 import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
-import { Archive, BarChart3, Building, ShoppingCart, Users, Menu, Ticket, X, FileSignature, FileCheck, ScrollText, Bug, LogOut, Settings, MapPin, Replace, RefreshCw, Handshake, MessageSquare } from "lucide-react";
+import { Archive, BarChart3, Building, ShoppingCart, Users, Menu, Ticket, X, FileSignature, FileCheck, ScrollText, Bug, LogOut, Settings, MapPin, Replace, RefreshCw, Handshake, MessageSquare, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -95,6 +95,9 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, className, onClose, user, b
         { id: "customerRenewal", label: t("nav.customerRenewal"), icon: RefreshCw },
         { id: "contracts", label: t("nav.contracts"), icon: FileSignature },
         { id: "reconciliation", label: t("nav.reconciliation"), icon: FileCheck },
+        // Before the audit log on purpose: money that is held and unexplained is the most urgent
+        // thing in this panel, and burying it under Logs invites nobody to open it.
+        { id: "heldPayments", label: t("nav.heldPayments"), icon: Wallet },
         { id: "auditlog", label: t("nav.auditlog"), icon: ScrollText },
         { id: "errorlogs", label: t("nav.errorlogs"), icon: Bug },
         { id: "feedback", label: t("nav.feedback"), icon: MessageSquare },

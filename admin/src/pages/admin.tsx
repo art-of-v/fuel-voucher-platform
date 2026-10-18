@@ -33,6 +33,7 @@ import VoucherExchangeTab from "@/components/VoucherExchangeTab";
 import SuppliersTab from "@/components/SuppliersTab";
 import CustomerRenewalTab from "@/components/CustomerRenewalTab";
 import AuditTab from "@/components/AuditTab";
+import HeldPaymentsTab from "@/components/HeldPaymentsTab";
 import ErrorLogsTab from "@/components/ErrorLogsTab";
 import FeedbackTab from "@/components/FeedbackTab";
 import SettingsTab from "@/components/SettingsTab";
@@ -134,7 +135,7 @@ export default function AdminScreen() {
 
   const [activeTab, setActiveTab] = useState(() => {
     // Guard against stale stored tabs (e.g. the removed 'stations' view).
-    const validTabs = ['brands', 'purchases', 'users', 'vouchers', 'imports', 'voucherExchange', 'suppliers', 'stationNodes', 'customerRenewal', 'contracts', 'reconciliation', 'auditlog', 'errorlogs', 'feedback', 'reports', 'settings'];
+    const validTabs = ['brands', 'purchases', 'users', 'vouchers', 'imports', 'voucherExchange', 'suppliers', 'stationNodes', 'customerRenewal', 'contracts', 'reconciliation', 'heldPayments', 'auditlog', 'errorlogs', 'feedback', 'reports', 'settings'];
     const stored = localStorage.getItem('admin_active_tab');
     return stored && validTabs.includes(stored) ? stored : 'brands';
   });
@@ -149,6 +150,16 @@ export default function AdminScreen() {
   const [reportToDate, setReportToDate] = useState("");
   const [reportTrigger, setReportTrigger] = useState(0);
   const [showReconciliationAct, setShowReconciliationAct] = useState(false);
+
+    // How much money is sitting unplaced. Not just a tab label: the whole point of the tab is that
+    // nobody thinks to open it, so the count has to meet them in the sidebar. Enabled on every tab,
+    // because the number is the alarm.
+    const { data: heldPaymentsTotal } = useQuery({
+        queryKey: ["admin", "heldPayments", "count"],
+        queryFn: () => apiRequest<any, { total: number }>("GET", "/api/admin/payments/unallocated?limit=1"),
+        refetchInterval: 60_000,
+    });
+    const heldPaymentCount = heldPaymentsTotal?.total ?? 0;
 
   const toDateInput = (d: Date) => {
     const y = d.getFullYear();
@@ -959,7 +970,7 @@ if (status === "booting") {
   }
 
   return (
-    <Layout activeTab={activeTab} onTabChange={handleTabChange} onLogout={async () => { await endSession(); }} user={user} badges={{ voucherExchange: exchangeAttentionCount }}>
+    <Layout activeTab={activeTab} onTabChange={handleTabChange} onLogout={async () => { await endSession(); }} user={user} badges={{ voucherExchange: exchangeAttentionCount, heldPayments: heldPaymentCount }}>
       <div className="space-y-6">
         {/* Brands Tab (new consolidated view) */}
         {activeTab === 'brands' && (
@@ -2386,7 +2397,11 @@ if (status === "booting") {
         )}
 
         {/* Audit Log Tab */}
-        {activeTab === 'auditlog' && (
+        {activeTab === 'heldPayments' && (
+            <HeldPaymentsTab />
+          )}
+
+          {activeTab === 'auditlog' && (
           <div className="space-y-6 animate-in fade-in duration-300">
             <h2 className="text-2xl font-bold flex items-center gap-2">
               <ScrollText className="w-6 h-6 text-primary" />

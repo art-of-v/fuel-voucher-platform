@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluentAssertions;
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Orders.SharedModels;
@@ -283,6 +284,64 @@ public class AdminPaymentsControllerTests : IClassFixture<TestDatabaseFixture>
         var second = await controller.Attach(paymentId, new AttachPaymentRequest { OrderId = orderId }, default);
 
         second.Should().BeOfType<NoContentResult>();
+    }
+
+    [Fact]
+    public async Task The_worklist_carries_the_customers_open_orders_to_pick_from()
+    {
+        // Without these the operator pastes an order UUID, which is not placing money — it is asking
+        // them to trust an identifier. One query for the page, keyed by customer.
+        using var context = CreateContext();
+        var code = NewCode();
+        var userId = await SeedCustomerAsync(context, code);
+        var openId = await SeedOrderAsync(context, userId, 2011m, OrderStatus.PendingPayment);
+        var paidId = await SeedOrderAsync(context, userId, 2012m, OrderStatus.Paid);
+        await SeedHeldPaymentAsync(context, userId, 2011m);
+
+        var response = await UnallocatedAsync(context);
+
+        response.OpenOrders.Should().Contain(o => o.Id == openId && o.Price == 2011m);
+        response.OpenOrders.Should().NotContain(o => o.Id == paidId,
+            "an order that is not waiting for payment is not a choice the backend will accept");
+    }
+
+    [Fact]
+    public async Task A_settlement_code_resolves_to_its_customer()
+    {
+        using var context = CreateContext();
+        var code = NewCode();
+        var userId = await SeedCustomerAsync(context, code);
+
+        // ActionResult (non-generic) returns the IActionResult directly - there is no .Result to unwrap.
+        var ok = (await CreateController(context).CustomerByCode(code.ToLowerInvariant(), default))
+            .Should().BeOfType<OkObjectResult>().Subject;
+
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(ok.Value));
+        doc.RootElement.GetProperty("Id").GetGuid().Should().Be(userId);
+    }
+
+    [Fact]
+    public async Task An_unmatched_code_explains_the_two_reasons_it_matched_nobody()
+    {
+        // "Not found" alone does not help: a mistyped code and a customer who has not registered are
+        // different problems with different fixes.
+        using var context = CreateContext();
+
+        var result = (await CreateController(context).CustomerByCode("ZZZZZZZZ", default))
+            .Should().BeOfType<NotFoundObjectResult>().Subject;
+
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(result.Value));
+        var error = doc.RootElement.GetProperty("error").GetString();
+        error.Should().Contain("mistyped").And.Contain("not registered");
+    }
+
+    [Fact]
+    public async Task A_code_of_the_wrong_length_is_refused_before_it_is_looked_up()
+    {
+        using var context = CreateContext();
+
+        (await CreateController(context).CustomerByCode("SHORT", default))
+            .Should().BeOfType<BadRequestObjectResult>();
     }
 
     [Fact]
