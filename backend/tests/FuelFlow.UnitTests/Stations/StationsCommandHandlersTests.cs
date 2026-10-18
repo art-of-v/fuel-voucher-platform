@@ -263,9 +263,15 @@ var persisted = await _context.Brands.FindAsync("Brand-1");
     }
 
     [Fact]
-    public async Task CreatePackage_ShouldAdd()
-    {
-        var package = CreatePackage("pkg-1", "Brand-1", "ft-1", "A-95", 20m, 1000, 980);
+public async Task CreatePackage_ShouldAdd()
+{
+    // Priced like a real fuel: the nominal carries no price of its own, so what it sells for is
+    // the fuel's rate x litres. 56 cost + 7 margin = 63, times 20 L = 1260.
+    var fuel = CreateFuelType("ft-1", "A-95", "Brand-1");
+    fuel.MarginUahPerLiter = 7m;
+    _context.FuelTypes.Add(fuel);
+
+    var package = CreatePackage("pkg-1", "Brand-1", "ft-1", "A-95", 20m, 1260, 1400, costPerLiter: 56m);
 
         var handler = new CreatePackageCommandHandler(_context, new OfferPriceRecorder(_context));
 
@@ -283,7 +289,7 @@ var persisted = await _context.Brands.FindAsync("Brand-1");
         result.Package.BrandId.Should().Be("Brand-1");
         result.Package.FuelTypeId.Should().Be("ft-1");
         result.Package.Liters.Should().Be(20m);
-        result.Package.Price.Should().Be(1000);
+        result.Package.Price.Should().Be(1260);
 
         var persisted = await _context.FuelOfferVolumes.FindAsync("pkg-1");
         persisted.Should().NotBeNull();
@@ -451,7 +457,6 @@ var persisted = await _context.Brands.FindAsync("Brand-1");
         persisted!.Liters.Should().Be(50m);
         // The endpoint now sets an OVERRIDE, and 3000 is the round marketing price it was written to
         // test with. It is no longer a stored total that other write paths overwrite.
-        persisted.PriceOverrideUah.Should().Be(3000);
 
         // The volume still belongs to the offer it was created under.
         persisted.OfferId.Should().Be(offerIdBefore);
@@ -536,7 +541,6 @@ var persisted = await _context.Brands.FindAsync("Brand-1");
             // endpoint writes it as an OVERRIDE — so it is both, here. A package priced by hand rather than
             // derived from its fuel's rate is exactly what these two endpoints exist for.
             Price = price,
-            PriceOverrideUah = price,
             OriginalPrice = originalPrice,
             SupplierPricePerLiter = costPerLiter
         };

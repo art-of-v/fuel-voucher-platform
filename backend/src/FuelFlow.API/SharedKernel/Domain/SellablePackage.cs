@@ -41,10 +41,6 @@ public sealed record SellablePackage
     public decimal Liters { get; init; }
 
     /// <summary>
-    /// This nominal's own price, or null to price it from the offer's rate. See
-    /// <see cref="FuelOfferVolume.PriceOverrideUah"/>.
-    /// </summary>
-    public decimal? PriceOverrideUah { get; init; }
 
     public decimal? PumpPricePerLiter { get; init; }
 
@@ -67,12 +63,13 @@ public sealed record SellablePackage
             SupplierPricePerLiter, MarginUahPerLiter, PumpPricePerLiter, MinDiscountPerLiter);
 
     /// <summary>
-    /// What this nominal costs, through <see cref="FuelPricing.PackagePrice"/>: the override when there
-    /// is one, otherwise the offer's rate × these litres.
+    /// What this nominal costs, through <see cref="FuelPricing.PackagePrice"/>: the rate × these
+    /// litres. One price per litre per grade, so a nominal cannot be sold at a number of its own.
     /// <para>
-    /// Throws when there is neither, which is the state of a fuel nobody has priced yet. Callers that can
-    /// meet it check <see cref="ComputedFinalPricePerLiter"/> first or handle the absence; this is
-    /// deliberately loud rather than returning zero, because a zero shelf price is a free fuel.
+    /// Throws when the fuel has no cost or no margin, which is the state of a fuel nobody has priced
+    /// yet. Callers that can meet it check <see cref="ComputedFinalPricePerLiter"/> first or handle the
+    /// absence; this is deliberately loud rather than returning zero, because a zero shelf price is a
+    /// free fuel.
     /// </para>
     /// </summary>
     public decimal ComputedPackagePrice =>
@@ -81,8 +78,7 @@ public sealed record SellablePackage
             MarginUahPerLiter,
             PumpPricePerLiter,
             MinDiscountPerLiter,
-            Liters,
-            PriceOverrideUah);
+            Liters);
 
     /// <summary>Which pool this came from. Carried so a caller can assert it matched what it asked for.</summary>
     public string DataKind { get; init; } = string.Empty;
@@ -106,7 +102,6 @@ public sealed record SellablePackage
         BrandId = offer.BrandId,
         FuelTypeId = offer.FuelTypeId,
         Liters = volume.Liters,
-        PriceOverrideUah = volume.PriceOverrideUah,
         PumpPricePerLiter = offer.PumpPricePerLiter,
         MinDiscountPerLiter = offer.MinDiscountPerLiter,
         SupplierPricePerLiter = offer.SupplierPricePerLiter,

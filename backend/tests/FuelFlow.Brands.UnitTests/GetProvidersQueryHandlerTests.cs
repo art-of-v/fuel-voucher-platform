@@ -272,7 +272,6 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
             Id = id,
             OfferId = offer.Id,
             Liters = liters,
-            PriceOverrideUah = final * liters,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
         };

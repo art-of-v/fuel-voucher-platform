@@ -151,9 +151,7 @@ public sealed class PricingFormulaTests
     {
         var pkg = new SellablePackage
         {
-
             Liters = 10m,
-            PriceOverrideUah = null,             // no exception: priced like the rest of the fuel
             SupplierPricePerLiter = 49m,     // cost
             MarginUahPerLiter = 7m,          // profit → cost-plus 56
             PumpPricePerLiter = 55m,
@@ -166,67 +164,34 @@ public sealed class PricingFormulaTests
         ServerPricing.PackagePrice(pkg, 10m).Should().Be(545);
     }
 
-    [Fact]
-    public void PackagePrice_NoKnobs_FallsBackToTheVolumesOwnOverride()
+[Fact]
+public void PackagePrice_NoKnobs_IsRefusedRatherThanCharged()
+{
+    var pkg = new SellablePackage
     {
-        var pkg = new SellablePackage
-        {
-            Liters = 10m,
-            // The one case an override exists for: an offer nobody has priced, with this size priced
-            // by hand. It is the only number that exists, so it is the charge.
-            PriceOverrideUah = 510m,
-            SupplierPricePerLiter = null,
-            MarginUahPerLiter = null,
-        };
+        Liters = 10m,
+        SupplierPricePerLiter = null,
+        MarginUahPerLiter = null,
+    };
 
-        ServerPricing.PackagePrice(pkg, 10m).Should().Be(510);
-    }
+    // No rate to price from. Returning zero here would put a free fuel on the
+    // shelf; the checkout handlers resolve the package before pricing it and never reach this -
+    // throwing says "this cannot be sold" instead of quietly charging nothing.
+    var act = () => ServerPricing.PackagePrice(pkg, 10m);
+    act.Should().Throw<InvalidOperationException>();
+}
 
-    [Fact]
-    public void PackagePrice_NoKnobsAndNoOverride_IsRefusedRatherThanCharged()
-    {
-        var pkg = new SellablePackage
-        {
-            Liters = 10m,
-            PriceOverrideUah = null,
-            SupplierPricePerLiter = null,
-            MarginUahPerLiter = null,
-        };
-
-        // Neither a rate nor a hand-written price. Returning zero here would put a free fuel on the
-        // shelf; the checkout handlers resolve the package before pricing it and never reach this, so
-        // throwing says "this cannot be sold" instead of quietly charging nothing.
-        var act = () => ServerPricing.PackagePrice(pkg, 10m);
-        act.Should().Throw<InvalidOperationException>();
-    }
-
-    [Fact]
-    public void PackagePrice_AnOverrideWins_OverTheFormula()
-    {
-        var pkg = new SellablePackage
-        {
-            Liters = 10m,
-            // A round marketing price for this size, on a fuel whose rate would say otherwise.
-            PriceOverrideUah = 500m,
-            SupplierPricePerLiter = 49m,
-            MarginUahPerLiter = 2m,      // rate would be 51/litre = 510
-        };
-
-        ServerPricing.PackagePrice(pkg, 10m).Should().Be(500m);
-    }
-
-    // --- ServerPricing.IsBelowCost -----------------------------------------
+// --- ServerPricing.IsBelowCost -----------------------------------------
 
     /// <summary>
-    /// The regression this covers: a package with a recorded cost but no stored per-litre price used to
-    /// fall back to <c>Price</c> — the frozen PACKAGE TOTAL — and compare it against a per-litre cost.
-    /// 590 UAH for 50 L read as "590 vs 54" and looked profitable while the customer was being charged
-    /// 11.80/litre against a 54/litre cost: a 42 UAH/litre loss on every litre, guard green.
+    /// The regression this covers: a package whose stored total once fell back to <c>Price</c> — the
+    /// frozen PACKAGE TOTAL — and compared it against a per-litre cost. 590 UAH for 50 L read as
+    /// "590 vs 54" and looked profitable while the customer was being charged 11.80/litre against a
+    /// 54/litre cost: a 42 UAH/litre loss on every litre, guard green.
     /// <para>
-    /// The column that held that total is now an <b>override</b>, and an override IS charged as given — so
-    /// this case is judged, not skipped. That is the point of the guard's new branch: an operator who
-    /// prices one nominal below cost gets the block, which is what stops an override from being a way to
-    /// sell at a loss. The assertion below is that it says so rather than passing.
+    /// There is no stored total any more — the charge is always the rate x litres, capped by the
+    /// ceiling. This pins that the guard judges the same number the customer is charged, per litre
+    /// against per litre, and refuses the sale when the ceiling lands under cost.
     /// </para>
     /// </summary>
     [Fact]
@@ -235,30 +200,29 @@ public sealed class PricingFormulaTests
         var pkg = new SellablePackage
         {
             Liters = 50m,
-            PriceOverrideUah = 590m,                 // package TOTAL — a different unit entirely
             SupplierPricePerLiter = 54m,             // per-litre cost
-            MarginUahPerLiter = null,                // ...and no per-litre rate to be derived from
-            PumpPricePerLiter = 92.90m,
+            MarginUahPerLiter = 7m,                 // cost-plus would be 61
+            PumpPricePerLiter = 55m,                // ceiling 55 - 5 = 50, under the 54 cost
+            MinDiscountPerLiter = 5m,
         };
 
         // What the customer is actually charged, per litre:
         (ServerPricing.PackagePrice(pkg, 50m) / 50m).Should().BeLessThan(54m);
 
-        // The override is the charge, so 590 for 50 L against a cost of 54/litre is a 42 UAH/litre loss
-        // and is refused. Per litre against per litre — the mistake this test has always covered was
-        // comparing the total to the rate, not comparing the override at all.
+        // 2500 for 50 L against a cost of 54/litre is a 4 UAH/litre loss and is refused. Per litre
+        // against per litre — the mistake this test has always covered was comparing the total to
+        // the rate.
         ServerPricing.IsBelowCost(pkg, 0m).Should().BeTrue();
         ServerPricing.TryGetBelowCostVerdict(pkg, 0m)
             .Should().Be(ServerPricing.BelowCostVerdict.BelowCost);
     }
 
     [Fact]
-    public void IsBelowCost_AnOverrideAtOrAboveCost_IsFine()
+    public void IsBelowCost_APriceAtOrAboveCost_IsFine()
     {
         var pkg = new SellablePackage
         {
             Liters = 10m,
-            PriceOverrideUah = 500m,                 // 50/litre against a 49/litre cost
             SupplierPricePerLiter = 49m,
             MarginUahPerLiter = 2m,
         };
@@ -272,7 +236,6 @@ public sealed class PricingFormulaTests
     {
         var pkg = new SellablePackage
         {
-
             Liters = 10m,
             SupplierPricePerLiter = 50m,
             MarginUahPerLiter = 2m,
@@ -295,7 +258,6 @@ public sealed class PricingFormulaTests
     {
         var pkg = new SellablePackage
         {
-
             Liters = 10m,
             SupplierPricePerLiter = cost is null ? null : (decimal)cost.Value,
             MarginUahPerLiter = 2m,
@@ -311,7 +273,6 @@ public sealed class PricingFormulaTests
     {
         var pkg = new SellablePackage
         {
-
             Liters = 10m,
             SupplierPricePerLiter = 40m,
             MarginUahPerLiter = 5m,
@@ -330,7 +291,6 @@ public sealed class PricingFormulaTests
         // has to judge the figure actually charged or a generous tier sells under cost unnoticed.
         var pkg = new SellablePackage
         {
-
             Liters = 10m,
             SupplierPricePerLiter = 50m,
             MarginUahPerLiter = 9m,

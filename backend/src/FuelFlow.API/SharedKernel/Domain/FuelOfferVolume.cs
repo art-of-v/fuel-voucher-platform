@@ -19,13 +19,6 @@ namespace FuelFlow.SharedKernel.Domain;
 /// "soft" override pretending to be a frozen price: one reprice erased it, and
 /// <c>deploy/preflight-db/010</c> existed to notice when it had not.
 ///
-/// <see cref="PriceOverrideUah"/> splits those two jobs. Null means "price this nominal like the rest of
-/// the fuel", and every repricing moves it with the offer. A number means an operator set this nominal on
-/// purpose — a round marketing price for a 50 L canister — and a reprice leaves it alone. Which one is
-/// in force is resolved by <see cref="FuelPricing.PackagePrice"/>, the same function the shelf, the quote
-/// and the charge use, so a displayed price and a charged price cannot disagree.
-/// </para>
-///
 /// <para>
 /// <b>An override is not a way around the below-cost guard.</b> It is a price like any other and is
 /// refused the same way when it would sell under cost — see
@@ -58,12 +51,6 @@ public sealed class FuelOfferVolume
     /// <summary>Volume in litres. Bounded above zero by <c>ck_fuel_offer_volumes_liters_positive</c>.</summary>
     public decimal Liters { get; set; }
 
-    /// <summary>
-    /// This nominal's own price in UAH, or null to price it from the offer's rate. See the class remarks
-    /// for what this replaced and why null is the ordinary case. Bounded at zero by
-    /// <c>ck_fuel_offer_volumes_price_override_non_negative</c>.
-    /// </summary>
-    public decimal? PriceOverrideUah { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }

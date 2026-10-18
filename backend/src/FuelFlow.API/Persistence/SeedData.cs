@@ -117,7 +117,6 @@ internal static class SeedData
                         Liters = liters,
                         // No override: the seeded catalogue is priced from its fuel's rate, which is what
                         // the old stored total worked out to anyway (finalPrice = cost + margin, no pump).
-                        PriceOverrideUah = null,
                         CreatedAtUtc = CreatedAtUtc,
                         UpdatedAtUtc = CreatedAtUtc,
                     });
@@ -131,7 +130,6 @@ internal static class SeedData
                 Id = "okko-dp-2",
                 OfferId = dp.Id,
                 Liters = 2m,
-                PriceOverrideUah = null,   // 104 = 52/litre x 2, i.e. exactly the fuel's rate
                 CreatedAtUtc = CreatedAtUtc,
                 UpdatedAtUtc = CreatedAtUtc,
             });
@@ -140,7 +138,6 @@ internal static class SeedData
                 Id = "okko-dp-3",
                 OfferId = dp.Id,
                 Liters = 3m,
-                PriceOverrideUah = null,   // 156 = 52/litre x 3
                 CreatedAtUtc = CreatedAtUtc,
                 UpdatedAtUtc = CreatedAtUtc,
             });

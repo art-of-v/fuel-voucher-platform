@@ -75,7 +75,7 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
                 // stating the unbound number here would pin every nominal as an override - which is
                 // exactly the drift this suite exists to rule out.
                 price: Math.Round(
-                    FuelPricing.PackagePrice(cost, profit, pump, 1m, nominal, overrideUah: null),
+                    FuelPricing.PackagePrice(cost, profit, pump, 1m, nominal),
                     2, MidpointRounding.AwayFromZero),
                 supplierPricePerLiter: cost,
                 marginUahPerLiter: profit,
@@ -145,14 +145,12 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
         {
             // No stored total and no override: the package price is the rate × litres, and it is
             // computed by the same function the storefront and checkout use.
-            volume.PriceOverrideUah.Should().BeNull();
             var price = FuelPricing.PackagePrice(
                 offer.SupplierPricePerLiter,
                 await MarginFor(offer),
                 offer.PumpPricePerLiter,
                 offer.MinDiscountPerLiter,
-                volume.Liters,
-                volume.PriceOverrideUah);
+                volume.Liters);
             price.Should().Be(Math.Round(59m * volume.Liters, 2, MidpointRounding.AwayFromZero));
             // The struck "before" price is the pump price × litres, recomputed from the offer rather than
             // stored - it was never authoritative, and a stale stored copy could leak a supplier cost.
@@ -207,14 +205,12 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
 var (volume, offer) = await ReadAsync("okko-95-20");
         offer.PumpPricePerLiter.Should().Be(57m);
         offer.FinalPerLiterWith(await MarginFor(offer)).Should().Be(56m);
-        volume.PriceOverrideUah.Should().BeNull();
         var price = FuelPricing.PackagePrice(
             offer.SupplierPricePerLiter,
             await MarginFor(offer),
             offer.PumpPricePerLiter,
             offer.MinDiscountPerLiter,
-            volume.Liters,
-            volume.PriceOverrideUah);
+                volume.Liters);
         price.Should().Be(1120m);
         // The struck "before" price is pump × litres, recomputed from the offer rather than read from a
         // stored column - which is what stops a stale copy from leaking a supplier cost.
@@ -264,8 +260,6 @@ var (volume, offer) = await ReadAsync("okko-95-20");
     {
         await SeedCatalogAsync();
         var (_, beforeOffer) = await ReadAsync("okko-95-20");
-        // The override is the only thing left on the volume that a reprice could touch.
-        var beforeOverride = (await _context.FuelOfferVolumes.AsNoTracking().FirstAsync(v => v.Id == "okko-95-20")).PriceOverrideUah;
 
         var result = await Handler().HandleAsync(Import(ScrapedSheet, dryRun: true), Guid.Empty, "tester");
 
@@ -275,7 +269,6 @@ var (volume, offer) = await ReadAsync("okko-95-20");
         _context.ChangeTracker.Clear();
         var (afterVolume, afterOffer) = await ReadAsync("okko-95-20");
         afterOffer.PumpPricePerLiter.Should().Be(beforeOffer.PumpPricePerLiter);
-        afterVolume.PriceOverrideUah.Should().Be(beforeOverride);
         _context.AuditEventOutbox.Should().BeEmpty();
     }
 
@@ -289,7 +282,11 @@ var (volume, offer) = await ReadAsync("okko-95-20");
 
 var (wogVolume, wogOffer) = await ReadAsync("wog-95-20");
         wogOffer.PumpPricePerLiter.Should().Be(58m);
-        // Untouched: this brand's rate did not move, and it carries no override, so its nominals still`n        // work out to (56 + 5) per litre x 20 - through the formula rather than from a stored total.`n        wogVolume.PriceOverrideUah.Should().BeNull();`n        wogOffer.FinalPerLiterWith(await MarginFor(wogOffer)).Should().Be(61m);
+        // Untouched: this brand's rate did not move, so its nominals still work out from the fuel's
+        // own rate - 56 cost + 5 margin = 61, capped by the ceiling at pump 58 less the guaranteed
+        // 1 UAH discount, which is 57 and therefore what the customer pays. Derived through the
+        // formula rather than from a stored total, which is all there has ever been.
+        wogOffer.FinalPerLiterWith(await MarginFor(wogOffer)).Should().Be(57m);
     }
 
     [Fact]

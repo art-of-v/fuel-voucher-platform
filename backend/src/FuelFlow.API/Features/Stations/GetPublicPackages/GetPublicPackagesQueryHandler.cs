@@ -71,7 +71,6 @@ var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
                 // The nominal's own price if one was set, otherwise null — resolved below against the
                 // offer's rate. Four nullable columns cross the wire to the projection; the supplier cost
                 // never leaves the database.
-                volume.PriceOverrideUah,
                 offer.SupplierPricePerLiter,
                 fuel.MarginUahPerLiter,
                 offer.PumpPricePerLiter,
@@ -89,13 +88,14 @@ var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
             // A package whose fuel nobody has priced yet and which carries no override has no price to
             // show. It is skipped rather than published at zero: a zero on the shelf is a free fuel, and
             // the row would also be unbuyable. On production that is 0 of 122 rows.
-            .Where(x => x.PriceOverrideUah is not null
-                || (x.SupplierPricePerLiter is not null && x.MarginUahPerLiter is not null))
+            // A fuel nobody has priced yet has no price to show. It is skipped rather than
+            // published at zero: a zero on the shelf is a free fuel, and it would be unbuyable.
+            .Where(x => x.SupplierPricePerLiter is not null && x.MarginUahPerLiter is not null)
             .Select(x =>
             {
                 var price = FuelPricing.PackagePrice(
                     x.SupplierPricePerLiter, x.MarginUahPerLiter, x.PumpPricePerLiter, x.MinDiscountPerLiter,
-                    x.Liters, x.PriceOverrideUah);
+                      x.Liters);
 
                 return new PublicPackageResponse(
                     x.Id,

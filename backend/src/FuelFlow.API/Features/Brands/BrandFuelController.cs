@@ -283,7 +283,6 @@ public sealed class BrandFuelController : ControllerBase
                 // anonymous callers. An operator who wants one size priced by hand sets an override
                 // afterwards, and from then on it survives every reprice — which is what made this
                 // column worth having.
-                PriceOverrideUah = null,
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow,
             });
@@ -780,7 +779,6 @@ public sealed class BrandFuelController : ControllerBase
                         Id = Guid.CreateVersion7().ToString(),
                         OfferId = offer.Id,
                         Liters = liters,
-                        PriceOverrideUah = null,   // priced from the offer like every other nominal
                         CreatedAtUtc = now,
                         UpdatedAtUtc = now,
                     });

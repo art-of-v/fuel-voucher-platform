@@ -20,11 +20,6 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 
-
-using FuelFlow.Persistence;
-using FuelFlow.SharedKernel.Domain;
-using Microsoft.EntityFrameworkCore;
-
 namespace FuelFlow.UnitTests.Brands;
 
 public sealed class BrandsQueryHandlersTests : IDisposable
@@ -697,14 +692,17 @@ CreateBrandStation("node-1", "Brand-a", "Node A"),
             });
         }
 
-        var offer = _context.SeedOffer(BrandId, fuelTypeId, isTestData);
+        // Priced like every other package on the shelf: there is no per-package override any more, so a
+    // fixture that leaves the knobs empty seeds a package the public query rightly skips as
+    // unpriced. Tests about availability must not depend on that.
+    var offer = _context.SeedOffer(
+        BrandId, fuelTypeId, isTestData, supplierPricePerLiter: 49m, marginUahPerLiter: 7m);
 
         return new FuelOfferVolume
         {
             Id = id,
             OfferId = offer.Id,
             Liters = liters,
-            PriceOverrideUah = 500m,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
         };

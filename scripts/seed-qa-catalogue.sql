@@ -114,20 +114,21 @@ WHERE live.data_kind = 'real'
   )
 ON CONFLICT (station_id, fuel_type_id, data_kind) DO NOTHING;
 
--- The QA volume twin, mirroring litres and price. The live volume kept its own id through the split
+-- The QA volume twin, mirroring litres. The live volume kept its own id through the split
 -- (the migration copied `p.id` across), so this one prefixes rather than appends - and a volume id
 -- that would breach ck_fuel_offer_volumes_id_length is refused loudly by that CHECK rather than
 -- silently truncated into a collision.
+--
+-- The twin also carries no price, and cannot: `price_override_uah` is gone, and a nominal's price is
+-- the fuel's rate x its litres. The margin lives on `fuel_types`, which the two pools share, so the QA
+-- catalogue is priced exactly like the live one. The pool separates stock and data, not money.
 INSERT INTO fuel_offer_volumes
-    (id, offer_id, liters, price_override_uah,
+    (id, offer_id, liters,
      created_at_utc, updated_at_utc, is_deleted, deleted_at_utc)
 SELECT
     'qa-' || live.id,
     live_offer.id || '-qa',
     live.liters,
-    -- The mirror carries whatever exception the live nominal had. Most carry none: a volume's price is
-    -- its offer's rate x its litres, and the QA offer is a mirror of the live one, so null reproduces it.
-    live.price_override_uah,
     now(), now(), false, NULL
 FROM fuel_offer_volumes live
 JOIN fuel_offers live_offer ON live_offer.id = live.offer_id
@@ -208,7 +209,7 @@ ON CONFLICT DO NOTHING;
 
 \echo ''
 \echo 'QA catalogue seeded. Verify, as the QA account:'
-\echo '  select o.station_id, f.name, v.liters, v.price_override_uah, o.data_kind'
+\echo '  select o.brand_id, f.name, v.liters, o.data_kind'
 \echo '    from fuel_offers o'
 \echo '    join fuel_offer_volumes v on v.offer_id = o.id'
 \echo '    join fuel_types f on f.id = o.fuel_type_id'

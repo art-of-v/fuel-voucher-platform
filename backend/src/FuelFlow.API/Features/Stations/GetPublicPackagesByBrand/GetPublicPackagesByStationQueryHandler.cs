@@ -52,7 +52,6 @@ public sealed class GetPublicPackagesByBrandQueryHandler
                 volume.Liters,
                 // Resolved against the offer's rate below — see GetPublicPackagesQueryHandler, which is
                 // the same query narrowed to one Brand.
-                volume.PriceOverrideUah,
                 offer.SupplierPricePerLiter,
                 fuel.MarginUahPerLiter,
                 offer.PumpPricePerLiter,
@@ -65,13 +64,14 @@ public sealed class GetPublicPackagesByBrandQueryHandler
         // Unpriced, unoverridden packages are skipped rather than shown at zero: see the same filter in
         // GetPublicPackagesQueryHandler.
         return rows
-            .Where(x => x.PriceOverrideUah is not null
-                || (x.SupplierPricePerLiter is not null && x.MarginUahPerLiter is not null))
+            // A fuel nobody has priced yet has no price to show. It is skipped rather than
+            // published at zero: a zero on the shelf is a free fuel, and it would be unbuyable.
+            .Where(x => x.SupplierPricePerLiter is not null && x.MarginUahPerLiter is not null)
             .Select(x =>
             {
                 var price = FuelPricing.PackagePrice(
                     x.SupplierPricePerLiter, x.MarginUahPerLiter, x.PumpPricePerLiter, x.MinDiscountPerLiter,
-                    x.Liters, x.PriceOverrideUah);
+                      x.Liters);
 
                 return new PublicPackageResponse(
                     x.Id,

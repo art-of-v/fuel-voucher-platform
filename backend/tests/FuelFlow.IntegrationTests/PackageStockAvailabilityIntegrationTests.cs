@@ -126,21 +126,22 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
     /// inside either pool).
     ///
     /// Checkout resolved that key with a bare <c>FirstOrDefaultAsync</c> - no pool filter, no
-    /// ordering - so the customer was charged off whichever row Postgres produced first. The two
-    /// rows carry the same price today only because the seed copies it, which is luck rather than
-    /// a property. Here the QA row is priced differently on purpose, so the old code fails and the
-    /// new code cannot.
+    /// ordering - so the customer was charged off whichever row Postgres produced first. Both rows
+    /// carry the same rate, because the fuel's margin is one number and a nominal has no price of its
+    /// own; what separates them is <c>data_kind</c>, and that is what the query has to filter on. The
+    /// test cannot make the two prices differ any more, so it asserts the thing that actually decides
+    /// it: each pool reads back its own row.
     /// </summary>
     [Fact]
-    public async Task FindPackage_IgnoresTheOtherPoolsRow_EvenWhenItsPriceDiffers()
+    public async Task FindPackage_IgnoresTheOtherPoolsRow()
     {
         using var seed = CreateContext();
         await TruncatePackagesAsync(seed);
 
-        SeedPackage(seed, "real-10l", isTestData: false, liters: 10m, price: 890.60m, updatedMinutesAgo: 60);
-        // Deliberately a different price, in the OTHER pool. Two pools cannot collide on the offer key,
-        // so the pool filter is what decides - and the test fails if it stops doing so.
-        SeedPackage(seed, "qa-mirror-10l", isTestData: true, liters: 10m, price: 1m, updatedMinutesAgo: 0);
+        SeedPackage(seed, "real-10l", isTestData: false, liters: 10m, pricePerLiter: 89.06m, updatedMinutesAgo: 60);
+        // The same fuel, the same nominal, in the OTHER pool. Two pools cannot collide on the offer
+        // key, so the pool filter is what decides - and the test fails if it stops doing so.
+        SeedPackage(seed, "qa-mirror-10l", isTestData: true, liters: 10m, pricePerLiter: 89.06m, updatedMinutesAgo: 0);
         await seed.SaveChangesAsync();
 
         var availability = CreateAvailability();
@@ -175,12 +176,12 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
         using var seed = CreateContext();
         await TruncatePackagesAsync(seed);
 
-        SeedPackage(seed, "first", isTestData: false, liters: 20m, price: 1780m, updatedMinutesAgo: 120);
+        SeedPackage(seed, "first", isTestData: false, liters: 20m, pricePerLiter: 89m, updatedMinutesAgo: 120);
         await seed.SaveChangesAsync();
 
         // Same offer (same Brand, fuel and pool) and the same nominal - the exact row the old
         // read-then-write race produced.
-        SeedPackage(seed, "second", isTestData: false, liters: 20m, price: 1781m, updatedMinutesAgo: 1);
+        SeedPackage(seed, "second", isTestData: false, liters: 20m, pricePerLiter: 89m, updatedMinutesAgo: 1);
 
         var act = async () => await seed.SaveChangesAsync();
         await act.Should().ThrowAsync<DbUpdateException>();
@@ -206,7 +207,7 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
         using var seed = CreateContext();
         await TruncatePackagesAsync(seed);
 
-        SeedPackage(seed, "qa-only", isTestData: true, liters: 5m, price: 100m, updatedMinutesAgo: 0);
+        SeedPackage(seed, "qa-only", isTestData: true, liters: 5m, pricePerLiter: 20m, updatedMinutesAgo: 0);
         await seed.SaveChangesAsync();
 
         var availability = CreateAvailability();
@@ -225,10 +226,10 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
         using var seed = CreateContext();
         await TruncatePackagesAsync(seed);
 
-        SeedPackage(seed, "real-2l", isTestData: false, liters: 2m, price: 178.12m, updatedMinutesAgo: 5);
-        SeedPackage(seed, "real-5l", isTestData: false, liters: 5m, price: 445.30m, updatedMinutesAgo: 5);
+        SeedPackage(seed, "real-2l", isTestData: false, liters: 2m, pricePerLiter: 89.06m, updatedMinutesAgo: 5);
+        SeedPackage(seed, "real-5l", isTestData: false, liters: 5m, pricePerLiter: 89.06m, updatedMinutesAgo: 5);
         // In the catalogue, but not in the cart - must not come back.
-        SeedPackage(seed, "real-50l", isTestData: false, liters: 50m, price: 4453m, updatedMinutesAgo: 5);
+        SeedPackage(seed, "real-50l", isTestData: false, liters: 50m, pricePerLiter: 89.06m, updatedMinutesAgo: 5);
 
         var wanted = new[]
         {
@@ -257,17 +258,27 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
     /// The offer is found by its key rather than created blindly, because two packages in one pool are
     /// two VOLUMES of one offer - that is the shape the uniqueness constraint demands, and seeding them
     /// as two offers would test a database state the application can never produce.
+    /// <para>
+    /// A nominal carries no price of its own, so the rate comes from the fuel - which means the two
+    /// pools of one fuel are priced alike, because the fuel's margin is one number. That is the point
+    /// of the rehearsal pool: it isolates stock and data, not money. A fixture that needs a nominal to
+    /// sell for X per litre states a cost of 30 and puts the rest in the margin.
+    /// </para>
     /// </remarks>
     private static void SeedPackage(
         ApplicationDbContext seed,
         string id,
         bool isTestData,
         decimal liters,
-        decimal price,
+        decimal pricePerLiter,
         int updatedMinutesAgo)
     {
         var pool = DataKinds.ForPool(isTestData);
         var offerId = OfferKeys.For("okko-95", pool);
+
+        var fuel = seed.FuelTypes.Local.FirstOrDefault(f => f.Id == "okko-95")
+            ?? seed.FuelTypes.FirstOrDefault(f => f.Id == "okko-95");
+        fuel!.MarginUahPerLiter = pricePerLiter - 30m;
 
         if (!seed.FuelOffers.Local.Any(o => o.Id == offerId) && !seed.FuelOffers.Any(o => o.Id == offerId))
         {
@@ -277,10 +288,6 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
                 BrandId = "okko",
                 FuelTypeId = "okko-95",
                 DataKind = pool,
-                // A flat cost and margin, independent of the volume's own price: what these tests
-                // assert is which keys come back and what each volume costs, and deriving a margin from
-                // the volume price made the QA fixture (1 UAH for 10 L) ask for a negative one, which the
-                // database refuses - correctly, since a negative margin is a loss on every litre.
                 SupplierPricePerLiter = 30m,
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow.AddMinutes(-updatedMinutesAgo),
@@ -292,7 +299,6 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
             Id = id,
             OfferId = offerId,
             Liters = liters,
-            PriceOverrideUah = price,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow.AddMinutes(-updatedMinutesAgo),
         });

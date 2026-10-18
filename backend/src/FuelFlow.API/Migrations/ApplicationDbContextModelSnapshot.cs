@@ -3870,10 +3870,6 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("text")
                         .HasColumnName("offer_id");
 
-                    b.Property<decimal?>("PriceOverrideUah")
-                        .HasColumnType("numeric(12,2)")
-                        .HasColumnName("price_override_uah");
-
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamptz")
                         .HasColumnName("updated_at_utc");
@@ -3893,8 +3889,6 @@ namespace FuelFlow.API.Migrations
                             t.HasCheckConstraint("ck_fuel_offer_volumes_liters_positive", "liters > 0");
 
                             t.HasCheckConstraint("ck_fuel_offer_volumes_offer_id_length", "length(offer_id) <= 103");
-
-                            t.HasCheckConstraint("ck_fuel_offer_volumes_price_override_non_negative", "price_override_uah IS NULL OR price_override_uah >= 0");
                         });
 
                     b.HasData(

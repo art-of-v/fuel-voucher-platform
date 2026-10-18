@@ -9,19 +9,18 @@ public sealed class FuelPackage
     public string FuelName { get; set; } = null!;
     public decimal Liters { get; set; }
 
-    /// <summary>
-    /// What this nominal costs, effective: the override when one is set, otherwise the fuel's rate ×
-    /// these litres. Computed by <see cref="FuelPricing.PackagePrice"/>, never stored — see
-    /// <see cref="FuelOfferVolume.PriceOverrideUah"/> for what this replaced.
-    /// </summary>
+/// <summary>
+/// What this nominal costs, effective: the fuel's rate x these litres, capped by the ceiling.
+/// Computed by <see cref="FuelPricing.PackagePrice"/>, never stored. Zero when the fuel is not
+/// priced yet — the admin listing still shows the nominal exists, the storefront skips it and
+/// checkout refuses it.
+/// </summary>
     public decimal Price { get; set; }
 
     /// <summary>
-    /// This nominal's own price, or null when it follows the fuel. Sent so an operator can see at a
-    /// glance which sizes are exceptions, rather than inferring it from a price that does not match.
+    /// The struck "before" price: the pump price this size would otherwise sell at, so the
+    /// storefront can show what the customer saves.
     /// </summary>
-    public decimal? PriceOverrideUah { get; set; }
-
     public decimal OriginalPrice { get; set; }
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
