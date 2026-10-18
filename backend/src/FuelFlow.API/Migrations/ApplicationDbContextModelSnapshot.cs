@@ -4325,6 +4325,14 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("AcquisitionSource")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasDefaultValue("direct")
+                        .HasColumnName("acquisition_source");
+
                     b.Property<string>("Address")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
@@ -4385,7 +4393,10 @@ namespace FuelFlow.API.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("suppliers", (string)null);
+                    b.ToTable("suppliers", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_suppliers_acquisition_source", "acquisition_source IN ('direct', 'partner')");
+                        });
                 });
 
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.User", b =>
