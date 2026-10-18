@@ -169,9 +169,6 @@ private readonly GetBrandsQueryHandler _getAll;
         var offerIdsToArchive = await _context.FuelOffers
             .Where(o => fuelIds.Contains(o.FuelTypeId))
             .Select(o => o.Id).ToListAsync(ct);
-        var packages = await _context.FuelOfferVolumes
-            .Where(v => offerIdsToArchive.Contains(v.OfferId))
-            .ToListAsync(ct);
         var offersToArchive = await _context.FuelOffers
             .Where(o => offerIdsToArchive.Contains(o.Id))
             .ToListAsync(ct);
@@ -180,15 +177,10 @@ private readonly GetBrandsQueryHandler _getAll;
         // here, so the old RemoveRange cascade could take paid-for vouchers with it; #217 keeps
         // anything that affects history. The !IsDeleted filters keep all three out of the catalog.
         var archivedAt = DateTime.UtcNow;
-        foreach (var package in packages)
-        {
-            package.IsDeleted = true;
-            package.DeletedAtUtc = archivedAt;
-        }
-        // The offers go too. Archiving only their volumes would leave a live offer behind with no
-        // sellable volume, and the next nominals edit would happily add volumes back to a brand that was
-        // deleted - the offer is the row that says "this fuel is on sale here", so it is the row that has
-        // to say no.
+        // The sizes are not touched, because they belong to the fuel and the fuel is archived below -
+        // so they are already out of the catalogue. Archiving the offer is what says "this fuel is
+        // not on sale here", and it is the row that has to say no: a live offer would keep the fuel
+        // on the shelf even with every fuel row behind it flagged deleted.
         foreach (var offer in offersToArchive)
         {
             offer.IsDeleted = true;

@@ -2,11 +2,8 @@ using FluentAssertions;
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Brands.GetAdminFuelTypeById;
 using FuelFlow.Features.Brands.GetAdminFuelTypes;
-using FuelFlow.Features.Brands.GetAdminPackages;
-using FuelFlow.Features.Brands.GetAdminPackagesByBrand;
 using FuelFlow.Features.Brands.GetAdminBrandById;
 using FuelFlow.Features.Brands.GetAdminBrands;
-using FuelFlow.Features.Brands.GetPackageSuggestions;
 using FuelFlow.Features.Brands.GetPublicPackages;
 using FuelFlow.Features.Brands.GetPublicPackagesByBrand;
 using FuelFlow.Features.Brands.GetPublicBrandStations;
@@ -146,7 +143,7 @@ CreateBrandStation("node-1", "Brand-a", "Node A"),
     [Fact]
     public async Task GetPublicPackages_ShouldReturnAllPackages()
     {
-        _context.FuelOfferVolumes.AddRange(
+        _context.FuelNominals.AddRange(
             CreatePackage("pkg-1", "Brand-a", "ft-a", "A-95", 10m),
             CreatePackage("pkg-2", "Brand-b", "ft-b", "Diesel", 20m));
         await _context.SaveChangesAsync();
@@ -165,7 +162,7 @@ CreateBrandStation("node-1", "Brand-a", "Node A"),
     [Fact]
     public async Task GetPublicPackages_ShouldNotServeAFlaggedTestPackage()
     {
-        _context.FuelOfferVolumes.AddRange(
+        _context.FuelNominals.AddRange(
             CreatePackage("pkg-real", "Brand-a", "ft-a", "A-95", 10m),
             CreatePackage("pkg-qa", "Brand-a", "ft-qa", "QA-CHECK-95", 5m, isTestData: true));
         await _context.SaveChangesAsync();
@@ -185,7 +182,7 @@ CreateBrandStation("node-1", "Brand-a", "Node A"),
     [Fact]
     public async Task GetPublicPackagesByBrand_ShouldNotServeAFlaggedTestPackage()
     {
-        _context.FuelOfferVolumes.AddRange(
+        _context.FuelNominals.AddRange(
             CreatePackage("pkg-real", "Brand-a", "ft-a", "A-95", 10m),
             CreatePackage("pkg-qa", "Brand-a", "ft-qa", "QA-CHECK-95", 5m, isTestData: true));
         await _context.SaveChangesAsync();
@@ -198,30 +195,10 @@ CreateBrandStation("node-1", "Brand-a", "Node A"),
         result[0].Id.Should().Be(PackageIds.For(OfferKeys.For("ft-a", DataKinds.Real), 10m));
     }
 
-    /// <summary>
-    /// The filter is deliberately not a global query filter, so the row an admin has to fix stays
-    /// visible to them. If this ever fails, someone widened it into the model and the admin screen
-    /// went blind to the very row it exists to manage.
-    /// </summary>
-    [Fact]
-    public async Task AdminPackages_ShouldStillListAFlaggedTestPackage()
-    {
-        _context.FuelOfferVolumes.AddRange(
-            CreatePackage("pkg-real", "Brand-a", "ft-a", "A-95", 10m),
-            CreatePackage("pkg-qa", "Brand-a", "ft-qa", "QA-CHECK-95", 5m, isTestData: true));
-        await _context.SaveChangesAsync();
-
-        var handler = new GetAdminPackagesQueryHandler(_context);
-
-        var result = await handler.HandleAsync(new GetAdminPackagesQuery());
-
-        result.Should().HaveCount(2, "the admin has to be able to see and clear the flag");
-    }
-
     [Fact]
     public async Task GetPublicPackagesByBrand_ShouldFilterByBrandId()
     {
-        _context.FuelOfferVolumes.AddRange(
+        _context.FuelNominals.AddRange(
             CreatePackage("pkg-1", "Brand-a", "ft-a", "A-95", 10m),
             CreatePackage("pkg-2", "Brand-a", "ft-a", "A-95", 20m),
             CreatePackage("pkg-3", "Brand-b", "ft-b", "Diesel", 20m));
@@ -244,7 +221,7 @@ CreateBrandStation("node-1", "Brand-a", "Node A"),
         // cost-derived OriginalPrice column is ignored and the supplier cost can never leak (#73).
 // No stored "before" price any more: it was never authoritative, and the storefront recomputes it
         // from the pump price - which is what stops a stale cost-derived value reaching anonymous callers.
-        _context.FuelOfferVolumes.Add(CreatePackage("pkg-1", "Brand-a", "ft-a", "A-95", 10m));
+        _context.FuelNominals.Add(CreatePackage("pkg-1", "Brand-a", "ft-a", "A-95", 10m));
         _context.SeedOffer("Brand-a", "ft-a",
             pumpPricePerLiter: 60m,      // public list price -> fresh "before" = 600
             finalPricePerLiter: 50m,
@@ -280,7 +257,7 @@ CreateBrandStation("node-1", "Brand-a", "Node A"),
         // stored cost-derived OriginalPrice (planning #73).
 // The legacy case: a package with no pump price at all. There is nothing to recompute the struck
         // price from, so the storefront falls back to the sale price and shows no fabricated saving.
-        _context.FuelOfferVolumes.Add(CreatePackage("pkg-legacy", "Brand-a", "ft-a", "A-95", 10m));
+        _context.FuelNominals.Add(CreatePackage("pkg-legacy", "Brand-a", "ft-a", "A-95", 10m));
         _context.SeedOffer("Brand-a", "ft-a",
             pumpPricePerLiter: null,
             finalPricePerLiter: 50m,
@@ -304,7 +281,7 @@ CreateBrandStation("node-1", "Brand-a", "Node A"),
     [Fact]
     public async Task GetPublicPackages_ShouldFlagAvailability_PromotingNothingAndHidingNothing()
     {
-        _context.FuelOfferVolumes.AddRange(
+        _context.FuelNominals.AddRange(
             CreatePackage("pkg-in-stock", "Brand-a", "ft-a", "A-95", 10m),
             CreatePackage("pkg-empty", "Brand-a", "ft-a", "A-95", 20m));
         _context.FuelVouchers.Add(CreateVoucher("Brand-a", "ft-a", 10m));
@@ -329,7 +306,7 @@ result.Should().HaveCount(2, "an empty shelf is greyed out, not removed from the
     [Fact]
     public async Task GetPublicPackages_ShouldNotCountUnactivatedImportedStockAsAvailable()
     {
-        _context.FuelOfferVolumes.Add(CreatePackage("pkg-1", "Brand-a", "ft-a", "A-95", 10m));
+        _context.FuelNominals.Add(CreatePackage("pkg-1", "Brand-a", "ft-a", "A-95", 10m));
         _context.FuelVouchers.Add(CreateVoucher("Brand-a", "ft-a", 10m, status: VoucherStatus.Imported));
         await _context.SaveChangesAsync();
 
@@ -348,7 +325,7 @@ result.Should().HaveCount(2, "an empty shelf is greyed out, not removed from the
     [Fact]
     public async Task GetPublicPackages_ShouldNotShowTestStockToARegularCustomer()
     {
-        _context.FuelOfferVolumes.Add(CreatePackage("pkg-1", "Brand-a", "ft-a", "A-95", 10m));
+        _context.FuelNominals.Add(CreatePackage("pkg-1", "Brand-a", "ft-a", "A-95", 10m));
         _context.FuelVouchers.Add(CreateVoucher("Brand-a", "ft-a", 10m, isTestData: true));
         await _context.SaveChangesAsync();
 
@@ -364,7 +341,7 @@ result.Should().HaveCount(2, "an empty shelf is greyed out, not removed from the
     {
         // The catalog carries "Brand-a"; imported stock carries whatever the supplier printed.
         // Fulfilment compares case-insensitively, so a case difference must not read as "no stock".
-        _context.FuelOfferVolumes.Add(CreatePackage("pkg-1", "Brand-a", "ft-a", "A-95", 10m));
+        _context.FuelNominals.Add(CreatePackage("pkg-1", "Brand-a", "ft-a", "A-95", 10m));
         _context.FuelVouchers.Add(CreateVoucher("Brand-A", "ft-a", 10m));
         await _context.SaveChangesAsync();
 
@@ -378,7 +355,7 @@ result.Should().HaveCount(2, "an empty shelf is greyed out, not removed from the
     [Fact]
     public async Task GetPublicPackages_ShouldIgnoreExpiredStock_WhileExpiryIsEnforced()
     {
-        _context.FuelOfferVolumes.Add(CreatePackage("pkg-1", "Brand-a", "ft-a", "A-95", 10m));
+        _context.FuelNominals.Add(CreatePackage("pkg-1", "Brand-a", "ft-a", "A-95", 10m));
         _context.FuelVouchers.Add(CreateVoucher(
             "Brand-a", "ft-a", 10m, providerExpiration: DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1))));
         await _context.SaveChangesAsync();
@@ -398,7 +375,7 @@ result.Should().HaveCount(2, "an empty shelf is greyed out, not removed from the
     [Fact]
     public async Task GetPublicPackages_ShouldCountExpiredStock_WhileExpiryIsDisabled()
     {
-        _context.FuelOfferVolumes.Add(CreatePackage("pkg-1", "Brand-a", "ft-a", "A-95", 10m));
+        _context.FuelNominals.Add(CreatePackage("pkg-1", "Brand-a", "ft-a", "A-95", 10m));
         _context.FuelVouchers.Add(CreateVoucher(
             "Brand-a", "ft-a", 10m, providerExpiration: DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1))));
         await _context.SaveChangesAsync();
@@ -418,7 +395,7 @@ result.Should().HaveCount(2, "an empty shelf is greyed out, not removed from the
     [Fact]
     public async Task GetPublicPackagesByBrand_ShouldFlagAvailabilityToo()
     {
-        _context.FuelOfferVolumes.AddRange(
+        _context.FuelNominals.AddRange(
             CreatePackage("pkg-in-stock", "Brand-a", "ft-a", "A-95", 10m),
             CreatePackage("pkg-empty", "Brand-a", "ft-a", "A-95", 20m));
         _context.FuelVouchers.Add(CreateVoucher("Brand-a", "ft-a", 10m));
@@ -446,9 +423,12 @@ result.Should().HaveCount(2);
         // change or entity swap can leak the operator's crown-jewel pricing to anonymous callers.
         var publicFields = typeof(PublicPackageResponse).GetProperties().Select(p => p.Name).ToArray();
 
-        publicFields.Should().NotContain(nameof(FuelPackage.SupplierPricePerLiter));
-        publicFields.Should().NotContain(nameof(FuelPackage.MarginUahPerLiter));
-        publicFields.Should().NotContain(nameof(FuelPackage.MarginPercent));
+        // Named as strings rather than through <c>nameof(FuelPackage)</c>: the package DTO is gone
+        // with the volume it projected from, and this guard is about what the public shape must NOT
+        // carry - which is a statement about names, not about a type that no longer exists.
+        publicFields.Should().NotContain("SupplierPricePerLiter");
+        publicFields.Should().NotContain("MarginUahPerLiter");
+        publicFields.Should().NotContain("MarginPercent");
     }
 
     [Fact]
@@ -491,39 +471,6 @@ result.Should().HaveCount(2);
     }
 
     [Fact]
-    public async Task GetAdminPackages_ShouldOrderByBrandIdThenFuelNameThenLiters()
-    {
-        _context.FuelOfferVolumes.AddRange(
-            CreatePackage("pkg-1", "Brand-b", "ft-b", "B Fuel", 50m),
-            CreatePackage("pkg-2", "Brand-a", "ft-a", "A Fuel", 20m),
-            CreatePackage("pkg-3", "Brand-a", "ft-a", "A Fuel", 10m));
-        await _context.SaveChangesAsync();
-
-        var handler = new GetAdminPackagesQueryHandler(_context);
-
-        var result = await handler.HandleAsync(new GetAdminPackagesQuery());
-
-        result.Select(p => p.Id).Should().Equal("pkg-3", "pkg-2", "pkg-1");
-    }
-
-    [Fact]
-    public async Task GetAdminPackagesByBrand_ShouldFilterByBrandId()
-    {
-        _context.FuelOfferVolumes.AddRange(
-            CreatePackage("pkg-1", "Brand-a", "ft-a", "A-95", 10m),
-            CreatePackage("pkg-2", "Brand-a", "ft-a", "A-95", 20m),
-            CreatePackage("pkg-3", "Brand-b", "ft-b", "Diesel", 20m));
-        await _context.SaveChangesAsync();
-
-        var handler = new GetAdminPackagesByBrandQueryHandler(_context);
-
-        var result = await handler.HandleAsync(new GetAdminPackagesByBrandQuery("Brand-a"));
-
-        result.Should().HaveCount(2);
-        result.Should().OnlyContain(p => p.BrandId == "Brand-a");
-    }
-
-    [Fact]
     public async Task GetAdminBrandById_ShouldReturnFound()
     {
         _context.Brands.Add(CreateBrand("Brand-a", "Alpha Brand"));
@@ -545,90 +492,6 @@ result.Should().HaveCount(2);
         var result = await handler.HandleAsync(new GetAdminBrandByIdQuery("missing"));
 
         result.Should().BeNull();
-    }
-
-    [Fact]
-    public async Task GetPackageSuggestions_ShouldReturnSuggestionForVoucherCombo()
-    {
-        _context.Brands.Add(CreateBrand("okko", "OKKO"));
-        _context.FuelTypes.Add(CreateFuelType("okko-95", "A-95", "okko"));
-        _context.FuelVouchers.Add(CreateVoucher("OKKO", "okko-95", 50m));
-        await _context.SaveChangesAsync();
-
-        var handler = new GetPackageSuggestionsQueryHandler(_context);
-
-        var result = await handler.HandleAsync(new GetPackageSuggestionsQuery());
-
-        var suggestion = result.Single();
-        suggestion.SuggestedId.Should().Be("okko-a-95-50");
-        suggestion.BrandId.Should().Be("okko");
-        suggestion.BrandName.Should().Be("OKKO");
-        suggestion.FuelTypeId.Should().Be("okko-95");
-        suggestion.FuelName.Should().Be("A-95");
-        suggestion.Liters.Should().Be(50m);
-    }
-
-    [Fact]
-    public async Task GetPackageSuggestions_ShouldMatchProviderCaseAndWhitespace()
-    {
-        _context.Brands.Add(CreateBrand("okko", "OKKO"));
-        _context.FuelTypes.Add(CreateFuelType("okko-95", "A-95", "okko"));
-        _context.FuelVouchers.Add(CreateVoucher("  okko ", "okko-95", 50m));
-        await _context.SaveChangesAsync();
-
-        var handler = new GetPackageSuggestionsQueryHandler(_context);
-
-        var result = await handler.HandleAsync(new GetPackageSuggestionsQuery());
-
-        result.Should().ContainSingle();
-    }
-
-    [Fact]
-    public async Task GetPackageSuggestions_ShouldSkipWhenPackageAlreadyExists()
-    {
-        _context.Brands.Add(CreateBrand("okko", "OKKO"));
-        _context.FuelTypes.Add(CreateFuelType("okko-95", "A-95", "okko"));
-        _context.FuelOfferVolumes.Add(CreatePackage("pkg-1", "okko", "okko-95", "A-95", 50m));
-        _context.FuelVouchers.Add(CreateVoucher("OKKO", "okko-95", 50m));
-        await _context.SaveChangesAsync();
-
-        var handler = new GetPackageSuggestionsQueryHandler(_context);
-
-        var result = await handler.HandleAsync(new GetPackageSuggestionsQuery());
-
-        result.Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task GetPackageSuggestions_ShouldSkipWhenProviderDoesNotMatchBrand()
-    {
-        _context.Brands.Add(CreateBrand("okko", "OKKO"));
-        _context.FuelTypes.Add(CreateFuelType("okko-95", "A-95", "okko"));
-        _context.FuelVouchers.Add(CreateVoucher("WOG", "okko-95", 50m));
-        await _context.SaveChangesAsync();
-
-        var handler = new GetPackageSuggestionsQueryHandler(_context);
-
-        var result = await handler.HandleAsync(new GetPackageSuggestionsQuery());
-
-        result.Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task GetPackageSuggestions_ShouldGroupDuplicateVoucherCombos()
-    {
-        _context.Brands.Add(CreateBrand("okko", "OKKO"));
-        _context.FuelTypes.Add(CreateFuelType("okko-95", "A-95", "okko"));
-        _context.FuelVouchers.AddRange(
-            CreateVoucher("OKKO", "okko-95", 50m),
-            CreateVoucher("OKKO", "okko-95", 50m));
-        await _context.SaveChangesAsync();
-
-        var handler = new GetPackageSuggestionsQueryHandler(_context);
-
-        var result = await handler.HandleAsync(new GetPackageSuggestionsQuery());
-
-        result.Should().ContainSingle();
     }
 
     /// <summary>
@@ -681,7 +544,7 @@ result.Should().HaveCount(2);
     /// this file keeps working with only the DbSet renamed. The offer is added here because EF will
     /// cascade the volumes in, but will not invent the parent they point at.
     /// </remarks>
-    private FuelOfferVolume CreatePackage(string id, string BrandId, string fuelTypeId, string fuelName, decimal liters, bool isTestData = false)
+    private FuelNominal CreatePackage(string id, string BrandId, string fuelTypeId, string fuelName, decimal liters, bool isTestData = false)
     {
         // The storefront joins volumes -> offers -> fuel_types for the display name. On the in-memory
         // provider that join is executed for real, so a fixture that seeds a package without seeding its
@@ -702,29 +565,20 @@ result.Should().HaveCount(2);
         // Priced like every other package on the shelf: there is no per-package override any more, so a
     // fixture that leaves the knobs empty seeds a package the public query rightly skips as
     // unpriced. Tests about availability must not depend on that.
-    var offer = _context.SeedOffer(
+    _context.SeedOffer(
         BrandId, fuelTypeId, isTestData, supplierPricePerLiter: 49m, marginUahPerLiter: 7m);
 
-    // The shelf reads its sizes from fuel_nominals, so a fixture has to state the size there too.
-    // Both rows are seeded while the volume table still exists; the volume is what carries the
-    // pool-scoped id today, and the nominal is what the storefront will read once it is gone.
-    var fuel = _context.FuelTypes.Local.FirstOrDefault(f => f.Id == fuelTypeId)
-        ?? _context.FuelTypes.FirstOrDefault(f => f.Id == fuelTypeId);
-    if (fuel is not null
-        && !_context.FuelNominals.Local.Any(n => n.FuelTypeId == fuelTypeId && n.Liters == liters)
-        && !_context.FuelNominals.Any(n => n.FuelTypeId == fuelTypeId && n.Liters == liters))
+    // The size itself. A nominal is keyed by fuel and litres and belongs to no pool, so this is
+    // the whole of what a package is now - there is no second row keeping the two in step.
+    var nominal = new FuelNominal
     {
-        _context.FuelNominals.Add(new FuelNominal { FuelTypeId = fuelTypeId, Liters = liters });
-    }
-
-        return new FuelOfferVolume
-        {
-            Id = id,
-            OfferId = offer.Id,
-            Liters = liters,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
-        };
+        FuelTypeId = fuelTypeId,
+        Liters = liters,
+        CreatedAtUtc = DateTime.UtcNow,
+        UpdatedAtUtc = DateTime.UtcNow,
+    };
+    _context.FuelNominals.Add(nominal);
+    return nominal;
     }
 
     private static FuelVoucher CreateVoucher(

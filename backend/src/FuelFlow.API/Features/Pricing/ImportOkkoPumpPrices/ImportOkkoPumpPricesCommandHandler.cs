@@ -149,15 +149,16 @@ public sealed class ImportOkkoPumpPricesCommandHandler
             .GroupBy(o => o.FuelTypeId)
             .ToDictionary(g => g.Key, g => g.OrderBy(o => o.Id, StringComparer.Ordinal).ToList());
 
-        var offerIds = offersByFuel.Values.SelectMany(list => list).Select(o => o.Id).ToList();
-        var volumesByOffer = (await _context.FuelOfferVolumes
-                .AsTracking()
-                .Where(v => offerIds.Contains(v.OfferId) && !v.IsDeleted)
-                .ToListAsync(ct))
-            .GroupBy(v => v.OfferId)
-            .ToDictionary(g => g.Key, g => g.ToList());
-
+// A nominal carries no stored price, so a pump change does not rewrite anything per size - it
+        // moves the offer's rate and every size follows. The counts the report gives back are the
+        // fuel's nominal count, because the sizes belong to the fuel rather than to one pool's offer.
         var now = DateTime.UtcNow;
+        var nominalCountByFuel = await _context.FuelNominals
+            .AsNoTracking()
+            .GroupBy(n => n.FuelTypeId)
+            .Select(g => new { FuelTypeId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.FuelTypeId, x => x.Count, ct);
+
         var actor = actingUserId == Guid.Empty ? (Guid?)null : actingUserId;
 
         var applied = new List<OkkoPumpApplied>();
@@ -220,7 +221,7 @@ public sealed class ImportOkkoPumpPricesCommandHandler
 
             foreach (var offer in poolOffers)
             {
-                var vols = volumesByOffer.TryGetValue(offer.Id, out var vv) ? vv : new List<FuelOfferVolume>();
+        var vols = nominalCountByFuel.TryGetValue(ft.Id, out var vcount) ? vcount : 0;
 
                 var cost = offer.SupplierPricePerLiter ?? 0m; // held constant: a pump change is not a cost event
                 var profit = ft.MarginUahPerLiter ?? 0m;
@@ -258,9 +259,9 @@ public sealed class ImportOkkoPumpPricesCommandHandler
                 }
 
                 if (changed) changedCount++;
-                repriced += vols.Count;
+        repriced += vols;
                 applied.Add(new OkkoPumpApplied(
-                    ft.Id, ft.Name, siteCode, pump, finalPerLiter, previousPump, changed, vols.Count));
+                    ft.Id, ft.Name, siteCode, pump, finalPerLiter, previousPump, changed, vols));
             }
 
             // Keep the fuel-type base/discount headline in step, as the operator write path does. It is

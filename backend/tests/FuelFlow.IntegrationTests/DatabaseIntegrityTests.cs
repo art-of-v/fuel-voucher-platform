@@ -118,7 +118,6 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
     [InlineData("brands", "ck_brands_id_length")]
     [InlineData("fuel_types", "ck_fuel_types_id_length")]
     [InlineData("brand_stations", "ck_brand_stations_id_length")]
-    [InlineData("fuel_offer_volumes", "ck_fuel_offer_volumes_id_length")]
     [InlineData("fuel_vouchers", "ck_fuel_vouchers_fuel_type_id_length")]
     [InlineData("purchase_batches", "ck_purchase_batches_fuel_type_id_length")]
     [InlineData("voucher_exchanges", "ck_voucher_exchanges_fuel_type_id_length")]
@@ -195,7 +194,7 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
     public async Task A_NonPositive_Liters_Volume_Is_Refused(double liters)
     {
         await using var context = CreateContext();
-        context.FuelOfferVolumes.Add(NewVolume($"vol-liters-{liters}", liters));
+        context.FuelNominals.Add(NewNominal("no-such-fuel", liters));
 
         var act = async () => await context.SaveChangesAsync();
         await act.Should().ThrowAsync<DbUpdateException>();
@@ -265,19 +264,18 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
             var (giveawayFuel, offer) = NewOfferWithFuel("offer-free-giveaway", 0m);
             seed.FuelTypes.Add(giveawayFuel);
             seed.FuelOffers.Add(offer);
-            seed.FuelOfferVolumes.Add(new FuelOfferVolume
+        seed.FuelNominals.Add(new FuelNominal
             {
-                Id = "vol-free-giveaway",
-                OfferId = offer.Id,
+                FuelTypeId = giveawayFuel.Id,
                 Liters = 5m,
-                // A free nominal, said so: 0 is a legal override, and the volume the offer's rate
+                CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow
             });
             await seed.SaveChangesAsync();
         }
 
         await using var context = CreateContext();
-        context.FuelOfferVolumes.Add(NewVolume("vol-zero-litres", 0));
+        context.FuelNominals.Add(NewNominal("no-such-fuel", 0));
 
         var act = async () => await context.SaveChangesAsync();
         await act.Should().ThrowAsync<DbUpdateException>();
@@ -330,14 +328,14 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
     /// into a wiring assertion that passes for the wrong reason. The sign constraints live on the
     /// volume's own columns and fire before anything else is consulted.
     /// </summary>
-    private static FuelOfferVolume NewVolume(string id, double liters) => new()
+    private static FuelNominal NewNominal(string fuelTypeId, double liters) => new()
     {
-        Id = id,
-        OfferId = $"no-such-offer-{id}",
+        FuelTypeId = fuelTypeId,
         Liters = (decimal)liters,
         CreatedAtUtc = DateTime.UtcNow,
         UpdatedAtUtc = DateTime.UtcNow
     };
+
     /// <summary>
     /// The sharpest edge in the schema. Deleting a fuel type used to cascade straight into
     /// fuel_vouchers and destroy every voucher sold against it — paper the customer had already

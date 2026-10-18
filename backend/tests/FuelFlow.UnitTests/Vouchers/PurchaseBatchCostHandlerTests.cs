@@ -37,7 +37,7 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
 
         // okko-dp fuel with two nominals; margin 2 UAH/L, no pump (so final = blended cost + 2).
         _context.FuelTypes.Add(new FuelTypeEntity { Id = "okko-dp", Name = "ДП ЄВРО", BrandId = "okko", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
-        _context.FuelOfferVolumes.AddRange(
+        _context.FuelNominals.AddRange(
             NewPackage("okko-dp", 10m),
             NewPackage("okko-dp", 20m));
         _context.Suppliers.Add(new Supplier
@@ -64,19 +64,19 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
     /// The blended-cost recalculator reprices OFFERS now, so a fixture left in fuel_packages would let
     /// every repricing assertion read a zero cost and the fuel card report it healthy.
     /// </remarks>
-    private FuelOfferVolume NewPackage(string fuelTypeId, decimal liters)
+private FuelNominal NewPackage(string fuelTypeId, decimal liters)
     {
-        var offer = _context.SeedOffer("okko", fuelTypeId, marginUahPerLiter: 2m);
-        return new FuelOfferVolume
-        {
-            Id = Guid.NewGuid().ToString(),
-            OfferId = offer.Id,
-            Liters = liters,
-            // No override: the nominal follows its offer, which is what this suite is about — the cost
-            // entry moves the offer's rate and the package prices move with it.
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
-        };
+    _context.SeedOffer("okko", fuelTypeId, marginUahPerLiter: 2m);
+    return new FuelNominal
+    {
+    FuelTypeId = fuelTypeId,
+    Liters = liters,
+    // The size is all a package is now. It carries no price of its own: the nominal follows its
+    // fuel's rate, which is what this suite is about - the cost entry moves the offer's rate and
+    // every size prices move with it.
+    CreatedAtUtc = DateTime.UtcNow,
+    UpdatedAtUtc = DateTime.UtcNow,
+    };
     }
 
     private Guid SeedImport()
@@ -185,10 +185,10 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         offer.SupplierPricePerLiter.Should().Be(25m);
         offer.FinalPerLiterWith(await MarginFor(offer)).Should().Be(27m);   // 25 cost + 2 margin
 
-        var volumes = await _context.FuelOfferVolumes
-            .Where(v => v.OfferId == offer.Id).OrderBy(v => v.Liters).ToListAsync();
-        // Nothing per volume any more: the cost moved the offer's rate, and every nominal follows it.
-
+        var sizes = await _context.FuelNominals
+            .Where(v => v.FuelTypeId == "okko-dp").OrderBy(v => v.Liters).ToListAsync();
+        // Nothing per size any more: the cost moved the offer's rate, and every nominal follows it.
+        sizes.Should().HaveCount(2);
         var fuel = await _context.FuelTypes.FirstAsync(f => f.Id == "okko-dp");
         fuel.DiscountPrice.Should().Be(27);   // final/L rounded
         fuel.BasePrice.Should().Be(27);       // pump null ⇒ final + minDiscount(0)
