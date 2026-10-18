@@ -129,22 +129,16 @@ public static class FuelPricing
     /// <param name="profitPerLiter">The offer's margin, or null when the fuel is not priced yet.</param>
     /// <param name="pumpPricePerLiter">The pump ceiling (колонка), or null when none is recorded.</param>
     /// <param name="minDiscountPerLiter">The guaranteed gap under the ceiling, or null for zero.</param>
-    /// <param name="liters">The nominal being priced.</param>
-    /// <param name="overrideUah">
-    /// This nominal's own price, when one was set. Wins over the arithmetic, including when it is lower —
-    /// the below-cost guard, not this function, is where a price that loses money is refused.
-    /// </param>
+/// <param name="liters">The nominal being priced.</param>
     public static decimal PackagePrice(
         decimal? costPerLiter,
         decimal? profitPerLiter,
         decimal? pumpPricePerLiter,
         decimal? minDiscountPerLiter,
-        decimal liters,
-        decimal? overrideUah)
-        => TryPackagePrice(costPerLiter, profitPerLiter, pumpPricePerLiter, minDiscountPerLiter, liters, overrideUah)
+        decimal liters)
+        => TryPackagePrice(costPerLiter, profitPerLiter, pumpPricePerLiter, minDiscountPerLiter, liters)
            ?? throw new InvalidOperationException(
-               "The offer has no supplier cost or no margin, and this volume carries no price override, "
-               + "so there is no price to quote.");
+               "The fuel has no supplier cost or no margin, so there is no price to quote.");
 
     /// <summary>
     /// The nullable form of <see cref="PackagePrice"/>, for the callers that can meet a nominal with no
@@ -161,14 +155,8 @@ public static class FuelPricing
         decimal? profitPerLiter,
         decimal? pumpPricePerLiter,
         decimal? minDiscountPerLiter,
-        decimal liters,
-        decimal? overrideUah)
+        decimal liters)
     {
-        if (overrideUah is { } set)
-        {
-            return set;
-        }
-
         if (FinalPerLiterOrNull(costPerLiter, profitPerLiter, pumpPricePerLiter, minDiscountPerLiter) is not { } price)
         {
             return null;

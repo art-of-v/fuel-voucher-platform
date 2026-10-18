@@ -74,7 +74,6 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
             Liters = liters,
             // No override: the nominal follows its offer, which is what this suite is about — the cost
             // entry moves the offer's rate and the package prices move with it.
-            PriceOverrideUah = null,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
         };
@@ -189,8 +188,6 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         var volumes = await _context.FuelOfferVolumes
             .Where(v => v.OfferId == offer.Id).OrderBy(v => v.Liters).ToListAsync();
         // Nothing per volume any more: the cost moved the offer's rate, and every nominal follows it.
-        volumes[0].PriceOverrideUah.Should().BeNull();
-        volumes[1].PriceOverrideUah.Should().BeNull();
 
         var fuel = await _context.FuelTypes.FirstAsync(f => f.Id == "okko-dp");
         fuel.DiscountPrice.Should().Be(27);   // final/L rounded

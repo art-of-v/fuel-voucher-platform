@@ -69,7 +69,6 @@ public sealed class SellablePackageProjectionTests : IDisposable
             Id = "projection-vol",
             OfferId = offer.Id,
             Liters = 10m,
-            PriceOverrideUah = null,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };

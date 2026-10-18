@@ -131,7 +131,6 @@ public sealed record CreatePackageRequest
     /// is the exception rather than the way to price a catalogue. 
     /// <c>PUT /api/admin/packages/{id}</c> with null puts the nominal back on the fuel's rate.
     /// </summary>
-    public decimal? PriceOverrideUah { get; init; }
 
     public decimal? SupplierPricePerLiter { get; init; }
     public decimal? MarginUahPerLiter { get; init; }
@@ -155,8 +154,6 @@ public sealed record CreatePackageRequest
         Liters = Liters,
         // The effective price is computed, not taken from the body: FuelPricing.PackagePrice resolves
         // the override if there is one and the offer's rate otherwise. The handler reads
-        // PriceOverrideUah, which is why the two are different numbers on purpose.
-        PriceOverrideUah = PriceOverrideUah,
         SupplierPricePerLiter = SupplierPricePerLiter,
         MarginUahPerLiter = MarginUahPerLiter,
         MarginPercent = MarginPercent,

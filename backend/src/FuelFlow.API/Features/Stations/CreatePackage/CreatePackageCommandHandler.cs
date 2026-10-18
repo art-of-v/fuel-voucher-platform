@@ -141,7 +141,6 @@ public sealed class CreatePackageCommandHandler
             // because an operator occasionally needs exactly that (a round marketing price for a 50 L
             // canister) and because it is the only way to create a nominal at all; it is not how a
             // catalogue is priced, and the brand screen is.
-            PriceOverrideUah = command.Package.PriceOverrideUah,
             CreatedAtUtc = now,
             UpdatedAtUtc = now,
         };

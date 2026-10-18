@@ -36,7 +36,6 @@ internal static class SellablePackageProjection
             BrandId = v.Offer.BrandId,
             FuelTypeId = v.Offer.FuelTypeId,
             Liters = v.Liters,
-            PriceOverrideUah = v.PriceOverrideUah,
             PumpPricePerLiter = v.Offer.PumpPricePerLiter,
             MinDiscountPerLiter = v.Offer.MinDiscountPerLiter,
             SupplierPricePerLiter = v.Offer.SupplierPricePerLiter,

@@ -21,7 +21,6 @@ internal sealed class FuelOfferVolumeConfiguration : IEntityTypeConfiguration<Fu
         builder.Property(e => e.Liters).HasColumnName("liters").HasColumnType("numeric(10,2)").IsRequired();
         // Nullable, and nullable is the point: null means "price this nominal from the offer's rate",
         // which is every row on production. Only an operator who means it sets a number here.
-        builder.Property(e => e.PriceOverrideUah).HasColumnName("price_override_uah").HasColumnType("numeric(12,2)");
 
         builder.Property(e => e.CreatedAtUtc).HasColumnName("created_at_utc").HasColumnType("timestamptz");
         builder.Property(e => e.UpdatedAtUtc).HasColumnName("updated_at_utc").HasColumnType("timestamptz");
@@ -59,7 +58,6 @@ internal sealed class FuelOfferVolumeConfiguration : IEntityTypeConfiguration<Fu
 
             // Carried over from ck_fuel_packages_price_non_negative (#314) and from the column it guards:
             // same reachability (the admin API takes the number straight off the body), same refusal.
-            t.HasCheckConstraint("ck_fuel_offer_volumes_price_override_non_negative", "price_override_uah IS NULL OR price_override_uah >= 0");
         });
     }
 }

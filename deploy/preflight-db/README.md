@@ -51,10 +51,16 @@ The chain that made it necessary, in order:
    derived from the offer's knobs and the offer has a single source of truth for it. `010` was rewritten to
    derive its rate too, and kept asking the same question.
 3. `PackagePriceOverrideOnNominals` (2026-10-17) replaced `fuel_offer_volumes.package_price` with a nullable
-   `price_override_uah`. Null means "the offer's rate × litres"; a number means an operator priced that size
-   on purpose. There is no longer a copy of the offer's price anywhere — `FuelPricing.PackagePrice` computes
-   the effective one, and every reader (shelf, quote, charge) uses that same function, so a drift between
-   what is shown and what is charged is not representable.
+   `price_override_uah`. Null means "the offer's rate x litres"; a number means an operator priced that size
+   on purpose. There was no longer a copy of the offer's price anywhere - `FuelPricing.PackagePrice` computed
+   the effective one, and every reader (shelf, quote, charge) used that same function, so a drift between
+   what is shown and what is charged was not representable.
+4. `NoOneOffPrices` (2026-10-18) dropped `price_override_uah` and its non-negative check. A per-nominal price
+   set by hand was the last way to say something other than "the formula decided", and it was a second source
+   of truth wearing the first one's clothes: a repricing moved every nominal but that one, so a price shown on
+   the shelf could silently differ from the price charged. What replaced it is nothing - every nominal is now
+   priced from its fuel's rate, and the margin lives on the fuel. That is also why the rehearsal and live
+   pools of one fuel are priced alike: the pool separates stock and data, not money.
 
 Deleting the check is therefore the intended outcome, not a gap. If a future change introduces a second
 copy of a price, it needs a check like this again — and `010`'s header, which is in the git history, says

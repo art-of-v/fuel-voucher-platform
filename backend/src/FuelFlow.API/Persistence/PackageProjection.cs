@@ -40,17 +40,15 @@ internal static class PackageProjection
             FuelTypeId = volume.Offer.FuelTypeId,
             FuelName = fuel.Name,
             Liters = volume.Liters,
-            // Computed, not read: the override when the operator set one, the offer's rate x litres
-            // otherwise. Zero when there is neither - the admin listing still shows that the nominal
-            // exists and is not priced yet, where the storefront skips it and checkout refuses it.
+            // Computed, not read: the rate x litres. Zero when the fuel is not priced
+            // yet - the admin listing still shows that the nominal exists and is unpriced, where the
+            // storefront skips it and checkout refuses it.
             Price = FuelPricing.TryPackagePrice(
                     volume.Offer.SupplierPricePerLiter,
                     fuel.MarginUahPerLiter,
                     volume.Offer.PumpPricePerLiter,
                     volume.Offer.MinDiscountPerLiter,
-                    volume.Liters,
-                    volume.PriceOverrideUah) ?? 0m,
-            PriceOverrideUah = volume.PriceOverrideUah,
+                    volume.Liters) ?? 0m,
             OriginalPrice = FuelPricing.OriginalPackagePrice(
                 volume.Offer.PumpPricePerLiter,
                 volume.Liters,
@@ -59,8 +57,7 @@ internal static class PackageProjection
                     fuel.MarginUahPerLiter,
                     volume.Offer.PumpPricePerLiter,
                     volume.Offer.MinDiscountPerLiter,
-                    volume.Liters,
-                    volume.PriceOverrideUah) ?? 0m),
+                    volume.Liters) ?? 0m),
             SupplierPricePerLiter = volume.Offer.SupplierPricePerLiter,
             MarginUahPerLiter = fuel.MarginUahPerLiter,
             MarginPercent = volume.Offer.MarginPercent,

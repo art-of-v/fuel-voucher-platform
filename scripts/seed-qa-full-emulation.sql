@@ -154,13 +154,13 @@ WHERE live.data_kind = 'real'
 ON CONFLICT (station_id, fuel_type_id, data_kind) DO NOTHING;
 
 INSERT INTO fuel_offer_volumes
-    (id, offer_id, liters, price_override_uah,
+    (id, offer_id, liters,
      created_at_utc, updated_at_utc, is_deleted, deleted_at_utc)
 SELECT
     'qa-' || live.id, live_offer.id || '-qa', live.liters,
-    -- Whatever exception the live nominal carries, and nothing more: the QA offer mirrors the live
-    -- offer's rate, so a null override reproduces the live price exactly.
-    live.price_override_uah,
+    -- No price: `price_override_uah` is gone and a nominal's price is the fuel's rate x its litres.
+    -- The margin lives on fuel_types, which both pools share, so the QA catalogue is priced exactly
+    -- like the live one - the pool separates stock and data, not money.
     now() - interval '2 days', now() - interval '2 days', false, NULL
 FROM fuel_offer_volumes live
 JOIN fuel_offers live_offer ON live_offer.id = live.offer_id
@@ -184,13 +184,12 @@ SELECT
     offer.station_id         AS station_id,
     offer.fuel_type_id       AS fuel_type_id,
     volume.liters            AS liters,
-    -- The effective price of the nominal: the override when one is set, else the offer's rate
-    -- x litres. The offer stopped storing a final price on 2026-10-17 and the volume stopped storing
-    -- a total the same day, so both numbers below are computed here the way FuelPricing.PackagePrice does.
-    coalesce(volume.price_override_uah,
-             round(least(coalesce(offer.supplier_price_per_liter, 0) + coalesce(offer.margin_uah_per_liter, 0),
-                            coalesce(offer.pump_price_per_liter, 1000000000) - coalesce(offer.min_discount_per_liter, 0))
-                   * volume.liters, 2)) AS price,
+    -- The effective price of the nominal: the fuel's rate x litres, capped by the ceiling. There is
+    -- no per-nominal override left to prefer, and no stored total to read, so both numbers below are
+    -- computed here the way FuelPricing.PackagePrice does.
+    round(least(coalesce(offer.supplier_price_per_liter, 0) + coalesce(offer.margin_uah_per_liter, 0),
+                   coalesce(offer.pump_price_per_liter, 1000000000) - coalesce(offer.min_discount_per_liter, 0))
+              * volume.liters, 2)) AS price,
     offer.supplier_price_per_liter,
     offer.pump_price_per_liter,
     offer.min_discount_per_liter,

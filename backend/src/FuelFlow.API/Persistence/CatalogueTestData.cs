@@ -168,32 +168,24 @@ internal static class CatalogueTestData
         DateTime? updatedAtUtc = null)
     {
 var offer = context.SeedOffer(
-            BrandId, fuelTypeId, isTestData,
-            supplierPricePerLiter, marginUahPerLiter, marginPercent,
-            finalPricePerLiter, pumpPricePerLiter, minDiscountPerLiter,
-            createdAtUtc, updatedAtUtc);
+    BrandId, fuelTypeId, isTestData,
+    supplierPricePerLiter, marginUahPerLiter, marginPercent,
+    finalPricePerLiter, pumpPricePerLiter, minDiscountPerLiter,
+    createdAtUtc, updatedAtUtc);
 
-// `price` is what the test wants this package to sell for. Under the override model that is
-        // either the offer's own rate x litres - in which case it is written as nothing at all and the
-        // package follows its fuel - or a deliberate exception, in which case it becomes the override and
-        // stays visible as one. Which of the two it is is decided here rather than by each test, so a
-        // fixture cannot accidentally pin a price it meant to be derived. The margin is the fuel's, read
-        // back off the row SeedOffer just wrote it to.
-        var derived = FuelPricing.TryPackagePrice(
-            offer.SupplierPricePerLiter,
-            context.FuelTypes.Local.FirstOrDefault(f => f.Id == offer.FuelTypeId)?.MarginUahPerLiter
-                ?? context.FuelTypes.FirstOrDefault(f => f.Id == offer.FuelTypeId)?.MarginUahPerLiter,
-            offer.PumpPricePerLiter,
-            offer.MinDiscountPerLiter,
-            liters,
-            overrideUah: null);
+// `price` used to be written as the per-package override, so it was the one number a fixture had
+    // to state. There is no override any more: the charge is always cost + margin, capped by the
+    // ceiling, so a fixture that wants a package to sell for something must say what the fuel COSTS
+    // and what its MARGIN is. `price` is kept only to name what the test is about, and is not
+    // written anywhere — a package seeded without knobs is unpriced, which the storefront skips and
+    // checkout refuses, exactly as it would in production.
+    _ = price;
 
         var volume = new FuelOfferVolume
         {
             Id = id,
             OfferId = offer.Id,
             Liters = liters,
-            PriceOverrideUah = derived == price ? null : price,
             CreatedAtUtc = createdAtUtc ?? DateTime.UtcNow,
             UpdatedAtUtc = updatedAtUtc ?? DateTime.UtcNow,
         };

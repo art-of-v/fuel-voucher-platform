@@ -201,18 +201,6 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
         await act.Should().ThrowAsync<DbUpdateException>();
     }
 
-    [Fact]
-    public async Task A_Negative_Price_Volume_Is_Refused()
-    {
-        await using var context = CreateContext();
-        var volume = NewVolume("vol-negative-price", 10);
-        volume.PriceOverrideUah = -100m;
-        context.FuelOfferVolumes.Add(volume);
-
-        var act = async () => await context.SaveChangesAsync();
-        await act.Should().ThrowAsync<DbUpdateException>();
-    }
-
     /// <summary>
     /// The negative-rate guard, which the old table never needed because it had no column for one.
     /// <para>
@@ -283,9 +271,6 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
                 OfferId = offer.Id,
                 Liters = 5m,
                 // A free nominal, said so: 0 is a legal override, and the volume the offer's rate
-                // would price from is now written by nothing at all.
-                PriceOverrideUah = 0m,
-                CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow
             });
             await seed.SaveChangesAsync();
@@ -345,15 +330,11 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
     /// into a wiring assertion that passes for the wrong reason. The sign constraints live on the
     /// volume's own columns and fire before anything else is consulted.
     /// </summary>
-    private static FuelOfferVolume NewVolume(string id, double liters, decimal? overrideUah = 100m) => new()
+    private static FuelOfferVolume NewVolume(string id, double liters) => new()
     {
         Id = id,
         OfferId = $"no-such-offer-{id}",
         Liters = (decimal)liters,
-        // Set outright rather than derived from litres - the zero-litre case would divide by zero, and
-        // the point of that test is that the row is rejected by the database, not that the test
-        // helper survived building it.
-        PriceOverrideUah = overrideUah,
         CreatedAtUtc = DateTime.UtcNow,
         UpdatedAtUtc = DateTime.UtcNow
     };

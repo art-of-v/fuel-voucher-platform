@@ -39,12 +39,6 @@ public static class ServerPricing
         // An override IS the price of this nominal, so it is the base the term discount comes off — not
         // a fallback for when the offer has no rate. Discounting the formula instead and ignoring the
         // override would make it a decoration: the shelf would show one number and the charge another.
-        if (package.PriceOverrideUah is { } @override)
-        {
-            var discountedOverride = Math.Max(0m, @override - Math.Max(0m, discountPerLiter) * liters);
-            return Math.Round(discountedOverride, 2, MidpointRounding.AwayFromZero);
-        }
-
         var perLiter = EffectivePricePerLiter(package);
         if (perLiter.HasValue)
         {
@@ -95,15 +89,6 @@ public static class ServerPricing
     /// </remarks>
     public static decimal? DiscountedPricePerLiter(SellablePackage package, decimal discountPerLiter)
     {
-        if (package.PriceOverrideUah is { } @override)
-        {
-            // The guard asks about the per-litre figure the customer is charged, so it has to be the
-            // override's, discounted — not the formula's.
-            return package.Liters > 0m
-                ? Math.Max(0m, (@override - Math.Max(0m, discountPerLiter) * package.Liters) / package.Liters)
-                : null;
-        }
-
         var perLiter = EffectivePricePerLiter(package);
         if (perLiter is not { } price)
         {
@@ -159,14 +144,6 @@ public static class ServerPricing
         // the formula would yield. Without this branch a per-nominal override would be the one route to
         // selling under cost with the block green, which is the entire reason the override is an explicit
         // column and not a second copy of the arithmetic.
-        if (package.PriceOverrideUah is { } @override)
-        {
-            var discounted = Math.Max(0m, @override - Math.Max(0m, discountPerLiter) * package.Liters);
-            return discounted < cost * package.Liters
-                ? BelowCostVerdict.BelowCost
-                : BelowCostVerdict.AboveCost;
-        }
-
         var chargedPerLiter = DiscountedPricePerLiter(package, discountPerLiter);
         if (chargedPerLiter is not { } price)
         {

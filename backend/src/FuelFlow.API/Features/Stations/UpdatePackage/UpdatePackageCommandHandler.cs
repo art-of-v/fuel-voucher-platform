@@ -53,7 +53,6 @@ public sealed class UpdatePackageCommandHandler
         // Null clears the override and puts the nominal back on the offer's rate. That is the direction
         // an operator should reach for when they are done with a special price, and it is the reason the
         // field is nullable rather than "0 means free".
-        volume.PriceOverrideUah = command.Updated.PriceOverrideUah;
         _context.FuelOfferVolumes.Update(volume);
 
         await _context.SaveChangesAsync(ct);
