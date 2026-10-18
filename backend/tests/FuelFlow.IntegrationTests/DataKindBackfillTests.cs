@@ -82,6 +82,14 @@ public sealed class DataKindBackfillTests : IClassFixture<TestDatabaseFixture>
 
             await context.Database.ExecuteSqlRawAsync(
                 """
+                INSERT INTO fuel_types (id, name, station_id, base_price, discount_price,
+                                        created_at_utc, updated_at_utc, is_deleted)
+                VALUES ('okko-0001-bk95', '95', 'okko-0001', 500, 520, now(), now(), false)
+                ON CONFLICT (id) DO NOTHING
+                """);
+
+            await context.Database.ExecuteSqlRawAsync(
+                """
                 INSERT INTO fuel_packages (id, station_id, fuel_type_id, fuel_name, liters, price,
                                            original_price, created_at_utc, updated_at_utc,
                                            is_test_data, is_deleted)
