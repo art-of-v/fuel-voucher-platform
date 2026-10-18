@@ -116,6 +116,7 @@ private readonly FuelFlow.Features.Vouchers.Security.IQrCipher _qrCipher;
     // constrained so the migration can be proved against a real database before any read path moves.
     public DbSet<FuelOffer> FuelOffers => Set<FuelOffer>();
     public DbSet<FuelOfferVolume> FuelOfferVolumes => Set<FuelOfferVolume>();
+    public DbSet<FuelNominal> FuelNominals => Set<FuelNominal>();
 
     // The append-only record of what each offer was priced at. Read by nothing in the application yet
     // on purpose: the offer's own columns remain the current price, so every existing read path is

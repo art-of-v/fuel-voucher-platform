@@ -3517,6 +3517,32 @@ namespace FuelFlow.API.Migrations
                     b.ToTable("error_logs", (string)null);
                 });
 
+            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.FuelNominal", b =>
+                {
+                    b.Property<string>("FuelTypeId")
+                        .HasColumnType("text")
+                        .HasColumnName("fuel_type_id");
+
+                    b.Property<decimal>("Liters")
+                        .HasColumnType("numeric(10,2)")
+                        .HasColumnName("liters");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.HasKey("FuelTypeId", "Liters");
+
+                    b.ToTable("fuel_nominals", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_fuel_nominals_liters_positive", "liters > 0");
+                        });
+                });
+
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.FuelOffer", b =>
                 {
                     b.Property<string>("Id")
@@ -5349,6 +5375,15 @@ namespace FuelFlow.API.Migrations
                         .WithMany()
                         .HasForeignKey("BrandId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.FuelNominal", b =>
+                {
+                    b.HasOne("FuelFlow.SharedKernel.Domain.FuelTypeEntity", null)
+                        .WithMany()
+                        .HasForeignKey("FuelTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
