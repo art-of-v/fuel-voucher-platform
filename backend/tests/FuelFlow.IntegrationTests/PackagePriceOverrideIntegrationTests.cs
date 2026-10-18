@@ -31,7 +31,7 @@ public sealed class PackagePriceOverrideIntegrationTests : IClassFixture<TestDat
             .UseNpgsql(_fixture.ConnectionString)
             .Options, TestQrCipher.Instance);
 
-    private static async Task<(FuelOffer Offer, FuelOfferVolume Volume)> SeedAsync(
+    private static async Task<(FuelOffer Offer, FuelOfferVolume Volume, FuelTypeEntity Fuel)> SeedAsync(
         ApplicationDbContext context,
         string suffix,
         decimal? overrideUah = null)
@@ -40,17 +40,18 @@ public sealed class PackagePriceOverrideIntegrationTests : IClassFixture<TestDat
 
         // The offer may not name a fuel that does not exist (FK from 20261018104336), and this id is
         // generated per call, so the fuel is created alongside the offer it is there to carry.
-        context.FuelTypes.Add(new FuelTypeEntity
+        var fuel = new FuelTypeEntity
         {
             Id = fuelId,
             Name = $"Override test fuel {suffix}",
             StationId = "okko",
             BasePrice = 0m,
             DiscountPrice = 0m,
+            MarginUahPerLiter = 2m,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
-        });
-
+        };
+        context.FuelTypes.Add(fuel);
         var offer = new FuelOffer
         {
             Id = fuelId,
@@ -75,19 +76,19 @@ public sealed class PackagePriceOverrideIntegrationTests : IClassFixture<TestDat
         context.FuelOffers.Add(offer);
         context.FuelOfferVolumes.Add(volume);
         await context.SaveChangesAsync();
-        return (offer, volume);
+        return (offer, volume, fuel);
     }
 
-    private static SellablePackage AsPackage(FuelOffer offer, FuelOfferVolume volume)
-        => SellablePackage.From(offer, volume);
+    private static SellablePackage AsPackage(FuelOffer offer, FuelOfferVolume volume, FuelTypeEntity fuel)
+        => SellablePackage.From(offer, volume, fuel);
 
     [Fact]
     public async Task AVolumeWithNoOverride_CostsTheOfferRateTimesItsLitres()
     {
         await using var context = CreateContext();
-        var (offer, volume) = await SeedAsync(context, "derived");
+        var (offer, volume, fuel) = await SeedAsync(context, "derived");
 
-        var package = AsPackage(offer, volume);
+        var package = AsPackage(offer, volume, fuel);
 
         package.PriceOverrideUah.Should().BeNull();
         package.ComputedPackagePrice.Should().Be(520m);   // (50 + 2) x 10
@@ -99,9 +100,9 @@ public sealed class PackagePriceOverrideIntegrationTests : IClassFixture<TestDat
     public async Task AnOverride_IsWhatTheCustomerIsCharged_EvenWhenTheFuelHasARate()
     {
         await using var context = CreateContext();
-        var (offer, volume) = await SeedAsync(context, "override", overrideUah: 500m);
+        var (offer, volume, fuel) = await SeedAsync(context, "override", overrideUah: 500m);
 
-        var package = AsPackage(offer, volume);
+        var package = AsPackage(offer, volume, fuel);
 
         package.ComputedPackagePrice.Should().Be(500m, "the override wins over the 520 the formula yields");
         ServerPricing.PackagePrice(package, 10m).Should().Be(500m,
@@ -112,9 +113,9 @@ public sealed class PackagePriceOverrideIntegrationTests : IClassFixture<TestDat
     public async Task AnOverride_IsStillSubjectToTheBelowCostGuard()
     {
         await using var context = CreateContext();
-        var (offer, volume) = await SeedAsync(context, "below-cost", overrideUah: 100m);
+        var (offer, volume, fuel) = await SeedAsync(context, "below-cost", overrideUah: 100m);
 
-        var package = AsPackage(offer, volume);
+        var package = AsPackage(offer, volume, fuel);
 
         // 100 UAH for 10 L against a 50 UAH/litre cost: a 400 UAH loss on the package. The override is a
         // price, not a licence, and this is what stops it being one.
@@ -127,7 +128,7 @@ public sealed class PackagePriceOverrideIntegrationTests : IClassFixture<TestDat
     public async Task AnOverride_SurvivesAReprice_AndTheDerivedOneMoves()
     {
         await using var context = CreateContext();
-        var (offer, volume) = await SeedAsync(context, "survives", overrideUah: 500m);
+        var (offer, volume, fuel) = await SeedAsync(context, "survives", overrideUah: 500m);
         var plain = await SeedAsync(context, "moves");
 
         // What a repricing is, as the write paths do it: the offer's knobs move and the volumes are not
@@ -157,7 +158,7 @@ public sealed class PackagePriceOverrideIntegrationTests : IClassFixture<TestDat
         var fuelId = $"unpriced-fuel-{Guid.CreateVersion7()}";
 
         // Same reason as SeedAsync: the offer names this fuel, so the fuel has to exist before it.
-        context.FuelTypes.Add(new FuelTypeEntity
+        var fuel = new FuelTypeEntity
         {
             Id = fuelId,
             Name = "Unpriced test fuel",
@@ -166,8 +167,8 @@ public sealed class PackagePriceOverrideIntegrationTests : IClassFixture<TestDat
             DiscountPrice = 0m,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
-        });
-
+        };
+        context.FuelTypes.Add(fuel);
         var offer = new FuelOffer
         {
             Id = fuelId,
@@ -192,7 +193,7 @@ public sealed class PackagePriceOverrideIntegrationTests : IClassFixture<TestDat
         context.FuelOfferVolumes.Add(volume);
         await context.SaveChangesAsync();
 
-        var package = AsPackage(offer, volume);
+        var package = AsPackage(offer, volume, fuel);
 
         package.ComputedFinalPricePerLiter.Should().BeNull();
         FuelPricing.TryPackagePrice(50m, null, 92.90m, 1m, 10m, null).Should().BeNull();

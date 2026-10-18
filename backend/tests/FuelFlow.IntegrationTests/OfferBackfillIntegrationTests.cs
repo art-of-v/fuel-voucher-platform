@@ -577,9 +577,9 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
         var okko95 = await context.FuelOffers.IgnoreQueryFilters()
             .SingleAsync(o => o.StationId == "okko" && o.FuelTypeId == "okko-95" && o.DataKind == DataKinds.Real);
 
-        okko95.ComputedFinalPricePerLiter.Should().Be(51m, "SeedData sets DiscountPrice, and the knobs derive it");
+        okko95.FinalPerLiterWith(await MarginOf(okko95)).Should().Be(51m, "SeedData sets DiscountPrice, and the knobs derive it");
         okko95.SupplierPricePerLiter.Should().Be(49m);
-        okko95.MarginUahPerLiter.Should().Be(2m);
+        okko95.MarginUahPerLiter.Should().Be(2m, "the seed still writes it; no reader looks at it any more");
 
         var volumes = await context.FuelOfferVolumes.IgnoreQueryFilters()
             .Where(v => v.OfferId == okko95.Id)
@@ -592,5 +592,18 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
         // No stored total and no override: the 10 L nominal works out to 10 L at 51.00 through the
         // offer's rate, which is the same number the seed used to write into a package_price column.
         volumes.Should().OnlyContain(v => v.PriceOverrideUah == null);
+    }
+
+    /// <summary>
+    /// The margin an offer sells at, which is its fuel's - the same place production reads it since
+    /// the offer stopped carrying a copy.
+    /// </summary>
+    private async Task<decimal?> MarginOf(FuelOffer offer)
+    {
+        await using var lookup = CreateContext();
+        return await lookup.FuelTypes
+            .Where(f => f.Id == offer.FuelTypeId)
+            .Select(f => f.MarginUahPerLiter)
+            .FirstOrDefaultAsync();
     }
 }

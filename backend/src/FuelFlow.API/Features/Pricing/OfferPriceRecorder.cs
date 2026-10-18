@@ -129,19 +129,47 @@ public sealed class OfferPriceRecorder
     /// step; asking each caller for it would have made it a parameter on two methods and a chance to
     /// pass the wrong fuel's number. One query, one place, no caller can get it wrong.
     /// </para>
+    /// <para>
+    /// <b>The tracker is consulted before the database, and that ordering is load-bearing.</b> Callers
+    /// mutate the fuel in memory and call this before saving - the recorder does not save, because they
+    /// own the transaction boundary. A plain query would read the committed margin and record the price
+    /// that was just superseded, so the history's newest row would be the wrong one. Reading a tracked
+    /// entity returns the pending value; only a fuel nobody has touched in this context needs a query.
+    /// </para>
     /// </summary>
     private async Task<Dictionary<string, FuelTypeEntity>> FuelsForAsync(
         List<string> fuelTypeIds,
         CancellationToken ct)
     {
-        var rows = await _context.FuelTypes
-            .AsNoTracking()
-            .Where(f => fuelTypeIds.Contains(f.Id))
-            .ToListAsync(ct);
+        var pending = context_FuelTypes_LocalOrEmpty(fuelTypeIds);
+        var missing = fuelTypeIds.Where(id => !pending.ContainsKey(id)).ToList();
 
-        var fuels = new Dictionary<string, FuelTypeEntity>(StringComparer.Ordinal);
-        foreach (var row in rows) fuels[row.Id] = row;
-        return fuels;
+        if (missing.Count > 0)
+        {
+            var rows = await _context.FuelTypes
+                .AsNoTracking()
+                .Where(f => missing.Contains(f.Id))
+                .ToListAsync(ct);
+            foreach (var row in rows) pending[row.Id] = row;
+        }
+
+        return pending;
+    }
+
+    /// <summary>
+    /// The fuels among <paramref name="ids"/> this context is already holding, under their own key so the
+    /// result can be filled in with the rest. Exposed as a method only to keep the null-vs-empty
+    /// distinction out of the query above.
+    /// </summary>
+    private Dictionary<string, FuelTypeEntity> context_FuelTypes_LocalOrEmpty(List<string> ids)
+    {
+        var pending = new Dictionary<string, FuelTypeEntity>(StringComparer.Ordinal);
+        foreach (var entry in _context.ChangeTracker.Entries<FuelTypeEntity>())
+        {
+            if (entry.State == EntityState.Detached) continue;
+            if (ids.Contains(entry.Entity.Id)) pending[entry.Entity.Id] = entry.Entity;
+        }
+        return pending;
     }
 
     /// <summary>The margin an offer sells at, which is its fuel's. Null when the fuel is not to hand.</summary>

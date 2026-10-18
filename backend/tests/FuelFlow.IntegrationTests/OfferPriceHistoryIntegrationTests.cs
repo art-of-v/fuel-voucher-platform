@@ -121,7 +121,11 @@ public sealed class OfferPriceHistoryIntegrationTests : IClassFixture<TestDataba
         var before = await RowsAsync(context, offer.Id);
         before.Should().HaveCount(1, "the opening row is what the second one is compared against");
 
-        offer.MarginUahPerLiter = 3m;   // 50 + 3 = the 53 the row below is expected to hold
+        // A margin lives on the fuel now, so this is the row that changes. The offer's own copy is
+        // inert: setting it and recording would produce an identical row and no history, which is the
+        // whole subject of this test.
+        var fuel = await context.FuelTypes.SingleAsync(f => f.Id == offer.FuelTypeId);
+        fuel.MarginUahPerLiter = 3m;   // 50 + 3 = the 53 the row below is expected to hold
         await Recorder(context).RecordAsync(offer, OfferPriceReasons.Operator, TestUser, DateTime.UtcNow);
         await context.SaveChangesAsync();
 
@@ -136,9 +140,9 @@ public sealed class OfferPriceHistoryIntegrationTests : IClassFixture<TestDataba
         after[^1].ChangedByUserId.Should().Be(TestUser);
         after[^1].EffectiveFromUtc.Should().BeOnOrAfter(after[0].EffectiveFromUtc);
 
-        // And the offer itself still holds the new price, which is what every read path uses.
-        await context.Entry(offer).ReloadAsync();
-        offer.MarginUahPerLiter.Should().Be(3m);
+        // And the fuel still holds the new price, which is what every read path uses.
+        await context.Entry(fuel).ReloadAsync();
+        fuel.MarginUahPerLiter.Should().Be(3m);
     }
 
     [Fact]
@@ -292,6 +296,7 @@ public sealed class OfferPriceHistoryIntegrationTests : IClassFixture<TestDataba
             StationId = "okko",
             BasePrice = 0m,
             DiscountPrice = 0m,
+            MarginUahPerLiter = margin,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         });
