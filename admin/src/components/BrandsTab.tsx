@@ -37,6 +37,11 @@ interface BrandFuelDto {
   minDiscountPerLiter: number;
   discountPerLiter: number;
   allowBelowCost: boolean;
+  /**
+   * The fuel's code at the network ("A-95", "DP"). Null when it has none — and that is worth
+   * seeing, because a fuel without a code is what the catalogue import can no longer match.
+   */
+  brandFuelCode: string | null;
   packageLiters: number[];
   /** Whether this fuel exists only to rehearse a flow. Decides whether its packages are sellable. */
   isTestData: boolean;
@@ -112,6 +117,7 @@ export default function BrandsTab({
   const [newFuelPump, setNewFuelPump] = useState("");
   const [newFuelMinDiscount, setNewFuelMinDiscount] = useState("0.50");
   const [newFuelAllowBelowCost, setNewFuelAllowBelowCost] = useState(false);
+  const [newFuelBrandFuelCode, setNewFuelBrandFuelCode] = useState("");
   const [newFuelIsTestData, setNewFuelIsTestData] = useState(false);
 
   /**
@@ -339,6 +345,7 @@ export default function BrandsTab({
       setNewFuelMinDiscount("0.50");
       setNewFuelAllowBelowCost(false);
       setNewFuelIsTestData(false);
+      setNewFuelBrandFuelCode("");
       toast.success(t("common.created"));
     },
     onError: (e: Error) => toast.error(e.message),
@@ -378,6 +385,10 @@ export default function BrandsTab({
         minDiscountPerLiter: fuel.minDiscountPerLiter ?? DEFAULT_MIN_DISCOUNT,
         allowBelowCost: fuel.allowBelowCost ?? false,
         isTestData: fuel.isTestData ?? false,
+        // Seeded from the saved value so the field reads as what it is. The save below always
+        // sends a string, and the API treats "" as "clear" — which is what an operator emptying
+        // the box means. An untouched box still round-trips to the same string.
+        brandFuelCode: fuel.brandFuelCode ?? "",
       },
     });
   };
@@ -412,6 +423,10 @@ export default function BrandsTab({
         minDiscountPerLiter: minDiscount,
         allowBelowCost: vals.allowBelowCost ?? fuel.allowBelowCost ?? false,
         isTestData: vals.isTestData ?? fuel.isTestData ?? false,
+        // Always a string, never undefined: the API reads an omitted field as "leave it alone"
+        // and "" as "clear it". Sending undefined here would make the code un-clearable from
+        // this screen, since every save would look like the field had not been mentioned.
+        brandFuelCode: vals.brandFuelCode ?? fuel.brandFuelCode ?? "",
       },
     });
   };
@@ -427,8 +442,9 @@ export default function BrandsTab({
         finalPricePerLiter: newFuelFinalPrice,
         pumpPricePerLiter: newFuelPumpNum,
         minDiscountPerLiter: parseFloat(newFuelMinDiscount) || 0,
-    allowBelowCost: newFuelAllowBelowCost,
-    isTestData: newFuelIsTestData,
+        allowBelowCost: newFuelAllowBelowCost,
+        isTestData: newFuelIsTestData,
+        brandFuelCode: newFuelBrandFuelCode.trim() || null,
       },
     });
   };
@@ -941,9 +957,39 @@ export default function BrandsTab({
                                     className="w-32 h-8 text-xs"
                                   />
                                 ) : (
-                                  <span className="font-medium">
-                                    {fuel.name}
-                                  </span>
+                                  <div className="flex flex-col gap-0.5">
+                                    <span className="font-medium">
+                                      {fuel.name}
+                                    </span>
+                                    {/* The code is what the catalogue import matches on. A fuel
+                                        without one is invisible to the next sync tick, which is
+                                        the usual reason a grade gets typed in twice. */}
+                                    <span
+                                      className="text-[10px] text-muted-foreground tabular-nums"
+                                      title={t("fuel.codeHint")}
+                                    >
+                                      {fuel.brandFuelCode
+                                        ? fuel.brandFuelCode
+                                        : t("fuel.codeNone")}
+                                    </span>
+                                  </div>
+                                )}
+                                {isEditing && (
+                                  <Input
+                                    value={vals?.brandFuelCode ?? ""}
+                                    placeholder={t("fuel.codePlaceholder")}
+                                    title={t("fuel.codeHint")}
+                                    onChange={(e) =>
+                                      setEditValues((prev) => ({
+                                        ...prev,
+                                        [fuel.id]: {
+                                          ...prev[fuel.id],
+                                          brandFuelCode: e.target.value,
+                                        },
+                                      }))
+                                    }
+                                    className="w-32 h-7 text-[11px] mt-1"
+                                  />
                                 )}
                               </td>
                               <td className="p-3">
@@ -1308,6 +1354,20 @@ className="w-24 h-8 text-right text-xs"
                                       setNewFuelName(e.target.value)
                                     }
                                     className="h-8 w-36"
+                                  />
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                  <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
+                                    {t("fuel.code")}
+                                  </label>
+                                  <Input
+                                    placeholder="A-95"
+                                    value={newFuelBrandFuelCode}
+                                    title={t("fuel.codeHint")}
+                                    onChange={(e) =>
+                                      setNewFuelBrandFuelCode(e.target.value)
+                                    }
+                                    className="h-8 w-24"
                                   />
                                 </div>
                                 <div className="flex flex-col gap-1">

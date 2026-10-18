@@ -30,7 +30,7 @@ internal static class BrandFuelCard
         var weighted = packages.Where(p => p.SupplierPricePerLiter is not null).ToList();
         if (weighted.Count == 0) return 0m;
 
-var litres = weighted.Sum(p => p.Liters);
+        var litres = weighted.Sum(p => p.Liters);
         if (litres <= 0m) return weighted.Average(p => p.SupplierPricePerLiter!.Value);
 
         var weightedTotal = weighted.Sum(p => p.SupplierPricePerLiter!.Value * p.Liters);
@@ -80,6 +80,11 @@ var litres = weighted.Sum(p => p.Liters);
             // is base - final. Derived here (display only) so the admin UI can show it.
             DiscountPerLiter = Math.Max(0, fuel.BasePrice - fuel.DiscountPrice),
             AllowBelowCost = fuel.AllowBelowCost,
+            // Read off the fuel, not derived from the packages. A code is how the catalogue import
+            // recognises this grade on the next tick, so an operator cannot see it without knowing
+            // which of their fuels will still match after a sync. It was absent here, so
+            // GET /api/admin/brands serialised null for every fuel and the screen showed nothing.
+            BrandFuelCode = fuel.BrandFuelCode,
             PackageLiters = packages.Select(p => (int)p.Liters).OrderBy(l => l).ToList(),
             // Read back off the packages rather than a column on the fuel type, because the flag
             // lives on the package - that is the row the storefront filters. Any=true when the fuel

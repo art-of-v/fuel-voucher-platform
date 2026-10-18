@@ -516,6 +516,10 @@ export const translations: Record<Language, Record<string, string>> = {
       "Cost is the weighted average of recorded batch costs. Set it on the Imports tab → batch costs.",
     "price.supplierSeedHint":
       "Initial cost for a new fuel; it recalculates automatically once you record a batch cost.",
+    "fuel.code": "Code",
+    "fuel.codePlaceholder": "e.g. A-95",
+    "fuel.codeNone": "no code",
+    "fuel.codeHint": "The code the network publishes for this grade. A fuel without one cannot be matched by the catalogue sync, so it is not repriced automatically.",
     "brands.addProvider": "Add Brand",
     "brands.namePlaceholder": "Brand Name (e.g. OKKO)",
     "brands.logoText": "Logo Text",
@@ -1576,6 +1580,10 @@ export const translations: Record<Language, Record<string, string>> = {
       "Собівартість — середньозважена з внесених вартостей партій. Задавайте її на вкладці «Імпорти» → собівартість партій.",
     "price.supplierSeedHint":
       "Початкова собівартість для нового пального; перераховується автоматично, щойно внесете вартість партії.",
+    "fuel.code": "Код",
+    "fuel.codePlaceholder": "напр. A-95",
+    "fuel.codeNone": "без коду",
+    "fuel.codeHint": "Код, який мережа публікує для цієї марки. Паливо без коду не зіставляється каталогом, тому ціна для нього не оновлюватиметься автоматично.",
     "brands.addProvider": "Додати Постачальника",
     "brands.namePlaceholder": "Назва (напр. OKKO)",
     "brands.logoText": "Текст Логотипу",
@@ -2560,6 +2568,10 @@ export const translations: Record<Language, Record<string, string>> = {
       "Der Einkaufspreis ist der gewichtete Durchschnitt der erfassten Chargenkosten. Legen Sie ihn im Tab „Importe“ → Chargenkosten fest.",
     "price.supplierSeedHint":
       "Anfänglicher Einkaufspreis für einen neuen Kraftstoff; wird automatisch neu berechnet, sobald Sie Chargenkosten erfassen.",
+    "fuel.code": "Code",
+    "fuel.codePlaceholder": "z.B. A-95",
+    "fuel.codeNone": "kein Code",
+    "fuel.codeHint": "Der Code, den das Netzwerk für diese Sorte veröffentlicht. Ein Kraftstoff ohne Code lässt sich vom Katalogabgleich nicht zuordnen und wird daher nicht automatisch bepreist.",
     "price.marginPlaceholder": "z.B. 2.00",
     "price.finalPlaceholder": "Ende (auto)",
     "price.nominalsAuto": "auto",
@@ -3620,6 +3632,10 @@ export const translations: Record<Language, Record<string, string>> = {
     "price.supplierSeedHint":
       "Costo inicial para un combustible nuevo; se recalcula automáticamente cuando registres un costo de lote.",
     "price.marginPlaceholder": "ej. 2.00",
+    "fuel.code": "Código",
+    "fuel.codePlaceholder": "p. ej. A-95",
+    "fuel.codeNone": "sin código",
+    "fuel.codeHint": "El código que la red publica para este tipo de combustible. Sin él no se puede asociar con el catálogo, por lo que su precio no se actualiza automáticamente.",
     "price.finalPlaceholder": "Final (auto)",
     "price.nominalsAuto": "auto",
     "brands.addProvider": "Agregar Marca",
