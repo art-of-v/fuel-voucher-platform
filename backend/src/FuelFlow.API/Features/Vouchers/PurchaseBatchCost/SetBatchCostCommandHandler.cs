@@ -89,6 +89,12 @@ public sealed class SetBatchCostCommandHandler
             .Where(v => v.ImportJobId == command.ImportJobId && v.FuelTypeId == command.FuelTypeId && !v.IsDeleted)
             .ToListAsync(cancellationToken);
 
+        // Writing a cost into every voucher of the batch is the operator entering what that lot was
+        // bought for - it is the arrival that moves the average, which is why the recompute below is
+        // correct here and wrong on the sale path. What is NOT settled is `ForceOverwrite`: it rewrites
+        // vouchers that were already bought at another figure, and the rule as agreed on 2026-10-17 is
+        // that a lot's price is immutable in history. Step 3 of planning #360 decides what a correction
+        // writes instead; until then this flag is the one path that can contradict it.
         var targets = command.ForceOverwrite
             ? vouchers
             : vouchers.Where(v => v.CostPerLiter is null).ToList();
@@ -155,6 +161,8 @@ public sealed class SetBatchCostCommandHandler
         // would not see the unsaved voucher costs otherwise.
         await _context.SaveChangesAsync(cancellationToken);
 
+        // The arrival, so the recompute here is the operator's rule and not a side effect: the moving
+        // average changes when a lot arrives and at no other time.
         var blended = await _recalculator.ComputeBlendedAsync(command.FuelTypeId, cancellationToken);
         var repriced = 0;
         if (blended is { } b)
