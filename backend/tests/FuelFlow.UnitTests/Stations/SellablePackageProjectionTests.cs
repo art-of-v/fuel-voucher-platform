@@ -58,7 +58,6 @@ public sealed class SellablePackageProjectionTests : IDisposable
             FuelTypeId = fuel.Id,
             DataKind = DataKinds.Real,
             SupplierPricePerLiter = 49m,
-            MarginUahPerLiter = 2m,
             MarginPercent = 4m,
             PumpPricePerLiter = 55m,
             MinDiscountPerLiter = 0.5m,

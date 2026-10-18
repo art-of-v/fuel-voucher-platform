@@ -282,7 +282,6 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
                 // the volume price made the QA fixture (1 UAH for 10 L) ask for a negative one, which the
                 // database refuses - correctly, since a negative margin is a loss on every litre.
                 SupplierPricePerLiter = 30m,
-                MarginUahPerLiter = 20m,
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow.AddMinutes(-updatedMinutesAgo),
             });

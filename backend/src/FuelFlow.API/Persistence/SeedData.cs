@@ -96,7 +96,8 @@ internal static class SeedData
                     FuelTypeId = ft.Id,
                     DataKind = DataKinds.Real,
                     SupplierPricePerLiter = supplierPrice,
-                    MarginUahPerLiter = margin,
+                    // No margin here: it is the fuel's, set below. The offer repeated it for a while,
+                    // and two copies of one number is how they drift.
                     // No `final_price_per_liter`: the offer stopped storing the derived figure on
                     // 2026-10-17, and the seed needs no override - `supplier + margin` is exactly
                     // `finalPrice`, since no pump price is seeded and the ceiling does not bind.

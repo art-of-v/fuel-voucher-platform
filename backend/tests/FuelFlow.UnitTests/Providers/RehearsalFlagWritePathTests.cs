@@ -461,7 +461,6 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         var offer = new FuelOffer
         {
             Id = "qa-offer-a95", BrandId = "okko", FuelTypeId = "qa-a95",
-            SupplierPricePerLiter = 60m, MarginUahPerLiter = 12.34m, // 60 + 12.34 = 72.34 per litre
             IsTestData = true,
             CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
         };

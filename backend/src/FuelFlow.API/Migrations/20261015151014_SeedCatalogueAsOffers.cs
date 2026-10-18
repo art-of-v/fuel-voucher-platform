@@ -89,8 +89,8 @@ namespace FuelFlow.API.Migrations
                          price_updated_at, price_updated_by_user_id, created_at_utc, updated_at_utc)
                     VALUES
                         ({Quote(historicalKey[offer.Id])}, {Quote(offer.BrandId)}, {Quote(offer.FuelTypeId)}, {Quote(offer.DataKind)},
-                         {Num(offer.SupplierPricePerLiter)}, {Num(offer.MarginUahPerLiter)}, {Num(offer.MarginPercent)},
-                         {Num(offer.FinalPerLiterWith(offer.MarginUahPerLiter))}, NULL, NULL, FALSE, NULL, NULL, NULL,
+                         {Num(offer.SupplierPricePerLiter)}, {Num(offer.FinalPerLiterWith(0m) - 0m)}, {Num(offer.MarginPercent)},
+                         {Num(offer.FinalPerLiterWith(offer.FinalPerLiterWith(0m) - 0m))}, NULL, NULL, FALSE, NULL, NULL, NULL,
                          {Ts(offer.CreatedAtUtc)}, {Ts(offer.UpdatedAtUtc)})
                     ON CONFLICT (id) DO NOTHING;
                     """);
@@ -126,7 +126,7 @@ namespace FuelFlow.API.Migrations
             var offer = SeedData.Catalogue.Offers.First(o => o.Id == volume.OfferId);
             var perLiter = FuelPricing.FinalPerLiterOrNull(
                 offer.SupplierPricePerLiter,
-                offer.MarginUahPerLiter,
+                offer.FinalPerLiterWith(0m) - 0m,
                 offer.PumpPricePerLiter,
                 offer.MinDiscountPerLiter);
 
