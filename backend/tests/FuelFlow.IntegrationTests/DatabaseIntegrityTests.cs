@@ -41,6 +41,11 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
     /// database actually enforces it, so this writes through raw SQL and expects the write to fail -
     /// going through EF would only prove EF sent a short string.
     /// </summary>
+    /// <summary>
+    /// Pinned on <c>brand_stations</c> since the column left <c>brands</c>: a brand is a network and
+    /// has no station type, but a filling station still does, and the limit on a short label is worth
+    /// as much wherever the column now lives.
+    /// </summary>
     [Fact]
     public async Task An_Overlong_Station_Type_Is_Refused_By_The_Column()
     {
@@ -48,8 +53,8 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
 
         var act = () => context.Database.ExecuteSqlRawAsync(
             """
-            INSERT INTO brands (id, name, color, logo_text, station_type, sort_order, created_at_utc, updated_at_utc, is_deleted)
-            VALUES ('bounds-probe', 'Probe', '#00ff80', 'PRB', {0}, 999, NOW(), NOW(), false)
+            INSERT INTO brand_stations (id, brand_id, name, station_type, lat, lng, created_at_utc, updated_at_utc, is_deleted)
+            VALUES ('bounds-probe', 'okko', 'Probe', {0}, 50.4, 30.4, NOW(), NOW(), false)
             """, new string('x', 300));
 
         var ex = await act.Should().ThrowAsync<PostgresException>();

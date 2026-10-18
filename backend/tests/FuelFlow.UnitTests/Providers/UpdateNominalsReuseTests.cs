@@ -71,7 +71,6 @@ public sealed class UpdateNominalsReuseTests : IDisposable
         {
             Id = "okko",
             Name = "OKKO",
-            StationType = "brand",
             Color = "#00ff80",
             LogoText = "OK",
             SortOrder = 1,

@@ -15,9 +15,4 @@ public sealed record PublicBrandResponse(
     string Name,
     string Color,
     string LogoText,
-    string? Address,
-    string? Phone,
-    string? StationType,
-    double? Lat,
-    double? Lng,
     int SortOrder);

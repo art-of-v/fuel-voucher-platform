@@ -3254,11 +3254,6 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("text")
                         .HasColumnName("id");
 
-                    b.Property<string>("Address")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("address");
-
                     b.Property<string>("Color")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -3279,14 +3274,6 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
 
-                    b.Property<double?>("Lat")
-                        .HasColumnType("double precision")
-                        .HasColumnName("lat");
-
-                    b.Property<double?>("Lng")
-                        .HasColumnType("double precision")
-                        .HasColumnName("lng");
-
                     b.Property<string>("LogoText")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -3299,21 +3286,11 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
-                    b.Property<string>("Phone")
-                        .HasMaxLength(45)
-                        .HasColumnType("character varying(45)")
-                        .HasColumnName("phone");
-
                     b.Property<int>("SortOrder")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
                         .HasDefaultValue(999)
                         .HasColumnName("sort_order");
-
-                    b.Property<string>("StationType")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("station_type");
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
@@ -3322,8 +3299,6 @@ namespace FuelFlow.API.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Name");
-
-                    b.HasIndex("StationType");
 
                     b.ToTable("brands", null, t =>
                         {
@@ -3339,8 +3314,6 @@ namespace FuelFlow.API.Migrations
                             Color = "#22c55e",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
-                            Lat = 50.485100000000003,
-                            Lng = 30.473400000000002,
                             LogoText = "OKKO",
                             Name = "OKKO",
                             SortOrder = 1,
@@ -3352,8 +3325,6 @@ namespace FuelFlow.API.Migrations
                             Color = "#10b981",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
-                            Lat = 50.450099999999999,
-                            Lng = 30.523399999999999,
                             LogoText = "WOG",
                             Name = "WOG",
                             SortOrder = 2,
@@ -3365,8 +3336,6 @@ namespace FuelFlow.API.Migrations
                             Color = "#06b6d4",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
-                            Lat = 50.400100000000002,
-                            Lng = 30.613399999999999,
                             LogoText = "UPG",
                             Name = "UPG",
                             SortOrder = 3,
@@ -3378,8 +3347,6 @@ namespace FuelFlow.API.Migrations
                             Color = "#eab308",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
-                            Lat = 50.4101,
-                            Lng = 30.403400000000001,
                             LogoText = "KLO",
                             Name = "KLO",
                             SortOrder = 4,

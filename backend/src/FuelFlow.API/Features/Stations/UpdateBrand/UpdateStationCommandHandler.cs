@@ -18,11 +18,6 @@ public sealed class UpdateBrandCommandHandler
         entity.Name = command.Updated.Name;
         entity.Color = command.Updated.Color;
         entity.LogoText = command.Updated.LogoText;
-        entity.Address = command.Updated.Address;
-        entity.Phone = command.Updated.Phone;
-        entity.StationType = command.Updated.StationType;
-        entity.Lat = command.Updated.Lat;
-        entity.Lng = command.Updated.Lng;
         _context.Brands.Update(entity);
 
         await _context.SaveChangesAsync(ct);

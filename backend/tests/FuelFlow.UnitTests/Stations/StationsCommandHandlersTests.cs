@@ -97,11 +97,6 @@ public sealed class BrandsCommandHandlersTests : IDisposable
             Name = "New Name",
             Color = "#ffffff",
             LogoText = "NEW",
-            Address = "New Address",
-            Phone = "123456789",
-            StationType = "fuel",
-            Lat = 50.5,
-            Lng = 30.5
         };
         var handler = new UpdateBrandCommandHandler(_context);
 
@@ -109,15 +104,13 @@ public sealed class BrandsCommandHandlersTests : IDisposable
 
         result.Should().BeTrue();
 
-        var persisted = await _context.Brands.FindAsync("Brand-1");
+var persisted = await _context.Brands.FindAsync("Brand-1");
         persisted!.Name.Should().Be("New Name");
         persisted.Color.Should().Be("#ffffff");
         persisted.LogoText.Should().Be("NEW");
-        persisted.Address.Should().Be("New Address");
-        persisted.Phone.Should().Be("123456789");
-        persisted.StationType.Should().Be("fuel");
-        persisted.Lat.Should().Be(50.5);
-        persisted.Lng.Should().Be(30.5);
+        // A brand is a network, not a place: address, phone, station type and coordinates moved to
+        // brand_stations, so an update to one no longer carries them and cannot write a stray address
+        // onto the brand row.
     }
 
     [Fact]
