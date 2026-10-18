@@ -64,9 +64,9 @@ public sealed class CreateCheckoutCommandHandler
         if (user == null || !user.IsActive || user.IsDeleted)
             throw new AccountInactiveException();
 
-        if (string.IsNullOrWhiteSpace(command.StationId))
+        if (string.IsNullOrWhiteSpace(command.BrandId))
         {
-            throw new ArgumentException("StationId is required", nameof(command));
+            throw new ArgumentException("BrandId is required", nameof(command));
         }
 
         if (command.LegalEntityId.HasValue)
@@ -82,11 +82,11 @@ public sealed class CreateCheckoutCommandHandler
         }
 
         var fuelTypeEntity = await _context.FuelTypes
-            .FirstOrDefaultAsync(f => f.Id == command.FuelTypeId && f.StationId == command.StationId, cancellationToken);
+            .FirstOrDefaultAsync(f => f.Id == command.FuelTypeId && f.BrandId == command.BrandId, cancellationToken);
 
         if (fuelTypeEntity == null)
         {
-            throw new ArgumentException($"Invalid fuel type ID: {command.FuelTypeId} for station {command.StationId}");
+            throw new ArgumentException($"Invalid fuel type ID: {command.FuelTypeId} for Brand {command.BrandId}");
         }
 
         // Pool membership is resolved once, by the same helper the storefront uses, and reused for the
@@ -99,24 +99,24 @@ public sealed class CreateCheckoutCommandHandler
         var isTestAccount = await _stock.IsTestAccountAsync(user.Id, cancellationToken);
 
         // Resolved through the shared helper, not by a local FirstOrDefaultAsync: a triple is not
-        // unique, because every real package has a QA mirror on the same station/fuel/nominal, so an
+        // unique, because every real package has a QA mirror on the same Brand/fuel/nominal, so an
         // unordered pick returns whichever row Postgres produced first. See PackageStockAvailability.
         var package = await _stock.FindPackageAsync(
-            isTestAccount, command.StationId, command.FuelTypeId, command.Liters, cancellationToken);
+            isTestAccount, command.BrandId, command.FuelTypeId, command.Liters, cancellationToken);
 
         if (package == null)
         {
             throw new ArgumentException(
-                $"No pricing found for fuel type {command.FuelTypeId} at station {command.StationId} for {command.Liters}L");
+                $"No pricing found for fuel type {command.FuelTypeId} at Brand {command.BrandId} for {command.Liters}L");
         }
 
         // Same gate as the bulk path, and for the same reason: never mint an invoice for fuel there is no
         // stock to deliver. Checked before the below-cost block so an empty shelf does not fire an
         // operator alert about a sale that was never going to happen. Answers about the same pool
         // the package above was taken from.
-        if (!await _stock.IsInStockAsync(isTestAccount, command.StationId, command.FuelTypeId, command.Liters, cancellationToken))
+        if (!await _stock.IsInStockAsync(isTestAccount, command.BrandId, command.FuelTypeId, command.Liters, cancellationToken))
         {
-            throw new PackageOutOfStockException(command.StationId, command.FuelTypeId, command.Liters);
+            throw new PackageOutOfStockException(command.BrandId, command.FuelTypeId, command.Liters);
         }
 
         // Slice-3 hard block (safety net at checkout, mirroring the operator write path): refuse a
@@ -131,7 +131,7 @@ public sealed class CreateCheckoutCommandHandler
             // that drifted below cost blocked sales silently. Throttled per fuel inside the dispatcher,
             // so a customer retrying the same checkout does not flood the chat.
             await _notifications.BelowCostAsync(
-                command.StationId, fuelTypeEntity.Name, cost, profit, deliberate: false, cancellationToken);
+                command.BrandId, fuelTypeEntity.Name, cost, profit, deliberate: false, cancellationToken);
             throw new BelowCostSaleBlockedException(command.FuelTypeId);
         }
 
@@ -146,7 +146,7 @@ public sealed class CreateCheckoutCommandHandler
         }
 
         var roundedMinute = (DateTime.UtcNow.Minute / 5) * 5;
-        var bucketKey = $"{command.UserId}:{command.StationId}:{command.FuelTypeId}:{command.Liters}:{command.Quantity}:{DateTime.UtcNow:yyyyMMddHH}{roundedMinute:D2}";
+        var bucketKey = $"{command.UserId}:{command.BrandId}:{command.FuelTypeId}:{command.Liters}:{command.Quantity}:{DateTime.UtcNow:yyyyMMddHH}{roundedMinute:D2}";
 
         // Dedupe only while the previous attempt is still awaiting payment:
         // retries and double-taps reuse the same invoice, but once an order is
@@ -190,7 +190,7 @@ public sealed class CreateCheckoutCommandHandler
         {
             Id = Guid.CreateVersion7(),
             OrderId = order.Id,
-            Brand = command.StationId!,
+            Brand = command.BrandId!,
             FuelTypeId = command.FuelTypeId,
             Liters = command.Liters,
             Quantity = command.Quantity,

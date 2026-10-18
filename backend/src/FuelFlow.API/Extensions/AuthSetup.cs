@@ -87,7 +87,7 @@ internal static class AuthSetup
     /// </para>
     /// <para>
     /// The failure mode of the fallback is the mirror image - a missed <c>[AllowAnonymous]</c> turns
-    /// a public endpoint into a 401 in production, and for the station list or the Monobank webhook
+    /// a public endpoint into a 401 in production, and for the Brand list or the Monobank webhook
     /// that means a visible outage or silently lost payment callbacks. The complete intended
     /// anonymous surface is therefore pinned by a test
     /// (<c>AnonymousEndpointSurfaceTests</c>) that enumerates routed endpoint metadata and fails on

@@ -33,7 +33,7 @@ internal static class SellablePackageProjection
         {
             PackageId = v.Id,
             OfferId = v.OfferId,
-            StationId = v.Offer.StationId,
+            BrandId = v.Offer.BrandId,
             FuelTypeId = v.Offer.FuelTypeId,
             Liters = v.Liters,
             PriceOverrideUah = v.PriceOverrideUah,

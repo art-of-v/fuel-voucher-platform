@@ -262,7 +262,7 @@ public sealed class LegalEntityController : ControllerBase
         var contracts = await _dbContext.Contracts
             .AsNoTracking()
             .Include(c => c.Entity)
-            .Include(c => c.Station)
+            .Include(c => c.Brand)
             .Where(c => c.UserId == userId.Value)
             .OrderByDescending(c => c.CreatedAtUtc)
             .ToListAsync(cancellationToken);
@@ -272,8 +272,8 @@ public sealed class LegalEntityController : ControllerBase
             id = c.Id,
             legalEntityId = c.LegalEntityId,
             legalEntityName = c.Entity?.Name,
-            stationId = c.StationId,
-            stationName = c.Station?.Name,
+            BrandId = c.BrandId,
+            BrandName = c.Brand?.Name,
             createdAt = c.CreatedAtUtc
         });
 
@@ -335,7 +335,7 @@ public sealed class LegalEntityController : ControllerBase
             .Include(uc => uc.Contract)
                 .ThenInclude(c => c!.Entity)
             .Include(uc => uc.Contract)
-                .ThenInclude(c => c!.Station)
+                .ThenInclude(c => c!.Brand)
             .Where(uc => uc.UserId == userId.Value)
             .OrderByDescending(uc => uc.SignedAtUtc)
             .ToListAsync(cancellationToken);
@@ -345,7 +345,7 @@ public sealed class LegalEntityController : ControllerBase
             id = uc.Id,
             contractId = uc.ContractId,
             legalEntityName = uc.Contract?.Entity?.Name,
-            stationName = uc.Contract?.Station?.Name,
+            BrandName = uc.Contract?.Brand?.Name,
             signedAt = uc.SignedAtUtc
         });
 

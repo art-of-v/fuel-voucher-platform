@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
-using FuelFlow.Features.Stations;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
@@ -95,7 +95,7 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
     /// <c>fuel_vouchers.fuel_type_id</c> is a real FK (Restrict), and without a package the storefront
     /// has nothing to report availability for.
     /// </summary>
-    private async Task SeedFuelAndPackageAsync(string stationId, string fuelTypeId, decimal liters)
+    private async Task SeedFuelAndPackageAsync(string BrandId, string fuelTypeId, decimal liters)
     {
         using var scope = _fixture.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -107,7 +107,7 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
             {
                 Id = fuelTypeId,
                 Name = fuelTypeId,
-                StationId = stationId,
+                BrandId = BrandId,
                 BasePrice = 50,
                 DiscountPrice = 47,
                 CreatedAtUtc = now,
@@ -119,12 +119,12 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
         // row in fuel_packages would leave the shop dark and every "activating turns it on" assertion
         // would pass against a package the app cannot see.
         if (!await context.FuelOfferVolumes.AnyAsync(
-                v => v.Offer.StationId == stationId && v.Offer.FuelTypeId == fuelTypeId && v.Liters == liters,
+                v => v.Offer.BrandId == BrandId && v.Offer.FuelTypeId == fuelTypeId && v.Liters == liters,
                 CancellationToken.None))
         {
             context.SeedPackage(
                 id: $"{fuelTypeId}-{liters:0.##}".Replace('.', '_'),
-                stationId: stationId,
+                BrandId: BrandId,
                 fuelTypeId: fuelTypeId,
                 liters: liters,
                 price: 470m * liters,
@@ -156,13 +156,13 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
             UpdatedAtUtc = DateTime.UtcNow
         };
 
-    private async Task<bool> IsPackageAvailableAsync(string stationId, string fuelTypeId, decimal liters)
+    private async Task<bool> IsPackageAvailableAsync(string BrandId, string fuelTypeId, decimal liters)
     {
         var response = await _client.GetAsync("/api/packages");
         response.EnsureSuccessStatusCode();
         var packages = await response.Content.ReadFromJsonAsync<List<PublicPackageResponse>>();
         return packages!.Single(p =>
-            p.StationId == stationId && p.FuelTypeId == fuelTypeId && p.Liters == liters).IsAvailable;
+            p.BrandId == BrandId && p.FuelTypeId == fuelTypeId && p.Liters == liters).IsAvailable;
     }
 
     private async Task<(HttpStatusCode Status, string Body)> ActivateAsync(params Guid[] ids)

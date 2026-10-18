@@ -2,7 +2,7 @@ using FluentAssertions;
 using FuelFlow.SharedKernel.Domain;
 using Xunit;
 
-namespace FuelFlow.UnitTests.Stations;
+namespace FuelFlow.UnitTests.Brands;
 
 /// <summary>
 /// The offer's key is its fuel type id, with <c>-qa</c> for the rehearsal pool, derived by
@@ -16,10 +16,10 @@ namespace FuelFlow.UnitTests.Stations;
 /// silently: change one and the others keep producing keys the unique index accepts but that nothing
 /// agrees on. <c>OfferBackfillIntegrationTests</c> closes the loop against a real database, both by
 /// asserting the ids a fully migrated database holds are the ones this method computes, and by
-/// asserting the premise that lets the station stay out of the key.
+/// asserting the premise that lets the Brand stay out of the key.
 /// </para>
 /// <para>
-/// It used to be <c>station_id + "-" + fuel_type_id</c>, which read <c>okko-okko-95</c> for a seeded
+/// It used to be <c>brand_id + "-" + fuel_type_id</c>, which read <c>okko-okko-95</c> for a seeded
 /// fuel and <c>okko-3808d410-b9ae-…</c> for an operator-created one — two shapes in one column,
 /// depending on which button made the row.
 /// </para>
@@ -29,15 +29,15 @@ public sealed class OfferKeyTests
     [Fact]
     public void TheRealPool_IsKeyedByTheFuelAlone()
     {
-        // No suffix and no station: the fuel type id already says which fuel this is, and the fuel
-        // belongs to exactly one station - which is the premise the station column's absence rests on.
+        // No suffix and no Brand: the fuel type id already says which fuel this is, and the fuel
+        // belongs to exactly one Brand - which is the premise the Brand column's absence rests on.
         OfferKeys.For("okko-95", DataKinds.Real).Should().Be("okko-95");
     }
 
     [Fact]
     public void AFuelWithAGeneratedId_KeysToThatId()
     {
-        // The shape the write path actually produces (BrandsController.AddFuel). Before the station
+        // The shape the write path actually produces (BrandsController.AddFuel). Before the Brand
         // prefix was dropped this arrived at a customer as 'okko-3808d410-b9ae-4511-9dfc-d6564fa2e1ad',
         // the brand spelled once in the key and again inside the id it wrapped.
         OfferKeys.For("3808d410-b9ae-4511-9dfc-d6564fa2e1ad", DataKinds.Real)
@@ -48,7 +48,7 @@ public sealed class OfferKeyTests
     public void TheQaPool_CarriesASuffix()
     {
         // The suffix is what keeps the rehearsal mirror of an offer from colliding with the live
-        // one. Without it the unique index on (station, fuel, pool) would be satisfied by a row
+        // one. Without it the unique index on (Brand, fuel, pool) would be satisfied by a row
         // that answers to the live offer's id.
         OfferKeys.For("okko-95", DataKinds.Qa).Should().Be("okko-95-qa");
     }
@@ -113,9 +113,9 @@ public sealed class OfferKeyTests
     }
 
     [Fact]
-    public void TheKeyNeverRepeatsTheStation()
+    public void TheKeyNeverRepeatsTheBrand()
     {
-        // The reason the method takes no station: a seeded fuel id already begins with its brand, so
+        // The reason the method takes no Brand: a seeded fuel id already begins with its brand, so
         // keying on both spelled the brand twice. Stated as a property rather than against one
         // literal, because the failure this guards is a shape ('okko-okko-…') and not a value.
         OfferKeys.For("okko-okko-95", DataKinds.Real)

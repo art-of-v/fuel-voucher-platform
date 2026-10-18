@@ -21,13 +21,13 @@ public sealed class PurchaseBatchPnlHandlerTests : IDisposable
             .Options;
         _context = new ApplicationDbContext(options, TestQrCipher.Instance);
 
-        _context.FuelTypes.Add(new FuelTypeEntity { Id = "okko-dp", Name = "ДП ЄВРО", StationId = "okko", BasePrice = 22, DiscountPrice = 22, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
+        _context.FuelTypes.Add(new FuelTypeEntity { Id = "okko-dp", Name = "ДП ЄВРО", BrandId = "okko", BasePrice = 22, DiscountPrice = 22, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
         // Fuel priced at 22 UAH/L (cost 20 + margin 2, no pump). The P&L reads its "current sale price"
         // off the offer, so the per-litre figures are seeded there and the volume carries only the
         // package total.
         _context.SeedPackage(
             id: Guid.NewGuid().ToString(),
-            stationId: "okko",
+            BrandId: "okko",
             fuelTypeId: "okko-dp",
             liters: 100m,
             price: 2200m,

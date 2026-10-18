@@ -59,10 +59,10 @@ public sealed class DataKindBackfillTests : IClassFixture<TestDatabaseFixture>
             // left sitting on ''.
             //
             // 'okko-0001-bk95' rather than 'okko-95': the offer key is now the fuel type id alone
-            // (DropTheStationPrefixFromOfferKeys), so an offer for 'okko-95' at a second station
+            // (DropTheBrandPrefixFromOfferKeys), so an offer for 'okko-95' at a second Brand
             // beside the seeded one is no longer representable - and this test rolls the schema BACK
             // and forward, so it walks through that migration and would hit its collision guard. The
-            // station/fuel pair is invented either way, and inventing one that survives the re-key is
+            // Brand/fuel pair is invented either way, and inventing one that survives the re-key is
             // what this line is about.
             //
             // Parameters are unquoted on purpose - a placeholder inside '' stays a string literal

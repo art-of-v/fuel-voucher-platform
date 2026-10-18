@@ -36,7 +36,7 @@ internal static class PackageProjection
         => new()
         {
             Id = volume.Id,
-            StationId = volume.Offer.StationId,
+            BrandId = volume.Offer.BrandId,
             FuelTypeId = volume.Offer.FuelTypeId,
             FuelName = fuel.Name,
             Liters = volume.Liters,
@@ -101,6 +101,6 @@ internal static class PackageProjection
     {
         Id = string.Empty,
         Name = string.Empty,
-        StationId = string.Empty
+        BrandId = string.Empty
     };
 }

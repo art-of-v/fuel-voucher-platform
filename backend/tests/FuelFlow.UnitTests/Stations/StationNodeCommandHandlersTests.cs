@@ -1,16 +1,16 @@
 using FluentAssertions;
-using FuelFlow.Features.Stations;
-using FuelFlow.Features.Stations.CreateStationNode;
-using FuelFlow.Features.Stations.DeleteStationNode;
-using FuelFlow.Features.Stations.GetAdminStationNodeById;
-using FuelFlow.Features.Stations.GetAdminStationNodes;
-using FuelFlow.Features.Stations.ImportStationNodes;
-using FuelFlow.Features.Stations.UpdateStationNode;
+using FuelFlow.Features.Brands;
+using FuelFlow.Features.Brands.CreateStationNode;
+using FuelFlow.Features.Brands.DeleteStationNode;
+using FuelFlow.Features.Brands.GetAdminStationNodeById;
+using FuelFlow.Features.Brands.GetAdminStationNodes;
+using FuelFlow.Features.Brands.ImportStationNodes;
+using FuelFlow.Features.Brands.UpdateStationNode;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 
-namespace FuelFlow.UnitTests.Stations;
+namespace FuelFlow.UnitTests.Brands;
 
 public sealed class StationNodeCommandHandlersTests : IDisposable
 {
@@ -94,7 +94,7 @@ public sealed class StationNodeCommandHandlersTests : IDisposable
 
         result.Success.Should().BeTrue();
         var persisted = await _context.StationNodes.FindAsync("n-1");
-        persisted!.StationId.Should().Be("wog");
+        persisted!.BrandId.Should().Be("wog");
         persisted.Name.Should().Be("New");
         persisted.City.Should().Be("Львів");
         persisted.Lat.Should().Be(49.0);
@@ -138,7 +138,7 @@ public sealed class StationNodeCommandHandlersTests : IDisposable
            archived.IsDeleted.Should().BeTrue();
            archived.DeletedAtUtc.Should().NotBeNull();
            (await _context.StationNodes.CountAsync(n => n.Id == "n-1")).Should().Be(0,
-               "#217: a node is part of the station map other rows point at, so it is archived not removed");
+               "#217: a node is part of the Brand map other rows point at, so it is archived not removed");
     }
 
     [Fact]
@@ -149,7 +149,7 @@ public sealed class StationNodeCommandHandlersTests : IDisposable
     }
 
     [Fact]
-    public async Task GetAdminStationNodes_ShouldFilterByStationId()
+    public async Task GetAdminStationNodes_ShouldFilterByBrandId()
     {
         await AddBrandAsync("okko");
         await AddBrandAsync("wog");
@@ -163,7 +163,7 @@ public sealed class StationNodeCommandHandlersTests : IDisposable
             .HandleAsync(new GetAdminStationNodesQuery(1, 50, "okko"));
 
         result.TotalCount.Should().Be(2);
-        result.Items.Should().OnlyContain(n => n.StationId == "okko");
+        result.Items.Should().OnlyContain(n => n.BrandId == "okko");
     }
 
     [Fact]
@@ -184,8 +184,8 @@ public sealed class StationNodeCommandHandlersTests : IDisposable
         await AddBrandAsync("okko");
         var json = """
         [
-          { "id": "okko-1", "stationId": "okko", "name": "Центр", "lat": 50.45, "lng": 30.52 },
-          { "stationId": "okko", "name": "Південь", "lat": 50.40, "lng": 30.50 }
+          { "id": "okko-1", "BrandId": "okko", "name": "Центр", "lat": 50.45, "lng": 30.52 },
+          { "BrandId": "okko", "name": "Південь", "lat": 50.40, "lng": 30.50 }
         ]
         """;
 
@@ -208,7 +208,7 @@ public sealed class StationNodeCommandHandlersTests : IDisposable
         _context.StationNodes.Add(original);
         await _context.SaveChangesAsync();
 
-        var json = """[ { "id": "okko-1", "stationId": "okko", "name": "New Name", "lat": 50.45, "lng": 30.52 } ]""";
+        var json = """[ { "id": "okko-1", "BrandId": "okko", "name": "New Name", "lat": 50.45, "lng": 30.52 } ]""";
         var result = await new ImportStationNodesCommandHandler(_context)
             .HandleAsync(new ImportStationNodesCommand(json, StationNodeImportFormat.Json));
 
@@ -225,10 +225,10 @@ public sealed class StationNodeCommandHandlersTests : IDisposable
         await AddBrandAsync("okko");
         var json = """
         [
-          { "stationId": "okko", "name": "Good", "lat": 50.45, "lng": 30.52 },
-          { "stationId": "ghost", "name": "BadBrand", "lat": 50.4, "lng": 30.5 },
-          { "stationId": "okko", "name": "BadCoords", "lat": 999, "lng": 30.5 },
-          { "stationId": "okko", "lat": 50.4, "lng": 30.5 }
+          { "BrandId": "okko", "name": "Good", "lat": 50.45, "lng": 30.52 },
+          { "BrandId": "ghost", "name": "BadBrand", "lat": 50.4, "lng": 30.5 },
+          { "BrandId": "okko", "name": "BadCoords", "lat": 999, "lng": 30.5 },
+          { "BrandId": "okko", "lat": 50.4, "lng": 30.5 }
         ]
         """;
 
@@ -246,8 +246,8 @@ public sealed class StationNodeCommandHandlersTests : IDisposable
         await AddBrandAsync("okko");
         var json = """
         [
-          { "id": "okko-1", "stationId": "okko", "name": "First", "lat": 50.45, "lng": 30.52 },
-          { "id": "okko-1", "stationId": "okko", "name": "Second", "lat": 50.45, "lng": 30.52 }
+          { "id": "okko-1", "BrandId": "okko", "name": "First", "lat": 50.45, "lng": 30.52 },
+          { "id": "okko-1", "BrandId": "okko", "name": "Second", "lat": 50.45, "lng": 30.52 }
         ]
         """;
 
@@ -262,7 +262,7 @@ public sealed class StationNodeCommandHandlersTests : IDisposable
     public async Task Import_ShouldParseCsv_WithQuotedCommaInAddress()
     {
         await AddBrandAsync("okko");
-        var csv = "id,stationId,name,address,lat,lng\n" +
+        var csv = "id,BrandId,name,address,lat,lng\n" +
                   "okko-1,okko,Центр,\"Проспект Перемоги, 98\",50.45,30.52\n";
 
         var result = await new ImportStationNodesCommandHandler(_context)
@@ -275,7 +275,7 @@ public sealed class StationNodeCommandHandlersTests : IDisposable
     [Fact]
     public void Parser_ShouldReportError_ForInvalidCsvCoordinate()
     {
-        var csv = "id,stationId,name,lat,lng\nokko-1,okko,Центр,not-a-number,30.52\n";
+        var csv = "id,BrandId,name,lat,lng\nokko-1,okko,Центр,not-a-number,30.52\n";
         var parsed = StationNodeImportParser.Parse(csv, StationNodeImportFormat.Csv);
 
         parsed.Rows.Should().BeEmpty();
@@ -291,15 +291,15 @@ public sealed class StationNodeCommandHandlersTests : IDisposable
 
     private async Task AddBrandAsync(string id)
     {
-        _context.Stations.Add(new Station { Id = id, Name = id.ToUpperInvariant(), Color = "#000000", LogoText = id });
+        _context.Brands.Add(new Brand { Id = id, Name = id.ToUpperInvariant(), Color = "#000000", LogoText = id });
         await _context.SaveChangesAsync();
     }
 
-    private static StationNode Node(string id, string stationId, string name, double lat, double lng, string? city = null) =>
+    private static StationNode Node(string id, string BrandId, string name, double lat, double lng, string? city = null) =>
         new()
         {
             Id = id,
-            StationId = stationId,
+            BrandId = BrandId,
             Name = name,
             Lat = lat,
             Lng = lng,

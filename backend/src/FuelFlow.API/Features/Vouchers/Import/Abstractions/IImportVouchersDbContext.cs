@@ -26,7 +26,7 @@ public interface IImportVouchersDbContext
 
     /// <summary>
     /// Read to check that the brand printed on a voucher sells the fuel it claims: the brand is this
-    /// row's <c>station_id</c>, and <c>brand</c> on the voucher is the same fact written as free text.
+    /// row's <c>brand_id</c>, and <c>brand</c> on the voucher is the same fact written as free text.
     /// </summary>
     DbSet<FuelTypeEntity> FuelTypes { get; }
 

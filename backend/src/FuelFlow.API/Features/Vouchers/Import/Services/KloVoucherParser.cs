@@ -27,7 +27,7 @@ public sealed class KloVoucherParser : IVoucherProviderParser
     private static readonly Regex FuelTypeRegex = new(
         @"\b(?<fuel>[АA]\s*[-–—]?\s*\d{2,3}(?:\s*\+)?|Д\s*[ПP]|ГАЗ)\b",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly Regex StationNameRegex = new(@"(?:КПП\s*К[5-6]\.?|КПП\s*К[\d\.]+\s*\d{3,4}|КПП\s*[\d\.]+\s*\d{3,4}|КПП\s*\d+\.?\s*\d{1,2})[\s\S]*?(?=\d{2}[./-](\d{2})[./-]\d{4})", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex BrandNameRegex = new(@"(?:КПП\s*К[5-6]\.?|КПП\s*К[\d\.]+\s*\d{3,4}|КПП\s*[\d\.]+\s*\d{3,4}|КПП\s*\d+\.?\s*\d{1,2})[\s\S]*?(?=\d{2}[./-](\d{2})[./-]\d{4})", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     public bool CanParse(ProviderDetectionContext context)
     {
@@ -44,7 +44,7 @@ public sealed class KloVoucherParser : IVoucherProviderParser
         var parsedVouchers = new List<ParsedVoucher>();
 
         var kloFuelTypes = await _context.FuelTypes
-            .Where(f => f.StationId == "klo")
+            .Where(f => f.BrandId == "klo")
             .ToListAsync(cancellationToken);
 
         foreach (var region in context.VoucherRegions)
@@ -66,7 +66,7 @@ public sealed class KloVoucherParser : IVoucherProviderParser
             var expirationDate = ParseExpirationDate(rawText);
             var voucherNumber = ParseVoucherNumber(rawText);
             var fuelTypeName = ParseFuelTypeName(rawText);
-            var stationName = ParseStationName(rawText);
+            var BrandName = ParseBrandName(rawText);
 
             string? qrPayload = null;
             QrDecodeResult qrResult = new();
@@ -86,7 +86,7 @@ public sealed class KloVoucherParser : IVoucherProviderParser
             }
 
             var fuelTypeEntity = await _context.FuelTypes
-                .FirstOrDefaultAsync(f => f.StationId == "klo" && f.Name == fuelTypeName, cancellationToken);
+                .FirstOrDefaultAsync(f => f.BrandId == "klo" && f.Name == fuelTypeName, cancellationToken);
 
             var fuelTypeId = fuelTypeEntity?.Id ?? "klo-dp";
             decimal confidence = fuelTypeEntity != null ? 20 : 0;
@@ -94,7 +94,7 @@ public sealed class KloVoucherParser : IVoucherProviderParser
             if (expirationDate != default) confidence += 20;
             if (!string.IsNullOrEmpty(voucherNumber)) confidence += 20;
             if (!string.IsNullOrEmpty(qrPayload)) confidence += 20;
-            if (!string.IsNullOrEmpty(stationName)) confidence += 5;
+            if (!string.IsNullOrEmpty(BrandName)) confidence += 5;
 
             parsedVouchers.Add(new ParsedVoucher
             {
@@ -171,9 +171,9 @@ public sealed class KloVoucherParser : IVoucherProviderParser
         };
     }
 
-    private static string ParseStationName(string text)
+    private static string ParseBrandName(string text)
     {
-        var match = StationNameRegex.Match(text);
+        var match = BrandNameRegex.Match(text);
         return match.Success ? match.Value.Trim() : string.Empty;
     }
 }

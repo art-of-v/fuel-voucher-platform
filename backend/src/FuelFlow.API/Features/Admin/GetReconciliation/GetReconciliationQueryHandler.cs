@@ -32,7 +32,7 @@ public sealed class GetReconciliationQueryHandler
         // filter, so a QA rehearsal row could shadow a real one by being newer.
         //
         // The GroupBy(...).First() this replaces existed only to break ties the schema already
-        // forbids - UNIQUE (station_id, fuel_type_id, data_kind) on fuel_offers times
+        // forbids - UNIQUE (brand_id, fuel_type_id, data_kind) on fuel_offers times
         // UNIQUE (offer_id, liters) on fuel_offer_volumes makes the triple unique inside a pool. A
         // duplicate now throws rather than silently resolving to one arbitrary price.
         // Projects the margin, not the offer entity. Handing back a whole tracked-free entity and then
@@ -54,9 +54,9 @@ public sealed class GetReconciliationQueryHandler
             // lookup answered one number.
             join f in _context.FuelTypes.AsNoTracking() on o.FuelTypeId equals f.Id
             where o.DataKind == DataKinds.Real
-            select new { o.StationId, o.FuelTypeId, v.Liters, MarginUahPerLiter = f.MarginUahPerLiter })
+            select new { o.BrandId, o.FuelTypeId, v.Liters, MarginUahPerLiter = f.MarginUahPerLiter })
             .ToDictionaryAsync(
-                x => (x.StationId, x.FuelTypeId, x.Liters),
+                x => (x.BrandId, x.FuelTypeId, x.Liters),
                 x => x.MarginUahPerLiter,
                 cancellationToken);
 

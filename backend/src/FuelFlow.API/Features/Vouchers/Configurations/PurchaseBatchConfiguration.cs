@@ -66,7 +66,7 @@ internal sealed class PurchaseBatchConfiguration : IEntityTypeConfiguration<Purc
         // FK convention above.
         builder.HasIndex(e => e.SupplierId);
 
-        // fuel_type_id is a catalog natural key, bounded by CHECK - see StationConfiguration.
+        // fuel_type_id is a catalog natural key, bounded by CHECK - see BrandConfiguration.
         builder.ToTable(t =>
         {
             t.HasCheckConstraint("ck_purchase_batches_fuel_type_id_length", "length(fuel_type_id) <= 100");

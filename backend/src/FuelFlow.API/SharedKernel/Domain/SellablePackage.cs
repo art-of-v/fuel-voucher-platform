@@ -34,7 +34,7 @@ public sealed record SellablePackage
 
     public string OfferId { get; init; } = string.Empty;
 
-    public string StationId { get; init; } = string.Empty;
+    public string BrandId { get; init; } = string.Empty;
 
     public string FuelTypeId { get; init; } = string.Empty;
 
@@ -103,7 +103,7 @@ public sealed record SellablePackage
     {
         PackageId = volume.Id,
         OfferId = offer.Id,
-        StationId = offer.StationId,
+        BrandId = offer.BrandId,
         FuelTypeId = offer.FuelTypeId,
         Liters = volume.Liters,
         PriceOverrideUah = volume.PriceOverrideUah,

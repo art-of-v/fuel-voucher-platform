@@ -1,13 +1,13 @@
 using FuelFlow.SharedKernel.Domain;
-using FuelFlow.Features.Stations.CreateFuelType;
-using FuelFlow.Features.Stations.DeleteFuelType;
-using FuelFlow.Features.Stations.GetAdminFuelTypeById;
-using FuelFlow.Features.Stations.GetAdminFuelTypes;
-using FuelFlow.Features.Stations.UpdateFuelType;
+using FuelFlow.Features.Brands.CreateFuelType;
+using FuelFlow.Features.Brands.DeleteFuelType;
+using FuelFlow.Features.Brands.GetAdminFuelTypeById;
+using FuelFlow.Features.Brands.GetAdminFuelTypes;
+using FuelFlow.Features.Brands.UpdateFuelType;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace FuelFlow.Features.Stations;
+namespace FuelFlow.Features.Brands;
 
 [ApiController]
 [Route("api/admin/fuel-types")]

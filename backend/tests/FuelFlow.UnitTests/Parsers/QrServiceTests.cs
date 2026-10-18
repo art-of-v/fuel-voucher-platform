@@ -239,8 +239,8 @@ public class KloVoucherParserTests : IDisposable
             .Options;
         _context = new ApplicationDbContext(options, TestQrCipher.Instance);
         _context.FuelTypes.AddRange(
-            new FuelTypeEntity { Id = "klo-dp", Name = "ДП Mustang", StationId = "klo", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "klo-95", Name = "A 95 EURO", StationId = "klo", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow });
+            new FuelTypeEntity { Id = "klo-dp", Name = "ДП Mustang", BrandId = "klo", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = "klo-95", Name = "A 95 EURO", BrandId = "klo", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow });
         _context.SaveChanges();
     }
 

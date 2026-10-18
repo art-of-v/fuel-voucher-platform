@@ -26,7 +26,7 @@ namespace FuelFlow.IntegrationTests;
 /// indexes and therefore never refused a write. That is why a defect could sit in a merged pull
 /// request, through a green unit suite, and only appear in production: with fifteen fuels and not one
 /// brand code, the catalogue step judged every published grade missing and tried to create "ГАЗ" beside
-/// the "ГАЗ" that was already there. Postgres refused it on <c>ux_fuel_types_station_name</c>, the
+/// the "ГАЗ" that was already there. Postgres refused it on <c>ux_fuel_types_Brand_name</c>, the
 /// refused rows stayed attached to the shared context, and the backfill step then tried to insert them
 /// again - which is how the same incident reported itself twice, the second time as an unrelated clash
 /// on a brand code.
@@ -39,7 +39,7 @@ namespace FuelFlow.IntegrationTests;
 [Collection("Integration Tests")]
 public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDatabaseFixture>
 {
-    private const string OkkoStationId = "okko";
+    private const string OkkoBrandId = "okko";
 
     private readonly TestDatabaseFixture _fixture;
 
@@ -87,7 +87,7 @@ public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDataba
     private async Task SeedOperatorTypedFuelsAsync(ApplicationDbContext context)
     {
         var seededFuels = await context.FuelTypes
-            .Where(f => f.StationId == OkkoStationId)
+            .Where(f => f.BrandId == OkkoBrandId)
             .ToListAsync();
 
         if (seededFuels.Count > 0)
@@ -114,24 +114,24 @@ public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDataba
         }
 
         var now = DateTime.UtcNow;
-        if (!await context.Stations.AnyAsync(s => s.Id == OkkoStationId))
+        if (!await context.Brands.AnyAsync(s => s.Id == OkkoBrandId))
         {
-            context.Stations.Add(new Station
+            context.Brands.Add(new Brand
             {
-                Id = OkkoStationId, Name = "OKKO", Color = "#000", LogoText = "OKKO"
+                Id = OkkoBrandId, Name = "OKKO", Color = "#000", LogoText = "OKKO"
             });
         }
 
         context.FuelTypes.AddRange(
             new FuelTypeEntity
             {
-                Id = "prod-gas", Name = "ГАЗ", StationId = OkkoStationId,
+                Id = "prod-gas", Name = "ГАЗ", BrandId = OkkoBrandId,
                 BasePrice = 45.50m, DiscountPrice = 44.50m,
                 CreatedAtUtc = now, UpdatedAtUtc = now
             },
             new FuelTypeEntity
             {
-                Id = "prod-a95", Name = "А95 ЄВРО", StationId = OkkoStationId,
+                Id = "prod-a95", Name = "А95 ЄВРО", BrandId = OkkoBrandId,
                 BasePrice = 51.00m, DiscountPrice = 50.00m,
                 CreatedAtUtc = now, UpdatedAtUtc = now
             });
@@ -160,7 +160,7 @@ public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDataba
         ForgetTrackedEntities(context);
 
         var fuels = await context.FuelTypes
-            .Where(f => f.StationId == OkkoStationId)
+            .Where(f => f.BrandId == OkkoBrandId)
             .ToListAsync();
 
         // The refusal happened every fifteen minutes on production and left no trace in the catalogue -
@@ -185,7 +185,7 @@ public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDataba
 
         secondTick.Errors.Should().BeEmpty();
 
-        (await again.FuelTypes.CountAsync(f => f.StationId == OkkoStationId))
+        (await again.FuelTypes.CountAsync(f => f.BrandId == OkkoBrandId))
             .Should().Be(2, "a second tick must be as idempotent as the first");
     }
 
@@ -204,7 +204,7 @@ public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDataba
         // Our own spelling of the grade, no code - exactly the state a fresh catalogue is in.
         context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = "prod-pulls-diesel", Name = "ДП PULLS", StationId = OkkoStationId,
+            Id = "prod-pulls-diesel", Name = "ДП PULLS", BrandId = OkkoBrandId,
             BasePrice = 105.90m, DiscountPrice = 102.90m,
             CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow,
         });
@@ -220,7 +220,7 @@ public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDataba
         await Sync(context, sheet).SyncPricesAsync();
         ForgetTrackedEntities(context);
 
-        (await context.FuelTypes.CountAsync(f => f.StationId == OkkoStationId))
+        (await context.FuelTypes.CountAsync(f => f.BrandId == OkkoBrandId))
             .Should().Be(3, "'ДП' and 'ДП PULLS' are one grade written two ways, not two fuels");
 
         (await context.FuelTypes.Select(f => f.Name).ToListAsync())
@@ -252,7 +252,7 @@ public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDataba
             "Пульс 95",
             "'95 PULLS' is a rendering; the code is the identity, and the name follows it");
 
-        (await context.FuelTypes.CountAsync(f => f.StationId == OkkoStationId)).Should().Be(3);
+        (await context.FuelTypes.CountAsync(f => f.BrandId == OkkoBrandId)).Should().Be(3);
     }
 
     /// <summary>
@@ -315,7 +315,7 @@ public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDataba
             await Sync(context, sheet, logged).SyncPricesAsync();
             ForgetTrackedEntities(context);
 
-            (await context.FuelTypes.CountAsync(f => f.StationId == OkkoStationId))
+            (await context.FuelTypes.CountAsync(f => f.BrandId == OkkoBrandId))
                 .Should().Be(2, "the refused insert must not be carried into the next step's save");
 
             var gas = await context.FuelTypes.SingleAsync(f => f.Id == "prod-gas");

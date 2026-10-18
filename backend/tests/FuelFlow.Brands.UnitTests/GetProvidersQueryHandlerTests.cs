@@ -33,7 +33,7 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
     [Fact]
     public async Task Handle_ReturnsFuelsWithPricingAndDistinctNominals()
     {
-        _context.Stations.Add(new Station
+        _context.Brands.Add(new Brand
         {
             Id = "test-okko",
             Name = "OKKO",
@@ -43,8 +43,8 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
             UpdatedAtUtc = DateTime.UtcNow
         });
         _context.FuelTypes.AddRange(
-            new FuelTypeEntity { Id = "test-fuel-a", Name = "A-95", StationId = "test-okko", BasePrice = 5100, DiscountPrice = 5100, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "test-fuel-b", Name = "ДП", StationId = "test-okko", BasePrice = 5200, DiscountPrice = 5200, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
+            new FuelTypeEntity { Id = "test-fuel-a", Name = "A-95", BrandId = "test-okko", BasePrice = 5100, DiscountPrice = 5100, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = "test-fuel-b", Name = "ДП", BrandId = "test-okko", BasePrice = 5200, DiscountPrice = 5200, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
         _context.SeedPackage("test-fuel-a-10", "test-okko", "test-fuel-a", 10m, 510m,
             supplierPricePerLiter: 49m, marginUahPerLiter: 2m, finalPricePerLiter: 51m);
         _context.SeedPackage("test-fuel-a-20", "test-okko", "test-fuel-a", 20m, 1020m,
@@ -78,7 +78,7 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
     [Fact]
     public async Task Handle_CostIsLitersWeightedAcrossPackages_NotOneArbitraryRow()
     {
-        _context.Stations.Add(new Station
+        _context.Brands.Add(new Brand
         {
             Id = "test-okko",
             Name = "OKKO",
@@ -91,7 +91,7 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
         {
             Id = "test-dp",
             Name = "ДП ЄВРО",
-            StationId = "test-okko",
+            BrandId = "test-okko",
             BasePrice = 110,
             DiscountPrice = 100,
             CreatedAtUtc = DateTime.UtcNow,
@@ -130,7 +130,7 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
     /// This test existed to catch two packages of one fuel carrying different per-litre prices, and to
     /// require the card to surface the disagreement via <c>PriceSpread</c> so an operator could see it
     /// before the write path flattened it. The split makes that state unrepresentable: one fuel at one
-    /// station owns one offer, and every volume of that offer reads the same price. The second package
+    /// Brand owns one offer, and every volume of that offer reads the same price. The second package
     /// seeded here therefore lands on the SAME offer, and the last write of cost wins - which is the
     /// behaviour worth pinning, because it is the opposite of the old weighted average and would be a
     /// silent regression if someone reintroduced per-package costs.
@@ -138,7 +138,7 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
     [Fact]
     public async Task Handle_AFuelHasOnePrice_BecauseItHasOneOffer()
     {
-        _context.Stations.Add(new Station
+        _context.Brands.Add(new Brand
         {
             Id = "test-okko",
             Name = "OKKO",
@@ -151,7 +151,7 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
         {
             Id = "test-dp",
             Name = "ДП ЄВРО",
-            StationId = "test-okko",
+            BrandId = "test-okko",
             BasePrice = 110,
             DiscountPrice = 100,
             CreatedAtUtc = DateTime.UtcNow,
@@ -182,7 +182,7 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
     [Fact]
     public async Task Handle_RepeatedReads_AreIdentical()
     {
-        _context.Stations.Add(new Station
+        _context.Brands.Add(new Brand
         {
             Id = "test-okko",
             Name = "OKKO",
@@ -195,7 +195,7 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
         {
             Id = "test-dp",
             Name = "ДП ЄВРО",
-            StationId = "test-okko",
+            BrandId = "test-okko",
             BasePrice = 110,
             DiscountPrice = 100,
             CreatedAtUtc = DateTime.UtcNow,
@@ -251,7 +251,7 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
     [Fact]
     public async Task Handle_ProviderWithoutFuels_HasEmptyFuelsAndNominals()
     {
-        _context.Stations.Add(new Station
+        _context.Brands.Add(new Brand
         {
             Id = "test-klo",
             Name = "KLO",

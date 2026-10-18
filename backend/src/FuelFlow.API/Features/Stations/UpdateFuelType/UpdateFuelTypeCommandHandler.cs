@@ -2,7 +2,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 
-namespace FuelFlow.Features.Stations.UpdateFuelType;
+namespace FuelFlow.Features.Brands.UpdateFuelType;
 
 public sealed class UpdateFuelTypeCommandHandler
 {
@@ -15,7 +15,7 @@ public sealed class UpdateFuelTypeCommandHandler
         if (entity is null) return false;
 
         entity.Name = command.Updated.Name;
-        entity.StationId = command.Updated.StationId;
+        entity.BrandId = command.Updated.BrandId;
         entity.BasePrice = command.Updated.BasePrice;
         entity.DiscountPrice = command.Updated.DiscountPrice;
         // Copied rather than ignored: this endpoint takes the whole entity, and a write path that

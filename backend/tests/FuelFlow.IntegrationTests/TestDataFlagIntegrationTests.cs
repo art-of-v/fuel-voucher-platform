@@ -10,7 +10,7 @@ namespace FuelFlow.IntegrationTests;
 
 /// <summary>
 /// <c>data_kind = 'qa'</c> marks a voucher as emulated: a seeded row whose code does not exist at the
-/// station. It is the thing that lets a QA account be handed test fuel without that fuel ever being
+/// Brand. It is the thing that lets a QA account be handed test fuel without that fuel ever being
 /// sellable to a paying customer, and it is the thing a cleanup runs on.
 /// <para>
 /// The default matters most of all. It is <see cref="DataKinds.Real"/>, so every voucher that

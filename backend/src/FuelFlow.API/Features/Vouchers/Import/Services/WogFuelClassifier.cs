@@ -92,7 +92,7 @@ public static class WogFuelClassifier
     /// Resolves the WOG fuel type for a parsed voucher from its OCR text.
     /// <para>
     /// Returns null (rather than guessing a default) when the text yields no category, or when
-    /// the resolved category has no matching row in the station catalog, so the caller rejects
+    /// the resolved category has no matching row in the Brand catalog, so the caller rejects
     /// the row with a clear message instead of silently importing it under the wrong fuel type
     /// or, worse, under a non-existent id that would trip the foreign key when the voucher
     /// row is persisted.

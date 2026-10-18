@@ -1,15 +1,15 @@
 using System.Security.Claims;
 using FuelFlow.SharedKernel.Domain;
-using FuelFlow.Features.Stations.CreatePackage;
-using FuelFlow.Features.Stations.DeletePackage;
-using FuelFlow.Features.Stations.GetAdminPackages;
-using FuelFlow.Features.Stations.GetAdminPackagesByStation;
-using FuelFlow.Features.Stations.GetPackageSuggestions;
-using FuelFlow.Features.Stations.UpdatePackage;
+using FuelFlow.Features.Brands.CreatePackage;
+using FuelFlow.Features.Brands.DeletePackage;
+using FuelFlow.Features.Brands.GetAdminPackages;
+using FuelFlow.Features.Brands.GetAdminPackagesByBrand;
+using FuelFlow.Features.Brands.GetPackageSuggestions;
+using FuelFlow.Features.Brands.UpdatePackage;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace FuelFlow.Features.Stations;
+namespace FuelFlow.Features.Brands;
 
 [ApiController]
 [Route("api/admin/packages")]
@@ -17,7 +17,7 @@ namespace FuelFlow.Features.Stations;
 public sealed class AdminPackageController : ControllerBase
 {
     private readonly GetAdminPackagesQueryHandler _getAll;
-    private readonly GetAdminPackagesByStationQueryHandler _getByStation;
+    private readonly GetAdminPackagesByBrandQueryHandler _getByBrand;
     private readonly GetPackageSuggestionsQueryHandler _getSuggestions;
     private readonly CreatePackageCommandHandler _create;
     private readonly UpdatePackageCommandHandler _update;
@@ -25,14 +25,14 @@ public sealed class AdminPackageController : ControllerBase
 
     public AdminPackageController(
         GetAdminPackagesQueryHandler getAll,
-        GetAdminPackagesByStationQueryHandler getByStation,
+        GetAdminPackagesByBrandQueryHandler getByBrand,
         GetPackageSuggestionsQueryHandler getSuggestions,
         CreatePackageCommandHandler create,
         UpdatePackageCommandHandler update,
         DeletePackageCommandHandler delete)
     {
         _getAll = getAll;
-        _getByStation = getByStation;
+        _getByBrand = getByBrand;
         _getSuggestions = getSuggestions;
         _create = create;
         _update = update;
@@ -120,7 +120,7 @@ public sealed class AdminPackageController : ControllerBase
 public sealed record CreatePackageRequest
 {
     public string Id { get; init; } = null!;
-    public string StationId { get; init; } = null!;
+    public string BrandId { get; init; } = null!;
     public string FuelTypeId { get; init; } = null!;
     public string FuelName { get; init; } = null!;
     public decimal Liters { get; init; }
@@ -149,7 +149,7 @@ public sealed record CreatePackageRequest
     public FuelPackage ToPackage() => new()
     {
         Id = Id,
-        StationId = StationId,
+        BrandId = BrandId,
         FuelTypeId = FuelTypeId,
         FuelName = FuelName,
         Liters = Liters,

@@ -1,3 +1,3 @@
-namespace FuelFlow.Features.Stations.GetPackageSuggestions;
+namespace FuelFlow.Features.Brands.GetPackageSuggestions;
 
 public sealed record GetPackageSuggestionsQuery;

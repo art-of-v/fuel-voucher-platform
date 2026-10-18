@@ -1,4 +1,4 @@
-namespace FuelFlow.Features.Stations.GetPublicPackages;
+namespace FuelFlow.Features.Brands.GetPublicPackages;
 
 /// <param name="CallerUserId">
 /// The signed-in caller's id, or null for an anonymous visitor. Not carried in the JWT —

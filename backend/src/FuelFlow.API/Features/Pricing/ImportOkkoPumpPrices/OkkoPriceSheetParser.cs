@@ -13,7 +13,7 @@ namespace FuelFlow.Features.Pricing.ImportOkkoPumpPrices;
 /// </para>
 /// <para>
 /// Parse errors are per-row: one malformed line never drops the whole file, mirroring
-/// <c>StationNodeImportParser</c>, and every rejection is reported back with its line number.
+/// <c>BrandStationImportParser</c>, and every rejection is reported back with its line number.
 /// </para>
 /// </summary>
 public static class OkkoPriceSheetParser

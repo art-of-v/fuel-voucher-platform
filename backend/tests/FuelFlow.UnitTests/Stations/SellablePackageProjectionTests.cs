@@ -4,7 +4,7 @@ using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
-namespace FuelFlow.UnitTests.Stations;
+namespace FuelFlow.UnitTests.Brands;
 
 /// <summary>
 /// <see cref="SellablePackageProjection"/> and <see cref="SellablePackage.From"/> are the same shape
@@ -44,7 +44,7 @@ public sealed class SellablePackageProjectionTests : IDisposable
         {
             Id = "projection-fuel",
             Name = "А-95 (projection fixture)",
-            StationId = "okko",
+            BrandId = "okko",
             BasePrice = 0m,
             DiscountPrice = 0m,
             MarginUahPerLiter = 2m,
@@ -54,7 +54,7 @@ public sealed class SellablePackageProjectionTests : IDisposable
         var offer = new FuelOffer
         {
             Id = "projection-fuel",
-            StationId = "okko",
+            BrandId = "okko",
             FuelTypeId = fuel.Id,
             DataKind = DataKinds.Real,
             SupplierPricePerLiter = 49m,

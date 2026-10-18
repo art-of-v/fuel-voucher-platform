@@ -35,8 +35,8 @@ public sealed class FuelTypeProductCodeTests : IClassFixture<TestDatabaseFixture
             .UseNpgsql(_fixture.ConnectionString)
             .Options, TestQrCipher.Instance);
 
-    private static FuelTypeProductCode Code(string fuelTypeId, string stationId, string productCode)
-        => new() { FuelTypeId = fuelTypeId, StationId = stationId, ProductCode = productCode };
+    private static FuelTypeProductCode Code(string fuelTypeId, string BrandId, string productCode)
+        => new() { FuelTypeId = fuelTypeId, BrandId = BrandId, ProductCode = productCode };
 
     [Fact]
     public async Task TwoFuelsAtOneNetwork_CannotClaimOneProductCode()
@@ -156,11 +156,11 @@ public sealed class FuelTypeProductCodeTests : IClassFixture<TestDatabaseFixture
         rows.Should().Be(0, "the codes are what paper in the wild carries, and only paper knows them");
     }
 
-    private async Task CleanupAsync(string stationId, string productCode)
+    private async Task CleanupAsync(string BrandId, string productCode)
     {
         await using var context = CreateContext();
         await context.Database.ExecuteSqlRawAsync(
-            "DELETE FROM fuel_type_product_codes WHERE station_id = {0} AND product_code = {1}",
-            stationId, productCode);
+            "DELETE FROM fuel_type_product_codes WHERE brand_id = {0} AND product_code = {1}",
+            BrandId, productCode);
     }
 }

@@ -41,7 +41,7 @@ public sealed record BackfillBrandFuelCodesResult(
 /// the sheet gives the codes that mean that category; a code is proposed only when exactly one of them
 /// does. Everything else is reported and left alone: no code on the sheet, several codes for the grade,
 /// or another live fuel already holding the candidate. A wrong code here is not a cosmetic mistake —
-/// it is an identity <c>ux_fuel_types_station_brand_fuel_code</c> then enforces, and the price import
+/// it is an identity <c>ux_fuel_types_Brand_brand_fuel_code</c> then enforces, and the price import
 /// would hand that fuel somebody else's pump.
 /// </para>
 /// <para>
@@ -53,7 +53,7 @@ public sealed record BackfillBrandFuelCodesResult(
 /// </remarks>
 public sealed class BackfillBrandFuelCodesCommandHandler
 {
-    private const string OkkoStationId = "okko";
+    private const string OkkoBrandId = "okko";
 
     private readonly ApplicationDbContext _context;
     private readonly AuditEventService _events;
@@ -93,14 +93,14 @@ public sealed class BackfillBrandFuelCodesCommandHandler
         // a handful either way.
         var uncoded = (await _context.FuelTypes
                 .AsTracking()
-                .Where(f => f.StationId == OkkoStationId && f.BrandFuelCode == null && !f.IsDeleted)
+                .Where(f => f.BrandId == OkkoBrandId && f.BrandFuelCode == null && !f.IsDeleted)
                 .ToListAsync(ct))
             .OrderBy(f => f.Id, StringComparer.Ordinal)
             .ToList();
 
         var taken = (await _context.FuelTypes
                 .AsNoTracking()
-                .Where(f => f.StationId == OkkoStationId && f.BrandFuelCode != null && !f.IsDeleted)
+                .Where(f => f.BrandId == OkkoBrandId && f.BrandFuelCode != null && !f.IsDeleted)
                 .Select(f => f.BrandFuelCode!)
                 .ToListAsync(ct))
             .ToHashSet(StringComparer.Ordinal);
@@ -165,7 +165,7 @@ public sealed class BackfillBrandFuelCodesCommandHandler
                     actingUserId == Guid.Empty ? Guid.Empty : actingUserId,
                     actingUserName,
                     $"{fill.Name}: matched OKKO's published code {fill.Code}",
-                    OkkoStationId,
+                    OkkoBrandId,
                     ct);
             }
         }

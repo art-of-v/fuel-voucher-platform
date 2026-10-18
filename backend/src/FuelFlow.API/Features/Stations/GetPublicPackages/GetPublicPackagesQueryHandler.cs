@@ -3,7 +3,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 
-namespace FuelFlow.Features.Stations.GetPublicPackages;
+namespace FuelFlow.Features.Brands.GetPublicPackages;
 
 public sealed class GetPublicPackagesQueryHandler
 {
@@ -46,7 +46,7 @@ var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
         //
         // Query syntax rather than chained `Join` calls: the second join keys off the offer, which is not in
         // scope after an anonymous-typed first join. The joins are explicit because the offer carries
-        // no navigation to FuelType - station and fuel are natural keys throughout this schema, so there
+        // no navigation to FuelType - Brand and fuel are natural keys throughout this schema, so there
         // is nothing to navigate; the fuel's display name is joined for here and nowhere else.
         var rows = await (
             from volume in _context.FuelOfferVolumes.AsNoTracking()
@@ -56,7 +56,7 @@ var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
             // filtering `volume.DataKind` would silently read as always-true and the pool guard would
             // evaporate.
             where offer.DataKind == DataKinds.ForPool(isTestAccount)
-            orderby offer.StationId, fuel.Name, volume.Liters
+            orderby offer.BrandId, fuel.Name, volume.Liters
             // Fuel name moved to fuel_types with the rest of the fuel's identity when the offer was
             // born - the offer knows WHICH fuel, not what it is called. Joining for the label keeps the
             // storefront's display name a property of the fuel rather than a string each package row
@@ -64,7 +64,7 @@ var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
             select new
             {
                 Id = volume.Id,
-                offer.StationId,
+                offer.BrandId,
                 offer.FuelTypeId,
                 FuelName = fuel.Name,
                 volume.Liters,
@@ -99,7 +99,7 @@ var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
 
                 return new PublicPackageResponse(
                     x.Id,
-                    x.StationId,
+                    x.BrandId,
                     x.FuelTypeId,
                     x.FuelName,
                     x.Liters,
@@ -107,7 +107,7 @@ var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
                     FuelPricing.OriginalPackagePrice(x.PumpPricePerLiter, x.Liters, price),
                     FuelPricing.FinalPerLiterOrNull(
                         x.SupplierPricePerLiter, x.MarginUahPerLiter, x.PumpPricePerLiter, x.MinDiscountPerLiter),
-                    available.Contains(StockKey.For(x.StationId, x.FuelTypeId, x.Liters)));
+                    available.Contains(StockKey.For(x.BrandId, x.FuelTypeId, x.Liters)));
             })
             .ToList();
     }

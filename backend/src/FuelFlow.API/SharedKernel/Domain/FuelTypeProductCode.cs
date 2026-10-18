@@ -37,12 +37,12 @@ public sealed class FuelTypeProductCode
     public string FuelTypeId { get; set; } = null!;
 
     /// <summary>
-    /// The network that publishes the code, mirroring <c>fuel_types.station_id</c>. Carried here
+    /// The network that publishes the code, mirroring <c>fuel_types.brand_id</c>. Carried here
     /// because a product code identifies a grade <em>within</em> a network — OKKO's 9018 and KLO's own
     /// codes share a numbering space we cannot prove they do not — and the uniqueness rule needs the
     /// network in the index to say that.
     /// </summary>
-    public string StationId { get; set; } = null!;
+    public string BrandId { get; set; } = null!;
 
     /// <summary>The code as it appears in the voucher's QR: <c>"9018"</c>, <c>"45290"</c>.</summary>
     public string ProductCode { get; set; } = null!;

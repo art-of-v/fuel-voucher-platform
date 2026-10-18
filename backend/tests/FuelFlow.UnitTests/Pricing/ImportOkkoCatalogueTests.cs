@@ -49,9 +49,9 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
 
     private ImportOkkoCatalogueCommandHandler Handler() => new(_context, _events, new OfferPriceRecorder(_context));
 
-    private async Task SeedStationAsync()
+    private async Task SeedBrandAsync()
     {
-        _context.Stations.Add(new Station { Id = "okko", Name = "OKKO", Color = "#000", LogoText = "OKKO" });
+        _context.Brands.Add(new Brand { Id = "okko", Name = "OKKO", Color = "#000", LogoText = "OKKO" });
         await _context.SaveChangesAsync();
         _context.ChangeTracker.Clear();
     }
@@ -75,7 +75,7 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
     [Fact]
     public async Task AGradeTheCatalogueDoesNotHave_BecomesAFuelAndAnOffer()
     {
-        await SeedStationAsync();
+        await SeedBrandAsync();
 
         var result = await Handler().ApplyAsync(
             new ImportOkkoCatalogueCommand(PublishedSheet, DryRun: false), Guid.Empty, "tester");
@@ -84,7 +84,7 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
         result.CreatedFuels.Select(c => c.BrandFuelCode).Should().BeEquivalentTo(["A-95", "DP"]);
 
         var fuel = await _context.FuelTypes.SingleAsync(f => f.BrandFuelCode == "DP");
-        fuel.StationId.Should().Be("okko");
+        fuel.BrandId.Should().Be("okko");
         fuel.Name.Should().Be(
             "ДП",
             "the name comes from the grade the code identifies, not from the label the brand happened to "
@@ -103,7 +103,7 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
         // The rule that keeps this import from publishing a price: an offer with no volumes is not
         // listed by the storefront and cannot be bought, so the fuel waits for an operator instead of
         // going on sale at cost-plus-zero.
-        await SeedStationAsync();
+        await SeedBrandAsync();
 
         await Handler().ApplyAsync(
             new ImportOkkoCatalogueCommand(PublishedSheet, DryRun: false), Guid.Empty, "tester");
@@ -129,7 +129,7 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
     {
         // The job runs every fifteen minutes. An import that created a duplicate each time would turn
         // the catalogue into the twin problem #349 was opened for.
-        await SeedStationAsync();
+        await SeedBrandAsync();
 
         await Handler().ApplyAsync(new ImportOkkoCatalogueCommand(PublishedSheet, DryRun: false), Guid.Empty, "t");
         var second = await Handler().ApplyAsync(new ImportOkkoCatalogueCommand(PublishedSheet, DryRun: false), Guid.Empty, "t");
@@ -137,7 +137,7 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
         second.Created.Should().Be(0);
         second.AlreadyKnown.Should().Be(2);
 
-        (await _context.FuelTypes.CountAsync(f => f.StationId == "okko")).Should().Be(2);
+        (await _context.FuelTypes.CountAsync(f => f.BrandId == "okko")).Should().Be(2);
     }
 
     [Fact]
@@ -146,11 +146,11 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
         // Operator columns belong to the operator: our price, the margin, the discount floor, the
         // below-cost opt-in, and the archive flag. An import that "helpfully" refreshed a price would
         // be publishing a number no human approved.
-        await SeedStationAsync();
+        await SeedBrandAsync();
         var existing = new FuelTypeEntity
         {
             Id = "okko-95",
-            StationId = "okko",
+            BrandId = "okko",
             Name = "А-95 (renamed by hand)",
             BrandFuelCode = "A-95",
             BasePrice = 54m,
@@ -165,7 +165,7 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
         _context.FuelOffers.Add(new FuelOffer
         {
             Id = "offer-95",
-            StationId = "okko",
+            BrandId = "okko",
             FuelTypeId = "okko-95",
             DataKind = DataKinds.Real,
             SupplierPricePerLiter = 49m,
@@ -197,11 +197,11 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
         // The absence rule. A scrape that fails to read a page, an anti-bot interstitial, a locale
         // change — every one of them would otherwise empty the catalogue of live fuels that paid
         // vouchers point at.
-        await SeedStationAsync();
+        await SeedBrandAsync();
         _context.FuelTypes.Add(new FuelTypeEntity
         {
             Id = "okko-old",
-            StationId = "okko",
+            BrandId = "okko",
             Name = "ДП Застарілий",
             BrandFuelCode = "DP-OLD",
             BasePrice = 50m,
@@ -222,7 +222,7 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
     public async Task AnEmptySheet_IsRefusedRatherThanApplied()
     {
         // Zero rows must never be able to mean "the catalogue is now empty".
-        await SeedStationAsync();
+        await SeedBrandAsync();
 
         var act = async () => await Handler().ApplyAsync(
             new ImportOkkoCatalogueCommand([], DryRun: false), Guid.Empty, "t");
@@ -234,14 +234,14 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
     [Fact]
     public async Task AGradeWeDoNotSell_IsReportedAndNeverCreated()
     {
-        await SeedStationAsync();
+        await SeedBrandAsync();
 
         var result = await Handler().ApplyAsync(
             new ImportOkkoCatalogueCommand(PublishedSheet, DryRun: false), Guid.Empty, "t");
 
         result.UnclassifiedSiteFuels.Should().BeEquivalentTo(["Pulls 100", "AdBlue"]);
 
-        (await _context.FuelTypes.CountAsync(f => f.StationId == "okko")).Should().Be(2);
+        (await _context.FuelTypes.CountAsync(f => f.BrandId == "okko")).Should().Be(2);
         (await _context.FuelTypes.AnyAsync(f => f.Name.Contains("100"))).Should().BeFalse(
             "inventing a fuel the catalogue has no category for is how a supplier's new product becomes a sellable row");
     }
@@ -253,7 +253,7 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
         // label is no longer a reason to refuse a grade the brand clearly sells. That used to end in
         // "reported and nothing created", which meant a missing field on their side silently removed a
         // fuel from our catalogue.
-        await SeedStationAsync();
+        await SeedBrandAsync();
 
         var result = await Handler().ApplyAsync(
             new ImportOkkoCatalogueCommand([new OkkoPumpPrice("DP", 99.90m)], DryRun: false), Guid.Empty, "t");
@@ -271,10 +271,10 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
         // The production incident: matching on the code alone found nothing because nothing carried a
         // code, and the import added "ДП" beside the "ДП PULLS" that already meant the same diesel.
         // Grade is the identity, so the second row is impossible by construction.
-        await SeedStationAsync();
+        await SeedBrandAsync();
         _context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = "hand-typed", Name = "ДП PULLS", StationId = "okko", CreatedAtUtc = DateTime.UtcNow,
+            Id = "hand-typed", Name = "ДП PULLS", BrandId = "okko", CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
         });
         await _context.SaveChangesAsync();
@@ -297,10 +297,10 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
     {
         // "ДП" and "DP" are one diesel written two ways. Our own catalogue holds both spellings, and the
         // site alternates between them, so a code check alone would keep adding rows forever.
-        await SeedStationAsync();
+        await SeedBrandAsync();
         _context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = "latin-diesel", Name = "DP", StationId = "okko",
+            Id = "latin-diesel", Name = "DP", BrandId = "okko",
             BrandFuelCode = "DP", CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow,
         });
         await _context.SaveChangesAsync();
@@ -316,7 +316,7 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
     [Fact]
     public async Task ADryRun_CreatesNothingAndStillSaysWhatItWouldDo()
     {
-        await SeedStationAsync();
+        await SeedBrandAsync();
 
         var result = await Handler().ApplyAsync(
             new ImportOkkoCatalogueCommand(PublishedSheet, DryRun: true), Guid.Empty, "t");
@@ -333,7 +333,7 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
     public async Task EveryCreatedFuel_IsRecordedInTheAuditTrail()
     {
         // A catalogue that grew while nobody was watching has to say so where a typed one does.
-        await SeedStationAsync();
+        await SeedBrandAsync();
 
         await Handler().ApplyAsync(new ImportOkkoCatalogueCommand(PublishedSheet, DryRun: false), Guid.Empty, "t");
         _context.ChangeTracker.Clear();
@@ -350,11 +350,11 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
     [Fact]
     public async Task AnArchivedFuel_DoesNotBlockAFreshOneForTheSameGrade()
     {
-        await SeedStationAsync();
+        await SeedBrandAsync();
         _context.FuelTypes.Add(new FuelTypeEntity
         {
             Id = "okko-95-old",
-            StationId = "okko",
+            BrandId = "okko",
             Name = "А-95 (archived)",
             BrandFuelCode = "A-95",
             IsDeleted = true,

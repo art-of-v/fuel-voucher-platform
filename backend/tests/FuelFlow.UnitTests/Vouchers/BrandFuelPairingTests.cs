@@ -6,7 +6,7 @@ namespace FuelFlow.UnitTests.Vouchers;
 
 /// <summary>
 /// A voucher records its brand twice — printed on the paper as <c>brand</c>, and in the catalog as
-/// the fuel type's <c>station_id</c>. Only the catalog side is constrained, so the two can disagree and
+/// the fuel type's <c>brand_id</c>. Only the catalog side is constrained, so the two can disagree and
 /// nothing in the schema would say so.
 /// </summary>
 public sealed class BrandFuelPairingTests

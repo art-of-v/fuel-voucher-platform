@@ -23,8 +23,8 @@ internal sealed class ContractConfiguration : IEntityTypeConfiguration<Contract>
             .HasColumnName("legal_entity_id")
             .IsRequired();
 
-        builder.Property(e => e.StationId)
-            .HasColumnName("station_id")
+        builder.Property(e => e.BrandId)
+            .HasColumnName("brand_id")
             .HasColumnType("text")
             .IsRequired();
 
@@ -45,20 +45,20 @@ internal sealed class ContractConfiguration : IEntityTypeConfiguration<Contract>
             .HasForeignKey(e => e.LegalEntityId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne(e => e.Station)
+        builder.HasOne(e => e.Brand)
             .WithMany()
-            .HasForeignKey(e => e.StationId)
+            .HasForeignKey(e => e.BrandId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(e => e.UserId);
         builder.HasIndex(e => e.LegalEntityId);
-        builder.HasIndex(e => e.StationId);
+        builder.HasIndex(e => e.BrandId);
 
-        // station_id is a natural key on the catalog ("okko"), bounded by CHECK rather than a type
-        // change - see StationConfiguration.
+        // brand_id is a natural key on the catalog ("okko"), bounded by CHECK rather than a type
+        // change - see BrandConfiguration.
         builder.ToTable(t =>
         {
-            t.HasCheckConstraint("ck_contracts_station_id_length", "length(station_id) <= 100");
+            t.HasCheckConstraint("ck_contracts_brand_id_length", "length(brand_id) <= 100");
         });
     }
 }

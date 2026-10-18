@@ -2,7 +2,7 @@ using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace FuelFlow.Features.Stations.Configurations;
+namespace FuelFlow.Features.Brands.Configurations;
 
 /// <summary>
 /// <c>fuel_type_product_codes</c> — the QR product codes a network's vouchers carry, and the grade
@@ -19,7 +19,7 @@ internal sealed class FuelTypeProductCodeConfiguration : IEntityTypeConfiguratio
         builder.HasKey(e => new { e.FuelTypeId, e.ProductCode });
 
         builder.Property(e => e.FuelTypeId).HasColumnName("fuel_type_id").HasColumnType("text").IsRequired();
-        builder.Property(e => e.StationId).HasColumnName("station_id").HasColumnType("text").IsRequired();
+        builder.Property(e => e.BrandId).HasColumnName("brand_id").HasColumnType("text").IsRequired();
         builder.Property(e => e.ProductCode).HasColumnName("product_code").HasColumnType("text").IsRequired();
         builder.Property(e => e.LastSeenAtUtc).HasColumnName("last_seen_at_utc").HasColumnType("timestamptz");
 
@@ -28,11 +28,11 @@ internal sealed class FuelTypeProductCodeConfiguration : IEntityTypeConfiguratio
         // whichever row the database happened to return first — which is how a real voucher ends up
         // priced against the wrong fuel.
         //
-        // It leads with station_id because the code is scoped to the network that publishes it, and
+        // It leads with brand_id because the code is scoped to the network that publishes it, and
         // because that is the lookup: a parser knows its brand and asks for its own codes.
-        builder.HasIndex(e => new { e.StationId, e.ProductCode })
+        builder.HasIndex(e => new { e.BrandId, e.ProductCode })
             .IsUnique()
-            .HasDatabaseName("ux_fuel_type_product_codes_station_code");
+            .HasDatabaseName("ux_fuel_type_product_codes_brand_code");
 
         builder.HasIndex(e => e.ProductCode)
             .HasDatabaseName("ix_fuel_type_product_codes_code");
@@ -42,7 +42,7 @@ internal sealed class FuelTypeProductCodeConfiguration : IEntityTypeConfiguratio
             // 100 is the bound every catalog text column shares (F-24); the codes themselves are four
             // or five digits, and the fuel type id they point at is bounded at 100 by its own CHECK.
             t.HasCheckConstraint("ck_fuel_type_product_codes_fuel_type_id_length", "length(fuel_type_id) <= 100");
-            t.HasCheckConstraint("ck_fuel_type_product_codes_station_id_length", "length(station_id) <= 100");
+            t.HasCheckConstraint("ck_fuel_type_product_codes_brand_id_length", "length(brand_id) <= 100");
 
             // Bounded at 32 rather than 100: this is a printed number, not prose. A 33-character
             // "product code" is a paste of the wrong field.

@@ -97,19 +97,19 @@ public sealed class PackageStockAvailability
     }
 
     /// <summary>
-    /// The <see cref="FuelPackage"/> that will actually be charged for one (station, fuel, litres)
+    /// The <see cref="FuelPackage"/> that will actually be charged for one (Brand, fuel, litres)
     /// line, or <see langword="null"/> when this caller's pool has no package for that triple.
     /// </summary>
     /// <remarks>
     /// <para>
     /// This is the single implementation shared with the storefront, and it exists because the two
     /// sides had drifted into reading different rows for the same key. Checkout used to resolve the
-    /// package with a bare <c>FirstOrDefaultAsync</c> on <c>(station, fuel, liters)</c>: no
+    /// package with a bare <c>FirstOrDefaultAsync</c> on <c>(Brand, fuel, liters)</c>: no
     /// <c>DataKind</c> filter and no <c>OrderBy</c>.
     /// </para>
     /// <para>
     /// Both omissions matter because a triple is not unique. <c>scripts/seed-qa-catalogue.sql</c> gives
-    /// every real package a QA mirror on the <em>same</em> station, fuel and nominal, so as shipped every
+    /// every real package a QA mirror on the <em>same</em> Brand, fuel and nominal, so as shipped every
     /// sellable triple has exactly two live rows — measured on production 2026-10-14: 13 offers producing
     /// 58 rows, 58 flagged real and 58 flagged QA, with no duplicates inside either pool. An unordered
     /// <c>FirstOrDefaultAsync</c> over two rows returns whichever one Postgres happens to produce first.
@@ -124,7 +124,7 @@ public sealed class PackageStockAvailability
     /// </remarks>
     public async Task<SellablePackage?> FindPackageAsync(
         bool isTestAccount,
-        string stationId,
+        string BrandId,
         string fuelTypeId,
         decimal liters,
         CancellationToken cancellationToken = default)
@@ -133,12 +133,12 @@ public sealed class PackageStockAvailability
 
         var row = await _context.FuelOfferVolumes
             .AsNoTracking()
-            .Where(v => v.Offer.StationId == stationId
+            .Where(v => v.Offer.BrandId == BrandId
                      && v.Offer.FuelTypeId == fuelTypeId
                      && v.Liters == liters
                      && v.Offer.DataKind == pool)
             // Not decorative, and no longer merely a tie-break: `UNIQUE (offer_id, liters)` on
-            // fuel_offer_volumes plus `UNIQUE (station_id, fuel_type_id, data_kind)` on fuel_offers
+            // fuel_offer_volumes plus `UNIQUE (brand_id, fuel_type_id, data_kind)` on fuel_offers
             // make this key unique, so exactly one row can match. The ordering is kept because it is
             // free and because the uniqueness is a property of the schema rather than of this query -
             // if the constraint is ever dropped, the order is what keeps the pick stable.
@@ -164,7 +164,7 @@ public sealed class PackageStockAvailability
             return [];
 
         // Narrowed with separate IN-lists on the entity rather than with
-        // `wanted.Contains(StockKey.For(v.Offer.StationId, v.Offer.FuelTypeId, v.Liters))`, which
+        // `wanted.Contains(StockKey.For(v.Offer.BrandId, v.Offer.FuelTypeId, v.Liters))`, which
         // cannot be translated - the same wall SellableKeys documents below, hit for the same reason.
         // Separate lists hand back a cross product the cart never asked about, so the resolved
         // dictionary is filtered back down to `wanted` after materialisation.
@@ -176,7 +176,7 @@ public sealed class PackageStockAvailability
         var rows = await _context.FuelOfferVolumes
             .AsNoTracking()
             .Where(v => v.Offer.DataKind == pool
-                     && brands.Contains(v.Offer.StationId.ToLower())
+                     && brands.Contains(v.Offer.BrandId.ToLower())
                      && fuelTypeIds.Contains(v.Offer.FuelTypeId)
                      && literSizes.Contains(v.Liters))
             // Same precedence as the single-line path, so one line of a cart cannot resolve to a
@@ -189,7 +189,7 @@ public sealed class PackageStockAvailability
         var resolved = new Dictionary<StockKey, SellablePackage>(wanted.Count);
         foreach (var row in rows)
         {
-            var key = StockKey.For(row.Offer.StationId, row.Offer.FuelTypeId, row.Volume.Liters);
+            var key = StockKey.For(row.Offer.BrandId, row.Offer.FuelTypeId, row.Volume.Liters);
             if (!wanted.Contains(key))
                 continue;
 
@@ -246,13 +246,13 @@ public sealed class PackageStockAvailability
     /// </summary>
     public Task<bool> IsInStockAsync(
         bool isTestAccount,
-        string stationId,
+        string BrandId,
         string fuelTypeId,
         decimal liters,
         CancellationToken cancellationToken = default)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var brand = stationId.ToLower();
+        var brand = BrandId.ToLower();
         var pool = DataKinds.ForPool(isTestAccount);
 
         return _context.FuelVouchers

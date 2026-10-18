@@ -202,7 +202,7 @@ public sealed class DataKindMigrationTests : IClassFixture<TestDatabaseFixture>
         => new()
         {
             Id = id,
-            StationId = "okko-0001",
+            BrandId = "okko-0001",
             FuelTypeId = "okko-95",
             SupplierPricePerLiter = 50m,
             MarginUahPerLiter = 5m,   // 50 + 5 = 55 per litre

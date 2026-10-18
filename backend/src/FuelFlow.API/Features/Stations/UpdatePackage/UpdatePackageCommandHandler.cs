@@ -2,7 +2,7 @@ using FuelFlow.SharedKernel.Domain;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace FuelFlow.Features.Stations.UpdatePackage;
+namespace FuelFlow.Features.Brands.UpdatePackage;
 
 /// <summary>
 /// The only endpoint that can set a per-nominal price override, and deliberately the only one.
@@ -41,8 +41,8 @@ public sealed class UpdatePackageCommandHandler
         if (volume is null) return false;
 
         // Only the two facts a package owns are writable here: how much it holds, and whether this
-        // nominal has a price of its own. Station and fuel are the OFFER's identity - UNIQUE
-        // (station_id, fuel_type_id, data_kind) - so moving a package to another station or fuel is not an
+        // nominal has a price of its own. Brand and fuel are the OFFER's identity - UNIQUE
+        // (brand_id, fuel_type_id, data_kind) - so moving a package to another Brand or fuel is not an
         // update, it is moving it to another offer, and it would drag the rest of that offer's volumes
         // with it if done here. Re-keying a package is what the brand screen does; this endpoint cannot
         // do it and silently ignoring the field is better than corrupting the offer it belongs to.

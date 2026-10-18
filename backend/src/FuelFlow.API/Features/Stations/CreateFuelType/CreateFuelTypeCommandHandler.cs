@@ -2,7 +2,7 @@ using FuelFlow.SharedKernel.Domain;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace FuelFlow.Features.Stations.CreateFuelType;
+namespace FuelFlow.Features.Brands.CreateFuelType;
 
 public sealed class CreateFuelTypeCommandHandler
 {
@@ -12,9 +12,9 @@ public sealed class CreateFuelTypeCommandHandler
     public async Task<CreateFuelTypeResult> HandleAsync(CreateFuelTypeCommand command, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(command.FuelType.Id) ||
-            string.IsNullOrWhiteSpace(command.FuelType.StationId) ||
+            string.IsNullOrWhiteSpace(command.FuelType.BrandId) ||
             string.IsNullOrWhiteSpace(command.FuelType.Name))
-            return new CreateFuelTypeResult { Error = "Id, StationId and Name are required" };
+            return new CreateFuelTypeResult { Error = "Id, BrandId and Name are required" };
 
         var exists = await _context.FuelTypes.AnyAsync(x => x.Id == command.FuelType.Id, ct);
         if (exists)

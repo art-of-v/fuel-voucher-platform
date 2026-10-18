@@ -7,7 +7,7 @@ public sealed record GetVouchersQuery(int Page = 1, int PageSize = 50, string? F
 
 /// <summary>
 /// Admin catalog list row. Deliberately carries NO redeemable material: the QR payload is
-/// the bearer instrument a station scans, so it is never included in a list response.
+/// the bearer instrument a Brand scans, so it is never included in a list response.
 /// Fetch it one voucher at a time via <see cref="QrCodeUrl"/>, which enforces admin-or-owner.
 /// </summary>
 public sealed record VoucherDto(

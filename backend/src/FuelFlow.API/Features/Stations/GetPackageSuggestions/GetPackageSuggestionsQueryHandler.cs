@@ -2,7 +2,7 @@ using FuelFlow.SharedKernel.Domain;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace FuelFlow.Features.Stations.GetPackageSuggestions;
+namespace FuelFlow.Features.Brands.GetPackageSuggestions;
 
 public sealed class GetPackageSuggestionsQueryHandler
 {
@@ -17,7 +17,7 @@ public sealed class GetPackageSuggestionsQueryHandler
             .Select(g => g.First())
             .ToList();
 
-        var allStations = await _context.Stations.AsNoTracking().ToListAsync(ct);
+        var allBrands = await _context.Brands.AsNoTracking().ToListAsync(ct);
         var allFuelTypes = await _context.FuelTypes.AsNoTracking().ToListAsync(ct);
         // Only "does this triple already exist" is asked, so the existence set is projected down to the
         // triple rather than to a whole sellable package: the card this feeds does not need the price,
@@ -25,7 +25,7 @@ public sealed class GetPackageSuggestionsQueryHandler
         // grew into reading the whole catalogue.
         var existingPackages = await _context.FuelOfferVolumes
             .AsNoTracking()
-            .Select(v => new { v.Offer.StationId, v.Offer.FuelTypeId, v.Liters })
+            .Select(v => new { v.Offer.BrandId, v.Offer.FuelTypeId, v.Liters })
             .ToListAsync(ct);
 
         var suggestions = new List<PackageSuggestionDto>();
@@ -33,25 +33,25 @@ public sealed class GetPackageSuggestionsQueryHandler
         foreach (var voucher in uniqueCombos)
         {
             var cleanProvider = voucher.Brand.ToLowerInvariant().Trim();
-            var station = allStations.FirstOrDefault(s => s.Name.ToLowerInvariant().Trim() == cleanProvider);
-            if (station is null) continue;
+            var Brand = allBrands.FirstOrDefault(s => s.Name.ToLowerInvariant().Trim() == cleanProvider);
+            if (Brand is null) continue;
 
             var fuelType = allFuelTypes.FirstOrDefault(ft =>
-                ft.StationId == station.Id && ft.Id == voucher.FuelTypeId);
+                ft.BrandId == Brand.Id && ft.Id == voucher.FuelTypeId);
             if (fuelType is null) continue;
 
             var exists = existingPackages.Any(pkg =>
-                pkg.StationId == station.Id &&
+                pkg.BrandId == Brand.Id &&
                 pkg.FuelTypeId == fuelType.Id &&
                 pkg.Liters == voucher.Liters);
             if (exists) continue;
 
-            var generatedId = $"{station.Id}-{fuelType.Name.Replace(" ", "").ToLowerInvariant()}-{voucher.Liters}";
+            var generatedId = $"{Brand.Id}-{fuelType.Name.Replace(" ", "").ToLowerInvariant()}-{voucher.Liters}";
             suggestions.Add(new PackageSuggestionDto
             {
                 SuggestedId = generatedId,
-                StationId = station.Id,
-                StationName = station.Name,
+                BrandId = Brand.Id,
+                BrandName = Brand.Name,
                 FuelTypeId = fuelType.Id,
                 FuelName = fuelType.Name,
                 Liters = voucher.Liters
@@ -65,8 +65,8 @@ public sealed class GetPackageSuggestionsQueryHandler
 public sealed class PackageSuggestionDto
 {
     public string SuggestedId { get; set; } = null!;
-    public string StationId { get; set; } = null!;
-    public string StationName { get; set; } = null!;
+    public string BrandId { get; set; } = null!;
+    public string BrandName { get; set; } = null!;
     public string FuelTypeId { get; set; } = null!;
     public string FuelName { get; set; } = null!;
     public decimal Liters { get; set; }

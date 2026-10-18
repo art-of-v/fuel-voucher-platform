@@ -99,16 +99,16 @@ public sealed class GetReportQueryHandler
             // The margin is the fuel's, so the fuel joins too - see GetDashboardQueryHandler.
             join f in _context.FuelTypes.AsNoTracking() on o.FuelTypeId equals f.Id
             where o.DataKind == DataKinds.Real
-            select new { o.StationId, o.FuelTypeId, v.Liters, MarginUahPerLiter = f.MarginUahPerLiter })
+            select new { o.BrandId, o.FuelTypeId, v.Liters, MarginUahPerLiter = f.MarginUahPerLiter })
             .ToDictionaryAsync(
-                x => (x.StationId, x.FuelTypeId, x.Liters),
+                x => (x.BrandId, x.FuelTypeId, x.Liters),
                 x => x.MarginUahPerLiter,
                 cancellationToken);
 
         // No GroupBy(...).First() any more, and that is the point of the split. The triple used to have
         // several candidate rows and this picked one "most recently priced" - which, across the real and
         // QA pools, silently read the rehearsal price for a real order. It is now a genuine key:
-        // `UNIQUE (station_id, fuel_type_id, data_kind)` on fuel_offers times
+        // `UNIQUE (brand_id, fuel_type_id, data_kind)` on fuel_offers times
         // `UNIQUE (offer_id, liters)` on fuel_offer_volumes, with the pool pinned above. Two rows cannot
         // collide, so there is nothing left to arbitrate - and a duplicate here would now throw instead
         // of quietly picking a price.

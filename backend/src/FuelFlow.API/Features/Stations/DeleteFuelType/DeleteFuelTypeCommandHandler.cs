@@ -2,7 +2,7 @@ using FuelFlow.SharedKernel.Domain;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace FuelFlow.Features.Stations.DeleteFuelType;
+namespace FuelFlow.Features.Brands.DeleteFuelType;
 
 public sealed class DeleteFuelTypeCommandHandler
 {

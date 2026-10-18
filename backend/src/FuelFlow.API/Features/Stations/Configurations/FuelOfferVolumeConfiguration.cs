@@ -2,7 +2,7 @@ using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace FuelFlow.Features.Stations.Configurations;
+namespace FuelFlow.Features.Brands.Configurations;
 
 /// <summary>
 /// <c>fuel_offer_volumes</c> — the volumes an offer is sold in. Planning #318, finding F-33.
@@ -36,7 +36,7 @@ internal sealed class FuelOfferVolumeConfiguration : IEntityTypeConfiguration<Fu
         builder.HasQueryFilter(e => !e.IsDeleted);
 
         // THE guarantee of this split. One volume per offer, enforced by the database, so the
-        // ambiguous "(station, fuel, litres) picks an arbitrary row" lookup that planning #315 had to
+        // ambiguous "(Brand, fuel, litres) picks an arbitrary row" lookup that planning #315 had to
         // resolve with an ORDER BY cannot come back through the new tables.
         builder.HasIndex(e => new { e.OfferId, e.Liters })
             .IsUnique()

@@ -1,5 +1,5 @@
 using FuelFlow.SharedKernel.Domain;
 
-namespace FuelFlow.Features.Stations.CreateFuelType;
+namespace FuelFlow.Features.Brands.CreateFuelType;
 
 public sealed record CreateFuelTypeCommand(FuelTypeEntity FuelType);

@@ -1,3 +1,3 @@
-namespace FuelFlow.Features.Stations.DeletePackage;
+namespace FuelFlow.Features.Brands.DeletePackage;
 
 public sealed record DeletePackageCommand(string Id);

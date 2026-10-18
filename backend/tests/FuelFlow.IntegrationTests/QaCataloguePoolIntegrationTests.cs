@@ -1,7 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
-using FuelFlow.Features.Stations;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
@@ -27,7 +27,7 @@ namespace FuelFlow.IntegrationTests;
 /// </para>
 /// <para>
 /// So the filter became pool-aware rather than absent, and this class pins both halves: each caller
-/// sees its own pool and <b>not</b> the other one. Also the by-station route, which is a separate
+/// sees its own pool and <b>not</b> the other one. Also the by-Brand route, which is a separate
 /// endpoint reading the same table — a filter applied to one and not the other would leave the
 /// stricter one decorative.
 /// </para>
@@ -35,8 +35,8 @@ namespace FuelFlow.IntegrationTests;
 [Collection("Integration Tests")]
 public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture>
 {
-    /// <summary>One station and one fuel, carrying a real package and its QA twin.</summary>
-    private const string Station = "qa-pool-okko";
+    /// <summary>One Brand and one fuel, carrying a real package and its QA twin.</summary>
+    private const string Brand = "qa-pool-okko";
     private const string FuelType = "qa-pool-95";
 
     /// <summary>The live nominal.</summary>
@@ -44,7 +44,7 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
 
     /// <summary>
     /// The QA nominal is deliberately not the real one. Availability keys on
-    /// (station, fuel type, nominal) and carries no name, so a QA package sharing 10 L with the real
+    /// (Brand, fuel type, nominal) and carries no name, so a QA package sharing 10 L with the real
     /// one would light the real package's availability flag from test stock — QA would be shown the
     /// live package as buyable because the QA package behind it existed. Distinct nominals keep the
     /// two pools' flags independent; the names stay 1:1.
@@ -59,7 +59,7 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
     public QaCataloguePoolIntegrationTests(TestDatabaseFixture fixture) => _fixture = fixture;
 
     /// <summary>
-    /// Seed the station, one fuel, both packages and one sellable voucher per pool. Idempotent: the
+    /// Seed the Brand, one fuel, both packages and one sellable voucher per pool. Idempotent: the
     /// fixture is one database per class and every test seeds, so a second call must find what the
     /// first left rather than collide with it.
     /// </summary>
@@ -75,7 +75,7 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
             {
                 Id = FuelType,
                 Name = RealName,
-                StationId = Station,
+                BrandId = Brand,
                 BasePrice = 50,
                 DiscountPrice = 47,
                 CreatedAtUtc = now,
@@ -88,14 +88,14 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
         // would assert against nothing.
         if (!await context.FuelOfferVolumes.AnyAsync(p => p.Id == "qa-pool-real-10", CancellationToken.None))
         {
-            context.SeedPackage("qa-pool-real-10", Station, FuelType, RealLiters, 470m * RealLiters,
+            context.SeedPackage("qa-pool-real-10", Brand, FuelType, RealLiters, 470m * RealLiters,
                 supplierPricePerLiter: 45m, marginUahPerLiter: 2m, finalPricePerLiter: 47m,
                 isTestData: false, createdAtUtc: now, updatedAtUtc: now);
         }
 
         if (!await context.FuelOfferVolumes.AnyAsync(p => p.Id == "qa-pool-qa-7", CancellationToken.None))
         {
-            context.SeedPackage("qa-pool-qa-7", Station, FuelType, QaLiters, 470m * QaLiters,
+            context.SeedPackage("qa-pool-qa-7", Brand, FuelType, QaLiters, 470m * QaLiters,
                 supplierPricePerLiter: 45m, marginUahPerLiter: 2m, finalPricePerLiter: 47m,
                 isTestData: true, createdAtUtc: now, updatedAtUtc: now);
         }
@@ -120,10 +120,10 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
     private static FuelVoucher SellableVoucher(decimal liters, bool isTestData) => new()
     {
         Id = Guid.CreateVersion7(),
-        // Brand is the station id, compared case-insensitively - StockKey is
-        // (station, fuel type, nominal), so a row keyed to the network name instead of the station
+        // Brand is the Brand id, compared case-insensitively - StockKey is
+        // (Brand, fuel type, nominal), so a row keyed to the network name instead of the Brand
         // would never match its own package.
-        Brand = Station,
+        Brand = Brand,
         FuelTypeId = FuelType,
         Liters = liters,
         CostPerLiter = 45m,
@@ -167,13 +167,13 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
         return client;
     }
 
-    private async Task<List<PublicPackageResponse>> PackagesAsync(HttpClient client, bool byStation)
+    private async Task<List<PublicPackageResponse>> PackagesAsync(HttpClient client, bool byBrand, string brand = Brand)
     {
-        var route = byStation ? $"/api/packages/station/{Station}" : "/api/packages";
+        var route = byBrand ? $"/api/packages/{brand}" : "/api/packages";
         var response = await client.GetAsync(route);
         response.EnsureSuccessStatusCode();
         var packages = await response.Content.ReadFromJsonAsync<List<PublicPackageResponse>>();
-        return packages!.Where(p => p.StationId == Station).ToList();
+        return packages!.Where(p => p.BrandId == Brand).ToList();
     }
 
     /// <summary>
@@ -183,12 +183,12 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task AnAnonymousCaller_SeesTheRealCatalogueOnly(bool byStation)
+    public async Task AnAnonymousCaller_SeesTheRealCatalogueOnly(bool byBrand)
     {
         await SeedBothPoolsAsync();
         var client = _fixture.CreateClient();
 
-        var packages = await PackagesAsync(client, byStation);
+        var packages = await PackagesAsync(client, byBrand, Brand);
 
         Assert.Contains(packages, p => p.Liters == RealLiters);
         Assert.DoesNotContain(packages, p => p.Liters == QaLiters);
@@ -201,12 +201,12 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task AnAuthenticatedNonQaCaller_SeesTheRealCatalogueOnly(bool byStation)
+    public async Task AnAuthenticatedNonQaCaller_SeesTheRealCatalogueOnly(bool byBrand)
     {
         await SeedBothPoolsAsync();
         var client = await ClientForAsync("+380991007001", isQaAccount: false);
 
-        var packages = await PackagesAsync(client, byStation);
+        var packages = await PackagesAsync(client, byBrand, Brand);
 
         Assert.Contains(packages, p => p.Liters == RealLiters);
         Assert.DoesNotContain(packages, p => p.Liters == QaLiters);
@@ -219,12 +219,12 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task AQaCaller_SeesTheQaCatalogue_AndTheQaStockBehindIt(bool byStation)
+    public async Task AQaCaller_SeesTheQaCatalogue_AndTheQaStockBehindIt(bool byBrand)
     {
         await SeedBothPoolsAsync();
         var client = await ClientForAsync("+380991007002", isQaAccount: true);
 
-        var packages = await PackagesAsync(client, byStation);
+        var packages = await PackagesAsync(client, byBrand, Brand);
 
         var qaPackage = Assert.Single(packages, p => p.Liters == QaLiters);
         Assert.True(qaPackage.IsAvailable,
@@ -244,24 +244,24 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
     {
         await SeedBothPoolsAsync();
 
-        var real = await PackagesAsync(await ClientForAsync("+380991007003", isQaAccount: false), byStation: false);
-        var qa = await PackagesAsync(await ClientForAsync("+380991007004", isQaAccount: true), byStation: false);
+        var real = await PackagesAsync(await ClientForAsync("+380991007003", isQaAccount: false), byBrand: false);
+        var qa = await PackagesAsync(await ClientForAsync("+380991007004", isQaAccount: true), byBrand: false);
 
         Assert.True(Assert.Single(real).IsAvailable, "the real package is backed by real stock");
         Assert.True(Assert.Single(qa).IsAvailable, "the QA package is backed by test stock");
     }
 
     /// <summary>
-    /// A QA caller and an anonymous one reading the same station, side by side: the rows are
-    /// genuinely different responses, not one response with a flag on it. This is what the by-station
+    /// A QA caller and an anonymous one reading the same Brand, side by side: the rows are
+    /// genuinely different responses, not one response with a flag on it. This is what the by-Brand
     /// route looked like when only the whole-catalogue route was pool-aware.
     /// </summary>
     [Fact]
-    public async Task TheByStationRoute_ResolvesTheSamePoolAsTheWholeCatalogue()
+    public async Task TheByBrandRoute_ResolvesTheSamePoolAsTheWholeCatalogue()
     {
         await SeedBothPoolsAsync();
-        var anonymous = await PackagesAsync(_fixture.CreateClient(), byStation: true);
-        var qa = await PackagesAsync(await ClientForAsync("+380991007005", isQaAccount: true), byStation: true);
+        var anonymous = await PackagesAsync(_fixture.CreateClient(), byBrand: true);
+        var qa = await PackagesAsync(await ClientForAsync("+380991007005", isQaAccount: true), byBrand: true);
 
         // The display name is the fuel's, and the fuel is shared by both pools - it comes from
         // fuel_types now, not from a string each package row carried and could contradict. So the QA

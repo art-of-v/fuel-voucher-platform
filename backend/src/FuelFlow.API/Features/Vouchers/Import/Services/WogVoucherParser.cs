@@ -39,7 +39,7 @@ public sealed class WogVoucherParser : IVoucherProviderParser
         var regions = context.VoucherRegions.ToList();
 
         var wogFuelTypes = await _context.FuelTypes
-            .Where(f => f.StationId == "wog")
+            .Where(f => f.BrandId == "wog")
             .ToListAsync(cancellationToken);
 
         foreach (var region in regions)

@@ -74,7 +74,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         {
             Id = "okko-95",
             Name = "A-95",
-            StationId = "okko",
+            BrandId = "okko",
             BasePrice = 60,
             DiscountPrice = 60,
             CreatedAtUtc = DateTime.UtcNow,
@@ -85,7 +85,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         // failing on prices of zero - or, worse, passing for the wrong reason.
         _context.SeedPackage(
             id: "pkg-okko-95-10",
-            stationId: "okko",
+            BrandId: "okko",
             fuelTypeId: "okko-95",
             liters: 10m,
             price: 600m,
@@ -132,8 +132,8 @@ public sealed class VoucherTermSaleTests : IDisposable
             {
                 
                 FuelTypeId = "okko-95",
-                StationId = "okko",
-                StationName = "OKKO",
+                BrandId = "okko",
+                BrandName = "OKKO",
                 Liters = 10,
                 Quantity = 1,
                 Price = 600,
@@ -536,7 +536,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         quote.Terms.Should().OnlyContain(t => t.PricePerLiterUah == null);
     }
 
-    // ── The ladder is stock-aware: a term the station cannot honour is not offered ──────────────
+    // ── The ladder is stock-aware: a term the Brand cannot honour is not offered ──────────────
     //
     // #182: the picker used to offer any term the manager priced, so the customer paid the long-term
     // price and fulfilment clamped the delivered validity down to the stock's paper term. A term has to

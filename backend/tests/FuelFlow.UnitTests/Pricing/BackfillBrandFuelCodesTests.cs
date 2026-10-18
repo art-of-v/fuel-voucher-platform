@@ -17,7 +17,7 @@ namespace FuelFlow.UnitTests.Pricing;
 /// <para>
 /// This is a derivation, so most of these tests are about the cases where it must <em>not</em> act: a
 /// grade with several published codes, a grade with none, a candidate another fuel already holds. A
-/// wrong code is not a cosmetic mistake — <c>ux_fuel_types_station_brand_fuel_code</c> then enforces
+/// wrong code is not a cosmetic mistake — <c>ux_fuel_types_Brand_brand_fuel_code</c> then enforces
 /// it, and the price import hands that fuel somebody else's pump.
 /// </para>
 /// <para>
@@ -62,10 +62,10 @@ public sealed class BackfillBrandFuelCodesTests : IDisposable
 
     private async Task SeedAsync(params FuelTypeEntity[] fuels)
     {
-        _context.Stations.Add(new Station { Id = "okko", Name = "OKKO", Color = "#000", LogoText = "OKKO" });
+        _context.Brands.Add(new Brand { Id = "okko", Name = "OKKO", Color = "#000", LogoText = "OKKO" });
         foreach (var fuel in fuels)
         {
-            fuel.StationId = "okko";
+            fuel.BrandId = "okko";
             fuel.CreatedAtUtc = DateTime.UtcNow;
             fuel.UpdatedAtUtc = DateTime.UtcNow;
             _context.FuelTypes.Add(fuel);
@@ -76,7 +76,7 @@ public sealed class BackfillBrandFuelCodesTests : IDisposable
     }
 
     private static FuelTypeEntity Fuel(string id, string name, string? code = null)
-        => new() { Id = id, Name = name, StationId = "okko", BrandFuelCode = code, BasePrice = 50m, DiscountPrice = 48m };
+        => new() { Id = id, Name = name, BrandId = "okko", BrandFuelCode = code, BasePrice = 50m, DiscountPrice = 48m };
 
     [Fact]
     public async Task AHandTypedFuel_GetsTheCodeTheBrandPublishesForItsGrade()

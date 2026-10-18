@@ -48,7 +48,7 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
 
         var act = () => context.Database.ExecuteSqlRawAsync(
             """
-            INSERT INTO stations (id, name, color, logo_text, station_type, sort_order, created_at_utc, updated_at_utc, is_deleted)
+            INSERT INTO brands (id, name, color, logo_text, station_type, sort_order, created_at_utc, updated_at_utc, is_deleted)
             VALUES ('bounds-probe', 'Probe', '#00ff80', 'PRB', {0}, 999, NOW(), NOW(), false)
             """, new string('x', 300));
 
@@ -100,19 +100,19 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
 
         var act = () => context.Database.ExecuteSqlRawAsync(
             """
-            INSERT INTO stations (id, name, color, logo_text, sort_order, created_at_utc, updated_at_utc, is_deleted)
+            INSERT INTO brands (id, name, color, logo_text, sort_order, created_at_utc, updated_at_utc, is_deleted)
             VALUES ({0}, 'Too Long', '#00ff80', 'TL', 999, NOW(), NOW(), false)
             """, new string('y', 150));
 
         var ex = await act.Should().ThrowAsync<PostgresException>();
-        ex.Which.MessageText.Should().Contain("ck_stations_id_length",
+        ex.Which.MessageText.Should().Contain("ck_brands_id_length",
             "the catalog key limit, not some unrelated constraint, is what must stop this");
     }
 
     [Theory]
-    [InlineData("stations", "ck_stations_id_length")]
+    [InlineData("brands", "ck_brands_id_length")]
     [InlineData("fuel_types", "ck_fuel_types_id_length")]
-    [InlineData("station_nodes", "ck_station_nodes_id_length")]
+    [InlineData("brand_stations", "ck_brand_stations_id_length")]
     [InlineData("fuel_offer_volumes", "ck_fuel_offer_volumes_id_length")]
     [InlineData("fuel_vouchers", "ck_fuel_vouchers_fuel_type_id_length")]
     [InlineData("purchase_batches", "ck_purchase_batches_fuel_type_id_length")]
@@ -243,7 +243,7 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
         context.FuelTypes.Add(new FuelTypeEntity
         {
             Id = $"ft-neg-{basePrice}-{discountPrice}",
-            StationId = "okko",
+            BrandId = "okko",
             Name = $"Negative {basePrice}/{discountPrice}",
             BasePrice = (decimal)basePrice,
             DiscountPrice = (decimal)discountPrice,
@@ -300,7 +300,7 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
     /// <para>
     /// The fuel is generated per offer rather than shared, because an offer is unique per
     /// (brand, fuel, pool) and this class shares one database: two offers hanging off one fuel would
-    /// trip <c>ix_fuel_offers_station_fuel_pool</c> before either test got to assert the thing it
+    /// trip <c>ix_fuel_offers_Brand_fuel_pool</c> before either test got to assert the thing it
     /// came for. Sharing one phantom fuel id also let these tests pass without the fuel existing at
     /// all, which the FK from 20261018104336 no longer allows.
     /// </para>
@@ -313,7 +313,7 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
         {
             Id = $"{id}-fuel",
             Name = $"Test fuel for {id}",
-            StationId = "okko",
+            BrandId = "okko",
             BasePrice = 0m,
             DiscountPrice = 0m,
             CreatedAtUtc = DateTime.UtcNow,
@@ -323,7 +323,7 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
         var offer = new FuelOffer
         {
             Id = id,
-            StationId = "okko",
+            BrandId = "okko",
             FuelTypeId = fuel.Id,
             SupplierPricePerLiter = supplierPricePerLiter,
             MarginUahPerLiter = 1m,
@@ -678,7 +678,7 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
             Id = contractId,
             UserId = userId,
             LegalEntityId = entityId,
-            StationId = "okko",
+            BrandId = "okko",
             CreatedAtUtc = DateTime.UtcNow
         };
         var signature = new UserContract

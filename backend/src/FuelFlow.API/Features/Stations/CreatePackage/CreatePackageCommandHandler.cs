@@ -3,7 +3,7 @@ using FuelFlow.Features.Pricing;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace FuelFlow.Features.Stations.CreatePackage;
+namespace FuelFlow.Features.Brands.CreatePackage;
 
 public sealed class CreatePackageCommandHandler
 {
@@ -28,9 +28,9 @@ public sealed class CreatePackageCommandHandler
         Guid? actingUserId = null)
     {
         if (string.IsNullOrWhiteSpace(command.Package.Id) ||
-            string.IsNullOrWhiteSpace(command.Package.StationId) ||
+            string.IsNullOrWhiteSpace(command.Package.BrandId) ||
             string.IsNullOrWhiteSpace(command.Package.FuelTypeId))
-            return new CreatePackageResult { Error = "Id, StationId and FuelTypeId are required" };
+            return new CreatePackageResult { Error = "Id, BrandId and FuelTypeId are required" };
 
         var exists = await _context.FuelOfferVolumes.AnyAsync(x => x.Id == command.Package.Id, ct);
         if (exists)
@@ -40,7 +40,7 @@ public sealed class CreatePackageCommandHandler
         var offerId = OfferKeys.For(command.Package.FuelTypeId, pool);
 
         // One supplier price per fuel, per pool. Every other write path copies the cost off the
-        // existing offer (BrandsController seeds, prices and station creation), so this endpoint is the
+        // existing offer (BrandsController seeds, prices and Brand creation), so this endpoint is the
         // only place where an offer can arrive carrying a cost of its own — and that is how a 0.01 L
         // test package at 5.00/L ended up beside 100.00/L packages, after which the fuel card reported
         // it healthy while the below-cost guard refused to sell the real fuel at all.
@@ -96,7 +96,7 @@ public sealed class CreatePackageCommandHandler
             existingOffer = new FuelOffer
             {
                 Id = offerId,
-                StationId = command.Package.StationId,
+                BrandId = command.Package.BrandId,
                 FuelTypeId = command.Package.FuelTypeId,
                 DataKind = pool,
                 CreatedAtUtc = now,
@@ -168,7 +168,7 @@ public sealed class CreatePackageCommandHandler
             {
                 Id = command.Package.FuelTypeId,
                 Name = command.Package.FuelName,
-                StationId = existingOffer.StationId
+                BrandId = existingOffer.BrandId
             })
         };
 

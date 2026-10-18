@@ -2,7 +2,7 @@ using FuelFlow.SharedKernel.Domain;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace FuelFlow.Features.Stations.DeletePackage;
+namespace FuelFlow.Features.Brands.DeletePackage;
 
 public sealed class DeletePackageCommandHandler
 {

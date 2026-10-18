@@ -1,17 +1,17 @@
 using FluentAssertions;
-using FuelFlow.Features.Stations;
-using FuelFlow.Features.Stations.GetAdminFuelTypeById;
-using FuelFlow.Features.Stations.GetAdminFuelTypes;
-using FuelFlow.Features.Stations.GetAdminPackages;
-using FuelFlow.Features.Stations.GetAdminPackagesByStation;
-using FuelFlow.Features.Stations.GetAdminStationById;
-using FuelFlow.Features.Stations.GetAdminStations;
-using FuelFlow.Features.Stations.GetPackageSuggestions;
-using FuelFlow.Features.Stations.GetPublicPackages;
-using FuelFlow.Features.Stations.GetPublicPackagesByStation;
-using FuelFlow.Features.Stations.GetPublicStationNodes;
-using FuelFlow.Features.Stations.GetPublicStationNodesByStation;
-using FuelFlow.Features.Stations.GetPublicStations;
+using FuelFlow.Features.Brands;
+using FuelFlow.Features.Brands.GetAdminFuelTypeById;
+using FuelFlow.Features.Brands.GetAdminFuelTypes;
+using FuelFlow.Features.Brands.GetAdminPackages;
+using FuelFlow.Features.Brands.GetAdminPackagesByBrand;
+using FuelFlow.Features.Brands.GetAdminBrandById;
+using FuelFlow.Features.Brands.GetAdminBrands;
+using FuelFlow.Features.Brands.GetPackageSuggestions;
+using FuelFlow.Features.Brands.GetPublicPackages;
+using FuelFlow.Features.Brands.GetPublicPackagesByBrand;
+using FuelFlow.Features.Brands.GetPublicStationNodes;
+using FuelFlow.Features.Brands.GetPublicStationNodesByBrand;
+using FuelFlow.Features.Brands.GetPublicBrands;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Availability;
 using Microsoft.Extensions.Configuration;
@@ -20,13 +20,13 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 
-namespace FuelFlow.UnitTests.Stations;
+namespace FuelFlow.UnitTests.Brands;
 
-public sealed class StationsQueryHandlersTests : IDisposable
+public sealed class BrandsQueryHandlersTests : IDisposable
 {
     private readonly ApplicationDbContext _context;
 
-    public StationsQueryHandlersTests()
+    public BrandsQueryHandlersTests()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
@@ -42,48 +42,48 @@ public sealed class StationsQueryHandlersTests : IDisposable
     }
 
     [Fact]
-    public async Task GetPublicStations_ShouldReturnSeededStations()
+    public async Task GetPublicBrands_ShouldReturnSeededBrands()
     {
-        _context.Stations.AddRange(
-            CreateStation("station-b", "Beta Station"),
-            CreateStation("station-a", "Alpha Station"));
+        _context.Brands.AddRange(
+            CreateBrand("Brand-b", "Beta Brand"),
+            CreateBrand("Brand-a", "Alpha Brand"));
         await _context.SaveChangesAsync();
 
-        var handler = new GetPublicStationsQueryHandler(_context);
+        var handler = new GetPublicBrandsQueryHandler(_context);
 
-        var result = await handler.HandleAsync(new GetPublicStationsQuery());
+        var result = await handler.HandleAsync(new GetPublicBrandsQuery());
 
         result.Should().HaveCount(2);
-        result.Select(s => s.Id).Should().Contain(new[] { "station-a", "station-b" });
-        result[0].Name.Should().Be("Alpha Station");
-        result[1].Name.Should().Be("Beta Station");
+        result.Select(s => s.Id).Should().Contain(new[] { "Brand-a", "Brand-b" });
+        result[0].Name.Should().Be("Alpha Brand");
+        result[1].Name.Should().Be("Beta Brand");
     }
 
     [Fact]
-    public async Task GetPublicStations_ShouldReturnEmptyList_WhenNoStations()
+    public async Task GetPublicBrands_ShouldReturnEmptyList_WhenNoBrands()
     {
-        var handler = new GetPublicStationsQueryHandler(_context);
+        var handler = new GetPublicBrandsQueryHandler(_context);
 
-        var result = await handler.HandleAsync(new GetPublicStationsQuery());
+        var result = await handler.HandleAsync(new GetPublicBrandsQuery());
 
         result.Should().BeEmpty();
     }
 
     [Fact]
-    public async Task GetAdminStations_ShouldPageResults()
+    public async Task GetAdminBrands_ShouldPageResults()
     {
         for (var i = 1; i <= 5; i++)
         {
-            _context.Stations.Add(CreateStation($"station-{i}", $"Station {i}"));
+            _context.Brands.Add(CreateBrand($"Brand-{i}", $"Brand {i}"));
         }
         await _context.SaveChangesAsync();
 
-        var handler = new GetAdminStationsQueryHandler(_context);
+        var handler = new GetAdminBrandsQueryHandler(_context);
 
-        var result = await handler.HandleAsync(new GetAdminStationsQuery(Page: 1, PageSize: 2));
+        var result = await handler.HandleAsync(new GetAdminBrandsQuery(Page: 1, PageSize: 2));
 
         result.Items.Should().HaveCount(2);
-        result.Items.Select(s => s.Id).Should().Equal("station-1", "station-2");
+        result.Items.Select(s => s.Id).Should().Equal("Brand-1", "Brand-2");
         result.TotalCount.Should().Be(5);
         result.Page.Should().Be(1);
         result.PageSize.Should().Be(2);
@@ -93,20 +93,20 @@ public sealed class StationsQueryHandlersTests : IDisposable
     }
 
     [Fact]
-    public async Task GetAdminStations_ShouldReturnLaterPages()
+    public async Task GetAdminBrands_ShouldReturnLaterPages()
     {
         for (var i = 1; i <= 5; i++)
         {
-            _context.Stations.Add(CreateStation($"station-{i}", $"Station {i}"));
+            _context.Brands.Add(CreateBrand($"Brand-{i}", $"Brand {i}"));
         }
         await _context.SaveChangesAsync();
 
-        var handler = new GetAdminStationsQueryHandler(_context);
+        var handler = new GetAdminBrandsQueryHandler(_context);
 
-        var result = await handler.HandleAsync(new GetAdminStationsQuery(Page: 3, PageSize: 2));
+        var result = await handler.HandleAsync(new GetAdminBrandsQuery(Page: 3, PageSize: 2));
 
         result.Items.Should().ContainSingle();
-        result.Items[0].Id.Should().Be("station-5");
+        result.Items[0].Id.Should().Be("Brand-5");
         result.HasPreviousPage.Should().BeTrue();
         result.HasNextPage.Should().BeFalse();
     }
@@ -115,8 +115,8 @@ public sealed class StationsQueryHandlersTests : IDisposable
     public async Task GetPublicStationNodes_ShouldReturnAllNodes()
     {
         _context.StationNodes.AddRange(
-            CreateStationNode("node-1", "station-a", "Node A"),
-            CreateStationNode("node-2", "station-b", "Node B"));
+            CreateStationNode("node-1", "Brand-a", "Node A"),
+            CreateStationNode("node-2", "Brand-b", "Node B"));
         await _context.SaveChangesAsync();
 
         var handler = new GetPublicStationNodesQueryHandler(_context);
@@ -127,28 +127,28 @@ public sealed class StationsQueryHandlersTests : IDisposable
     }
 
     [Fact]
-    public async Task GetPublicStationNodesByStation_ShouldFilterByStationId()
+    public async Task GetPublicStationNodesByBrand_ShouldFilterByBrandId()
     {
         _context.StationNodes.AddRange(
-            CreateStationNode("node-1", "station-a", "Node A1"),
-            CreateStationNode("node-2", "station-a", "Node A2"),
-            CreateStationNode("node-3", "station-b", "Node B"));
+            CreateStationNode("node-1", "Brand-a", "Node A1"),
+            CreateStationNode("node-2", "Brand-a", "Node A2"),
+            CreateStationNode("node-3", "Brand-b", "Node B"));
         await _context.SaveChangesAsync();
 
-        var handler = new GetPublicStationNodesByStationQueryHandler(_context);
+        var handler = new GetPublicStationNodesByBrandQueryHandler(_context);
 
-        var result = await handler.HandleAsync(new GetPublicStationNodesByStationQuery("station-a"));
+        var result = await handler.HandleAsync(new GetPublicStationNodesByBrandQuery("Brand-a"));
 
         result.Should().HaveCount(2);
-        result.Should().OnlyContain(n => n.StationId == "station-a");
+        result.Should().OnlyContain(n => n.BrandId == "Brand-a");
     }
 
     [Fact]
     public async Task GetPublicPackages_ShouldReturnAllPackages()
     {
         _context.FuelOfferVolumes.AddRange(
-            CreatePackage("pkg-1", "station-a", "ft-a", "A-95", 10m),
-            CreatePackage("pkg-2", "station-b", "ft-b", "Diesel", 20m));
+            CreatePackage("pkg-1", "Brand-a", "ft-a", "A-95", 10m),
+            CreatePackage("pkg-2", "Brand-b", "ft-b", "Diesel", 20m));
         await _context.SaveChangesAsync();
 
         var handler = new GetPublicPackagesQueryHandler(_context, Stock());
@@ -166,8 +166,8 @@ public sealed class StationsQueryHandlersTests : IDisposable
     public async Task GetPublicPackages_ShouldNotServeAFlaggedTestPackage()
     {
         _context.FuelOfferVolumes.AddRange(
-            CreatePackage("pkg-real", "station-a", "ft-a", "A-95", 10m),
-            CreatePackage("pkg-qa", "station-a", "ft-qa", "QA-CHECK-95", 5m, isTestData: true));
+            CreatePackage("pkg-real", "Brand-a", "ft-a", "A-95", 10m),
+            CreatePackage("pkg-qa", "Brand-a", "ft-qa", "QA-CHECK-95", 5m, isTestData: true));
         await _context.SaveChangesAsync();
 
         var handler = new GetPublicPackagesQueryHandler(_context, Stock());
@@ -180,19 +180,19 @@ public sealed class StationsQueryHandlersTests : IDisposable
 
     /// <summary>
     /// The second anonymous route. A filter on GetPublicPackages alone would have left the
-    /// rehearsal package buyable through /api/packages/station/{id}.
+    /// rehearsal package buyable through /api/packages/Brand/{id}.
     /// </summary>
     [Fact]
-    public async Task GetPublicPackagesByStation_ShouldNotServeAFlaggedTestPackage()
+    public async Task GetPublicPackagesByBrand_ShouldNotServeAFlaggedTestPackage()
     {
         _context.FuelOfferVolumes.AddRange(
-            CreatePackage("pkg-real", "station-a", "ft-a", "A-95", 10m),
-            CreatePackage("pkg-qa", "station-a", "ft-qa", "QA-CHECK-95", 5m, isTestData: true));
+            CreatePackage("pkg-real", "Brand-a", "ft-a", "A-95", 10m),
+            CreatePackage("pkg-qa", "Brand-a", "ft-qa", "QA-CHECK-95", 5m, isTestData: true));
         await _context.SaveChangesAsync();
 
-        var handler = new GetPublicPackagesByStationQueryHandler(_context, Stock());
+        var handler = new GetPublicPackagesByBrandQueryHandler(_context, Stock());
 
-        var result = await handler.HandleAsync(new GetPublicPackagesByStationQuery("station-a", CallerUserId: null));
+        var result = await handler.HandleAsync(new GetPublicPackagesByBrandQuery("Brand-a", CallerUserId: null));
 
         result.Should().ContainSingle();
         result[0].Id.Should().Be("pkg-real");
@@ -207,8 +207,8 @@ public sealed class StationsQueryHandlersTests : IDisposable
     public async Task AdminPackages_ShouldStillListAFlaggedTestPackage()
     {
         _context.FuelOfferVolumes.AddRange(
-            CreatePackage("pkg-real", "station-a", "ft-a", "A-95", 10m),
-            CreatePackage("pkg-qa", "station-a", "ft-qa", "QA-CHECK-95", 5m, isTestData: true));
+            CreatePackage("pkg-real", "Brand-a", "ft-a", "A-95", 10m),
+            CreatePackage("pkg-qa", "Brand-a", "ft-qa", "QA-CHECK-95", 5m, isTestData: true));
         await _context.SaveChangesAsync();
 
         var handler = new GetAdminPackagesQueryHandler(_context);
@@ -219,20 +219,20 @@ public sealed class StationsQueryHandlersTests : IDisposable
     }
 
     [Fact]
-    public async Task GetPublicPackagesByStation_ShouldFilterByStationId()
+    public async Task GetPublicPackagesByBrand_ShouldFilterByBrandId()
     {
         _context.FuelOfferVolumes.AddRange(
-            CreatePackage("pkg-1", "station-a", "ft-a", "A-95", 10m),
-            CreatePackage("pkg-2", "station-a", "ft-a", "A-95", 20m),
-            CreatePackage("pkg-3", "station-b", "ft-b", "Diesel", 20m));
+            CreatePackage("pkg-1", "Brand-a", "ft-a", "A-95", 10m),
+            CreatePackage("pkg-2", "Brand-a", "ft-a", "A-95", 20m),
+            CreatePackage("pkg-3", "Brand-b", "ft-b", "Diesel", 20m));
         await _context.SaveChangesAsync();
 
-        var handler = new GetPublicPackagesByStationQueryHandler(_context, Stock());
+        var handler = new GetPublicPackagesByBrandQueryHandler(_context, Stock());
 
-        var result = await handler.HandleAsync(new GetPublicPackagesByStationQuery("station-a", CallerUserId: null));
+        var result = await handler.HandleAsync(new GetPublicPackagesByBrandQuery("Brand-a", CallerUserId: null));
 
         result.Should().HaveCount(2);
-        result.Should().OnlyContain(p => p.StationId == "station-a");
+        result.Should().OnlyContain(p => p.BrandId == "Brand-a");
     }
 
     [Fact]
@@ -244,8 +244,8 @@ public sealed class StationsQueryHandlersTests : IDisposable
         // cost-derived OriginalPrice column is ignored and the supplier cost can never leak (#73).
 // No stored "before" price any more: it was never authoritative, and the storefront recomputes it
         // from the pump price - which is what stops a stale cost-derived value reaching anonymous callers.
-        _context.FuelOfferVolumes.Add(CreatePackage("pkg-1", "station-a", "ft-a", "A-95", 10m));
-        _context.SeedOffer("station-a", "ft-a",
+        _context.FuelOfferVolumes.Add(CreatePackage("pkg-1", "Brand-a", "ft-a", "A-95", 10m));
+        _context.SeedOffer("Brand-a", "ft-a",
             pumpPricePerLiter: 60m,      // public list price -> fresh "before" = 600
             finalPricePerLiter: 50m,
             supplierPricePerLiter: 42m,
@@ -259,7 +259,7 @@ public sealed class StationsQueryHandlersTests : IDisposable
 
         var pkg = result.Should().ContainSingle().Which;
         pkg.Id.Should().Be("pkg-1");
-        pkg.StationId.Should().Be("station-a");
+        pkg.BrandId.Should().Be("Brand-a");
         pkg.FuelTypeId.Should().Be("ft-a");
         pkg.FuelName.Should().Be("A-95");
         pkg.Liters.Should().Be(10m);
@@ -277,8 +277,8 @@ public sealed class StationsQueryHandlersTests : IDisposable
         // stored cost-derived OriginalPrice (planning #73).
 // The legacy case: a package with no pump price at all. There is nothing to recompute the struck
         // price from, so the storefront falls back to the sale price and shows no fabricated saving.
-        _context.FuelOfferVolumes.Add(CreatePackage("pkg-legacy", "station-a", "ft-a", "A-95", 10m));
-        _context.SeedOffer("station-a", "ft-a",
+        _context.FuelOfferVolumes.Add(CreatePackage("pkg-legacy", "Brand-a", "ft-a", "A-95", 10m));
+        _context.SeedOffer("Brand-a", "ft-a",
             pumpPricePerLiter: null,
             finalPricePerLiter: 50m,
             supplierPricePerLiter: 42m,
@@ -302,9 +302,9 @@ public sealed class StationsQueryHandlersTests : IDisposable
     public async Task GetPublicPackages_ShouldFlagAvailability_PromotingNothingAndHidingNothing()
     {
         _context.FuelOfferVolumes.AddRange(
-            CreatePackage("pkg-in-stock", "station-a", "ft-a", "A-95", 10m),
-            CreatePackage("pkg-empty", "station-a", "ft-a", "A-95", 20m));
-        _context.FuelVouchers.Add(CreateVoucher("station-a", "ft-a", 10m));
+            CreatePackage("pkg-in-stock", "Brand-a", "ft-a", "A-95", 10m),
+            CreatePackage("pkg-empty", "Brand-a", "ft-a", "A-95", 20m));
+        _context.FuelVouchers.Add(CreateVoucher("Brand-a", "ft-a", 10m));
         await _context.SaveChangesAsync();
 
         var handler = new GetPublicPackagesQueryHandler(_context, Stock());
@@ -324,8 +324,8 @@ public sealed class StationsQueryHandlersTests : IDisposable
     [Fact]
     public async Task GetPublicPackages_ShouldNotCountUnactivatedImportedStockAsAvailable()
     {
-        _context.FuelOfferVolumes.Add(CreatePackage("pkg-1", "station-a", "ft-a", "A-95", 10m));
-        _context.FuelVouchers.Add(CreateVoucher("station-a", "ft-a", 10m, status: VoucherStatus.Imported));
+        _context.FuelOfferVolumes.Add(CreatePackage("pkg-1", "Brand-a", "ft-a", "A-95", 10m));
+        _context.FuelVouchers.Add(CreateVoucher("Brand-a", "ft-a", 10m, status: VoucherStatus.Imported));
         await _context.SaveChangesAsync();
 
         var handler = new GetPublicPackagesQueryHandler(_context, Stock());
@@ -343,8 +343,8 @@ public sealed class StationsQueryHandlersTests : IDisposable
     [Fact]
     public async Task GetPublicPackages_ShouldNotShowTestStockToARegularCustomer()
     {
-        _context.FuelOfferVolumes.Add(CreatePackage("pkg-1", "station-a", "ft-a", "A-95", 10m));
-        _context.FuelVouchers.Add(CreateVoucher("station-a", "ft-a", 10m, isTestData: true));
+        _context.FuelOfferVolumes.Add(CreatePackage("pkg-1", "Brand-a", "ft-a", "A-95", 10m));
+        _context.FuelVouchers.Add(CreateVoucher("Brand-a", "ft-a", 10m, isTestData: true));
         await _context.SaveChangesAsync();
 
         var handler = new GetPublicPackagesQueryHandler(_context, Stock());
@@ -357,10 +357,10 @@ public sealed class StationsQueryHandlersTests : IDisposable
     [Fact]
     public async Task GetPublicPackages_ShouldMatchStockByBrandCaseInsensitively()
     {
-        // The catalog carries "station-a"; imported stock carries whatever the supplier printed.
+        // The catalog carries "Brand-a"; imported stock carries whatever the supplier printed.
         // Fulfilment compares case-insensitively, so a case difference must not read as "no stock".
-        _context.FuelOfferVolumes.Add(CreatePackage("pkg-1", "station-a", "ft-a", "A-95", 10m));
-        _context.FuelVouchers.Add(CreateVoucher("STATION-A", "ft-a", 10m));
+        _context.FuelOfferVolumes.Add(CreatePackage("pkg-1", "Brand-a", "ft-a", "A-95", 10m));
+        _context.FuelVouchers.Add(CreateVoucher("Brand-A", "ft-a", 10m));
         await _context.SaveChangesAsync();
 
         var handler = new GetPublicPackagesQueryHandler(_context, Stock());
@@ -373,9 +373,9 @@ public sealed class StationsQueryHandlersTests : IDisposable
     [Fact]
     public async Task GetPublicPackages_ShouldIgnoreExpiredStock_WhileExpiryIsEnforced()
     {
-        _context.FuelOfferVolumes.Add(CreatePackage("pkg-1", "station-a", "ft-a", "A-95", 10m));
+        _context.FuelOfferVolumes.Add(CreatePackage("pkg-1", "Brand-a", "ft-a", "A-95", 10m));
         _context.FuelVouchers.Add(CreateVoucher(
-            "station-a", "ft-a", 10m, providerExpiration: DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1))));
+            "Brand-a", "ft-a", 10m, providerExpiration: DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1))));
         await _context.SaveChangesAsync();
 
         var handler = new GetPublicPackagesQueryHandler(_context, Stock());
@@ -393,9 +393,9 @@ public sealed class StationsQueryHandlersTests : IDisposable
     [Fact]
     public async Task GetPublicPackages_ShouldCountExpiredStock_WhileExpiryIsDisabled()
     {
-        _context.FuelOfferVolumes.Add(CreatePackage("pkg-1", "station-a", "ft-a", "A-95", 10m));
+        _context.FuelOfferVolumes.Add(CreatePackage("pkg-1", "Brand-a", "ft-a", "A-95", 10m));
         _context.FuelVouchers.Add(CreateVoucher(
-            "station-a", "ft-a", 10m, providerExpiration: DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1))));
+            "Brand-a", "ft-a", 10m, providerExpiration: DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1))));
         await _context.SaveChangesAsync();
 
         var handler = new GetPublicPackagesQueryHandler(_context, Stock(
@@ -411,17 +411,17 @@ public sealed class StationsQueryHandlersTests : IDisposable
     /// let it advertise stock checkout then refuses.
     /// </summary>
     [Fact]
-    public async Task GetPublicPackagesByStation_ShouldFlagAvailabilityToo()
+    public async Task GetPublicPackagesByBrand_ShouldFlagAvailabilityToo()
     {
         _context.FuelOfferVolumes.AddRange(
-            CreatePackage("pkg-in-stock", "station-a", "ft-a", "A-95", 10m),
-            CreatePackage("pkg-empty", "station-a", "ft-a", "A-95", 20m));
-        _context.FuelVouchers.Add(CreateVoucher("station-a", "ft-a", 10m));
+            CreatePackage("pkg-in-stock", "Brand-a", "ft-a", "A-95", 10m),
+            CreatePackage("pkg-empty", "Brand-a", "ft-a", "A-95", 20m));
+        _context.FuelVouchers.Add(CreateVoucher("Brand-a", "ft-a", 10m));
         await _context.SaveChangesAsync();
 
-        var handler = new GetPublicPackagesByStationQueryHandler(_context, Stock());
+        var handler = new GetPublicPackagesByBrandQueryHandler(_context, Stock());
 
-        var result = await handler.HandleAsync(new GetPublicPackagesByStationQuery("station-a", CallerUserId: null));
+        var result = await handler.HandleAsync(new GetPublicPackagesByBrandQuery("Brand-a", CallerUserId: null));
 
         result.Should().HaveCount(2);
         result.Single(p => p.Id == "pkg-in-stock").IsAvailable.Should().BeTrue();
@@ -448,8 +448,8 @@ public sealed class StationsQueryHandlersTests : IDisposable
     public async Task GetAdminFuelTypes_ShouldReturnAllFuelTypes()
     {
         _context.FuelTypes.AddRange(
-            CreateFuelType("ft-a", "A-95", "station-a"),
-            CreateFuelType("ft-b", "Diesel", "station-b"));
+            CreateFuelType("ft-a", "A-95", "Brand-a"),
+            CreateFuelType("ft-b", "Diesel", "Brand-b"));
         await _context.SaveChangesAsync();
 
         var handler = new GetAdminFuelTypesQueryHandler(_context);
@@ -462,7 +462,7 @@ public sealed class StationsQueryHandlersTests : IDisposable
     [Fact]
     public async Task GetAdminFuelTypeById_ShouldReturnFound()
     {
-        _context.FuelTypes.Add(CreateFuelType("ft-a", "A-95", "station-a"));
+        _context.FuelTypes.Add(CreateFuelType("ft-a", "A-95", "Brand-a"));
         await _context.SaveChangesAsync();
 
         var handler = new GetAdminFuelTypeByIdQueryHandler(_context);
@@ -484,12 +484,12 @@ public sealed class StationsQueryHandlersTests : IDisposable
     }
 
     [Fact]
-    public async Task GetAdminPackages_ShouldOrderByStationIdThenFuelNameThenLiters()
+    public async Task GetAdminPackages_ShouldOrderByBrandIdThenFuelNameThenLiters()
     {
         _context.FuelOfferVolumes.AddRange(
-            CreatePackage("pkg-1", "station-b", "ft-b", "B Fuel", 50m),
-            CreatePackage("pkg-2", "station-a", "ft-a", "A Fuel", 20m),
-            CreatePackage("pkg-3", "station-a", "ft-a", "A Fuel", 10m));
+            CreatePackage("pkg-1", "Brand-b", "ft-b", "B Fuel", 50m),
+            CreatePackage("pkg-2", "Brand-a", "ft-a", "A Fuel", 20m),
+            CreatePackage("pkg-3", "Brand-a", "ft-a", "A Fuel", 10m));
         await _context.SaveChangesAsync();
 
         var handler = new GetAdminPackagesQueryHandler(_context);
@@ -500,42 +500,42 @@ public sealed class StationsQueryHandlersTests : IDisposable
     }
 
     [Fact]
-    public async Task GetAdminPackagesByStation_ShouldFilterByStationId()
+    public async Task GetAdminPackagesByBrand_ShouldFilterByBrandId()
     {
         _context.FuelOfferVolumes.AddRange(
-            CreatePackage("pkg-1", "station-a", "ft-a", "A-95", 10m),
-            CreatePackage("pkg-2", "station-a", "ft-a", "A-95", 20m),
-            CreatePackage("pkg-3", "station-b", "ft-b", "Diesel", 20m));
+            CreatePackage("pkg-1", "Brand-a", "ft-a", "A-95", 10m),
+            CreatePackage("pkg-2", "Brand-a", "ft-a", "A-95", 20m),
+            CreatePackage("pkg-3", "Brand-b", "ft-b", "Diesel", 20m));
         await _context.SaveChangesAsync();
 
-        var handler = new GetAdminPackagesByStationQueryHandler(_context);
+        var handler = new GetAdminPackagesByBrandQueryHandler(_context);
 
-        var result = await handler.HandleAsync(new GetAdminPackagesByStationQuery("station-a"));
+        var result = await handler.HandleAsync(new GetAdminPackagesByBrandQuery("Brand-a"));
 
         result.Should().HaveCount(2);
-        result.Should().OnlyContain(p => p.StationId == "station-a");
+        result.Should().OnlyContain(p => p.BrandId == "Brand-a");
     }
 
     [Fact]
-    public async Task GetAdminStationById_ShouldReturnFound()
+    public async Task GetAdminBrandById_ShouldReturnFound()
     {
-        _context.Stations.Add(CreateStation("station-a", "Alpha Station"));
+        _context.Brands.Add(CreateBrand("Brand-a", "Alpha Brand"));
         await _context.SaveChangesAsync();
 
-        var handler = new GetAdminStationByIdQueryHandler(_context);
+        var handler = new GetAdminBrandByIdQueryHandler(_context);
 
-        var result = await handler.HandleAsync(new GetAdminStationByIdQuery("station-a"));
+        var result = await handler.HandleAsync(new GetAdminBrandByIdQuery("Brand-a"));
 
         result.Should().NotBeNull();
-        result!.Name.Should().Be("Alpha Station");
+        result!.Name.Should().Be("Alpha Brand");
     }
 
     [Fact]
-    public async Task GetAdminStationById_ShouldReturnNull_WhenMissing()
+    public async Task GetAdminBrandById_ShouldReturnNull_WhenMissing()
     {
-        var handler = new GetAdminStationByIdQueryHandler(_context);
+        var handler = new GetAdminBrandByIdQueryHandler(_context);
 
-        var result = await handler.HandleAsync(new GetAdminStationByIdQuery("missing"));
+        var result = await handler.HandleAsync(new GetAdminBrandByIdQuery("missing"));
 
         result.Should().BeNull();
     }
@@ -543,7 +543,7 @@ public sealed class StationsQueryHandlersTests : IDisposable
     [Fact]
     public async Task GetPackageSuggestions_ShouldReturnSuggestionForVoucherCombo()
     {
-        _context.Stations.Add(CreateStation("okko", "OKKO"));
+        _context.Brands.Add(CreateBrand("okko", "OKKO"));
         _context.FuelTypes.Add(CreateFuelType("okko-95", "A-95", "okko"));
         _context.FuelVouchers.Add(CreateVoucher("OKKO", "okko-95", 50m));
         await _context.SaveChangesAsync();
@@ -554,8 +554,8 @@ public sealed class StationsQueryHandlersTests : IDisposable
 
         var suggestion = result.Single();
         suggestion.SuggestedId.Should().Be("okko-a-95-50");
-        suggestion.StationId.Should().Be("okko");
-        suggestion.StationName.Should().Be("OKKO");
+        suggestion.BrandId.Should().Be("okko");
+        suggestion.BrandName.Should().Be("OKKO");
         suggestion.FuelTypeId.Should().Be("okko-95");
         suggestion.FuelName.Should().Be("A-95");
         suggestion.Liters.Should().Be(50m);
@@ -564,7 +564,7 @@ public sealed class StationsQueryHandlersTests : IDisposable
     [Fact]
     public async Task GetPackageSuggestions_ShouldMatchProviderCaseAndWhitespace()
     {
-        _context.Stations.Add(CreateStation("okko", "OKKO"));
+        _context.Brands.Add(CreateBrand("okko", "OKKO"));
         _context.FuelTypes.Add(CreateFuelType("okko-95", "A-95", "okko"));
         _context.FuelVouchers.Add(CreateVoucher("  okko ", "okko-95", 50m));
         await _context.SaveChangesAsync();
@@ -579,7 +579,7 @@ public sealed class StationsQueryHandlersTests : IDisposable
     [Fact]
     public async Task GetPackageSuggestions_ShouldSkipWhenPackageAlreadyExists()
     {
-        _context.Stations.Add(CreateStation("okko", "OKKO"));
+        _context.Brands.Add(CreateBrand("okko", "OKKO"));
         _context.FuelTypes.Add(CreateFuelType("okko-95", "A-95", "okko"));
         _context.FuelOfferVolumes.Add(CreatePackage("pkg-1", "okko", "okko-95", "A-95", 50m));
         _context.FuelVouchers.Add(CreateVoucher("OKKO", "okko-95", 50m));
@@ -593,9 +593,9 @@ public sealed class StationsQueryHandlersTests : IDisposable
     }
 
     [Fact]
-    public async Task GetPackageSuggestions_ShouldSkipWhenProviderDoesNotMatchStation()
+    public async Task GetPackageSuggestions_ShouldSkipWhenProviderDoesNotMatchBrand()
     {
-        _context.Stations.Add(CreateStation("okko", "OKKO"));
+        _context.Brands.Add(CreateBrand("okko", "OKKO"));
         _context.FuelTypes.Add(CreateFuelType("okko-95", "A-95", "okko"));
         _context.FuelVouchers.Add(CreateVoucher("WOG", "okko-95", 50m));
         await _context.SaveChangesAsync();
@@ -610,7 +610,7 @@ public sealed class StationsQueryHandlersTests : IDisposable
     [Fact]
     public async Task GetPackageSuggestions_ShouldGroupDuplicateVoucherCombos()
     {
-        _context.Stations.Add(CreateStation("okko", "OKKO"));
+        _context.Brands.Add(CreateBrand("okko", "OKKO"));
         _context.FuelTypes.Add(CreateFuelType("okko-95", "A-95", "okko"));
         _context.FuelVouchers.AddRange(
             CreateVoucher("OKKO", "okko-95", 50m),
@@ -634,9 +634,9 @@ public sealed class StationsQueryHandlersTests : IDisposable
             .AddInMemoryCollection(settings ?? new Dictionary<string, string?>())
             .Build());
 
-    private static Station CreateStation(string id, string name)
+    private static Brand CreateBrand(string id, string name)
     {
-        return new Station
+        return new Brand
         {
             Id = id,
             Name = name,
@@ -644,23 +644,23 @@ public sealed class StationsQueryHandlersTests : IDisposable
         };
     }
 
-    private static StationNode CreateStationNode(string id, string stationId, string name)
+    private static StationNode CreateStationNode(string id, string BrandId, string name)
     {
         return new StationNode
         {
             Id = id,
-            StationId = stationId,
+            BrandId = BrandId,
             Name = name
         };
     }
 
-    private static FuelTypeEntity CreateFuelType(string id, string name, string stationId)
+    private static FuelTypeEntity CreateFuelType(string id, string name, string BrandId)
     {
         return new FuelTypeEntity
         {
             Id = id,
             Name = name,
-            StationId = stationId,
+            BrandId = BrandId,
             BasePrice = 50,
             DiscountPrice = 45
         };
@@ -674,7 +674,7 @@ public sealed class StationsQueryHandlersTests : IDisposable
     /// this file keeps working with only the DbSet renamed. The offer is added here because EF will
     /// cascade the volumes in, but will not invent the parent they point at.
     /// </remarks>
-    private FuelOfferVolume CreatePackage(string id, string stationId, string fuelTypeId, string fuelName, decimal liters, bool isTestData = false)
+    private FuelOfferVolume CreatePackage(string id, string BrandId, string fuelTypeId, string fuelName, decimal liters, bool isTestData = false)
     {
         // The storefront joins volumes -> offers -> fuel_types for the display name. On the in-memory
         // provider that join is executed for real, so a fixture that seeds a package without seeding its
@@ -686,13 +686,13 @@ public sealed class StationsQueryHandlersTests : IDisposable
             {
                 Id = fuelTypeId,
                 Name = fuelName,
-                StationId = stationId,
+                BrandId = BrandId,
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow,
             });
         }
 
-        var offer = _context.SeedOffer(stationId, fuelTypeId, isTestData);
+        var offer = _context.SeedOffer(BrandId, fuelTypeId, isTestData);
 
         return new FuelOfferVolume
         {

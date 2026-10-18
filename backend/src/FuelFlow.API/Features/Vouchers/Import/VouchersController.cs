@@ -173,7 +173,7 @@ public sealed class VouchersController : ControllerBase
             return NotFound();
 
         // Authorization must agree with MarkVoucherAsUsedCommandHandler, because both endpoints
-        // hand out control of the same bearer instrument: the QR payload IS what a station scans.
+        // hand out control of the same bearer instrument: the QR payload IS what a Brand scans.
         //
         // The previous check tested AssignedToUserId only. Issuing fuel to a worker sets
         // WorkerUserId and LEAVES AssignedToUserId on the owner, so that check was wrong in both

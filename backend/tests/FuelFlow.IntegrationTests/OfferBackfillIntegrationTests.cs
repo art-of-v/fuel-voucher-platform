@@ -48,7 +48,7 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
     {
         await context.Database.ExecuteSqlRawAsync(
             """
-            INSERT INTO fuel_types (id, name, station_id, base_price, discount_price,
+            INSERT INTO fuel_types (id, name, brand_id, base_price, discount_price,
                                     created_at_utc, updated_at_utc, is_deleted)
             SELECT f.id, f.name, 'upg', 0, 0, now(), now(), false
               FROM (VALUES
@@ -153,13 +153,13 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
         // The key derivation is stated three times - in OfferKeys and inline in the SQL of the two
         // migrations that have to produce or repair these ids, because a migration cannot call into the
         // assembly it migrates from. This is what keeps those copies from drifting apart. The ids here
-        // were written by SplitFuelPackagesIntoOffers under the older station-prefixed key and then
-        // re-keyed by DropTheStationPrefixFromOfferKeys, so this asserts the end state both migrations
+        // were written by SplitFuelPackagesIntoOffers under the older Brand-prefixed key and then
+        // re-keyed by DropTheBrandPrefixFromOfferKeys, so this asserts the end state both migrations
         // had to agree on.
         await using var context = CreateContext();
 
         var rows = await context.FuelOffers.IgnoreQueryFilters()
-            .Select(o => new { o.Id, o.StationId, o.FuelTypeId, o.DataKind })
+            .Select(o => new { o.Id, o.BrandId, o.FuelTypeId, o.DataKind })
             .ToListAsync();
 
         rows.Should().NotBeEmpty();
@@ -169,13 +169,13 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
     }
 
     [Fact]
-    public async Task EveryOffer_IsSoldByItsOwnFuelsStation()
+    public async Task EveryOffer_IsSoldByItsOwnFuelsBrand()
     {
-        // The premise that lets the station stay out of the key: fuel_type_id is a primary key, so it
-        // identifies a fuel, and a fuel belongs to exactly one station - which is what makes the key
+        // The premise that lets the Brand stay out of the key: fuel_type_id is a primary key, so it
+        // identifies a fuel, and a fuel belongs to exactly one Brand - which is what makes the key
         // unique. Nothing in the schema can enforce it (it is a fact about two tables), so it is a
         // test here and deploy/preflight-db/012 before every pull. If this ever fails, the offer key is
-        // ambiguous and OfferKeys has to start spelling the station out again.
+        // ambiguous and OfferKeys has to start spelling the Brand out again.
         //
         // Asked in SQL because FuelOffer has no navigation to the fuel type, which is the whole point:
         // the two columns are related by an agreement, not by a foreign key.
@@ -186,17 +186,17 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
             SELECT o.id AS "Value"
             FROM fuel_offers o
             JOIN fuel_types f ON f.id = o.fuel_type_id
-            WHERE o.station_id <> f.station_id
+            WHERE o.brand_id <> f.brand_id
             """).ToListAsync();
 
-        mismatched.Should().BeEmpty("the offer's station is its fuel type's station, which is what makes the key unique");
+        mismatched.Should().BeEmpty("the offer's Brand is its fuel type's Brand, which is what makes the key unique");
     }
 
     [Fact]
-    public async Task ALiveFuelWithADuplicateName_IsRefusedAtTheSameStation()
+    public async Task ALiveFuelWithADuplicateName_IsRefusedAtTheSameBrand()
     {
         // The guard that the natural fuel id used to give for free. A second 'А-95' at OKKO used to
-        // collide on the primary key; the id is generated now, so without ux_fuel_types_station_name it
+        // collide on the primary key; the id is generated now, so without ux_fuel_types_Brand_name it
         // would become a second offer and a second landing place for a parsed voucher.
         await using var context = CreateContext();
         var now = DateTime.UtcNow;
@@ -204,7 +204,7 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
         context.FuelTypes.Add(new FuelTypeEntity
         {
             Id = "twin-a",
-            StationId = "upg",
+            BrandId = "upg",
             Name = "А-95 (twin test)",
             BasePrice = 50m,
             DiscountPrice = 48m,
@@ -217,8 +217,8 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
 
         context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = "twin-b",            // different id, same (station, name)
-            StationId = "upg",
+            Id = "twin-b",            // different id, same (Brand, name)
+            BrandId = "upg",
             Name = "А-95 (twin test)",
             BasePrice = 50m,
             DiscountPrice = 48m,
@@ -244,7 +244,7 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
         context.FuelTypes.Add(new FuelTypeEntity
         {
             Id = "reused-a",
-            StationId = "upg",
+            BrandId = "upg",
             Name = "ДП (reuse test)",
             BasePrice = 50m,
             DiscountPrice = 48m,
@@ -256,7 +256,7 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
         context.FuelTypes.Add(new FuelTypeEntity
         {
             Id = "reused-b",
-            StationId = "upg",
+            BrandId = "upg",
             Name = "ДП (reuse test)",
             BasePrice = 50m,
             DiscountPrice = 48m,
@@ -285,7 +285,7 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
         context.FuelOffers.Add(new FuelOffer
         {
             Id = OfferKeys.For("upg-pool", DataKinds.Real),
-            StationId = "upg",
+            BrandId = "upg",
             FuelTypeId = "upg-pool",
             DataKind = DataKinds.Real,
             SupplierPricePerLiter = 49m,
@@ -297,7 +297,7 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
         context.FuelOffers.Add(new FuelOffer
         {
             Id = OfferKeys.For("upg-pool", DataKinds.Qa),
-            StationId = "upg",
+            BrandId = "upg",
             FuelTypeId = "upg-pool",
             DataKind = DataKinds.Qa,
             SupplierPricePerLiter = 0.5m,
@@ -309,7 +309,7 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
         await context.SaveChangesAsync();
 
         var pools = await context.FuelOffers.IgnoreQueryFilters()
-            .Where(o => o.StationId == "upg" && o.FuelTypeId == "upg-pool")
+            .Where(o => o.BrandId == "upg" && o.FuelTypeId == "upg-pool")
             .Select(o => o.DataKind).ToListAsync();
 
         pools.Should().BeEquivalentTo(["real", "qa"]);
@@ -318,7 +318,7 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
     [Fact]
     public async Task ASecondOfferForTheSameFuelAndPool_IsRefused()
     {
-        // The natural key, enforced. Without it two offers for one (station, fuel, pool) would let
+        // The natural key, enforced. Without it two offers for one (Brand, fuel, pool) would let
         // the storefront's per-litre price become ambiguous again - the defect this whole split is
 // about, re-entering through the new tables.
     await using var context = CreateContext();
@@ -328,7 +328,7 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
         context.FuelOffers.Add(new FuelOffer
         {
             Id = "dup-1",
-            StationId = "upg",
+            BrandId = "upg",
             FuelTypeId = "upg-dup",
             DataKind = DataKinds.Real,
             CreatedAtUtc = now,
@@ -341,7 +341,7 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
         context.FuelOffers.Add(new FuelOffer
         {
             Id = "dup-2",           // different id, same natural key
-            StationId = "upg",
+            BrandId = "upg",
             FuelTypeId = "upg-dup",
             DataKind = DataKinds.Real,
             CreatedAtUtc = now,
@@ -364,7 +364,7 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
         var offer = new FuelOffer
         {
             Id = "vol-offer",
-            StationId = "upg",
+            BrandId = "upg",
             FuelTypeId = "upg-vol",
             DataKind = DataKinds.Real,
             CreatedAtUtc = now,
@@ -412,7 +412,7 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
         var offer = new FuelOffer
         {
             Id = $"neg-offer-{liters}",
-            StationId = "upg",
+            BrandId = "upg",
             FuelTypeId = "upg-neg",
             DataKind = DataKinds.Real,
             CreatedAtUtc = now,
@@ -445,7 +445,7 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
         context.FuelOffers.Add(new FuelOffer
         {
             Id = "neg-margin-offer",
-            StationId = "upg",
+            BrandId = "upg",
             FuelTypeId = "upg-margin",
             DataKind = DataKinds.Real,
             MarginUahPerLiter = -1m,
@@ -466,7 +466,7 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
         context.FuelOffers.Add(new FuelOffer
         {
             Id = "bad-pool-offer",
-            StationId = "upg",
+            BrandId = "upg",
             FuelTypeId = "upg-badpool",
             DataKind = "sandbox",
             CreatedAtUtc = now,
@@ -496,7 +496,7 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
 
         await context.Database.ExecuteSqlRawAsync(
             """
-            INSERT INTO fuel_offers (id, station_id, fuel_type_id, data_kind, supplier_price_per_liter,
+            INSERT INTO fuel_offers (id, brand_id, fuel_type_id, data_kind, supplier_price_per_liter,
                                      margin_uah_per_liter, created_at_utc, updated_at_utc, is_deleted)
             VALUES ('arch-offer', 'upg', 'upg-arch', 'real', 58, 2, now(), now(), false)
             """);
@@ -540,7 +540,7 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
 
     await context.Database.ExecuteSqlRawAsync(
         """
-        INSERT INTO fuel_offers (id, station_id, fuel_type_id, data_kind, supplier_price_per_liter,
+        INSERT INTO fuel_offers (id, brand_id, fuel_type_id, data_kind, supplier_price_per_liter,
         margin_uah_per_liter, created_at_utc, updated_at_utc, is_deleted)
     VALUES ('keep-offer', 'upg', 'upg-keep', 'real', 58, 2, now(), now(), false)
     """);
@@ -575,7 +575,7 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
         await using var context = CreateContext();
 
         var okko95 = await context.FuelOffers.IgnoreQueryFilters()
-            .SingleAsync(o => o.StationId == "okko" && o.FuelTypeId == "okko-95" && o.DataKind == DataKinds.Real);
+            .SingleAsync(o => o.BrandId == "okko" && o.FuelTypeId == "okko-95" && o.DataKind == DataKinds.Real);
 
         okko95.FinalPerLiterWith(await MarginOf(okko95)).Should().Be(51m, "SeedData sets DiscountPrice, and the knobs derive it");
         okko95.SupplierPricePerLiter.Should().Be(49m);

@@ -29,7 +29,7 @@ public sealed class TermQuoteQueryHandler
 
     public async Task<TermQuoteResponse> HandleAsync(
         bool isTestAccount,
-        string stationId, string fuelTypeId, decimal liters, CancellationToken cancellationToken = default)
+        string BrandId, string fuelTypeId, decimal liters, CancellationToken cancellationToken = default)
     {
         var config = await _settings.GetVoucherTermConfigAsync(cancellationToken);
         var pool = DataKinds.ForPool(isTestAccount);
@@ -39,7 +39,7 @@ public sealed class TermQuoteQueryHandler
         // prices rather than failing the whole screen.
         var row = await _context.FuelOfferVolumes
             .AsNoTracking()
-            .Where(v => v.Offer.StationId == stationId
+            .Where(v => v.Offer.BrandId == BrandId
                      && v.Offer.FuelTypeId == fuelTypeId
                      && v.Liters == liters
                      && v.Offer.DataKind == pool)
@@ -54,12 +54,12 @@ public sealed class TermQuoteQueryHandler
         // package's margin is its margin - so this no longer costs a second query per quote.
         var allowBelowCost = package is null || row!.Fuel.AllowBelowCost;
 
-        // The ladder must not offer a term the station cannot honour. Charging the long-term price and
+        // The ladder must not offer a term the Brand cannot honour. Charging the long-term price and
         // then clamping the delivered validity down to the stock's paper term is exactly the mis-sell this
         // gate exists to prevent, so a term with no backing stock is simply not on the ladder.
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var bestStockExpiration = await TermStockCoverage.BestStockExpirationAsync(
-            _context, stationId, fuelTypeId, liters, cancellationToken);
+            _context, BrandId, fuelTypeId, liters, cancellationToken);
 
         var terms = new List<TermQuoteItem>();
         foreach (var tier in config.Tiers)

@@ -2,7 +2,7 @@ using FuelFlow.SharedKernel.Domain;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace FuelFlow.Features.Stations.GetAdminPackages;
+namespace FuelFlow.Features.Brands.GetAdminPackages;
 
 public sealed class GetAdminPackagesQueryHandler
 {
@@ -25,7 +25,7 @@ public sealed class GetAdminPackagesQueryHandler
             // the row. Without this the navigation is null after materialisation - lazy loading is off -
             // and the handler throws on the first package rather than returning a wrong answer.
             .Include(v => v.Offer)
-            .OrderBy(v => v.Offer.StationId)
+            .OrderBy(v => v.Offer.BrandId)
             .ThenBy(v => v.Offer.FuelTypeId)
             .ThenBy(v => v.Liters)
             .ToListAsync(ct);

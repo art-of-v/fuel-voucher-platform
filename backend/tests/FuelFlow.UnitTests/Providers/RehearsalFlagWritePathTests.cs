@@ -73,7 +73,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
             }
         };
 
-        _context.Stations.Add(new Station
+        _context.Brands.Add(new Brand
         {
             Id = "okko", Name = "OKKO", Color = "#22c55e", LogoText = "OKKO",
             CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
@@ -248,12 +248,12 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
     /// prices, and <c>OkkoFuelClassifier</c> resolving a parsed voucher by name with
     /// <c>FirstOrDefault</c> — so the twin that never received the imported pump price is a landing
     /// place for a real voucher. The database refuses the same thing with
-    /// <c>ux_fuel_types_station_name</c>; this is the version that can say which fuel already owns the
+    /// <c>ux_fuel_types_Brand_name</c>; this is the version that can say which fuel already owns the
     /// name, and it is asserted here on an in-memory context that has no index at all.
     /// </para>
     /// </summary>
     [Fact]
-    public async Task AddingAFuelThatAlreadyExistsAtThatStation_IsRefused()
+    public async Task AddingAFuelThatAlreadyExistsAtThatBrand_IsRefused()
     {
         await SeedQaFuelAsync();
         await _context.SaveChangesAsync(); // the guard reads the row, not the change tracker
@@ -273,7 +273,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
 
         var conflict = result.Should().BeOfType<ConflictObjectResult>().Subject;
 
-        (await _context.FuelTypes.CountAsync(f => f.StationId == "okko" && f.Name == "А95 ЄВРО(QA)"))
+        (await _context.FuelTypes.CountAsync(f => f.BrandId == "okko" && f.Name == "А95 ЄВРО(QA)"))
             .Should().Be(1, "a second row for the same fuel is a second offer the storefront would list twice");
 
         (await _context.FuelOffers.CountAsync()).Should().Be(1, "and it must not have created one");
@@ -281,13 +281,13 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
     }
 
     [Fact]
-    public async Task TheSameFuelNameAtAnotherStation_IsNotADuplicate()
+    public async Task TheSameFuelNameAtAnotherBrand_IsNotADuplicate()
     {
-        // The uniqueness is per station, deliberately: two networks both listing 'ГАЗ' is the
+        // The uniqueness is per Brand, deliberately: two networks both listing 'ГАЗ' is the
         // catalogue working, not a duplicate.
         await SeedQaFuelAsync();
 
-        _context.Stations.Add(new Station
+        _context.Brands.Add(new Brand
         {
             Id = "wog", Name = "WOG", Color = "#10b981", LogoText = "WOG",
             CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
@@ -450,7 +450,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
     {
         _context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = "qa-a95", StationId = "okko", Name = "А95 ЄВРО(QA)",
+            Id = "qa-a95", BrandId = "okko", Name = "А95 ЄВРО(QA)",
             BasePrice = 92.90m, DiscountPrice = 72.34m,
             CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
         });
@@ -460,7 +460,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         // screens read back.
         var offer = new FuelOffer
         {
-            Id = "qa-offer-a95", StationId = "okko", FuelTypeId = "qa-a95",
+            Id = "qa-offer-a95", BrandId = "okko", FuelTypeId = "qa-a95",
             SupplierPricePerLiter = 60m, MarginUahPerLiter = 12.34m, // 60 + 12.34 = 72.34 per litre
             IsTestData = true,
             CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow

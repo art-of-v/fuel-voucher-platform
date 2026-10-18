@@ -15,15 +15,15 @@ public sealed class CheckoutItem
     public decimal Price { get; set; }
 
     /// <summary>
-    /// The fuel brand, as a station id. The line's brand is written from this, so it is the only
+    /// The fuel brand, as a Brand id. The line's brand is written from this, so it is the only
     /// place the brand travels.
     /// </summary>
     /// <remarks>
     /// The item also used to carry a required <c>Provider</c> that the handler overwrote with this
-    /// value - see <see cref="CreateCheckoutCommand.StationId"/> for why the duplicate went away.
+    /// value - see <see cref="CreateCheckoutCommand.BrandId"/> for why the duplicate went away.
     /// </remarks>
-    public string? StationId { get; set; }
-    public string? StationName { get; set; }
+    public string? BrandId { get; set; }
+    public string? BrandName { get; set; }
 
     /// <summary>
     /// The term of validity the customer is buying this fuel for (<c>1w</c>…<c>6m</c>), which earns a

@@ -1,4 +1,4 @@
-namespace FuelFlow.Features.Stations;
+namespace FuelFlow.Features.Brands;
 
 /// <summary>
 /// Recognises a rehearsal package from how it is named, used to refuse an obviously-rehearsal row

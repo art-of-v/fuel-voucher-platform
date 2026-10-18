@@ -350,7 +350,7 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
 
         // The FK side of the same natural-key trade: fuel_type_id points at fuel_types.id ("okko-95"),
         // which is deliberately a readable string rather than a UUID. Bounded by CHECK so the
-        // reference cannot drift into something arbitrary - see StationConfiguration.
+        // reference cannot drift into something arbitrary - see BrandConfiguration.
         builder.ToTable(t =>
         {
             t.HasCheckConstraint("ck_fuel_vouchers_fuel_type_id_length", "length(fuel_type_id) <= 100");

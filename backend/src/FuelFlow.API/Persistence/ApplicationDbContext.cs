@@ -102,8 +102,8 @@ private readonly FuelFlow.Features.Vouchers.Security.IQrCipher _qrCipher;
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<UserPushToken> PushTokens => Set<UserPushToken>();
 
-    public DbSet<Station> Stations => Set<Station>();
-    public DbSet<StationNode> StationNodes => Set<StationNode>();
+    public DbSet<Brand> Brands => Set<Brand>();
+    public DbSet<BrandStation> BrandStations => Set<BrandStation>();
     public DbSet<FuelTypeEntity> FuelTypes => Set<FuelTypeEntity>();
 
     // No FuelPackages DbSet: the table is gone (SplitFuelPackagesIntoOffers then DropFuelPackages).
@@ -169,7 +169,7 @@ var cipher = _qrCipher;
             plain => cipher.Encrypt(plain),
             stored => cipher.Decrypt(stored)));
 
-        modelBuilder.Entity<Station>().HasData(SeedData.Stations);
+        modelBuilder.Entity<Brand>().HasData(SeedData.Brands);
         modelBuilder.Entity<FuelTypeEntity>().HasData(SeedData.FuelTypes);
         // The catalogue is seeded as offers plus volumes, because that is what the application reads.
         // fuel_packages is not seeded and no longer exists: it was deliberately left unseeded while it
