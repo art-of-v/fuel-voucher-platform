@@ -71,6 +71,36 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
         fuelA.PriceSpread.Should().BeNull();
     }
 
+    // The card never carried the code, so every fuel serialised as null and the admin screen had
+    // nothing to show. That matters beyond cosmetics: the code is what the catalogue import matches
+    // on, so a fuel whose code the operator cannot see is a fuel they cannot tell apart from a
+    // near-duplicate of it - which is how the same grade gets typed in twice.
+    [Fact]
+    public async Task Handle_CarriesTheBrandFuelCode_AndNullWhenThereIsNone()
+    {
+        _context.Stations.Add(new Station
+        {
+            Id = "test-okko",
+            Name = "OKKO",
+            LogoText = "OKKO",
+            Color = "#fff",
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        _context.FuelTypes.AddRange(
+            new FuelTypeEntity { Id = "test-coded", Name = "А-95", StationId = "test-okko", BrandFuelCode = "A-95", BasePrice = 92.9m, DiscountPrice = 89.06m, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = "test-uncoded", Name = "А 92", StationId = "test-okko", BrandFuelCode = null, BasePrice = 85m, DiscountPrice = 84.5m, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
+        await _context.SaveChangesAsync();
+
+        var providers = await _handler.HandleAsync(new GetBrandsQuery());
+
+        var brand = providers.Single(p => p.Id == "test-okko");
+        brand.Fuels.Single(f => f.Id == "test-coded").BrandFuelCode.Should().Be("A-95");
+        // Null must stay null rather than becoming "" - the screen tells the two apart, and the API
+        // reads an empty string on a write as "clear this".
+        brand.Fuels.Single(f => f.Id == "test-uncoded").BrandFuelCode.Should().BeNull();
+    }
+
     // The production case from #202: four packages for one fuel, one of them a 0.01 L leftover with a
     // cost nothing like the others. The card used to report whichever row the database returned first,
     // so it showed 5.00 for a fuel whose real packages all cost 100.00 - and which the below-cost
