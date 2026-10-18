@@ -21,8 +21,8 @@ public sealed class ParseInvoiceHandlerTests : IDisposable
         _context = new ApplicationDbContext(options, TestQrCipher.Instance);
 
         _context.FuelTypes.AddRange(
-            new FuelTypeEntity { Id = "okko-dp", Name = "Дизельне паливо ОККО", BrandId = "okko", CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "okko-a95", Name = "Бензин А-95 ОККО", BrandId = "okko", CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
+            new FuelTypeEntity { Id = "okko-dp", Name = "Дизельне паливо ОККО", BrandId = BrandIds.Okko, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = "okko-a95", Name = "Бензин А-95 ОККО", BrandId = BrandIds.Okko, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
         _context.SaveChanges();
 
         _handler = new ParseInvoiceCommandHandler(_context);

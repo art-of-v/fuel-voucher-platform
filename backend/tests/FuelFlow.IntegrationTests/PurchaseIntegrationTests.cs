@@ -155,7 +155,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
             Liters = 50,
             Quantity = 1,
             Price = 2500,
-            BrandId = "okko",
+            BrandId = BrandIds.Okko,
             BrandName = "OKKO Brand #123"
         };
 
@@ -177,7 +177,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
         // Arrange
         var request = new CreateCheckoutCommand
         {
-            BrandId = "okko",
+            BrandId = BrandIds.Okko,
             FuelTypeId = "okko-95",
             Liters = 50,
             Quantity = 1,
@@ -200,7 +200,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
 
         var request = new CreateCheckoutCommand
         {
-            BrandId = "", // Invalid
+            BrandId = Guid.Empty, // Invalid
             FuelTypeId = "okko-95",
             Liters = 50,
             Quantity = 1,
@@ -231,7 +231,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
             Liters = 20,
             Quantity = 2,
             Price = 1800,
-            BrandId = "wog"
+            BrandId = BrandIds.Wog
         };
 
         var createResponse = await _client.PostAsJsonAsync("/api/purchases", createRequest);
@@ -266,7 +266,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
             Liters = 50,
             Quantity = 1,
             Price = 2000,
-            BrandId = "okko"
+            BrandId = BrandIds.Okko
         };
 
         var createResponse = await _client.PostAsJsonAsync("/api/purchases", createRequest);
@@ -307,7 +307,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
             Liters = 20,
             Quantity = 1,
             Price = 1250,
-            BrandId = "okko"
+            BrandId = BrandIds.Okko
         };
 
         var createResponse = await _client.PostAsJsonAsync("/api/purchases", createRequest);
@@ -347,7 +347,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
             Liters = 50,
             Quantity = 1,
             Price = 3000,
-            BrandId = "okko"
+            BrandId = BrandIds.Okko
         };
 
         // Act
@@ -380,7 +380,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
             Liters = 10,
             Quantity = 1,
             Price = 500,
-            BrandId = "wog"
+            BrandId = BrandIds.Wog
         };
 
         // Act
@@ -418,10 +418,10 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
         var packages = await response.Content.ReadFromJsonAsync<List<PublicPackageResponse>>();
         Assert.NotNull(packages);
 
-        var stocked = packages!.Single(p => p.BrandId == "okko" && p.FuelTypeId == "okko-95" && p.Liters == 10m);
+        var stocked = packages!.Single(p => p.BrandId == BrandIds.Okko && p.FuelTypeId == "okko-95" && p.Liters == 10m);
         Assert.True(stocked.IsAvailable, "an activated voucher of exactly this nominal is behind this package");
 
-        var empty = packages.Single(p => p.BrandId == "wog" && p.FuelTypeId == "wog-dp" && p.Liters == 10m);
+        var empty = packages.Single(p => p.BrandId == BrandIds.Wog && p.FuelTypeId == "wog-dp" && p.Liters == 10m);
         Assert.False(empty.IsAvailable);
     }
 }

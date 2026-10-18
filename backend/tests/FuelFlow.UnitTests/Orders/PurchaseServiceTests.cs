@@ -1,3 +1,4 @@
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Settings;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
@@ -83,11 +84,11 @@ public OrderCommandHandlersTests()
     {
         var fuelTypes = new[]
         {
-            new FuelTypeEntity { Id = "okko-dp", Name = "ДП ЄВРО", BrandId = "okko", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "okko-95", Name = "A-95", BrandId = "okko", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "okko-p95", Name = "Pulls 95", BrandId = "okko", BasePrice = 62, DiscountPrice = 58, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "wog-dp", Name = "ДП Mustang", BrandId = "wog", BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "wog-95", Name = "A-95 Mustang", BrandId = "wog", BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow }
+            new FuelTypeEntity { Id = "okko-dp", Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = "okko-95", Name = "A-95", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = "okko-p95", Name = "Pulls 95", BrandId = BrandIds.Okko, BasePrice = 62, DiscountPrice = 58, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = "wog-dp", Name = "ДП Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = "wog-95", Name = "A-95 Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow }
         };
         _context.FuelTypes.AddRange(fuelTypes);
         _context.SaveChanges();
@@ -97,7 +98,7 @@ public OrderCommandHandlersTests()
     {
         // Offers plus volumes: checkout resolves the line's package through the offer, so a fixture in
         // fuel_packages would make every line unresolvable and the guard tests would assert nothing.
-        _context.SeedPackage("pkg-okko-95-50", "okko", "okko-95", 50m, 2500m,
+        _context.SeedPackage("pkg-okko-95-50", BrandIds.Okko, "okko-95", 50m, 2500m,
             supplierPricePerLiter: 49m, marginUahPerLiter: 1m, finalPricePerLiter: 50m);
         _context.SaveChanges();
     }
@@ -129,7 +130,7 @@ public OrderCommandHandlersTests()
     }
 
     private PackageStockAvailability Stock()
-        => new(_context, new ConfigurationBuilder().Build());
+        => new(_context, new ConfigurationBuilder().Build(), new BrandSlugResolver(_context));
 
     public void Dispose()
     {
@@ -142,7 +143,7 @@ public OrderCommandHandlersTests()
         UserId = _context.Users.First().Id,
         
         FuelTypeId = "okko-95",
-        BrandId = "okko",
+        BrandId = BrandIds.Okko,
         BrandName = "OKKO",
         Liters = 50,
         Quantity = 1,
@@ -158,7 +159,7 @@ public OrderCommandHandlersTests()
             {
                 
                 FuelTypeId = "okko-95",
-                BrandId = "okko",
+                BrandId = BrandIds.Okko,
                 BrandName = "OKKO",
                 Liters = 50,
                 Quantity = 1,
@@ -176,11 +177,11 @@ public OrderCommandHandlersTests()
     {
         _context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = "okko-loss", Name = "ДП збиток", BrandId = "okko",
+            Id = "okko-loss", Name = "ДП збиток", BrandId = BrandIds.Okko,
             BasePrice = 49, DiscountPrice = 49, AllowBelowCost = allowBelowCost,
             CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
         });
-        _context.SeedPackage("pkg-okko-loss-50", "okko", "okko-loss", 50m, 2425m,
+        _context.SeedPackage("pkg-okko-loss-50", BrandIds.Okko, "okko-loss", 50m, 2425m,
             supplierPricePerLiter: 50m, marginUahPerLiter: 2m,
             pumpPricePerLiter: 49m, minDiscountPerLiter: 0.5m, finalPricePerLiter: 48.5m);
         _context.SaveChanges();
@@ -193,7 +194,7 @@ public OrderCommandHandlersTests()
     private CreateCheckoutCommand BelowCostCommand() => new()
     {
         UserId = _context.Users.First().Id,
-        FuelTypeId = "okko-loss", BrandId = "okko", BrandName = "OKKO",
+        FuelTypeId = "okko-loss", BrandId = BrandIds.Okko, BrandName = "OKKO",
         Liters = 50, Quantity = 1, Price = 2425
     };
 
@@ -204,7 +205,7 @@ public OrderCommandHandlersTests()
         {
             new CheckoutItem
             {
-                FuelTypeId = "okko-loss", BrandId = "okko", BrandName = "OKKO",
+                FuelTypeId = "okko-loss", BrandId = BrandIds.Okko, BrandName = "OKKO",
                 Liters = 50, Quantity = 1, Price = 2425
             }
         }
@@ -362,14 +363,14 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
         // Before #90 this collapsed to a whole 457 UAH and would then mismatch the success webhook.
         _context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = "okko-frac", Name = "ДП дробові", BrandId = "okko",
+            Id = "okko-frac", Name = "ДП дробові", BrandId = BrandIds.Okko,
             BasePrice = 50, DiscountPrice = 48,
             CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
         });
         // 45.67/litre × 10 = 456.70 — the price the offer's own knobs produce, stated so the fixture agrees
         // with the formula. It said 4567 here before, which the old stored total made harmless; under an
         // override model that would have pinned the package at ten times its worth.
-        _context.SeedPackage("pkg-okko-frac-10", "okko", "okko-frac", 10m, 456.70m,
+        _context.SeedPackage("pkg-okko-frac-10", BrandIds.Okko, "okko-frac", 10m, 456.70m,
             supplierPricePerLiter: 43m, marginUahPerLiter: 2.67m, // cost-plus 45.67/л, ≥ cost → not below-cost
             finalPricePerLiter: 45.67m);
         await _context.SaveChangesAsync();
@@ -385,7 +386,7 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
         var command = new CreateCheckoutCommand
         {
             UserId = _context.Users.First().Id,
-            FuelTypeId = "okko-frac", BrandId = "okko", BrandName = "OKKO",
+            FuelTypeId = "okko-frac", BrandId = BrandIds.Okko, BrandName = "OKKO",
             Liters = 10, Quantity = 1, Price = 4567   // client price is ignored; server recomputes 456.70
         };
 

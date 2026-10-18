@@ -1,3 +1,4 @@
+using FuelFlow.Features.Brands;
 using FluentAssertions;
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Persistence;
@@ -239,8 +240,8 @@ public class KloVoucherParserTests : IDisposable
             .Options;
         _context = new ApplicationDbContext(options, TestQrCipher.Instance);
         _context.FuelTypes.AddRange(
-            new FuelTypeEntity { Id = "klo-dp", Name = "ДП Mustang", BrandId = "klo", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "klo-95", Name = "A 95 EURO", BrandId = "klo", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow });
+            new FuelTypeEntity { Id = "klo-dp", Name = "ДП Mustang", BrandId = BrandIds.Klo, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = "klo-95", Name = "A 95 EURO", BrandId = BrandIds.Klo, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow });
         _context.SaveChanges();
     }
 
@@ -253,7 +254,7 @@ public class KloVoucherParserTests : IDisposable
     [Fact]
     public void CanParse_ShouldReturnTrue_WhenKloKeywordPresent()
     {
-        var parser = new KloVoucherParser(_context, NullLogger<KloVoucherParser>.Instance);
+        var parser = new KloVoucherParser(_context, new BrandSlugResolver(_context), NullLogger<KloVoucherParser>.Instance);
         var context = new ProviderDetectionContext
         {
             Words = new List<Word> { WordTestHelper.CreateWord("КЛО", 0, 0), WordTestHelper.CreateWord("KLO", 10, 0) }
@@ -267,7 +268,7 @@ public class KloVoucherParserTests : IDisposable
     [Fact]
     public void CanParse_ShouldReturnFalse_WhenKloKeywordMissing()
     {
-        var parser = new KloVoucherParser(_context, NullLogger<KloVoucherParser>.Instance);
+        var parser = new KloVoucherParser(_context, new BrandSlugResolver(_context), NullLogger<KloVoucherParser>.Instance);
         var context = new ProviderDetectionContext
         {
             Words = new List<Word> { WordTestHelper.CreateWord("OKKO", 0, 0), WordTestHelper.CreateWord("WOG", 10, 0) }
@@ -281,7 +282,7 @@ public class KloVoucherParserTests : IDisposable
     [Fact]
     public async Task ParseAsync_ShouldExtractVoucherFields()
     {
-        var parser = new KloVoucherParser(_context, NullLogger<KloVoucherParser>.Instance);
+        var parser = new KloVoucherParser(_context, new BrandSlugResolver(_context), NullLogger<KloVoucherParser>.Instance);
         _qrDecoderMock.Setup(x => x.Decode(It.IsAny<Image>()))
             .Returns(new QrDecodeResult { Text = "KLO-QR-PAYLOAD", EccLevel = "L" });
 

@@ -461,7 +461,7 @@ private async Task SeedAsync()
             {
                 Id = "okko-dp",
                 Name = "Дизель",
-                BrandId = "okko",
+                BrandId = BrandIds.Okko,
                 BasePrice = 60m,
                 DiscountPrice = 60m,
                 CreatedAtUtc = DateTime.UtcNow,

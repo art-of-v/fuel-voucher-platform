@@ -85,7 +85,7 @@ public class VoucherAcquisitionSourceTests : WebApplicationFactory<Program>, ICl
             {
                 Id = "okko-acq",
                 Name = "Дизель (acq test)",
-                BrandId = "okko",
+                BrandId = BrandIds.Okko,
                 BasePrice = 60m,
                 DiscountPrice = 60m,
                 CreatedAtUtc = DateTime.UtcNow,

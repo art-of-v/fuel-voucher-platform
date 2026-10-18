@@ -23,6 +23,12 @@ namespace FuelFlow.IntegrationTests;
 [Collection("Integration Tests")]
 public sealed class GetFuelPriceAtIntegrationTests : IClassFixture<TestDatabaseFixture>
 {
+    /// <summary>
+    /// The network this test seeded. A field rather than an argument to the row builders because
+    /// <see cref="SeedFuelAsync"/> creates one per test and every row it writes belongs to it.
+    /// </summary>
+    private Guid _brandId;
+
     private readonly TestDatabaseFixture _fixture;
 
     public GetFuelPriceAtIntegrationTests(TestDatabaseFixture fixture) => _fixture = fixture;
@@ -40,27 +46,30 @@ public sealed class GetFuelPriceAtIntegrationTests : IClassFixture<TestDatabaseF
         ApplicationDbContext context,
         string suffix)
     {
-        var Brand = $"at-{suffix}";
+        // A uuid per test, and a slug beside it: the slug is what the catalogue resolves a brand by
+        // and it is unique, so two tests in this class cannot collide on either.
+        var brandId = _brandId = Guid.CreateVersion7();
+        var slug = $"at-{suffix}";
         var fuelTypeId = $"at-fuel-{suffix}";
         var offerId = $"at-offer-{suffix}";
 
         var now = DateTime.UtcNow;
         context.Brands.Add(new Brand
         {
-            Id = Brand, Name = $"AT {suffix}", Color = "#000", LogoText = "AT",
+            Id = brandId, Slug = slug, Name = $"AT {suffix}", Color = "#000", LogoText = "AT",
         });
         context.FuelTypes.Add(new FuelTypeEntity
         {
             Id = fuelTypeId,
             Name = $"AT {suffix}",
-            BrandId = Brand,
+            BrandId = _brandId,
             CreatedAtUtc = now,
             UpdatedAtUtc = now,
         });
         context.FuelOffers.Add(new FuelOffer
         {
             Id = offerId,
-            BrandId = Brand,
+            BrandId = _brandId,
             FuelTypeId = fuelTypeId,
             DataKind = DataKinds.Real,
             PumpPricePerLiter = 50m,
@@ -72,7 +81,12 @@ public sealed class GetFuelPriceAtIntegrationTests : IClassFixture<TestDatabaseF
         return (fuelTypeId, offerId);
     }
 
-    private static FuelOfferPrice Row(
+    /// <summary>
+    /// A price-history row for the network this test seeded. The brand id is a field rather than an
+    /// argument because it is created per test by <see cref="SeedFuelAsync"/> and every one of these
+    /// rows belongs to it.
+    /// </summary>
+    private FuelOfferPrice Row(
         string offerId,
         string fuelTypeId,
         DateTime from,
@@ -81,7 +95,7 @@ public sealed class GetFuelPriceAtIntegrationTests : IClassFixture<TestDatabaseF
         {
             Id = Guid.CreateVersion7(),
             OfferId = offerId,
-            BrandId = "at-x",
+            BrandId = _brandId,
             FuelTypeId = fuelTypeId,
             DataKind = DataKinds.Real,
             PumpPricePerLiter = pump,

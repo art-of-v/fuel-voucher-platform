@@ -1,3 +1,4 @@
+using FuelFlow.Features.Brands;
 using FluentAssertions;
 using FuelFlow.Features.Vouchers.Availability;
 using FuelFlow.Features.Vouchers;
@@ -146,9 +147,9 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
 
         var availability = CreateAvailability();
 
-        (await availability.FindPackageAsync(false, "okko", "okko-95", 10m))!.PackageId
+(await availability.FindPackageAsync(false, BrandIds.Okko, "okko-95", 10m))!.PackageId
     .Should().Be(PackageIds.For(OfferKeys.For("okko-95", DataKinds.Real), 10m));
-        (await availability.FindPackageAsync(true, "okko", "okko-95", 10m))!.PackageId
+        (await availability.FindPackageAsync(true, BrandIds.Okko, "okko-95", 10m))!.PackageId
             .Should().Be(PackageIds.For(OfferKeys.For("okko-95", DataKinds.Qa), 10m));
     }
 
@@ -193,7 +194,7 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
         // And with the duplicate refused, the key resolves to the one row that exists - no ordering
         // involved, because there is nothing to order.
         var availability = CreateAvailability();
-        var chosen = await availability.FindPackageAsync(false, "okko", "okko-95", 20m);
+var chosen = await availability.FindPackageAsync(false, BrandIds.Okko, "okko-95", 20m);
         chosen!.PackageId.Should().Be(PackageIds.For(OfferKeys.For("okko-95", DataKinds.Real), 20m));
 
         var bulk = await availability.FindPackagesAsync(
@@ -216,7 +217,7 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
 
         var availability = CreateAvailability();
 
-        (await availability.FindPackageAsync(false, "okko", "okko-95", 5m)).Should().BeNull(
+        (await availability.FindPackageAsync(false, BrandIds.Okko, "okko-95", 5m)).Should().BeNull(
             "a real customer must not be priced off a rehearsal package");
     }
 
@@ -289,7 +290,7 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
             seed.FuelOffers.Add(new FuelOffer
             {
                 Id = offerId,
-                BrandId = "okko",
+                BrandId = BrandIds.Okko,
                 FuelTypeId = "okko-95",
                 DataKind = pool,
                 SupplierPricePerLiter = 30m,
@@ -315,7 +316,7 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
     private PackageStockAvailability CreateAvailability()
         => new(CreateContext(), new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["VoucherExpiration:Enabled"] = "true" })
-            .Build());
+            .Build(), new BrandSlugResolver(CreateContext()));
 
     private static FuelVoucher Stock(string brand, string fuelTypeId, decimal liters, DateOnly expiry)
         => new()

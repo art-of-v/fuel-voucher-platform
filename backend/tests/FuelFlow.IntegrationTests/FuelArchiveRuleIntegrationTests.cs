@@ -1,3 +1,4 @@
+using FuelFlow.Features.Brands;
 using FluentAssertions;
 using FuelFlow.Features.Pricing;
 using FuelFlow.Features.Pricing.ImportOkkoCatalogue;
@@ -53,7 +54,7 @@ public sealed class FuelArchiveRuleIntegrationTests : IClassFixture<TestDatabase
         ApplicationDbContext context, IReadOnlyList<OkkoPumpPrice> sheet)
     {
         var events = new Features.Brands.AuditEventService(context);
-        var handler = new ImportOkkoCatalogueCommandHandler(context, events, new OfferPriceRecorder(context));
+        var handler = new ImportOkkoCatalogueCommandHandler(context, new BrandSlugResolver(context), events, new OfferPriceRecorder(context));
         return await handler.ApplyAsync(new ImportOkkoCatalogueCommand(sheet, DryRun: false), Guid.Empty, "test");
     }
 
@@ -64,17 +65,17 @@ public sealed class FuelArchiveRuleIntegrationTests : IClassFixture<TestDatabase
         VoucherStatus status)
     {
         var now = DateTime.UtcNow;
-        // Under the real OKKO Brand: the catalogue import only ever looks at that one brand, so a
-        // fuel parked elsewhere would be invisible to it and the test would pass for the wrong reason.
-        const string Brand = "okko";
+// Under the real OKKO brand: the catalogue import only ever looks at that one, so a fuel parked
+        // elsewhere would be invisible to it and the test would pass for the wrong reason.
+        var brandId = BrandIds.Okko;
         var fuelId = $"arch-fuel-{suffix}";
         context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = fuelId, Name = name, BrandId = Brand,
+            Id = fuelId, Name = name, BrandId = brandId,
             // A code the sheet does not carry: the brand published it once and does not any more.
             // Without a code there is nothing saying this row was ever one of the brand's grades,
             // and absence from the sheet would prove nothing. Unique per test because the live
-            // (Brand, code) index allows one, and every test in this class seeds a dropped grade.
+            // (brand, code) index allows one, and every test in this class seeds a dropped grade.
             BrandFuelCode = $"Dropped-{suffix}",
             CreatedAtUtc = now, UpdatedAtUtc = now,
         });
