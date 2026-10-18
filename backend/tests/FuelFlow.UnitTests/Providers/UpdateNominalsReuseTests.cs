@@ -65,6 +65,39 @@ public sealed class UpdateNominalsReuseTests : IDisposable
         return controller;
     }
 
+
+    [Fact]
+    public async Task A_Nominal_The_Operator_Adds_Is_Written_To_The_Fuels_Nominal_List()
+    {
+        await SeedAsync(10, 20);
+
+        await CreateController().UpdateNominals("okko", new List<int> { 10, 20, 30 }, default);
+
+        // The size is now stated once, on the fuel. Everything else - the volumes per pool, the shelf -
+        // follows from this list rather than being its own copy of the answer.
+        var sizes = await _context.FuelNominals.AsNoTracking()
+            .Where(n => n.FuelTypeId == "okko-a95")
+            .OrderBy(n => n.Liters)
+            .Select(n => n.Liters)
+            .ToListAsync();
+
+        sizes.Should().Equal(10m, 20m, 30m);
+    }
+
+    [Fact]
+    public async Task A_Nominal_The_Operator_Removes_Leaves_The_Fuels_Nominal_List()
+    {
+        await SeedAsync(10, 20);
+
+        await CreateController().UpdateNominals("okko", new List<int> { 10 }, default);
+
+        var sizes = await _context.FuelNominals.AsNoTracking()
+            .Where(n => n.FuelTypeId == "okko-a95")
+            .Select(n => n.Liters)
+            .ToListAsync();
+
+        sizes.Should().Equal(10m);
+    }
     private async Task<List<FuelOfferVolume>> SeedAsync(params int[] nominals)
     {
         _context.Brands.Add(new Brand

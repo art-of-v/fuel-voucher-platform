@@ -717,6 +717,33 @@ public sealed class BrandFuelController : ControllerBase
         var wanted = nominals.Distinct().ToHashSet();
         var now = DateTime.UtcNow;
 
+        // The sizes a fuel is sold in are the operator's answer, written once per fuel rather than once
+        // per offer. The volume loops below then follow it, which is the right way round: a size the
+        // operator did not ask for has no row here, so no pool can quietly keep selling it.
+        var existingNominals = await _context.FuelNominals
+            .AsTracking()
+            .Where(n => BrandFuels.Select(f => f.Id).Contains(n.FuelTypeId))
+            .ToListAsync(ct);
+
+        foreach (var fuel in BrandFuels)
+        {
+            foreach (var leaving in existingNominals.Where(n => n.FuelTypeId == fuel.Id && !wanted.Contains((int)n.Liters)))
+            {
+                _context.FuelNominals.Remove(leaving);
+            }
+
+            foreach (var liters in wanted.Where(l => existingNominals.All(n => n.FuelTypeId != fuel.Id || n.Liters != l)))
+            {
+                _context.FuelNominals.Add(new FuelNominal
+                {
+                    FuelTypeId = fuel.Id,
+                    Liters = liters,
+                    CreatedAtUtc = now,
+                    UpdatedAtUtc = now
+                });
+            }
+        }
+
         foreach (var leaving in existingVolumes.Where(v => !wanted.Contains((int)v.Liters)))
         {
             leaving.IsDeleted = true;
