@@ -7,6 +7,7 @@ using FuelFlow.Features.Notifications.SharedModels;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Pricing.Rules.SharedModels;
+using FuelFlow.Features.Pricing.Terms.SharedModels;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Settlement.SharedModels;
 using FuelFlow.Features.Support.SharedModels;
@@ -146,6 +147,7 @@ private readonly FuelFlow.Features.Vouchers.Security.IQrCipher _qrCipher;
     public DbSet<FeedbackMessage> FeedbackMessages => Set<FeedbackMessage>();
     public DbSet<FeedbackMessageReply> FeedbackMessageReplies => Set<FeedbackMessageReply>();
     public DbSet<FeedbackChatBinding> FeedbackChatBindings => Set<FeedbackChatBinding>();
+    public DbSet<VoucherTermPricing> VoucherTermPricings => Set<VoucherTermPricing>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

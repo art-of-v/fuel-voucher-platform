@@ -1,4 +1,5 @@
 using FluentAssertions;
+using FuelFlow.Features.Pricing.Terms.SharedModels;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Persistence;
@@ -164,6 +165,113 @@ public sealed class RuntimeSettingsServiceTests : IDisposable
         var tier = (await _service.GetVoucherRenewalConfigAsync()).Tier(VoucherRenewalTerm.OneMonth)!;
         tier.RatePerLiterUah.Should().Be(0m);
         tier.IsOfferable.Should().BeFalse();
+    }
+
+    // --- The dated table over the key/value fallback ---------------------------------------
+    // The migration moves the live ladder across, so from that point the table is what the quote
+    // reads. The key/value row stays as a fallback for a tier with no row here, which is also what
+    // makes deploy order irrelevant. These four pin the precedence and the write behaviour; the
+    // partial unique index that backs "one open row" is asserted against real Postgres separately.
+
+    private VoucherTermPricing OpenTier(string scheme, VoucherRenewalTerm term, bool enabled, decimal rate)
+    {
+        var row = new VoucherTermPricing
+        {
+            Id = Guid.NewGuid(),
+            Scheme = scheme,
+            TermCode = term.Code(),
+            Enabled = enabled,
+            RatePerLiter = rate,
+            ValidFrom = DateTime.UtcNow.AddDays(-1),
+            ValidTo = null,
+            CreatedAtUtc = DateTime.UtcNow.AddDays(-1)
+        };
+        _context.VoucherTermPricings.Add(row);
+        return row;
+    }
+
+    [Fact]
+    public async Task ADatedRenewalTier_IsPreferredOverTheKeyValueSetting()
+    {
+        await _service.UpsertAsync(AppSettingKeysProxy.TierEnabled(VoucherRenewalTerm.OneWeek), "false");
+        await _service.UpsertAsync(AppSettingKeysProxy.TierRate(VoucherRenewalTerm.OneWeek), "10");
+
+        OpenTier(VoucherTermPricingSchemes.RenewalRate, VoucherRenewalTerm.OneWeek, enabled: true, rate: 24.5m);
+        await _context.SaveChangesAsync();
+
+        var tier = (await _service.GetVoucherRenewalConfigAsync()).Tier(VoucherRenewalTerm.OneWeek)!;
+        tier.Enabled.Should().BeTrue();
+        tier.RatePerLiterUah.Should().Be(24.5m);
+    }
+
+    [Fact]
+    public async Task ATierWithNoDatedRow_FallsBackToTheKeyValueSetting()
+    {
+        await _service.UpsertAsync(AppSettingKeysProxy.TierEnabled(VoucherRenewalTerm.TwoMonths), "true");
+        await _service.UpsertAsync(AppSettingKeysProxy.TierRate(VoucherRenewalTerm.TwoMonths), "27");
+
+        // A different tier is dated, to prove the fallback is per tier and not "table is non-empty".
+        OpenTier(VoucherTermPricingSchemes.RenewalRate, VoucherRenewalTerm.OneWeek, enabled: true, rate: 24.5m);
+        await _context.SaveChangesAsync();
+
+        var tier = (await _service.GetVoucherRenewalConfigAsync()).Tier(VoucherRenewalTerm.TwoMonths)!;
+        tier.Enabled.Should().BeTrue();
+        tier.RatePerLiterUah.Should().Be(27m);
+    }
+
+    [Fact]
+    public async Task AChangedTier_ClosesTheRowItReplaces_SoTheHistoryIsKept()
+    {
+        var original = OpenTier(VoucherTermPricingSchemes.PurchaseTermDiscount, VoucherRenewalTerm.OneMonth, enabled: true, rate: 3m);
+        await _context.SaveChangesAsync();
+
+        var appended = await _service.SetTierAsync(
+            VoucherTermPricingSchemes.PurchaseTermDiscount,
+            VoucherRenewalTerm.OneMonth.Code(),
+            enabled: true,
+            ratePerLiter: 4.5m,
+            updatedByUserId: null,
+            updatedByUserName: "tester");
+        appended.Should().BeTrue();
+
+        _context.ChangeTracker.Clear();
+        var rows = await _context.VoucherTermPricings
+            .Where(r => r.Scheme == VoucherTermPricingSchemes.PurchaseTermDiscount)
+            .OrderBy(r => r.ValidFrom)
+            .ToListAsync();
+
+        rows.Should().HaveCount(2);
+        rows[0].Id.Should().Be(original.Id);
+        rows[0].RatePerLiter.Should().Be(3m);
+        rows[0].ValidTo.Should().NotBeNull();
+        rows[0].ValidTo.Should().BeAfter(rows[0].ValidFrom);
+        rows[1].ValidTo.Should().BeNull();
+        rows[1].RatePerLiter.Should().Be(4.5m);
+
+        var tier = (await _service.GetVoucherTermConfigAsync()).Tier(VoucherRenewalTerm.OneMonth)!;
+        tier.DiscountPerLiterUah.Should().Be(4.5m);
+    }
+
+    [Fact]
+    public async Task AnUnchangedTier_WritesNoRow_SoSavingOtherSettingsDoesNotFillTheHistoryWithNoise()
+    {
+        OpenTier(VoucherTermPricingSchemes.RenewalRate, VoucherRenewalTerm.OneWeek, enabled: true, rate: 24.5m);
+        await _context.SaveChangesAsync();
+
+        // The Settings screen submits the whole ladder on every save, most of it untouched. Only a
+        // real change may append history.
+        var appended = await _service.SetTierAsync(
+            VoucherTermPricingSchemes.RenewalRate,
+            VoucherRenewalTerm.OneWeek.Code(),
+            enabled: true,
+            ratePerLiter: 24.5m,
+            updatedByUserId: null,
+            updatedByUserName: "tester");
+        appended.Should().BeFalse();
+
+        var rows = await _context.VoucherTermPricings.ToListAsync();
+        rows.Should().HaveCount(1);
+        rows[0].ValidTo.Should().BeNull();
     }
 
     // Thin shim so the persisted-config tests spell the app_settings keys exactly as production does,
