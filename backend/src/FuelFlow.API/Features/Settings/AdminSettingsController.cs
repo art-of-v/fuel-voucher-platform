@@ -187,7 +187,7 @@ public sealed class AdminSettingsController : ControllerBase
             {
                 FuelTypeId = g.Key.FuelTypeId,
                 Name = g.Key.Name,
-                BrandId = g.Key.BrandId,
+                BrandId = g.Key.BrandId.ToString(),
                 // Per offer, then the tightest across pools — the same two steps the SQL did, and the
                 // reason they are not merged: `final - cost` pairs figures from the SAME offer.
                 MarginPerLiterUah = g.Min(row => row.Final!.Value - row.Supplier)
@@ -642,6 +642,12 @@ public sealed class VoucherTermFuelMarginDto
 {
     public string FuelTypeId { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The brand's uuid, rendered as a string. This DTO is settings-shaped and the admin form echoes
+    /// it back verbatim, so the wire type stays a string; the value it now carries is an id rather
+    /// than the network's code, and the form must send it back unchanged.
+    /// </summary>
     public string BrandId { get; set; } = string.Empty;
     /// <summary>Least margin across this fuel's packages, in UAH per litre. Zero means it has none.</summary>
     public decimal MarginPerLiterUah { get; set; }

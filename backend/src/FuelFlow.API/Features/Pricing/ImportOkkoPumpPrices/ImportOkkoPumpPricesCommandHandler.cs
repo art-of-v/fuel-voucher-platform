@@ -59,9 +59,11 @@ public sealed record SyncOkkoPumpPricesCommand(
 /// </summary>
 public sealed class ImportOkkoPumpPricesCommandHandler
 {
-    private const string OkkoBrandId = "okko";
+    /// <summary>See <see cref="BackfillBrandFuelCodesCommandHandler"/> for why this is a slug.</summary>
+    private const string OkkoSlug = "okko";
 
     private readonly ApplicationDbContext _context;
+    private readonly BrandSlugResolver _brands;
     private readonly AuditEventService _events;
 
     // Appends to fuel_offer_prices for every offer this import repriced. Injected rather than reached
@@ -71,10 +73,12 @@ public sealed class ImportOkkoPumpPricesCommandHandler
 
     public ImportOkkoPumpPricesCommandHandler(
         ApplicationDbContext context,
+        BrandSlugResolver brands,
         AuditEventService events,
         OfferPriceRecorder priceRecorder)
     {
         _context = context;
+        _brands = brands;
         _events = events;
         _priceRecorder = priceRecorder;
     }
@@ -108,6 +112,30 @@ public sealed class ImportOkkoPumpPricesCommandHandler
         // category, a name collapses to the same category, and two fuels of one category are then
         // indistinguishable - so it stays as the fallback for the fuels that have no code yet, and stops
         // being consulted the moment one does.
+        //
+        // Resolved before anything else, because "OKKO" is a slug and the rows are keyed by id now
+        // (planning D-21). A brand that is not in the catalogue means there is nothing to price, and
+        // saying so loudly matters: a sync that reported "0 priced" every quarter hour would be
+        // indistinguishable from a working sync with a quiet price sheet.
+        var okkoId = await _brands.ResolveAsync(OkkoSlug, ct);
+        if (okkoId is null)
+        {
+            // Reported as an error rather than returned quietly: a sync that reported "0 priced"
+            // every quarter hour would be indistinguishable from a working sync with a quiet price
+            // sheet, and the pump price is what the public site sells against.
+            return new OkkoPumpApplyResult(
+                FuelsMatched: 0,
+                FuelsChanged: 0,
+                PackagesRepriced: 0,
+                Applied: [],
+                UnmatchedSiteFuels: [],
+                OkkoFuelsWithoutPrice: [],
+                BelowCostSkipped: [],
+                Errors: [new OkkoPriceSheetError(0,
+                    $"No live brand carries the slug '{OkkoSlug}', so no pump price could be applied.")],
+                DryRun: dryRun);
+        }
+
         var priceByCode = new Dictionary<string, decimal>(StringComparer.Ordinal);
         foreach (var row in prices)
         {
@@ -129,7 +157,7 @@ public sealed class ImportOkkoPumpPricesCommandHandler
         // is not translatable by EF, and the row count here is a handful of fuel types either way.
         var okkoFuelTypes = (await _context.FuelTypes
                 .AsTracking()
-                .Where(ft => ft.BrandId == OkkoBrandId)
+                .Where(ft => ft.BrandId == okkoId.Value)
                 .ToListAsync(ct))
             .OrderBy(ft => ft.Id, StringComparer.Ordinal)
             .ToList();
@@ -377,7 +405,7 @@ public sealed class ImportOkkoPumpPricesCommandHandler
             await _events.RecordEventAsync(
                 "Fuel", a.FuelTypeId, "PumpPriceImported",
                 oldValue, newValue, actorId ?? Guid.Empty, actorName,
-                summary, OkkoBrandId, ct);
+                summary, OkkoSlug, ct);
         }
     }
 }

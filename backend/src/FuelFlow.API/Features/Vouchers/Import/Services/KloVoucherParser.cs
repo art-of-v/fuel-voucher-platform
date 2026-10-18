@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
@@ -12,12 +13,20 @@ namespace FuelFlow.Features.Vouchers.Import;
 
 public sealed class KloVoucherParser : IVoucherProviderParser
 {
+    /// <summary>See <see cref="OkkoVoucherParser"/> for why this is a slug and not an id.</summary>
+    private const string BrandSlug = "klo";
+
     private readonly ApplicationDbContext _context;
+    private readonly BrandSlugResolver _brands;
     private readonly ILogger<KloVoucherParser> _logger;
 
-    public KloVoucherParser(ApplicationDbContext context, ILogger<KloVoucherParser> logger)
+    public KloVoucherParser(
+        ApplicationDbContext context,
+        BrandSlugResolver brands,
+        ILogger<KloVoucherParser> logger)
     {
         _context = context;
+        _brands = brands;
         _logger = logger;
     }
 
@@ -43,8 +52,16 @@ public sealed class KloVoucherParser : IVoucherProviderParser
     {
         var parsedVouchers = new List<ParsedVoucher>();
 
+        var kloId = await _brands.ResolveAsync(BrandSlug, cancellationToken);
+        if (kloId is null)
+        {
+            _logger.LogWarning(
+                "Skipping the KLO page: no live brand carries the slug {Slug}.", BrandSlug);
+            return parsedVouchers;
+        }
+
         var kloFuelTypes = await _context.FuelTypes
-            .Where(f => f.BrandId == "klo")
+            .Where(f => f.BrandId == kloId.Value)
             .ToListAsync(cancellationToken);
 
         foreach (var region in context.VoucherRegions)
@@ -86,7 +103,7 @@ public sealed class KloVoucherParser : IVoucherProviderParser
             }
 
             var fuelTypeEntity = await _context.FuelTypes
-                .FirstOrDefaultAsync(f => f.BrandId == "klo" && f.Name == fuelTypeName, cancellationToken);
+                .FirstOrDefaultAsync(f => f.BrandId == kloId.Value && f.Name == fuelTypeName, cancellationToken);
 
             var fuelTypeId = fuelTypeEntity?.Id ?? "klo-dp";
             decimal confidence = fuelTypeEntity != null ? 20 : 0;

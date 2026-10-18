@@ -64,7 +64,7 @@ public sealed class CreateCheckoutCommandHandler
         if (user == null || !user.IsActive || user.IsDeleted)
             throw new AccountInactiveException();
 
-        if (string.IsNullOrWhiteSpace(command.BrandId))
+        if (command.BrandId is null || command.BrandId == Guid.Empty)
         {
             throw new ArgumentException("BrandId is required", nameof(command));
         }
@@ -102,7 +102,7 @@ public sealed class CreateCheckoutCommandHandler
         // unique, because every real package has a QA mirror on the same Brand/fuel/nominal, so an
         // unordered pick returns whichever row Postgres produced first. See PackageStockAvailability.
         var package = await _stock.FindPackageAsync(
-            isTestAccount, command.BrandId, command.FuelTypeId, command.Liters, cancellationToken);
+            isTestAccount, command.BrandId.Value, command.FuelTypeId, command.Liters, cancellationToken);
 
         if (package == null)
         {
@@ -114,9 +114,9 @@ public sealed class CreateCheckoutCommandHandler
         // stock to deliver. Checked before the below-cost block so an empty shelf does not fire an
         // operator alert about a sale that was never going to happen. Answers about the same pool
         // the package above was taken from.
-        if (!await _stock.IsInStockAsync(isTestAccount, command.BrandId, command.FuelTypeId, command.Liters, cancellationToken))
+        if (!await _stock.IsInStockAsync(isTestAccount, command.BrandId.Value, command.FuelTypeId, command.Liters, cancellationToken))
         {
-            throw new PackageOutOfStockException(command.BrandId, command.FuelTypeId, command.Liters);
+            throw new PackageOutOfStockException(package.BrandSlug, command.FuelTypeId, command.Liters);
         }
 
         // Slice-3 hard block (safety net at checkout, mirroring the operator write path): refuse a
@@ -131,7 +131,7 @@ public sealed class CreateCheckoutCommandHandler
             // that drifted below cost blocked sales silently. Throttled per fuel inside the dispatcher,
             // so a customer retrying the same checkout does not flood the chat.
             await _notifications.BelowCostAsync(
-                command.BrandId, fuelTypeEntity.Name, cost, profit, deliberate: false, cancellationToken);
+                package.BrandSlug, fuelTypeEntity.Name, cost, profit, deliberate: false, cancellationToken);
             throw new BelowCostSaleBlockedException(command.FuelTypeId);
         }
 
@@ -194,7 +194,7 @@ public sealed class CreateCheckoutCommandHandler
         {
             Id = Guid.CreateVersion7(),
             OrderId = order.Id,
-            Brand = command.BrandId!,
+            Brand = package.BrandSlug,
             FuelTypeId = command.FuelTypeId,
             Liters = command.Liters,
             Quantity = command.Quantity,

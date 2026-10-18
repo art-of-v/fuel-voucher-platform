@@ -10,9 +10,15 @@ namespace FuelFlow.Features.Brands.GetPublicFuelTypes;
 /// declares in <c>mobile/src/core/types/api.ts</c>, so the wire format is unchanged; only the audit
 /// timestamps, which no client reads, are dropped.
 /// </summary>
+/// <remarks>
+/// <c>BrandId</c> became a uuid with planning D-21 and <c>BrandSlug</c> came with it: the fuel id is
+/// still the natural key <c>"okko-95"</c> in this slice, so a client holding only a fuel has no other
+/// way to know which network it belongs to.
+/// </remarks>
 public sealed record PublicFuelTypeResponse(
     string Id,
+    Guid BrandId,
+    string BrandSlug,
     string Name,
-    string BrandId,
     decimal BasePrice,
     decimal DiscountPrice);

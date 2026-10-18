@@ -4,7 +4,7 @@ public sealed class FuelTypeEntity
 {
     public string Id { get; set; } = null!;
     public string Name { get; set; } = null!;
-    public string BrandId { get; set; } = null!;
+    public Guid BrandId { get; set; }
 
     /// <summary>
     /// The grade's code in the <b>brand's</b> own spelling, as the brand publishes it on its price

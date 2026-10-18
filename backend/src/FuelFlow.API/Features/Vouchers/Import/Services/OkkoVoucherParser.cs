@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
@@ -12,18 +13,30 @@ namespace FuelFlow.Features.Vouchers.Import;
 
 public sealed class OkkoVoucherParser : IVoucherProviderParser
 {
+    /// <summary>
+    /// The network this parser reads. A slug, not an id: the database keys brands by uuid now
+    /// (planning D-21), and the parser's one hardcoded fact about OKKO is the name a supplier uses.
+    /// </summary>
+    private const string BrandSlug = "okko";
+
     private readonly ApplicationDbContext _context;
+    private readonly BrandSlugResolver _brands;
     private readonly ILogger<OkkoVoucherParser> _logger;
 
-    private static readonly Regex LitersRegex = new(@"(\d+(?:[.,]\d+)?)\s*(?:л|l)\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex LitersRegex = new(@"(\d+(?:[.,]\d+)?)\s*(?:?|l)\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex DateRegex = new(@"\b(\d{2})[./-](\d{2})[./-](\d{4})\b", RegexOptions.Compiled);
     private static readonly Regex VoucherNumberRegex = new(@"\b\d{16,20}\b", RegexOptions.Compiled);
 
-    public OkkoVoucherParser(ApplicationDbContext context, ILogger<OkkoVoucherParser> logger)
+    public OkkoVoucherParser(
+        ApplicationDbContext context,
+        BrandSlugResolver brands,
+        ILogger<OkkoVoucherParser> logger)
     {
         _context = context;
+        _brands = brands;
         _logger = logger;
     }
+
 
     public bool CanParse(ProviderDetectionContext context)
     {
@@ -39,8 +52,20 @@ public sealed class OkkoVoucherParser : IVoucherProviderParser
     {
         var parsedVouchers = new List<ParsedVoucher>();
 
+        // A brand that is not in the catalogue has nothing to import against, and a page of OKKO
+        // vouchers read with no fuels loaded produces a batch of unpriced rows. Nothing, loudly.
+        var okkoId = await _brands.ResolveAsync(BrandSlug, cancellationToken);
+        if (okkoId is null)
+        {
+            _logger.LogWarning(
+                "Skipping the OKKO page: no live brand carries the slug {Slug}. Archived brands are " +
+                "excluded from the lookup on purpose - an archived network must not accept new stock.",
+                BrandSlug);
+            return parsedVouchers;
+        }
+
         var okkoFuelTypes = await _context.FuelTypes
-            .Where(f => f.BrandId == "okko")
+            .Where(f => f.BrandId == okkoId.Value)
             .ToListAsync(cancellationToken);
 
         // One query per import, not per voucher: the QR product code resolves a fuel exactly, and
@@ -48,7 +73,7 @@ public sealed class OkkoVoucherParser : IVoucherProviderParser
         // fuel the brand sells. Empty until somebody fills the table in, which is why the classifier
         // still has its category path underneath.
         var byProductCode = (await _context.FuelTypeProductCodes
-                .Where(c => c.BrandId == "okko")
+                .Where(c => c.BrandId == okkoId.Value)
                 .ToListAsync(cancellationToken))
             .Where(c => okkoFuelTypes.Any(ft => ft.Id == c.FuelTypeId))
             .GroupBy(c => c.ProductCode)

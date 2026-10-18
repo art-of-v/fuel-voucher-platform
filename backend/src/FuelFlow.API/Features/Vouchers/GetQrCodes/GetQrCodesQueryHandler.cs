@@ -27,7 +27,7 @@ public sealed class GetQrCodesQueryHandler
         return items.Select((v, i) => new QrCodeDto
         {
             Id = i + 1,
-            BrandId = v.FuelType?.BrandId ?? "",
+            BrandId = v.FuelType?.BrandId.ToString() ?? "",
             FuelType = v.FuelType?.Name ?? v.FuelTypeId,
             Liters = v.Liters,
             QrCodeUrl = v.QrPayload,

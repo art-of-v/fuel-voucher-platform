@@ -13,7 +13,7 @@ public sealed class UpdateBrandStationCommandHandler
     {
         var updated = command.Updated;
 
-        if (string.IsNullOrWhiteSpace(updated.BrandId) || string.IsNullOrWhiteSpace(updated.Name))
+        if (updated.BrandId == Guid.Empty || string.IsNullOrWhiteSpace(updated.Name))
             return new UpdateBrandStationResult { Error = "BrandId and Name are required" };
 
         if (updated.Lat is null || updated.Lng is null ||
@@ -26,7 +26,7 @@ public sealed class UpdateBrandStationCommandHandler
 
         var BrandExists = await _context.Brands.AnyAsync(s => s.Id == updated.BrandId, ct);
         if (!BrandExists)
-            return new UpdateBrandStationResult { Error = $"Brand (brand) '{updated.BrandId}' does not exist" };
+            return new UpdateBrandStationResult { Error = $"Brand '{updated.BrandId}' does not exist" };
 
         entity.BrandId = updated.BrandId;
         entity.Name = updated.Name;

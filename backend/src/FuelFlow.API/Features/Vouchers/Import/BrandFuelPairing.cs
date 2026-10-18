@@ -11,10 +11,18 @@ namespace FuelFlow.Features.Vouchers.Import;
 /// prices it correctly. It just stops being sellable with no error anywhere.
 /// <para>
 /// The comparison is case-insensitive and whitespace-tolerant because the brand is read off paper in caps
-/// ("OKKO") while the catalog stores it lower ("okko") — every other brand comparison in the codebase
+/// ("OKKO") while the catalog stores it lower ("okko") - every other brand comparison in the codebase
 /// already folds case for that reason.
 /// </para>
+/// <para>
+/// <b>Both sides are names, not ids.</b> The paper says OKKO and the catalogue's slug says okko; they
+/// agree because a slug has always been the lower-cased brand name (see <c>StockKey</c>). Planning D-21
+/// moved <c>fuel_types.brand_id</c> to a uuid, so the caller now has to resolve it to a slug before
+/// asking this question - which is a better place for that lookup to happen than here, where there is
+/// no context and no database.
+/// </para>
 /// </remarks>
+
 public static class BrandFuelPairing
 {
     /// <param name="parsedProvider">The brand as read off the voucher's paper.</param>

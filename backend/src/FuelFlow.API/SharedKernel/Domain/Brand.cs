@@ -2,7 +2,23 @@ namespace FuelFlow.SharedKernel.Domain;
 
 public sealed class Brand
 {
-    public string Id { get; set; } = null!;
+    /// <summary>
+    /// Surrogate key. Nothing outside the database has to know it, and nothing derives meaning from it.
+    /// </summary>
+    /// <remarks>
+    /// This was the network's own code (<c>"okko"</c>), which made the primary key a magic string that
+    /// every write path, every import and every test had to spell correctly. Planning D-21: the
+    /// natural key moved to <see cref="Slug"/> and the identity became opaque.
+    /// </remarks>
+    public Guid Id { get; set; }
+
+    /// <summary>
+    /// The network's own code — <c>"okko"</c>, <c>"wog"</c>, <c>"klo"</c> — and the one name a supplier,
+    /// an invoice or a parser can be asked for. Unique, and preserved across the whole migration off
+    /// the natural key, so a rollback loses nothing.
+    /// </summary>
+    public string Slug { get; set; } = null!;
+
     public string Name { get; set; } = null!;
     public string Color { get; set; } = "#00ff80";
     public string LogoText { get; set; } = null!;
@@ -28,4 +44,11 @@ public sealed class Brand
 
     /// <summary>When the entry was archived, or null while it is live.</summary>
     public DateTime? DeletedAtUtc { get; set; }
+
+    /// <summary>
+    /// The physical locations belonging to this network. The inverse of
+    /// <see cref="BrandStation.Brand"/>, declared here rather than only as a foreign key so EF has one
+    /// relationship to model instead of two configurations of the same one.
+    /// </summary>
+    public ICollection<BrandStation> Stations { get; set; } = new List<BrandStation>();
 }

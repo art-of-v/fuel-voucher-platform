@@ -13,10 +13,10 @@ internal static class SeedData
 
     internal static Brand[] Brands =>
     [
-        new() { Id = "okko", SortOrder = 1, Name = "OKKO", LogoText = "OKKO", Color = "#22c55e", CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "wog", SortOrder = 2, Name = "WOG", LogoText = "WOG", Color = "#10b981", CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "upg", SortOrder = 3, Name = "UPG", LogoText = "UPG", Color = "#06b6d4", CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "klo", SortOrder = 4, Name = "KLO", LogoText = "KLO", Color = "#eab308", CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc }
+        new() { Id = BrandIds.Okko, Slug = "okko", SortOrder = 1, Name = "OKKO", LogoText = "OKKO", Color = "#22c55e", CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
+        new() { Id = BrandIds.Wog, Slug = "wog", SortOrder = 2, Name = "WOG", LogoText = "WOG", Color = "#10b981", CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
+        new() { Id = BrandIds.Upg, Slug = "upg", SortOrder = 3, Name = "UPG", LogoText = "UPG", Color = "#06b6d4", CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
+        new() { Id = BrandIds.Klo, Slug = "klo", SortOrder = 4, Name = "KLO", LogoText = "KLO", Color = "#eab308", CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc }
     ];
 
         // Only the OKKO fuels carry a brand fuel code, and that is a fact about evidence rather than a
@@ -31,16 +31,16 @@ internal static class SeedData
     // name against real rows in every environment.
     internal static FuelTypeEntity[] FuelTypes =>
     [
-        new() { Id = "okko-dp", Name = "ДП ЄВРО", BrandId = "okko", BrandFuelCode = "DP", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "okko-95", Name = "A-95", BrandId = "okko", BrandFuelCode = "A-95", BasePrice = 54, DiscountPrice = 51, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "okko-p95", Name = "Pulls 95", BrandId = "okko", BrandFuelCode = "Pulls 95", BasePrice = 60, DiscountPrice = 56, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "okko-pulls-dp", Name = "ДП PULLS", BrandId = "okko", BrandFuelCode = "Pulls Diesel", BasePrice = 58, DiscountPrice = 55, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "okko-gas", Name = "ГАЗ", BrandId = "okko", BrandFuelCode = "SPBT", BasePrice = 29, DiscountPrice = 27, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "wog-dp", Name = "ДП Mustang", BrandId = "wog", BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "wog-95", Name = "A-95 Mustang", BrandId = "wog", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "wog-95-euro", Name = "A 95 EURO", BrandId = "wog", BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "wog-100", Name = "Mustang 100", BrandId = "wog", BasePrice = 65, DiscountPrice = 61, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "wog-gas", Name = "ГАЗ", BrandId = "wog", BasePrice = 29, DiscountPrice = 27, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc }
+        new() { Id = "okko-dp", Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BrandFuelCode = "DP", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
+        new() { Id = "okko-95", Name = "A-95", BrandId = BrandIds.Okko, BrandFuelCode = "A-95", BasePrice = 54, DiscountPrice = 51, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
+        new() { Id = "okko-p95", Name = "Pulls 95", BrandId = BrandIds.Okko, BrandFuelCode = "Pulls 95", BasePrice = 60, DiscountPrice = 56, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
+        new() { Id = "okko-pulls-dp", Name = "ДП PULLS", BrandId = BrandIds.Okko, BrandFuelCode = "Pulls Diesel", BasePrice = 58, DiscountPrice = 55, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
+        new() { Id = "okko-gas", Name = "ГАЗ", BrandId = BrandIds.Okko, BrandFuelCode = "SPBT", BasePrice = 29, DiscountPrice = 27, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
+        new() { Id = "wog-dp", Name = "ДП Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
+        new() { Id = "wog-95", Name = "A-95 Mustang", BrandId = BrandIds.Wog, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
+        new() { Id = "wog-95-euro", Name = "A 95 EURO", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
+        new() { Id = "wog-100", Name = "Mustang 100", BrandId = BrandIds.Wog, BasePrice = 65, DiscountPrice = 61, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
+        new() { Id = "wog-gas", Name = "ГАЗ", BrandId = BrandIds.Wog, BasePrice = 29, DiscountPrice = 27, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc }
     ];
 
     /// <summary>

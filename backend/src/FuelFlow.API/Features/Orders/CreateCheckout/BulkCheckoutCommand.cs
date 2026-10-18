@@ -22,7 +22,7 @@ public sealed class CheckoutItem
     /// The item also used to carry a required <c>Provider</c> that the handler overwrote with this
     /// value - see <see cref="CreateCheckoutCommand.BrandId"/> for why the duplicate went away.
     /// </remarks>
-    public string? BrandId { get; set; }
+    public Guid? BrandId { get; set; }
     public string? BrandName { get; set; }
 
     /// <summary>

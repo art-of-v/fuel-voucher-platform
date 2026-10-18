@@ -33,6 +33,7 @@ public sealed class GetBrandsQueryHandler
             return new BrandDto
             {
                 Id = Brand.Id,
+                Slug = Brand.Slug,
                 Name = Brand.Name,
                 LogoText = Brand.LogoText,
                 Color = Brand.Color,

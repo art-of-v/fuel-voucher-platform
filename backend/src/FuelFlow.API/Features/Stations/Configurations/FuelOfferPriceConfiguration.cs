@@ -30,7 +30,7 @@ internal sealed class FuelOfferPriceConfiguration : IEntityTypeConfiguration<Fue
 
         builder.Property(e => e.Id).HasColumnName("id").HasColumnType("uuid");
         builder.Property(e => e.OfferId).HasColumnName("offer_id").HasColumnType("text").IsRequired();
-        builder.Property(e => e.BrandId).HasColumnName("brand_id").HasColumnType("text").IsRequired();
+        builder.Property(e => e.BrandId).HasColumnName("brand_id").HasColumnType("uuid").IsRequired();
         builder.Property(e => e.FuelTypeId).HasColumnName("fuel_type_id").HasColumnType("text").IsRequired();
 
         // Same six columns, same scale, as the offer they are copied from: a history row that stored a
@@ -88,7 +88,6 @@ internal sealed class FuelOfferPriceConfiguration : IEntityTypeConfiguration<Fue
             // database rather than in a remark that says "should not happen".
             t.HasCheckConstraint("ck_fuel_offer_prices_offer_id_length", "length(offer_id) <= 103");
             t.HasCheckConstraint("ck_fuel_offer_prices_fuel_type_id_length", "length(fuel_type_id) <= 100");
-            t.HasCheckConstraint("ck_fuel_offer_prices_brand_id_length", "length(brand_id) <= 100");
         });
     }
 }

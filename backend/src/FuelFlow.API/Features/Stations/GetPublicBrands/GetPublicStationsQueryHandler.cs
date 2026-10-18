@@ -14,6 +14,7 @@ public sealed class GetPublicBrandsQueryHandler
             .OrderBy(x => x.SortOrder).ThenBy(x => x.Name)
             .Select(x => new PublicBrandResponse(
                 x.Id,
+                x.Slug,
                 x.Name,
                 x.Color,
                 x.LogoText,

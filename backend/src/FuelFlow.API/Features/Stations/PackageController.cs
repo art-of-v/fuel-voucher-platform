@@ -39,7 +39,7 @@ public sealed class PackageController : ControllerBase
 
     [HttpGet("{brandId}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetByBrand([FromRoute] string BrandId, CancellationToken ct) =>
+    public async Task<IActionResult> GetByBrand([FromRoute] Guid BrandId, CancellationToken ct) =>
         Ok(await _getByBrand.HandleAsync(new GetPublicPackagesByBrandQuery(BrandId, CallerUserId()), ct));
 
     /// <summary>

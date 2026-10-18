@@ -2,7 +2,16 @@ namespace FuelFlow.Features.Brands;
 
 public sealed record BrandDto
 {
-    public string Id { get; init; } = null!;
+    /// <summary>Surrogate key. Server-assigned; ignored on create.</summary>
+    public Guid Id { get; init; }
+
+    /// <summary>
+    /// The network's own code, <c>"okko"</c> — what an operator types and what an import file
+    /// carries. Unique. This is the identity a human means; <see cref="Id"/> is only what the
+    /// database joins on.
+    /// </summary>
+    public string Slug { get; init; } = null!;
+
     public string Name { get; init; } = null!;
     public string LogoText { get; init; } = null!;
     public string Color { get; init; } = null!;

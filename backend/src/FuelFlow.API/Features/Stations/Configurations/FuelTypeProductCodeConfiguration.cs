@@ -19,7 +19,7 @@ internal sealed class FuelTypeProductCodeConfiguration : IEntityTypeConfiguratio
         builder.HasKey(e => new { e.FuelTypeId, e.ProductCode });
 
         builder.Property(e => e.FuelTypeId).HasColumnName("fuel_type_id").HasColumnType("text").IsRequired();
-        builder.Property(e => e.BrandId).HasColumnName("brand_id").HasColumnType("text").IsRequired();
+        builder.Property(e => e.BrandId).HasColumnName("brand_id").HasColumnType("uuid").IsRequired();
         builder.Property(e => e.ProductCode).HasColumnName("product_code").HasColumnType("text").IsRequired();
         builder.Property(e => e.LastSeenAtUtc).HasColumnName("last_seen_at_utc").HasColumnType("timestamptz");
 
@@ -42,7 +42,6 @@ internal sealed class FuelTypeProductCodeConfiguration : IEntityTypeConfiguratio
             // 100 is the bound every catalog text column shares (F-24); the codes themselves are four
             // or five digits, and the fuel type id they point at is bounded at 100 by its own CHECK.
             t.HasCheckConstraint("ck_fuel_type_product_codes_fuel_type_id_length", "length(fuel_type_id) <= 100");
-            t.HasCheckConstraint("ck_fuel_type_product_codes_brand_id_length", "length(brand_id) <= 100");
 
             // Bounded at 32 rather than 100: this is a printed number, not prose. A 33-character
             // "product code" is a paste of the wrong field.

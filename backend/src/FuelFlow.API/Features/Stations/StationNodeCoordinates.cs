@@ -14,10 +14,15 @@ public static class BrandStationCoordinates
     public static bool IsValidLng(double lng) => lng is >= -180 and <= 180;
 
     /// <summary>
-    /// Deterministic id for an imported node that carries no explicit id, so re-importing the
+    /// Deterministic external id for an imported node that carries no explicit id, so re-importing the
     /// same brand file updates the same rows instead of duplicating them. Coordinates are the
     /// natural key of a physical АЗК; rounded to 5 dp (~1 m) and rendered invariant.
     /// </summary>
-    public static string DeriveId(string BrandId, double lat, double lng) =>
-        string.Create(CultureInfo.InvariantCulture, $"{BrandId}-{lat:F5}-{lng:F5}");
+    /// <param name="brandSlug">
+    /// The network's slug, <em>not</em> its id. Seeding this with the slug keeps every external id
+    /// this derives byte-identical to the ones the text-keyed era wrote, so the migration is a
+    /// rename rather than a rewrite.
+    /// </param>
+    public static string DeriveId(string brandSlug, double lat, double lng) =>
+        string.Create(CultureInfo.InvariantCulture, $"{brandSlug}-{lat:F5}-{lng:F5}");
 }

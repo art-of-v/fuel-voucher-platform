@@ -1,3 +1,3 @@
 namespace FuelFlow.Features.Brands.GetProviderById;
 
-public sealed record GetBrandByIdQuery(string Id);
+public sealed record GetBrandByIdQuery(Guid Id);

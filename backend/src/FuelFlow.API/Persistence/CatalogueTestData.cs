@@ -38,7 +38,7 @@ internal static class CatalogueTestData
     /// </remarks>
     public static FuelOffer SeedOffer(
         this ApplicationDbContext context,
-        string BrandId,
+        Guid BrandId,
         string fuelTypeId,
         bool isTestData = false,
         decimal? supplierPricePerLiter = null,
@@ -153,7 +153,7 @@ internal static class CatalogueTestData
     public static FuelNominal SeedPackage(
         this ApplicationDbContext context,
         string id,
-        string BrandId,
+        Guid BrandId,
         string fuelTypeId,
         decimal liters,
         decimal price,
@@ -217,7 +217,7 @@ var offer = context.SeedOffer(
     public static void SeedPackageInBothPools(
         this ApplicationDbContext context,
         string idPrefix,
-        string BrandId,
+        Guid BrandId,
         string fuelTypeId,
         decimal liters,
         decimal realPrice,

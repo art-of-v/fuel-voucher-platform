@@ -21,7 +21,8 @@ namespace FuelFlow.Features.Brands;
 /// </summary>
 public sealed record PublicPackageResponse(
     string Id,
-    string BrandId,
+    Guid BrandId,
+    string BrandSlug,
     string FuelTypeId,
     string FuelName,
     decimal Liters,

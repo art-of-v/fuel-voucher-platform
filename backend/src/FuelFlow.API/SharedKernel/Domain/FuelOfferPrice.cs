@@ -69,7 +69,7 @@ public sealed class FuelOfferPrice
     public string OfferId { get; set; } = null!;
 
     /// <summary>The network, mirrored from the offer so a price row is readable without the join.</summary>
-    public string BrandId { get; set; } = null!;
+    public Guid BrandId { get; set; }
 
     /// <summary>Mirrors the offer's fuel type, for the same reason.</summary>
     public string FuelTypeId { get; set; } = null!;

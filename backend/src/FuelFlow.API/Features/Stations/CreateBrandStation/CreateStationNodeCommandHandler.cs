@@ -14,10 +14,9 @@ public sealed class CreateBrandStationCommandHandler
     {
         var node = command.Node;
 
-        if (string.IsNullOrWhiteSpace(node.Id) ||
-            string.IsNullOrWhiteSpace(node.BrandId) ||
+        if (node.BrandId == Guid.Empty ||
             string.IsNullOrWhiteSpace(node.Name))
-            return new CreateBrandStationResult { Error = "Id, BrandId and Name are required" };
+            return new CreateBrandStationResult { Error = "BrandId and Name are required" };
 
         if (node.Lat is null || node.Lng is null ||
             !BrandStationCoordinates.IsValidLat(node.Lat.Value) ||
@@ -26,12 +25,26 @@ public sealed class CreateBrandStationCommandHandler
 
         var BrandExists = await _context.Brands.AnyAsync(s => s.Id == node.BrandId, ct);
         if (!BrandExists)
-            return new CreateBrandStationResult { Error = $"Brand (brand) '{node.BrandId}' does not exist" };
+            return new CreateBrandStationResult { Error = $"Brand '{node.BrandId}' does not exist" };
 
-        var exists = await _context.BrandStations.AnyAsync(n => n.Id == node.Id, ct);
+        // Derived from the coordinates when the caller did not name the АЗК, the same rule the bulk
+        // import follows - so the form and the file cannot produce two different identities for one
+        // physical station.
+        var slug = await _context.Brands.Where(b => b.Id == node.BrandId)
+            .Select(b => b.Slug).FirstOrDefaultAsync(ct);
+        if (string.IsNullOrWhiteSpace(node.ExternalId))
+        {
+            node.ExternalId = string.IsNullOrWhiteSpace(slug)
+                ? $"{node.BrandId}-{node.Lat:F5}-{node.Lng:F5}"
+                : BrandStationCoordinates.DeriveId(slug, node.Lat!.Value, node.Lng!.Value);
+        }
+
+        var exists = await _context.BrandStations
+            .AnyAsync(n => n.BrandId == node.BrandId && n.ExternalId == node.ExternalId, ct);
         if (exists)
-            return new CreateBrandStationResult { Conflict = true, Error = $"Brand node with id '{node.Id}' already exists" };
+            return new CreateBrandStationResult { Conflict = true, Error = $"Brand node with external id '{node.ExternalId}' already exists at this brand" };
 
+        node.Id = Guid.CreateVersion7();
         node.CreatedAtUtc = DateTime.UtcNow;
         node.UpdatedAtUtc = node.CreatedAtUtc;
         _context.BrandStations.Add(node);

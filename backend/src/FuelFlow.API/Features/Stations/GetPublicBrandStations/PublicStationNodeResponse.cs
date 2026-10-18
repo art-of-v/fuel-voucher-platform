@@ -18,10 +18,17 @@ namespace FuelFlow.Features.Brands.GetPublicBrandStations;
 /// <c>UpdatedAtUtc</c>, which no client reads, so the wire format is unchanged for installed mobile
 /// clients.
 /// </para>
+///
+/// <para>
+/// <c>Id</c> and <c>BrandId</c> became uuids with planning D-21, and <c>BrandSlug</c> was added so a
+/// client can still label a node without a second lookup. <c>ExternalId</c> is deliberately
+/// <em>not</em> published: it is the importer's re-import key, and no client has any use for it.
+/// </para>
 /// </summary>
 public sealed record PublicBrandStationResponse(
-    string Id,
-    string BrandId,
+    Guid Id,
+    Guid BrandId,
+    string BrandSlug,
     string Name,
     string? Address,
     string? Phone,

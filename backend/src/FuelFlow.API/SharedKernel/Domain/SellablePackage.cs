@@ -36,7 +36,14 @@ public sealed record SellablePackage
 
     public string OfferId { get; init; } = string.Empty;
 
-    public string BrandId { get; init; } = string.Empty;
+    public Guid BrandId { get; init; }
+
+    /// <summary>
+    /// The network's own code (<c>"okko"</c>). Carried beside <see cref="BrandId"/> so the storefront
+    /// can group and label a shelf without a second round trip, and so a log line or a support
+    /// ticket can be read by a human.
+    /// </summary>
+    public string BrandSlug { get; init; } = string.Empty;
 
     public string FuelTypeId { get; init; } = string.Empty;
 
@@ -100,11 +107,13 @@ public sealed record SellablePackage
     public static SellablePackage From(
         FuelOffer offer,
         FuelTypeEntity fuel,
-        decimal liters) => new()
+        decimal liters,
+        string brandSlug) => new()
     {
         PackageId = PackageIds.For(offer.Id, liters),
         OfferId = offer.Id,
         BrandId = offer.BrandId,
+        BrandSlug = brandSlug,
         FuelTypeId = offer.FuelTypeId,
         Liters = liters,
         PumpPricePerLiter = offer.PumpPricePerLiter,
