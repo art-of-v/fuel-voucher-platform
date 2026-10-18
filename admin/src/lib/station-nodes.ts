@@ -4,7 +4,7 @@
 
 export interface StationNode {
   id: string;
-  stationId: string;
+  brandId: string;
   name: string;
   address?: string | null;
   phone?: string | null;
@@ -45,8 +45,8 @@ export function isValidCoordinate(lat: number, lng: number): boolean {
 }
 
 // Convenience-only mirror of backend StationNodeCoordinates.DeriveId
-// ({stationId}-{lat:F5}-{lng:F5}). The server is authoritative on import and
+// ({brandId}-{lat:F5}-{lng:F5}). The server is authoritative on import and
 // requires an explicit id on single create; this just pre-fills that field.
-export function deriveNodeId(stationId: string, lat: number, lng: number): string {
-  return `${stationId}-${lat.toFixed(5)}-${lng.toFixed(5)}`;
+export function deriveNodeId(brandId: string, lat: number, lng: number): string {
+  return `${brandId}-${lat.toFixed(5)}-${lng.toFixed(5)}`;
 }
