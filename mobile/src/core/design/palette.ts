@@ -144,7 +144,7 @@ export const BRAND_COLORS: Record<string, string> = {
 };
 
 /**
- * Fuel-brand logos, keyed by `stationId` — the AЗК networks we actually carry.
+ * Fuel-brand logos, keyed by `brandId` — the AЗК networks we actually carry.
  * The brand accents above are all but indistinguishable at a glance (okko / wog /
  * upg are three greens), so wherever a brand is identified on the map the logo is
  * the primary mark and {@link BRAND_COLORS} the fallback. Only networks with a

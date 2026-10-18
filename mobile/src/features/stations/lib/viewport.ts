@@ -56,4 +56,4 @@ export function pointsInRegion<T extends Coords>(points: readonly T[], region: M
 }
 
 /** Narrowing helper for the union the map screen actually holds. */
-export type MapPoint = StationNode | (StationNode & { stationId?: number });
+export type MapPoint = StationNode | (StationNode & { brandId?: string });

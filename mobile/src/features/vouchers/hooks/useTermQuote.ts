@@ -20,16 +20,16 @@ import { useAppStateActive } from '../../../core/hooks/useAppStateActive';
  * fuel.
  */
 export function useTermQuote(
-  stationId: string | undefined,
+  brandId: string | undefined,
   fuelTypeId: string | undefined,
   liters: number | undefined,
 ): TermQuote | null {
   const isActive = useAppStateActive();
-  const enabled = !!stationId && !!fuelTypeId && !!liters;
+  const enabled = !!brandId && !!fuelTypeId && !!liters;
 
   const { data } = useQuery<TermQuote>({
-    queryKey: ['term-quote', stationId, fuelTypeId, liters],
-    queryFn: async () => getTermQuote(stationId as string, fuelTypeId as string, liters as number),
+    queryKey: ['term-quote', brandId, fuelTypeId, liters],
+    queryFn: async () => getTermQuote(brandId as string, fuelTypeId as string, liters as number),
     enabled,
     // The ladder changes rarely; the per-line price changes whenever the catalog does. A minute of
     // staleness is short enough that a repriced term is never what the customer finally pays, and the

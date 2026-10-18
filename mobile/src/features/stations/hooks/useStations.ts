@@ -13,7 +13,7 @@ export function useStations() {
 
       return stations.map((station) => ({
         ...station,
-        fuels: fuels.filter((f) => f.stationId === station.id),
+        fuels: fuels.filter((f) => f.brandId === station.id),
       }));
     },
     // Admin changes prices (cost/margin/pump) while the catalog stays open; poll

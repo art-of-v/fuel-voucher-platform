@@ -28,11 +28,14 @@ export interface TermQuote {
  * editing the ladder mid-session can change what the picker shows but never what is charged.
  */
 export async function getTermQuote(
-  stationId: string,
+  brandId: string,
   fuelTypeId: string,
   liters: number,
 ): Promise<TermQuote> {
-  const query = new URLSearchParams({ stationId, fuelTypeId, liters: String(liters) });
+  // `BrandId`, not `brandId`/`stationId`: PurchaseController binds it as `[FromQuery] string BrandId`
+  // and answers 400 when it is blank. ASP.NET's query binding is case-insensitive, so `brandId`
+  // binds too — but the param is written to match the server's declaration.
+  const query = new URLSearchParams({ brandId, fuelTypeId, liters: String(liters) });
   const response = await apiFetch(`/api/purchases/term-quote?${query.toString()}`);
   if (!response.ok) throw new Error('Could not load the term options.');
 

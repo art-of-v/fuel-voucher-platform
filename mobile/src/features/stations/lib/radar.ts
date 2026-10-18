@@ -51,29 +51,29 @@ export function packagePumpPerLiter(pkg: FuelPackage): number | null {
 }
 
 /**
- * Cheapest voucher грн/л per station (brand) for the given canonical fuel. Packages are
- * per-brand and keyed by `stationId`, so every node of a brand shares this price. The
+ * Cheapest voucher грн/л per brand for the given canonical fuel. Packages are per-brand and
+ * keyed by `brandId`, so every node of a brand shares this price. The
  * fuel argument is a canonical id from {@link normalizeFuelName} (e.g. `'a-95'`).
  */
-export function bestPriceByStation(
+export function bestPriceByBrand(
   packages: FuelPackage[],
   canonicalFuel: string,
 ): Map<string, StationPrice> {
-  const byStation = new Map<string, StationPrice>();
+  const byBrand = new Map<string, StationPrice>();
   for (const pkg of packages) {
     if (normalizeFuelName(pkg.fuelName) !== canonicalFuel) continue;
     const voucher = packageVoucherPerLiter(pkg);
     if (voucher == null) continue;
-    const existing = byStation.get(pkg.stationId);
+    const existing = byBrand.get(pkg.brandId);
     if (existing && existing.voucherPerLiter <= voucher) continue;
     const pump = packagePumpPerLiter(pkg);
-    byStation.set(pkg.stationId, {
+    byBrand.set(pkg.brandId, {
       voucherPerLiter: voucher,
       pumpPerLiter: pump ?? voucher,
       savingsPerLiter: pump != null ? Math.max(0, pump - voucher) : 0,
     });
   }
-  return byStation;
+  return byBrand;
 }
 
 /** Distinct canonical fuels present in the packages, in first-seen order. */
@@ -111,11 +111,11 @@ function nodeLatLng(node: StationNode): LatLng | null {
  */
 export function rankStations(
   nodes: StationNode[],
-  priceByStation: Map<string, StationPrice>,
+  priceByBrand: Map<string, StationPrice>,
   userLoc?: LatLng | null,
 ): RankedStation[] {
   const ranked: RankedStation[] = nodes.map((node) => {
-    const price = priceByStation.get(node.stationId) ?? null;
+    const price = priceByBrand.get(node.brandId) ?? null;
     let distanceKm: number | null = null;
     if (userLoc) {
       const coord = nodeLatLng(node);
@@ -183,8 +183,8 @@ export function radarWithinRadius(
 }
 
 export interface BrandRank {
-  /** Brand id (= `stationId`), e.g. `'wog'`. The leaderboard key. */
-  stationId: string;
+  /** Brand id, e.g. `'wog'` — the wire name on every catalogue payload. The leaderboard key. */
+  brandId: string;
   /** Voucher грн/л for the fuel. Packages are per-brand, so every node shares it. */
   price: StationPrice;
   /** Distance to this brand's nearest АЗК in the set, or null when location is unknown. */
@@ -223,14 +223,14 @@ export function rankBrands(ranked: RankedStation[], radiusKm?: number | null): B
   const byBrand = new Map<string, RankedStation[]>();
   for (const r of ranked) {
     if (r.price == null) continue;
-    const list = byBrand.get(r.node.stationId);
+    const list = byBrand.get(r.node.brandId);
     if (list) list.push(r);
-    else byBrand.set(r.node.stationId, [r]);
+    else byBrand.set(r.node.brandId, [r]);
   }
 
   const unbounded = radiusKm == null;
   const brands: BrandRank[] = [];
-  for (const [stationId, nodes] of byBrand) {
+  for (const [brandId, nodes] of byBrand) {
     // Nearest-first within the brand; nodes without a distance sort last.
     nodes.sort((a, b) => {
       if (a.distanceKm != null && b.distanceKm != null) return a.distanceKm - b.distanceKm;
@@ -247,7 +247,7 @@ export function rankBrands(ranked: RankedStation[], radiusKm?: number | null): B
       : nodes.filter((r) => r.distanceKm != null && r.distanceKm <= radiusKm);
 
     brands.push({
-      stationId,
+      brandId,
       price: nodes[0].price!,
       // The brand's true nearest, not its nearest *inside* the ring: a dimmed row exists
       // precisely to say how far away that is.
@@ -273,7 +273,7 @@ export function rankBrands(ranked: RankedStation[], radiusKm?: number | null): B
     }
     if (a.nearestDistanceKm != null && b.nearestDistanceKm == null) return -1;
     if (a.nearestDistanceKm == null && b.nearestDistanceKm != null) return 1;
-    return a.stationId.localeCompare(b.stationId);
+    return a.brandId.localeCompare(b.brandId);
   });
 
   return brands;

@@ -1,6 +1,6 @@
 import {
   availableFuels,
-  bestPriceByStation,
+  bestPriceByBrand,
   formatShortAddress,
   haversineKm,
   packageVoucherPerLiter,
@@ -13,7 +13,7 @@ import type { FuelPackage, StationNode } from '../../../core/types/api';
 function pkg(overrides: Partial<FuelPackage> = {}): FuelPackage {
   return {
     id: 'p',
-    stationId: 'okko',
+    brandId: 'okko',
     fuelTypeId: 'ft',
     fuelName: 'А-95',
     liters: 10,
@@ -26,7 +26,7 @@ function pkg(overrides: Partial<FuelPackage> = {}): FuelPackage {
 function node(overrides: Partial<StationNode> = {}): StationNode {
   return {
     id: 'n',
-    stationId: 'okko',
+    brandId: 'okko',
     name: 'Node',
     lat: '50.45',
     lng: '30.52',
@@ -68,21 +68,21 @@ describe('packageVoucherPerLiter', () => {
   });
 });
 
-describe('bestPriceByStation', () => {
+describe('bestPriceByBrand', () => {
   it('filters by canonical fuel, keeps the cheapest per station, and computes savings', () => {
     const packages = [
-      pkg({ id: 'a', stationId: 'okko', finalPricePerLiter: 50, originalPrice: 560, liters: 10 }),
-      pkg({ id: 'b', stationId: 'okko', finalPricePerLiter: 48, originalPrice: 560, liters: 10 }),
+      pkg({ id: 'a', brandId: 'okko', finalPricePerLiter: 50, originalPrice: 560, liters: 10 }),
+      pkg({ id: 'b', brandId: 'okko', finalPricePerLiter: 48, originalPrice: 560, liters: 10 }),
       pkg({
         id: 'c',
-        stationId: 'wog',
+        brandId: 'wog',
         fuelName: 'ДП',
         finalPricePerLiter: 47,
         originalPrice: 550,
         liters: 10,
       }),
     ];
-    const map = bestPriceByStation(packages, 'a-95');
+    const map = bestPriceByBrand(packages, 'a-95');
     expect(map.size).toBe(1); // ДП excluded
     const okko = map.get('okko')!;
     expect(okko.voucherPerLiter).toBe(48); // cheapest of the two А-95 rows
@@ -91,7 +91,7 @@ describe('bestPriceByStation', () => {
   });
 
   it('clamps negative savings to zero', () => {
-    const map = bestPriceByStation(
+    const map = bestPriceByBrand(
       [pkg({ finalPricePerLiter: 60, originalPrice: 560, liters: 10 })],
       'a-95',
     );
@@ -114,14 +114,14 @@ describe('availableFuels', () => {
 describe('rankStations', () => {
   it('orders priced nodes cheapest-first and pushes unpriced nodes last', () => {
     const nodes = [
-      node({ id: 'wog1', stationId: 'wog', name: 'WOG' }),
-      node({ id: 'okko1', stationId: 'okko', name: 'OKKO' }),
-      node({ id: 'klo1', stationId: 'klo', name: 'KLO' }), // no price
+      node({ id: 'wog1', brandId: 'wog', name: 'WOG' }),
+      node({ id: 'okko1', brandId: 'okko', name: 'OKKO' }),
+      node({ id: 'klo1', brandId: 'klo', name: 'KLO' }), // no price
     ];
-    const prices = bestPriceByStation(
+    const prices = bestPriceByBrand(
       [
-        pkg({ stationId: 'okko', finalPricePerLiter: 48 }),
-        pkg({ stationId: 'wog', finalPricePerLiter: 52 }),
+        pkg({ brandId: 'okko', finalPricePerLiter: 48 }),
+        pkg({ brandId: 'wog', finalPricePerLiter: 52 }),
       ],
       'a-95',
     );
@@ -131,9 +131,9 @@ describe('rankStations', () => {
   });
 
   it('breaks price ties by distance when the user location is known', () => {
-    const near = node({ id: 'near', stationId: 'okko', name: 'Near', lat: '50.46', lng: '30.52' });
-    const far = node({ id: 'far', stationId: 'okko', name: 'Far', lat: '50.90', lng: '30.52' });
-    const prices = bestPriceByStation([pkg({ stationId: 'okko', finalPricePerLiter: 48 })], 'a-95');
+    const near = node({ id: 'near', brandId: 'okko', name: 'Near', lat: '50.46', lng: '30.52' });
+    const far = node({ id: 'far', brandId: 'okko', name: 'Far', lat: '50.90', lng: '30.52' });
+    const prices = bestPriceByBrand([pkg({ brandId: 'okko', finalPricePerLiter: 48 })], 'a-95');
     const ranked = rankStations([far, near], prices, { lat: 50.45, lng: 30.52 });
     expect(ranked.map((r) => r.node.id)).toEqual(['near', 'far']);
     expect(ranked[0].distanceKm).toBeGreaterThan(0);
@@ -143,13 +143,13 @@ describe('rankStations', () => {
 describe('radarWithinRadius', () => {
   // User at (50, 30); nodes offset in latitude only, so distance ≈ 111 km × Δlat.
   const user = { lat: 50, lng: 30 };
-  const prices = bestPriceByStation([pkg({ stationId: 'okko', finalPricePerLiter: 48 })], 'a-95');
+  const prices = bestPriceByBrand([pkg({ brandId: 'okko', finalPricePerLiter: 48 })], 'a-95');
   const rank = (nodes: StationNode[], loc = user) => rankStations(nodes, prices, loc);
 
   it('returns every priced station with a null radius when the location is unknown', () => {
     const nodes = [
-      node({ id: 'a', stationId: 'okko', lat: '50.036', lng: '30' }),
-      node({ id: 'x', stationId: 'klo', lat: '50.036', lng: '30' }), // unpriced
+      node({ id: 'a', brandId: 'okko', lat: '50.036', lng: '30' }),
+      node({ id: 'x', brandId: 'klo', lat: '50.036', lng: '30' }), // unpriced
     ];
     const res = radarWithinRadius(rankStations(nodes, prices, null), null);
     expect(res.radiusKm).toBeNull();
@@ -188,86 +188,159 @@ describe('radarWithinRadius', () => {
 
 describe('rankBrands', () => {
   const user = { lat: 50, lng: 30 };
-  const prices = bestPriceByStation(
+  const prices = bestPriceByBrand(
     [
-      pkg({ stationId: 'okko', finalPricePerLiter: 48, originalPrice: 560, liters: 10 }),
-      pkg({ stationId: 'wog', finalPricePerLiter: 46, originalPrice: 560, liters: 10 }),
+      pkg({ brandId: 'okko', finalPricePerLiter: 48, originalPrice: 560, liters: 10 }),
+      pkg({ brandId: 'wog', finalPricePerLiter: 46, originalPrice: 560, liters: 10 }),
     ],
     'a-95',
   );
 
   it('collapses nodes into one row per brand, cheapest voucher грн/л first', () => {
     const nodes = [
-      node({ id: 'okko-near', stationId: 'okko', lat: '50.036', lng: '30' }), // ~4 km
-      node({ id: 'okko-far', stationId: 'okko', lat: '50.36', lng: '30' }), //  ~40 km
-      node({ id: 'wog-1', stationId: 'wog', lat: '50.09', lng: '30' }), //    ~10 km
+      node({ id: 'okko-near', brandId: 'okko', lat: '50.036', lng: '30' }), // ~4 km
+      node({ id: 'okko-far', brandId: 'okko', lat: '50.36', lng: '30' }), //  ~40 km
+      node({ id: 'wog-1', brandId: 'wog', lat: '50.09', lng: '30' }), //    ~10 km
     ];
     const brands = rankBrands(rankStations(nodes, prices, user));
-    expect(brands.map((b) => b.stationId)).toEqual(['wog', 'okko']); // 46 before 48
-    const okko = brands.find((b) => b.stationId === 'okko')!;
+    expect(brands.map((b) => b.brandId)).toEqual(['wog', 'okko']); // 46 before 48
+    const okko = brands.find((b) => b.brandId === 'okko')!;
     expect(okko.nodes.map((n) => n.node.id)).toEqual(['okko-near', 'okko-far']); // nearest-first
     expect(okko.nearestDistanceKm).toBeCloseTo(okko.nodes[0].distanceKm!, 5);
   });
 
   it('ignores unpriced brands — the leaderboard is a price ranking', () => {
     const nodes = [
-      node({ id: 'okko-1', stationId: 'okko', lat: '50.036', lng: '30' }),
-      node({ id: 'klo-1', stationId: 'klo', lat: '50.036', lng: '30' }), // no price
+      node({ id: 'okko-1', brandId: 'okko', lat: '50.036', lng: '30' }),
+      node({ id: 'klo-1', brandId: 'klo', lat: '50.036', lng: '30' }), // no price
     ];
     const brands = rankBrands(rankStations(nodes, prices, user));
-    expect(brands.map((b) => b.stationId)).toEqual(['okko']);
+    expect(brands.map((b) => b.brandId)).toEqual(['okko']);
   });
 
   // A brand with nothing inside the ring used to vanish from the leaderboard entirely, which
   // read as "this network doesn't exist" rather than "its pumps are 75 km away" — the shape a
   // Lviv customer saw for KLO, whose nearest АЗК is 75 km from the city.
   describe('keeps an out-of-range network visible', () => {
-    const threeBrands = bestPriceByStation(
+    const threeBrands = bestPriceByBrand(
       [
-        pkg({ stationId: 'okko', finalPricePerLiter: 48 }),
-        pkg({ stationId: 'wog', finalPricePerLiter: 46 }),
-        pkg({ stationId: 'klo', finalPricePerLiter: 44 }), // cheapest overall, but far away
+        pkg({ brandId: 'okko', finalPricePerLiter: 48 }),
+        pkg({ brandId: 'wog', finalPricePerLiter: 46 }),
+        pkg({ brandId: 'klo', finalPricePerLiter: 44 }), // cheapest overall, but far away
       ],
       'a-95',
     );
     const nodes = [
-      node({ id: 'okko-1', stationId: 'okko', lat: '50.036', lng: '30' }), //  ~4 km
-      node({ id: 'okko-far', stationId: 'okko', lat: '50.36', lng: '30' }), // ~40 km
-      node({ id: 'wog-1', stationId: 'wog', lat: '50.09', lng: '30' }), //   ~10 km
-      node({ id: 'klo-1', stationId: 'klo', lat: '51.4', lng: '30' }), //  ~155 km
+      node({ id: 'okko-1', brandId: 'okko', lat: '50.036', lng: '30' }), //  ~4 km
+      node({ id: 'okko-far', brandId: 'okko', lat: '50.36', lng: '30' }), // ~40 km
+      node({ id: 'wog-1', brandId: 'wog', lat: '50.09', lng: '30' }), //   ~10 km
+      node({ id: 'klo-1', brandId: 'klo', lat: '51.4', lng: '30' }), //  ~155 km
     ];
     const ranked = rankStations(nodes, threeBrands, user);
 
     it('sorts a cheaper but unreachable network below every reachable one', () => {
       const brands = rankBrands(ranked, 20);
-      expect(brands.map((b) => b.stationId)).toEqual(['wog', 'okko', 'klo']);
+      expect(brands.map((b) => b.brandId)).toEqual(['wog', 'okko', 'klo']);
       expect(brands[0].inRange).toBe(true);
       expect(brands[2].inRange).toBe(false);
     });
 
     it('reports the true nearest distance, not a radius-clipped one', () => {
-      const klo = rankBrands(ranked, 20).find((b) => b.stationId === 'klo')!;
+      const klo = rankBrands(ranked, 20).find((b) => b.brandId === 'klo')!;
       expect(klo.nearestDistanceKm).toBeGreaterThan(100);
       expect(klo.nearestDistanceKm).toBeCloseTo(klo.nodes[0].distanceKm!, 5);
     });
 
     it('lists the in-radius АЗК for a reachable brand so its drill-in is unchanged', () => {
-      const okko = rankBrands(ranked, 20).find((b) => b.stationId === 'okko')!;
-      const all = rankBrands(ranked).find((b) => b.stationId === 'okko')!;
+      const okko = rankBrands(ranked, 20).find((b) => b.brandId === 'okko')!;
+      const all = rankBrands(ranked).find((b) => b.brandId === 'okko')!;
       expect(okko.nodes.map((n) => n.node.id)).toEqual(['okko-1']);
       // The unbounded call has no radius to clip against, so it keeps the whole brand.
       expect(all.nodes.map((n) => n.node.id)).toEqual(['okko-1', 'okko-far']);
     });
 
     it('falls back to the nearest-first list for an unreachable brand, so the drill-in can answer how far', () => {
-      const klo = rankBrands(ranked, 20).find((b) => b.stationId === 'klo')!;
+      const klo = rankBrands(ranked, 20).find((b) => b.brandId === 'klo')!;
       expect(klo.nodes.map((n) => n.node.id)).toEqual(['klo-1']);
     });
 
     it('treats every brand as in range when the radius is unbounded', () => {
       const brands = rankBrands(ranked); // no radius: location unknown, or nothing met the bar
       expect(brands.every((b) => b.inRange)).toBe(true);
-      expect(brands.map((b) => b.stationId)).toEqual(['klo', 'wog', 'okko']); // 44, 46, 48
+      expect(brands.map((b) => b.brandId)).toEqual(['klo', 'wog', 'okko']); // 44, 46, 48
+    });
+  });
+
+  // The 2026-10-18 rename moved `stations` to `brands` and `station_id` to `brand_id`, and changed
+  // the client's URLs but not the field it read. Every node arrived with `brandId` and no
+  // `stationId`, so grouping put every АЗК under `undefined` and the tiebreak at the end of the
+  // sort threw `Cannot read properties of undefined (reading 'localeCompare')` — the leaderboard
+  // screen died on open. Pinned here against the server's real payload rather than a hand-built
+  // fixture: the fixture is what let the rename through, because it used the client's field name.
+  describe('reads the wire field the server actually sends', () => {
+    const asServerPayload = (json: string) => JSON.parse(json) as StationNode[];
+
+    it('groups a /api/brand-stations payload instead of throwing', () => {
+      const nodes = asServerPayload(
+        JSON.stringify([
+          {
+            id: 'klo-9',
+            brandId: 'klo',
+            name: 'KLO',
+            address: null,
+            phone: null,
+            city: null,
+            stationType: null,
+            lat: 50.4969698,
+            lng: 30.4645316,
+          },
+          {
+            id: 'okko-1',
+            brandId: 'okko',
+            name: 'OKKO №1',
+            address: null,
+            phone: null,
+            city: null,
+            stationType: null,
+            lat: 50.45,
+            lng: 30.52,
+          },
+        ]),
+      );
+      const bothPriced = bestPriceByBrand(
+        [
+          pkg({ brandId: 'okko', finalPricePerLiter: 48 }),
+          pkg({ brandId: 'klo', finalPricePerLiter: 44 }),
+        ],
+        'a-95',
+      );
+
+      const brands = rankBrands(rankStations(nodes, bothPriced, user));
+
+      expect(brands.map((b) => b.brandId)).toEqual(['klo', 'okko']);
+    });
+
+    it('prices a /api/packages payload under the same field', () => {
+      const packages = JSON.parse(
+        JSON.stringify([
+          {
+            id: 'b292b112-ac9a-40c8-93de-962f82f07574:2',
+            brandId: 'klo',
+            fuelTypeId: 'b292b112-ac9a-40c8-93de-962f82f07574',
+            fuelName: 'А-95',
+            liters: 2,
+            price: 169,
+            originalPrice: 169,
+            finalPricePerLiter: 84.5,
+            isAvailable: false,
+          },
+        ]),
+      ) as FuelPackage[];
+
+      const priced = bestPriceByBrand(packages, 'a-95');
+
+      expect(priced.get('klo')?.voucherPerLiter).toBeCloseTo(84.5, 5);
+      expect(priced.size).toBe(1);
     });
   });
 });
