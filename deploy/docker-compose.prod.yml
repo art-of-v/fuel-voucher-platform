@@ -288,6 +288,25 @@ services:
       Telegram__Feedback__StaffChatId: ${TELEGRAM_FEEDBACK_STAFF_CHAT_ID:-0}
       Telegram__Feedback__StaffUserIds__0: ${TELEGRAM_FEEDBACK_STAFF_USER_IDS:-}
 
+      # --- Settlement bot (closed channel finance declares arriving money in, optional) -----
+      # A THIRD bot token: Telegram allows exactly one webhook per token, so the alerting bot
+      # and the feedback bot cannot share this endpoint without letting unrelated traffic reach
+      # the handler that creates payments.
+      # Register the webhook ONLY after this deploy is live, otherwise Telegram retries a 404
+      # forever:  curl "https://api.telegram.org/bot<TOKEN>/setWebhook" \
+      #            -d url=https://api.palne.shop/api/telegram/settlement/webhook \
+      #            -d secret_token=<TELEGRAM_SETTLEMENT_WEBHOOK_SECRET> -d allowed_updates='["message"]'
+      # The endpoint lives on API_DOMAIN, not ROOT_DOMAIN: the admin domain proxies only an
+      # allow-list of /api paths and answers 404 for everything else.
+      # AllowedChatId is NEGATIVE for a group (-100... or the newer -5... form). AllowedUserIds
+      # is the actual security boundary - the secret only proves Telegram sent the delivery - so
+      # it is part of IsConfigured: empty means every delivery is rejected, never every accepted.
+      Telegram__Settlement__Enabled: ${TELEGRAM_SETTLEMENT_ENABLED:-false}
+      Telegram__Settlement__BotToken: ${TELEGRAM_SETTLEMENT_BOT_TOKEN:-}
+      Telegram__Settlement__WebhookSecret: ${TELEGRAM_SETTLEMENT_WEBHOOK_SECRET:-}
+      Telegram__Settlement__AllowedChatId: ${TELEGRAM_SETTLEMENT_CHAT_ID:-0}
+      Telegram__Settlement__AllowedUserIds__0: ${TELEGRAM_SETTLEMENT_ALLOWED_USER_IDS:-}
+
       # --- Feedback triage classifier (optional) -------------------------------------------
       # Unset => IsConfigured is false, and every message is stored and shown unfiltered
       # rather than lost. The LLM is a filter, not a gate.
