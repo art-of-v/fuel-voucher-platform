@@ -97,6 +97,14 @@ internal sealed class SettlementMessageConfiguration : IEntityTypeConfiguration<
             t.HasCheckConstraint("ck_settlement_messages_outcome",
                 $"outcome IN ('{string.Join("','", SettlementOutcomes.All)}')"));
 
+        // Restrict, like every other money-side FK in this schema: a message that produced a payment
+        // is evidence, and it must not disappear because the payment did. Null is allowed and normal -
+        // a refusal produced no payment at all.
+        builder.HasOne(e => e.Payment)
+            .WithMany(p => p.SettlementMessages)
+            .HasForeignKey(e => e.PaymentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // Money declared as zero is not money, and the parser already refuses it. Stated here as well
         // so a future write path cannot introduce one behind the parser's back.
         builder.ToTable(t =>
