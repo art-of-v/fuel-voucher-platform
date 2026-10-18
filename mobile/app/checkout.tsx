@@ -142,8 +142,8 @@ export default function CheckoutScreen() {
       // Aggregate all cart items into one Monobank invoice
       const items = cart.map((item) => ({
         packageId: item.package.id,
-        stationId: item.station.id,
-        stationName: item.station.name,
+        brandId: item.station.id,
+        brandName: item.station.name,
         fuelType: item.fuel.id,
         fuelName: item.fuel.name,
         liters: item.package.liters,

@@ -9,7 +9,13 @@ export interface Station {
 
 export interface StationNode {
   id: string;
-  stationId: string;
+  /**
+   * The fuel network this АЗК belongs to, as a Brand id (`okko`, `wog`, …) — the wire name on
+   * `GET /api/brand-stations`. It was `stationId` until the 2026-10-18 rename, when `stations`
+   * became `brands` and `station_nodes` became `brand_stations`; nothing pointed at a filling
+   * station in either name.
+   */
+  brandId: string;
   name: string;
   address?: string;
   phone?: string;
@@ -22,7 +28,8 @@ export interface StationNode {
 export interface FuelType {
   id: string;
   name: string;
-  stationId: string;
+  /** Brand id, matching {@link StationNode.brandId}. */
+  brandId: string;
   basePrice: number;
   discountPrice: number;
 }
@@ -33,7 +40,8 @@ export interface StationWithFuels extends Station {
 
 export interface FuelPackage {
   id: string;
-  stationId: string;
+  /** Brand id, matching {@link StationNode.brandId}. */
+  brandId: string;
   fuelTypeId: string;
   fuelName: string;
   liters: number;

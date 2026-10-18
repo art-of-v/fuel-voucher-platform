@@ -38,7 +38,7 @@ let mockDiscounted = 0;
 let mockIsWorker = false;
 // The catalog snapshot the availability check reads. `undefined` until a test says otherwise.
 let mockCatalog:
-  { stationId: string; fuelTypeId: string; liters: number; isAvailable?: boolean }[] | undefined;
+  { brandId: string; fuelTypeId: string; liters: number; isAvailable?: boolean }[] | undefined;
 
 jest.mock('expo-router', () => {
   const R = jest.requireActual<typeof import('react')>('react');
@@ -216,7 +216,7 @@ function makeItem(id = 'line-1', over: Partial<CartItem> = {}): CartItem {
     id,
     package: {
       id: 'pkg-1',
-      stationId: 'st-1',
+      brandId: 'st-1',
       fuelTypeId: 'ft-1',
       fuelName: 'A95',
       liters: 50,
@@ -226,7 +226,7 @@ function makeItem(id = 'line-1', over: Partial<CartItem> = {}): CartItem {
       fuelType: 'A95',
     },
     station: { id: 'st-1', name: 'Shell', color: '#f00', logoText: 'SH', sortOrder: 1 },
-    fuel: { id: 'ft-1', name: 'A95', stationId: 'st-1', basePrice: 40, discountPrice: 38 },
+    fuel: { id: 'ft-1', name: 'A95', brandId: 'st-1', basePrice: 40, discountPrice: 38 },
     quantity: 1,
     ...over,
   } as CartItem;
@@ -536,7 +536,7 @@ describe('Basket - stock that ran out while the basket was open', () => {
 
   it('blocks checkout and says why when a line has no stock left', () => {
     stocked();
-    mockCatalog = [{ stationId: 'st-1', fuelTypeId: 'ft-1', liters: 50, isAvailable: false }];
+    mockCatalog = [{ brandId: 'st-1', fuelTypeId: 'ft-1', liters: 50, isAvailable: false }];
 
     render(<BasketScreen />);
 
@@ -547,7 +547,7 @@ describe('Basket - stock that ran out while the basket was open', () => {
 
   it('marks the emptied line and passes the answer down to its card', () => {
     stocked();
-    mockCatalog = [{ stationId: 'st-1', fuelTypeId: 'ft-1', liters: 50, isAvailable: false }];
+    mockCatalog = [{ brandId: 'st-1', fuelTypeId: 'ft-1', liters: 50, isAvailable: false }];
 
     render(<BasketScreen />);
 
@@ -557,7 +557,7 @@ describe('Basket - stock that ran out while the basket was open', () => {
 
   it('still checks out when every line is in stock', () => {
     stocked();
-    mockCatalog = [{ stationId: 'st-1', fuelTypeId: 'ft-1', liters: 50, isAvailable: true }];
+    mockCatalog = [{ brandId: 'st-1', fuelTypeId: 'ft-1', liters: 50, isAvailable: true }];
 
     render(<BasketScreen />);
 
@@ -584,7 +584,7 @@ describe('Basket - stock that ran out while the basket was open', () => {
     // the same as unavailable, and guessing "unavailable" here would strand a legitimate basket.
     stocked();
     mockCatalog = [
-      { stationId: 'other-station', fuelTypeId: 'ft-9', liters: 5, isAvailable: true },
+      { brandId: 'other-station', fuelTypeId: 'ft-9', liters: 5, isAvailable: true },
     ];
 
     render(<BasketScreen />);

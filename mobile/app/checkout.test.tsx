@@ -147,7 +147,7 @@ function makeItem(over: Partial<CartItem> = {}): CartItem {
     id: 'line-1',
     package: {
       id: 'pkg-1',
-      stationId: 'st-1',
+      brandId: 'st-1',
       fuelTypeId: 'ft-1',
       fuelName: 'A95',
       liters: 50,
@@ -163,7 +163,7 @@ function makeItem(over: Partial<CartItem> = {}): CartItem {
       logoText: 'SH',
       sortOrder: 1,
     },
-    fuel: { id: 'ft-1', name: 'A95', stationId: 'st-1', basePrice: 40, discountPrice: 38 },
+    fuel: { id: 'ft-1', name: 'A95', brandId: 'st-1', basePrice: 40, discountPrice: 38 },
     quantity: 2,
     ...over,
   } as CartItem;
@@ -222,8 +222,8 @@ describe('Checkout — what gets sent to the payment brand', () => {
     expect(mockCreateInvoice.mock.calls[0][0]).toEqual([
       expect.objectContaining({
         packageId: 'pkg-1',
-        stationId: 'st-1',
-        stationName: 'Shell Darnytsia',
+        brandId: 'st-1',
+        brandName: 'Shell Darnytsia',
         fuelType: 'ft-1',
         fuelName: 'A95',
         liters: 50,

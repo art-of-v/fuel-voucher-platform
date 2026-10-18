@@ -21,7 +21,7 @@ import { useAllPackages } from '../src/features/stations/hooks/useAllPackages';
 import { useUserLocation } from '../src/features/stations/hooks/useUserLocation';
 import {
   availableFuels,
-  bestPriceByStation,
+  bestPriceByBrand,
   formatShortAddress,
   radarWithinRadius,
   rankBrands,
@@ -456,16 +456,16 @@ export default function MapScreen() {
     setSelectedFuel(fuelOptions.includes(DEFAULT_FUEL) ? DEFAULT_FUEL : fuelOptions[0]);
   }, [fuelOptions, selectedFuel]);
 
-  const priceByStation = React.useMemo(
-    () => bestPriceByStation(packages ?? [], selectedFuel),
+  const priceByBrand = React.useMemo(
+    () => bestPriceByBrand(packages ?? [], selectedFuel),
     [packages, selectedFuel],
   );
 
   // `filteredPoints` is already `StationNode[]`, so the cast this needed is gone.
   // Ranking respects the current search filter.
   const rankedNearby = React.useMemo(
-    () => rankStations(filteredPoints, priceByStation, location),
-    [filteredPoints, priceByStation, location],
+    () => rankStations(filteredPoints, priceByBrand, location),
+    [filteredPoints, priceByBrand, location],
   );
 
   // The price radar: the nearby list widens its radius 5→10→20→50→100 km until it holds
@@ -495,7 +495,7 @@ export default function MapScreen() {
   );
 
   const activeBrand = React.useMemo(
-    () => (selectedBrand ? (brandRanks.find((b) => b.stationId === selectedBrand) ?? null) : null),
+    () => (selectedBrand ? (brandRanks.find((b) => b.brandId === selectedBrand) ?? null) : null),
     [brandRanks, selectedBrand],
   );
 
@@ -588,23 +588,23 @@ export default function MapScreen() {
             {tileUrl && <UrlTile urlTemplate={tileUrl} maximumZ={19} flipY={false} />}
 
             {visiblePoints.map((point) => {
-              const isNode = 'stationId' in point;
+              const isNode = 'brandId' in point;
               const coordinate = {
                 latitude: parseFloat(point.lat!),
                 longitude: parseFloat(point.lng!),
               };
-              const stationId = isNode ? (point as StationNode).stationId : undefined;
+              const brandId = isNode ? (point as StationNode).brandId : undefined;
               // Pins carry each network's own logo (and colour as the border /
               // fallback — data, not theme, see BRAND_LOGOS / BRAND_COLORS).
-              const brandColor = (stationId && BRAND_COLORS[stationId]) || tokens.colors.primary;
-              const logo = stationId
-                ? (BRAND_SYMBOLS[stationId] ?? BRAND_LOGOS[stationId])
+              const brandColor = (brandId && BRAND_COLORS[brandId]) || tokens.colors.primary;
+              const logo = brandId
+                ? (BRAND_SYMBOLS[brandId] ?? BRAND_LOGOS[brandId])
                 : undefined;
-              const price = stationId ? (priceByStation.get(stationId) ?? null) : null;
+              const price = brandId ? (priceByBrand.get(brandId) ?? null) : null;
 
               return (
                 <StationMarker
-                  key={`${isNode ? 'node' : 'station'}-${point.id}`}
+                  key={`${isNode ? 'node' : 'brand'}-${point.id}`}
                   point={point}
                   coordinate={coordinate}
                   brandColor={brandColor}
@@ -777,7 +777,7 @@ export default function MapScreen() {
                         numberOfLines={1}
                       >
                         {activeBrand
-                          ? `${activeBrand.stationId.toUpperCase()} · ${fuelLabel(selectedFuel)}`
+                          ? `${activeBrand.brandId.toUpperCase()} · ${fuelLabel(selectedFuel)}`
                           : `${t('map.networkRanking')} · ${fuelLabel(selectedFuel)}`}
                       </Text>
                     </View>
@@ -807,16 +807,16 @@ export default function MapScreen() {
                                 emphasised and a network with no АЗК in range is dimmed. */}
               {!activeBrand &&
                 brandRanks.map((b, i) => {
-                  const brandColor = BRAND_COLORS[b.stationId] || tokens.colors.primary;
+                  const brandColor = BRAND_COLORS[b.brandId] || tokens.colors.primary;
                   // Only a brand the customer can actually reach may be "cheapest".
                   const isLeader = i === 0 && b.inRange;
                   const delta = b.price.voucherPerLiter - brandRanks[0].price.voucherPerLiter;
                   return (
                     <Pressable
-                      key={b.stationId}
+                      key={b.brandId}
                       onPress={() => {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        setSelectedBrand(b.stationId);
+                        setSelectedBrand(b.brandId);
                         sheetRef.current?.expand();
                       }}
                       style={[
@@ -840,8 +840,8 @@ export default function MapScreen() {
                         {i + 1}
                       </Text>
                       <View style={b.inRange ? undefined : styles.brandOutOfRange}>
-                        {BRAND_LOGOS[b.stationId] ? (
-                          <BrandLogoChip logo={BRAND_LOGOS[b.stationId]} size={30} />
+                        {BRAND_LOGOS[b.brandId] ? (
+                          <BrandLogoChip logo={BRAND_LOGOS[b.brandId]} size={30} />
                         ) : (
                           <View style={[styles.brandDot, { backgroundColor: brandColor }]} />
                         )}
@@ -865,7 +865,7 @@ export default function MapScreen() {
                             ]}
                             numberOfLines={1}
                           >
-                            {b.stationId.toUpperCase()}
+                            {b.brandId.toUpperCase()}
                           </Text>
                           {isLeader && (
                             <View
@@ -1027,10 +1027,10 @@ export default function MapScreen() {
                       gap: tokens.spacing.sm,
                     }}
                   >
-                    {'stationId' in selectedStation &&
-                    BRAND_LOGOS[(selectedStation as StationNode).stationId] ? (
+                    {'brandId' in selectedStation &&
+                    BRAND_LOGOS[(selectedStation as StationNode).brandId] ? (
                       <BrandLogoChip
-                        logo={BRAND_LOGOS[(selectedStation as StationNode).stationId]}
+                        logo={BRAND_LOGOS[(selectedStation as StationNode).brandId]}
                         size={32}
                       />
                     ) : (
@@ -1039,8 +1039,8 @@ export default function MapScreen() {
                           styles.brandBadge,
                           {
                             backgroundColor:
-                              ('stationId' in selectedStation &&
-                                BRAND_COLORS[(selectedStation as StationNode).stationId]) ||
+                              ('brandId' in selectedStation &&
+                                BRAND_COLORS[(selectedStation as StationNode).brandId]) ||
                               tokens.colors.primary,
                           },
                         ]}
@@ -1054,8 +1054,8 @@ export default function MapScreen() {
                         <Text
                           style={[styles.brandBadgeText, { color: tokens.colors.text.onPrimary }]}
                         >
-                          {'stationId' in selectedStation
-                            ? (selectedStation as any).stationId.toUpperCase()
+                          {'brandId' in selectedStation
+                            ? (selectedStation as StationNode).brandId.toUpperCase()
                             : t('map.stationFallback')}
                         </Text>
                       </View>
@@ -1089,9 +1089,9 @@ export default function MapScreen() {
 
               <View style={[styles.divider, { backgroundColor: tokens.colors.borderLight }]} />
 
-              {'stationId' in selectedStation &&
+              {'brandId' in selectedStation &&
                 (() => {
-                  const p = priceByStation.get((selectedStation as StationNode).stationId);
+                  const p = priceByBrand.get((selectedStation as StationNode).brandId);
                   return (
                     <View style={styles.priceBlock}>
                       <Text style={[styles.infoLabel, { color: tokens.colors.text.dim }]}>

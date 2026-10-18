@@ -2,8 +2,13 @@ import { apiFetch } from '../../../core/api/apiClient';
 
 interface PurchaseData {
   packageId: string;
-  stationId: string;
-  stationName: string;
+  /**
+   * The fuel network, as a Brand id — `CheckoutItem.BrandId` on the server. It was `stationId`
+   * until the 2026-10-18 rename, and `POST /api/purchases/bulk` answers 400
+   * ("BrandId is required for every item") for any body that does not carry it.
+   */
+  brandId: string;
+  brandName: string;
   fuelType: string;
   fuelName: string;
   liters: number;
@@ -128,8 +133,8 @@ export async function createMonobankInvoice(
       liters: data.liters,
       quantity: data.quantity,
       price: data.price,
-      stationId: data.stationId,
-      stationName: data.stationName,
+      brandId: data.brandId,
+      brandName: data.brandName,
       ...(legalEntityId ? { legalEntityId } : {}),
     }),
   });
@@ -167,8 +172,8 @@ export async function createBulkMonobankInvoice(
         liters: data.liters,
         quantity: data.quantity,
         price: data.price,
-        stationId: data.stationId,
-        stationName: data.stationName,
+        brandId: data.brandId,
+        brandName: data.brandName,
         // Undefined means the voucher's full remaining term. The server recomputes the price from its
         // own catalog, so this only chooses WHICH term, never how much it costs.
         ...(data.termCode ? { termCode: data.termCode } : {}),

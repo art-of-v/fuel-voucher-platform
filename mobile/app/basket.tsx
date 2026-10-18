@@ -157,13 +157,13 @@ export default function BasketScreen() {
   // only way to know before the customer reaches the payment screen — and the server's 409 is the
   // backstop, not the plan.
   //
-  // Matched on (station, fuel, nominal) rather than the package id, because that is the same composite
+  // Matched on (brand, fuel, nominal) rather than the package id, because that is the same composite
   // the backend counts stock by; a re-priced or re-imported package keeps its identity but not its stock.
   const { data: allPackages } = useAllPackages();
   const availability = useMemo(() => {
     const byKey = new Map<string, boolean>();
     for (const p of allPackages ?? []) {
-      byKey.set(`${p.stationId}|${p.fuelTypeId}|${p.liters}`, p.isAvailable !== false);
+      byKey.set(`${p.brandId}|${p.fuelTypeId}|${p.liters}`, p.isAvailable !== false);
     }
     return byKey;
   }, [allPackages]);
@@ -175,7 +175,7 @@ export default function BasketScreen() {
           const pkg = item.package;
           if (!pkg) return false;
           // Unknown (catalog still loading) must not disable the basket — a slow fetch is not a refusal.
-          const known = availability.get(`${pkg.stationId}|${pkg.fuelTypeId}|${pkg.liters}`);
+          const known = availability.get(`${pkg.brandId}|${pkg.fuelTypeId}|${pkg.liters}`);
           return known === false;
         })
         .map((item) => item.id),
@@ -407,7 +407,7 @@ export default function BasketScreen() {
             isAvailable={
               item.package
                 ? availability.get(
-                    `${item.package.stationId}|${item.package.fuelTypeId}|${item.package.liters}`,
+                    `${item.package.brandId}|${item.package.fuelTypeId}|${item.package.liters}`,
                   )
                 : undefined
             }

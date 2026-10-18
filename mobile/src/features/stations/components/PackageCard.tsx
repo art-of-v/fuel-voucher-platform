@@ -110,9 +110,9 @@ export function PackageCard({
     outputRange: [15, 0],
   });
 
-  // The ladder is per station + fuel + nominal, which is exactly one package, so one fetch per card is
+  // The ladder is per brand + fuel + nominal, which is exactly one package, so one fetch per card is
   // one fetch per package. A failed or disabled quote leaves every price below at its normal value.
-  const quote = useTermQuote(pkg.stationId, pkg.fuelTypeId, pkg.liters);
+  const quote = useTermQuote(pkg.brandId, pkg.fuelTypeId, pkg.liters);
   const linePrice = linePriceForTerm(quote, term, pkg.price);
 
   // The shop has nothing sellable behind this package. It stays in the list — the customer can still
