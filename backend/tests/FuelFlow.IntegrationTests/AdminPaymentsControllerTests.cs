@@ -53,7 +53,8 @@ public class AdminPaymentsControllerTests : IClassFixture<TestDatabaseFixture>
 
     private static string NewPhone() => "+380" + Random.Shared.Next(100000000, 999999999).ToString();
 
-    private async Task<Guid> SeedCustomerAsync(ApplicationDbContext context, string code)
+    private async Task<Guid> SeedCustomerAsync(
+        ApplicationDbContext context, string code, string? firstName = null, string? lastName = null)
     {
         var roleId = await context.Roles.Where(r => r.Name == SeedRoles.UserName).Select(r => r.Id).FirstAsync();
         var now = DateTime.UtcNow;
@@ -66,12 +67,22 @@ public class AdminPaymentsControllerTests : IClassFixture<TestDatabaseFixture>
             CreatedAtUtc = now,
             UpdatedAtUtc = now,
             IsActive = true,
+            FirstName = firstName,
+            LastName = lastName,
             SettlementCode = code,
         };
 
         context.Users.Add(user);
         await context.SaveChangesAsync();
         return user.Id;
+    }
+
+    private async Task<IReadOnlyList<CustomerSearchHit>> SearchCustomersAsync(
+        ApplicationDbContext context, string search, int limit = 20)
+    {
+        var result = await CreateController(context).Customers(search, limit, default);
+        var payload = (result.Result as OkObjectResult)?.Value as List<CustomerSearchHit>;
+        return payload ?? new List<CustomerSearchHit>();
     }
 
     private async Task<Guid> SeedOrderAsync(ApplicationDbContext context, Guid userId, decimal price, OrderStatus status = OrderStatus.PendingPayment)
@@ -342,6 +353,73 @@ public class AdminPaymentsControllerTests : IClassFixture<TestDatabaseFixture>
 
         (await CreateController(context).CustomerByCode("SHORT", default))
             .Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task The_customer_picker_finds_by_name_phone_or_code()
+    {
+        using var context = CreateContext();
+        var code = NewCode();
+        var userId = await SeedCustomerAsync(context, code, firstName: "Олена", lastName: "Ковальчук");
+
+        (await SearchCustomersAsync(context, "Ковальчук")).Should().ContainSingle().Which.Id.Should().Be(userId);
+        (await SearchCustomersAsync(context, "Олена")).Should().ContainSingle();
+        (await SearchCustomersAsync(context, code)).Should().ContainSingle().Which.Id.Should().Be(userId);
+    }
+
+    [Fact]
+    public async Task The_customer_picker_needs_two_characters()
+    {
+        // A one-character search matches most of the table, and the point of a bounded query is
+        // defeated the moment the bound is the result set.
+        using var context = CreateContext();
+        await SeedCustomerAsync(context, NewCode(), firstName: "Олена");
+
+        (await SearchCustomersAsync(context, "О")).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task The_customer_picker_is_bounded()
+    {
+        using var context = CreateContext();
+        for (var i = 0; i < 5; i++)
+        {
+            await SeedCustomerAsync(context, NewCode(), firstName: "Тест", lastName: $"Клієнт{i}");
+        }
+
+        var hits = (await SearchCustomersAsync(context, "Клієнт", limit: 2)).ToList();
+
+        hits.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task An_exact_code_outranks_a_lucky_substring()
+    {
+        // Two customers can share a name fragment, and a third can have this text inside their code.
+        // The certain match should not sit below the coincidence.
+        using var context = CreateContext();
+        var roleId = await context.Roles.Where(r => r.Name == SeedRoles.UserName).Select(r => r.Id).FirstAsync();
+        var exactCode = NewCode();
+        var substringHolder = "ZZ" + exactCode.Substring(2, 6);
+        var now = DateTime.UtcNow;
+
+        context.Users.Add(new User
+        {
+            Id = Guid.NewGuid(), PhoneNumber = NewPhone(), RoleId = roleId,
+            CreatedAtUtc = now, UpdatedAtUtc = now, IsActive = true,
+            FirstName = "Точний", LastName = "Код", SettlementCode = exactCode,
+        });
+        context.Users.Add(new User
+        {
+            Id = Guid.NewGuid(), PhoneNumber = NewPhone(), RoleId = roleId,
+            CreatedAtUtc = now, UpdatedAtUtc = now, IsActive = true,
+            FirstName = "Підрядок", LastName = "Код", SettlementCode = substringHolder,
+        });
+        await context.SaveChangesAsync();
+
+        var hits = await SearchCustomersAsync(context, exactCode);
+
+        hits.First().SettlementCode.Should().Be(exactCode);
     }
 
     [Fact]
