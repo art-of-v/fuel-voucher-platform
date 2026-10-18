@@ -1,401 +1,170 @@
-using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-#pragma warning disable CA1814 // Prefer jagged arrays over multidimensional
+namespace FuelFlow.API.Migrations;
 
-namespace FuelFlow.API.Migrations
+/// <summary>
+/// <c>stations</c> was a brand network all along - okko, wog, klo - and six tables reached it through
+/// a column called <c>station_id</c> that pointed at none of the filling stations.
+/// <c>station_nodes</c> was the table that held those, one row per address.
+/// <para>
+/// The rename is the whole point: a column called <c>brand_id</c> beside a table called
+/// <c>brand_stations</c> says what both are, once, and cannot be misread the way
+/// <c>fuel_offers.station_id</c> could.
+/// </para>
+/// <para>
+/// <b>Written as SQL rather than as EF operations, on purpose.</b> EF scaffolded this as a mix of
+/// renames, constraint drops and re-adds, and its <c>Down</c> as a drop-and-recreate of both tables.
+/// That pair is not a mirror: rolling back and re-applying - which seven of the integration tests do,
+/// because a migration you cannot roll back is a deploy you cannot undo - failed on the second pass
+/// with <c>relation "brand_stations" does not exist</c>. A forward migration that only renames, and a
+/// backward one that only renames back, cannot drift apart: each statement here is the exact inverse
+/// of the statement above it.
+/// </para>
+/// <para>
+/// Nothing is dropped and nothing is created, so the rows in both tables and the values in all six
+/// <c>station_id</c> columns are untouched - <c>okko</c> is still <c>okko</c>.
+/// </para>
+/// </summary>
+public partial class StationsBecomeBrands : Migration
 {
-    /// <inheritdoc />
-    public partial class StationsBecomeBrands : Migration
+    /// <summary>
+    /// The tables, then everything whose name embeds theirs. PostgreSQL keeps a constraint's name when
+    /// the table it belongs to is renamed, so a rename without these leaves an error message pointing
+    /// at a table that no longer exists.
+    /// </summary>
+    protected override void Up(MigrationBuilder migrationBuilder)
     {
-        /// <inheritdoc />
-        protected override void Up(MigrationBuilder migrationBuilder)
-        {
-            migrationBuilder.DropForeignKey(
-                name: "FK_contracts_stations_station_id",
-                table: "contracts");
-
-            // Both tables arrived by rename: they are the same rows under a name that says what they
-            // are. stations was a brand network and station_nodes a filling station inside one -
-            // which is why six tables had a column called station_id holding something that is not
-            // a station id. Dropping either table would orphan every row that points at it, so the
-            // rename is the whole operation and nothing below recreates a row.
-            migrationBuilder.RenameTable(
-                name: "stations",
-                newName: "brands");
-
-            migrationBuilder.RenameTable(
-                name: "station_nodes",
-                newName: "brand_stations");
-
-            // EF had planned to drop and recreate this table, so it never emitted the column rename
-            // that the rename above needs. Its index kept the old name for the same reason.
-            migrationBuilder.RenameColumn(
-                name: "station_id",
-                table: "brand_stations",
-                newName: "brand_id");
-
-            migrationBuilder.RenameIndex(
-                name: "IX_station_nodes_station_id",
-                table: "brand_stations",
-                newName: "IX_brand_stations_brand_id");
-
-            // PostgreSQL carries constraints across a table rename, names included, so these four still say
-            // `stations` / `station_nodes` and would leave the error text pointing at tables that no
-            // longer exist. Declared as drop-and-add rather than raw SQL so the check that compares
-            // the model against what the migrations install can still see them.
-            migrationBuilder.DropCheckConstraint(name: "ck_stations_id_length", table: "brands");
-            migrationBuilder.AddCheckConstraint(name: "ck_brands_id_length", table: "brands", sql: "length(id) <= 100");
-
-            migrationBuilder.DropCheckConstraint(name: "ck_stations_name_length", table: "brands");
-            migrationBuilder.AddCheckConstraint(name: "ck_brands_name_length", table: "brands", sql: "length(name) <= 200");
-
-            migrationBuilder.DropCheckConstraint(name: "ck_station_nodes_id_length", table: "brand_stations");
-            migrationBuilder.AddCheckConstraint(name: "ck_brand_stations_id_length", table: "brand_stations", sql: "length(id) <= 100");
-
-            migrationBuilder.DropCheckConstraint(name: "ck_station_nodes_station_id_length", table: "brand_stations");
-            migrationBuilder.AddCheckConstraint(name: "ck_brand_stations_brand_id_length", table: "brand_stations", sql: "length(brand_id) <= 100");
-
-            migrationBuilder.DropCheckConstraint(
-                name: "ck_fuel_types_station_id_length",
-                table: "fuel_types");
-
-            migrationBuilder.DropCheckConstraint(
-                name: "ck_fuel_type_product_codes_station_id_length",
-                table: "fuel_type_product_codes");
-
-            migrationBuilder.DropCheckConstraint(
-                name: "ck_fuel_offers_station_id_length",
-                table: "fuel_offers");
-
-            migrationBuilder.DropCheckConstraint(
-                name: "ck_fuel_offer_prices_station_id_length",
-                table: "fuel_offer_prices");
-
-            migrationBuilder.DropCheckConstraint(
-                name: "ck_contracts_station_id_length",
-                table: "contracts");
-
-            migrationBuilder.RenameColumn(
-                name: "station_id",
-                table: "fuel_types",
-                newName: "brand_id");
-
-            migrationBuilder.RenameIndex(
-                name: "ux_fuel_types_station_name",
-                table: "fuel_types",
-                newName: "ux_fuel_types_brand_name");
-
-            migrationBuilder.RenameIndex(
-                name: "ux_fuel_types_station_brand_fuel_code",
-                table: "fuel_types",
-                newName: "ux_fuel_types_brand_brand_fuel_code");
-
-            migrationBuilder.RenameIndex(
-                name: "IX_fuel_types_station_id",
-                table: "fuel_types",
-                newName: "IX_fuel_types_brand_id");
-
-            migrationBuilder.RenameColumn(
-                name: "station_id",
-                table: "fuel_type_product_codes",
-                newName: "brand_id");
-
-            migrationBuilder.RenameIndex(
-                name: "ux_fuel_type_product_codes_station_code",
-                table: "fuel_type_product_codes",
-                newName: "ux_fuel_type_product_codes_brand_code");
-
-            migrationBuilder.RenameColumn(
-                name: "station_id",
-                table: "fuel_offers",
-                newName: "brand_id");
-
-            migrationBuilder.RenameIndex(
-                name: "IX_fuel_offers_station_id_fuel_type_id",
-                table: "fuel_offers",
-                newName: "IX_fuel_offers_brand_id_fuel_type_id");
-
-            migrationBuilder.RenameIndex(
-                name: "IX_fuel_offers_station_id",
-                table: "fuel_offers",
-                newName: "IX_fuel_offers_brand_id");
-
-            migrationBuilder.RenameIndex(
-                name: "ix_fuel_offers_station_fuel_pool",
-                table: "fuel_offers",
-                newName: "ix_fuel_offers_brand_fuel_pool");
-
-            migrationBuilder.RenameColumn(
-                name: "station_id",
-                table: "fuel_offer_prices",
-                newName: "brand_id");
-
-            migrationBuilder.RenameColumn(
-                name: "station_id",
-                table: "contracts",
-                newName: "brand_id");
-
-            migrationBuilder.RenameIndex(
-                name: "IX_contracts_station_id",
-                table: "contracts",
-                newName: "IX_contracts_brand_id");
-
-            migrationBuilder.AddCheckConstraint(
-                name: "ck_fuel_types_brand_id_length",
-                table: "fuel_types",
-                sql: "length(brand_id) <= 100");
-
-            migrationBuilder.AddCheckConstraint(
-                name: "ck_fuel_type_product_codes_brand_id_length",
-                table: "fuel_type_product_codes",
-                sql: "length(brand_id) <= 100");
-
-            migrationBuilder.AddCheckConstraint(
-                name: "ck_fuel_offers_brand_id_length",
-                table: "fuel_offers",
-                sql: "length(brand_id) <= 100");
-
-            migrationBuilder.AddCheckConstraint(
-                name: "ck_fuel_offer_prices_brand_id_length",
-                table: "fuel_offer_prices",
-                sql: "length(brand_id) <= 100");
-
-            migrationBuilder.AddCheckConstraint(
-                name: "ck_contracts_brand_id_length",
-                table: "contracts",
-                sql: "length(brand_id) <= 100");
-
-            migrationBuilder.AddForeignKey(
-                name: "FK_contracts_brands_brand_id",
-                table: "contracts",
-                column: "brand_id",
-                principalTable: "brands",
-                principalColumn: "id",
-                onDelete: ReferentialAction.Restrict);
-
-            migrationBuilder.AddForeignKey(
-                name: "FK_brand_stations_brands_brand_id",
-                table: "brand_stations",
-                column: "brand_id",
-                principalTable: "brands",
-                principalColumn: "id",
-                onDelete: ReferentialAction.Restrict);
-        }
-
-        /// <inheritdoc />
-        protected override void Down(MigrationBuilder migrationBuilder)
-        {
-            migrationBuilder.DropForeignKey(
-                name: "FK_contracts_brands_brand_id",
-                table: "contracts");
-
-            migrationBuilder.DropForeignKey(
-                name: "FK_brand_stations_brands_brand_id",
-                table: "brand_stations");
-
-            migrationBuilder.DropTable(
-                name: "brand_stations");
-
-            migrationBuilder.DropTable(
-                name: "brands");
-
-            migrationBuilder.DropCheckConstraint(
-                name: "ck_fuel_types_brand_id_length",
-                table: "fuel_types");
-
-            migrationBuilder.DropCheckConstraint(
-                name: "ck_fuel_type_product_codes_brand_id_length",
-                table: "fuel_type_product_codes");
-
-            migrationBuilder.DropIndex(
-                name: "IX_fuel_offers_fuel_type_id",
-                table: "fuel_offers");
-
-            migrationBuilder.DropCheckConstraint(
-                name: "ck_fuel_offers_brand_id_length",
-                table: "fuel_offers");
-
-            migrationBuilder.DropCheckConstraint(
-                name: "ck_fuel_offer_prices_brand_id_length",
-                table: "fuel_offer_prices");
-
-            migrationBuilder.DropCheckConstraint(
-                name: "ck_contracts_brand_id_length",
-                table: "contracts");
-
-            migrationBuilder.RenameColumn(
-                name: "brand_id",
-                table: "fuel_types",
-                newName: "station_id");
-
-            migrationBuilder.RenameIndex(
-                name: "ux_fuel_types_brand_name",
-                table: "fuel_types",
-                newName: "ux_fuel_types_station_name");
-
-            migrationBuilder.RenameIndex(
-                name: "ux_fuel_types_brand_brand_fuel_code",
-                table: "fuel_types",
-                newName: "ux_fuel_types_station_brand_fuel_code");
-
-            migrationBuilder.RenameIndex(
-                name: "IX_fuel_types_brand_id",
-                table: "fuel_types",
-                newName: "IX_fuel_types_station_id");
-
-            migrationBuilder.RenameColumn(
-                name: "brand_id",
-                table: "fuel_type_product_codes",
-                newName: "station_id");
-
-            migrationBuilder.RenameIndex(
-                name: "ux_fuel_type_product_codes_brand_code",
-                table: "fuel_type_product_codes",
-                newName: "ux_fuel_type_product_codes_station_code");
-
-            migrationBuilder.RenameColumn(
-                name: "brand_id",
-                table: "fuel_offers",
-                newName: "station_id");
-
-            migrationBuilder.RenameIndex(
-                name: "IX_fuel_offers_brand_id_fuel_type_id",
-                table: "fuel_offers",
-                newName: "IX_fuel_offers_station_id_fuel_type_id");
-
-            migrationBuilder.RenameIndex(
-                name: "IX_fuel_offers_brand_id",
-                table: "fuel_offers",
-                newName: "IX_fuel_offers_station_id");
-
-            migrationBuilder.RenameIndex(
-                name: "ix_fuel_offers_brand_fuel_pool",
-                table: "fuel_offers",
-                newName: "ix_fuel_offers_station_fuel_pool");
-
-            migrationBuilder.RenameColumn(
-                name: "brand_id",
-                table: "fuel_offer_prices",
-                newName: "station_id");
-
-            migrationBuilder.RenameColumn(
-                name: "brand_id",
-                table: "contracts",
-                newName: "station_id");
-
-            migrationBuilder.RenameIndex(
-                name: "IX_contracts_brand_id",
-                table: "contracts",
-                newName: "IX_contracts_station_id");
-
-            migrationBuilder.CreateTable(
-                name: "stations",
-                columns: table => new
-                {
-                    id = table.Column<string>(type: "text", nullable: false),
-                    address = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    color = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false, defaultValue: "#00ff80"),
-                    created_at_utc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    deleted_at_utc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    is_deleted = table.Column<bool>(type: "boolean", nullable: false),
-                    lat = table.Column<double>(type: "double precision", nullable: true),
-                    lng = table.Column<double>(type: "double precision", nullable: true),
-                    logo_text = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    phone = table.Column<string>(type: "character varying(45)", maxLength: 45, nullable: true),
-                    sort_order = table.Column<int>(type: "integer", nullable: false, defaultValue: 999),
-                    station_type = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
-                    updated_at_utc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_stations", x => x.id);
-                    table.CheckConstraint("ck_stations_id_length", "length(id) <= 100");
-                    table.CheckConstraint("ck_stations_name_length", "length(name) <= 200");
-                });
-
-            migrationBuilder.CreateTable(
-                name: "station_nodes",
-                columns: table => new
-                {
-                    id = table.Column<string>(type: "text", nullable: false),
-                    address = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    city = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
-                    created_at_utc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    deleted_at_utc = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    is_deleted = table.Column<bool>(type: "boolean", nullable: false),
-                    lat = table.Column<double>(type: "double precision", nullable: true),
-                    lng = table.Column<double>(type: "double precision", nullable: true),
-                    name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    phone = table.Column<string>(type: "character varying(45)", maxLength: 45, nullable: true),
-                    station_id = table.Column<string>(type: "text", nullable: false),
-                    station_type = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
-                    updated_at_utc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_station_nodes", x => x.id);
-                    table.CheckConstraint("ck_station_nodes_id_length", "length(id) <= 100");
-                    table.CheckConstraint("ck_station_nodes_station_id_length", "length(station_id) <= 100");
-                    table.ForeignKey(
-                        name: "FK_station_nodes_stations_station_id",
-                        column: x => x.station_id,
-                        principalTable: "stations",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.InsertData(
-                table: "stations",
-                columns: new[] { "id", "address", "color", "created_at_utc", "deleted_at_utc", "is_deleted", "lat", "lng", "logo_text", "name", "phone", "sort_order", "station_type", "updated_at_utc" },
-                values: new object[,]
-                {
-                    { "klo", null, "#eab308", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, false, 50.4101, 30.403400000000001, "KLO", "KLO", null, 4, null, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc) },
-                    { "okko", null, "#22c55e", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, false, 50.485100000000003, 30.473400000000002, "OKKO", "OKKO", null, 1, null, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc) },
-                    { "upg", null, "#06b6d4", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, false, 50.400100000000002, 30.613399999999999, "UPG", "UPG", null, 3, null, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc) },
-                    { "wog", null, "#10b981", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, false, 50.450099999999999, 30.523399999999999, "WOG", "WOG", null, 2, null, new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc) }
-                });
-
-            migrationBuilder.AddCheckConstraint(
-                name: "ck_fuel_types_station_id_length",
-                table: "fuel_types",
-                sql: "length(station_id) <= 100");
-
-            migrationBuilder.AddCheckConstraint(
-                name: "ck_fuel_type_product_codes_station_id_length",
-                table: "fuel_type_product_codes",
-                sql: "length(station_id) <= 100");
-
-            migrationBuilder.AddCheckConstraint(
-                name: "ck_fuel_offers_station_id_length",
-                table: "fuel_offers",
-                sql: "length(station_id) <= 100");
-
-            migrationBuilder.AddCheckConstraint(
-                name: "ck_fuel_offer_prices_station_id_length",
-                table: "fuel_offer_prices",
-                sql: "length(station_id) <= 100");
-
-            migrationBuilder.AddCheckConstraint(
-                name: "ck_contracts_station_id_length",
-                table: "contracts",
-                sql: "length(station_id) <= 100");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_station_nodes_station_id",
-                table: "station_nodes",
-                column: "station_id");
-
-            migrationBuilder.AddForeignKey(
-                name: "FK_brand_stations_stations_station_id",
-                table: "brand_stations",
-                column: "station_id",
-                principalTable: "stations",
-                principalColumn: "id",
-                onDelete: ReferentialAction.Restrict);
-        }
+        RenameBrands(migrationBuilder);
+        RenameBrandStations(migrationBuilder);
+        RenameBrandColumns(migrationBuilder);
+    }
+
+    protected override void Down(MigrationBuilder migrationBuilder)
+    {
+        RenameBrandColumnsBack(migrationBuilder);
+        RenameBrandStationsBack(migrationBuilder);
+        RenameBrandsBack(migrationBuilder);
+    }
+
+    // --- the brand network ---------------------------------------------------------------
+
+    private static void RenameBrands(MigrationBuilder migrationBuilder)
+    {
+        migrationBuilder.Sql("""ALTER TABLE "stations" RENAME TO "brands";""");
+        migrationBuilder.Sql("""ALTER TABLE "brands" RENAME CONSTRAINT "PK_stations" TO "PK_brands";""");
+        migrationBuilder.Sql("""ALTER TABLE "brands" RENAME CONSTRAINT "ck_stations_id_length" TO "ck_brands_id_length";""");
+        migrationBuilder.Sql("""ALTER TABLE "brands" RENAME CONSTRAINT "ck_stations_name_length" TO "ck_brands_name_length";""");
+        migrationBuilder.Sql("""ALTER INDEX "IX_stations_name" RENAME TO "IX_brands_name";""");
+        migrationBuilder.Sql("""ALTER INDEX "IX_stations_station_type" RENAME TO "IX_brands_station_type";""");
+    }
+
+    private static void RenameBrandsBack(MigrationBuilder migrationBuilder)
+    {
+        migrationBuilder.Sql("""ALTER INDEX "IX_brands_station_type" RENAME TO "IX_stations_station_type";""");
+        migrationBuilder.Sql("""ALTER INDEX "IX_brands_name" RENAME TO "IX_stations_name";""");
+        migrationBuilder.Sql("""ALTER TABLE "brands" RENAME CONSTRAINT "ck_brands_name_length" TO "ck_stations_name_length";""");
+        migrationBuilder.Sql("""ALTER TABLE "brands" RENAME CONSTRAINT "ck_brands_id_length" TO "ck_stations_id_length";""");
+        migrationBuilder.Sql("""ALTER TABLE "brands" RENAME CONSTRAINT "PK_brands" TO "PK_stations";""");
+        migrationBuilder.Sql("""ALTER TABLE "brands" RENAME TO "stations";""");
+    }
+
+    // --- a filling station inside one ----------------------------------------------------
+
+    private static void RenameBrandStations(MigrationBuilder migrationBuilder)
+    {
+        migrationBuilder.Sql("""ALTER TABLE "station_nodes" RENAME TO "brand_stations";""");
+        migrationBuilder.Sql("""ALTER TABLE "brand_stations" RENAME CONSTRAINT "PK_station_nodes" TO "PK_brand_stations";""");
+        migrationBuilder.Sql("""ALTER TABLE "brand_stations" RENAME CONSTRAINT "ck_station_nodes_id_length" TO "ck_brand_stations_id_length";""");
+        migrationBuilder.Sql("""ALTER TABLE "brand_stations" RENAME CONSTRAINT "FK_station_nodes_stations_station_id" TO "FK_brand_stations_brands_brand_id";""");
+        migrationBuilder.Sql("""ALTER INDEX "IX_station_nodes_station_id" RENAME TO "IX_brand_stations_brand_id";""");
+    }
+
+    private static void RenameBrandStationsBack(MigrationBuilder migrationBuilder)
+    {
+        migrationBuilder.Sql("""ALTER INDEX "IX_brand_stations_brand_id" RENAME TO "IX_station_nodes_station_id";""");
+        migrationBuilder.Sql("""ALTER TABLE "brand_stations" RENAME CONSTRAINT "FK_brand_stations_brands_brand_id" TO "FK_station_nodes_stations_station_id";""");
+        migrationBuilder.Sql("""ALTER TABLE "brand_stations" RENAME CONSTRAINT "ck_brand_stations_id_length" TO "ck_station_nodes_id_length";""");
+        migrationBuilder.Sql("""ALTER TABLE "brand_stations" RENAME CONSTRAINT "PK_brand_stations" TO "PK_station_nodes";""");
+        migrationBuilder.Sql("""ALTER TABLE "brand_stations" RENAME TO "station_nodes";""");
+    }
+
+    // --- the six columns, and every index and CHECK whose name embeds them ----------------
+
+    /// <summary>
+    /// Each table's column, then its index and its length CHECK. A CHECK cannot simply be renamed:
+    /// the definition itself names the column, so it is dropped and re-added in one statement, which
+    /// is atomic - there is no window where the constraint does not exist.
+    /// </summary>
+    private static void RenameBrandColumns(MigrationBuilder migrationBuilder)
+    {
+        migrationBuilder.Sql("""ALTER TABLE "contracts" RENAME COLUMN "station_id" TO "brand_id";""");
+        migrationBuilder.Sql("""ALTER INDEX "IX_contracts_station_id" RENAME TO "IX_contracts_brand_id";""");
+        migrationBuilder.Sql("""ALTER TABLE "contracts" DROP CONSTRAINT "ck_contracts_station_id_length", ADD CONSTRAINT "ck_contracts_brand_id_length" CHECK (length(brand_id) <= 100);""");
+        migrationBuilder.Sql("""ALTER TABLE "contracts" RENAME CONSTRAINT "FK_contracts_stations_station_id" TO "FK_contracts_brands_brand_id";""");
+
+        migrationBuilder.Sql("""ALTER TABLE "fuel_offers" RENAME COLUMN "station_id" TO "brand_id";""");
+        migrationBuilder.Sql("""ALTER INDEX "IX_fuel_offers_station_id" RENAME TO "IX_fuel_offers_brand_id";""");
+        migrationBuilder.Sql("""ALTER INDEX "IX_fuel_offers_station_id_fuel_type_id" RENAME TO "IX_fuel_offers_brand_id_fuel_type_id";""");
+        migrationBuilder.Sql("""ALTER INDEX "ix_fuel_offers_station_fuel_pool" RENAME TO "ix_fuel_offers_brand_fuel_pool";""");
+        migrationBuilder.Sql("""ALTER TABLE "fuel_offers" DROP CONSTRAINT "ck_fuel_offers_station_id_length", ADD CONSTRAINT "ck_fuel_offers_brand_id_length" CHECK (length(brand_id) <= 100);""");
+
+        migrationBuilder.Sql("""ALTER TABLE "fuel_offer_prices" RENAME COLUMN "station_id" TO "brand_id";""");
+        migrationBuilder.Sql("""ALTER TABLE "fuel_offer_prices" DROP CONSTRAINT "ck_fuel_offer_prices_station_id_length", ADD CONSTRAINT "ck_fuel_offer_prices_brand_id_length" CHECK (length(brand_id) <= 100);""");
+
+        migrationBuilder.Sql("""ALTER TABLE "fuel_types" RENAME COLUMN "station_id" TO "brand_id";""");
+        migrationBuilder.Sql("""ALTER INDEX "IX_fuel_types_station_id" RENAME TO "IX_fuel_types_brand_id";""");
+        migrationBuilder.Sql("""ALTER INDEX "ux_fuel_types_station_name" RENAME TO "ux_fuel_types_brand_name";""");
+        migrationBuilder.Sql("""ALTER INDEX "ux_fuel_types_station_brand_fuel_code" RENAME TO "ux_fuel_types_brand_brand_fuel_code";""");
+        migrationBuilder.Sql("""ALTER TABLE "fuel_types" DROP CONSTRAINT "ck_fuel_types_station_id_length", ADD CONSTRAINT "ck_fuel_types_brand_id_length" CHECK (length(brand_id) <= 100);""");
+
+        migrationBuilder.Sql("""ALTER TABLE "fuel_type_product_codes" RENAME COLUMN "station_id" TO "brand_id";""");
+        migrationBuilder.Sql("""ALTER INDEX "ux_fuel_type_product_codes_station_code" RENAME TO "ux_fuel_type_product_codes_brand_code";""");
+        migrationBuilder.Sql("""ALTER TABLE "fuel_type_product_codes" DROP CONSTRAINT "ck_fuel_type_product_codes_station_id_length", ADD CONSTRAINT "ck_fuel_type_product_codes_brand_id_length" CHECK (length(brand_id) <= 100);""");
+
+        migrationBuilder.Sql("""ALTER TABLE "brand_stations" RENAME COLUMN "station_id" TO "brand_id";""");
+        migrationBuilder.Sql("""ALTER TABLE "brand_stations" DROP CONSTRAINT "ck_station_nodes_station_id_length", ADD CONSTRAINT "ck_brand_stations_brand_id_length" CHECK (length(brand_id) <= 100);""");
+    }
+
+    /// <summary>The exact inverse, in the exact reverse order, so a roll-back cycle is a no-op twice over.</summary>
+    private static void RenameBrandColumnsBack(MigrationBuilder migrationBuilder)
+    {
+        // PostgreSQL refuses to rename a column a CHECK references ("other objects depend on it"),
+        // so each table drops its length CHECK, renames, and re-adds it under the old name pointing at
+        // the old column. The gap is inside the migration's transaction, so no session ever sees a
+        // table without the constraint.
+        migrationBuilder.Sql("""ALTER TABLE "brand_stations" DROP CONSTRAINT "ck_brand_stations_brand_id_length";""");
+        migrationBuilder.Sql("""ALTER TABLE "brand_stations" RENAME COLUMN "brand_id" TO "station_id";""");
+        migrationBuilder.Sql("""ALTER TABLE "brand_stations" ADD CONSTRAINT "ck_station_nodes_station_id_length" CHECK (length(station_id) <= 100);""");
+
+        migrationBuilder.Sql("""ALTER TABLE "fuel_type_product_codes" DROP CONSTRAINT "ck_fuel_type_product_codes_brand_id_length";""");
+        migrationBuilder.Sql("""ALTER TABLE "fuel_type_product_codes" RENAME COLUMN "brand_id" TO "station_id";""");
+        migrationBuilder.Sql("""ALTER TABLE "fuel_type_product_codes" ADD CONSTRAINT "ck_fuel_type_product_codes_station_id_length" CHECK (length(station_id) <= 100);""");
+        migrationBuilder.Sql("""ALTER INDEX "ux_fuel_type_product_codes_brand_code" RENAME TO "ux_fuel_type_product_codes_station_code";""");
+
+        migrationBuilder.Sql("""ALTER TABLE "fuel_types" DROP CONSTRAINT "ck_fuel_types_brand_id_length";""");
+        migrationBuilder.Sql("""ALTER TABLE "fuel_types" RENAME COLUMN "brand_id" TO "station_id";""");
+        migrationBuilder.Sql("""ALTER TABLE "fuel_types" ADD CONSTRAINT "ck_fuel_types_station_id_length" CHECK (length(station_id) <= 100);""");
+        migrationBuilder.Sql("""ALTER INDEX "IX_fuel_types_brand_id" RENAME TO "IX_fuel_types_station_id";""");
+        migrationBuilder.Sql("""ALTER INDEX "ux_fuel_types_brand_name" RENAME TO "ux_fuel_types_station_name";""");
+        migrationBuilder.Sql("""ALTER INDEX "ux_fuel_types_brand_brand_fuel_code" RENAME TO "ux_fuel_types_station_brand_fuel_code";""");
+
+        migrationBuilder.Sql("""ALTER TABLE "fuel_offer_prices" DROP CONSTRAINT "ck_fuel_offer_prices_brand_id_length";""");
+        migrationBuilder.Sql("""ALTER TABLE "fuel_offer_prices" RENAME COLUMN "brand_id" TO "station_id";""");
+        migrationBuilder.Sql("""ALTER TABLE "fuel_offer_prices" ADD CONSTRAINT "ck_fuel_offer_prices_station_id_length" CHECK (length(station_id) <= 100);""");
+
+        migrationBuilder.Sql("""ALTER TABLE "fuel_offers" DROP CONSTRAINT "ck_fuel_offers_brand_id_length";""");
+        migrationBuilder.Sql("""ALTER TABLE "fuel_offers" RENAME COLUMN "brand_id" TO "station_id";""");
+        migrationBuilder.Sql("""ALTER TABLE "fuel_offers" ADD CONSTRAINT "ck_fuel_offers_station_id_length" CHECK (length(station_id) <= 100);""");
+        migrationBuilder.Sql("""ALTER INDEX "IX_fuel_offers_brand_id" RENAME TO "IX_fuel_offers_station_id";""");
+        migrationBuilder.Sql("""ALTER INDEX "IX_fuel_offers_brand_id_fuel_type_id" RENAME TO "IX_fuel_offers_station_id_fuel_type_id";""");
+        migrationBuilder.Sql("""ALTER INDEX "ix_fuel_offers_brand_fuel_pool" RENAME TO "ix_fuel_offers_station_fuel_pool";""");
+
+        migrationBuilder.Sql("""ALTER TABLE "contracts" DROP CONSTRAINT "ck_contracts_brand_id_length";""");
+        migrationBuilder.Sql("""ALTER TABLE "contracts" RENAME COLUMN "brand_id" TO "station_id";""");
+        migrationBuilder.Sql("""ALTER TABLE "contracts" ADD CONSTRAINT "ck_contracts_station_id_length" CHECK (length(station_id) <= 100);""");
+        migrationBuilder.Sql("""ALTER INDEX "IX_contracts_brand_id" RENAME TO "IX_contracts_station_id";""");
+        migrationBuilder.Sql("""ALTER TABLE "contracts" RENAME CONSTRAINT "FK_contracts_brands_brand_id" TO "FK_contracts_stations_station_id";""");
     }
 }
