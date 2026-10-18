@@ -25,28 +25,24 @@ public sealed class FuelNominalBackfillIntegrationTests : IClassFixture<TestData
             .Options, TestQrCipher.Instance);
 
     [Fact]
-    public async Task EveryLiveVolume_BecomesANominalOfItsFuel()
-    {
-        await using var context = CreateContext();
+public async Task Every_Seeded_Fuel_Has_At_Least_One_Nominal()
+{
+    await using var context = CreateContext();
 
-        // The pairs the backfill had to copy, straight from the table it read.
-        var fromVolumes = await (from v in context.FuelOfferVolumes
-                                 join o in context.FuelOffers on v.OfferId equals o.Id
-                                 where !v.IsDeleted && !o.IsDeleted && v.Liters > 0
-                                 select new { o.FuelTypeId, Liters = v.Liters })
-            .Distinct()
-            .ToListAsync();
+    // This used to read `fuel_offer_volumes` and prove that the backfill copied every live size
+    // across. That table is gone, so the copy can no longer be observed at runtime - the migration
+    // that did it is history and still correct, but nothing is left to compare against. What is
+    // still observable, and is what actually matters, is that the seeded catalogue has sizes at
+    // all: a fuel with no nominal is a fuel the storefront cannot sell, and it would read as an
+    // empty catalogue rather than as a missing one.
+    var fuelsWithoutASize = await (from f in context.FuelTypes
+        where !f.IsDeleted
+        && !context.FuelNominals.Any(n => n.FuelTypeId == f.Id)
+        select f.Id)
+        .ToListAsync();
 
-        fromVolumes.Should().NotBeEmpty("a fresh catalogue has no volumes to copy and this test proves nothing");
-
-        var nominals = await context.FuelNominals
-            .AsNoTracking()
-            .Select(n => new { n.FuelTypeId, n.Liters })
-            .ToListAsync();
-
-        nominals.Should().Contain(fromVolumes,
-            "a nominal that is not listed after the backfill is a size the operator chose which has vanished from the shelf");
-    }
+    fuelsWithoutASize.Should().BeEmpty("a fresh catalogue is seeded with sizes for every live fuel");
+}
 
     [Fact]
     public async Task ANominal_IsOneRowPerFuelAndSize_NotPerOffer()

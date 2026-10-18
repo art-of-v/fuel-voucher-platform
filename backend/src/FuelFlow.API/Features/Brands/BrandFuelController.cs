@@ -226,9 +226,9 @@ public sealed class BrandFuelController : ControllerBase
             var existingFuelIds = await _context.FuelTypes
                 .Where(f => f.BrandId == id && f.Id != fuel.Id)
                 .Select(f => f.Id).ToListAsync(ct);
-            litersToCreate = await _context.FuelOfferVolumes
-                .Where(v => existingFuelIds.Contains(v.Offer.FuelTypeId))
-                .Select(v => (int)v.Liters)
+            litersToCreate = await _context.FuelNominals
+                .Where(n => existingFuelIds.Contains(n.FuelTypeId))
+                .Select(n => (int)n.Liters)
                 .Distinct()
                 .OrderBy(l => l)
                 .ToListAsync(ct);
@@ -270,23 +270,21 @@ public sealed class BrandFuelController : ControllerBase
         // rather than at the first time somebody edited it.
         await _priceRecorder.RecordAsync(offer, OfferPriceReasons.Operator, GetUserId(), ct: ct);
 
-        foreach (var liters in litersToCreate)
+            foreach (var liters in litersToCreate)
         {
-            _context.FuelOfferVolumes.Add(new FuelOfferVolume
+            // The sizes are the fuel's, stated once. No price override either: a fuel added through
+            // this screen is priced like itself, and the "before" price the storefront strikes
+            // through is recomputed from the pump price via FuelPricing.OriginalPackagePrice
+            // (planning #73), so the supplier cost never leaks to anonymous callers.
+            _context.FuelNominals.Add(new FuelNominal
             {
-                Id = Guid.CreateVersion7().ToString(),
-                OfferId = offer.Id,
+                FuelTypeId = fuel.Id,
                 Liters = liters,
-                // No price override: a fuel added through this screen is priced like itself, and the
-                // "before" price the storefront strikes through is recomputed from the pump price via
-                // FuelPricing.OriginalPackagePrice (planning #73), so the supplier cost never leaks to
-                // anonymous callers. An operator who wants one size priced by hand sets an override
-                // afterwards, and from then on it survives every reprice — which is what made this
-                // column worth having.
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow,
             });
         }
+
         await _context.SaveChangesAsync(ct);
 
         var userId = GetUserId();
@@ -379,6 +377,11 @@ public sealed class BrandFuelController : ControllerBase
         var otherOfferId = OfferKeys.For(fuel.Id, otherPool);
         var otherOffer = await _context.FuelOffers.FirstOrDefaultAsync(o => o.Id == otherOfferId, ct);
 
+        // Whether this request is the one that made the offer. An entity it created is already
+        // Added; calling Update on it turns that into an UPDATE against a row that is not there yet,
+        // which the database answers with a concurrency failure.
+        var offerCreatedNow = offer is null;
+
         if (offer is null)
         {
             offer = new FuelOffer
@@ -393,28 +396,18 @@ public sealed class BrandFuelController : ControllerBase
             _context.FuelOffers.Add(offer);
         }
 
-        var volumes = await _context.FuelOfferVolumes
-            .Where(v => v.OfferId == offerId || v.OfferId == otherOfferId)
-            .ToListAsync(ct);
-
-        var seededVolumes = volumes.Count == 0;
-        if (seededVolumes)
-        {
-            volumes = DefaultNominals.Select(liters => new FuelOfferVolume
-            {
-                Id = Guid.CreateVersion7().ToString(),
-                OfferId = offerId,
-                Liters = liters,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow,
-            }).ToList();
-            _context.FuelOfferVolumes.AddRange(volumes);
-        }
-        else if (offerId != otherOfferId)
-        {
-            // Re-keying: the volumes belonged to the other pool's offer and now belong to this one.
-            foreach (var volume in volumes) volume.OfferId = offerId;
-        }
+var seededNominals = await _context.FuelNominals
+    .AnyAsync(n => n.FuelTypeId == fuel.Id, ct);
+    if (!seededNominals)
+    {
+    _context.FuelNominals.AddRange(DefaultNominals.Select(liters => new FuelNominal
+    {
+        FuelTypeId = fuel.Id,
+        Liters = liters,
+        CreatedAtUtc = DateTime.UtcNow,
+        UpdatedAtUtc = DateTime.UtcNow,
+    }));
+    }
 
         var Brand = await _context.Brands.FirstOrDefaultAsync(s => s.Id == fuel.BrandId, ct);
         var BrandName = Brand?.Name ?? "?";
@@ -527,8 +520,8 @@ public sealed class BrandFuelController : ControllerBase
             fuel.BrandFuelCode = wanted;
         }
 
-        if (!seededVolumes) _context.FuelOfferVolumes.UpdateRange(volumes);
-        if (!seededVolumes) _context.FuelOffers.Update(offer);
+
+        if (!offerCreatedNow) _context.FuelOffers.Update(offer);
         _context.FuelTypes.Update(fuel);
 
         await _context.SaveChangesAsync(ct);
@@ -620,9 +613,6 @@ public sealed class BrandFuelController : ControllerBase
         var offerIdsToArchive = await _context.FuelOffers
             .Where(o => o.FuelTypeId == fuelId)
             .Select(o => o.Id).ToListAsync(ct);
-        var packages = await _context.FuelOfferVolumes
-            .Where(v => offerIdsToArchive.Contains(v.OfferId))
-            .ToListAsync(ct);
         var offersToArchive = await _context.FuelOffers
             .Where(o => offerIdsToArchive.Contains(o.Id))
             .ToListAsync(ct);
@@ -630,20 +620,16 @@ public sealed class BrandFuelController : ControllerBase
         // Archive rather than remove - same reasoning as the brand branch above: the cascade from
         // fuel_types reaches fuel_vouchers (#217).
         var archivedAt = DateTime.UtcNow;
-        foreach (var package in packages)
-        {
-            package.IsDeleted = true;
-            package.DeletedAtUtc = archivedAt;
-        }
-        // The offers go too. Archiving only their volumes would leave a live offer behind with no
-        // sellable volume, and the next nominals edit would happily add volumes back to a brand that was
-        // deleted - the offer is the row that says "this fuel is on sale here", so it is the row that has
-        // to say no.
+        // The sizes are not archived: they belong to the fuel, and the fuel row below is the one that
+        // says no. Archiving the offers is what takes the fuel off the shelf, and a live offer would
+        // put it back the moment a nominals edit touched the fuel.
         foreach (var offer in offersToArchive)
         {
             offer.IsDeleted = true;
             offer.DeletedAtUtc = archivedAt;
-        }        fuel.IsDeleted = true;
+        }
+
+        fuel.IsDeleted = true;
         fuel.DeletedAtUtc = archivedAt;
         await _context.SaveChangesAsync(ct);
 

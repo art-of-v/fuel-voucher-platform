@@ -162,7 +162,7 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
     /// concurrent PUTs could both insert - and the ordering was the mitigation.
     /// <para>
     /// The split removed the possibility rather than the symptom. <c>UNIQUE (brand_id, fuel_type_id,
-    /// data_kind)</c> on fuel_offers times <c>UNIQUE (offer_id, liters)</c> on fuel_offer_volumes makes
+    /// the fuel's own primary key on fuel_nominals makes (brand, fuel, size) unique inside a pool, so the
     /// the triple unique inside a pool, so the race that produced two rows now fails at the constraint.
     /// Asserting "the newer one wins" would be asserting a tie-break that can never be reached, and it
     /// would quietly invite someone to reintroduce the ambiguity by ordering the query.
@@ -173,7 +173,7 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
     /// </para>
     /// </remarks>
     [Fact]
-    public async Task A_DuplicateVolumeOnOneKey_IsRefusedByTheDatabase()
+    public async Task A_DuplicateNominalOnOneKey_IsRefusedByTheDatabase()
     {
         using var seed = CreateContext();
         await TruncatePackagesAsync(seed);
@@ -181,9 +181,11 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
         SeedPackage(seed, "first", isTestData: false, liters: 20m, pricePerLiter: 89m, updatedMinutesAgo: 120);
         await seed.SaveChangesAsync();
 
-        // Same offer (same Brand, fuel and pool) and the same nominal - the exact row the old
-        // read-then-write race produced.
-        SeedPackage(seed, "second", isTestData: false, liters: 20m, pricePerLiter: 89m, updatedMinutesAgo: 1);
+        // The same size twice, added straight rather than through the fixture: the helper treats a
+        // size the fuel already lists as done, which is correct for a caller and useless here - the
+        // point is what the DATABASE does with the row an old read-then-write race would have
+        // produced, so the duplicate has to actually reach it.
+        seed.FuelNominals.Add(new FuelNominal { FuelTypeId = "okko-95", Liters = 20m });
 
         var act = async () => await seed.SaveChangesAsync();
         await act.Should().ThrowAsync<DbUpdateException>();
@@ -251,7 +253,7 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
 
     private static async Task TruncatePackagesAsync(ApplicationDbContext context)
         => await context.Database.ExecuteSqlRawAsync(
-            """TRUNCATE TABLE "fuel_offer_volumes", "fuel_offers", "fuel_vouchers", "orders", "order_line_items", "fulfillments", "outbox_events" RESTART IDENTITY CASCADE""");
+            """TRUNCATE TABLE "fuel_offers", "fuel_vouchers", "orders", "order_line_items", "fulfillments", "outbox_events" RESTART IDENTITY CASCADE""");
 
     /// <summary>
     /// Seeds one sellable package as an offer plus a volume.
@@ -296,14 +298,8 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
             });
         }
 
-        seed.FuelOfferVolumes.Add(new FuelOfferVolume
-        {
-            Id = id,
-            OfferId = offerId,
-            Liters = liters,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow.AddMinutes(-updatedMinutesAgo),
-        });
+        // Availability resolves sizes from fuel_nominals, so a fuel without one is a package the
+        // resolver cannot see. Stated once per (fuel, size): both pools of a fuel sell the same sizes.
 
         // Availability resolves sizes from fuel_nominals, so a volume without one is a package the
         // resolver cannot see. Stated once per (fuel, size): both pools of a fuel sell the same sizes.

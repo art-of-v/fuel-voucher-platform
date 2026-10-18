@@ -98,9 +98,8 @@ public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDataba
                 .ToListAsync();
             var seededOfferIds = seededOffers.Select(o => o.Id).ToList();
 
-            context.FuelOfferVolumes.RemoveRange(await context.FuelOfferVolumes
-                .Where(v => seededOfferIds.Contains(v.OfferId))
-                .ToListAsync());
+        // The sizes are the fuel's and the seeded catalogue already states them; nothing per
+        // offer has to be torn down here any more.
 
             // The price history hangs off the offer with a foreign key and no cascade, so it goes first.
             context.FuelOfferPrices.RemoveRange(await context.FuelOfferPrices

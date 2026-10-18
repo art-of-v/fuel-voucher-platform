@@ -127,20 +127,13 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         });
-        _context.FuelOfferVolumes.AddRange(
+        _context.FuelNominals.AddRange(
             // The QA leftover, inserted first so an unordered read would pick it.
             Package("test-dp-001", 0.01m, cost: 5.00m, final: 10.00m),
             Package("test-dp-2", 2m, cost: 100.00m, final: 99.90m),
             Package("test-dp-3", 3m, cost: 100.00m, final: 99.90m),
             Package("test-dp-10", 10m, cost: 100.00m, final: 99.90m));
-        // The card reads the sizes from fuel_nominals, so each volume needs its size stated there too.
-        _context.FuelNominals.AddRange(
-            new FuelNominal { FuelTypeId = "test-dp", Liters = 0.01m },
-            new FuelNominal { FuelTypeId = "test-dp", Liters = 2m },
-            new FuelNominal { FuelTypeId = "test-dp", Liters = 3m },
-            new FuelNominal { FuelTypeId = "test-dp", Liters = 10m });
         await _context.SaveChangesAsync();
-
         var providers = await _handler.HandleAsync(new GetBrandsQuery());
         var fuel = providers.Single(p => p.Id == "test-okko").Fuels.Single();
 
@@ -193,16 +186,11 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         });
-        // Two volumes of ONE offer, seeded with different costs. There is no second offer to put the second
-        // price on, so the offer carries one cost and the card reports it.
-        _context.FuelOfferVolumes.AddRange(
+        // Two sizes of ONE offer. The offer carries the price; the sizes are the fuel's, so the card
+        // reports one price per fuel and lists both sizes.
+        _context.FuelNominals.AddRange(
             Package("test-dp-2", 2m, cost: 100.00m, final: 99.90m),
             Package("test-dp-10", 10m, cost: 110.00m, final: 105.00m));
-        // The card reads the sizes from fuel_nominals, so stating them only as volumes describes a
-        // fuel nothing can see. One fuel, two allowed sizes.
-        _context.FuelNominals.AddRange(
-            new FuelNominal { FuelTypeId = "test-dp", Liters = 2m },
-            new FuelNominal { FuelTypeId = "test-dp", Liters = 10m });
         await _context.SaveChangesAsync();
 
         var providers = await _handler.HandleAsync(new GetBrandsQuery());
@@ -246,7 +234,7 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
         // is 101. This fixture used to state 99.90, which its own cost and margin did not produce - a
         // discrepancy the seeder now refuses, and the reason it does: a fixture that disagrees with the
         // formula proves nothing about the rows the application would really write.
-        _context.FuelOfferVolumes.AddRange(
+        _context.FuelNominals.AddRange(
             Package("test-dp-a", 2m, cost: 100.00m, final: 101m, margin: 1.00m, pump: 105m),
             Package("test-dp-b", 5m, cost: 100.00m, final: 101m, margin: 1.00m, pump: 105m),
             Package("test-dp-c", 9m, cost: 100.00m, final: 101m, margin: 1.00m, pump: 105m));
@@ -266,24 +254,25 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
     /// working with only the DbSet renamed. The per-litre figures move to the offer because that is
     /// where the brand card now reads them: one price per litre per fuel, not one copy per package.
     /// </remarks>
-    private FuelOfferVolume Package(
+private FuelNominal Package(
         string id, decimal liters, decimal cost, decimal final,
         decimal? margin = null, decimal? pump = null)
     {
-        var offer = _context.SeedOffer(
-            "test-okko", "test-dp",
-            supplierPricePerLiter: cost,
-            marginUahPerLiter: margin ?? (final - cost),
-            finalPricePerLiter: final,
-            pumpPricePerLiter: pump,
-            minDiscountPerLiter: 0.5m);
+    _context.SeedOffer(
+        "test-okko", "test-dp",
+        supplierPricePerLiter: cost,
+        marginUahPerLiter: margin ?? (final - cost),
+        finalPricePerLiter: final,
+        pumpPricePerLiter: pump,
+        minDiscountPerLiter: 0.5m);
 
-        return new FuelOfferVolume
-        {
-            Id = id,
-            OfferId = offer.Id,
-            Liters = liters,
-            CreatedAtUtc = DateTime.UtcNow,
+    // The size, keyed by fuel and litres. The offer supplies the price; the nominal says the size
+    // is sold at all, and it is the same row whichever pool reads it.
+    return new FuelNominal
+    {
+        FuelTypeId = "test-dp",
+        Liters = liters,
+        CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
         };
     }

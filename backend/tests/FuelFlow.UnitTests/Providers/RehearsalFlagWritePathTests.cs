@@ -465,9 +465,9 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
             CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
         };
         _context.FuelOffers.Add(offer);
-        _context.FuelOfferVolumes.Add(new FuelOfferVolume
+        _context.FuelNominals.Add(new FuelNominal
         {
-            Id = "qa-vol-a95", OfferId = offer.Id, Liters = 10m,
+            FuelTypeId = offer.FuelTypeId, Liters = 10m,
             CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
         });
     }

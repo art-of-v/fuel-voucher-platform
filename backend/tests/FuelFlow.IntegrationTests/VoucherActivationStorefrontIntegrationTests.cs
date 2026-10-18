@@ -115,11 +115,11 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
             });
         }
 
-        // Seeded as an offer plus a volume: the storefront resolves its package through the offer, so a
-        // row in fuel_packages would leave the shop dark and every "activating turns it on" assertion
-        // would pass against a package the app cannot see.
-        if (!await context.FuelOfferVolumes.AnyAsync(
-                v => v.Offer.BrandId == BrandId && v.Offer.FuelTypeId == fuelTypeId && v.Liters == liters,
+        // Seeded as an offer plus the size it is sold in: the storefront resolves its package
+        // through the offer and the fuel's nominal list, so seeding neither would leave the shop dark
+        // and every "activating turns it on" assertion would pass against a package the app cannot see.
+        if (!await context.FuelNominals.AnyAsync(
+                n => n.FuelTypeId == fuelTypeId && n.Liters == liters,
                 CancellationToken.None))
         {
             context.SeedPackage(

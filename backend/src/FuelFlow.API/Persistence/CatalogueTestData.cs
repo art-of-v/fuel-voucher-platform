@@ -150,7 +150,7 @@ internal static class CatalogueTestData
     /// <c>ImportOkkoPumpPrices</c> used to have.
     /// </para>
     /// </remarks>
-    public static FuelOfferVolume SeedPackage(
+    public static FuelNominal SeedPackage(
         this ApplicationDbContext context,
         string id,
         string BrandId,
@@ -181,28 +181,26 @@ var offer = context.SeedOffer(
     // checkout refuses, exactly as it would in production.
     _ = price;
 
-        // The size is the fuel's, not a row's: the storefront and checkout both read the size list from
-    // fuel_nominals now, so a fixture that seeds only a volume describes a package nothing can see.
-    // Both are written while the volume table still exists - the volume still carries the pool-scoped
-    // id that the admin paths address - and the nominal is what the sellable read path resolves.
-    var alreadyListed =
-        context.FuelNominals.Local.Any(n => n.FuelTypeId == fuelTypeId && n.Liters == liters)
-        || context.FuelNominals.Any(n => n.FuelTypeId == fuelTypeId && n.Liters == liters);
-    if (!alreadyListed)
-    {
-        context.FuelNominals.Add(new FuelNominal { FuelTypeId = fuelTypeId, Liters = liters });
-    }
-
-        var volume = new FuelOfferVolume
+        var nominal = new FuelNominal
         {
-            Id = id,
-            OfferId = offer.Id,
+            FuelTypeId = fuelTypeId,
             Liters = liters,
             CreatedAtUtc = createdAtUtc ?? DateTime.UtcNow,
             UpdatedAtUtc = updatedAtUtc ?? DateTime.UtcNow,
         };
-        context.FuelOfferVolumes.Add(volume);
-        return volume;
+
+        // `HasData` seeds the same (fuel, size) pairs into a fresh database, so adding one blindly
+        // collides on the primary key. The size is a fact about the fuel, not about this fixture, so
+        // finding it already there is the correct answer rather than something to fail over.
+        var alreadyListed =
+            context.FuelNominals.Local.Any(n => n.FuelTypeId == fuelTypeId && n.Liters == liters)
+            || context.FuelNominals.Any(n => n.FuelTypeId == fuelTypeId && n.Liters == liters);
+        if (alreadyListed)
+            return context.FuelNominals.Local.FirstOrDefault(n => n.FuelTypeId == fuelTypeId && n.Liters == liters)
+                ?? new FuelNominal { FuelTypeId = fuelTypeId, Liters = liters };
+
+        context.FuelNominals.Add(nominal);
+        return nominal;
     }
 
     /// <summary>

@@ -140,8 +140,11 @@ public sealed class FuelOffer
     /// </summary>
     public string DataKind { get; set; } = DataKinds.Real;
 
-    /// <summary>The volumes this offer is sold in. Not a query filter: see <see cref="FuelPackage"/>.</summary>
-    public ICollection<FuelOfferVolume> Volumes { get; set; } = new List<FuelOfferVolume>();
+    /// <summary>
+    /// The sizes this offer sells in are not its own: they belong to the fuel, in
+    /// <see cref="FuelNominal"/>. An offer is the pool and the price; the catalogue's shape is
+    /// one answer for every pool, which is what keeps a rehearsal size from being a live one.
+    /// </summary>
 
     /// <summary>
     /// Whether this offer is rehearsal data and must never reach the storefront. A view over

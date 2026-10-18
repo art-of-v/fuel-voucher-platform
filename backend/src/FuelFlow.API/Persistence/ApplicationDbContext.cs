@@ -115,7 +115,6 @@ private readonly FuelFlow.Features.Vouchers.Security.IQrCipher _qrCipher;
     // The split target of #318. Nothing reads these yet in this PR: they are created, backfilled and
     // constrained so the migration can be proved against a real database before any read path moves.
     public DbSet<FuelOffer> FuelOffers => Set<FuelOffer>();
-    public DbSet<FuelOfferVolume> FuelOfferVolumes => Set<FuelOfferVolume>();
     public DbSet<FuelNominal> FuelNominals => Set<FuelNominal>();
 
     // The append-only record of what each offer was priced at. Read by nothing in the application yet
@@ -174,14 +173,14 @@ var cipher = _qrCipher;
 
         modelBuilder.Entity<Brand>().HasData(SeedData.Brands);
         modelBuilder.Entity<FuelTypeEntity>().HasData(SeedData.FuelTypes);
-        // The catalogue is seeded as offers plus volumes, because that is what the application reads.
-        // fuel_packages is not seeded and no longer exists: it was deliberately left unseeded while it
-        // survived as the rollback target for an already-migrated database, because seeding it would
-        // have created a second source of truth for prices in a fresh database. DropFuelPackages is
-        // that release, so there is now only one shape and it is the one the application reads.
-        var (seedOffers, seedVolumes) = SeedData.Catalogue;
+        // The catalogue is seeded as offers plus the sizes those fuels are sold in, because that is
+        // what the application reads. The volumes are gone: a size belongs to the fuel, so one row
+        // per fuel states the whole catalogue's shape and both pools show it.
+        var seedOffers = SeedData.Catalogue.Offers;
         modelBuilder.Entity<FuelOffer>().HasData(seedOffers);
-        modelBuilder.Entity<FuelOfferVolume>().HasData(seedVolumes);
+        // fuel_nominals is NOT seeded here. The 2026-10-18 backfill already wrote a row for every
+        // live volume, which is exactly this set; seeding it again inserts the same primary keys a
+        // second time and the migration fails. One source for the sizes: the backfill.
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
