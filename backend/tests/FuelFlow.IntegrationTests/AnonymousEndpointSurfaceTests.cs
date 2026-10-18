@@ -115,8 +115,15 @@ public class AnonymousEndpointSurfaceTests : IClassFixture<TestDatabaseFixture>
         // credential a bot platform can offer - see TelegramFeedbackWebhookController. Without it
         // anyone who learned the URL could post fake updates into a customer's chat or flood the
         // staff group. A reviewed decision, not a missing [Authorize].
-        "POST /api/telegram/feedback/webhook",
-    ];
+"POST /api/telegram/feedback/webhook",
+
+          // Telegram's webhook for the settlement channel. Same authentication, and a higher
+          // consequence: this one creates payments. The secret header proves the delivery came from
+          // Telegram and nothing else - the sender allow list inside SettlementUpdateHandler is the
+          // boundary that decides who may move money, and an empty list accepts nobody. Without the
+          // header, anyone who learned the URL could declare money into the ledger.
+          "POST /api/telegram/settlement/webhook",
+      ];
 
     [Fact]
     public async Task FallbackPolicy_RequiresAnAuthenticatedUser()

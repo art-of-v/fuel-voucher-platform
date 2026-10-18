@@ -7,6 +7,7 @@ using FuelFlow.Features.Notifications.SharedModels;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Settings.SharedModels;
+using FuelFlow.Features.Settlement.SharedModels;
 using FuelFlow.Features.Support.SharedModels;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.Features.Vouchers;
@@ -87,6 +88,10 @@ private readonly FuelFlow.Features.Vouchers.Security.IQrCipher _qrCipher;
     // acted on. See Features/Payments for why both arrived at once.
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<WebhookEvent> WebhookEvents => Set<WebhookEvent>();
+
+    // Every message the settlement channel receives, including the ones that produced no payment.
+    // Its unique (chat_id, message_id) is what stops a Telegram redelivery becoming a second payment.
+    public DbSet<SettlementMessage> SettlementMessages => Set<SettlementMessage>();
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
     public DbSet<OutboxEvent> OutboxEvents => Set<OutboxEvent>();
     public DbSet<Notification> Notifications => Set<Notification>();
