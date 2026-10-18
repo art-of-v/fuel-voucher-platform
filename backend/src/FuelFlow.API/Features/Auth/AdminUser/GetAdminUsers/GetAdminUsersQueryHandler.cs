@@ -26,11 +26,16 @@ public sealed class GetAdminUsersQueryHandler
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
             var search = query.Search.Trim().ToLowerInvariant();
+
+            // Settlement code is searchable on purpose: an operator receiving a settlement message
+            // pastes the code rather than the customer's name, and without this the only way from the
+            // code to the customer is to scroll the whole list.
             items = items.Where(u =>
                 (u.PhoneNumber?.ToLowerInvariant().Contains(search) == true) ||
                 (u.Email?.ToLowerInvariant().Contains(search) == true) ||
                 (u.FirstName?.ToLowerInvariant().Contains(search) == true) ||
-                (u.LastName?.ToLowerInvariant().Contains(search) == true)).ToList();
+                (u.LastName?.ToLowerInvariant().Contains(search) == true) ||
+                (u.SettlementCode?.ToLowerInvariant().Contains(search) == true)).ToList();
         }
 
         return items.Select(u => new AdminUserDto
@@ -44,6 +49,10 @@ public sealed class GetAdminUsersQueryHandler
             ProfileImageUrl = u.ProfileImageUrl,
             ReferralCode = u.ReferralCode,
             ReferredBy = u.ReferredBy,
+            // The column is NOT NULL, so this only ever sees a value for a row that has been inserted. Empty
+                // rather than null so the grid renders a visibly wrong cell instead of a blank one if
+                // that ever stops being true.
+                SettlementCode = u.SettlementCode ?? string.Empty,
             BonusBalance = u.BonusBalance,
             Role = u.Role?.Name,
             IsActive = u.IsActive,
@@ -72,6 +81,14 @@ public sealed class AdminUserDto
     public string? ProfileImageUrl { get; set; }
     public string? ReferralCode { get; set; }
     public string? ReferredBy { get; set; }
+
+    /// <summary>
+    /// Read-only, staff-only, no setter anywhere. The operator quotes this to attribute money to a
+    /// customer, so the panel is the only place it may be surfaced - it must not be added to any
+    /// customer-facing response, and no endpoint may accept it as an input.
+    /// </summary>
+    public string SettlementCode { get; set; } = null!;
+
     public decimal BonusBalance { get; set; }
     public string? Role { get; set; }
     public bool IsActive { get; set; }

@@ -327,6 +327,10 @@ voucherNumber: string;
     // column rendered "N/A" for every user. referredBy stays - the column predates the feature
     // and is populated by other paths.
     referredBy: string | null;
+    // Read-only and staff-only: the code an operator quotes to attribute money to this customer.
+    // Issued once at registration and immutable, so there is nothing to edit and no endpoint that
+    // accepts one as input.
+    settlementCode: string;
     bonusBalance: number;
     isDeleted: boolean;
     isActive: boolean;
@@ -1022,6 +1026,7 @@ if (status === "booting") {
                     <th className="text-left p-4">{t('table.id')}</th>
                     <th className="text-left p-4">{t('table.name')}</th>
                     <th className="text-left p-4">{t('table.phone')}</th>
+                    <th className="text-left p-4">{t('table.settlementCode')}</th>
                     <th className="text-left p-4">{t('table.email')}</th>
                     <th className="text-left p-4">{t('table.birthdate')}</th>
                     <th className="text-left p-4">{t('table.bonusBalance')}</th>
@@ -1723,8 +1728,16 @@ if (status === "booting") {
                               <div className="text-[10px] text-muted-foreground/70">
                                 {t('vouchers.customerExpires')}: {formatDate(v.customerExpirationDate)}
                               </div>
-                            )}
-                          </td>
+)}
+                      </td>
+                      <td className="p-4">
+                        <span
+                          className="inline-flex items-center px-1.5 py-0.5 rounded bg-muted font-mono text-xs font-semibold tracking-wider text-foreground"
+                          title={t('users.settlementCodeTitle')}
+                        >
+                          {user.settlementCode}
+                        </span>
+                      </td>
                           <td className="p-4 font-mono text-xs text-muted-foreground">{v.voucherNumber}</td>
                           <td className="p-4">
                             <div className="flex items-center gap-2">

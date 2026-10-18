@@ -4481,6 +4481,12 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("role_id");
 
+                    b.Property<string>("SettlementCode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("settlement_code");
+
                     b.Property<int>("TokenVersion")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
@@ -4504,6 +4510,9 @@ namespace FuelFlow.API.Migrations
                         .HasFilter("referral_code IS NOT NULL AND is_deleted = false");
 
                     b.HasIndex("RoleId");
+
+                    b.HasIndex("SettlementCode")
+                        .IsUnique();
 
                     b.ToTable("users", null, t =>
                         {

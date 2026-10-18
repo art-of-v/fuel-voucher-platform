@@ -30,6 +30,32 @@ public sealed class User
 
     public string? ReferralCode { get; set; }
     public string? ReferredBy { get; set; }
+
+    /// <summary>
+    /// The short identifier an operator quotes to the finance channel to attribute money to this
+    /// customer. Issued once by the database and immutable for the life of the account: a changed
+    /// code orphans every payment recorded against it.
+    /// <para>
+    /// Deliberately NOT <see cref="ReferralCode"/>. That one is optional, chosen by the customer,
+    /// and may change - correct for marketing, wrong for money, and a customer without one would
+    /// have no way to be paid on this route at all. This one also avoids <c>0 O 1 I L</c>: it is
+    /// transcribed by hand, and those are the pairs people misread. A mistyped code credits money
+    /// to the wrong person, so the alphabet trades a little space for legibility.
+    /// </para>
+    /// <para>
+    /// Staff-only. It must not appear in any customer-facing response, and there is deliberately no
+    /// path that lets a client choose or change it.
+    /// </para>
+    /// <para>
+    /// Nullable in C# on purpose, although the column is NOT NULL. The value is store-generated:
+    /// EF must omit it from the INSERT so the database assigns it (see <c>ValueGeneratedOnAdd</c>).
+    /// Giving it a non-null default here - even <c>string.Empty</c> - makes EF send that default,
+    /// the trigger's "if NULL, assign" never fires, and every user collides on the same value at
+    /// the unique index. Null means "not yet issued", which is exactly true before the INSERT.
+    /// </para>
+    /// </summary>
+    public string? SettlementCode { get; set; }
+
     /// <summary>
     /// UAH. Decimal, not an integer type: money is never an integer type, whatever the scale - see the
     /// money-type decision in the schema notes. Displayed directly as UAH by the admin client

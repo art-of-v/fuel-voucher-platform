@@ -62,7 +62,24 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasColumnName("referred_by")
             .HasMaxLength(50);
 
-    builder.Property(e => e.BonusBalance)
+        builder.Property(e => e.SettlementCode)
+            .HasColumnName("settlement_code")
+            .HasMaxLength(8)
+            .IsRequired()
+            // Store-generated. Without this EF includes the column in every INSERT and writes the
+            // CLR default, so trg_users_assign_settlement_code never sees NULL and every row gets
+            // the same code. See User.SettlementCode.
+            .ValueGeneratedOnAdd();
+
+        // Unique across every row, soft-deleted ones included - the opposite of phone_number and
+        // referral_code, which a soft-deleted user is deliberately allowed to release. A settlement
+        // code must never be reissued: payments recorded against a deleted account still have to
+        // resolve, and a recycled code would silently re-point them at whoever registers next. The
+        // old ones are small enough to keep, so the ledger stays readable.
+        builder.HasIndex(e => e.SettlementCode)
+            .IsUnique();
+
+        builder.Property(e => e.BonusBalance)
                .HasColumnName("bonus_balance")
                .HasColumnType("numeric(12,2)")
                .HasDefaultValue(0m)
