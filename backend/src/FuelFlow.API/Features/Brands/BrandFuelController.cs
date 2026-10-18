@@ -251,7 +251,8 @@ public sealed class BrandFuelController : ControllerBase
             BrandId = id,
             FuelTypeId = fuel.Id,
             SupplierPricePerLiter = request.SupplierPricePerLiter,
-            MarginUahPerLiter = request.MarginUahPerLiter,
+            // No margin here: it belongs to the fuel, set above. Repeating it on the offer is what
+            // this column was, and two copies of one number is how they drift.
             MarginPercent = request.MarginPercent,
             // No FinalPricePerLiter: the offer stopped storing the derived figure on 2026-10-17.
             // inalPerLiter above is still used - to price the volumes this creates, and in the audit

@@ -80,14 +80,6 @@ public sealed class FuelOffer
     // sent — which is not a price, it is a request. Reads call
     // `FuelPricing.FinalPerLiterOrNull`, or the [NotMapped] property below.
     public decimal? SupplierPricePerLiter { get; set; }   // cost/л (собівартість)
-
-    /// <summary>
-    /// The offer's own copy of the margin. <b>Nothing writes or reads it any more</b> — the margin
-    /// belongs to <see cref="FuelTypeEntity.MarginUahPerLiter"/> and every read path has moved there.
-    /// The column goes in the migration that follows; the property stays until then so the entity and
-    /// that migration agree on the shape of the table.
-    /// </summary>
-    public decimal? MarginUahPerLiter { get; set; }       // profit/л (заробіток)
     public decimal? MarginPercent { get; set; }
 
     // Slice 1a pricing knobs. Pump (колонка) is the ceiling; MinDiscount is the
@@ -100,8 +92,8 @@ public sealed class FuelOffer
     /// The customer price per litre this offer's knobs produce once the margin is supplied, or
     /// <c>null</c> while no cost or no margin is recorded.
     /// <para>
-    /// <b>A method, not a property, and that is the whole point.</b> This was
-    /// <c>ComputedFinalPricePerLiter</c>, reading <see cref="MarginUahPerLiter"/> itself — which is
+/// <b>A method, not a property, and that is the whole point.</b> This was
+    /// <c>ComputedFinalPricePerLiter</c>, reading the offer's own margin - which is
     /// correct only while the offer holds a margin that something writes. It no longer does, so that
     /// property would have answered cost-plus-nothing on every read path that had not moved yet, and
     /// every path that had would have had to remember to derive the number itself and get the argument

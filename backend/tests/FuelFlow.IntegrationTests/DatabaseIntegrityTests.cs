@@ -331,7 +331,6 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
             BrandId = "okko",
             FuelTypeId = fuel.Id,
             SupplierPricePerLiter = supplierPricePerLiter,
-            MarginUahPerLiter = 1m,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };
@@ -1426,4 +1425,3 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
             .Should().Be(1, "the row is history and is kept — just not readable as a live account");
     }
 }
-
