@@ -1057,6 +1057,14 @@ if (status === "booting") {
                           )}
                         </span>
                       </td>
+                      <td className="p-4">
+                        <span
+                          className="inline-flex items-center px-1.5 py-0.5 rounded bg-muted font-mono text-xs font-semibold tracking-wider text-foreground"
+                          title={t('users.settlementCodeTitle')}
+                        >
+                          {user.settlementCode}
+                        </span>
+                      </td>
                       <td className="p-4">{user.email || <span className="text-muted-foreground italic">N/A</span>}</td>
                       <td className="p-4">{user.birthdate ? formatDate(user.birthdate) : <span className="text-muted-foreground italic">N/A</span>}</td>
                       <td className="p-4 text-primary font-bold">{user.bonusBalance || 0} UAH</td>
@@ -1729,14 +1737,6 @@ if (status === "booting") {
                                 {t('vouchers.customerExpires')}: {formatDate(v.customerExpirationDate)}
                               </div>
 )}
-                      </td>
-                      <td className="p-4">
-                        <span
-                          className="inline-flex items-center px-1.5 py-0.5 rounded bg-muted font-mono text-xs font-semibold tracking-wider text-foreground"
-                          title={t('users.settlementCodeTitle')}
-                        >
-                          {user.settlementCode}
-                        </span>
                       </td>
                           <td className="p-4 font-mono text-xs text-muted-foreground">{v.voucherNumber}</td>
                           <td className="p-4">
