@@ -1,4 +1,5 @@
 using System.Globalization;
+using FuelFlow.Features.Pricing.Terms.SharedModels;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Features.Vouchers.Terms;
@@ -147,10 +148,23 @@ public sealed class RuntimeSettingsService
                 ? thresholdParsed
                 : DefaultVoucherRenewalThresholdDays;
 
+        var currentRows = await LoadCurrentTiersAsync(VoucherTermPricingSchemes.RenewalRate, cancellationToken);
+
         var tiers = VoucherRenewalTerms.All
             .Select(term =>
             {
                 var code = term.Code();
+
+                // The dated row wins when there is one; the key/value setting is the fallback.
+                // Falling back rather than replacing outright is what makes deploy order irrelevant:
+                // a tier with no row yet prices exactly as it did before the table existed.
+                var current = currentRows
+                    .FirstOrDefault(r => r.TermCode == code);
+
+                if (current is not null)
+                {
+                    return new VoucherRenewalTierConfig(term, current.Enabled, current.RatePerLiter);
+                }
 
                 var tierEnabled = rows.TryGetValue(AppSettingKeys.VoucherRenewalTierEnabled(code), out var tierEnabledRaw)
                     && bool.TryParse(tierEnabledRaw, out var tierEnabledParsed) && tierEnabledParsed;
@@ -182,10 +196,20 @@ public sealed class RuntimeSettingsService
         var enabled = rows.TryGetValue(AppSettingKeys.VoucherTermSaleEnabled, out var enabledRaw)
             && bool.TryParse(enabledRaw, out var enabledParsed) && enabledParsed;
 
+        var currentRows = await LoadCurrentTiersAsync(VoucherTermPricingSchemes.PurchaseTermDiscount, cancellationToken);
+
         var tiers = VoucherRenewalTerms.All
             .Select(term =>
             {
                 var code = term.Code();
+
+                var current = currentRows
+                    .FirstOrDefault(r => r.TermCode == code);
+
+                if (current is not null)
+                {
+                    return new VoucherTermTierConfig(term, current.Enabled, current.RatePerLiter);
+                }
 
                 var tierEnabled = rows.TryGetValue(AppSettingKeys.VoucherTermTierEnabled(code), out var tierEnabledRaw)
                     && bool.TryParse(tierEnabledRaw, out var tierEnabledParsed) && tierEnabledParsed;
@@ -200,6 +224,107 @@ public sealed class RuntimeSettingsService
             .ToList();
 
         return new VoucherTermConfig(enabled, tiers);
+    }
+
+    /// <summary>
+    /// The open row for every tier of one scheme, i.e. the prices in force right now.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// One query per ladder, on the quote and checkout paths, so it is deliberately narrow: only
+    /// <c>valid_to IS NULL</c> rows, projected to the three fields the tiers need. History stays in
+    /// the table but is not paid for on every price.
+    /// </para>
+    /// <para>
+    /// The window is expressed as "not closed yet" rather than "valid_from &lt;= now", because the
+    /// only writer opens a row stamped with the same clock it closes the previous one. Comparing to
+    /// <c>now</c> as well would make a change invisible for the microseconds between the two
+    /// writes, which is a much rarer bug to hit than a clock skew but a much worse one to explain.
+    /// </para>
+    /// </remarks>
+    private async Task<List<VoucherTermPricing>> LoadCurrentTiersAsync(
+        string scheme,
+        CancellationToken cancellationToken)
+    {
+        return await _context.VoucherTermPricings
+            .AsNoTracking()
+            .Where(r => r.Scheme == scheme && r.ValidTo == null)
+            .Select(r => new VoucherTermPricing
+            {
+                Id = r.Id,
+                Scheme = r.Scheme,
+                TermCode = r.TermCode,
+                Enabled = r.Enabled,
+                RatePerLiter = r.RatePerLiter,
+                ValidFrom = r.ValidFrom,
+                ValidTo = r.ValidTo
+            })
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Sets one tier, keeping the history: the open row is closed and a new one opened.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>An unchanged tier writes nothing.</b> The Settings screen saves the whole ladder in one
+    /// request, so without this every save of an unrelated setting would append sixteen identical rows
+    /// and the history would be unreadable - which is the only reason to keep history at all.
+    /// </para>
+    /// <para>
+    /// <b>Both writes are in one transaction.</b> Closing the old row and opening the new one
+    /// separately would pass through a moment where the tier has no current price; if the process
+    /// died there, the partial unique index would then refuse the retry.
+    /// </para>
+    /// </remarks>
+    /// <returns>True when a row was appended; false when the tier was already at these values.</returns>
+    public async Task<bool> SetTierAsync(
+        string scheme,
+        string termCode,
+        bool enabled,
+        decimal ratePerLiter,
+        Guid? updatedByUserId,
+        string? updatedByUserName,
+        CancellationToken cancellationToken = default)
+    {
+        var open = await _context.VoucherTermPricings
+            .AsTracking()
+            .FirstOrDefaultAsync(
+                r => r.Scheme == scheme && r.TermCode == termCode && r.ValidTo == null,
+                cancellationToken);
+
+        if (open is not null && open.Enabled == enabled && open.RatePerLiter == ratePerLiter)
+        {
+            return false;
+        }
+
+        var now = DateTime.UtcNow;
+
+        if (open is not null)
+        {
+            open.ValidTo = now;
+            open.UpdatedAtUtc = now;
+            open.UpdatedByUserId = updatedByUserId;
+            open.UpdatedByUserName = updatedByUserName;
+        }
+
+        _context.VoucherTermPricings.Add(new VoucherTermPricing
+        {
+            Id = Guid.NewGuid(),
+            Scheme = scheme,
+            TermCode = termCode,
+            Enabled = enabled,
+            RatePerLiter = ratePerLiter,
+            ValidFrom = now,
+            ValidTo = null,
+            CreatedAtUtc = now,
+            UpdatedByUserId = updatedByUserId,
+            UpdatedByUserName = updatedByUserName,
+            UpdatedAtUtc = now
+        });
+
+        await _context.SaveChangesAsync(cancellationToken);
+        return true;
     }
 
     public async Task UpsertAsync(

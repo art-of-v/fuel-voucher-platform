@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using FuelFlow.Features.Pricing.Terms.SharedModels;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Feedback;
 using FuelFlow.Features.Vouchers.Renewal;
@@ -338,6 +339,13 @@ public sealed class AdminSettingsController : ControllerBase
                 // A price can never be negative; a zero rate is allowed but leaves the tier not-offerable
                 // (IsOfferable requires rate > 0), so an admin can pre-enable a tier before pricing it.
                 var rate = Math.Max(0m, tier.RatePerLiterUah);
+                await UpsertTierAsync(
+                    VoucherTermPricingSchemes.RenewalRate,
+                    code,
+                    tier.Enabled,
+                    rate,
+                    cancellationToken);
+
                 await _settings.UpsertAsync(
                     AppSettingKeys.VoucherRenewalTierRatePerLiter(code),
                     rate.ToString(CultureInfo.InvariantCulture),
@@ -388,6 +396,13 @@ public sealed class AdminSettingsController : ControllerBase
                 // before pricing it. Capped at the litre price by the checkout guard, so an absurd value
                 // here can never sell fuel below cost.
                 var discount = Math.Clamp(tier.DiscountPerLiterUah, 0m, 1_000_000m);
+                await UpsertTierAsync(
+                    VoucherTermPricingSchemes.PurchaseTermDiscount,
+                    code,
+                    tier.Enabled,
+                    discount,
+                    cancellationToken);
+
                 await _settings.UpsertAsync(
                     AppSettingKeys.VoucherTermTierDiscountPerLiter(code),
                     discount.ToString(CultureInfo.InvariantCulture),
@@ -417,6 +432,30 @@ public sealed class AdminSettingsController : ControllerBase
             feedbackBot = feedbackBotResult
         });
     }
+
+    /// <summary>
+    /// Records one tier change in <c>voucher_term_pricing</c>, closing the row it replaces.
+    /// </summary>
+    /// <remarks>
+    /// The key/value row is written too, by the caller. That is transitional and deliberate: it is
+    /// the fallback the loader uses for a tier that has no table row yet, and keeping it in step means
+    /// removing the fallback later cannot change a price. Once every tier is written here, the
+    /// <c>UpsertAsync</c> calls for the 32 tier keys are dead and can go in one follow-up.
+    /// </remarks>
+    private Task UpsertTierAsync(
+        string scheme,
+        string termCode,
+        bool enabled,
+        decimal ratePerLiter,
+        CancellationToken cancellationToken)
+        => _settings.SetTierAsync(
+            scheme,
+            termCode,
+            enabled,
+            ratePerLiter,
+            GetUserId(),
+            GetUserName(),
+            cancellationToken);
 
     /// <summary>
     /// Registers the feedback webhook against this deployment's own public address, so an operator

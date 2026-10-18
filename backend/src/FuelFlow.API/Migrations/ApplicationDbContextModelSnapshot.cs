@@ -1821,6 +1821,84 @@ namespace FuelFlow.API.Migrations
                         });
                 });
 
+            modelBuilder.Entity("FuelFlow.Features.Pricing.Terms.SharedModels.VoucherTermPricing", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.Property<decimal>("RatePerLiter")
+                        .HasColumnType("numeric(14,4)")
+                        .HasColumnName("rate_per_liter");
+
+                    b.Property<string>("Scheme")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("scheme");
+
+                    b.Property<string>("TermCode")
+                        .IsRequired()
+                        .HasMaxLength(4)
+                        .HasColumnType("character varying(4)")
+                        .HasColumnName("term_code");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<Guid?>("UpdatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_user_id");
+
+                    b.Property<string>("UpdatedByUserName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("updated_by_user_name");
+
+                    b.Property<DateTime>("ValidFrom")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("valid_from");
+
+                    b.Property<DateTime?>("ValidTo")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("valid_to");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UpdatedByUserId")
+                        .HasDatabaseName("ix_voucher_term_pricing_updated_by")
+                        .HasFilter("updated_by_user_id IS NOT NULL");
+
+                    b.HasIndex("Scheme", "TermCode")
+                        .IsUnique()
+                        .HasDatabaseName("ux_voucher_term_pricing_open_tier")
+                        .HasFilter("valid_to IS NULL");
+
+                    b.HasIndex("Scheme", "ValidFrom", "ValidTo")
+                        .HasDatabaseName("ix_voucher_term_pricing_current");
+
+                    b.ToTable("voucher_term_pricing", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_voucher_term_pricing_rate_non_negative", "rate_per_liter >= 0");
+
+                            t.HasCheckConstraint("ck_voucher_term_pricing_scheme", "scheme IN ('renewal_rate','purchase_term_discount')");
+
+                            t.HasCheckConstraint("ck_voucher_term_pricing_term_code", "term_code IN ('1w','2w','1m','2m','3m','4m','5m','6m')");
+
+                            t.HasCheckConstraint("ck_voucher_term_pricing_valid_window", "valid_to IS NULL OR valid_to > valid_from");
+                        });
+                });
+
             modelBuilder.Entity("FuelFlow.Features.Settings.SharedModels.AppSetting", b =>
                 {
                     b.Property<string>("Key")
