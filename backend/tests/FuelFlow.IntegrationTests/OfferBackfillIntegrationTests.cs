@@ -31,6 +31,42 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
 
     public OfferBackfillIntegrationTests(TestDatabaseFixture fixture) => _fixture = fixture;
 
+    /// <summary>
+    /// Creates the fuels the offers in these tests point at.
+    /// <para>
+    /// <c>20261018104336</c> gave <c>fuel_offers</c> a real foreign key to <c>fuel_types</c>, so an offer
+    /// can no longer name a fuel that does not exist. That is the constraint earning its keep — an offer
+    /// with no fuel has no margin to read and prices nothing — but these tests invent fuel ids on the fly
+    /// to isolate one behaviour each, so the rows have to exist alongside.
+    /// </para>
+    /// <para>
+    /// Idempotent, and deliberately in one place: these ids are invented per test, and seeding them
+    /// from eight separate call sites is how one of them ends up missing.
+    /// </para>
+    /// </summary>
+    private async Task SeedReferencedFuelsAsync(ApplicationDbContext context)
+    {
+        await context.Database.ExecuteSqlRawAsync(
+            """
+            INSERT INTO fuel_types (id, name, station_id, base_price, discount_price,
+                                    created_at_utc, updated_at_utc, is_deleted)
+            SELECT f.id, f.name, 'upg', 0, 0, now(), now(), false
+              FROM (VALUES
+                      ('upg-arch',    'ДП (arch)'),
+                      ('upg-keep',    'ДП (keep)'),
+                      ('upg-badpool', 'ДП (badpool)'),
+                      ('upg-dup',     'ДП (dup)'),
+                      ('upg-margin',  'ДП (margin)'),
+                      ('upg-neg',     'ДП (neg)'),
+                      ('upg-pool',    'ДП (pool)'),
+                      ('upg-vol',     'ДП (vol)')
+                   ) AS f(id, name)
+            ON CONFLICT (id) DO NOTHING
+            """);
+
+        context.ChangeTracker.Clear();
+    }
+
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(_fixture.ConnectionString)
@@ -244,6 +280,8 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
         await using var context = CreateContext();
         var now = DateTime.UtcNow;
 
+        await SeedReferencedFuelsAsync(context);
+
         context.FuelOffers.Add(new FuelOffer
         {
             Id = OfferKeys.For("upg-pool", DataKinds.Real),
@@ -282,8 +320,9 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
     {
         // The natural key, enforced. Without it two offers for one (station, fuel, pool) would let
         // the storefront's per-litre price become ambiguous again - the defect this whole split is
-        // about, re-entering through the new tables.
-        await using var context = CreateContext();
+// about, re-entering through the new tables.
+    await using var context = CreateContext();
+    await SeedReferencedFuelsAsync(context);
         var now = DateTime.UtcNow;
 
         context.FuelOffers.Add(new FuelOffer
@@ -317,9 +356,10 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
     public async Task ASameVolumeTwiceForOneOffer_IsRefused()
     {
         // THE guarantee of the split. The ambiguous checkout lookup that #315 had to resolve with an
-        // ORDER BY cannot come back through these tables.
-        await using var context = CreateContext();
-        var now = DateTime.UtcNow;
+// ORDER BY cannot come back through these tables.
+    await using var context = CreateContext();
+    await SeedReferencedFuelsAsync(context);
+    var now = DateTime.UtcNow;
 
         var offer = new FuelOffer
         {
@@ -494,15 +534,16 @@ public sealed class OfferBackfillIntegrationTests : IClassFixture<TestDatabaseFi
         //
         // Its own rows rather than the previous test's, because the whole class shares one database
         // and xUnit does not promise an order - reading a neighbour's rows would make this test
-        // depend on which of the two ran first.
-        await using var context = CreateContext();
+// depend on which of the two ran first.
+    await using var context = CreateContext();
+    await SeedReferencedFuelsAsync(context);
 
-        await context.Database.ExecuteSqlRawAsync(
-            """
-            INSERT INTO fuel_offers (id, station_id, fuel_type_id, data_kind, supplier_price_per_liter,
-                                     margin_uah_per_liter, created_at_utc, updated_at_utc, is_deleted)
-            VALUES ('keep-offer', 'upg', 'upg-keep', 'real', 58, 2, now(), now(), false)
-            """);
+    await context.Database.ExecuteSqlRawAsync(
+        """
+        INSERT INTO fuel_offers (id, station_id, fuel_type_id, data_kind, supplier_price_per_liter,
+        margin_uah_per_liter, created_at_utc, updated_at_utc, is_deleted)
+    VALUES ('keep-offer', 'upg', 'upg-keep', 'real', 58, 2, now(), now(), false)
+    """);
 
         await context.Database.ExecuteSqlRawAsync(
             """
