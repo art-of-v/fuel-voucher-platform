@@ -294,8 +294,10 @@ export default function BrandsTab({
     }) => {
       await apiRequest("PUT", `/api/admin/brand-fuels/${fuelId}`, data);
     },
-    onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ["/api/admin/brands", `/api/admin/brand-fuels/${fuelId}`] });
+    onSuccess: (_result, { fuelId }) => {
+      // The history panel is keyed on the fuel's own URL, so that is what has to be invalidated -
+      // the bare controller prefix is not a route, and this handler has no fuel of its own.
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/brands", `/api/admin/brand-fuels/${fuelId}`] });
       setEditingFuel(null);
       toast.success(t("common.saved"));
     },
@@ -306,8 +308,8 @@ export default function BrandsTab({
     mutationFn: async (fuelId: string) => {
       await apiRequest("DELETE", `/api/admin/brand-fuels/${fuelId}`);
     },
-    onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ["/api/admin/brands", `/api/admin/brand-fuels/${fuelId}`] });
+    onSuccess: (_result, fuelId) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/brands", `/api/admin/brand-fuels/${fuelId}`] });
       toast.success(t("common.deleted"));
     },
     onError: (e: Error) => toast.error(e.message),
