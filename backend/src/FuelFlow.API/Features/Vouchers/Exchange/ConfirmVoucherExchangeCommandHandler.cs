@@ -265,25 +265,20 @@ public sealed class ConfirmVoucherExchangeCommandHandler
 
         await _context.SaveChangesAsync(ct);
 
-        // The blended cost a sale produced is *reported*, not applied.
+        // The blended cost is *measured and reported*, never applied.
         //
         // The operator's rule, settled 2026-10-17 and recorded in README (`purchase_batches`) and
         // planning #360: **a sold voucher does not move the price.** The moving average is recomputed
-        // when a lot arrives and at no other time, so a sale must not reprice the fuel. This block
-        // still calls RepriceAsync, which contradicts that rule — it is step 3 of #360 and this comment
-        // is the marker, not the fix. Until it is removed, every exchange moves the price by however
-        // much stock it happened to consume.
+        // when a lot arrives and at no other time. This used to call RepriceAsync, so every sale
+        // moved the quoted price by however much stock it happened to consume - and the direction
+        // depended on which vouchers the sale happened to take, which is not a fact about the market.
+        //
+        // Reporting stays: the receipt tells the operator what the pool averages to after this
+        // exchange, which is how they see the stock thinning without the price moving under it.
         var blendedByFuel = new List<ExchangeFuelBlended>();
         foreach (var fuel in newFuels)
         {
             var blended = await _recalculator.ComputeBlendedAsync(fuel, ct);
-            var repriced = 0;
-            if (blended is { } b)
-            {
-                repriced = await _recalculator.RepriceAsync(
-                    fuel, b, command.ActingUserId, OfferPriceReasons.ExchangeRelease, ct);
-            }
-
             blendedByFuel.Add(new ExchangeFuelBlended(fuel, blended));
         }
 

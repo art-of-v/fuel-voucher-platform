@@ -139,35 +139,46 @@ public sealed class CostEntryAuditIntegrationTests : IClassFixture<TestDatabaseF
         doc.RootElement.GetProperty("FuelTypeId").GetString().Should().Be("okko-95");
     }
 
+    /// <summary>
+    /// A batch's price is stamped once. This used to be the opposite test: it drove the
+    /// <c>ForceOverwrite</c> flag and asserted that a second entry rewrote every voucher and left an
+    /// audit row carrying both figures. The flag is gone (README `purchase_batches`, planning #360) —
+    /// what a lot cost is a purchase fact, and rewriting vouchers that were already bought is how a
+    /// correction would silently restate money that was spent.
+    /// </summary>
     [Fact]
-    public async Task SetBatchCost_ShouldAuditAForcedOverwrite_WithBothTheOldAndTheNewCost()
+    public async Task SetBatchCost_RefusesASecondPriceForTheSameBatch_AndWritesNothing()
     {
         using var setup = CreateContext();
-        var importId = await SeedUncostedImportAsync(setup, "overwrite");
+        var importId = await SeedUncostedImportAsync(setup, "immutable");
 
         using (var first = CreateContext())
         {
             await Handler(first).HandleAsync(
                 new SetBatchCostCommand(importId, "okko-95", 49.50m, Guid.NewGuid(), "First"));
         }
+
         using (var second = CreateContext())
         {
             var result = await Handler(second).HandleAsync(
-                new SetBatchCostCommand(importId, "okko-95", 47.00m, Guid.NewGuid(), "Second", ForceOverwrite: true));
-            result.Success.Should().BeTrue();
+                new SetBatchCostCommand(importId, "okko-95", 47.00m, Guid.NewGuid(), "Second"));
+            result.Success.Should().BeFalse("the batch is already costed, and its price is not ours to rewrite");
         }
 
         using var verify = CreateContext();
+        verify.FuelVouchers
+            .Where(v => v.ImportJobId == importId && v.CostPerLiter != null)
+            .Select(v => v.CostPerLiter)
+            .ToList()
+            .Should().OnlyContain(c => c == 49.50m,
+                "the refused correction must leave the bought price exactly as it was");
+
         var rows = await verify.Set<AuditEventOutbox>().AsNoTracking()
             .Where(e => e.EventType == "BatchCostEntered" && e.AggregateId == $"{importId}:okko-95")
-            .OrderBy(e => e.ChangedAtUtc)
             .ToListAsync();
 
-        rows.Should().HaveCount(2, "correcting a cost is exactly the change that must be traceable");
-        using var latest = JsonDocument.Parse(rows[^1].NewValue);
-        latest.RootElement.GetProperty("CostPerLiter").GetDecimal().Should().Be(47.00m);
-        rows[^1].OldValue.Should().NotBeNull("the overwritten value is the whole point of an audit row");
-        using var oldDoc = JsonDocument.Parse(rows[^1].OldValue!);
-        oldDoc.RootElement.GetProperty("CostPerLiter").GetDecimal().Should().Be(49.50m);
+        rows.Should().HaveCount(1,
+            "no event for an entry that changed nothing - an audit row that records a refusal as an "
+            + "edit would make the trail say something happened when it did not");
     }
 }
