@@ -122,7 +122,11 @@ public sealed class RefundOrderCommandHandler
             return new RefundOrderResult
             {
                 RefundId = existing.Id,
-                OrderId = existing.OrderId,
+                // `existing` is the refund of a capture this handler already resolved through
+                // `order.Id`, so its order is this one. Read from the order rather than cast off the
+                // payment: the payment's own column is now nullable, and a refund without an order
+                // would mean the invariant broke rather than that there is nothing to report.
+                OrderId = order.Id,
                 AmountKopecks = existing.AmountKopecks,
                 // The refund vocabulary, not the payment's. This string is an API contract the admin
                 // and the tests read, and it has always said "Processing" - a refund that is a
@@ -291,7 +295,9 @@ public sealed class RefundOrderCommandHandler
             return new RefundOrderResult
             {
                 RefundId = winner.Id,
-                OrderId = winner.OrderId,
+                // Same reasoning as the idempotent branch above: `winner` is a refund of this order's
+                // capture, so the order is the one already in hand.
+                OrderId = order.Id,
                 AmountKopecks = winner.AmountKopecks,
                 Status = winner.Status == PaymentStatus.Pending ? "Processing" : "Completed",
                 ErrorMessage = winner.ErrorMessage

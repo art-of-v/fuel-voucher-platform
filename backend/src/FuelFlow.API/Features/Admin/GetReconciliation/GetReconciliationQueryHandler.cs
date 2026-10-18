@@ -130,8 +130,11 @@ public sealed class GetReconciliationQueryHandler
 
         var refundsByOrder = await _context.Payments
             .AsNoTracking()
-            .Where(p => p.Kind == PaymentKind.Refund && orderIds.Contains(p.OrderId))
-            .ToDictionaryAsync(p => p.OrderId, cancellationToken);
+// A refund reverses a capture, and a capture always has an order. Stated as a filter rather than a
+                // null-forgiving cast so the guarantee is visible: an orderless payment is money we hold,
+                // not something a statement line can be reconciled against.
+                .Where(p => p.Kind == PaymentKind.Refund && p.OrderId != null && orderIds.Contains(p.OrderId.Value))
+                .ToDictionaryAsync(p => p.OrderId!.Value, cancellationToken);
 
         var threeWayMatch = orders.Select(o =>
         {

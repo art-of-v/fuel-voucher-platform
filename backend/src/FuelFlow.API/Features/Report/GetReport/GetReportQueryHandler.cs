@@ -48,8 +48,12 @@ public sealed class GetReportQueryHandler
         var orderIds = orders.Select(o => o.Id).ToList();
         var refundsByOrder = await _context.Payments
             .AsNoTracking()
-            .Where(p => p.Kind == PaymentKind.Refund && orderIds.Contains(p.OrderId))
-            .ToDictionaryAsync(p => p.OrderId, cancellationToken);
+// A refund reverses a capture, and a capture always has an order - so the null check is not
+                // defensive noise, it is what keeps an orderless payment out of a dictionary keyed by
+                // order id. It also means an unallocated payment can never leak into a per-order
+                // revenue report, which is the whole point of holding it as an advance.
+                .Where(p => p.Kind == PaymentKind.Refund && p.OrderId != null && orderIds.Contains(p.OrderId.Value))
+                .ToDictionaryAsync(p => p.OrderId!.Value, cancellationToken);
 
         var vouchersQuery = _context.FuelVouchers
             .AsNoTracking()

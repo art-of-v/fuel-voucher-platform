@@ -51,13 +51,16 @@ public sealed class GetAdminPurchasesQueryHandler
             .OrderByDescending(o => o.CreatedAtUtc)
             .ToListAsync(cancellationToken);
 
-var refunds = await _context.Payments
+// A refund reverses a capture, and a capture always has an order. The filter says so rather than
+    // casting it away, so an orderless payment cannot reach a dictionary keyed by order id.
+    var refunds = await _context.Payments
     .AsNoTracking()
     .Where(p => p.Kind == PaymentKind.Refund
-             && purchases.Select(o => o.Id).Contains(p.OrderId))
+             && p.OrderId != null
+             && purchases.Select(o => o.Id).Contains(p.OrderId.Value))
     .ToListAsync(cancellationToken);
 
-    var refundByOrderId = refunds.ToDictionary(p => p.OrderId);
+    var refundByOrderId = refunds.ToDictionary(p => p.OrderId!.Value);
 
         return purchases.Select(o =>
         {

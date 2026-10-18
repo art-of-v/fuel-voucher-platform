@@ -1,6 +1,7 @@
 namespace FuelFlow.Payments.SharedModels;
 
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
 
 /// <summary>
@@ -49,7 +50,34 @@ public sealed class Payment
 {
     public Guid Id { get; set; }
 
-    public Guid OrderId { get; set; }
+    /// <summary>
+    /// The order this payment settles, or <see langword="null"/> when it is not yet attached to one.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Nullable because money does not wait for an order. A customer can pay first and order later, and
+    /// a column that cannot hold that state forces the money to be recorded somewhere else - or, worse,
+    /// not at all until an order happens to exist.
+    /// </para>
+    /// <para>
+    /// <b>A NULL here is not an error and not a pending payment.</b> It is money we hold that is not yet
+    /// against a sale: an advance, which is a liability, not revenue. Revenue is recognised when the fuel
+    /// is delivered, never on receipt. Posting such a row into a sales account would report something
+    /// the business has not earned and would put VAT on the wrong side.
+    /// </para>
+    /// <para>
+    /// Every acquirer-driven capture still carries one. These are payments declared outside the
+    /// acquirer, where the invoice and the order are not the same thing.
+    /// </para>
+    /// </remarks>
+    public Guid? OrderId { get; set; }
+
+    /// <summary>
+    /// The customer this money belongs to, when we know who paid. NULL alongside a NULL
+    /// <see cref="OrderId"/> means the payment is <em>unallocated</em>: the money is real and belongs
+    /// to nobody yet, and an operator decides whose it is.
+    /// </summary>
+    public Guid? UserId { get; set; }
 
     public PaymentKind Kind { get; set; } = PaymentKind.Capture;
 
@@ -151,7 +179,8 @@ public sealed class Payment
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
 
-    public Order Order { get; set; } = null!;
+    public Order? Order { get; set; }
+    public User? User { get; set; }
 }
 
 public enum PaymentKind

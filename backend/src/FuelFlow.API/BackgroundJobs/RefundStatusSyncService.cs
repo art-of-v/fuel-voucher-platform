@@ -74,10 +74,13 @@ private readonly ApplicationDbContext _context;
             .Select(o => new { o.Id, o.IdempotencyKey })
             .ToDictionaryAsync(o => o.Id, o => o.IdempotencyKey ?? o.Id.ToString(), cancellationToken);
 
-        return refunds
-            .Where(p => byOrder.ContainsKey(p.OrderId))
-            .GroupBy(p => p.Id)
-            .ToDictionary(g => g.Key, g => byOrder[g.First().OrderId]);
+return refunds
+                // A refund always has an order, so this filter only excludes the shape the column can
+                // now take for other reasons. Written here rather than as a cast because "refunds
+                // without an order" would be a real finding, not a null to silence.
+                .Where(p => p.OrderId != null && byOrder.ContainsKey(p.OrderId.Value))
+                .GroupBy(p => p.Id)
+                .ToDictionary(g => g.Key, g => byOrder[g.First().OrderId!.Value]);
     }
 
     public virtual async Task SyncPendingRefundsAsync(CancellationToken cancellationToken = default)
@@ -257,7 +260,7 @@ private readonly ApplicationDbContext _context;
                     refund.Id, refund.OrderId, refund.ProviderInvoiceId, entries.Count, siblings);
 
                 await _notifications.RefundSyncUnmatchedAsync(
-                    refund.Id, refund.OrderId, refund.ProviderInvoiceId ?? "(none)", entries.Count, siblings, cancellationToken);
+                    refund.Id, refund.OrderId!.Value, refund.ProviderInvoiceId ?? "(none)", entries.Count, siblings, cancellationToken);
 
                 return;
             }
