@@ -328,7 +328,9 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
         // A pump change is not a purchase-cost event.
         var pkg = await OfferOfAsync("okko-95-50");
         pkg.SupplierPricePerLiter.Should().Be(40m);
-        pkg.MarginUahPerLiter.Should().Be(3m);
+        // The margin is the fuel's now. Asserting it on the offer would be asserting a column nothing
+        // writes, and it would pass for a reason the production code no longer relies on.
+        (await MarginFor(pkg)).Should().Be(3m);
     }
 
     [Fact]
@@ -389,4 +391,15 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
             .Where(v => v.Id == volumeId)
             .Select(v => v.Offer)
             .FirstAsync();
+
+    /// <summary>
+    /// The margin an offer sells at, which is its fuel's - the same place production reads it since
+    /// the offer stopped carrying a copy. A test that asserted the offer's own column would have been
+    /// asserting a number nothing writes.
+    /// </summary>
+    private async Task<decimal?> MarginFor(FuelOffer offer)
+        => await _context.FuelTypes
+            .Where(f => f.Id == offer.FuelTypeId)
+            .Select(f => f.MarginUahPerLiter)
+            .FirstOrDefaultAsync();
 }

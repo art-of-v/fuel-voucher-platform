@@ -56,6 +56,14 @@ namespace FuelFlow.API.Migrations
     /// <c>ComputedFinalPricePerLiter</c> because the stored property no longer exists. Rewriting history is
     /// not on the table; a migration that cannot compile is a migration nobody can roll back.
     /// </para>
+    /// <para>
+    /// <b>Edited 2026-10-18, again only to keep compiling, and the statement is still unchanged.</b>
+    /// The margin moved to <c>fuel_types</c>, so the no-argument <c>ComputedFinalPricePerLiter</c> went
+    /// with it: it read a column that nothing writes now, and on this seed - which predates the move -
+    /// that column is still correct, which is why it is passed in explicitly rather than deleted. The
+    /// value emitted below is byte-identical to the 2026-10-17 build, and this migration has already
+    /// run everywhere, so there is no database it could run against anyway.
+    /// </para>
     public partial class SeedCatalogueAsOffers : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -82,7 +90,7 @@ namespace FuelFlow.API.Migrations
                     VALUES
                         ({Quote(historicalKey[offer.Id])}, {Quote(offer.StationId)}, {Quote(offer.FuelTypeId)}, {Quote(offer.DataKind)},
                          {Num(offer.SupplierPricePerLiter)}, {Num(offer.MarginUahPerLiter)}, {Num(offer.MarginPercent)},
-                         {Num(offer.ComputedFinalPricePerLiter)}, NULL, NULL, FALSE, NULL, NULL, NULL,
+                         {Num(offer.FinalPerLiterWith(offer.MarginUahPerLiter))}, NULL, NULL, FALSE, NULL, NULL, NULL,
                          {Ts(offer.CreatedAtUtc)}, {Ts(offer.UpdatedAtUtc)})
                     ON CONFLICT (id) DO NOTHING;
                     """);

@@ -21,9 +21,10 @@ internal sealed class FuelOfferConfiguration : IEntityTypeConfiguration<FuelOffe
         builder.Property(e => e.FuelTypeId).HasColumnName("fuel_type_id").HasColumnType("text").IsRequired();
 
         builder.Property(e => e.SupplierPricePerLiter).HasColumnName("supplier_price_per_liter").HasColumnType("numeric(10,4)");
+        // The offer's own copy of the margin: no reader, no writer, kept only until the migration that drops
+        // the column. Nothing to Ignore any more - FinalPerLiterWith is a method, not a property.
         builder.Property(e => e.MarginUahPerLiter).HasColumnName("margin_uah_per_liter").HasColumnType("numeric(10,4)");
         builder.Property(e => e.MarginPercent).HasColumnName("margin_percent").HasColumnType("numeric(10,4)");
-        builder.Ignore(e => e.ComputedFinalPricePerLiter);
         builder.Property(e => e.PumpPricePerLiter).HasColumnName("pump_price_per_liter").HasColumnType("numeric(10,4)");
         builder.Property(e => e.MinDiscountPerLiter).HasColumnName("min_discount_per_liter").HasColumnType("numeric(10,4)");
 

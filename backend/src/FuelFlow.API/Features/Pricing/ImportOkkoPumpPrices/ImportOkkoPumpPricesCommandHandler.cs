@@ -210,11 +210,12 @@ public sealed class ImportOkkoPumpPricesCommandHandler
 
             var poolOffers = offersByFuel.TryGetValue(ft.Id, out var found) ? found : new List<FuelOffer>();
 
-            // Cost and margin are the offer's, and a fuel with more than one offer here (one per pool)
-            // is priced per pool - each offer keeps its own cost, and only the imported pump is shared.
-            // The loop below therefore runs per offer rather than per package, which is what makes the
-            // "report the first and rewrite them all" branch unnecessary: there is nothing left to
-            // disagree once every package of an offer shares one row.
+            // Cost is the offer's, and a fuel with more than one offer here (one per pool) is priced per pool -
+            // each offer keeps its own cost, and only the imported pump is shared. The margin is the
+            // fuel's, which is why the loop below can reprice several offers without them drifting
+            // apart: there is nothing left for the pools to disagree about. The loop therefore runs per
+            // offer rather than per package, which is what makes the "report the first and rewrite them
+            // all" branch unnecessary.
             var repriced = 0;
 
             foreach (var offer in poolOffers)
@@ -222,7 +223,7 @@ public sealed class ImportOkkoPumpPricesCommandHandler
                 var vols = volumesByOffer.TryGetValue(offer.Id, out var vv) ? vv : new List<FuelOfferVolume>();
 
                 var cost = offer.SupplierPricePerLiter ?? 0m; // held constant: a pump change is not a cost event
-                var profit = offer.MarginUahPerLiter ?? 0m;
+                var profit = ft.MarginUahPerLiter ?? 0m;
                 var minDiscount = offer.MinDiscountPerLiter ?? 0m;
                 var finalPerLiter = FuelPricing.FinalPerLiter(cost, profit, pump, minDiscount);
 
@@ -270,7 +271,9 @@ public sealed class ImportOkkoPumpPricesCommandHandler
                 var headline = poolOffers[0];
                 var headlineFinal = FuelPricing.FinalPerLiter(
                     headline.SupplierPricePerLiter ?? 0m,
-                    headline.MarginUahPerLiter ?? 0m,
+                    // The margin is `ft`'s - every pool of this fuel is priced from the same one, which is
+                    // the whole point of it living on the fuel.
+                    ft.MarginUahPerLiter ?? 0m,
                     pump,
                     headline.MinDiscountPerLiter ?? 0m);
                 ft.BasePrice = Math.Round(pump, 2, MidpointRounding.AwayFromZero);

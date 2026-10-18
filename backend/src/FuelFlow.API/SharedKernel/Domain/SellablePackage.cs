@@ -87,8 +87,19 @@ public sealed record SellablePackage
     /// <summary>Which pool this came from. Carried so a caller can assert it matched what it asked for.</summary>
     public string DataKind { get; init; } = string.Empty;
 
-    /// <summary>Compose the pair. The one place this join is expressed, and the only place identity is set.</summary>
-    public static SellablePackage From(FuelOffer offer, FuelOfferVolume volume) => new()
+    /// <summary>
+    /// Compose the triple. The one place this join is expressed, and the only place identity is set.
+    /// <para>
+    /// The fuel is passed in rather than reached through <c>offer.FuelType</c> because this runs after
+    /// materialisation, where the navigation is only populated if the query asked for it - and the
+    /// callers here project server-side, so nothing asked. A margin read off a navigation that happens
+    /// to be loaded is a margin that is silently zero everywhere else.
+    /// </para>
+    /// </summary>
+    public static SellablePackage From(
+        FuelOffer offer,
+        FuelOfferVolume volume,
+        FuelTypeEntity fuel) => new()
     {
         PackageId = volume.Id,
         OfferId = offer.Id,
@@ -99,7 +110,7 @@ public sealed record SellablePackage
         PumpPricePerLiter = offer.PumpPricePerLiter,
         MinDiscountPerLiter = offer.MinDiscountPerLiter,
         SupplierPricePerLiter = offer.SupplierPricePerLiter,
-        MarginUahPerLiter = offer.MarginUahPerLiter,
+        MarginUahPerLiter = fuel.MarginUahPerLiter,
         MarginPercent = offer.MarginPercent,
         DataKind = offer.DataKind,
     };

@@ -117,7 +117,7 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
             offer.MarginUahPerLiter.Should().BeNull();
             // Not "no price recorded" any more but "not priced at all": with no cost and no margin the derived
         // price is null, which is what makes the fuel unsellable.
-        offer.ComputedFinalPricePerLiter.Should().BeNull();
+        offer.FinalPerLiterWith(await MarginFor(offer)).Should().BeNull();
 
             (await _context.FuelOfferVolumes.CountAsync(v => v.OfferId == offer.Id))
                 .Should().Be(0, "no nominals means nothing is displayed and nothing is purchasable");
@@ -155,6 +155,8 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
             BrandFuelCode = "A-95",
             BasePrice = 54m,
             DiscountPrice = 51m,
+            // The margin is the fuel's; without it this fixture has a cost and no price.
+            MarginUahPerLiter = 2m,
             AllowBelowCost = true,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
@@ -186,7 +188,7 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
 
         var offer = await _context.FuelOffers.SingleAsync(o => o.FuelTypeId == "okko-95");
         offer.SupplierPricePerLiter.Should().Be(49m, "the pump sync owns the pump; this import owns nothing here");
-        offer.ComputedFinalPricePerLiter.Should().Be(51m);
+        offer.FinalPerLiterWith(await MarginFor(offer)).Should().Be(51m);
     }
 
     [Fact]
@@ -369,4 +371,15 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
         result.Created.Should().Be(1, "the archived row is history, not an answer");
         result.CreatedFuels.Single().FuelTypeId.Should().NotBe("okko-95-old");
     }
+
+    /// <summary>
+    /// The margin an offer sells at, which is its fuel's - the same place production reads it since
+    /// the offer stopped carrying a copy. A test that asserted the offer's own column would have been
+    /// asserting a number nothing writes.
+    /// </summary>
+    private async Task<decimal?> MarginFor(FuelOffer offer)
+        => await _context.FuelTypes
+            .Where(f => f.Id == offer.FuelTypeId)
+            .Select(f => f.MarginUahPerLiter)
+            .FirstOrDefaultAsync();
 }

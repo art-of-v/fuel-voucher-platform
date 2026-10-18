@@ -140,7 +140,7 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
         a95.Should().HaveCount(3);
         offer.PumpPricePerLiter.Should().Be(92.90m);
         // cost 54 + profit 5 = 59, under the 92.90 - 1 = 91.90 ceiling.
-        offer.ComputedFinalPricePerLiter.Should().Be(59m);
+        offer.FinalPerLiterWith(await MarginFor(offer)).Should().Be(59m);
         foreach (var volume in a95)
         {
             // No stored total and no override: the package price is the rate × litres, and it is
@@ -148,7 +148,7 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
             volume.PriceOverrideUah.Should().BeNull();
             var price = FuelPricing.PackagePrice(
                 offer.SupplierPricePerLiter,
-                offer.MarginUahPerLiter,
+                await MarginFor(offer),
                 offer.PumpPricePerLiter,
                 offer.MinDiscountPerLiter,
                 volume.Liters,
@@ -176,7 +176,7 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
         // A pump change is not a cost event: cost and margin must be untouched. These live on the offer
         // now, so one read covers every volume of the fuel - there is no per-package copy left to miss.
         offer.SupplierPricePerLiter.Should().Be(54m);
-        offer.MarginUahPerLiter.Should().Be(5m);
+        (await MarginFor(offer)).Should().Be(5m, "the margin lives on the fuel; the offer's own copy is never written");
         offer.MinDiscountPerLiter.Should().Be(1m);
     }
 
@@ -206,11 +206,11 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
 
 var (volume, offer) = await ReadAsync("okko-95-20");
         offer.PumpPricePerLiter.Should().Be(57m);
-        offer.ComputedFinalPricePerLiter.Should().Be(56m);
+        offer.FinalPerLiterWith(await MarginFor(offer)).Should().Be(56m);
         volume.PriceOverrideUah.Should().BeNull();
         var price = FuelPricing.PackagePrice(
             offer.SupplierPricePerLiter,
-            offer.MarginUahPerLiter,
+            await MarginFor(offer),
             offer.PumpPricePerLiter,
             offer.MinDiscountPerLiter,
             volume.Liters,
@@ -289,7 +289,7 @@ var (volume, offer) = await ReadAsync("okko-95-20");
 
 var (wogVolume, wogOffer) = await ReadAsync("wog-95-20");
         wogOffer.PumpPricePerLiter.Should().Be(58m);
-        // Untouched: this brand's rate did not move, and it carries no override, so its nominals still`n        // work out to (56 + 5) per litre x 20 - through the formula rather than from a stored total.`n        wogVolume.PriceOverrideUah.Should().BeNull();`n        wogOffer.ComputedFinalPricePerLiter.Should().Be(61m);
+        // Untouched: this brand's rate did not move, and it carries no override, so its nominals still`n        // work out to (56 + 5) per litre x 20 - through the formula rather than from a stored total.`n        wogVolume.PriceOverrideUah.Should().BeNull();`n        wogOffer.FinalPerLiterWith(await MarginFor(wogOffer)).Should().Be(61m);
     }
 
     [Fact]
@@ -421,7 +421,7 @@ var (wogVolume, wogOffer) = await ReadAsync("wog-95-20");
             price.PumpPricePerLiter.Should().Be(offer.PumpPricePerLiter);
             // The recorded figure is the derived one: the history stores what the customer paid, not the
             // inputs it came from, which is the whole reason the column exists.
-            price.FinalPricePerLiter.Should().Be(offer.ComputedFinalPricePerLiter);
+            price.FinalPricePerLiter.Should().Be(offer.FinalPerLiterWith(await MarginFor(offer)));
             price.SupplierPricePerLiter.Should().Be(offer.SupplierPricePerLiter);
         }
     }
@@ -602,4 +602,15 @@ var (wogVolume, wogOffer) = await ReadAsync("wog-95-20");
             .FirstAsync();
         return (row.Volume, row.Offer);
     }
+
+    /// <summary>
+    /// The margin an offer sells at, which is its fuel's - the same place production reads it since
+    /// the offer stopped carrying a copy. A test that asserted the offer's own column would have been
+    /// asserting a number nothing writes.
+    /// </summary>
+    private async Task<decimal?> MarginFor(FuelOffer offer)
+        => await _context.FuelTypes
+            .Where(f => f.Id == offer.FuelTypeId)
+            .Select(f => f.MarginUahPerLiter)
+            .FirstOrDefaultAsync();
 }

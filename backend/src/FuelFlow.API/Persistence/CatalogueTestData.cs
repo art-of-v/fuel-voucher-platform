@@ -72,7 +72,40 @@ internal static class CatalogueTestData
         }
 
         if (supplierPricePerLiter is not null) offer.SupplierPricePerLiter = supplierPricePerLiter;
-        if (marginUahPerLiter is not null) offer.MarginUahPerLiter = marginUahPerLiter;
+        // The margin is the fuel's. The parameter keeps its name and its call sites: what changed is
+        // where it lands, and the two derived figures below read it from the same place the production
+        // code does. A fixture that set it on the offer would now price every assertion at cost.
+        //
+        // The fuel is created if the fixture has not seeded one, because a fixture that states a price
+        // has to be able to state what sells it - and a half-configured fuel (a margin with no name, or
+        // a name with no margin) is a test that passes for a reason nobody wrote down.
+        var fuel = context.FuelTypes.Local.FirstOrDefault(f => f.Id == fuelTypeId);
+        if (fuel is null)
+        {
+            fuel = context.FuelTypes.FirstOrDefault(f => f.Id == fuelTypeId);
+            if (fuel is null)
+            {
+                fuel = new FuelTypeEntity
+                {
+                    Id = fuelTypeId,
+                    Name = fuelTypeId,
+                    StationId = stationId,
+                    CreatedAtUtc = createdAtUtc ?? DateTime.UtcNow,
+                    UpdatedAtUtc = updatedAtUtc ?? DateTime.UtcNow
+                };
+                context.FuelTypes.Add(fuel);
+            }
+            else
+            {
+                // Read out of the store rather than the tracker - the fixture cleared its tracker, which
+                // is what `ChangeTracker.Clear` is for. Attaching it is what makes the margin below
+                // survive to the database; an untracked entity takes the change and drops it on save.
+                context.FuelTypes.Attach(fuel);
+            }
+        }
+
+        if (marginUahPerLiter is not null) fuel.MarginUahPerLiter = marginUahPerLiter;
+        var margin = fuel.MarginUahPerLiter;
         if (marginPercent is not null) offer.MarginPercent = marginPercent;
         if (pumpPricePerLiter is not null) offer.PumpPricePerLiter = pumpPricePerLiter;
         if (minDiscountPerLiter is not null) offer.MinDiscountPerLiter = minDiscountPerLiter;
@@ -84,7 +117,11 @@ internal static class CatalogueTestData
         // three assertions later as an unexplained price on the storefront.
         if (finalPricePerLiter is not null)
         {
-            var computed = offer.ComputedFinalPricePerLiter;
+            var computed = FuelPricing.FinalPerLiterOrNull(
+                offer.SupplierPricePerLiter,
+                margin,
+                offer.PumpPricePerLiter,
+                offer.MinDiscountPerLiter);
             if (computed != finalPricePerLiter)
             {
                 throw new InvalidOperationException(
@@ -136,14 +173,16 @@ var offer = context.SeedOffer(
             finalPricePerLiter, pumpPricePerLiter, minDiscountPerLiter,
             createdAtUtc, updatedAtUtc);
 
-        // `price` is what the test wants this package to sell for. Under the override model that is
-        // either the offer's own rate × litres — in which case it is written as nothing at all and the
-        // package follows its fuel — or a deliberate exception, in which case it becomes the override and
+// `price` is what the test wants this package to sell for. Under the override model that is
+        // either the offer's own rate x litres - in which case it is written as nothing at all and the
+        // package follows its fuel - or a deliberate exception, in which case it becomes the override and
         // stays visible as one. Which of the two it is is decided here rather than by each test, so a
-        // fixture cannot accidentally pin a price it meant to be derived.
+        // fixture cannot accidentally pin a price it meant to be derived. The margin is the fuel's, read
+        // back off the row SeedOffer just wrote it to.
         var derived = FuelPricing.TryPackagePrice(
             offer.SupplierPricePerLiter,
-            offer.MarginUahPerLiter,
+            context.FuelTypes.Local.FirstOrDefault(f => f.Id == offer.FuelTypeId)?.MarginUahPerLiter
+                ?? context.FuelTypes.FirstOrDefault(f => f.Id == offer.FuelTypeId)?.MarginUahPerLiter,
             offer.PumpPricePerLiter,
             offer.MinDiscountPerLiter,
             liters,

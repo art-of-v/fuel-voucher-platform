@@ -73,7 +73,7 @@ var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
                 // never leaves the database.
                 volume.PriceOverrideUah,
                 offer.SupplierPricePerLiter,
-                offer.MarginUahPerLiter,
+                fuel.MarginUahPerLiter,
                 offer.PumpPricePerLiter,
                 offer.MinDiscountPerLiter,
             })

@@ -83,8 +83,25 @@ public sealed class GetImportBatchPnlQueryHandler
             .Where(o => fuelIds.Contains(o.FuelTypeId) && o.DataKind == DataKinds.Real)
             .ToListAsync(cancellationToken);
 
+        // The final price is cost plus the FUEL's margin, so the fuels are read too. Reading it off the offer
+        // would use a copy nothing writes any more, and would silently price every batch at cost.
+        var fuels = await _context.FuelTypes
+            .AsNoTracking()
+            .Where(f => fuelIds.Contains(f.Id))
+            .ToDictionaryAsync(f => f.Id, cancellationToken);
+
         var currentPrices = pricedOffers
-            .Select(o => new { o.FuelTypeId, Final = o.ComputedFinalPricePerLiter })
+            .Select(o => new
+            {
+                o.FuelTypeId,
+                Final = fuels.TryGetValue(o.FuelTypeId, out var fuel)
+                    ? FuelPricing.FinalPerLiterOrNull(
+                        o.SupplierPricePerLiter,
+                        fuel.MarginUahPerLiter,
+                        o.PumpPricePerLiter,
+                        o.MinDiscountPerLiter)
+                    : null
+            })
             .Where(o => o.Final is not null)
             .GroupBy(o => o.FuelTypeId)
             .ToDictionary(g => g.Key, g => g.Min(o => o.Final!.Value));

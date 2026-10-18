@@ -3,6 +3,7 @@ using System.Text.Json;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Feedback;
 using FuelFlow.Features.Vouchers.Renewal;
+using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -154,7 +155,13 @@ public sealed class AdminSettingsController : ControllerBase
                 .Join(_context.FuelTypes,
                     offer => offer.FuelTypeId,
                     fuel => fuel.Id,
-                    (offer, fuel) => new { offer, fuel.Name, fuel.StationId })
+                    (offer, fuel) => new
+                    {
+                        offer,
+                        fuel.Name,
+                        fuel.StationId,
+                        MarginUahPerLiter = fuel.MarginUahPerLiter
+                    })
                 .ToListAsync(cancellationToken))
             .Where(row => row.offer.SupplierPricePerLiter is not null)
             .Select(row => new
@@ -163,7 +170,12 @@ public sealed class AdminSettingsController : ControllerBase
                 row.Name,
                 row.StationId,
                 Supplier = row.offer.SupplierPricePerLiter!.Value,
-                Final = row.offer.ComputedFinalPricePerLiter
+                // From the fuel's margin, joined above: the offer's own copy is no longer written.
+                Final = FuelPricing.FinalPerLiterOrNull(
+                    row.offer.SupplierPricePerLiter,
+                    row.MarginUahPerLiter,
+                    row.offer.PumpPricePerLiter,
+                    row.offer.MinDiscountPerLiter)
             })
             .Where(row => row.Final is not null)
             .ToList();

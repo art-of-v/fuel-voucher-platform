@@ -107,11 +107,11 @@ public sealed class CreatePackageCommandHandler
 
         // The knobs go on the offer, so a package created here is priced by the same single source as one
         // created through the brand screen. Previously each package row carried its own copy and this is
-        // exactly the endpoint that wrote a second, disagreeing copy.
+        // exactly the endpoint that wrote a second, disagreeing copy. The margin is the exception: it
+        // belongs to the fuel, so this endpoint no longer writes it at all - it is the brand screen's
+        // to set, and a posted `marginUahPerLiter` is ignored rather than silently taking effect.
         if (command.Package.SupplierPricePerLiter is not null)
             existingOffer.SupplierPricePerLiter = command.Package.SupplierPricePerLiter;
-        if (command.Package.MarginUahPerLiter is not null)
-            existingOffer.MarginUahPerLiter = command.Package.MarginUahPerLiter;
         if (command.Package.MarginPercent is not null)
             existingOffer.MarginPercent = command.Package.MarginPercent;
         // `command.Package.FinalPricePerLiter` used to be written straight onto the offer here,
@@ -153,12 +153,24 @@ public sealed class CreatePackageCommandHandler
         // there is one, the offer's rate × litres otherwise — so a caller that posted no override still
         // reads back what the customer will pay. The caller has no reason to know a volume and an offer
         // are what it is looking at.
-        var fuelName = await _context.FuelTypes
-            .Where(f => f.Id == command.Package.FuelTypeId)
-            .Select(f => f.Name)
-            .FirstOrDefaultAsync(ct) ?? command.Package.FuelName;
+        // The fuel is read as the row itself, not just its name: the package's price is built from the fuel's
+        // margin, so a name-only lookup would have been a second query for the same id.
+        var fuel = await _context.FuelTypes.AsNoTracking()
+            .FirstOrDefaultAsync(f => f.Id == command.Package.FuelTypeId, ct);
 
-        return new CreatePackageResult { Success = true, Package = volume.ToPackage(fuelName) };
+        // The caller may post a package for a fuel nobody has created yet, and the response still has to
+        // carry a name. Falling back to whatever they sent keeps that answer instead of throwing after
+        // the write that already succeeded.
+        return new CreatePackageResult
+        {
+            Success = true,
+            Package = volume.ToPackage(fuel ?? new FuelTypeEntity
+            {
+                Id = command.Package.FuelTypeId,
+                Name = command.Package.FuelName,
+                StationId = existingOffer.StationId
+            })
+        };
 
 
     }

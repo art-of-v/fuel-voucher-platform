@@ -186,15 +186,16 @@ public sealed class SetBatchCostCommandHandler
             // every sale/activation — surface that immediately so pricing can be fixed.
             var fuelType = await _context.FuelTypes.AsNoTracking()
                 .FirstOrDefaultAsync(f => f.Id == command.FuelTypeId, cancellationToken);
-            // The margin that the new cost would be sold at belongs to the offer, once - reading it off
+            // The margin the new cost would be sold at belongs to the fuel, once - reading it off
             // "the first package of this fuel" was an arbitrary pick between rows that now cannot differ
-            // at all, which is the point of the split.
+            // at all, which is the point of the split. The fuel is already loaded for the opt-in flag
+            // above, so the two answers come from one row.
             var offer = await _context.FuelOffers.AsNoTracking()
                 .Where(o => o.FuelTypeId == command.FuelTypeId && o.DataKind == DataKinds.Real)
                 .FirstOrDefaultAsync(cancellationToken);
             if (fuelType is { AllowBelowCost: false } && offer is not null)
             {
-                var profit = offer.MarginUahPerLiter ?? 0m;
+                var profit = fuelType.MarginUahPerLiter ?? 0m;
                 var minDiscount = offer.MinDiscountPerLiter ?? 0m;
                 if (FuelPricing.IsBelowCost(b, profit, offer.PumpPricePerLiter, minDiscount))
                 {

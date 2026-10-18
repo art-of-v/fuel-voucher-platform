@@ -78,8 +78,16 @@ public sealed class BlendedCostRecalculator
         var offers = await _context.FuelOffers.Where(o => o.FuelTypeId == fuelTypeId).ToListAsync(ct);
         if (offers.Count == 0) return 0;
 
+        // The margin belongs to the fuel, so every offer this call reprices carries the same one. Read
+        // it once rather than per offer: the cost and the rest of the knobs are the offer's, but what we
+        // add on top is the grade's, and two pools of one fuel cannot disagree about that.
+        var fuel = await _context.FuelTypes
+            .AsNoTracking()
+            .FirstOrDefaultAsync(f => f.Id == fuelTypeId, ct);
+        var margin = fuel?.MarginUahPerLiter ?? 0m;
+
         // The volumes are loaded only to restate each package's frozen total from the new per-litre
-        // price. The cost and the margin belong to the offer, once.
+        // price. The cost is the offer's, once.
         var offerIds = offers.Select(o => o.Id).ToList();
         var volumes = await _context.FuelOfferVolumes
             .Where(v => offerIds.Contains(v.OfferId) && !v.IsDeleted)
@@ -91,7 +99,7 @@ public sealed class BlendedCostRecalculator
 
         foreach (var offer in offers)
         {
-            var profit = offer.MarginUahPerLiter ?? 0m;
+            var profit = margin;
             var pump = offer.PumpPricePerLiter;
             var minDiscount = offer.MinDiscountPerLiter ?? 0m;
 

@@ -36,11 +36,26 @@ public sealed class SellablePackageProjectionTests : IDisposable
     [Fact]
     public async Task TheProjection_AndFrom_AgreeOnEveryField()
     {
+        // The margin is the fuel's, and this is the projection that proves both halves of the join agree -
+        // so the fuel is a real row here rather than a value on the offer. An in-memory provider cannot
+        // translate `Offer.FuelType.MarginUahPerLiter`, which is why this is one of the fixtures that
+        // wants a real database.
+        var fuel = new FuelTypeEntity
+        {
+            Id = "projection-fuel",
+            Name = "А-95 (projection fixture)",
+            StationId = "okko",
+            BasePrice = 0m,
+            DiscountPrice = 0m,
+            MarginUahPerLiter = 2m,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
         var offer = new FuelOffer
         {
             Id = "projection-fuel",
             StationId = "okko",
-            FuelTypeId = "projection-fuel",
+            FuelTypeId = fuel.Id,
             DataKind = DataKinds.Real,
             SupplierPricePerLiter = 49m,
             MarginUahPerLiter = 2m,
@@ -60,6 +75,7 @@ public sealed class SellablePackageProjectionTests : IDisposable
             UpdatedAtUtc = DateTime.UtcNow
         };
 
+        _context.FuelTypes.Add(fuel);
         _context.FuelOffers.Add(offer);
         _context.FuelOfferVolumes.Add(volume);
         await _context.SaveChangesAsync();
@@ -73,7 +89,9 @@ public sealed class SellablePackageProjectionTests : IDisposable
             .SingleAsync();
         var composed = SellablePackage.From(
             await _context.FuelOffers.SingleAsync(o => o.Id == offer.Id),
-            await _context.FuelOfferVolumes.SingleAsync(v => v.Id == volume.Id));
+            await _context.FuelOfferVolumes.SingleAsync(v => v.Id == volume.Id),
+            // Third of the join, for the same reason the projection takes it: the margin is the fuel's.
+            await _context.FuelTypes.SingleAsync(f => f.Id == offer.FuelTypeId));
 
         projected.Should().BeEquivalentTo(composed);
 
