@@ -78,7 +78,62 @@ public sealed class AdminPaymentsController : ControllerBase
                 p.SettlementMessages.OrderBy(m => m.MessageId).Select(m => m.TelegramDisplayName).FirstOrDefault()))
             .ToListAsync(ct);
 
-        return Ok(new UnallocatedPaymentsResponse(items, total));
+        // One extra query for the whole page, not one per row. The alternative is an operator pasting
+        // an order id, which is not placing money — it is asking them to trust a UUID.
+        var customerIds = items.Select(i => i.UserId).Where(id => id is not null).Select(id => id!.Value).Distinct().ToList();
+
+        var openOrders = customerIds.Count == 0
+            ? []
+            : await _context.Orders
+                .AsNoTracking()
+                .Where(o => customerIds.Contains(o.UserId) && o.Status == OrderStatus.PendingPayment)
+                .OrderByDescending(o => o.CreatedAtUtc)
+                .Select(o => new OpenOrderRefDto(o.Id, o.UserId, o.Price, o.CreatedAtUtc))
+                .ToListAsync(ct);
+
+        return Ok(new UnallocatedPaymentsResponse(items, total, openOrders));
+    }
+
+    /// <summary>
+    /// Finds the customer a settlement code names, or says plainly that it names nobody.
+    /// </summary>
+    /// <remarks>
+    /// The workflow this exists for: finance typed a code that did not match, and the operator needs
+    /// to know whether that is a typo in a code that does exist, or a code for a customer who does not.
+    /// Those are different problems with different fixes, and "not found" alone does not tell them
+    /// which. Deliberately no name or phone search — that is a customer list with its own pagination,
+    /// and a partial version of it here would be a worse version of one that already exists.
+    /// </remarks>
+    [HttpGet("customers/by-code")]
+    public async Task<ActionResult> CustomerByCode([FromQuery] string code, CancellationToken ct)
+    {
+        var normalised = (code ?? string.Empty).Trim().ToUpperInvariant();
+        if (normalised.Length != 8)
+            return BadRequest(new { error = "A settlement code is eight characters." });
+
+        var customer = await _context.Users
+            .AsNoTracking()
+            .Where(u => u.SettlementCode == normalised)
+            .Select(u => new { u.Id, u.PhoneNumber, u.FirstName, u.LastName, u.SettlementCode })
+            .FirstOrDefaultAsync(ct);
+
+        if (customer is null)
+        {
+            return NotFound(new
+            {
+                error = $"No customer has the code {normalised}. It was either mistyped, or it belongs to a customer who has not registered yet.",
+            });
+        }
+
+        return Ok(new
+        {
+            customer.Id,
+            customer.PhoneNumber,
+            customer.SettlementCode,
+            Name = string.IsNullOrEmpty(customer.FirstName) && string.IsNullOrEmpty(customer.LastName)
+                ? null
+                : (customer.FirstName + " " + customer.LastName).Trim(),
+        });
     }
 
     /// <summary>
@@ -194,7 +249,17 @@ public sealed class AdminPaymentsController : ControllerBase
     }
 }
 
-public sealed record UnallocatedPaymentsResponse(IReadOnlyList<UnallocatedPaymentDto> Data, int Total);
+/// <summary>
+/// The worklist plus every open order belonging to a customer on it, so the operator picks an order
+/// from a list rather than assembling a UUID.
+/// </summary>
+public sealed record UnallocatedPaymentsResponse(
+    IReadOnlyList<UnallocatedPaymentDto> Data,
+    int Total,
+    IReadOnlyList<OpenOrderRefDto> OpenOrders);
+
+/// <summary>One order still waiting for money. The price is here so the operator can match it to the amount.</summary>
+public sealed record OpenOrderRefDto(Guid Id, Guid UserId, decimal Price, DateTime CreatedAtUtc);
 
 /// <summary>
 /// One payment waiting to be placed. Carries what finance actually typed: the operator is resolving a
