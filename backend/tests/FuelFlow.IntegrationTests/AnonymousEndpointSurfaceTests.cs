@@ -98,11 +98,11 @@ public class AnonymousEndpointSurfaceTests : IClassFixture<TestDatabaseFixture>
         // project explicit DTOs rather than returning entities, so a column added to a table
         // cannot become public reference data by accident (FF-31).
         "GET /api/packages",
-        "GET /api/packages/{brandId}",
+        "GET /api/packages/{brandid}",
         "GET /api/brands",
         "GET /api/brands/fuel-types",
         "GET /api/brand-stations",
-        "GET /api/brand-stations/{brandId}",
+        "GET /api/brand-stations/{brandid}",
 
         // Public contact form behind the /support page on palne.shop: a visitor with no account
         // must be able to reach support. Anonymous by design and spam-hardened at the endpoint
@@ -158,8 +158,8 @@ public class AnonymousEndpointSurfaceTests : IClassFixture<TestDatabaseFixture>
             .ToArray();
 
         actual.Should().BeEquivalentTo(ExpectedAnonymousEndpoints,
-            "an endpoint reachable without a token is an attack-surface decision; add it to " +
-            nameof(ExpectedAnonymousEndpoints) + " deliberately, or attribute it with [Authorize]");
+            "an endpoint reachable without a token is an attack-surface decision; add it to "
+            + nameof(ExpectedAnonymousEndpoints) + " deliberately, or attribute it with [Authorize]");
     }
 
     /// <summary>
