@@ -1,6 +1,5 @@
 using FuelFlow.Features.Pricing;
 using FluentAssertions;
-using FuelFlow.Features.Brands.CreateFuelType;
 using FuelFlow.Features.Brands.CreatePackage;
 using FuelFlow.Features.Brands.CreateBrand;
 using FuelFlow.Features.Brands.DeleteFuelType;
@@ -150,56 +149,6 @@ var persisted = await _context.Brands.FindAsync("Brand-1");
         var result = await handler.HandleAsync(new DeleteBrandCommand("missing"));
 
         result.Should().BeFalse();
-    }
-
-    [Fact]
-    public async Task CreateFuelType_ShouldAdd()
-    {
-        var fuelType = CreateFuelType("ft-1", "A-95", "Brand-1");
-
-        var handler = new CreateFuelTypeCommandHandler(_context);
-
-        var result = await handler.HandleAsync(new CreateFuelTypeCommand(fuelType));
-
-        result.Success.Should().BeTrue();
-        result.Conflict.Should().BeFalse();
-        result.Error.Should().BeNull();
-        result.FuelType.Should().BeSameAs(fuelType);
-
-        var persisted = await _context.FuelTypes.FindAsync("ft-1");
-        persisted.Should().NotBeNull();
-        persisted!.CreatedAtUtc.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
-    }
-
-    [Fact]
-    public async Task CreateFuelType_ShouldReturnConflict_WhenExists()
-    {
-        var fuelType = CreateFuelType("ft-1", "A-95", "Brand-1");
-        _context.FuelTypes.Add(fuelType);
-        await _context.SaveChangesAsync();
-
-        var handler = new CreateFuelTypeCommandHandler(_context);
-
-        var result = await handler.HandleAsync(new CreateFuelTypeCommand(fuelType));
-
-        result.Success.Should().BeFalse();
-        result.Conflict.Should().BeTrue();
-        result.Error.Should().Contain("already exists");
-        result.FuelType.Should().BeNull();
-    }
-
-    [Fact]
-    public async Task CreateFuelType_ShouldReturnError_WhenRequiredFieldsMissing()
-    {
-        var fuelType = CreateFuelType("", "", "");
-
-        var handler = new CreateFuelTypeCommandHandler(_context);
-
-        var result = await handler.HandleAsync(new CreateFuelTypeCommand(fuelType));
-
-        result.Success.Should().BeFalse();
-        result.Conflict.Should().BeFalse();
-        result.Error.Should().Be("Id, BrandId and Name are required");
     }
 
     [Fact]

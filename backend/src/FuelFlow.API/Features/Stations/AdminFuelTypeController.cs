@@ -1,5 +1,4 @@
 using FuelFlow.SharedKernel.Domain;
-using FuelFlow.Features.Brands.CreateFuelType;
 using FuelFlow.Features.Brands.DeleteFuelType;
 using FuelFlow.Features.Brands.GetAdminFuelTypeById;
 using FuelFlow.Features.Brands.GetAdminFuelTypes;
@@ -15,20 +14,17 @@ public sealed class AdminFuelTypeController : ControllerBase
 {
     private readonly GetAdminFuelTypesQueryHandler _getAll;
     private readonly GetAdminFuelTypeByIdQueryHandler _getById;
-    private readonly CreateFuelTypeCommandHandler _create;
     private readonly UpdateFuelTypeCommandHandler _update;
     private readonly DeleteFuelTypeCommandHandler _delete;
 
     public AdminFuelTypeController(
         GetAdminFuelTypesQueryHandler getAll,
         GetAdminFuelTypeByIdQueryHandler getById,
-        CreateFuelTypeCommandHandler create,
         UpdateFuelTypeCommandHandler update,
         DeleteFuelTypeCommandHandler delete)
     {
         _getAll = getAll;
         _getById = getById;
-        _create = create;
         _update = update;
         _delete = delete;
     }
@@ -51,17 +47,20 @@ public sealed class AdminFuelTypeController : ControllerBase
         return result is null ? NotFound() : Ok(result);
     }
 
-    [HttpPost]
-    [Authorize(Policy = "Staff")]
-    public async Task<IActionResult> Create([FromBody] FuelTypeEntity request, CancellationToken ct)
-    {
-        var result = await _create.HandleAsync(new CreateFuelTypeCommand(request), ct);
-        if (result.Error != null && !result.Conflict)
-            return BadRequest(result.Error);
-        if (result.Conflict)
-            return Conflict(result.Error);
-        return CreatedAtAction(nameof(GetById), new { id = result.FuelType!.Id }, result.FuelType);
-    }
+    // POST removed 2026-10-18. It was the way one grade of a fuel got typed in twice: the create
+    // handler refused only a duplicate Id and knew nothing about the brand, so `А95` and `А 95+` at
+    // KLO, and `A-95` and `upg95` at UPG, all went in under fresh ids and neither DB index could
+    // object — `ux_fuel_types_station_name` only fires on an identical name, and the whole point was
+    // that the names differed.
+    //
+    // Creation now lives in two places that both know the brand: `POST /api/admin/brand-fuels/brands/{id}/fuels`,
+    // which refuses a duplicate name and a duplicate code within the brand, and the UPG/WOG price
+    // import, which keys on the brand's own published code. This route had no caller in any client,
+    // script, deploy config or doc.
+    //
+    // The action is deleted rather than commented out on purpose. Under [ApiController] a method with
+    // no HTTP attribute binds to the controller prefix instead of disappearing, which is how four
+    // actions once answered 500 (AmbiguousMatchException) instead of 404 — see the note above.
 
     [HttpPut("{id}")]
     [Authorize(Policy = "Staff")]
