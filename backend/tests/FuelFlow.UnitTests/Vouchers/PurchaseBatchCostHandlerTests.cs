@@ -144,8 +144,8 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         _context.Dispose();
     }
 
-    private SetBatchCostCommand Cmd(Guid importId, string fuelTypeId, decimal cost, bool force = false) =>
-        new(importId, fuelTypeId, cost, AdminId, "Admin User", force);
+    private SetBatchCostCommand Cmd(Guid importId, string fuelTypeId, decimal cost) =>
+        new(importId, fuelTypeId, cost, AdminId, "Admin User");
 
     // ── SetBatchCostCommandHandler ───────────────────────────────────────────
 
@@ -258,22 +258,28 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         second.Error.Should().NotContain("customers paid");
     }
 
+    /// <summary>
+    /// A second price for the same batch is refused, and the first one stands. This used to be the
+    /// opposite test: it drove the <c>ForceOverwrite</c> flag and asserted that a second entry restamped
+    /// the voucher and repriced the pool. The flag is gone — what a lot cost is a purchase fact, and a
+    /// correction is a new recorded entry rather than a rewrite of vouchers already bought (README
+    /// `purchase_batches`, planning #360).
+    /// </summary>
     [Fact]
-    public async Task SetCost_ForceOverwrite_RestampsExistingCost()
+    public async Task SetCost_ASecondPriceForTheSameBatch_IsRefusedAndChangesNothing()
     {
         var import = SeedImport();
         SeedVoucher(import, "okko-dp", 100m);
         await _context.SaveChangesAsync();
 
         await _setHandler.HandleAsync(Cmd(import, "okko-dp", 25m));
-        var result = await _setHandler.HandleAsync(Cmd(import, "okko-dp", 30m, force: true));
+        var result = await _setHandler.HandleAsync(Cmd(import, "okko-dp", 30m));
 
-        result.Success.Should().BeTrue();
-        result.VouchersCosted.Should().Be(1);
-        result.BlendedCostPerLiter.Should().Be(30m);
+        result.Success.Should().BeFalse("the batch is already costed, and its price is not ours to rewrite");
+        result.VouchersCosted.Should().Be(0);
 
         var voucher = await _context.FuelVouchers.FirstAsync(v => v.ImportJobId == import);
-        voucher.CostPerLiter.Should().Be(30m);
+        voucher.CostPerLiter.Should().Be(25m, "the bought price is exactly what it was");
 
         // Still one grouping row for the (import × fuel) pair.
         (await _context.PurchaseBatches.CountAsync()).Should().Be(1);
@@ -320,18 +326,28 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         offer.ComputedFinalPricePerLiter.Should().Be(27m);
     }
 
+    /// <summary>
+    /// Only stock counts. The in-stock voucher's litres are entered by this call, the Assigned
+    /// (sold) one's were costed by an earlier one, and only the former may drive the average.
+    /// <para>
+    /// The in-stock voucher is seeded <em>uncosted</em> on purpose. This test used to drive
+    /// <c>ForceOverwrite</c> to restamp it, which meant it only passed while a flag existed whose
+    /// whole purpose was rewriting a bought price — and removing that flag left it asserting nothing
+    /// about the pool it claims to test.
+    /// </para>
+    /// </summary>
     [Fact]
     public async Task SetCost_SoldStockLeavesThePool()
     {
-        // 100 L still in stock @ import1(20) + 100 L Assigned (sold) @ import2(30). Only the in-stock
-        // 100 L @ 20 should drive blended — the sold voucher's liters have left the pool.
+        // 100 L still in stock @ import1, entered here at 20, + 100 L Assigned (sold) @ import2(30).
+        // Only the in-stock 100 L @ 20 should drive blended — the sold voucher's liters have left it.
         var import1 = SeedImport();
         var import2 = SeedImport();
-        SeedVoucher(import1, "okko-dp", 100m, VoucherStatus.Imported, costPerLiter: 20m);
+        SeedVoucher(import1, "okko-dp", 100m, VoucherStatus.Imported);
         SeedVoucher(import2, "okko-dp", 100m, VoucherStatus.Assigned, costPerLiter: 30m);
         await _context.SaveChangesAsync();
 
-        var result = await _setHandler.HandleAsync(Cmd(import1, "okko-dp", 20m, force: true));
+        var result = await _setHandler.HandleAsync(Cmd(import1, "okko-dp", 20m));
 
         result.BlendedCostPerLiter.Should().Be(20m);
     }
