@@ -56,6 +56,19 @@ public sealed class FuelOffer
     /// <summary>Natural key of the fuel, as read from supplier PDFs. See <c>fuel_types.id</c>.</summary>
     public string FuelTypeId { get; set; } = null!;
 
+    /// <summary>
+    /// The fuel this offer sells, so a read path can take the margin from
+    /// <see cref="FuelTypeEntity.MarginUahPerLiter"/> — the fuel, not the offer, is where a margin
+    /// lives (planning #360).
+    /// <para>
+    /// Optional navigation, so a query that does not need the fuel does not drag the join in with it.
+    /// It also means the fuel's own global filter applies inside that join, which is the point: an
+    /// archived fuel leaves the shelf. That costs nothing, because a fuel may only be archived once
+    /// every one of its vouchers is spent or expired.
+    /// </para>
+    /// </summary>
+    public FuelTypeEntity? FuelType { get; set; }
+
     // Per-litre pricing. One copy per offer — this is the whole point of the table.
     //
     // Inputs only, since 2026-10-17: `final_price_per_liter` is gone, because it was

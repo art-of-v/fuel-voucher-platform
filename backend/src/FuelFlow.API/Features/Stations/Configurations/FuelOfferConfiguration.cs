@@ -55,6 +55,13 @@ internal sealed class FuelOfferConfiguration : IEntityTypeConfiguration<FuelOffe
         builder.HasIndex(e => e.StationId);
         builder.HasIndex(e => new { e.StationId, e.FuelTypeId });
 
+        // The way to the fuel, so a read path can take the margin from there rather than from a copy
+        // of it on the offer. Restrict, like every other relation here.
+        builder.HasOne(e => e.FuelType)
+            .WithMany()
+            .HasForeignKey(e => e.FuelTypeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasMany(e => e.Volumes)
             .WithOne(v => v.Offer)
             .HasForeignKey(v => v.OfferId)
