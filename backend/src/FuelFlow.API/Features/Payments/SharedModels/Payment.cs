@@ -1,6 +1,7 @@
 namespace FuelFlow.Payments.SharedModels;
 
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Features.Settlement.SharedModels;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
 
@@ -181,6 +182,13 @@ public sealed class Payment
 
     public Order? Order { get; set; }
     public User? User { get; set; }
+
+    /// <summary>
+    /// The channel messages that produced this payment. A collection and not a single reference,
+    /// because the relationship is genuinely one-to-many and asserting one would be a guess: one
+    /// message makes one payment, but a payment from an acquirer has none at all.
+    /// </summary>
+    public ICollection<SettlementMessage> SettlementMessages { get; set; } = new List<SettlementMessage>();
 }
 
 public enum PaymentKind

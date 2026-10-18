@@ -1810,6 +1810,8 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("PaymentId");
+
                     b.HasIndex("SentAtUtc")
                         .HasDatabaseName("ix_settlement_messages_refusals")
                         .HasFilter("outcome <> 'accepted'");
@@ -4977,6 +4979,16 @@ namespace FuelFlow.API.Migrations
                     b.Navigation("SourceVoucher");
                 });
 
+            modelBuilder.Entity("FuelFlow.Features.Settlement.SharedModels.SettlementMessage", b =>
+                {
+                    b.HasOne("FuelFlow.Payments.SharedModels.Payment", "Payment")
+                        .WithMany("SettlementMessages")
+                        .HasForeignKey("PaymentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Payment");
+                });
+
             modelBuilder.Entity("FuelFlow.Features.Vouchers.Events.VoucherEvent", b =>
                 {
                     b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", null)
@@ -5259,6 +5271,11 @@ namespace FuelFlow.API.Migrations
                     b.Navigation("Fulfillments");
 
                     b.Navigation("LineItems");
+                });
+
+            modelBuilder.Entity("FuelFlow.Payments.SharedModels.Payment", b =>
+                {
+                    b.Navigation("SettlementMessages");
                 });
 
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.FuelOffer", b =>

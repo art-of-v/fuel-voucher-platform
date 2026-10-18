@@ -1,3 +1,5 @@
+using FuelFlow.Payments.SharedModels;
+
 namespace FuelFlow.Features.Settlement.SharedModels;
 
 /// <summary>
@@ -96,6 +98,8 @@ public sealed class SettlementMessage
 
     /// <summary>The payment this produced, when it produced one.</summary>
     public Guid? PaymentId { get; set; }
+
+    public Payment? Payment { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }
 }
