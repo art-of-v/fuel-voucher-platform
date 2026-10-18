@@ -1,0 +1,41 @@
+# Local admin-panel tooling. NOT part of any deployment - nothing in prod.yml or
+# staging.yml reads this file, and `deploy/` is on the server, not in the image.
+#
+# Why it exists: node_modules is gitignored, so every fresh worktree (one per PR,
+# per this repo's rules) has none, and `npm ci` costs ~15s of every checkout. A
+# named volume keeps the tree across worktrees and makes it a one-off.
+#
+# The volume is named after the package-lock hash, and that is not tidiness. A
+# shared node_modules is only correct while every worktree has the same lockfile;
+# the moment one branch changes a dependency, every other worktree silently
+# resolves against a tree that does not match its lockfile, and you get failures
+# that reproduce on nobody's machine. Hashing the lockfile gives each dependency
+# set its own volume instead.
+#
+#   docker compose -f deploy/docker-compose.dev-admin.yml up -d
+#   docker compose -f deploy/docker-compose.dev-admin.yml exec admin npm run test
+#   docker compose -f deploy/docker-compose.dev-admin.yml down
+#
+# On Windows use `//` in the volume name; Compose rejects a bare `/`.
+
+name: fuelflow-dev-admin
+
+services:
+  admin:
+    image: node:22-alpine
+    working_dir: /app
+    # Bind-mounted so edits in any worktree are picked up without a rebuild. Only
+    # node_modules is masked, because a bind mount hides whatever is in the image
+    # at that path - and that is exactly what the volume is for.
+    volumes:
+      - ../admin:/app
+      - admin-modules:/app/node_modules
+    # Nothing to reach, and nothing to reach it: a dev container with no ports.
+    command: tail -f /dev/null
+
+volumes:
+  admin-modules:
+    # `${VAR:-default}` because Compose will not interpolate inside a top-level
+    # volume name without this form, and an unset variable there is a hard error
+    # rather than an empty name.
+    name: fuelflow-admin-modules-${LOCK_HASH:-default}
