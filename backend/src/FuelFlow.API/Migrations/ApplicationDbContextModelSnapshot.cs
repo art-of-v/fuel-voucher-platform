@@ -726,6 +726,58 @@ namespace FuelFlow.API.Migrations
                     b.ToTable("feedback_message_replies", (string)null);
                 });
 
+            modelBuilder.Entity("FuelFlow.Features.Ledger.SharedModels.AccountingPeriod", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("ClosedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("closed_at_utc");
+
+                    b.Property<Guid?>("ClosedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("closed_by_user_id");
+
+                    b.Property<DateOnly>("PeriodEnd")
+                        .HasColumnType("date")
+                        .HasColumnName("period_end");
+
+                    b.Property<DateOnly>("PeriodStart")
+                        .HasColumnType("date")
+                        .HasColumnName("period_start");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasDefaultValue("Open")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClosedByUserId");
+
+                    b.HasIndex("PeriodStart")
+                        .IsUnique();
+
+                    b.HasIndex("PeriodStart", "PeriodEnd");
+
+                    b.ToTable("accounting_periods", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_accounting_periods_closed_names_a_closer", "status <> 'Closed' OR closed_by_user_id IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_accounting_periods_closure_shape", "(status = 'Closed') = (closed_at_utc IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_accounting_periods_range", "period_end >= period_start");
+
+                            t.HasCheckConstraint("ck_accounting_periods_status", "status IN ('Open','Closed')");
+                        });
+                });
+
             modelBuilder.Entity("FuelFlow.Features.Ledger.SharedModels.BankAccount", b =>
                 {
                     b.Property<Guid>("Id")
@@ -783,6 +835,303 @@ namespace FuelFlow.API.Migrations
                             t.HasCheckConstraint("ck_bank_accounts_bank_code_not_blank", "btrim(bank_code) <> ''");
 
                             t.HasCheckConstraint("ck_bank_accounts_currency", "currency = 'UAH'");
+                        });
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Ledger.SharedModels.ChartOfAccount", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AccountType")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("account_type");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("code");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsPostable")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_postable");
+
+                    b.Property<string>("NameUkr")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name_ukr");
+
+                    b.Property<string>("NormalBalance")
+                        .IsRequired()
+                        .HasMaxLength(6)
+                        .HasColumnType("character varying(6)")
+                        .HasColumnName("normal_balance");
+
+                    b.Property<Guid?>("ParentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parent_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("ParentId");
+
+                    b.ToTable("chart_of_accounts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_chart_of_accounts_account_type", "account_type IN ('Asset','Liability','Equity','Revenue','Expense','Vat')");
+
+                            t.HasCheckConstraint("ck_chart_of_accounts_code_is_numeric", "code ~ '^[0-9]+$'");
+
+                            t.HasCheckConstraint("ck_chart_of_accounts_code_not_blank", "btrim(code) <> ''");
+
+                            t.HasCheckConstraint("ck_chart_of_accounts_normal_balance", "normal_balance IN ('Debit','Credit')");
+
+                            t.HasCheckConstraint("ck_chart_of_accounts_not_its_own_parent", "parent_id IS DISTINCT FROM id");
+                        });
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Ledger.SharedModels.JournalEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<DateOnly>("EntryDate")
+                        .HasColumnType("date")
+                        .HasColumnName("entry_date");
+
+                    b.Property<long>("EntryNo")
+                        .HasColumnType("bigint")
+                        .HasColumnName("entry_no");
+
+                    b.Property<Guid>("PeriodId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("period_id");
+
+                    b.Property<DateTime?>("PostedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("posted_at_utc");
+
+                    b.Property<Guid?>("PostedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("posted_by_user_id");
+
+                    b.Property<Guid?>("ReversedByEntryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reversed_by_entry_id");
+
+                    b.Property<Guid?>("SourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_id");
+
+                    b.Property<string>("SourceType")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("source_type");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasDefaultValue("Draft")
+                        .HasColumnName("status");
+
+                    b.Property<string>("TamperHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("tamper_hash");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("PostedByUserId");
+
+                    b.HasIndex("ReversedByEntryId");
+
+                    b.HasIndex("PeriodId", "EntryNo")
+                        .IsUnique();
+
+                    b.HasIndex("SourceType", "SourceId");
+
+                    b.ToTable("journal_entries", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_journal_entries_description_not_blank", "btrim(description) <> ''");
+
+                            t.HasCheckConstraint("ck_journal_entries_entry_no_positive", "entry_no > 0");
+
+                            t.HasCheckConstraint("ck_journal_entries_not_own_reversal", "reversed_by_entry_id IS DISTINCT FROM id");
+
+                            t.HasCheckConstraint("ck_journal_entries_posted_shape", "(status = 'Draft') OR (posted_at_utc IS NOT NULL AND posted_by_user_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_journal_entries_reversed_shape", "status <> 'Reversed' OR reversed_by_entry_id IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_journal_entries_source_type", "source_type IN ('Payment','Refund','Fulfillment','Cost','Movement','Adjustment','Fiscalization','Reversal')");
+
+                            t.HasCheckConstraint("ck_journal_entries_status", "status IN ('Draft','Posted','Reversed')");
+
+                            t.HasCheckConstraint("ck_journal_entries_tamper_hash_length", "tamper_hash IS NULL OR tamper_hash ~ '^[0-9a-f]{64}$'");
+                        });
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Ledger.SharedModels.JournalLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<decimal>("CreditUah")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("credit_uah");
+
+                    b.Property<decimal>("DebitUah")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("debit_uah");
+
+                    b.Property<Guid>("EntryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("entry_id");
+
+                    b.Property<Guid?>("LegalEntityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("legal_entity_id");
+
+                    b.Property<short>("LineNo")
+                        .HasColumnType("smallint")
+                        .HasColumnName("line_no");
+
+                    b.Property<string>("OfferId")
+                        .HasMaxLength(103)
+                        .HasColumnType("text")
+                        .HasColumnName("offer_id");
+
+                    b.Property<Guid?>("PartyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("party_id");
+
+                    b.Property<decimal?>("QuantityLiters")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)")
+                        .HasColumnName("quantity_liters");
+
+                    b.Property<Guid?>("VoucherId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("voucher_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountId");
+
+                    b.HasIndex("LegalEntityId");
+
+                    b.HasIndex("OfferId");
+
+                    b.HasIndex("PartyId");
+
+                    b.HasIndex("VoucherId");
+
+                    b.HasIndex("EntryId", "LineNo")
+                        .IsUnique();
+
+                    b.ToTable("journal_lines", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_journal_lines_amounts_non_negative", "debit_uah >= 0 AND credit_uah >= 0");
+
+                            t.HasCheckConstraint("ck_journal_lines_line_no_positive", "line_no > 0");
+
+                            t.HasCheckConstraint("ck_journal_lines_one_side", "(debit_uah > 0 AND credit_uah = 0) OR (credit_uah > 0 AND debit_uah = 0)");
+
+                            t.HasCheckConstraint("ck_journal_lines_quantity_positive", "quantity_liters IS NULL OR quantity_liters > 0");
+                        });
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Ledger.SharedModels.LedgerMappingRule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<string>("Side")
+                        .IsRequired()
+                        .HasMaxLength(6)
+                        .HasColumnType("character varying(6)")
+                        .HasColumnName("side");
+
+                    b.Property<string>("SourceEvent")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("source_event");
+
+                    b.Property<string>("SourceType")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("source_type");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountId");
+
+                    b.HasIndex("SourceEvent", "Side")
+                        .IsUnique();
+
+                    b.ToTable("ledger_mapping_rules", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_ledger_mapping_rules_event_not_blank", "btrim(source_event) <> ''");
+
+                            t.HasCheckConstraint("ck_ledger_mapping_rules_side", "side IN ('Debit','Credit')");
+
+                            t.HasCheckConstraint("ck_ledger_mapping_rules_source_type", "source_type IN ('Payment','Refund','Fulfillment','Cost','Movement','Adjustment','Fiscalization','Reversal')");
                         });
                 });
 
@@ -4298,6 +4647,14 @@ namespace FuelFlow.API.Migrations
                     b.Navigation("FeedbackMessage");
                 });
 
+            modelBuilder.Entity("FuelFlow.Features.Ledger.SharedModels.AccountingPeriod", b =>
+                {
+                    b.HasOne("FuelFlow.SharedKernel.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("ClosedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("FuelFlow.Features.Ledger.SharedModels.BankAccount", b =>
                 {
                     b.HasOne("FuelFlow.Features.Ledger.SharedModels.OperatorLegalEntity", "OperatorLegalEntity")
@@ -4307,6 +4664,90 @@ namespace FuelFlow.API.Migrations
                         .IsRequired();
 
                     b.Navigation("OperatorLegalEntity");
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Ledger.SharedModels.ChartOfAccount", b =>
+                {
+                    b.HasOne("FuelFlow.Features.Ledger.SharedModels.ChartOfAccount", null)
+                        .WithMany()
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Ledger.SharedModels.JournalEntry", b =>
+                {
+                    b.HasOne("FuelFlow.SharedKernel.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("FuelFlow.Features.Ledger.SharedModels.AccountingPeriod", "Period")
+                        .WithMany("Entries")
+                        .HasForeignKey("PeriodId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FuelFlow.SharedKernel.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("PostedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("FuelFlow.Features.Ledger.SharedModels.JournalEntry", null)
+                        .WithMany()
+                        .HasForeignKey("ReversedByEntryId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Period");
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Ledger.SharedModels.JournalLine", b =>
+                {
+                    b.HasOne("FuelFlow.Features.Ledger.SharedModels.ChartOfAccount", "Account")
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FuelFlow.Features.Ledger.SharedModels.JournalEntry", "Entry")
+                        .WithMany("Lines")
+                        .HasForeignKey("EntryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FuelFlow.Features.Contracts.SharedModels.LegalEntity", null)
+                        .WithMany()
+                        .HasForeignKey("LegalEntityId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("FuelFlow.SharedKernel.Domain.FuelOffer", null)
+                        .WithMany()
+                        .HasForeignKey("OfferId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("FuelFlow.Features.Ledger.SharedModels.Party", null)
+                        .WithMany()
+                        .HasForeignKey("PartyId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", null)
+                        .WithMany()
+                        .HasForeignKey("VoucherId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Account");
+
+                    b.Navigation("Entry");
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Ledger.SharedModels.LedgerMappingRule", b =>
+                {
+                    b.HasOne("FuelFlow.Features.Ledger.SharedModels.ChartOfAccount", "Account")
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Account");
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Ledger.SharedModels.NaturalPerson", b =>
@@ -4642,6 +5083,16 @@ namespace FuelFlow.API.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Role");
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Ledger.SharedModels.AccountingPeriod", b =>
+                {
+                    b.Navigation("Entries");
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Ledger.SharedModels.JournalEntry", b =>
+                {
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Ledger.SharedModels.OperatorLegalEntity", b =>
