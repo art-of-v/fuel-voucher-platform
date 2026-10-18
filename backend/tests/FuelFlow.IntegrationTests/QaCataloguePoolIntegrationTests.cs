@@ -35,24 +35,28 @@ namespace FuelFlow.IntegrationTests;
 [Collection("Integration Tests")]
 public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture>
 {
-    /// <summary>One Brand and one fuel, carrying a real package and its QA twin.</summary>
+    /// <summary>One Brand, one fuel, one nominal — sold in both pools.</summary>
     private const string Brand = "qa-pool-okko";
     private const string FuelType = "qa-pool-95";
 
-    /// <summary>The live nominal.</summary>
-    private const decimal RealLiters = 10m;
+    /// <summary>
+    /// The one nominal both pools sell. A size belongs to the fuel, not to a pool: <c>fuel_nominals</c>
+    /// is keyed by <c>(fuel_type_id, liters)</c> and knows nothing about <c>data_kind</c>. So the two
+    /// pools of one fuel list the same sizes and differ in what each size COSTS and whose stock is
+    /// behind it. The tests below are built on that, and a distinct QA nominal is no longer
+    /// expressible.
+    /// </summary>
+    private const decimal Liters = 10m;
 
     /// <summary>
-    /// The QA nominal is deliberately not the real one. Availability keys on
-    /// (Brand, fuel type, nominal) and carries no name, so a QA package sharing 10 L with the real
-    /// one would light the real package's availability flag from test stock — QA would be shown the
-    /// live package as buyable because the QA package behind it existed. Distinct nominals keep the
-    /// two pools' flags independent; the names stay 1:1.
+    /// What the live offer buys the litre at, and what the rehearsal offer buys it at. Two costs is
+    /// the whole demonstration that the pool is being honoured: the same fuel, the same size, two
+    /// different prices, one per pool.
     /// </summary>
-    private const decimal QaLiters = 7m;
+    private const decimal RealCostPerLiter = 45m;
+    private const decimal QaCostPerLiter = 40m;
 
     private const string RealName = "А95";
-    private const string QaName = "А95(QA)";
 
     private readonly TestDatabaseFixture _fixture;
 
@@ -83,36 +87,35 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
             });
         }
 
-        // Seeded as an offer plus a volume per pool. The storefront joins volumes to offers to read the
-        // price, so a package left in fuel_packages would leave the catalogue empty and these tests
-        // would assert against nothing.
-        if (!await context.FuelOfferVolumes.AnyAsync(p => p.Id == "qa-pool-real-10", CancellationToken.None))
-        {
-            context.SeedPackage("qa-pool-real-10", Brand, FuelType, RealLiters, 470m * RealLiters,
-                supplierPricePerLiter: 45m, marginUahPerLiter: 2m, finalPricePerLiter: 47m,
-                isTestData: false, createdAtUtc: now, updatedAtUtc: now);
-        }
+// One nominal, sold in both pools. The offer carries the cost, so the two pools price it
+    // differently - which is what makes the pool observable at all now that the size list is shared.
+    if (!await context.FuelOfferVolumes.AnyAsync(p => p.Id == "qa-pool-real-10", CancellationToken.None))
+    {
+        context.SeedPackage("qa-pool-real-10", Brand, FuelType, Liters, 470m * Liters,
+            supplierPricePerLiter: RealCostPerLiter, marginUahPerLiter: 2m, finalPricePerLiter: 47m,
+            isTestData: false, createdAtUtc: now, updatedAtUtc: now);
+    }
 
-        if (!await context.FuelOfferVolumes.AnyAsync(p => p.Id == "qa-pool-qa-7", CancellationToken.None))
-        {
-            context.SeedPackage("qa-pool-qa-7", Brand, FuelType, QaLiters, 470m * QaLiters,
-                supplierPricePerLiter: 45m, marginUahPerLiter: 2m, finalPricePerLiter: 47m,
-                isTestData: true, createdAtUtc: now, updatedAtUtc: now);
-        }
+    if (!await context.FuelOfferVolumes.AnyAsync(p => p.Id == "qa-pool-qa-10", CancellationToken.None))
+    {
+        context.SeedPackage("qa-pool-qa-10", Brand, FuelType, Liters, 420m * Liters,
+            supplierPricePerLiter: QaCostPerLiter, marginUahPerLiter: 2m, finalPricePerLiter: 42m,
+            isTestData: true, createdAtUtc: now, updatedAtUtc: now);
+    }
 
-        // One sellable voucher per pool, seeded once. Without both, "QA can see the QA package" would
-        // pass on a row that is merely visible but dark, which is not what the reviewer needs.
-        if (!await context.FuelVouchers.AnyAsync(
-                v => v.FuelTypeId == FuelType && v.Liters == RealLiters && v.DataKind == DataKinds.Real, CancellationToken.None))
-        {
-            context.FuelVouchers.Add(SellableVoucher(RealLiters, isTestData: false));
-        }
+    // One sellable voucher per pool, seeded once. Without both, "QA can see the QA package" would
+    // pass on a row that is merely visible but dark, which is not what the reviewer needs.
+    if (!await context.FuelVouchers.AnyAsync(
+            v => v.FuelTypeId == FuelType && v.Liters == Liters && v.DataKind == DataKinds.Real, CancellationToken.None))
+    {
+        context.FuelVouchers.Add(SellableVoucher(Liters, isTestData: false));
+    }
 
-        if (!await context.FuelVouchers.AnyAsync(
-                v => v.FuelTypeId == FuelType && v.Liters == QaLiters && v.DataKind == DataKinds.Qa, CancellationToken.None))
-        {
-            context.FuelVouchers.Add(SellableVoucher(QaLiters, isTestData: true));
-        }
+    if (!await context.FuelVouchers.AnyAsync(
+            v => v.FuelTypeId == FuelType && v.Liters == Liters && v.DataKind == DataKinds.Qa, CancellationToken.None))
+    {
+        context.FuelVouchers.Add(SellableVoucher(Liters, isTestData: true));
+    }
 
         await context.SaveChangesAsync();
     }
@@ -178,7 +181,7 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
 
     /// <summary>
     /// The anonymous reader is the case that was already safe and must stay that way: it sees the
-    /// live catalogue, and not one row of the QA one.
+    /// live catalogue, priced from the live offer.
     /// </summary>
     [Theory]
     [InlineData(false)]
@@ -190,8 +193,11 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
 
         var packages = await PackagesAsync(client, byBrand, Brand);
 
-        Assert.Contains(packages, p => p.Liters == RealLiters);
-        Assert.DoesNotContain(packages, p => p.Liters == QaLiters);
+        var package = Assert.Single(packages);
+        Assert.Equal(Liters, package.Liters);
+        // The live offer's cost plus the fuel's margin. A rehearsal price here would mean the pool
+        // filter had stopped filtering, which is the outage this whole directory of tests exists for.
+        Assert.Equal(47m, package.FinalPricePerLiter);
     }
 
     /// <summary>
@@ -208,13 +214,13 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
 
         var packages = await PackagesAsync(client, byBrand, Brand);
 
-        Assert.Contains(packages, p => p.Liters == RealLiters);
-        Assert.DoesNotContain(packages, p => p.Liters == QaLiters);
+        Assert.Equal(47m, Assert.Single(packages).FinalPricePerLiter);
     }
 
     /// <summary>
-    /// The behaviour that did not exist before: QA sees its own catalogue, with the QA stock behind
-    /// it, and the live package is not in the response at all — not greyed out, absent.
+    /// The behaviour that did not exist before: QA reads its own offer, with the QA stock behind it.
+    /// The size is the same one the live catalogue sells, because a size belongs to the fuel — what
+    /// differs is the price it is offered at and the pool the stock comes from.
     /// </summary>
     [Theory]
     [InlineData(false)]
@@ -226,18 +232,19 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
 
         var packages = await PackagesAsync(client, byBrand, Brand);
 
-        var qaPackage = Assert.Single(packages, p => p.Liters == QaLiters);
+        var qaPackage = Assert.Single(packages);
+        Assert.Equal(Liters, qaPackage.Liters);
+        Assert.Equal(42m, qaPackage.FinalPricePerLiter);
         Assert.True(qaPackage.IsAvailable,
             "the QA package is visible and its stock is sellable, which is the whole point — a QA run " +
             "that could see the catalogue but not buy from it would be no better than reusing the live one");
-        Assert.DoesNotContain(packages, p => p.Liters == RealLiters);
     }
 
     /// <summary>
-    /// The two pools must not bleed through the availability flag either. Each caller's own package
-    /// is lit and the other one is not, which is only true while the row filter and the stock filter
-    /// read the same pool — the reason <c>PackageStockAvailability</c> resolves the caller once and
-    /// uses it for both.
+    /// The two pools must not bleed through the availability flag either. Each caller is backed by
+    /// its own pool's stock, which is only true while the row filter and the stock filter read the
+    /// same pool — the reason <c>PackageStockAvailability</c> resolves the caller once and uses it
+    /// for both.
     /// </summary>
     [Fact]
     public async Task AvailabilityFollowsTheCallersOwnPool()
@@ -265,12 +272,16 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
 
         // The display name is the fuel's, and the fuel is shared by both pools - it comes from
         // fuel_types now, not from a string each package row carried and could contradict. So the QA
-        // catalogue no longer renders its own "(QA)" label; the two pools are told apart by their
-        // nominal, which is what actually differs. Anything identifying a pool by name here would have
-        // been asserting the old duplicated column.
-        Assert.Equal(RealName, Assert.Single(anonymous).FuelName);
-        Assert.Equal(RealName, Assert.Single(qa).FuelName);
-        Assert.Equal(RealLiters, Assert.Single(anonymous).Liters);
-        Assert.Equal(QaLiters, Assert.Single(qa).Liters);
+        // catalogue no longer renders its own "(QA)" label; the two pools are told apart by the offer
+        // pricing them, which is what actually differs. Anything identifying a pool by name here
+        // would have been asserting the old duplicated column.
+        var anonymousPackage = Assert.Single(anonymous);
+        var qaPackage = Assert.Single(qa);
+        Assert.Equal(RealName, anonymousPackage.FuelName);
+        Assert.Equal(RealName, qaPackage.FuelName);
+        Assert.Equal(Liters, anonymousPackage.Liters);
+        Assert.Equal(Liters, qaPackage.Liters);
+        Assert.NotEqual(anonymousPackage.Id, qaPackage.Id);
+        Assert.NotEqual(anonymousPackage.Price, qaPackage.Price);
     }
 }

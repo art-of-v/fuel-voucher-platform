@@ -37,19 +37,21 @@ public sealed class GetPublicPackagesByBrandQueryHandler
         // joined from fuel_types for the same reason as there - the offer knows which fuel, not what
         // it is called.
         var rows = await (
-            from volume in _context.FuelOfferVolumes.AsNoTracking()
-            join offer in _context.FuelOffers.AsNoTracking() on volume.OfferId equals offer.Id
+            from offer in _context.FuelOffers.AsNoTracking()
             join fuel in _context.FuelTypes.AsNoTracking() on offer.FuelTypeId equals fuel.Id
+            // The sizes are the fuel's, not the offer's - see GetPublicPackagesQueryHandler, which is
+            // the same query narrowed to one Brand.
+            from nominal in _context.FuelNominals.AsNoTracking() where nominal.FuelTypeId == fuel.Id
             where offer.BrandId == query.BrandId
                && offer.DataKind == DataKinds.ForPool(isTestAccount)
-            orderby fuel.Name, volume.Liters
+            orderby fuel.Name, nominal.Liters
             select new
             {
-                Id = volume.Id,
+                offer.Id,
                 offer.BrandId,
                 offer.FuelTypeId,
                 FuelName = fuel.Name,
-                volume.Liters,
+                nominal.Liters,
                 // Resolved against the offer's rate below — see GetPublicPackagesQueryHandler, which is
                 // the same query narrowed to one Brand.
                 offer.SupplierPricePerLiter,
@@ -61,7 +63,7 @@ public sealed class GetPublicPackagesByBrandQueryHandler
 
         var available = await _stock.AvailableKeysAsync(isTestAccount, ct);
 
-        // Unpriced, unoverridden packages are skipped rather than shown at zero: see the same filter in
+        // A fuel nobody has priced yet is skipped rather than shown at zero: see the same filter in
         // GetPublicPackagesQueryHandler.
         return rows
             // A fuel nobody has priced yet has no price to show. It is skipped rather than
@@ -71,10 +73,10 @@ public sealed class GetPublicPackagesByBrandQueryHandler
             {
                 var price = FuelPricing.PackagePrice(
                     x.SupplierPricePerLiter, x.MarginUahPerLiter, x.PumpPricePerLiter, x.MinDiscountPerLiter,
-                      x.Liters);
+                    x.Liters);
 
                 return new PublicPackageResponse(
-                    x.Id,
+                    PackageIds.For(x.Id, x.Liters),
                     x.BrandId,
                     x.FuelTypeId,
                     x.FuelName,

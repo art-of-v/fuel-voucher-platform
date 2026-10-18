@@ -181,6 +181,18 @@ var offer = context.SeedOffer(
     // checkout refuses, exactly as it would in production.
     _ = price;
 
+        // The size is the fuel's, not a row's: the storefront and checkout both read the size list from
+    // fuel_nominals now, so a fixture that seeds only a volume describes a package nothing can see.
+    // Both are written while the volume table still exists - the volume still carries the pool-scoped
+    // id that the admin paths address - and the nominal is what the sellable read path resolves.
+    var alreadyListed =
+        context.FuelNominals.Local.Any(n => n.FuelTypeId == fuelTypeId && n.Liters == liters)
+        || context.FuelNominals.Any(n => n.FuelTypeId == fuelTypeId && n.Liters == liters);
+    if (!alreadyListed)
+    {
+        context.FuelNominals.Add(new FuelNominal { FuelTypeId = fuelTypeId, Liters = liters });
+    }
+
         var volume = new FuelOfferVolume
         {
             Id = id,

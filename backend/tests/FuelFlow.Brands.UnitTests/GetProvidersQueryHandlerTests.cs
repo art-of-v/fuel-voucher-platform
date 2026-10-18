@@ -133,6 +133,12 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
             Package("test-dp-2", 2m, cost: 100.00m, final: 99.90m),
             Package("test-dp-3", 3m, cost: 100.00m, final: 99.90m),
             Package("test-dp-10", 10m, cost: 100.00m, final: 99.90m));
+        // The card reads the sizes from fuel_nominals, so each volume needs its size stated there too.
+        _context.FuelNominals.AddRange(
+            new FuelNominal { FuelTypeId = "test-dp", Liters = 0.01m },
+            new FuelNominal { FuelTypeId = "test-dp", Liters = 2m },
+            new FuelNominal { FuelTypeId = "test-dp", Liters = 3m },
+            new FuelNominal { FuelTypeId = "test-dp", Liters = 10m });
         await _context.SaveChangesAsync();
 
         var providers = await _handler.HandleAsync(new GetBrandsQuery());
@@ -192,6 +198,11 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
         _context.FuelOfferVolumes.AddRange(
             Package("test-dp-2", 2m, cost: 100.00m, final: 99.90m),
             Package("test-dp-10", 10m, cost: 110.00m, final: 105.00m));
+        // The card reads the sizes from fuel_nominals, so stating them only as volumes describes a
+        // fuel nothing can see. One fuel, two allowed sizes.
+        _context.FuelNominals.AddRange(
+            new FuelNominal { FuelTypeId = "test-dp", Liters = 2m },
+            new FuelNominal { FuelTypeId = "test-dp", Liters = 10m });
         await _context.SaveChangesAsync();
 
         var providers = await _handler.HandleAsync(new GetBrandsQuery());

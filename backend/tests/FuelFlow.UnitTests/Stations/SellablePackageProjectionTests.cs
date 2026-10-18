@@ -64,34 +64,36 @@ public sealed class SellablePackageProjectionTests : IDisposable
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };
-        var volume = new FuelOfferVolume
+
+        var nominal = new FuelNominal
         {
-            Id = "projection-vol",
-            OfferId = offer.Id,
-            Liters = 10m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            FuelTypeId = fuel.Id,
+            Liters = 10m
         };
 
         _context.FuelTypes.Add(fuel);
         _context.FuelOffers.Add(offer);
-        _context.FuelOfferVolumes.Add(volume);
+        _context.FuelNominals.Add(nominal);
         await _context.SaveChangesAsync();
         _context.ChangeTracker.Clear();
 
         // Filtered by id: EnsureCreated also loads the HasData catalogue into this context, and this
-        // test is about one pair of rows, not about whatever the seed brought with it.
-        var projected = await _context.FuelOfferVolumes
-            .Where(v => v.Id == volume.Id)
-            .Project()
+        // test is about one offer, not about whatever the seed brought with it.
+        var projected = await _context.FuelOffers
+            .Where(o => o.Id == offer.Id)
+            .Project(_context.FuelNominals.Where(n => n.FuelTypeId == fuel.Id))
             .SingleAsync();
         var composed = SellablePackage.From(
             await _context.FuelOffers.SingleAsync(o => o.Id == offer.Id),
-            await _context.FuelOfferVolumes.SingleAsync(v => v.Id == volume.Id),
             // Third of the join, for the same reason the projection takes it: the margin is the fuel's.
-            await _context.FuelTypes.SingleAsync(f => f.Id == offer.FuelTypeId));
+            await _context.FuelTypes.SingleAsync(f => f.Id == offer.FuelTypeId),
+            nominal.Liters);
 
         projected.Should().BeEquivalentTo(composed);
+
+        // And the id both sides synthesise is the same string, or a package the shop advertised
+        // could not be resolved at checkout.
+        projected.PackageId.Should().Be(PackageIds.For(offer.Id, 10m));
 
         // The price both paths resolve: derived, and equal on both sides.
         projected.ComputedFinalPricePerLiter.Should().Be(51m);
