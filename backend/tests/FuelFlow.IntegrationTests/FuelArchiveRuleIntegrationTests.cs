@@ -83,9 +83,15 @@ public sealed class FuelArchiveRuleIntegrationTests : IClassFixture<TestDatabase
         // case needs one. The FK is to a real order row, so a stub id would only move the failure.
         var orderId = Guid.NewGuid();
         var buyerId = Guid.NewGuid();
+        // The phone is derived from the id, as everywhere else in this suite: the previous shape
+        // was "+38000" + the wall clock to the second + the suffix's hash mod 1000, which has a
+        // thousand buckets and a second of resolution - so two tests landing in the same second
+        // with suffixes whose hashes agree mod 1000 inserted the same phone, and the unique index
+        // on it refused the second row. It failed on 2026-10-19 in the integration suite, in a
+        // test that has nothing to do with what it was testing.
         context.Users.Add(new User
         {
-            Id = buyerId, PhoneNumber = $"+38000{DateTime.UtcNow:HHmmss}{suffix.GetHashCode() % 1000:000}",
+            Id = buyerId, PhoneNumber = $"+38{buyerId:N}"[..20],
             CreatedAtUtc = now,
         });
         context.Orders.Add(new Order
