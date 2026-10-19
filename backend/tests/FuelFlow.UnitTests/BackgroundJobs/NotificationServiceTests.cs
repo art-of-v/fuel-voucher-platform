@@ -1,4 +1,5 @@
 using FluentAssertions;
+using FuelFlow.API.BackgroundJobs;
 using FuelFlow.API.BackgroundJobs.Models;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Notifications.Push;
@@ -57,7 +58,7 @@ public sealed class ApiNotificationServiceTests : IDisposable
                 fulfilledAt = DateTime.UtcNow
             }),
             Processed = processed,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1)
         };
     }
 
@@ -119,7 +120,7 @@ public sealed class ApiNotificationServiceTests : IDisposable
                 FulfilledAt = DateTime.UtcNow
             }),
             Processed = false,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1)
         };
         _context.OutboxEvents.Add(outboxEvent);
         await _context.SaveChangesAsync();
@@ -304,7 +305,7 @@ public sealed class JobsWorkerNotificationServiceTests : IDisposable
                 fulfilledAt = DateTime.UtcNow
             }),
             Processed = processed,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1)
         };
     }
 

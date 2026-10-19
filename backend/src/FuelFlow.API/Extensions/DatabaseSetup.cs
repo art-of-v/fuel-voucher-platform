@@ -1,3 +1,5 @@
+using FuelFlow.API.BackgroundJobs;
+using Hangfire;
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -58,10 +60,30 @@ internal static class DatabaseSetup
         services.AddSingleton(dataSource);
 
         services.AddScoped<IImportVouchersDbContext>(brand => brand.GetRequiredService<ApplicationDbContext>());
+
+        // The outbox dispatcher, registered HERE rather than in the host's Program.cs, so that every
+        // host that builds an ApplicationDbContext gets it - a host that forgot it would write
+        // outbox rows that nothing dispatches until the safety net catches them, and the gap would
+        // look like a slow queue rather than a missing registration.
+        //
+        // The job client is optional: a host without Hangfire still writes outbox rows, and the
+        // safety net in a host that has Hangfire dispatches them.
+        services.AddScoped(brand => new OutboxDispatchInterceptor(
+            brand.GetService<IBackgroundJobClient>(),
+            brand.GetRequiredService<ILogger<OutboxDispatchInterceptor>>()));
+        services.AddScoped<OutboxDispatchJob>();
+
         services.AddDbContext<ApplicationDbContext>((brand, options) =>
         {
             var loggerFactory = brand.GetRequiredService<ILoggerFactory>();
             var environment = brand.GetRequiredService<IHostEnvironment>();
+
+            // The outbox dispatcher. A written outbox row becomes a queued job, so an event is
+            // dispatched when it happens rather than when a clock next looks for it. The
+            // recurring jobs that used to poll for it every minute stay as a safety net, for the
+            // case where the enqueue failed or the process died between the commit and the
+            // enqueue - which is why they only claim events old enough not to race with this.
+            options.AddInterceptors(brand.GetRequiredService<OutboxDispatchInterceptor>());
             // Tracking is deliberately left at the default, TrackAll.
             //
             // This context used to be configured NoTracking globally, on the reasonable-sounding grounds

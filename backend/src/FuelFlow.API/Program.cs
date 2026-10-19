@@ -180,12 +180,29 @@ try
         recurringJobManager.AddOrUpdate<FulfillmentService>(
             "process-fulfillments",
             service => service.ProcessPendingOrdersAsync(CancellationToken.None),
-            "*/1 * * * *");
+            // Every 5 minutes, and it is a SAFETY NET rather than the path. An ORDER_CREATED
+            // outbox event is dispatched by the job the outbox interceptor queued when the row
+            // was written, which happens within seconds of the purchase; this one only picks up
+            // what the fast path missed - an enqueue that failed, or a process that died between
+            // the commit and the enqueue.
+            //
+            // It used to run every minute and be the ONLY path, which meant a voucher could sit
+            // unfulfilled for up to a minute and its notification for up to two, and the database
+            // grew a Hangfire row every minute to say it had checked and found nothing. Five
+            // minutes is the floor that keeps the fallback bounded, and the fallback only runs
+            // when something has already gone wrong.
+            //
+            // The three sweeps this job also runs - the mismatched-fulfilment repair and the two
+            // backfills - are repairs rather than user-facing latency, so they are happy at the
+            // same cadence.
+            "*/5 * * * *");
 
-recurringJobManager.AddOrUpdate<NotificationService>(
+        recurringJobManager.AddOrUpdate<NotificationService>(
       "process-notifications",
       service => service.ProcessOrderFulfilledEventsAsync(CancellationToken.None),
-      "*/1 * * * *");
+      // Every 5 minutes, and a safety net - see process-fulfillments. The event itself is
+      // dispatched by the job the outbox interceptor queued.
+      "*/5 * * * *");
 
       // #150 W3. A separate job rather than a second call inside the one above: AddOrUpdate takes
       // an expression tree, which cannot hold an async lambda, and one job per event type is what
@@ -193,12 +210,21 @@ recurringJobManager.AddOrUpdate<NotificationService>(
       recurringJobManager.AddOrUpdate<NotificationService>(
       "process-worker-notifications",
       service => service.ProcessVoucherIssuedEventsAsync(CancellationToken.None),
-      "*/1 * * * *");
+      // Every 5 minutes, and a safety net - see process-fulfillments.
+      "*/5 * * * *");
 
         recurringJobManager.AddOrUpdate<RefundStatusSyncService>(
             "sync-refund-status",
             service => service.SyncPendingRefundsAsync(CancellationToken.None),
-            "*/1 * * * *");
+            // Every 5 minutes rather than every minute. Two reasons, and neither is "it is faster
+            // this way". The first half of this job abandons refunds that have been pending for
+            // 24 hours, and a refund that is 24 hours old is still 24 hours old five minutes later -
+            // the cadence buys nothing there. The second half asks the acquirer what happened to
+            // each pending refund, and the acquirer is told about a refund by webhook, so this is
+            // only ever the path for a webhook that never arrived; the sibling reconciliation job
+            // already argues that a 3-minute grace window makes sub-minute polling moot, and the
+            // same argument holds here.
+            "*/5 * * * *");
 
         // Safety net for lost/late Monobank payment webhooks. No-ops unless Monobank:Enabled and
         // ReconciliationEnabled, so it never polls the in-process mock. Every 2 minutes: the outbound

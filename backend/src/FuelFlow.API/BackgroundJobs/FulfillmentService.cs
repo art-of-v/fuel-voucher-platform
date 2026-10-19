@@ -55,8 +55,13 @@ public class FulfillmentService
 
     public async Task ProcessPendingOrdersAsync(CancellationToken cancellationToken = default)
     {
+        // The safety net for the ORDER_CREATED outbox. The fast path is the job the outbox
+        // interceptor queued when the row was written, and it claims the event within seconds.
+        // This waits longer than that, so the two never race for the same row.
+        var claimCutoff = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow;
+
         var unprocessedEvents = await _context.OutboxEvents
-            .Where(e => !e.Processed && e.EventType == OutboxEventType.OrderCreated)
+            .Where(e => !e.Processed && e.EventType == OutboxEventType.OrderCreated && e.CreatedAtUtc < claimCutoff)
             .OrderBy(e => e.CreatedAtUtc)
             .Take(50)
             .ToListAsync(cancellationToken);
@@ -596,7 +601,7 @@ if (!fullyAttributed && fulfillments.Count > 0)
         }
     }
 
-    private async Task ProcessOrderCreatedEventAsync(OutboxEvent outboxEvent, CancellationToken cancellationToken)
+    public async Task ProcessOrderCreatedEventAsync(OutboxEvent outboxEvent, CancellationToken cancellationToken)
     {
         var payload = System.Text.Json.JsonSerializer.Deserialize<OrderCreatedPayload>(outboxEvent.Payload);
 
