@@ -251,12 +251,13 @@ public sealed class RenewalCheckoutCommandHandler
         // Idempotency (mirrors BulkCheckoutCommandHandler): collapse an accidental resend of the SAME
         // batch onto the live pending order + invoice instead of double-charging. The "renew:" prefix
         // keeps a renewal bucket from ever matching a buy-fuel order's key on the StartsWith probe.
-        var roundedMinute = (DateTime.UtcNow.Minute / 5) * 5;
+        // No clock in the key, for the same reason the other two handlers have none: a rolled
+        // bucket makes the window discontinuous, and a retry across the boundary is a second charge.
         var cartSignature = string.Join("|", command.Items
             .Select(i => $"{i.VoucherId:N}:{i.TermCode}")
             .OrderBy(s => s, StringComparer.Ordinal));
         var cartDigest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(cartSignature)))[..32];
-        var bucketKey = $"renew:{userId:N}:{DateTime.UtcNow:yyyyMMddHH}{roundedMinute:D2}:{cartDigest}";
+        var bucketKey = $"renew:{userId:N}:{cartDigest}";
 
         var existingOrder = await _context.Orders
             .Where(o => o.Status == OrderStatus.PendingPayment
