@@ -6,7 +6,11 @@
 -- WHY THIS EXISTS. `20261018191320_CatalogueBrandsBecomeUuid` shipped 2026-10-18 and, per the CI dry
 -- run's production dump, the live `fuel_types` rows read:
 --
---     01a14b20-c2f0-7207-b803-43b246a8eb08,А-95,...,11111111-1111-4111-8111-111111111111
+--     01a14b20-c2f0-7207-b803-43b246a8eb08,А-95,...,89a11944-bdb3-5ed4-b55c-edae31335a6e
+--
+-- (the brand id is the derived one: `20261019201500_SeededBrandIdsBecomeDerived` gave the seeded
+-- networks ids derived from their slug, and the dump of 2026-10-18 carried the constant that
+-- migration replaced. The fuel type's own id is what this file is about, and it does not change.)
 --
 -- so the fuel's identity on production is ALREADY a uuid - carried in a `text` column. Planning
 -- records the second slice as blocked because "production `fuel_types.id` is already a uuid, so the

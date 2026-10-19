@@ -18,12 +18,19 @@
 // To refresh after an intentional API change: re-capture, update the expected key
 // lists in `wireContract.test.ts` in the same commit, and read the diff. A refresh
 // that only touches this file is a test nobody looked at.
+//
+// ONE EXCEPTION, THE BRAND IDS. The four brand ids below are the ones the server
+// carries after `20261019201500_SeededBrandIdsBecomeDerived` gave the seeded networks
+// ids derived from their slug; the capture of 2026-10-19 carried the constants that
+// migration replaced. They are values, not shape - the client treats a brand id as
+// opaque - but a fixture that says "captured" should not carry a value the server
+// no longer sends.
 // ---------------------------------------------------------------------------
 
 /** GET /api/brands — `Station` on the client, `PublicBrandResponse` on the server. */
 export const wireBrands = [
   {
-    id: '11111111-1111-4111-8111-111111111111',
+    id: '89a11944-bdb3-5ed4-b55c-edae31335a6e',
     slug: 'okko',
     name: 'OKKO',
     color: '#22c55e',
@@ -31,7 +38,7 @@ export const wireBrands = [
     sortOrder: 1,
   },
   {
-    id: '22222222-2222-4222-8222-222222222222',
+    id: '0b9d7319-8ce3-50c9-a6e0-58e850217ffa',
     slug: 'wog',
     name: 'WOG',
     color: '#10b981',
@@ -39,7 +46,7 @@ export const wireBrands = [
     sortOrder: 2,
   },
   {
-    id: '33333333-3333-4333-8333-333333333333',
+    id: '080a78c0-c80b-53f1-97cd-0fedb0ea953b',
     slug: 'upg',
     name: 'UPG',
     color: '#06b6d4',
@@ -47,7 +54,7 @@ export const wireBrands = [
     sortOrder: 3,
   },
   {
-    id: '44444444-4444-4444-8444-444444444444',
+    id: '48652f56-ca2d-590e-acfd-e8d9f970433b',
     slug: 'klo',
     name: 'KLO',
     color: '#eab308',
@@ -60,7 +67,7 @@ export const wireBrands = [
 export const wireBrandStations = [
   {
     id: 'b889b58c-7cea-4203-b43f-a6450fa9dbb4',
-    brandId: '44444444-4444-4444-8444-444444444444',
+    brandId: '48652f56-ca2d-590e-acfd-e8d9f970433b',
     brandSlug: 'klo',
     name: 'KLO',
     address: 'вулиця Семена Скляренка, 5Б',
@@ -72,7 +79,7 @@ export const wireBrandStations = [
   },
   {
     id: '4ab83747-5b14-4a2e-a4f5-8f2c86c03cfe',
-    brandId: '44444444-4444-4444-8444-444444444444',
+    brandId: '48652f56-ca2d-590e-acfd-e8d9f970433b',
     brandSlug: 'klo',
     name: 'KLO Ірпінь',
     address: 'вулиця Соборна, 195-3',
@@ -84,7 +91,7 @@ export const wireBrandStations = [
   },
   {
     id: '28de24c5-7587-4995-9308-f031221703da',
-    brandId: '44444444-4444-4444-8444-444444444444',
+    brandId: '48652f56-ca2d-590e-acfd-e8d9f970433b',
     brandSlug: 'klo',
     name: 'KLO Ірпінь',
     address: 'вулиця Соборна, 195-3',
@@ -96,7 +103,7 @@ export const wireBrandStations = [
   },
   {
     id: '865196ca-7336-4608-af8e-4a1c51a7aa6c',
-    brandId: '44444444-4444-4444-8444-444444444444',
+    brandId: '48652f56-ca2d-590e-acfd-e8d9f970433b',
     brandSlug: 'klo',
     name: 'KLO Березань',
     address: 'проспект Володимира Маяковського, 10',
@@ -112,7 +119,7 @@ export const wireBrandStations = [
 export const wireFuelTypes = [
   {
     id: '01a15198-201d-7968-b669-0a51ecafb7ef',
-    brandId: '22222222-2222-4222-8222-222222222222',
+    brandId: '0b9d7319-8ce3-50c9-a6e0-58e850217ffa',
     brandSlug: 'wog',
     name: '100 Mustang Євро5-Е0',
     basePrice: 102.9,
@@ -120,7 +127,7 @@ export const wireFuelTypes = [
   },
   {
     id: '01a13e35-3153-7682-92ec-e513e60dcbe4',
-    brandId: '11111111-1111-4111-8111-111111111111',
+    brandId: '89a11944-bdb3-5ed4-b55c-edae31335a6e',
     brandSlug: 'okko',
     name: '100 PULLS',
     basePrice: 103.4,
@@ -128,7 +135,7 @@ export const wireFuelTypes = [
   },
   {
     id: '01a15198-2018-7cad-80ad-b02e167ffd22',
-    brandId: '22222222-2222-4222-8222-222222222222',
+    brandId: '0b9d7319-8ce3-50c9-a6e0-58e850217ffa',
     brandSlug: 'wog',
     name: '95 Mustang Євро5-Е10',
     basePrice: 95.9,
@@ -136,7 +143,7 @@ export const wireFuelTypes = [
   },
   {
     id: 'c7fae808-d061-4929-8e78-2bf8e19e40a1',
-    brandId: '22222222-2222-4222-8222-222222222222',
+    brandId: '0b9d7319-8ce3-50c9-a6e0-58e850217ffa',
     brandSlug: 'wog',
     name: '95 Євро5-Е10',
     basePrice: 92.9,
@@ -148,7 +155,7 @@ export const wireFuelTypes = [
 export const wirePackages = [
   {
     id: '01a13e35-3153-7682-92ec-e513e60dcbe4:2',
-    brandId: '11111111-1111-4111-8111-111111111111',
+    brandId: '89a11944-bdb3-5ed4-b55c-edae31335a6e',
     brandSlug: 'okko',
     fuelTypeId: '01a13e35-3153-7682-92ec-e513e60dcbe4',
     fuelName: '100 PULLS',
@@ -160,7 +167,7 @@ export const wirePackages = [
   },
   {
     id: '01a13e35-3153-7682-92ec-e513e60dcbe4:3',
-    brandId: '11111111-1111-4111-8111-111111111111',
+    brandId: '89a11944-bdb3-5ed4-b55c-edae31335a6e',
     brandSlug: 'okko',
     fuelTypeId: '01a13e35-3153-7682-92ec-e513e60dcbe4',
     fuelName: '100 PULLS',
@@ -172,7 +179,7 @@ export const wirePackages = [
   },
   {
     id: '01a13e35-3153-7682-92ec-e513e60dcbe4:5',
-    brandId: '11111111-1111-4111-8111-111111111111',
+    brandId: '89a11944-bdb3-5ed4-b55c-edae31335a6e',
     brandSlug: 'okko',
     fuelTypeId: '01a13e35-3153-7682-92ec-e513e60dcbe4',
     fuelName: '100 PULLS',
@@ -184,7 +191,7 @@ export const wirePackages = [
   },
   {
     id: '01a13e35-3153-7682-92ec-e513e60dcbe4:10',
-    brandId: '11111111-1111-4111-8111-111111111111',
+    brandId: '89a11944-bdb3-5ed4-b55c-edae31335a6e',
     brandSlug: 'okko',
     fuelTypeId: '01a13e35-3153-7682-92ec-e513e60dcbe4',
     fuelName: '100 PULLS',
