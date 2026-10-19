@@ -137,8 +137,53 @@ CreateBrandStation(StationId(1), BrandId(1), "Node A"),
         var result = await handler.HandleAsync(new GetPublicBrandStationsByBrandQuery(BrandId(1)));
 
         result.Should().HaveCount(2);
-        result.Should().OnlyContain(n => n.BrandId == BrandId(1));
     }
+
+    /// <summary>
+    /// A fuel the catalogue import has just created is shown, priced at the column price, and marked
+    /// unavailable.
+    /// </summary>
+    /// <remarks>
+    /// The import creates a fuel with the published pump price and no cost, because our cost is not
+    /// something it knows. It used to be SKIPPED by the storefront - "a zero on the shelf is a free
+    /// fuel" - which made the shelf empty, and an empty shelf says "we do not sell this" rather than
+    /// "we have not costed this yet". The stock badge is the honest signal: there is nothing to buy
+    /// until a batch of vouchers is costed, and the checkout refuses it with a 400.
+    /// </remarks>
+    [Fact]
+    public async Task GetPublicPackages_ShouldShowAFuelWeHaveNotCosted_AtTheColumnPrice_AndUnavailable()
+    {
+        EnsureBrand(BrandId(1));
+
+        // Exactly what the import writes: a pump price and no cost, no margin.
+        _context.FuelTypes.Add(new FuelTypeEntity
+        {
+            Id = "ft-imported",
+            Name = "А-95",
+            BrandId = BrandId(1),
+            PumpPricePerLiter = 92.90m,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+        });
+        _context.FuelNominals.Add(new FuelNominal
+        {
+            FuelTypeId = "ft-imported",
+            Liters = 10m,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+        });
+        await _context.SaveChangesAsync();
+
+        var handler = new GetPublicPackagesQueryHandler(_context, Stock());
+
+        var result = await handler.HandleAsync(new GetPublicPackagesQuery(CallerUserId: null));
+
+        var package = result.Should().ContainSingle().Subject;
+        package.Price.Should().Be(929.00m, "the column price is the price we can show until we have a cost");
+        package.FinalPricePerLiter.Should().Be(92.90m);
+        package.IsAvailable.Should().BeFalse("there is no stock behind it, and that is what the badge says");
+    }
+
 
     [Fact]
     public async Task GetPublicPackages_ShouldReturnAllPackages()

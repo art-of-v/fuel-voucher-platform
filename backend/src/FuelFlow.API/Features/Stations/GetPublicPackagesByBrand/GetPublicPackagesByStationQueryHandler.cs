@@ -67,17 +67,17 @@ var rows = await (
 
         var available = await _stock.AvailableKeysAsync(isTestAccount, ct);
 
-        // A fuel nobody has priced yet is skipped rather than shown at zero: see the same filter in
-        // GetPublicPackagesQueryHandler.
+        // A fuel nobody has priced yet is shown, not skipped: see the same rule and the same reason in
+        // GetPublicPackagesQueryHandler - an empty shelf says "we do not sell this", and the column
+        // price plus the stock badge say what is true.
         return rows
-            // A fuel nobody has priced yet has no price to show. It is skipped rather than
-            // published at zero: a zero on the shelf is a free fuel, and it would be unbuyable.
-            .Where(x => x.SupplierPricePerLiter is not null && x.MarginUahPerLiter is not null)
             .Select(x =>
             {
-                var price = FuelPricing.PackagePrice(
-                    x.SupplierPricePerLiter, x.MarginUahPerLiter, x.PumpPricePerLiter, x.MinDiscountPerLiter,
-                    x.Liters);
+                // Our price when we can compute it; the column price when we cannot.
+                var ourPrice = FuelPricing.FinalPerLiterOrNull(
+                    x.SupplierPricePerLiter, x.MarginUahPerLiter, x.PumpPricePerLiter, x.MinDiscountPerLiter);
+                var perLiter = ourPrice ?? x.PumpPricePerLiter ?? 0m;
+                var price = Math.Round(perLiter * x.Liters, 2, MidpointRounding.AwayFromZero);
 
                 return new PublicPackageResponse(
                     PackageIds.For(x.FuelTypeId, x.DataKind, x.Liters),
@@ -88,9 +88,10 @@ var rows = await (
                     x.Liters,
                     price,
                     FuelPricing.OriginalPackagePrice(x.PumpPricePerLiter, x.Liters, price),
-                    FuelPricing.FinalPerLiterOrNull(
-                        x.SupplierPricePerLiter, x.MarginUahPerLiter, x.PumpPricePerLiter, x.MinDiscountPerLiter),
-                    available.Contains(StockKey.For(x.BrandSlug, x.FuelTypeId, x.Liters)));
+                    perLiter,
+                    // A fuel we cannot price cannot be charged, so it is unavailable even with stock
+                    // behind it: see the same rule in GetPublicPackagesQueryHandler.
+                    available.Contains(StockKey.For(x.BrandSlug, x.FuelTypeId, x.Liters)) && ourPrice is not null);
             })
             .ToList();
     }
