@@ -576,7 +576,7 @@ jobs:
       # point of the split - the job needs a shell and a running postgres, not the repository.
       - name: Dump schema, history and catalogue from production
         env:
-          TABLES: fuel_types stations fuel_offers fuel_offer_volumes
+          TABLES: brands fuel_types fuel_offers fuel_offer_volumes
         run: |
           set -euo pipefail
           out="$RUNNER_TEMP/dryrun"
@@ -715,10 +715,16 @@ jobs:
           # Parent first, then child. Kept as a literal list rather than re-derived from the glob so
           # that adding a table to TABLES is a deliberate act: a new CSV with no place in this order
           # is skipped, not silently loaded in the wrong place - and the loop says so when it does.
-          order=(fuel_types stations fuel_offers fuel_offer_volumes)
+          order=(brands fuel_types fuel_offers fuel_offer_volumes)
           for table in "${order[@]}"; do
             f="$table.csv"
-            [ -f "$f" ] || { echo "  $table MISSING from the dump" >&2; continue; }
+            # A name in the order with no CSV is FATAL, not a warning. The two lists are written
+            # in the same file and are meant to agree; when they disagree the restore silently
+            # loads an empty table and the migrations then run against a database that is missing
+            # half the catalogue. That is not a hypothetical: this list still said `stations` after
+            # the rename to `brands`, so every dry run restored no brands at all and the uuid
+            # migration's orphan guard fired on 19 rows that were not orphans at all.
+            [ -f "$f" ] || { echo "  $table IS IN THE RESTORE ORDER BUT NOT IN THE DUMP" >&2; exit 1; }
             db -q -c "\\copy $table FROM '$f' WITH (FORMAT csv, HEADER true)"
             echo "  $table restored"
           done
