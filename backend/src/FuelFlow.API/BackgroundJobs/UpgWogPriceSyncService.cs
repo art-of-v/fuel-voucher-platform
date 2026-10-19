@@ -58,6 +58,9 @@ public sealed class UpgWogPriceSyncService
         _logger = logger;
     }
 
+    /// <summary>
+    /// The fifteen-minute refresh: what the vendors charge, for the grades we already carry.
+    /// </summary>
     public async Task SyncPricesAsync(CancellationToken cancellationToken = default)
     {
         if (!_options.Enabled)
@@ -69,11 +72,35 @@ public sealed class UpgWogPriceSyncService
 
         foreach (var brand in SupportedBrands)
         {
-            await SyncOneAsync(brand, cancellationToken);
+            await SyncOneAsync(brand, createMissing: false, cancellationToken);
         }
     }
 
-    private async Task SyncOneAsync(string brand, CancellationToken ct)
+    /// <summary>
+    /// The weekly check: whether the vendors sell a grade we do not carry.
+    /// </summary>
+    /// <remarks>
+    /// A new grade is news on a scale of weeks, and creating one is a decision - it puts a row in the
+    /// catalogue and a size on the shelf - so it belongs to a job that runs weekly rather than to the
+    /// one that moves prices every fifteen minutes. The grades this carries are also the ones the
+    /// price refresh prices, so the week the catalogue grows is the week the price reaches it.
+    /// </remarks>
+    public async Task SyncCatalogueAndPricesAsync(CancellationToken cancellationToken = default)
+    {
+        if (!_options.Enabled)
+        {
+            _logger.LogDebug(
+                "UPG/WOG catalogue sync skipped (UpgWogPrice:Enabled=false); the catalogue keeps the grades it has");
+            return;
+        }
+
+        foreach (var brand in SupportedBrands)
+        {
+            await SyncOneAsync(brand, createMissing: true, cancellationToken);
+        }
+    }
+
+    private async Task SyncOneAsync(string brand, bool createMissing, CancellationToken ct)
     {
         IReadOnlyList<UpgWogPrice> prices;
         try
@@ -92,7 +119,7 @@ public sealed class UpgWogPriceSyncService
         try
         {
             var result = await _import.HandleAsync(
-                new ImportUpgWogPricesCommand(UpgWogPriceSheet.Write(prices), brand, DryRun: false),
+                new ImportUpgWogPricesCommand(UpgWogPriceSheet.Write(prices), brand, DryRun: false, createMissing),
                 Guid.Empty, SyncActorName, ct);
 
             if (result.Errors.Count > 0)

@@ -8,7 +8,18 @@ using Microsoft.EntityFrameworkCore;
 namespace FuelFlow.Features.Pricing.ImportUpgWogPrices;
 
 /// <summary>Imports the pump prices UPG and WOG publish, and the grades they publish that we do not yet sell.</summary>
-public sealed record ImportUpgWogPricesCommand(string Content, string BrandId, bool DryRun);
+/// <param name="CreateMissing">
+/// Whether a grade the brand sells and we do not become a row. True for the operator's own upload
+/// and for the weekly catalogue check, false for the fifteen-minute price refresh: a new grade is
+/// news that arrives on a scale of weeks, and a price refresh that created rows would add a fuel to
+/// the catalogue every time a vendor added one - which is a decision, and it belongs to a job that
+/// runs weekly rather than to the one that moves prices.
+/// </param>
+public sealed record ImportUpgWogPricesCommand(
+    string Content,
+    string BrandId,
+    bool DryRun,
+    bool CreateMissing = true);
 
 /// <summary>One grade created by the import. Reported so the operator learns what appeared.</summary>
 public sealed record UpgWogFuelCreated(string BrandId, string Name, string Code, decimal PumpPerLiter);
@@ -145,6 +156,13 @@ public sealed class ImportUpgWogPricesCommandHandler
 
             if (!byCode.TryGetValue(code, out var fuel))
             {
+                if (!command.CreateMissing)
+                {
+                    // A grade we do not carry, on a refresh that is only allowed to move prices.
+                    // Skipped rather than created, and the weekly catalogue check is what brings it in.
+                    continue;
+                }
+
                 var made = await CreateAsync(brandKey, code, row.PricePerLiter, actor, now, command.DryRun, ct);
                 created.Add(made);
                 continue;

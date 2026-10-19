@@ -237,7 +237,10 @@ public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDataba
             new("Pulls 95", 95.90m, "95 PULLS"),
         };
 
-        await Sync(context, sheet).SyncPricesAsync();
+        // The weekly catalogue check is what brings a new grade in; the fifteen-minute price refresh
+        // only moves prices. A grade we do not carry is news on a scale of weeks, and creating one
+        // is a decision - so it belongs to the job that runs weekly.
+        await Sync(context, sheet).SyncCatalogueAndPricesAsync();
         ForgetTrackedEntities(context);
 
         var created = await context.FuelTypes.SingleAsync(f => f.BrandFuelCode == "Pulls 95");
@@ -305,7 +308,9 @@ public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDataba
             };
 
             var logged = new CollectingLogger();
-            await Sync(context, sheet, logged).SyncPricesAsync();
+            // The catalogue step and the pricing step live in the same job, and the catalogue runs
+            // first: a grade that does not exist yet has nowhere to hold a price.
+            await Sync(context, sheet, logged).SyncCatalogueAndPricesAsync();
             ForgetTrackedEntities(context);
 
             (await context.FuelTypes.CountAsync(f => f.BrandId == OkkoBrandId))
