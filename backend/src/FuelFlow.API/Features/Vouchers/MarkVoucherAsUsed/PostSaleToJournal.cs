@@ -63,7 +63,7 @@ public sealed partial class MarkVoucherAsUsedCommandHandler
         // it properly means deciding what a restamp after a redemption means, which is an
         // accounting question rather than a code one.
         // </para>
-        if (cost > 0m)
+if (cost > 0m)
         {
             await _journal.PostAsync(
                 new PostJournalEntryRequest
@@ -73,12 +73,25 @@ public sealed partial class MarkVoucherAsUsedCommandHandler
                     SourceId = id,
                     EntryDate = entryDate,
                     AmountUah = cost,
-                    Description = $"Собівартість викупу ваучера",
+                    Description = "Собівартість викупу ваучера",
                     VoucherId = id,
                     QuantityLiters = liters,
                     PostedByUserId = actorUserId,
                 },
                 cancellationToken);
+        }
+        else
+        {
+            // Loud, not silent. A voucher imported by a brand parser carries no cost - those parsers
+            // read the QR and nothing else - so cost arrives later via SetBatchCostCommandHandler. If
+            // it never did, booking zero would make the expense vanish with nothing to complain:
+            // a book that is short and confident, discovered at month close. The revenue above still
+            // posts, so this is a margin that is wrong rather than an entry that is missing.
+            _logger.LogWarning(
+                "PAYMENTS: voucher {VoucherId} was redeemed with no cost per liter recorded, so no "
+                + "cost of sales was booked for it. Run the batch cost command for its import before "
+                + "the month closes, or the margin on this sale is overstated.",
+                id);
         }
 
         if (voucher.OrderId is null)
