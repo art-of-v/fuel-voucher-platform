@@ -5,6 +5,7 @@ using FuelFlow.BackgroundJobs;
 using FuelFlow.Features.Pricing.BackfillBrandFuelCodes;
 using FuelFlow.Features.Pricing.ImportOkkoCatalogue;
 using FuelFlow.Features.Pricing.ScrapeOkkoPrices;
+using FuelFlow.Features.Pricing.ScrapeUpgWogPrices;
 using FuelFlow.Features.Admin.GetReconciliation;
 using FuelFlow.Features.Auth.AdminLogin;
 using FuelFlow.Features.Auth.AdminUser.GetAdminUsers;
@@ -153,6 +154,7 @@ internal static class ServiceSetup
         AddSettlementServices(services, config);
         AddBackgroundJobServices(services);
         AddOkkoPriceServices(services, config);
+        AddUpgWogPriceServices(services, config);
         AddUpdateServices(services);
 
         services.Scan(scan => scan
@@ -340,6 +342,18 @@ services.AddScoped<TermQuoteQueryHandler>();
         });
     }
 
+    private static void AddUpgWogPriceServices(IServiceCollection services, IConfiguration config)
+    {
+        services.Configure<UpgWogPriceOptions>(config.GetSection(UpgWogPriceOptions.SectionName));
+
+        var upgWog = config.GetSection(UpgWogPriceOptions.SectionName).Get<UpgWogPriceOptions>();
+        services.AddHttpClient<IUpgWogPriceClient, UpgWogPriceClient>(client =>
+        {
+            var timeout = upgWog?.TimeoutSeconds ?? 30;
+            if (timeout > 0) client.Timeout = TimeSpan.FromSeconds(timeout);
+        });
+    }
+
     private static void AddInfrastructureServices(IServiceCollection services)
     {
         services.AddHttpContextAccessor();
@@ -493,6 +507,8 @@ services.AddScoped<FuelFlow.Features.Vouchers.Availability.PackageStockAvailabil
         services.AddScoped<ExpiredVoucherLossService>();
         services.AddScoped<RuntimeSettingsService>();
         services.AddScoped<OkkoPriceSyncService>();
+        // The same job for the two vendors that publish a page rather than an API.
+        services.AddScoped<UpgWogPriceSyncService>();
         // The catalogue half of the same fetch: creates the fuels OKKO sells that we do not carry yet,
         // and nothing else. Registered beside the sync because it is only ever called by it.
         services.AddScoped<ImportOkkoCatalogueCommandHandler>();

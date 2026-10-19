@@ -274,6 +274,15 @@ recurringJobManager.AddOrUpdate<NotificationService>(
             "sync-okko-pump-prices",
             service => service.SyncPricesAsync(CancellationToken.None),
             "*/15 * * * *");
+
+        // The same cadence for UPG and WOG, which publish a page rather than an API. Their importer
+        // creates a grade it has not seen before - with its sizes - and records the price, so a fuel
+        // we did not carry appears on the shelf at the vendor's price, marked unavailable until an
+        // operator costs it. A failed fetch writes nothing: the last known prices stand.
+        recurringJobManager.AddOrUpdate<UpgWogPriceSyncService>(
+            "sync-upgwog-pump-prices",
+            service => service.SyncPricesAsync(CancellationToken.None),
+            "*/15 * * * *");
     }
 
     // Production deploys only the API (Hangfire runs in-process, no JobsWorker), and
