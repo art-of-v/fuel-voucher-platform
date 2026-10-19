@@ -143,22 +143,28 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         // explicit and matches the sibling constraint.
         builder.HasIndex(e => e.MonobankInvoiceId)
             .IsUnique()
-            .HasFilter("monobank_invoice_id IS NOT NULL")
-            // The database name is not decoration - it is the only thing that makes the model agree
-            // with the database. UniqueMonobankInvoiceId created the index as
-            // IX_orders_monobank_invoice_id (snake_case, as migrationBuilder names things), while EF's
-            // convention for HasIndex("MonobankInvoiceId") would be IX_orders_MonobankInvoiceId
-            // (PascalCase). Without this line the model and the database described two different
-            // indexes, so the *next* migration added for any reason would scaffold a CREATE for the
-            // PascalCase one and every fresh database would fail to migrate with
-            // 42P07 "relation IX_orders_monobank_invoice_id already exists".
-            // HasDatabaseName is what closes it; see the note in SplitFuelPackagesIntoOffers.
-            .HasDatabaseName("IX_orders_monobank_invoice_id");
+            .HasFilter("monobank_invoice_id IS NOT NULL");
         builder.HasIndex(e => new { e.UserId, e.Status });
         builder.HasIndex(e => new { e.UserId, e.CreatedAtUtc })
             .IsDescending(false, true);
 
-        // IX_orders_user_id is a strict leftmost prefix of both composites above and is dropped.
+        // The index names are no longer written out here. EF's default for this index is
+        // IX_orders_monobank_invoice_id, and ApplicationDbContext's naming convention turns that
+        // into ix_orders_monobank_invoice_id - which is the name the database now carries, after
+        // 20261019131002_IndexNamesFollowOneConvention renamed it.
+        //
+        // The explicit HasDatabaseName this replaced was there for a real reason, and the reason
+        // still holds: UniqueMonobankInvoiceId created the index as IX_orders_monobank_invoice_id
+        // (snake_case, as migrationBuilder names things) while EF's convention would have
+        // scaffolded a different one, so the model and the database described two different
+        // indexes and the *next* migration added for any reason would have failed on a fresh
+        // database with 42P07 "relation ... already exists". What changed is that the name now
+        // comes from one convention rather than from a line that had to be kept in step with
+        // whatever a migration happened to create - and that convention is applied to the model,
+        // so the two cannot drift apart again.
+        //
+        // IX_orders_user_id was a strict leftmost prefix of both composites above and was dropped
+        // by F-11; the row it was for is served by the two composites.
 
         builder.ToTable(t =>
         {

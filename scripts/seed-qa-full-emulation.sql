@@ -205,7 +205,7 @@ WHERE nominal.data_kind = 'qa'
   AND (:'seed_all_brands'::boolean OR lower(brand.slug) = lower(:'brand'));
 
 -- One batch per (import, fuel type) - and that is exactly the shape the unique index
--- `IX_purchase_batches_import_job_id_fuel_type_id` demands. It is keyed on the fuel type alone, not
+-- `ix_purchase_batches_import_job_id_fuel_type_id` demands. It is keyed on the fuel type alone, not
 -- the brand and not the nominal, so a catalogue that lists 10 L, 20 L and 50 L of the same fuel
 -- shares one batch, and the query has to collapse to it rather than emit one row per package.
 INSERT INTO purchase_batches
