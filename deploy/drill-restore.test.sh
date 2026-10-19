@@ -80,6 +80,13 @@ for c in amount_uah parent_payment_id voucher_id to_status event_type actor_user
   grep -q "HasColumnName(\"$c\"" "$SNAPSHOT"; check "column $c exists" $?
 done
 
+# qr_payload is bytea. A regex against it is a Postgres type error, not a false -
+# which is exactly how the shipped version of this script failed on its first real
+# run, after every static assertion here had passed. The test cannot catch a bad
+# regex, but it can pin the type the query has to be written for.
+grep -q 'Property<byte\[\]>("QrPayload")' "$SNAPSHOT"; check "qr_payload is bytea (queries must not regex it)" 0
+grep -q "convert_to(voucher_number, 'UTF8') in qr_payload" "$CODE"; check "checks ciphertext by content, not by charset" 0
+
 echo
 echo "3. The checks that were wrong the first time stay wrong loudly"
 # These are the identifiers the first draft invented. If a future schema change
