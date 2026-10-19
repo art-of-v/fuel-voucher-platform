@@ -3553,6 +3553,9 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("BrandId")
+                        .HasDatabaseName("ix_fuel_offer_prices_brand_id");
+
                     b.HasIndex("ChangedByUserId");
 
                     b.HasIndex("FuelTypeId", "EffectiveFromUtc")
@@ -3617,7 +3620,7 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("margin_percent");
 
                     b.Property<decimal?>("MarginUahPerLiter")
-                        .HasColumnType("numeric")
+                        .HasColumnType("numeric(10,4)")
                         .HasColumnName("margin_uah_per_liter");
 
                     b.Property<decimal?>("MinDiscountPerLiter")
@@ -3678,6 +3681,8 @@ namespace FuelFlow.API.Migrations
                             t.HasCheckConstraint("ck_fuel_types_prices_non_negative", "base_price >= 0 AND discount_price >= 0");
 
                             t.HasCheckConstraint("ck_fuel_types_pricing_knobs_non_negative", "(supplier_price_per_liter IS NULL OR supplier_price_per_liter >= 0) AND (pump_price_per_liter IS NULL OR pump_price_per_liter >= 0) AND (min_discount_per_liter IS NULL OR min_discount_per_liter >= 0)");
+
+                            t.HasCheckConstraint("ck_fuel_types_zero_price_needs_no_pump_price", "discount_price > 0 OR pump_price_per_liter IS NULL");
                         });
 
                     b.HasData(
@@ -4744,6 +4749,45 @@ namespace FuelFlow.API.Migrations
 
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.FuelNominal", b =>
                 {
+                    b.HasOne("FuelFlow.SharedKernel.Domain.FuelTypeEntity", null)
+                        .WithMany()
+                        .HasForeignKey("FuelTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.FuelOfferPrice", b =>
+                {
+                    b.HasOne("FuelFlow.SharedKernel.Domain.Brand", null)
+                        .WithMany()
+                        .HasForeignKey("BrandId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FuelFlow.SharedKernel.Domain.FuelTypeEntity", null)
+                        .WithMany()
+                        .HasForeignKey("FuelTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.FuelTypeEntity", b =>
+                {
+                    b.HasOne("FuelFlow.SharedKernel.Domain.Brand", null)
+                        .WithMany()
+                        .HasForeignKey("BrandId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.FuelTypeProductCode", b =>
+                {
+                    b.HasOne("FuelFlow.SharedKernel.Domain.Brand", null)
+                        .WithMany()
+                        .HasForeignKey("BrandId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("FuelFlow.SharedKernel.Domain.FuelTypeEntity", null)
                         .WithMany()
                         .HasForeignKey("FuelTypeId")

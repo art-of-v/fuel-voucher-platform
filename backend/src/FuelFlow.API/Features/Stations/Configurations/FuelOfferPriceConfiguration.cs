@@ -41,11 +41,32 @@ builder.Property(e => e.BrandId).HasColumnName("brand_id").HasColumnType("uuid")
 
         builder.HasIndex(e => e.ChangedByUserId);
 
+        // The foreign key below needs an index to lead with, and this is the only column in the
+        // table that does not already have one: fuel_type_id leads ix_fuel_offer_prices_fuel_effective.
+        builder.HasIndex(e => e.BrandId).HasDatabaseName("ix_fuel_offer_prices_brand_id");
+
         builder.HasIndex(e => new { e.FuelTypeId, e.EffectiveFromUtc })
             .HasDatabaseName("ix_fuel_offer_prices_fuel_effective");
-        // No foreign key: the fuel this row prices is the fuel it is about, and a fuel is never
-        // deleted - it is archived, and an archived fuel keeps its whole price history readable,
-        // which is the only reason the record is worth keeping.
+        // Two constraints that used to be comments.
+        //
+        // On the fuel: the argument for leaving this unconstrained was that "a fuel is never
+        // deleted, it is archived, and an archived fuel keeps its whole price history readable".
+        // That argument is about archiving; RESTRICT is about deleting, and the two do not
+        // conflict. Archiving still keeps the history - the constraint only stops anything from
+        // removing the fuel underneath it. On a price history, losing rows quietly is worse than
+        // failing loudly, which is why this is RESTRICT rather than the CASCADE fuel_nominals
+        // carries.
+        //
+        // On the brand: same reasoning as fuel_types and brand_stations, both RESTRICT.
+        builder.HasOne<Brand>()
+            .WithMany()
+            .HasForeignKey(e => e.BrandId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<FuelTypeEntity>()
+            .WithMany()
+            .HasForeignKey(e => e.FuelTypeId)
+            .OnDelete(DeleteBehavior.Restrict);
         builder.ToTable(t =>
         {
             // The same value sets and sign constraints the offer itself carries, and deliberately so: a

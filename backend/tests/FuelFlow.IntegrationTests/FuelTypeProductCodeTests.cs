@@ -47,7 +47,7 @@ public sealed class FuelTypeProductCodeTests : IClassFixture<TestDatabaseFixture
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
 
-        context.FuelTypeProductCodes.Add(Code("okko-dp-euro", BrandIds.Okko, "9018"));
+        context.FuelTypeProductCodes.Add(Code("okko-p95", BrandIds.Okko, "9018"));
 
         var act = async () => await context.SaveChangesAsync();
         await act.Should().ThrowAsync<DbUpdateException>(
@@ -86,18 +86,22 @@ public sealed class FuelTypeProductCodeTests : IClassFixture<TestDatabaseFixture
     public async Task TheSameCodeAtTwoNetworks_IsNotADuplicate()
     {
         // A code identifies a grade within a network. Refusing it across networks would be wrong
-        // (they may legitimately overlap) and permitting it globally would silently price a KLO
+        // (they may legitimately overlap) and permitting it globally would silently price a WOG
         // voucher against an OKKO fuel if they ever did.
+        //
+        // The two fuels are real ones, at two real networks. They have to be: a product code points
+        // at a fuel, and that is a foreign key now, so a row naming a fuel that does not exist is
+        // refused by the database before the unique index ever gets to say anything about codes.
         await using var context = CreateContext();
 
         context.FuelTypeProductCodes.Add(Code("okko-dp", BrandIds.Okko, "7701"));
-        context.FuelTypeProductCodes.Add(Code("klo-dp", BrandIds.Klo, "7701"));
+        context.FuelTypeProductCodes.Add(Code("wog-dp", BrandIds.Wog, "7701"));
 
         var act = async () => await context.SaveChangesAsync();
         await act.Should().NotThrowAsync();
 
         await CleanupAsync(BrandIds.Okko, "7701");
-        await CleanupAsync(BrandIds.Klo, "7701");
+        await CleanupAsync(BrandIds.Wog, "7701");
     }
 
     [Fact]
