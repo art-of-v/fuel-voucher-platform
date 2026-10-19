@@ -49,40 +49,34 @@ var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
     // navigation to FuelType - Brand and fuel are natural keys throughout this schema, so there is
     // nothing to navigate; the fuel's display name is joined for here and nowhere else.
     var rows = await (
-    from offer in _context.FuelOffers.AsNoTracking()
-    join fuel in _context.FuelTypes.AsNoTracking() on offer.FuelTypeId equals fuel.Id
-    // The network's own code travels with the row: the stock keys below are matched on it, and
-    // it is what the client renders next to the uuid it now orders by.
-    join brand in _context.Brands.AsNoTracking() on offer.BrandId equals brand.Id
+// The fuel and its sizes. There is no offer in this query and there will not be: the price is the
+    // fuel's own, so a second row saying what a litre costs could only ever disagree with the first.
+    // The pool lives on the nominal, which is the only thing left that varies.
+    from fuel in _context.FuelTypes.AsNoTracking()
+    where !fuel.IsDeleted
+    // The network's own code travels with the row: the stock keys below are matched on it, and it is
+    // what the client renders next to the uuid it now orders by.
+    join brand in _context.Brands.AsNoTracking() on fuel.BrandId equals brand.Id
     // The sizes belong to the fuel AND the pool: a nominal row says the operator allows this size in
     // this catalogue, so a 7 L canister that exists only to rehearse a pickup is not a size the
-    // public site lists. The filter is on the NOMINAL's pool, not the offer's - they answer the same
-    // question today and only the nominal's is load-bearing once the offer is gone.
+    // public site lists.
     from nominal in _context.FuelNominals.AsNoTracking()
     where nominal.FuelTypeId == fuel.Id
           && nominal.DataKind == DataKinds.ForPool(isTestAccount)
-    where offer.DataKind == DataKinds.ForPool(isTestAccount)
-    orderby offer.BrandId, fuel.Name, nominal.Liters
-    // Fuel name moved to fuel_types with the rest of the fuel's identity when the offer was
-    // born - the offer knows WHICH fuel, not what it is called. Joining for the label keeps the
-    // storefront's display name a property of the fuel rather than a string each package row
-    // could contradict.
+    orderby fuel.BrandId, fuel.Name, nominal.Liters
     select new
     {
-    offer.Id,
-    offer.BrandId,
-    // The slug travels with the row: the stock keys below are matched on it, and it is what the
-    // client renders next to the uuid it now orders by.
-    BrandSlug = brand.Slug,
-    offer.FuelTypeId,
-    FuelName = fuel.Name,
-    nominal.Liters,
-    // Four nullable columns cross the wire to the projection; the supplier cost never leaves the
-    // database.
-    offer.SupplierPricePerLiter,
-    fuel.MarginUahPerLiter,
-    offer.PumpPricePerLiter,
-    offer.MinDiscountPerLiter,
+        fuel.BrandId,
+        BrandSlug = brand.Slug,
+        FuelTypeId = fuel.Id,
+        FuelName = fuel.Name,
+        nominal.DataKind,
+        nominal.Liters,
+        // The supplier cost never leaves the database: it is selected, priced with, and dropped.
+        fuel.SupplierPricePerLiter,
+        fuel.MarginUahPerLiter,
+        fuel.PumpPricePerLiter,
+        fuel.MinDiscountPerLiter,
     })
     .ToListAsync(ct);
 
@@ -103,7 +97,7 @@ var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
     x.Liters);
 
     return new PublicPackageResponse(
-    PackageIds.For(x.Id, x.Liters),
+                    PackageIds.For(x.FuelTypeId, x.DataKind, x.Liters),
                     x.BrandId,
                     x.BrandSlug,
                     x.FuelTypeId,

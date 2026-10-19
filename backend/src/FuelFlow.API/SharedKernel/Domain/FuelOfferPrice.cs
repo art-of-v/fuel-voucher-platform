@@ -62,13 +62,21 @@ namespace FuelFlow.SharedKernel.Domain;
 /// </remarks>
 public sealed class FuelOfferPrice
 {
-    /// <summary>Key. Version 7 UUID, so the id alone orders the rows of one offer chronologically.</summary>
+    /// <summary>Key. Version 7 UUID, so the id alone orders the rows of one fuel chronologically.</summary>
     public Guid Id { get; set; }
 
-    /// <summary>The offer this price belongs to. Natural key, see <see cref="FuelOffer.Id"/>.</summary>
+    /// <summary>
+    /// The fuel this price belongs to - the same key <c>offer_id</c> used to carry.
+    /// </summary>
+    /// <remarks>
+    /// The row already had a <see cref="FuelTypeId"/> column, so the offer id was a second way to
+    /// say which fuel this is, and the only one left pointing at a table that no longer exists.
+    /// There is no pool to record either: one price per grade, because nothing can price one grade
+    /// two ways any more.
+    /// </remarks>
     public string OfferId { get; set; } = null!;
 
-    /// <summary>The network, mirrored from the offer so a price row is readable without the join.</summary>
+/// <summary>The network, mirrored from the fuel so a price row is readable without the join.</summary>
     public Guid BrandId { get; set; }
 
     /// <summary>Mirrors the offer's fuel type, for the same reason.</summary>

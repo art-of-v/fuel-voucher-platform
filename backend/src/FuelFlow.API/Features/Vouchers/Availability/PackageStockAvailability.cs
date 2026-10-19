@@ -131,33 +131,29 @@ public sealed class PackageStockAvailability
     {
 var pool = DataKinds.ForPool(isTestAccount);
 
-        // The size is the fuel's, not a row's: the offer names the pool and the price, the nominal
-        // says this size is allowed for sale. `UNIQUE (brand_id, fuel_type_id, data_kind)` on
-        // fuel_offers times the fuel's own PK on fuel_nominals makes this key unique, so exactly one
-        // package can match - which is what the ordering used to paper over when it was not.
+        // The size is the fuel's, not a row's: the fuel names the price and the nominal says this
+        // size is allowed for sale. fuel_nominals is keyed (fuel_type_id, data_kind, liters), so
+        // exactly one package can match - which is what the ordering used to paper over when it
+        // was not.
         var row = await (
-            from offer in _context.FuelOffers.AsNoTracking()
-            join nominal in _context.FuelNominals.AsNoTracking() on offer.FuelTypeId equals nominal.FuelTypeId
+            from fuel in _context.FuelTypes.AsNoTracking()
+            from nominal in _context.FuelNominals.AsNoTracking()
+            where nominal.FuelTypeId == fuel.Id
             // The slug is joined rather than resolved afterwards: the caller matches vouchers and order
             // lines by brand TEXT, so a package that came back without one could not be stocked or
             // ordered.
-            join brand in _context.Brands.AsNoTracking() on offer.BrandId equals brand.Id
-            where offer.BrandId == brandId
-                  && offer.FuelTypeId == fuelTypeId
-                && nominal.Liters == liters
-// The caller's own pool, on BOTH sides: the size list is per pool, so a
-            // rehearsal size must resolve through the rehearsal offer and not the live one, which is
-            // the leak this guards. Filtering only the offer would let a live price answer for a
-            // rehearsal size.
-            && nominal.DataKind == pool
-            && offer.DataKind == pool
-            // The slug is carried through the query rather than read off the entity afterwards: the
-            // caller matches vouchers and order lines by brand TEXT, so a package that came back
-            // without one could not be stocked or ordered.
-            select new { Offer = offer, Fuel = offer.FuelType!, BrandSlug = brand.Slug })
+            join brand in _context.Brands.AsNoTracking() on fuel.BrandId equals brand.Id
+            where fuel.BrandId == brandId
+                  && fuel.Id == fuelTypeId
+                  && nominal.Liters == liters
+                  // The caller's pool, on the nominal: the size list is per pool, so a rehearsal size
+                  // resolves only against the caller's own catalogue, and a live one never answers
+                  // for it.
+                  && nominal.DataKind == pool
+            select new { Fuel = fuel, DataKind = nominal.DataKind, BrandSlug = brand.Slug })
             .FirstOrDefaultAsync(cancellationToken);
 
-        return row is null ? null : SellablePackage.From(row.Offer, row.Fuel, liters, row.BrandSlug);
+        return row is null ? null : SellablePackage.From(row.Fuel, row.DataKind, liters, row.BrandSlug);
     }
 
     /// <summary>
@@ -183,34 +179,34 @@ var pool = DataKinds.ForPool(isTestAccount);
         var literSizes = wanted.Select(k => k.Liters).Distinct().ToArray();
         var pool = DataKinds.ForPool(isTestAccount);
 
-        var rows = await (
-            from offer in _context.FuelOffers.AsNoTracking()
-            join nominal in _context.FuelNominals.AsNoTracking() on offer.FuelTypeId equals nominal.FuelTypeId
+var rows = await (
+            from fuel in _context.FuelTypes.AsNoTracking()
+            from nominal in _context.FuelNominals.AsNoTracking()
+            where nominal.FuelTypeId == fuel.Id
             // The cart names its brands by slug, so the narrowing below compares against the
             // network's own code rather than an id the cart never had.
-            join brand in _context.Brands.AsNoTracking() on offer.BrandId equals brand.Id
-where offer.DataKind == pool
-            && nominal.DataKind == pool
-            && brands.Contains(brand.Slug.ToLower())
-                  && fuelTypeIds.Contains(offer.FuelTypeId)
+            join brand in _context.Brands.AsNoTracking() on fuel.BrandId equals brand.Id
+            where nominal.DataKind == pool
+                  && brands.Contains(brand.Slug.ToLower())
+                  && fuelTypeIds.Contains(fuel.Id)
                   && literSizes.Contains(nominal.Liters)
             // Same precedence as the single-line path, so one line of a cart cannot resolve to a
             // different package than the same line ordered on its own. Both keys are unique, so this
             // ordering is free belt-and-braces rather than a tie-break anything depends on.
-            orderby offer.Id, nominal.Liters
-            select new { Offer = offer, Fuel = offer.FuelType!, Liters = nominal.Liters, BrandSlug = brand.Slug })
+            orderby fuel.Id, nominal.Liters
+            select new { Fuel = fuel, DataKind = nominal.DataKind, Liters = nominal.Liters, BrandSlug = brand.Slug })
             .ToListAsync(cancellationToken);
 
         var resolved = new Dictionary<StockKey, SellablePackage>(wanted.Count);
         foreach (var row in rows)
         {
-            var key = StockKey.For(row.BrandSlug, row.Offer.FuelTypeId, row.Liters);
+var key = StockKey.For(row.BrandSlug, row.Fuel.Id, row.Liters);
             if (!wanted.Contains(key))
                 continue;
 
             // First write wins, and the ordering above means "first" is the same package the
             // single-line path would have taken.
-            resolved.TryAdd(key, SellablePackage.From(row.Offer, row.Fuel, row.Liters, row.BrandSlug));
+            resolved.TryAdd(key, SellablePackage.From(row.Fuel, row.DataKind, row.Liters, row.BrandSlug));
         }
 
         return resolved;

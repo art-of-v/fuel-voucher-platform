@@ -82,6 +82,50 @@ public sealed class FuelTypeEntity
     /// </remarks>
     public decimal? MarginUahPerLiter { get; set; }
 
+    /// <summary>
+    /// What we pay for the litre, or null while nobody has recorded a cost. The fuel's, not a
+    /// per-package copy: four copies of one number across the nominals is how they drift.
+    /// </summary>
+    /// <remarks>
+    /// Moved here from <c>fuel_offers.supplier_price_per_liter</c> on 2026-10-19. The offer existed
+    /// so that two pools could hold two prices for one grade; with the pool moved onto the size list
+    /// and the margin already here, the offer was a second place to say what a litre costs.
+    /// </remarks>
+    public decimal? SupplierPricePerLiter { get; set; }
+
+    /// <summary>
+    /// The ceiling: the highest a litre may sell for whatever the margin asks. Null means no ceiling,
+    /// which is a grade nobody tracks against the pump.
+    /// </summary>
+    public decimal? PumpPricePerLiter { get; set; }
+
+    /// <summary>
+    /// The guaranteed gap under that ceiling - a discount the operator promises even if the margin
+    /// would not cover it. Not the same number as <see cref="DiscountPrice"/>, which is the
+    /// headline the customer sees.
+    /// </summary>
+    public decimal? MinDiscountPerLiter { get; set; }
+
+    /// <summary>
+    /// The margin as a percentage, kept beside the per-litre figure it is shown next to. Only ever
+    /// read; the price is computed from <see cref="MarginUahPerLiter"/> because a percentage of a
+    /// price that is itself a function of the margin is circular.
+    /// </summary>
+    public decimal? MarginPercent { get; set; }
+
+    /// <summary>
+    /// When this fuel was last repriced, and by whom - stamped whether or not the number came out
+    /// different. Moved here from the offer on 2026-10-19 with the rest of the pricing.
+    /// </summary>
+    /// <remarks>
+    /// Distinct from <see cref="UpdatedAtUtc"/>, which moves for any change at all. "The price was
+    /// touched" is the question a manager asks after a reprice that turned out to be a no-op, and
+    /// <c>updated_at</c> cannot answer it.
+    /// </remarks>
+    public DateTime? PriceUpdatedAt { get; set; }
+
+    public Guid? PriceUpdatedByUserId { get; set; }
+
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
 

@@ -43,6 +43,28 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
         builder.Property(e => e.MarginUahPerLiter)
             .HasColumnName("margin_uah_per_liter");
 
+        // The four pricing knobs, moved off fuel_offers on 2026-10-19. Same naming discipline as
+        // the margin above: one column, one spelling.
+        builder.Property(e => e.SupplierPricePerLiter)
+            .HasColumnName("supplier_price_per_liter");
+
+        builder.Property(e => e.PumpPricePerLiter)
+            .HasColumnName("pump_price_per_liter");
+
+        builder.Property(e => e.MinDiscountPerLiter)
+            .HasColumnName("min_discount_per_liter");
+
+        builder.Property(e => e.MarginPercent)
+            .HasColumnName("margin_percent");
+
+        builder.Property(e => e.PriceUpdatedAt)
+            .HasColumnName("price_updated_at")
+            .HasColumnType("timestamp with time zone");
+
+        builder.Property(e => e.PriceUpdatedByUserId)
+            .HasColumnName("price_updated_by_user_id")
+            .HasColumnType("uuid");
+
         builder.Property(e => e.BasePrice)
             .HasColumnName("base_price")
             .HasColumnType("numeric(12,2)")

@@ -71,10 +71,7 @@ internal static class CatalogueTestData
             context.FuelOffers.Add(offer);
         }
 
-        if (supplierPricePerLiter is not null) offer.SupplierPricePerLiter = supplierPricePerLiter;
-        // The margin is the fuel's. The parameter keeps its name and its call sites: what changed is
-        // where it lands, and the two derived figures below read it from the same place the production
-        // code does. A fixture that set it on the offer would now price every assertion at cost.
+
         //
         // The fuel is created if the fixture has not seeded one, because a fixture that states a price
         // has to be able to state what sells it - and a half-configured fuel (a margin with no name, or
@@ -106,9 +103,14 @@ internal static class CatalogueTestData
 
         if (marginUahPerLiter is not null) fuel.MarginUahPerLiter = marginUahPerLiter;
         var margin = fuel.MarginUahPerLiter;
-        if (marginPercent is not null) offer.MarginPercent = marginPercent;
-        if (pumpPricePerLiter is not null) offer.PumpPricePerLiter = pumpPricePerLiter;
-        if (minDiscountPerLiter is not null) offer.MinDiscountPerLiter = minDiscountPerLiter;
+
+        // Every pricing figure is the fuel's from here on. A fixture that left any of them on the
+        // offer would price every assertion off a row production no longer reads - the price would
+        // look set and the shelf would show nothing.
+        if (supplierPricePerLiter is not null) fuel.SupplierPricePerLiter = supplierPricePerLiter;
+        if (marginPercent is not null) fuel.MarginPercent = marginPercent;
+        if (pumpPricePerLiter is not null) fuel.PumpPricePerLiter = pumpPricePerLiter;
+        if (minDiscountPerLiter is not null) fuel.MinDiscountPerLiter = minDiscountPerLiter;
 
         // `finalPricePerLiter` no longer configures anything — the offer stopped storing the derived
         // figure on 2026-10-17 — so it is checked against the formula instead of being written. Every
