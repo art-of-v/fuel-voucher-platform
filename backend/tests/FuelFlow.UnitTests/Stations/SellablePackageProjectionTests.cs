@@ -28,6 +28,7 @@ public sealed class SellablePackageProjectionTests : IDisposable
             .Options;
 
         _context = new ApplicationDbContext(options, TestQrCipher.Instance);
+        _context.AddMissing();
         _context.Database.EnsureCreated();
     }
 
@@ -81,7 +82,7 @@ public sealed class SellablePackageProjectionTests : IDisposable
         // test is about one offer, not about whatever the seed brought with it.
         var projected = await _context.FuelOffers
             .Where(o => o.Id == offer.Id)
-            .Project(_context.FuelNominals.Where(n => n.FuelTypeId == fuel.Id))
+            .Project(_context.FuelNominals.Where(n => n.FuelTypeId == fuel.Id), _context.Brands.AsNoTracking())
             .SingleAsync();
         var composed = SellablePackage.From(
             await _context.FuelOffers.SingleAsync(o => o.Id == offer.Id),

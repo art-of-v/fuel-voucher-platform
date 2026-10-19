@@ -33,17 +33,25 @@ namespace FuelFlow.Persistence;
         /// The caller's pool. The offer supplies the price knobs and the identity; it no longer carries
         /// a list of sizes, so it cannot be the grain on its own.
         /// </param>
-        /// <param name="nominals">Every size any fuel is sold in. Filtered to the offer's fuel below.</param>
-        public static IQueryable<SellablePackage> Project(
+/// <param name="nominals">Every size any fuel is sold in. Filtered to the offer's fuel below.</param>
+    /// <param name="brands">
+    /// The networks, for the slug beside each offer's uuid. Joined rather than resolved afterwards:
+    /// <see cref="SellablePackage.BrandSlug"/> is what the stock key matches a voucher's brand NAME
+    /// against, so a projection that left it empty would produce packages nothing can be found by.
+    /// </param>
+    public static IQueryable<SellablePackage> Project(
             this IQueryable<FuelOffer> offers,
-            IQueryable<FuelNominal> nominals)
+            IQueryable<FuelNominal> nominals,
+            IQueryable<Brand> brands)
         => from offer in offers
            join nominal in nominals on offer.FuelTypeId equals nominal.FuelTypeId
+           join brand in brands on offer.BrandId equals brand.Id
            select new SellablePackage
            {
                PackageId = PackageIds.For(offer.Id, nominal.Liters),
                OfferId = offer.Id,
                BrandId = offer.BrandId,
+               BrandSlug = brand.Slug,
                FuelTypeId = offer.FuelTypeId,
                Liters = nominal.Liters,
                PumpPricePerLiter = offer.PumpPricePerLiter,

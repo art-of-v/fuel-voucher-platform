@@ -63,7 +63,7 @@ public sealed class BrandStationCommandHandlersTests : IDisposable
 
         result.Success.Should().BeTrue();
         result.Node.Should().BeSameAs(node);
-        var persisted = await _context.BrandStations.FindAsync("okko-1");
+        var persisted = await ByExternalIdAsync("okko-1");
         persisted.Should().NotBeNull();
         persisted!.CreatedAtUtc.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
     }
@@ -115,8 +115,8 @@ public sealed class BrandStationCommandHandlersTests : IDisposable
             .HandleAsync(new UpdateBrandStationCommand(NodeId("n-1"), Node("n-1", WogId, "New", 49.0, 24.0, city: "Львів")));
 
         result.Success.Should().BeTrue();
-        var persisted = await _context.BrandStations.FindAsync("n-1");
-        persisted!.BrandId.Should().Be("wog");
+        var persisted = await ByExternalIdAsync("n-1");
+        persisted!.BrandId.Should().Be(WogId);
         persisted.Name.Should().Be("New");
         persisted.City.Should().Be("Львів");
         persisted.Lat.Should().Be(49.0);
@@ -185,7 +185,7 @@ public sealed class BrandStationCommandHandlersTests : IDisposable
             .HandleAsync(new GetAdminBrandStationsQuery(1, 50, OkkoId));
 
         result.TotalCount.Should().Be(2);
-        result.Items.Should().OnlyContain(n => n.BrandId == BrandIds.Okko);
+        result.Items.Should().OnlyContain(n => n.BrandId == OkkoId);
     }
 
     [Fact]
@@ -218,7 +218,7 @@ public sealed class BrandStationCommandHandlersTests : IDisposable
         result.Updated.Should().Be(0);
         result.Errors.Should().BeEmpty();
         // The id-less row got a coordinate-derived id.
-        (await _context.BrandStations.FindAsync(BrandStationCoordinates.DeriveId("okko", 50.40, 30.50))).Should().NotBeNull();
+        (await ByExternalIdAsync(BrandStationCoordinates.DeriveId("okko", 50.40, 30.50))).Should().NotBeNull();
     }
 
     [Fact]
@@ -236,7 +236,7 @@ public sealed class BrandStationCommandHandlersTests : IDisposable
 
         result.Added.Should().Be(0);
         result.Updated.Should().Be(1);
-        var persisted = await _context.BrandStations.FindAsync("okko-1");
+        var persisted = await ByExternalIdAsync("okko-1");
         persisted!.Name.Should().Be("New Name");
         persisted.CreatedAtUtc.Should().Be(new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc));
     }
@@ -277,7 +277,7 @@ public sealed class BrandStationCommandHandlersTests : IDisposable
             .HandleAsync(new ImportBrandStationsCommand(json, BrandStationImportFormat.Json));
 
         result.Added.Should().Be(1);
-        (await _context.BrandStations.FindAsync("okko-1"))!.Name.Should().Be("Second");
+        (await ByExternalIdAsync("okko-1"))!.Name.Should().Be("Second");
     }
 
     [Fact]
@@ -291,7 +291,7 @@ public sealed class BrandStationCommandHandlersTests : IDisposable
             .HandleAsync(new ImportBrandStationsCommand(csv, BrandStationImportFormat.Csv));
 
         result.Added.Should().Be(1);
-        (await _context.BrandStations.FindAsync("okko-1"))!.Address.Should().Be("Проспект Перемоги, 98");
+        (await ByExternalIdAsync("okko-1"))!.Address.Should().Be("Проспект Перемоги, 98");
     }
 
     [Fact]
@@ -310,6 +310,13 @@ public sealed class BrandStationCommandHandlersTests : IDisposable
         var parsed = BrandStationImportParser.Parse("{ not json", BrandStationImportFormat.Json);
         parsed.Errors.Should().NotBeEmpty();
     }
+
+    /// <summary>
+    /// By the importer's key. The station's own uuid is the server's to assign, so a test that
+    /// knows only the file's id has to ask for it by the column that carries that id.
+    /// </summary>
+    private Task<BrandStation?> ByExternalIdAsync(string externalId)
+        => _context.BrandStations.SingleOrDefaultAsync(n => n.ExternalId == externalId);
 
     private async Task AddBrandAsync(Guid id, string slug)
     {

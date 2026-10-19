@@ -21,9 +21,6 @@ internal sealed class FuelOfferConfiguration : IEntityTypeConfiguration<FuelOffe
         builder.Property(e => e.FuelTypeId).HasColumnName("fuel_type_id").HasColumnType("text").IsRequired();
 
         builder.Property(e => e.SupplierPricePerLiter).HasColumnName("supplier_price_per_liter").HasColumnType("numeric(10,4)");
-        // The offer's own copy of the margin: no reader, no writer, kept only until the migration that drops
-        // the column. Nothing to Ignore any more - FinalPerLiterWith is a method, not a property.
-        builder.Property(e => e.MarginUahPerLiter).HasColumnName("margin_uah_per_liter").HasColumnType("numeric(10,4)");
         builder.Property(e => e.MarginPercent).HasColumnName("margin_percent").HasColumnType("numeric(10,4)");
         builder.Property(e => e.PumpPricePerLiter).HasColumnName("pump_price_per_liter").HasColumnType("numeric(10,4)");
         builder.Property(e => e.MinDiscountPerLiter).HasColumnName("min_discount_per_liter").HasColumnType("numeric(10,4)");
@@ -81,11 +78,10 @@ internal sealed class FuelOfferConfiguration : IEntityTypeConfiguration<FuelOffe
             // The value set DataKinds.All documents.
             t.HasCheckConstraint("ck_fuel_offers_data_kind", "data_kind IN ('real', 'qa')");
 
-            // The same sign constraints fuel_packages carries, on the columns that are money here.
-            // A negative margin is not a cheap mistake to make: the dashboard and reconciliation
-            // both multiply this straight into revenue.
-            t.HasCheckConstraint("ck_fuel_offers_margin_signs",
-                "margin_uah_per_liter IS NULL OR margin_uah_per_liter >= 0");
+            // The sign constraints on the columns that are money here. A negative figure is not a
+            // cheap mistake to make: the dashboard and reconciliation both multiply this straight
+            // into revenue. The margin is not among them - it moved to the fuel in
+            // 20261018181305_MarginLivesOnTheFuel, and the constraint that pinned it followed.
             t.HasCheckConstraint("ck_fuel_offers_prices_non_negative",
                 "(supplier_price_per_liter IS NULL OR supplier_price_per_liter >= 0) AND " +
                 "(pump_price_per_liter IS NULL OR pump_price_per_liter >= 0) AND " +

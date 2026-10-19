@@ -20,7 +20,7 @@ public sealed class GetBrandByIdQueryHandler
 // Same single projected query as GetBrandsQueryHandler, narrowed to this brand's fuels.
     var packages = await _context.FuelOffers
     .AsNoTracking()
-    .Project(_context.FuelNominals.AsNoTracking())
+    .Project(_context.FuelNominals.AsNoTracking(), _context.Brands.AsNoTracking())
     .Where(p => fuelIds.Contains(p.FuelTypeId))
     .ToListAsync(ct);
 

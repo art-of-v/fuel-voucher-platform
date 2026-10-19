@@ -51,6 +51,7 @@ public sealed class VoucherTermSaleTests : IDisposable
             .Options;
 
         _context = new ApplicationDbContext(options, TestQrCipher.Instance);
+        _context.AddMissing();
         _settings = new RuntimeSettingsService(_context);
 
         _monobank
