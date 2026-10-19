@@ -587,7 +587,7 @@ jobs:
       # point of the split - the job needs a shell and a running postgres, not the repository.
       - name: Dump schema, history and catalogue from production
         env:
-          TABLES: brands fuel_types fuel_offers
+          TABLES: brands fuel_types
         run: |
           set -euo pipefail
           out="$RUNNER_TEMP/dryrun"
@@ -718,7 +718,7 @@ jobs:
           db -q -v ON_ERROR_STOP=1 -f schema.sql > /dev/null
           db -q -c "\\copy \"__EFMigrationsHistory\" FROM 'history.csv' WITH (FORMAT csv, HEADER true)"
           # Order is EXPLICIT, and it must be, because the dump contains real foreign keys:
-          # fuel_types.brand_id -> brands.id and fuel_offers.fuel_type_id -> fuel_types.id.
+          # fuel_types.brand_id -> brands.id.
           # Alphabetically `fuel_types` sorts BEFORE `brands` ('_' < 's' does not apply here, but the
           # habit does): a glob-ordered restore loads the child first and dies on
           # FK_fuel_types_brands_brand_id. Nothing is wrong with the data; the restore was simply
@@ -727,7 +727,7 @@ jobs:
           # Parent first, then child. Kept as a literal list rather than re-derived from the glob so
           # that adding a table to TABLES is a deliberate act: a new CSV with no place in this order
           # is skipped, not silently loaded in the wrong place - and the loop says so when it does.
-          order=(brands fuel_types fuel_offers)
+          order=(brands fuel_types)
           for table in "${order[@]}"; do
             f="$table.csv"
             # A name in the order with no CSV is FATAL, not a warning. The two lists are written
@@ -750,9 +750,11 @@ jobs:
               *) echo "  $table IS IN THE DUMP BUT NOT IN THE RESTORE ORDER" >&2; exit 1 ;;
             esac
           done
-          db -t -A -c "SELECT count(*) FROM fuel_offers WHERE NOT is_deleted" | sed 's/^/live offers: /'
+          db -t -A -c "SELECT count(*) FROM fuel_types WHERE NOT is_deleted" | sed 's/^/live fuels: /'
 
-      # The whole point. On the production dump this is where the offer split failed twice.
+      # The whole point. On the production dump this is where the offer split failed twice, and on
+      # 2026-10-19 where the pricing migration failed once: the copy of the prices off the offers ran
+      # after the table was dropped. The step that runs next says so on a failure.
       - name: Apply pending migrations
         run: |
           set -euo pipefail
@@ -774,10 +776,10 @@ jobs:
           # `SELECT count(*) FROM fuel_offers WHERE to_regclass('public.fuel_offers') IS NOT NULL`,
           # which looks guarded and is not: Postgres resolves the table at PARSE time, so on a run
           # where the migration created no offers table this step errors instead of reporting zero.
-          # fuel_packages and fuel_offer_volumes are gone from the schema, so neither is counted here -
-          # a migration that DROPS one is exactly the case this step exists to show, and their absence
-          # is the result rather than a gap in the summary. What is left is the network, the fuel it
-          # belongs to and the offer that prices it, which is the chain this PR rewrites.
+          # fuel_packages, fuel_offer_volumes and now fuel_offers are gone from the schema, so none
+          # is counted here - a migration that DROPS one is exactly the case this step exists to show,
+          # and their absence is the result rather than a gap in the summary. What is left is the
+          # network and the fuel it belongs to, which is the chain this PR rewrites.
           for t in brands fuel_types fuel_offers; do
             if db -X -t -A -c "SELECT to_regclass('public.$t') IS NOT NULL" | grep -q t; then
               db -X -t -A -F' | ' -c "SELECT '$t', count(*) FROM $t"
