@@ -45,6 +45,48 @@ public sealed class MigrationDiscoveryTests
         ids.Should().Contain("20261007091958_RenameOrderCleanupSettingKeys");
     }
 
+    /// <summary>
+    /// The eight migrations that were deleted from the repository and are back.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// On 2026-09-11 a commit deleted eight migration files with the reasoning that "EF scans the
+    /// assembly, already-applied history rows are unaffected". That is true for the databases that
+    /// already have them and irrelevant for every database that does not: a fresh environment would
+    /// have migrated without them and come out with a different schema than production.
+    /// </para>
+    /// <para>
+    /// It happened to be harmless — <c>20260919113317_AddMissingDriftedTables</c> re-creates
+    /// everything those eight made, with <c>IF NOT EXISTS</c> — but by luck rather than by design.
+    /// The files are back, and a from-zero build applies 172 migrations and produces the same
+    /// schema as production.
+    /// </para>
+    /// <para>
+    /// <b>This is the pin, not the fix.</b> The general check is the CI gate,
+    /// <c>deploy/check-migration-history.sh</c>, which compares the migration folder against a
+    /// deployed database's <c>__EFMigrationsHistory</c> and refuses a repository that has lost one.
+    /// It needs a database, so it cannot run here; these eight are asserted locally so that the
+    /// exact deletion that happened is caught by a test that needs nothing.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void The_Migrations_Production_Applied_Are_Still_Here()
+    {
+        var ids = DiscoverMigrationIds();
+
+        ids.Should().Contain(new[]
+        {
+            "20260803120600_AddRefunds",
+            "20260804123305_AddRuntimeSettingsAndPartialFulfillmentSince",
+            "20260816121521_AddVerificationCodeAttempts",
+            "20260816163113_AddRefreshTokenFamily",
+            "20260816163849_WidenOrderIdempotencyKey",
+            "20260817190228_AddCompanyMembership",
+            "20260817190316_AddWorkerVoucherAssignment",
+            "20260817191435_AddOrderLegalEntity"
+        }, "the migration history is append-only: a migration production has applied stays in the folder, under its original id");
+    }
+
     [Fact]
     public void Hand_Written_Migrations_Carry_The_Attributes_Discovery_Needs()
     {

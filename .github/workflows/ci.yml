@@ -512,6 +512,13 @@ jobs:
       - name: Test the restore drill
         run: bash deploy/drill-restore.test.sh
 
+      # The gate that refuses a repository which has lost a migration production has applied.
+      # The comparison itself is over two text files, so the test needs no database and no build;
+      # what it also checks is that the workflow step that CALLS the script is still there, because
+      # a gate that is not wired in is a script nobody runs.
+      - name: Test the migration history gate
+        run: bash deploy/check-migration-history.test.sh
+
   # The repo-root fetchers in scripts/ — the only write path into `station_nodes`. They parse a
   # third-party site nobody here controls (UPG rebuilds its map page periodically, KLO renders its
   # pins through a WordPress plugin), and a silent parse change would import a few hundred rows with
@@ -765,6 +772,36 @@ jobs:
           dotnet restore backend/src/FuelFlow.API/FuelFlow.API.csproj
           dotnet ef database update --project backend/src/FuelFlow.API \
             --connection "Host=localhost;Port=5432;Database=fuelflow;Username=postgres;Password=postgres"
+
+      # The history is append-only, and until now nothing enforced it: a commit deleted eight
+      # migration files on 2026-09-11 with the reasoning that EF ignores history rows it cannot
+      # find, which is true for the databases that already have them and irrelevant for every
+      # database that does not. It happened to be harmless - a later migration re-creates
+      # everything those eight made, with IF NOT EXISTS - but by luck, not by design.
+      #
+      # The check is here, AFTER the apply, for two reasons. The project has to be built before
+      # `dotnet ef migrations list` will run, and the apply step is what builds it. And the table
+      # now holds production's history PLUS this pull request's migrations, so every row in it
+      # should correspond to a migration this repository contains - which is a stronger statement
+      # than comparing against production's history alone.
+      #
+      # It runs after the apply rather than before because the apply CANNOT fail on a missing
+      # migration: EF skips history rows it does not recognise and says nothing, which is the whole
+      # reason the check is needed.
+      - name: Every applied migration is still in the repository
+        run: |
+          set -euo pipefail
+          export PGPASSWORD=postgres
+          db() { psql "postgres://postgres:$PGPASSWORD@localhost:5432/fuelflow" "$@"; }
+
+          db -q -t -A -c 'SELECT "MigrationId" FROM "__EFMigrationsHistory"' > history.ids
+
+          # EF's own listing, so the two sides are compared in the terms EF applies them in.
+          dotnet ef migrations list --project backend/src/FuelFlow.API --no-build \
+            --connection "Host=localhost;Port=5432;Database=fuelflow;Username=postgres;Password=postgres" \
+            | awk '{print $1}' > assembly.ids
+
+          bash deploy/check-migration-history.sh history.ids assembly.ids
 
       - name: Summarise what the migration produced
         run: |
