@@ -5,17 +5,18 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 namespace FuelFlow.Features.Brands.Configurations;
 
 /// <summary>
-/// <c>fuel_offer_prices</c> - the append-only record of what each fuel was priced at, and when.
-internal sealed class FuelOfferPriceConfiguration : IEntityTypeConfiguration<FuelOfferPrice>
+/// <c>fuel_price_history</c> - the append-only record of what each fuel was priced at, and when.
+/// </summary>
+internal sealed class FuelPriceHistoryConfiguration : IEntityTypeConfiguration<FuelPriceHistory>
 {
-    public void Configure(EntityTypeBuilder<FuelOfferPrice> builder)
+    public void Configure(EntityTypeBuilder<FuelPriceHistory> builder)
     {
-        builder.ToTable("fuel_offer_prices");
+        builder.ToTable("fuel_price_history");
 
         builder.HasKey(e => e.Id);
 
         builder.Property(e => e.Id).HasColumnName("id").HasColumnType("uuid");
-builder.Property(e => e.BrandId).HasColumnName("brand_id").HasColumnType("uuid").IsRequired();
+        builder.Property(e => e.BrandId).HasColumnName("brand_id").HasColumnType("uuid").IsRequired();
         builder.Property(e => e.FuelTypeId).HasColumnName("fuel_type_id").HasColumnType("text").IsRequired();
 
         // Same six columns, same scale, as the fuel they are copied from: a history row that stored
@@ -33,7 +34,7 @@ builder.Property(e => e.BrandId).HasColumnName("brand_id").HasColumnType("uuid")
         builder.Property(e => e.EffectiveFromUtc).HasColumnName("effective_from_utc").HasColumnType("timestamptz").IsRequired();
         builder.Property(e => e.RecordedAtUtc).HasColumnName("recorded_at_utc").HasColumnType("timestamptz").IsRequired();
 
-        // A bare uuid, no foreign key - see FuelOfferPrice.ChangedByUserId. The column is indexed all
+        // A bare uuid, no foreign key - see FuelPriceHistory.ChangedByUserId. The column is indexed all
         // the same, because "everything this person repriced" is a question worth being able to ask.
         builder.Property(e => e.ChangedByUserId).HasColumnName("changed_by_user_id").HasColumnType("uuid");
 
@@ -42,11 +43,11 @@ builder.Property(e => e.BrandId).HasColumnName("brand_id").HasColumnType("uuid")
         builder.HasIndex(e => e.ChangedByUserId);
 
         // The foreign key below needs an index to lead with, and this is the only column in the
-        // table that does not already have one: fuel_type_id leads ix_fuel_offer_prices_fuel_effective.
-        builder.HasIndex(e => e.BrandId).HasDatabaseName("ix_fuel_offer_prices_brand_id");
+        // table that does not already have one: fuel_type_id leads ix_fuel_price_history_fuel_effective.
+        builder.HasIndex(e => e.BrandId).HasDatabaseName("ix_fuel_price_history_brand_id");
 
         builder.HasIndex(e => new { e.FuelTypeId, e.EffectiveFromUtc })
-            .HasDatabaseName("ix_fuel_offer_prices_fuel_effective");
+            .HasDatabaseName("ix_fuel_price_history_fuel_effective");
         // Two constraints that used to be comments.
         //
         // On the fuel: the argument for leaving this unconstrained was that "a fuel is never
@@ -69,20 +70,20 @@ builder.Property(e => e.BrandId).HasColumnName("brand_id").HasColumnType("uuid")
             .OnDelete(DeleteBehavior.Restrict);
         builder.ToTable(t =>
         {
-            // The same value sets and sign constraints the offer itself carries, and deliberately so: a
-            // history row is written by the same five paths as the offer, and a CHECK is the one thing
-            // that holds for a row written by a migration, a seed or a future caller alike.
-            t.HasCheckConstraint("ck_fuel_offer_prices_data_kind", "data_kind IN ('real', 'qa')");
-            t.HasCheckConstraint("ck_fuel_offer_prices_reason",
+            // The same value sets and sign constraints the fuel itself carries, and deliberately so: a
+            // history row is written by the same five paths as the fuel's price, and a CHECK is the one
+            // thing that holds for a row written by a migration, a seed or a future caller alike.
+            t.HasCheckConstraint("ck_fuel_price_history_data_kind", "data_kind IN ('real', 'qa')");
+            t.HasCheckConstraint("ck_fuel_price_history_reason",
                 "reason IN ('operator', 'pump-import', 'catalogue-import', 'batch-cost', 'exchange-release', 'backfill')");
-            t.HasCheckConstraint("ck_fuel_offer_prices_margin_signs",
+            t.HasCheckConstraint("ck_fuel_price_history_margin_signs",
                 "margin_uah_per_liter IS NULL OR margin_uah_per_liter >= 0");
-            t.HasCheckConstraint("ck_fuel_offer_prices_prices_non_negative",
+            t.HasCheckConstraint("ck_fuel_price_history_prices_non_negative",
                 "(final_price_per_liter IS NULL OR final_price_per_liter >= 0) AND " +
                 "(pump_price_per_liter IS NULL OR pump_price_per_liter >= 0) AND " +
                 "(min_discount_per_liter IS NULL OR min_discount_per_liter >= 0)");
 
-            t.HasCheckConstraint("ck_fuel_offer_prices_fuel_type_id_length", "length(fuel_type_id) <= 100");
+            t.HasCheckConstraint("ck_fuel_price_history_fuel_type_id_length", "length(fuel_type_id) <= 100");
         });
     }
 }

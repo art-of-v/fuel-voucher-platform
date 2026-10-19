@@ -29,10 +29,10 @@ namespace FuelFlow.SharedKernel.Domain;
 /// rewriting those reads to resolve "the latest row" would put a per-row sort in the hot path of
 /// every package query for no gain. The invariant this table has to keep is therefore narrow and
 /// checkable: <b>the newest row for a fuel equals the fuel's own price columns</b>. It is maintained
-/// from a single choke point - <c>OfferPriceRecorder</c> - which every write path calls after
+/// from a single choke point - <c>PriceHistoryRecorder</c> - which every write path calls after
 /// mutating the fuel, because a second place that remembered to append a row is a second place that
-/// can forget. <c>FuelOfferPriceHistoryIntegrationTests</c> asserts the invariant against the
-/// database rather than trusting it.
+/// can forget. <c>ProvidersControllerTests</c> and <c>GetFuelPriceAtIntegrationTests</c> assert it
+/// against the database rather than trusting it.
 /// </para>
 ///
 /// <para>
@@ -53,7 +53,7 @@ namespace FuelFlow.SharedKernel.Domain;
 /// millisecond would trade a cosmetic ambiguity for a write that can fail.
 /// </para>
 /// </remarks>
-public sealed class FuelOfferPrice
+public sealed class FuelPriceHistory
 {
     /// <summary>Key. Version 7 UUID, so the id alone orders the rows of one fuel chronologically.</summary>
     public Guid Id { get; set; }
@@ -100,8 +100,8 @@ public sealed class FuelOfferPrice
     public Guid? ChangedByUserId { get; set; }
 
     /// <summary>
-    /// Why the price moved, from <see cref="OfferPriceReasons"/>. The audit trail says what changed;
+    /// Why the price moved, from <see cref="PriceHistoryReasons"/>. The audit trail says what changed;
     /// this says which door it came through.
     /// </summary>
-    public string Reason { get; set; } = OfferPriceReasons.Operator;
+    public string Reason { get; set; } = PriceHistoryReasons.Operator;
 }

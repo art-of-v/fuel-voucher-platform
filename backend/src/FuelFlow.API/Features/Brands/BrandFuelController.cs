@@ -56,8 +56,8 @@ public sealed class BrandFuelController : ControllerBase
     private readonly NotificationDispatcher _notifications;
 
     // Every price this controller writes goes through here, so the history cannot be missed by the one
-    // endpoint that forgets. See OfferPriceRecorder for why that is a service rather than a comment.
-    private readonly OfferPriceRecorder _priceRecorder;
+    // endpoint that forgets. See PriceHistoryRecorder for why that is a service rather than a comment.
+    private readonly PriceHistoryRecorder _priceRecorder;
 
     public BrandFuelController(
         GetFuelPriceHistoryQueryHandler getPriceHistory,
@@ -65,7 +65,7 @@ public sealed class BrandFuelController : ControllerBase
         AuditEventService eventService,
         ApplicationDbContext context,
         NotificationDispatcher notifications,
-        OfferPriceRecorder priceRecorder)
+        PriceHistoryRecorder priceRecorder)
     {
         _getPriceHistory = getPriceHistory;
         _getPriceAt = getPriceAt;
@@ -256,7 +256,7 @@ public sealed class BrandFuelController : ControllerBase
     // A fuel that has never been priced has no previous price, so this row is not a change but the
     // price it was born with - the same as every later row's role, and the reason a fuel's history
     // starts at its creation rather than at the first time somebody edited it.
-    await _priceRecorder.RecordAsync(fuel, OfferPriceReasons.Operator, GetUserId(), ct: ct);
+    await _priceRecorder.RecordAsync(fuel, PriceHistoryReasons.Operator, GetUserId(), ct: ct);
 
             foreach (var liters in litersToCreate)
         {
@@ -410,7 +410,7 @@ var seededNominals = await _context.FuelNominals
         // The history row, before the save that persists the offer - and it also stamps
         // price_updated_at / price_updated_by_user_id, which this endpoint previously left at their
         // creation-time values, so the audit trail could not say when an operator repriced a fuel.
-        await _priceRecorder.RecordAsync(fuel, OfferPriceReasons.Operator, GetUserId(), ct: ct);
+        await _priceRecorder.RecordAsync(fuel, PriceHistoryReasons.Operator, GetUserId(), ct: ct);
 
         // The other pool has nothing to archive: an offer existed to hold a price, and the
         // price is the fuel's. What separates the pools now is the size list, handled above.

@@ -41,7 +41,7 @@ public sealed class ImportUpgWogPricesTests : IDisposable
         _context.Dispose();
     }
 
-    private ImportUpgWogPricesCommandHandler Handler() => new(_context, new OfferPriceRecorder(_context), new BrandSlugResolver(_context));
+    private ImportUpgWogPricesCommandHandler Handler() => new(_context, new PriceHistoryRecorder(_context), new BrandSlugResolver(_context));
 
     private static string Sheet(params (string Code, decimal Price)[] rows)
     {

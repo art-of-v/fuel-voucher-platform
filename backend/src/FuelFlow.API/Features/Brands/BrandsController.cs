@@ -34,8 +34,8 @@ private readonly GetBrandsQueryHandler _getAll;
     private readonly NotificationDispatcher _notifications;
 
     // Every price this controller writes goes through here, so the history cannot be missed by the one
-    // endpoint that forgets. See OfferPriceRecorder for why that is a service rather than a comment.
-    private readonly OfferPriceRecorder _priceRecorder;
+    // endpoint that forgets. See PriceHistoryRecorder for why that is a service rather than a comment.
+    private readonly PriceHistoryRecorder _priceRecorder;
     private readonly BrandSlugResolver _brands;
 
     public BrandsController(
@@ -47,7 +47,7 @@ private readonly GetBrandsQueryHandler _getAll;
         AuditEventService eventService,
         ApplicationDbContext context,
         NotificationDispatcher notifications,
-        OfferPriceRecorder priceRecorder,
+        PriceHistoryRecorder priceRecorder,
         BrandSlugResolver brands)
     {
         _getAll = getAll;

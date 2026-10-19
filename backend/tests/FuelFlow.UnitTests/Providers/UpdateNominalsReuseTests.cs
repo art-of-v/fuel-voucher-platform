@@ -44,7 +44,7 @@ public sealed class UpdateNominalsReuseTests : IDisposable
             new AuditEventService(_context),
             _context,
             NotificationDispatcher.Disabled,
-            new OfferPriceRecorder(_context));
+            new PriceHistoryRecorder(_context));
 
         // UpdateNominals records an audit event attributed to the caller, so the controller needs a
         // principal - there is no ASP.NET pipeline in a unit test.

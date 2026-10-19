@@ -298,7 +298,7 @@ public sealed class MovementBatchIntegrationTests : IClassFixture<TestDatabaseFi
         var bulkAction = new BulkActionVouchersCommandHandler(ctx, backgroundJobClient.Object, eventService);
 
         return new ConfirmVoucherExchangeCommandHandler(
-            ctx, new BlendedCostRecalculator(ctx, new OfferPriceRecorder(ctx)), bulkAction, eventService);
+            ctx, new BlendedCostRecalculator(ctx, new PriceHistoryRecorder(ctx)), bulkAction, eventService);
     }
 
     private static async Task<Guid> SeedSupplierAsync(ApplicationDbContext ctx)

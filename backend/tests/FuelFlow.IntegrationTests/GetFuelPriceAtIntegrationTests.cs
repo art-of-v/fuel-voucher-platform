@@ -39,10 +39,10 @@ public sealed class GetFuelPriceAtIntegrationTests : IClassFixture<TestDatabaseF
             .Options, TestQrCipher.Instance);
 
     /// <summary>
-    /// A fuel and one offer of its own, so a test's rows are the only ones the query can find. The ids
+    /// A fuel of its own, so a test's rows are the only ones the query can find. The ids
     /// are suffixed rather than random so two tests in this class cannot collide on them.
     /// </summary>
-    private async Task<(string FuelTypeId, string OfferId)> SeedFuelAsync(
+    private async Task<string> SeedFuelAsync(
         ApplicationDbContext context,
         string suffix)
     {
@@ -51,7 +51,6 @@ public sealed class GetFuelPriceAtIntegrationTests : IClassFixture<TestDatabaseF
         var brandId = _brandId = Guid.CreateVersion7();
         var slug = $"at-{suffix}";
         var fuelTypeId = $"at-fuel-{suffix}";
-        var offerId = $"at-offer-{suffix}";
 
         var now = DateTime.UtcNow;
         context.Brands.Add(new Brand
@@ -69,7 +68,7 @@ public sealed class GetFuelPriceAtIntegrationTests : IClassFixture<TestDatabaseF
         });
 
         await context.SaveChangesAsync();
-        return (fuelTypeId, fuelTypeId);
+        return fuelTypeId;
     }
 
     /// <summary>
@@ -77,12 +76,11 @@ public sealed class GetFuelPriceAtIntegrationTests : IClassFixture<TestDatabaseF
     /// argument because it is created per test by <see cref="SeedFuelAsync"/> and every one of these
     /// rows belongs to it.
     /// </summary>
-    private FuelOfferPrice Row(
+    private FuelPriceHistory Row(
         string fuelTypeId,
-        string offerId,
         DateTime from,
         decimal? pump,
-        string reason = OfferPriceReasons.Operator) => new()
+        string reason = PriceHistoryReasons.Operator) => new()
         {
             Id = Guid.CreateVersion7(),
             BrandId = _brandId,
@@ -100,16 +98,16 @@ public sealed class GetFuelPriceAtIntegrationTests : IClassFixture<TestDatabaseF
     {
         await using var context = CreateContext();
         var handler = new GetFuelPriceAtQueryHandler(context);
-        var (fuelTypeId, offerId) = await SeedFuelAsync(context, "follow");
+        var fuelTypeId = await SeedFuelAsync(context, "follow");
 
         var t1 = new DateTime(2026, 3, 1, 8, 0, 0, DateTimeKind.Utc);
         var t2 = new DateTime(2026, 3, 5, 8, 0, 0, DateTimeKind.Utc);
         var t3 = new DateTime(2026, 3, 9, 8, 0, 0, DateTimeKind.Utc);
 
-        context.FuelOfferPrices.AddRange(
-            Row(fuelTypeId, offerId, t1, 50m),
-            Row(fuelTypeId, offerId, t2, 51m),
-            Row(fuelTypeId, offerId, t3, 49m));
+        context.FuelPriceHistory.AddRange(
+            Row(fuelTypeId, t1, 50m),
+            Row(fuelTypeId, t2, 51m),
+            Row(fuelTypeId, t3, 49m));
         await context.SaveChangesAsync();
 
         (await handler.HandleAsync(new GetFuelPriceAtQuery(fuelTypeId, t1.AddSeconds(1))))
@@ -125,10 +123,10 @@ public sealed class GetFuelPriceAtIntegrationTests : IClassFixture<TestDatabaseF
     {
         await using var context = CreateContext();
         var handler = new GetFuelPriceAtQueryHandler(context);
-        var (fuelTypeId, offerId) = await SeedFuelAsync(context, "before");
+        var fuelTypeId = await SeedFuelAsync(context, "before");
 
         var firstPrice = new DateTime(2026, 3, 1, 8, 0, 0, DateTimeKind.Utc);
-        context.FuelOfferPrices.Add(Row(fuelTypeId, offerId, firstPrice, 50m));
+        context.FuelPriceHistory.Add(Row(fuelTypeId, firstPrice, 50m));
         await context.SaveChangesAsync();
 
         var answer = await handler.HandleAsync(new GetFuelPriceAtQuery(
@@ -143,9 +141,9 @@ public sealed class GetFuelPriceAtIntegrationTests : IClassFixture<TestDatabaseF
     {
         await using var context = CreateContext();
         var handler = new GetFuelPriceAtQueryHandler(context);
-        var (fuelTypeId, offerId) = await SeedFuelAsync(context, "future");
+        var fuelTypeId = await SeedFuelAsync(context, "future");
 
-        context.FuelOfferPrices.Add(Row(fuelTypeId, offerId, new DateTime(2026, 3, 1, 8, 0, 0, DateTimeKind.Utc), 50m));
+        context.FuelPriceHistory.Add(Row(fuelTypeId, new DateTime(2026, 3, 1, 8, 0, 0, DateTimeKind.Utc), 50m));
         await context.SaveChangesAsync();
 
         var answer = await handler.HandleAsync(new GetFuelPriceAtQuery(fuelTypeId, DateTime.UtcNow.AddYears(5)));
@@ -162,12 +160,12 @@ public sealed class GetFuelPriceAtIntegrationTests : IClassFixture<TestDatabaseF
         // write time would hide it from the one question it was entered to answer.
         await using var context = CreateContext();
         var handler = new GetFuelPriceAtQueryHandler(context);
-        var (fuelTypeId, offerId) = await SeedFuelAsync(context, "backdated");
+        var fuelTypeId = await SeedFuelAsync(context, "backdated");
 
         var lastTuesday = new DateTime(2026, 3, 3, 8, 0, 0, DateTimeKind.Utc);
-        var backdated = Row(fuelTypeId, offerId, lastTuesday, 47.25m);
+        var backdated = Row(fuelTypeId, lastTuesday, 47.25m);
         backdated.RecordedAtUtc = DateTime.UtcNow;
-        context.FuelOfferPrices.Add(backdated);
+        context.FuelPriceHistory.Add(backdated);
         await context.SaveChangesAsync();
 
         var answer = await handler.HandleAsync(new GetFuelPriceAtQuery(
@@ -181,18 +179,18 @@ public sealed class GetFuelPriceAtIntegrationTests : IClassFixture<TestDatabaseF
     [Fact]
     public async Task TwoRepricesInOneInstant_ResolveToTheLaterOne()
     {
-        // Two rows can share effective_from: there is deliberately no unique index on (offer, from),
+        // Two rows can share effective_from: there is deliberately no unique index on (fuel, from),
         // because refusing a second reprice in the same millisecond would trade a cosmetic ambiguity
         // for a write that can fail. The tie-break is the greater id, which is a version 7 UUID and so
         // breaks the tie chronologically rather than arbitrarily.
         await using var context = CreateContext();
         var handler = new GetFuelPriceAtQueryHandler(context);
-        var (fuelTypeId, offerId) = await SeedFuelAsync(context, "tie");
+        var fuelTypeId = await SeedFuelAsync(context, "tie");
 
         var at = new DateTime(2026, 3, 1, 8, 0, 0, DateTimeKind.Utc);
-        var first = Row(fuelTypeId, offerId, at, 50m);
-        var second = Row(fuelTypeId, offerId, at, 53m);
-        context.FuelOfferPrices.AddRange(first, second);
+        var first = Row(fuelTypeId, at, 50m);
+        var second = Row(fuelTypeId, at, 53m);
+        context.FuelPriceHistory.AddRange(first, second);
         await context.SaveChangesAsync();
 
         var winner = await handler.HandleAsync(new GetFuelPriceAtQuery(fuelTypeId, at.AddMinutes(1)));
@@ -208,13 +206,13 @@ public sealed class GetFuelPriceAtIntegrationTests : IClassFixture<TestDatabaseF
         // order lines needs to know whether they were both inside one price window or across a change.
         await using var context = CreateContext();
         var handler = new GetFuelPriceAtQueryHandler(context);
-        var (fuelTypeId, offerId) = await SeedFuelAsync(context, "window");
+        var fuelTypeId = await SeedFuelAsync(context, "window");
 
         var t1 = new DateTime(2026, 3, 1, 8, 0, 0, DateTimeKind.Utc);
         var t2 = new DateTime(2026, 3, 5, 8, 0, 0, DateTimeKind.Utc);
-        context.FuelOfferPrices.AddRange(
-            Row(fuelTypeId, offerId, t1, 50m),
-            Row(fuelTypeId, offerId, t2, 51m));
+        context.FuelPriceHistory.AddRange(
+            Row(fuelTypeId, t1, 50m),
+            Row(fuelTypeId, t2, 51m));
         await context.SaveChangesAsync();
 
         var answer = await handler.HandleAsync(new GetFuelPriceAtQuery(fuelTypeId, t2.AddHours(-1)));
@@ -228,7 +226,7 @@ public sealed class GetFuelPriceAtIntegrationTests : IClassFixture<TestDatabaseF
     {
         await using var context = CreateContext();
         var handler = new GetFuelPriceAtQueryHandler(context);
-        var (fuelTypeId, _) = await SeedFuelAsync(context, "empty");
+        var fuelTypeId = await SeedFuelAsync(context, "empty");
 
         var answer = await handler.HandleAsync(new GetFuelPriceAtQuery(fuelTypeId, DateTime.UtcNow));
 
@@ -244,15 +242,15 @@ public sealed class GetFuelPriceAtIntegrationTests : IClassFixture<TestDatabaseF
         await using var context = CreateContext();
         var atHandler = new GetFuelPriceAtQueryHandler(context);
         var historyHandler = new FuelFlow.Features.Brands.GetFuelPriceHistory.GetFuelPriceHistoryQueryHandler(context);
-        var (fuelTypeId, offerId) = await SeedFuelAsync(context, "agree");
+        var fuelTypeId = await SeedFuelAsync(context, "agree");
 
         var t1 = new DateTime(2026, 3, 1, 8, 0, 0, DateTimeKind.Utc);
         var t2 = new DateTime(2026, 3, 5, 8, 0, 0, DateTimeKind.Utc);
         var t3 = new DateTime(2026, 3, 9, 8, 0, 0, DateTimeKind.Utc);
-        context.FuelOfferPrices.AddRange(
-            Row(fuelTypeId, offerId, t1, 50m),
-            Row(fuelTypeId, offerId, t2, 51m),
-            Row(fuelTypeId, offerId, t3, 49m));
+        context.FuelPriceHistory.AddRange(
+            Row(fuelTypeId, t1, 50m),
+            Row(fuelTypeId, t2, 51m),
+            Row(fuelTypeId, t3, 49m));
         await context.SaveChangesAsync();
 
         foreach (var moment in new[] { t1, t2.AddHours(3), t3.AddDays(1) })

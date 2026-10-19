@@ -39,7 +39,7 @@ public sealed record FuelPriceAt(
     string Reason);
 
 /// <summary>
-/// Answers "what was this fuel priced at, then", from <c>fuel_offer_prices</c>.
+/// Answers "what was this fuel priced at, then", from <c>fuel_price_history</c>.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -53,8 +53,8 @@ public sealed record FuelPriceAt(
 /// <para>
 /// <b>Which row "the price at T" means.</b> The greatest <c>effective_from</c> at or before T, and
 /// where two rows share a timestamp - two reprices inside one transaction - the greater
-/// <see cref="FuelOfferPrice.Id"/>. That is the same rule
-/// <see cref="GetFuelPriceHistoryQueryHandler"/> and <see cref="FuelOfferPrice"/> state for "current",
+/// <see cref="FuelPriceHistory.Id"/>. That is the same rule
+/// <see cref="GetFuelPriceHistoryQueryHandler"/> and <see cref="FuelPriceHistory"/> state for "current",
 /// reused rather than reinvented: two definitions of "the price in effect" would disagree exactly when
 /// it matters, which is on a row someone is about to settle money against.
 /// </para>
@@ -73,11 +73,10 @@ public sealed record FuelPriceAt(
 /// </para>
 ///
 /// <para>
-/// <b>Both pools.</b> A fuel has one offer per pool and they are priced independently, so the two
-/// series interleave. This returns the row with the greatest <c>effective_from</c> across both, and says
-/// which pool it came from in <c>data_kind</c> - the same care the history endpoint takes, because a
-/// rehearsal price read as a live one is the mistake that column exists to prevent everywhere else in
-/// this schema.
+/// <b>Which side of the shelf.</b> One price per grade, so the two pools do not price it separately
+/// any more; the row still says in <c>data_kind</c> which side of the shelf the write was made on -
+/// the same care the history endpoint takes, because a rehearsal price read as a live one is the
+/// mistake that column exists to prevent everywhere else in this schema.
 /// </para>
 /// </remarks>
 public sealed class GetFuelPriceAtQueryHandler
@@ -91,7 +90,7 @@ public sealed class GetFuelPriceAtQueryHandler
     /// </summary>
     public async Task<FuelPriceAt?> HandleAsync(GetFuelPriceAtQuery query, CancellationToken ct = default)
     {
-        var row = await _context.FuelOfferPrices
+        var row = await _context.FuelPriceHistory
             .AsNoTracking()
             .Where(p => p.FuelTypeId == query.FuelTypeId && p.EffectiveFromUtc <= query.AsOfUtc)
             .OrderByDescending(p => p.EffectiveFromUtc)
@@ -122,8 +121,8 @@ public sealed class GetFuelPriceAtQueryHandler
 
         // The row that displaced this one, so the caller can see the window it was the price for
         // rather than having to ask again to find out. Bounded to this fuel and strictly after this
-        // row's instant, which is one indexed lookup on a table that is indexed on (offer, from).
-        var supersededAt = await _context.FuelOfferPrices
+        // row's instant, which is one indexed lookup on a table that is indexed on (fuel, from).
+        var supersededAt = await _context.FuelPriceHistory
             .AsNoTracking()
             .Where(p => p.FuelTypeId == query.FuelTypeId && p.EffectiveFromUtc > row.PriceFrom)
             .OrderBy(p => p.EffectiveFromUtc)

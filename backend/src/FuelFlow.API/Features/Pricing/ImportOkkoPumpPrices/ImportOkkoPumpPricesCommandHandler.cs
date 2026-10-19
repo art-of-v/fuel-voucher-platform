@@ -66,16 +66,16 @@ public sealed class ImportOkkoPumpPricesCommandHandler
     private readonly BrandSlugResolver _brands;
     private readonly AuditEventService _events;
 
-    // Appends to fuel_offer_prices for every offer this import repriced. Injected rather than reached
+    // Appends to fuel_price_history for every fuel this import repriced. Injected rather than reached
     // for, so the unattended path is as bound to leave history as the operator path is - this is the
     // one write path that runs every quarter hour with nobody watching.
-    private readonly OfferPriceRecorder _priceRecorder;
+    private readonly PriceHistoryRecorder _priceRecorder;
 
     public ImportOkkoPumpPricesCommandHandler(
         ApplicationDbContext context,
         BrandSlugResolver brands,
         AuditEventService events,
-        OfferPriceRecorder priceRecorder)
+        PriceHistoryRecorder priceRecorder)
     {
         _context = context;
         _brands = brands;
@@ -282,7 +282,7 @@ public sealed class ImportOkkoPumpPricesCommandHandler
             // recorder fetches the existing history in a single query instead of one per fuel. It
             // also re-stamps price_updated_at / price_updated_by_user_id.
             await _priceRecorder.RecordRangeAsync(
-                repricedFuels, OfferPriceReasons.PumpImport, actor, now, ct);
+                repricedFuels, PriceHistoryReasons.PumpImport, actor, now, ct);
             await _context.SaveChangesAsync(ct);
             await RecordEventsAsync(applied, actor, actingUserName, ct);
         }

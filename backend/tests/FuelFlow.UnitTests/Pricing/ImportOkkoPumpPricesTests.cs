@@ -32,7 +32,7 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
         _context.Dispose();
     }
 
-    private ImportOkkoPumpPricesCommandHandler Handler() => new(_context, new BrandSlugResolver(_context), _events, new OfferPriceRecorder(_context));
+    private ImportOkkoPumpPricesCommandHandler Handler() => new(_context, new BrandSlugResolver(_context), _events, new PriceHistoryRecorder(_context));
 
     /// <summary>The production seed catalog: five OKKO fuel types with their pump/cost/margin knobs.</summary>
     private async Task SeedCatalogAsync()
@@ -390,7 +390,7 @@ var (wogVolume, wogFuel) = await ReadAsync("wog-95-20");
     }
 
     [Fact]
-    public async Task Import_ShouldAppendTheNewPrice_ToTheOfferHistory()
+    public async Task Import_ShouldAppendTheNewPrice_ToThePriceHistory()
     {
         await SeedCatalogAsync();
 
@@ -399,10 +399,10 @@ var (wogVolume, wogFuel) = await ReadAsync("wog-95-20");
 
         // This path runs unattended over the whole catalogue every quarter hour, which is exactly why
         // it has to be the one that cannot forget the history: nobody is watching it not to.
-        var prices = await _context.FuelOfferPrices.ToListAsync();
+        var prices = await _context.FuelPriceHistory.ToListAsync();
 
         prices.Should().HaveCount(5, "one opening row per fuel the import repriced");
-        prices.Should().OnlyContain(p => p.Reason == OfferPriceReasons.PumpImport);
+        prices.Should().OnlyContain(p => p.Reason == PriceHistoryReasons.PumpImport);
         prices.Should().OnlyContain(p => p.ChangedByUserId == null, "no person typed these");
 prices.Should().OnlyContain(p => p.BrandId == BrandIds.Okko && p.DataKind == DataKinds.Real);
 
@@ -426,13 +426,13 @@ prices.Should().OnlyContain(p => p.BrandId == BrandIds.Okko && p.DataKind == Dat
 
         await Handler().HandleAsync(Import(ScrapedSheet), Guid.Empty, "tester");
         _context.ChangeTracker.Clear();
-        var before = await _context.FuelOfferPrices.CountAsync();
+        var before = await _context.FuelPriceHistory.CountAsync();
 
         await Handler().HandleAsync(Import(ScrapedSheet), Guid.Empty, "tester");
         _context.ChangeTracker.Clear();
 
         // Twenty-five rows a quarter hour is noise that buries the changes the history exists to show.
-        (await _context.FuelOfferPrices.CountAsync()).Should().Be(before);
+        (await _context.FuelPriceHistory.CountAsync()).Should().Be(before);
     }
 
     [Fact]

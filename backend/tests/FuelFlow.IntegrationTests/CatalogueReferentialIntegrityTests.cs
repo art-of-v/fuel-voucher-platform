@@ -23,7 +23,7 @@ namespace FuelFlow.IntegrationTests;
 /// <para>
 /// The delete rules are asserted alongside the constraints because they disagree on purpose.
 /// <c>fuel_type_product_codes</c> cascades - those are lookup rows derived from a fuel, the same as
-/// <c>fuel_nominals</c>. <c>fuel_offer_prices</c> restricts, because it is a price history and
+/// <c>fuel_nominals</c>. <c>fuel_price_history</c> restricts, because it is a price history and
 /// losing rows quietly is worse than failing loudly.
 /// </para>
 /// </remarks>
@@ -42,8 +42,8 @@ public sealed class CatalogueReferentialIntegrityTests : IClassFixture<TestDatab
     public static TheoryData<string, string, string> ExpectedForeignKeys => new()
     {
         { "fuel_types", "brand_id", "RESTRICT" },
-        { "fuel_offer_prices", "brand_id", "RESTRICT" },
-        { "fuel_offer_prices", "fuel_type_id", "RESTRICT" },
+        { "fuel_price_history", "brand_id", "RESTRICT" },
+        { "fuel_price_history", "fuel_type_id", "RESTRICT" },
         { "fuel_type_product_codes", "brand_id", "RESTRICT" },
         { "fuel_type_product_codes", "fuel_type_id", "CASCADE" },
     };
@@ -73,14 +73,14 @@ public sealed class CatalogueReferentialIntegrityTests : IClassFixture<TestDatab
     }
 
     [Fact]
-    public async Task An_Offer_Price_Naming_An_Unknown_Fuel_Is_Refused()
+    public async Task A_Price_History_Row_Naming_An_Unknown_Fuel_Is_Refused()
     {
         await using var context = CreateContext();
         var brandId = await SeededBrand(context);
 
-        var offer = NewOfferPrice(brandId, fuelTypeId: "no-such-fuel-exists-anywhere");
+        var row = NewPriceHistoryRow(brandId, fuelTypeId: "no-such-fuel-exists-anywhere");
 
-        var act = async () => { context.FuelOfferPrices.Add(offer); await context.SaveChangesAsync(); };
+        var act = async () => { context.FuelPriceHistory.Add(row); await context.SaveChangesAsync(); };
 
         await AssertRefusedAsync(act, PostgresErrorCodes.ForeignKeyViolation);
     }
@@ -203,7 +203,7 @@ public sealed class CatalogueReferentialIntegrityTests : IClassFixture<TestDatab
         UpdatedAtUtc = DateTime.UtcNow,
     };
 
-    private static FuelOfferPrice NewOfferPrice(Guid brandId, string fuelTypeId) => new()
+    private static FuelPriceHistory NewPriceHistoryRow(Guid brandId, string fuelTypeId) => new()
     {
         Id = Guid.NewGuid(),
         BrandId = brandId,

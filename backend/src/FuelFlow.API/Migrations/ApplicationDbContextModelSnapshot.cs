@@ -3604,7 +3604,7 @@ namespace FuelFlow.API.Migrations
                         });
                 });
 
-            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.FuelOfferPrice", b =>
+            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.FuelPriceHistory", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -3671,25 +3671,25 @@ namespace FuelFlow.API.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("BrandId")
-                        .HasDatabaseName("ix_fuel_offer_prices_brand_id");
+                        .HasDatabaseName("ix_fuel_price_history_brand_id");
 
                     b.HasIndex("ChangedByUserId")
-                        .HasDatabaseName("ix_fuel_offer_prices_changed_by_user_id");
+                        .HasDatabaseName("ix_fuel_price_history_changed_by_user_id");
 
                     b.HasIndex("FuelTypeId", "EffectiveFromUtc")
-                        .HasDatabaseName("ix_fuel_offer_prices_fuel_effective");
+                        .HasDatabaseName("ix_fuel_price_history_fuel_effective");
 
-                    b.ToTable("fuel_offer_prices", null, t =>
+                    b.ToTable("fuel_price_history", null, t =>
                         {
-                            t.HasCheckConstraint("ck_fuel_offer_prices_data_kind", "data_kind IN ('real', 'qa')");
+                            t.HasCheckConstraint("ck_fuel_price_history_data_kind", "data_kind IN ('real', 'qa')");
 
-                            t.HasCheckConstraint("ck_fuel_offer_prices_fuel_type_id_length", "length(fuel_type_id) <= 100");
+                            t.HasCheckConstraint("ck_fuel_price_history_fuel_type_id_length", "length(fuel_type_id) <= 100");
 
-                            t.HasCheckConstraint("ck_fuel_offer_prices_margin_signs", "margin_uah_per_liter IS NULL OR margin_uah_per_liter >= 0");
+                            t.HasCheckConstraint("ck_fuel_price_history_margin_signs", "margin_uah_per_liter IS NULL OR margin_uah_per_liter >= 0");
 
-                            t.HasCheckConstraint("ck_fuel_offer_prices_prices_non_negative", "(final_price_per_liter IS NULL OR final_price_per_liter >= 0) AND (pump_price_per_liter IS NULL OR pump_price_per_liter >= 0) AND (min_discount_per_liter IS NULL OR min_discount_per_liter >= 0)");
+                            t.HasCheckConstraint("ck_fuel_price_history_prices_non_negative", "(final_price_per_liter IS NULL OR final_price_per_liter >= 0) AND (pump_price_per_liter IS NULL OR pump_price_per_liter >= 0) AND (min_discount_per_liter IS NULL OR min_discount_per_liter >= 0)");
 
-                            t.HasCheckConstraint("ck_fuel_offer_prices_reason", "reason IN ('operator', 'pump-import', 'catalogue-import', 'batch-cost', 'exchange-release', 'backfill')");
+                            t.HasCheckConstraint("ck_fuel_price_history_reason", "reason IN ('operator', 'pump-import', 'catalogue-import', 'batch-cost', 'exchange-release', 'backfill')");
                         });
                 });
 
@@ -4887,7 +4887,7 @@ namespace FuelFlow.API.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.FuelOfferPrice", b =>
+            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.FuelPriceHistory", b =>
                 {
                     b.HasOne("FuelFlow.SharedKernel.Domain.Brand", null)
                         .WithMany()

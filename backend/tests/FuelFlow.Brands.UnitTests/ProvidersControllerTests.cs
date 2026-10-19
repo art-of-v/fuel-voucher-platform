@@ -61,7 +61,7 @@ public sealed class BrandFuelControllerTests : IDisposable
             new AuditEventService(_context),
             _context,
             notifications,
-            new OfferPriceRecorder(_context))
+            new PriceHistoryRecorder(_context))
         {
             ControllerContext = new ControllerContext
             {
@@ -306,7 +306,7 @@ public sealed class BrandFuelControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task UpdateFuel_AppendsTheNewPrice_ToTheOfferHistory_WithTheOperatorAsActor()
+    public async Task UpdateFuel_AppendsTheNewPrice_ToThePriceHistory_WithTheOperatorAsActor()
     {
         await AddBrandAsync(TestOkko, "OKKO");
         await AddFuelAsync("test-fuel-h", TestOkko, "A-95");
@@ -327,7 +327,7 @@ public sealed class BrandFuelControllerTests : IDisposable
             CancellationToken.None);
         _context.ChangeTracker.Clear();
 
-        var history = await _context.FuelOfferPrices
+        var history = await _context.FuelPriceHistory
             .OrderBy(p => p.EffectiveFromUtc).ThenBy(p => p.Id)
             .ToListAsync();
 
@@ -339,7 +339,7 @@ public sealed class BrandFuelControllerTests : IDisposable
         history[0].FinalPricePerLiter.Should().Be(63m);
         history[1].MarginUahPerLiter.Should().Be(4m);
         history[1].FinalPricePerLiter.Should().Be(64m);
-        history.Should().OnlyContain(p => p.Reason == OfferPriceReasons.Operator);
+        history.Should().OnlyContain(p => p.Reason == PriceHistoryReasons.Operator);
         history.Should().OnlyContain(p => p.ChangedByUserId == actingUser);
     }
 

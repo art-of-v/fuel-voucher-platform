@@ -16,9 +16,10 @@
 -- WHAT IT DELETES, and why each part has to go with the catalogue:
 --   * `fuel_nominals` (the `data_kind = 'qa'` rows) - the QA twins themselves. The pool lives on
 --     the nominal, so a QA size with no twin is a size nobody should be offered.
---   * `fuel_offer_prices` - the QA price history. It arrives with 20261017142210
---     (AddFuelOfferPriceHistory) and carries `data_kind` of its own; a price row is a record of
---     something sold, so it has to go when the pool it belongs to is decommissioned.
+--   * `fuel_price_history` - the QA price history. It arrives with 20261017142210
+--     (AddFuelOfferPriceHistory) and is renamed on 2026-10-19 (20261019132728), the migration that
+--     took the offer out of the name; it carries `data_kind` of its own, and a price row is a record
+--     of something sold, so it has to go when the pool it belongs to is decommissioned.
 --   * `fuel_vouchers` - the QA stock and the QA wallet vouchers. They hang off the catalogue only
 --     by (brand, fuel_type_id, liters) and carry `data_kind` themselves, so they would survive as
 --     orphans of a catalogue that no longer exists.
@@ -35,9 +36,10 @@
 -- `voucher_renewal_items` is deliberately absent: `20261017073518_DropVoucherRenewalItems` removed the
 -- table, and `20261017065731` moved its RESTRICT onto `order_line_items.order_id`, which is deleted
 -- below. (scripts/reset-test-data.sql still names the dropped table - that script is stale, this one
--- is not.) The price history is guarded rather than assumed: `fuel_offer_prices` arrives with
--- 20261017142210 (AddFuelOfferPriceHistory), and a database that has not taken it yet must still run
--- this script rather than die on a missing relation.
+-- is not.) The price history is guarded rather than assumed: `fuel_price_history` arrives with
+-- 20261017142210 (AddFuelOfferPriceHistory) and is renamed on 2026-10-19 (20261019132728), and a
+-- database that has not taken it yet must still run this script rather than die on a missing
+-- relation.
 --
 -- An order is removed only when it has at least one QA voucher AND no voucher outside the QA pool. An
 -- order that mixes the two is left alone and reported instead: deleting it would take a real voucher
@@ -294,17 +296,18 @@ WHERE name = 'QA Supplier (emulated)'
 
 -- The catalogue itself: the QA size list, and the QA price history.
 --
--- `fuel_offer_prices` since 20261017142210 (AddFuelOfferPriceHistory): a price row is a record of
--- something sold, so the fuel it was sold under RESTRICTs - which is the point, and which means the
--- history has to go first when a whole pool is decommissioned. The table is guarded rather than
--- assumed, so a database that has not taken the migration yet still runs this script.
+-- `fuel_price_history` since 20261017142210 (AddFuelOfferPriceHistory), renamed on 2026-10-19
+-- (20261019132728): a price row is a record of something sold, so the fuel it was sold under
+-- RESTRICTs - which is the point, and which means the history has to go first when a whole pool is
+-- decommissioned. The table is guarded rather than assumed, so a database that has not taken the
+-- migration yet still runs this script.
 SELECT EXISTS (
     SELECT 1 FROM information_schema.tables
-    WHERE table_schema = 'public' AND table_name = 'fuel_offer_prices'
+    WHERE table_schema = 'public' AND table_name = 'fuel_price_history'
 ) AS has_price_history \gset
 
 \if :has_price_history
-DELETE FROM fuel_offer_prices WHERE data_kind = 'qa';
+DELETE FROM fuel_price_history WHERE data_kind = 'qa';
 \endif
 
 -- The QA nominals. There is no offer row to delete any more: the twin IS a nominal, and the pool
@@ -321,7 +324,7 @@ WHERE data_kind = 'qa'
 
 \echo '--- after ---'
 \if :has_price_history
-SELECT 'qa_offer_prices_left' AS check, count(*) AS value FROM fuel_offer_prices WHERE data_kind = 'qa'
+SELECT 'qa_price_history_left' AS check, count(*) AS value FROM fuel_price_history WHERE data_kind = 'qa'
 UNION ALL
 SELECT 'qa_nominals_left', count(*) FROM fuel_nominals WHERE data_kind = 'qa'
 UNION ALL
@@ -333,7 +336,7 @@ SELECT 'qa_supplier_left', count(*) FROM suppliers WHERE name = 'QA Supplier (em
 UNION ALL
 SELECT 'real_nominals_kept', count(*) FROM fuel_nominals WHERE data_kind = 'real';
 \else
-\echo 'fuel_offer_prices is not present on this database - skipped that check.'
+\echo 'fuel_price_history is not present on this database - skipped that check.'
 SELECT 'qa_nominals_left' AS check, count(*) AS value FROM fuel_nominals WHERE data_kind = 'qa'
 UNION ALL SELECT 'qa_vouchers_left', count(*) FROM fuel_vouchers WHERE data_kind = 'qa'
 UNION ALL SELECT 'qa_imports_left', count(*) FROM voucher_imports WHERE file_name LIKE 'QA-EMULATED-%'
