@@ -49,9 +49,7 @@ export function fuelHeadlinePrice(
   const column = fuel.pumpPricePerLiter ?? undefined;
   const legacy = fuel.discountPrice || undefined;
 
-  const price = fuel.isAvailable
-    ? (ours ?? column ?? legacy)
-    : (column ?? ours ?? legacy);
+  const price = fuel.isAvailable ? (ours ?? column ?? legacy) : (column ?? ours ?? legacy);
 
   // Zero is not a price. It is what an unpriced fuel carries in the column, and rendering it would
   // put "0 ₴" on the shelf.
