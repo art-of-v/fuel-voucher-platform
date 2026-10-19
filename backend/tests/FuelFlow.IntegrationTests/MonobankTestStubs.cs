@@ -14,5 +14,18 @@ public sealed class StubMonobankClientFactory : IMonobankClientFactory
 
     public StubMonobankClientFactory(IMonobankClient client) => _client = client;
 
-    public IMonobankClient ForMerchant(MonobankMerchant merchant) => _client;
+    /// <summary>Every merchant the production code asked for, in call order.</summary>
+    /// <remarks>
+    /// Recording is what lets a test assert which merchant was polled. The reconciliation tests
+    /// need it: recovery must query the merchant that issued the invoice, because polling the live
+    /// merchant for a sandbox invoice answers "unknown invoice" and cancels an order whose payment
+    /// may be sitting there. Tests that do not care simply ignore the list.
+    /// </remarks>
+    public List<MonobankMerchant> RequestedMerchants { get; } = [];
+
+    public IMonobankClient ForMerchant(MonobankMerchant merchant)
+    {
+        RequestedMerchants.Add(merchant);
+        return _client;
+    }
 }

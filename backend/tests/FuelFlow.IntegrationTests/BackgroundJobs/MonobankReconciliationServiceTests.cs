@@ -14,16 +14,25 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
+using Xunit;
 
-namespace FuelFlow.UnitTests.BackgroundJobs;
+namespace FuelFlow.IntegrationTests.BackgroundJobs;
 
 /// <summary>
 /// The reconciliation poller feeds polled invoice statuses through the real
 /// <see cref="ProcessMonobankWebhookCommandHandler"/>, so these tests construct a genuine handler
 /// (not a mock) and assert on the persisted order, the ORDER_CREATED outbox row and the fulfillment
 /// enqueue - proving a poll-driven recovery is identical to a webhook-driven one.
+/// <para>
+/// <b>Why this runs on Postgres rather than in-memory.</b> A settled payment now posts to the
+/// double-entry journal, and the journal takes its entry number with <c>INSERT ... ON CONFLICT DO
+/// UPDATE ... RETURNING</c> over <c>gen_random_uuid()</c>. The EF in-memory provider runs neither,
+/// so a settled-payment test on it cannot reach the ledger at all. Moving here buys the real engine:
+/// triggers, constraints and transactions, which is the whole point of testing a posting path.
+/// </para>
 /// </summary>
-public sealed class MonobankReconciliationServiceTests : IDisposable
+[Collection("Integration Tests")]
+public sealed class MonobankReconciliationServiceTests : IClassFixture<TestDatabaseFixture>, IAsyncLifetime
 {
     private readonly ApplicationDbContext _context;
     private readonly Mock<IMonobankClient> _monobankClientMock = new();
@@ -31,14 +40,13 @@ public sealed class MonobankReconciliationServiceTests : IDisposable
     private readonly Mock<IBackgroundJobClient> _backgroundJobClientMock = new();
     private readonly ProcessMonobankWebhookCommandHandler _handler;
 
-    public MonobankReconciliationServiceTests()
+    public MonobankReconciliationServiceTests(TestDatabaseFixture fixture)
     {
+        // TrackAll on purpose: the API context leaves tracking at the default in production
+        // (DatabaseSetup), and this used to set NoTracking to "mirror production", which was
+        // backwards - it exercised a configuration the app never runs.
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
-            // Mirror production: the API context leaves tracking at the default, TrackAll
-            // (DatabaseSetup). This used to set NoTracking to "mirror production", which was
-            // backwards - it exercised a configuration the app never runs, and would have passed
-            // even if the handler's load+Update path broke under the real default.
+            .UseNpgsql(fixture.ConnectionString)
             .Options;
 
         _context = new ApplicationDbContext(options, TestQrCipher.Instance);
@@ -50,13 +58,22 @@ public sealed class MonobankReconciliationServiceTests : IDisposable
             _backgroundJobClientMock.Object,
             new Mock<RefundStatusSyncService>(null!, null!, null!).Object,
             new FuelFlowMetrics(),
-            NotificationDispatcher.Disabled);
+            NotificationDispatcher.Disabled,
+            TestJournal.For(_context));
+
+        TestJournal.SeedChart(_context);
     }
 
-    public void Dispose()
+    /// <summary>
+    /// The class shares one cloned database, and the poller scans every pending order in it, so
+    /// each test starts from empty rather than inheriting the previous one's rows.
+    /// </summary>
+    public async Task InitializeAsync() => await PaymentTestReset.RunAsync(_context);
+
+    public Task DisposeAsync()
     {
-        _context.Database.EnsureDeleted();
         _context.Dispose();
+        return Task.CompletedTask;
     }
 
     private MonobankReconciliationService CreateService(
@@ -91,6 +108,22 @@ public sealed class MonobankReconciliationServiceTests : IDisposable
                 ModifiedDate = DateTime.UtcNow
             });
 
+/// <summary>
+    /// Orders carry a real FK to <c>users</c>, which the in-memory provider never enforced. Seeding
+    /// a user is the price of running on Postgres, and it is a price worth paying: the old provider
+    /// would happily have accepted an order that production's database would refuse.
+    /// </summary>
+    private static int _userSeq;
+
+    private async Task<Guid> SeedUserAsync()
+    {
+        var id = Guid.NewGuid();
+        var phone = $"+38050{Interlocked.Increment(ref _userSeq):D7}";
+        await _context.Database.ExecuteSqlRawAsync(
+            $"INSERT INTO users (id, phone_number, created_at_utc, updated_at_utc) VALUES ('{id}', '{phone}', now(), now())");
+        return id;
+    }
+
     private async Task<Order> AddOrderAsync(
         string invoiceId,
         OrderStatus status,
@@ -100,7 +133,7 @@ public sealed class MonobankReconciliationServiceTests : IDisposable
         var order = new Order
         {
             Id = Guid.NewGuid(),
-            UserId = Guid.NewGuid(),
+            UserId = await SeedUserAsync(),
             Price = 2500, // Money.ToKopecks(2500) == 250000, matching the default SetupInvoice amount
             Status = status,
             MonobankInvoiceId = invoiceId,

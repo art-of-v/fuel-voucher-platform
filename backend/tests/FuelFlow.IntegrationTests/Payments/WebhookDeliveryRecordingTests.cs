@@ -5,12 +5,14 @@ using FuelFlow.Features.Monobank.ProcessWebhook;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using Xunit;
 
-namespace FuelFlow.UnitTests.Payments;
+namespace FuelFlow.IntegrationTests.Payments;
 
 /// <summary>
 /// What the webhook path does with the delivery it is handed, and with the money behind it.
@@ -29,16 +31,17 @@ namespace FuelFlow.UnitTests.Payments;
 /// order did.
 /// </para>
 /// </remarks>
-public sealed class WebhookDeliveryRecordingTests : IDisposable
+[Collection("Integration Tests")]
+public sealed class WebhookDeliveryRecordingTests : IClassFixture<TestDatabaseFixture>, IAsyncLifetime
 {
     private readonly ApplicationDbContext _context;
     private readonly ProcessMonobankWebhookCommandHandler _handler;
 
-    public WebhookDeliveryRecordingTests()
+    public WebhookDeliveryRecordingTests(TestDatabaseFixture fixture)
     {
         _context = new ApplicationDbContext(
             new DbContextOptionsBuilder<ApplicationDbContext>()
-                .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+                .UseNpgsql(fixture.ConnectionString)
                 .Options, TestQrCipher.Instance);
 
         _handler = new ProcessMonobankWebhookCommandHandler(
@@ -47,15 +50,37 @@ public sealed class WebhookDeliveryRecordingTests : IDisposable
             new Mock<IBackgroundJobClient>().Object,
             new Mock<RefundStatusSyncService>(null!, null!, null!).Object,
             new FuelFlow.SharedKernel.Observability.FuelFlowMetrics(),
-            FuelFlow.SharedKernel.Observability.NotificationDispatcher.Disabled);
+            FuelFlow.SharedKernel.Observability.NotificationDispatcher.Disabled,
+            TestJournal.For(_context));
+
+        TestJournal.SeedChart(_context);
     }
 
-    public void Dispose()
+    /// <summary>Each test starts from empty: the class shares one cloned database.</summary>
+    public async Task InitializeAsync() => await PaymentTestReset.RunAsync(_context);
+
+    public Task DisposeAsync()
     {
-        _context.Database.EnsureDeleted();
         _context.Dispose();
         GC.SuppressFinalize(this);
+        return Task.CompletedTask;
     }
+
+    private static int _userSeq;
+
+    /// <summary>
+    /// Orders carry a real FK to <c>users</c>, which the in-memory provider never enforced. Several
+    /// of these tests assert <c>SingleAsync</c> over payments or webhook events, so a leaked row
+    /// from a previous test would fail them for the wrong reason.
+    /// </summary>
+    private User SeedUser() => new()
+    {
+        Id = Guid.NewGuid(),
+        PhoneNumber = $"+38050{Interlocked.Increment(ref _userSeq):D7}",
+        CreatedAtUtc = DateTime.UtcNow,
+        UpdatedAtUtc = DateTime.UtcNow,
+        SettlementCode = string.Empty,
+    };
 
     // ---------------------------------------------------------------- the delivery
 
@@ -264,12 +289,15 @@ public sealed class WebhookDeliveryRecordingTests : IDisposable
 
     private static long MoneyForMonobank(decimal kopecks) => decimal.ToInt64(kopecks);
 
-    private async Task<Order> SeedOrderAsync(string invoiceId, OrderStatus status)
+private async Task<Order> SeedOrderAsync(string invoiceId, OrderStatus status)
     {
+        var user = SeedUser();
+        _context.Users.Add(user);
+
         var order = new Order
         {
             Id = Guid.CreateVersion7(),
-            UserId = Guid.NewGuid(),
+            UserId = user.Id,
             Price = 2500m,
             Status = status,
             Kind = OrderKind.Purchase,
