@@ -249,6 +249,17 @@ public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDataba
             "'95 PULLS' is a rendering; the code is the identity, and the name follows it");
 
         (await context.FuelTypes.CountAsync(f => f.BrandId == OkkoBrandId)).Should().Be(3);
+
+        // The sizes, the same three every other importer gives a grade it creates. A size is not a
+        // price: it is what puts the grade on the shelf at all, because the storefront lists a fuel
+        // by its size. What keeps the fuel off sale is the missing MARGIN, and that is the part no
+        // importer has any business guessing.
+        var sizes = await context.FuelNominals.AsNoTracking()
+            .Where(n => n.FuelTypeId == created.Id)
+            .Select(n => n.Liters)
+            .OrderBy(l => l)
+            .ToListAsync();
+        sizes.Should().Equal(10m, 20m, 50m);
     }
 
     /// <summary>
