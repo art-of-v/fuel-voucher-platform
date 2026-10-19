@@ -178,7 +178,43 @@ public void PackagePrice_NoKnobs_IsRefusedRatherThanCharged()
     // shelf; the checkout handlers resolve the package before pricing it and never reach this -
     // throwing says "this cannot be sold" instead of quietly charging nothing.
     var act = () => ServerPricing.PackagePrice(pkg, 10m);
-    act.Should().Throw<InvalidOperationException>();
+    act.Should().Throw<NoPriceAvailableException>();
+}
+
+[Fact]
+public void TryPackagePrice_NoKnobs_IsNullRatherThanAFault()
+{
+    // The nullable twin, for the callers that can meet such a fuel and have to decide what to show:
+    // the term quote answers with the ladder and no prices instead of faulting the customer's screen.
+    // One arithmetic, two shapes - the number is the same one the throwing form would have returned.
+    var pkg = new SellablePackage
+    {
+        Liters = 10m,
+        SupplierPricePerLiter = null,
+        MarginUahPerLiter = null,
+        PumpPricePerLiter = 92.90m,
+    };
+
+    ServerPricing.TryPackagePrice(pkg, 10m, 0m).Should().BeNull();
+    ServerPricing.DiscountedPricePerLiter(pkg, 20m).Should().BeNull();
+}
+
+[Fact]
+public void TryPackagePrice_WithKnobs_IsTheSameNumberTheThrowingFormReturns()
+{
+    // A quoted price and a charged price that disagree are the bug this pair exists to prevent.
+    var pkg = new SellablePackage
+    {
+        Liters = 10m,
+        SupplierPricePerLiter = 49m,
+        MarginUahPerLiter = 7m,
+        PumpPricePerLiter = 55m,
+        MinDiscountPerLiter = 0.5m,
+    };
+
+    // 54.5 * 10 = 545, and with a 5 ₴/L term discount off the per-litre price: 49.5 * 10 = 495.
+    ServerPricing.TryPackagePrice(pkg, 10m, 0m).Should().Be(ServerPricing.PackagePrice(pkg, 10m));
+    ServerPricing.TryPackagePrice(pkg, 10m, 5m).Should().Be(ServerPricing.PackagePrice(pkg, 10m, 5m));
 }
 
 // --- ServerPricing.IsBelowCost -----------------------------------------

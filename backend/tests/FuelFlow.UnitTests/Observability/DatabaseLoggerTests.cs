@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Threading.Channels;
 using FluentAssertions;
 using FuelFlow.Features.ErrorLogs.Logging;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -125,6 +126,19 @@ public sealed class DatabaseLoggerTests
     {
         TryLog(logger => logger.LogError(
             new OperationCanceledException("The client closed the connection."), "aborted"))
+            .Should().BeNull();
+    }
+
+    [Fact]
+    public void Log_ForAFuelNobodyHasPriced_IsDroppedAsNoise()
+    {
+        // A fuel the catalogue publishes but nobody has costed is a state, not an incident: the
+        // storefront lists it as unavailable and the buy path refuses it, so every attempt writes the
+        // same row. On 2026-10-19 that was 24 rows in the journal in seventeen seconds, which is the
+        // same flooding that hid the failures that mattered.
+        TryLog(logger => logger.LogError(
+            new NoPriceAvailableException("The fuel has no supplier cost and no margin, so there is no price to charge."),
+            "Unhandled exception for {Method} {Path}", "GET", "/api/purchases/term-quote"))
             .Should().BeNull();
     }
 

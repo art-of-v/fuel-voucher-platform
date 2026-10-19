@@ -137,7 +137,7 @@ public static class FuelPricing
         decimal? minDiscountPerLiter,
         decimal liters)
         => TryPackagePrice(costPerLiter, profitPerLiter, pumpPricePerLiter, minDiscountPerLiter, liters)
-           ?? throw new InvalidOperationException(
+           ?? throw new NoPriceAvailableException(
                "The fuel has no supplier cost or no margin, so there is no price to quote.");
 
     /// <summary>
@@ -146,9 +146,10 @@ public static class FuelPricing
     /// </summary>
     /// <remarks>
     /// Three callers, three answers, which is why this is separate from the throwing one. The storefront
-    /// skips such a package: it cannot be bought and a zero on the shelf is a free fuel. The admin
-    /// listing shows it at zero, because an operator needs to see that the nominal exists and is not
-    /// priced yet. Checkout throws, because charging nothing is not an option.
+    /// lists such a fuel at the pump price the market publishes and marks it unavailable: it cannot be
+    /// bought, and a zero on the shelf is a free fuel. The term quote answers with the ladder and no
+    /// prices, for the same reason a missing package gets one. Checkout throws, because charging
+    /// nothing is not an option.
     /// </remarks>
     public static decimal? TryPackagePrice(
         decimal? costPerLiter,
