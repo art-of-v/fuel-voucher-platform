@@ -257,6 +257,9 @@ services.AddScoped<TermQuoteQueryHandler>();
         // Central QA test-access gate. Scoped: it reads the per-request DB context via
         // RuntimeSettingsService. SetQaTestAccessCommandHandler is picked up by the CommandHandler scan.
         services.AddScoped<FuelFlow.Features.Auth.QaTestAccess.QaTestAccessService>();
+        // Turns a business fact into a balanced posting. Scoped: it joins the caller's transaction,
+        // so several entries for one payment commit together or not at all.
+        services.AddScoped<FuelFlow.Features.Ledger.JournalPostingService>();
     }
 
     private static void AddSmsService(IServiceCollection services, IConfiguration config)

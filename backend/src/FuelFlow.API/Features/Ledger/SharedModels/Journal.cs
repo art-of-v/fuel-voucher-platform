@@ -105,6 +105,15 @@ public sealed class JournalEntry
     public Guid PeriodId { get; set; }
     public JournalSourceType SourceType { get; set; }
 
+    /// <summary>
+    /// The domain event that caused this entry, matching <c>ledger_mapping_rules.source_event</c>.
+    /// Stored on the entry, not just inferred from the mapping, because one business fact can produce
+    /// several entries - a sale posts revenue, then VAT, then cost of sales - and idempotency has to
+    /// tell those apart. Keying on the source row alone would let the second entry be swallowed as a
+    /// duplicate of the first.
+    /// </summary>
+    public string SourceEvent { get; set; } = null!;
+
     /// <summary>The operational row that caused this entry, where there is exactly one.</summary>
     public Guid? SourceId { get; set; }
 

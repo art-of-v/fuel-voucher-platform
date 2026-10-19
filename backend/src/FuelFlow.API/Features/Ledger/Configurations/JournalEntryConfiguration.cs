@@ -22,6 +22,8 @@ internal sealed class JournalEntryConfiguration : IEntityTypeConfiguration<Journ
         builder.Property(e => e.PeriodId).HasColumnName("period_id").IsRequired();
         builder.Property(e => e.SourceType)
             .HasColumnName("source_type").HasConversion<string>().HasMaxLength(24).IsRequired();
+        builder.Property(e => e.SourceEvent)
+            .HasColumnName("source_event").HasMaxLength(40).IsRequired();
         builder.Property(e => e.SourceId).HasColumnName("source_id");
         builder.Property(e => e.Description).HasColumnName("description").HasMaxLength(500).IsRequired();
         builder.Property(e => e.Status)
@@ -39,6 +41,12 @@ internal sealed class JournalEntryConfiguration : IEntityTypeConfiguration<Journ
         builder.HasIndex(e => new { e.PeriodId, e.EntryNo }).IsUnique();
 
         builder.HasIndex(e => new { e.SourceType, e.SourceId });
+
+        // Idempotency, enforced by the database rather than by a read-then-write check: two
+        // concurrent replays of the same webhook must not both decide they are the first. The
+        // event is part of the key because one source row legitimately produces several entries -
+        // revenue, VAT and cost of sales are three postings of the same payment.
+        builder.HasIndex(e => new { e.SourceEvent, e.SourceType, e.SourceId }).IsUnique();
 
         builder.HasOne(e => e.Period)
             .WithMany(e => e.Entries)
@@ -62,6 +70,7 @@ internal sealed class JournalEntryConfiguration : IEntityTypeConfiguration<Journ
                 """);
             t.HasCheckConstraint("ck_journal_entries_status", "status IN ('Draft','Posted','Reversed')");
             t.HasCheckConstraint("ck_journal_entries_description_not_blank", "btrim(description) <> ''");
+            t.HasCheckConstraint("ck_journal_entries_source_event_not_blank", "btrim(source_event) <> ''");
 
             // Posting is a claim that someone stood behind it. A posted entry without both a moment
             // and a person is an entry nobody can be asked about.

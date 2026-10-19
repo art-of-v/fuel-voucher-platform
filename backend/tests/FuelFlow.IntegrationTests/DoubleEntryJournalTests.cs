@@ -17,7 +17,10 @@ namespace FuelFlow.IntegrationTests;
 /// </para>
 /// <para>
 /// Nothing writes to the journal yet. These are guard rails standing on an empty track, which is the
-/// only reason they can be tested exhaustively now rather than after the first real posting.
+/// The engine that writes here is <c>JournalPostingService</c>, covered by
+/// <see cref="JournalPostingServiceTests"/>. These tests stay at the trigger level on purpose: the
+/// point is that the database refuses the write, including from a <c>psql</c> session, which a test
+/// that went through a service could not prove.
 /// </para>
 /// <para>
 /// <strong>No per-test cleanup</strong>, because it is impossible rather than unnecessary: a posted
@@ -107,7 +110,7 @@ public sealed class DoubleEntryJournalTests : IClassFixture<TestDatabaseFixture>
     }
 
     private static string EntrySql(Scaffold s, Guid entry, string date, int? entry_no = null)
-        => $"INSERT INTO journal_entries (id, entry_no, entry_date, period_id, source_type, description, status, posted_at_utc, posted_by_user_id, created_at_utc) VALUES ('{entry}', {entry_no ?? 1}, '{date}', '{s.PeriodId}', 'Adjustment', 'probe', 'Draft', NULL, NULL, now())";
+        => $"INSERT INTO journal_entries (id, entry_no, entry_date, period_id, source_type, source_event, source_id, description, status, posted_at_utc, posted_by_user_id, created_at_utc) VALUES ('{entry}', {entry_no ?? 1}, '{date}', '{s.PeriodId}', 'Adjustment', 'adjustment.probe', '{Guid.NewGuid()}', 'probe', 'Draft', NULL, NULL, now())";
 
     private static string LineSql(Guid entry, short lineNo, Guid account, decimal debit, decimal credit)
     {

@@ -906,6 +906,34 @@ namespace FuelFlow.API.Migrations
                         });
                 });
 
+            modelBuilder.Entity("FuelFlow.Features.Ledger.SharedModels.DocumentSequence", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("LastValue")
+                        .HasColumnType("bigint")
+                        .HasColumnName("last_value");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("name");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("document_sequences", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_document_sequences_non_negative", "last_value >= 0");
+                        });
+                });
+
             modelBuilder.Entity("FuelFlow.Features.Ledger.SharedModels.JournalEntry", b =>
                 {
                     b.Property<Guid>("Id")
@@ -951,6 +979,12 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("reversed_by_entry_id");
 
+                    b.Property<string>("SourceEvent")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("source_event");
+
                     b.Property<Guid?>("SourceId")
                         .HasColumnType("uuid")
                         .HasColumnName("source_id");
@@ -987,6 +1021,9 @@ namespace FuelFlow.API.Migrations
 
                     b.HasIndex("SourceType", "SourceId");
 
+                    b.HasIndex("SourceEvent", "SourceType", "SourceId")
+                        .IsUnique();
+
                     b.ToTable("journal_entries", null, t =>
                         {
                             t.HasCheckConstraint("ck_journal_entries_description_not_blank", "btrim(description) <> ''");
@@ -998,6 +1035,8 @@ namespace FuelFlow.API.Migrations
                             t.HasCheckConstraint("ck_journal_entries_posted_shape", "(status = 'Draft') OR (posted_at_utc IS NOT NULL AND posted_by_user_id IS NOT NULL)");
 
                             t.HasCheckConstraint("ck_journal_entries_reversed_shape", "status <> 'Reversed' OR reversed_by_entry_id IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_journal_entries_source_event_not_blank", "btrim(source_event) <> ''");
 
                             t.HasCheckConstraint("ck_journal_entries_source_type", "source_type IN ('Payment','Refund','Fulfillment','Cost','Movement','Adjustment','Fiscalization','Reversal')");
 
