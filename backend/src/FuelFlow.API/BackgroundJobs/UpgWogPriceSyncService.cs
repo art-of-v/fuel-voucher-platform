@@ -1,0 +1,130 @@
+using FuelFlow.Features.Pricing.ImportUpgWogPrices;
+using FuelFlow.Features.Pricing.ScrapeUpgWogPrices;
+using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Options;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+
+namespace FuelFlow.BackgroundJobs;
+
+/// <summary>
+/// Keeps UPG's and WOG's pump prices in step with what they charge, every fifteen minutes.
+/// </summary>
+/// <remarks>
+/// <para>
+/// The counterpart of <see cref="OkkoPriceSyncService"/>, for the two vendors that publish a page
+/// rather than an API. The shape of the work is the same: fetch the sheet, hand it to the importer
+/// that already exists, and let the importer create the grades it has never seen - with their
+/// sizes - and record the price in the history.
+/// </para>
+/// <para>
+/// <b>A failed fetch changes nothing.</b> A vendor page that is down, or that has changed shape,
+/// leaves the last known prices in place. This importer does not archive a fuel the sheet stopped
+/// carrying, so a bad fetch cannot empty the catalogue the way an empty sheet would on the OKKO
+/// side - but the guard is still the first thing it does, because the importer refuses an
+/// unreadable sheet rather than writing half of one.
+/// </para>
+/// <para>
+/// <b>One brand failing does not stop the other.</b> Each is fetched, written and reported on its
+/// own, because UPG and WOG are separate sites and one of them being down says nothing about the
+/// other.
+/// </para>
+/// </remarks>
+public sealed class UpgWogPriceSyncService
+{
+    /// <summary>Actor recorded on audit rows written by the scheduler — there is no person behind them.</summary>
+    private const string SyncActorName = "upg-wog-price-sync";
+
+    /// <summary>The brands this job serves, and the only ones its pages may name.</summary>
+    public static readonly string[] SupportedBrands = ["upg", "wog"];
+
+    private readonly IUpgWogPriceClient _client;
+    private readonly ImportUpgWogPricesCommandHandler _import;
+    private readonly ApplicationDbContext _context;
+    private readonly UpgWogPriceOptions _options;
+    private readonly ILogger<UpgWogPriceSyncService> _logger;
+
+    public UpgWogPriceSyncService(
+        IUpgWogPriceClient client,
+        ImportUpgWogPricesCommandHandler import,
+        ApplicationDbContext context,
+        IOptions<UpgWogPriceOptions> options,
+        ILogger<UpgWogPriceSyncService> logger)
+    {
+        _client = client;
+        _import = import;
+        _context = context;
+        _options = options.Value;
+        _logger = logger;
+    }
+
+    public async Task SyncPricesAsync(CancellationToken cancellationToken = default)
+    {
+        if (!_options.Enabled)
+        {
+            _logger.LogDebug(
+                "UPG/WOG price sync skipped (UpgWogPrice:Enabled=false); the catalogue keeps its current pump prices");
+            return;
+        }
+
+        foreach (var brand in SupportedBrands)
+        {
+            await SyncOneAsync(brand, cancellationToken);
+        }
+    }
+
+    private async Task SyncOneAsync(string brand, CancellationToken ct)
+    {
+        IReadOnlyList<UpgWogPrice> prices;
+        try
+        {
+            prices = await _client.FetchAsync(brand, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Deliberately: no fallback write. Today's fetch failing must not be able to change a
+            // price, and the prices we already have are the last ones the vendor told us.
+            _logger.LogError(ex,
+                "{Brand} price sync failed to fetch prices; keeping the last known pump prices", brand);
+            return;
+        }
+
+        try
+        {
+            var result = await _import.HandleAsync(
+                new ImportUpgWogPricesCommand(UpgWogPriceSheet.Write(prices), brand, DryRun: false),
+                Guid.Empty, SyncActorName, ct);
+
+            if (result.Errors.Count > 0)
+            {
+                _logger.LogError(
+                    "{Brand} price sync read {Count} error(s) from the sheet; nothing was written: {Errors}",
+                    brand, result.Errors.Count,
+                    string.Join(" | ", result.Errors.Select(e => e.Message)));
+                return;
+            }
+
+            if (result.Created.Count > 0)
+            {
+                // Information, not Debug: the catalogue grew and nobody typed it. Each created fuel
+                // also carries the vendor's own code, which is what makes the next tick match it.
+                _logger.LogInformation(
+                    "{Brand} sync added {Count} fuel(s) the catalogue did not have: {Fuels}.",
+                    brand, result.Created.Count,
+                    string.Join(", ", result.Created.Select(f => $"{f.Name} [{f.Code}]")));
+            }
+
+            if (result.Repriced.Count > 0)
+            {
+                _logger.LogDebug(
+                    "{Brand} sync repriced {Count} fuel(s).", brand, result.Repriced.Count);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _context.ChangeTracker.Clear();
+            _logger.LogError(ex, "{Brand} price sync fetched {Count} price(s) but failed to apply them",
+                brand, prices.Count);
+        }
+    }
+}
