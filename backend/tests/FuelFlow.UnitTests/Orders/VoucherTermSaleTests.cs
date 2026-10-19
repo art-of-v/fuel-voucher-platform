@@ -538,6 +538,33 @@ public sealed class VoucherTermSaleTests : IDisposable
         quote.Terms.Should().OnlyContain(t => t.PricePerLiterUah == null);
     }
 
+    [Fact]
+    public async Task Quote_SurvivesAFuelNobodyHasPriced()
+    {
+        // The catalogue publishes a fuel's pump price before anybody has costed it, so the shelf can
+        // carry a grade with a price and no cost behind it. There is no price to quote, and the line
+        // is refused at checkout either way - so the quote must answer with the ladder and no prices
+        // rather than fault. It used to throw, and every card on the shelf asked for a quote once a
+        // minute: 24 rows in the admin error journal in seventeen seconds, on 2026-10-19.
+        EnableTermSale(("1w", 20m));
+        _context.SeedPackage(
+            id: "pkg-okko-unpriced-10",
+            BrandId: BrandIds.Okko,
+            fuelTypeId: "okko-unpriced",
+            liters: 10m,
+            price: 929m,               // what the pump publishes; not a price we charge
+            pumpPricePerLiter: 92.90m  // and nobody has set a cost and a margin for it
+        );
+        _context.SaveChanges();
+
+        var quote = await QuoteHandler().HandleAsync(isTestAccount: false, BrandIds.Okko, "okko-unpriced", 10m);
+
+        quote.Enabled.Should().BeTrue();
+        quote.Terms.Should().OnlyContain(t => !t.Available, "a fuel with no price cannot be bought on any term");
+        quote.Terms.Should().OnlyContain(t => t.PricePerLiterUah == null, "there is no price to show");
+        quote.Terms.Should().OnlyContain(t => t.LinePriceUah == 0m, "and no line price to charge");
+    }
+
     // ── The ladder is stock-aware: a term the Brand cannot honour is not offered ──────────────
     //
     // #182: the picker used to offer any term the manager priced, so the customer paid the long-term

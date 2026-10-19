@@ -42,7 +42,9 @@ public sealed class TermQuoteQueryHandler
 
         // A missing package is not an error: the catalog can change between browsing and checkout, and the
         // line gets rejected properly at checkout. Returning the bare ladder lets the picker render without
-        // prices rather than failing the whole screen.
+        // prices rather than failing the whole screen. An unpriced fuel is the same situation from the
+        // customer's side: the catalogue published its pump price, but nobody has set a cost and a margin,
+        // so there is no price to quote - and there is nothing the customer can do about that either.
 var row = await (
         // The fuel, and whether it sells this size in this pool. There is no offer to join: the
         // price is the fuel's, so joining one could only ever bring a second opinion about it.
@@ -82,7 +84,12 @@ from fuel in _context.FuelTypes.AsNoTracking()
         {
             var discount = tier.IsOfferable ? tier.DiscountPerLiterUah : 0m;
             var perLiter = package is null ? (decimal?)null : ServerPricing.DiscountedPricePerLiter(package, discount);
-            var linePrice = package is null ? 0m : ServerPricing.PackagePrice(package, liters, discount);
+            // No price to quote means no line price, not a fault: the ladder comes back with no prices
+            // and nothing on it is buyable, which is the same answer a missing package gets. The line
+            // is refused at checkout either way, so quoting it must not fail the screen.
+            var linePrice = package is null
+                ? 0m
+                : ServerPricing.TryPackagePrice(package, liters, discount) ?? 0m;
 
             // Mirrors the checkout guard so the picker never offers a term that payment would reject.
             var belowCost = package is not null && !allowBelowCost && ServerPricing.IsBelowCost(package, discount);
