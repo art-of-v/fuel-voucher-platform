@@ -93,20 +93,14 @@ public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDataba
         if (seededFuels.Count > 0)
         {
             var seededIds = seededFuels.Select(f => f.Id).ToList();
-            var seededOffers = await context.FuelOffers
-                .Where(o => seededIds.Contains(o.FuelTypeId))
-                .ToListAsync();
-            var seededOfferIds = seededOffers.Select(o => o.Id).ToList();
 
-        // The sizes are the fuel's and the seeded catalogue already states them; nothing per
-        // offer has to be torn down here any more.
-
-            // The price history hangs off the offer with a foreign key and no cascade, so it goes first.
+            // The sizes are the fuel's and the seeded catalogue already states them; nothing per
+            // offer has to be torn down here any more. The price history hangs off the fuel, so it
+            // goes before the fuel it belongs to.
             context.FuelOfferPrices.RemoveRange(await context.FuelOfferPrices
-                .Where(p => seededOfferIds.Contains(p.OfferId))
+                .Where(p => seededIds.Contains(p.FuelTypeId))
                 .ToListAsync());
 
-            context.FuelOffers.RemoveRange(seededOffers);
             context.FuelTypes.RemoveRange(seededFuels);
             await context.SaveChangesAsync();
             context.ChangeTracker.Clear();
