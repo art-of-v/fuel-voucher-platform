@@ -519,6 +519,16 @@ jobs:
       - name: Test the migration history gate
         run: bash deploy/check-migration-history.test.sh
 
+      # The script that turns WAL archiving on. It was written, syntax-checked, merged
+      # and shipped without ever being RUN, and the first run on the production server
+      # died on a lost newline - a failure `bash -n` cannot see, because the mangled
+      # line is still a valid command. This test runs the script for real, against a
+      # throwaway database, and asserts that a WAL segment actually lands in the
+      # archive directory. Everything the script prints is a claim; the segment is the
+      # proof.
+      - name: Test the PITR setup
+        run: bash deploy/enable-pitr.test.sh
+
   # The repo-root fetchers in scripts/ — the only write path into `station_nodes`. They parse a
   # third-party site nobody here controls (UPG rebuilds its map page periodically, KLO renders its
   # pins through a WordPress plugin), and a silent parse change would import a few hundred rows with
