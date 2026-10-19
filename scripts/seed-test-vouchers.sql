@@ -61,25 +61,33 @@ BEGIN;
   -- One query, three answers, because psql's `\if` takes a BOOLEAN and not an arithmetic comparison
   -- ("\if :count = 0" is a parse error, and an unset variable is false, so a broken guard reads as a
   -- passing one). The booleans are computed here, where SQL can compare, and `\gset` assigns them.
+  --
+  -- The brand is matched through `brands.slug`, because `fuel_types.station_id` is gone: the brand
+  -- became a row of its own with a uuid id and the slug ('okko') kept the text the network was
+  -- known by. The value this script is given has not changed - only the way it is looked up has.
   SELECT
     count(*) <> 1                       AS fuel_not_resolved,
     count(*) > 1                        AS fuel_ambiguous,
-    coalesce(min(id), '')               AS fuel_type_id
-  FROM fuel_types
-  WHERE station_id = :'fuel_brand' AND NOT is_deleted
-    AND lower(name) = lower(:'fuel_name')
+    coalesce(min(f.id), '')             AS fuel_type_id
+  FROM fuel_types f
+  JOIN brands b ON b.id = f.brand_id
+  WHERE lower(b.slug) = lower(:'fuel_brand') AND NOT f.is_deleted
+    AND lower(f.name) = lower(:'fuel_name')
   \gset
 
   \if :fuel_not_resolved
     \echo 'No live fuel type matches that brand and name. Candidates at this brand:'
-    SELECT id, name FROM fuel_types WHERE station_id = :'fuel_brand' ORDER BY name;
+    SELECT f.id, f.name FROM fuel_types f
+      JOIN brands b ON b.id = f.brand_id
+      WHERE lower(b.slug) = lower(:'fuel_brand') AND NOT f.is_deleted ORDER BY f.name;
     \quit
   \endif
 
   \if :fuel_ambiguous
     \echo 'More than one live fuel type matches that brand and name - refusing to pick:'
-    SELECT id, name FROM fuel_types
-      WHERE station_id = :'fuel_brand' AND NOT is_deleted AND lower(name) = lower(:'fuel_name');
+    SELECT f.id, f.name FROM fuel_types f
+      JOIN brands b ON b.id = f.brand_id
+      WHERE lower(b.slug) = lower(:'fuel_brand') AND NOT f.is_deleted AND lower(f.name) = lower(:'fuel_name');
     \quit
   \endif
 \endif

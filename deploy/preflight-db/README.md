@@ -70,17 +70,40 @@ what to write.
 
 | File | Asks | Blocks |
 |---|---|---|
-| `011-fuel-type-name-twins.sql` | Does any station have more than one **live** fuel row under one name | yes |
+| `011-fuel-type-name-twins.sql` | Does any brand have more than one **live** fuel row under one name | yes |
 
 `011` is a precondition its migration refuses on: a failed deploy with the refusal on the box, versus
-thirty seconds and a list of rows to reconcile. One live fuel per name per station is what makes the name
-identify a fuel, which is what every other key in the schema depends on.
+thirty seconds and a list of rows to reconcile. One live fuel per name per brand is what makes the name
+identify a fuel, which is what every other key in the schema depends on. It groups by `brand_id`,
+because `20261018191320_CatalogueBrandsBecomeUuid` renamed `fuel_types.station_id` to `brand_id` -
+a station was a brand - and the index it guards is `ux_fuel_types_brand_name`.
 
 `012-offer-station-matches-its-fuel-type.sql` was deleted on 2026-10-19, together with the table it asked
 about. It asked whether `fuel_offers.brand_id` disagreed with `fuel_types.brand_id`, to justify an offer key
 that carried no station in it. There is no offer row any more and the key is the fuel type's own id, so
 the question cannot be asked and there is nothing left for an answer to worry about. Its number is not
 reused, the way `010`'s is not.
+
+## A check that cannot run is a warning, never a pass
+
+The runner used to count the rows psql printed and call the file `ok` when the count was zero. A
+query PostgreSQL **refused** also prints zero rows - the error goes to stderr, which was sent to
+`/dev/null` - and psql exits 0 on a SQL error unless it is told otherwise. So `011` spent a week
+grouping by a column that had been renamed, aborting on every deploy, and printing
+`011-fuel-type-name-twins.sql: ok` every time. A gate that cannot run was a gate that said yes.
+
+Three things prevent that now:
+
+- the runner passes `ON_ERROR_STOP=1` and reads psql's exit code, so a refused query is an exit
+  code rather than a silent empty result;
+- a file that could not run is reported as **could not run**, with psql's own error line, and is
+  counted separately from the files that ran - so "all data preconditions that ran are satisfied"
+  cannot be printed over a check that never ran;
+- `PreflightSqlExecutesTests` executes every file in this directory against a database built by the
+  same migrations the application runs, so a renamed column fails the build instead of the deploy.
+
+`deploy/preflight-db.test.sh` covers the runner's side of it: a stub whose psql fails must produce
+a warning naming the file, and never the word `ok`.
 
 ## Adding a file
 
@@ -91,6 +114,8 @@ reused, the way `010`'s is not.
 - Wrap it in `BEGIN; / SET TRANSACTION READ ONLY; / COMMIT;`, and add a row to `PreflightDbFileTests`
   — that test walks the directory and fails if a file ships without a case, so a new check cannot
   arrive without the read-only guarantee the whole directory runs on.
+- It has to **run**: `PreflightSqlExecutesTests` executes every file in this directory against the
+  migrated schema, so a column that no longer exists fails the build rather than the deploy.
 
 ## Wiring
 

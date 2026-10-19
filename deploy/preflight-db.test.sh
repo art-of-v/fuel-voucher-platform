@@ -50,6 +50,15 @@ if [[ "$1" == "exec" ]]; then
   # of that, so the counting bug below shipped: `grep -c .` counted BEGIN/SET/COMMIT and the check
   # reported "VIOLATED - 3 row(s)" against a clean database, then printed "(0 rows)" as the detail.
   # It fired on the first real deploy, which is how it was found.
+  #
+  # DOCKER_STUB_PSQL_FAILS answers the way psql does under ON_ERROR_STOP=1: the error on stderr,
+  # nothing on stdout, exit 3. That is the shape of the bug this file's runner had - a query naming
+  # a column that no longer exists, counted as zero rows, reported "ok".
+  if [[ "${DOCKER_STUB_PSQL_FAILS:-0}" == "1" ]]; then
+    echo 'ERROR:  column f.station_id does not exist' >&2
+    echo 'LINE 1: ...' >&2
+    exit 3
+  fi
   if [[ "$*" == *"-t -A"* ]]; then
     printf 'BEGIN\nSET\n'
     [[ -n "${DOCKER_STUB_ROWS:-}" ]] && printf '%s\n' "$DOCKER_STUB_ROWS"
@@ -95,7 +104,7 @@ check "a clean database exits 0" "0" "$?"
 violated_file="$(find "$SCRIPT_DIR/preflight-db" -name '*.sql' | sort | head -1)"
 
 contains "the file is reported ok" "$(basename "$violated_file"): ok" "$out"
-contains "and satisfaction is stated with a count" "all data preconditions satisfied (${checked_expected} checked)" "$out"
+contains "and satisfaction is stated with a count" "all data preconditions that ran are satisfied (${checked_expected} checked)" "$out"
 # The regression, stated on its own. psql prints BEGIN, SET and COMMIT to stdout whatever -t -A
 # says, so counting non-empty lines calls those three a violation on a database that is fine — which
 # is exactly what this check did on production on its first real run, printing
@@ -139,8 +148,39 @@ check "an unreachable database is a warning, not a failure" "0" "$?"
 contains "and it says the check did not run" "not checked" "$out"
 # This is the assertion the check exists for. Reporting "satisfied" here is how a gate stops
 # being read: silence that looks exactly like a clean system.
-lacks "and it does NOT claim the preconditions were satisfied" "all data preconditions satisfied" "$out"
+lacks "and it does NOT claim the preconditions were satisfied" "all data preconditions that ran are satisfied" "$out"
 contains "it states outright that nothing was checked" "NO precondition was checked" "$out"
+
+# ------------------------------------------------------------------------------
+# The query itself fails
+# ------------------------------------------------------------------------------
+# The unreachable-database case above is the polite version of a check that did not run: the runner
+# knew before it asked. This is the one that shipped. `011` grouped by `f.station_id` from
+# 2026-10-18, `20261018191320_CatalogueBrandsBecomeUuid` renamed that column, and every deploy
+# printed "011-fuel-type-name-twins.sql: ok" - because the runner sent psql's stderr to /dev/null,
+# counted the empty stdout as zero rows, and psql exits 0 on a SQL error unless it is told not to.
+# A gate that cannot run was a gate that said yes, for a week, on the production deploy path.
+#
+# DOCKER_STUB_PSQL_FAILS makes the stub answer the way psql does under ON_ERROR_STOP=1: the error
+# on stderr, nothing on stdout, exit 3.
+out="$(run DOCKER_STUB_RUNNING=1 DOCKER_STUB_ROWS= DOCKER_STUB_PSQL_FAILS=1)"
+check "a query that cannot run is a warning, not a failure" "0" "$?"
+contains "it says the check could not run" "COULD NOT RUN" "$out"
+# The file is named, because "a check did not run" without saying which one is the same silence.
+contains "and it names the file" ": COULD NOT RUN" "$out"
+# And the psql error travels with it: "could not run" is not actionable, "column f.station_id does
+# not exist" is.
+contains "and it carries the error psql reported" "does not exist" "$out"
+# The regression, stated as the thing that must NOT come back.
+lacks "a failed query is never reported ok" ": ok" "$out"
+lacks "and it does not claim the preconditions were satisfied" "are satisfied" "$out"
+contains "it counts the unreadable file separately" "precondition(s) could NOT be run" "$out"
+
+# A clean database under the same stub still passes, so the branch above is about the failure and
+# not about every file being unreadable.
+out="$(run DOCKER_STUB_RUNNING=1 DOCKER_STUB_ROWS= DOCKER_STUB_PSQL_FAILS=0)"
+check "the same database with a working query still passes" "0" "$?"
+contains "and reports the file ok" ": ok" "$out"
 
 # ------------------------------------------------------------------------------
 # Every file in the directory is read-only
