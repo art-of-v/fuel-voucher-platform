@@ -227,8 +227,9 @@ services:
     volumes:
       - staging_postgres_data:/var/lib/postgresql/data
       # A separate archive directory from production's: staging must never write into (or
-      # prune) production's WAL archive.
-      - ${STAGING_WAL_ARCHIVE_DIR:-/root/fuelflow-wal-staging}:/var/lib/postgresql/wal
+      # prune) production's WAL archive. Literal rather than a variable, for the reason given
+      # in docker-compose.prod.yml.
+      - /root/fuelflow-wal-staging:/var/lib/postgresql/wal
     ports:
       # localhost only, and a DIFFERENT port from prod's 5432 so both can bind the loopback.
       - "127.0.0.1:55432:5432"
