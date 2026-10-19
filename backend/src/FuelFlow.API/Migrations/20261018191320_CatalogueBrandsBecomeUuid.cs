@@ -336,27 +336,26 @@ namespace FuelFlow.API.Migrations
         }
 
         /// <summary>
-        /// The indexes this migration brings into existence, and nothing else.
+        /// The indexes on the <c>brand_id</c> columns this migration dropped, restored under the
+        /// names the database already used.
         /// </summary>
         /// <remarks>
         /// <para>
-        /// Only indexes on columns this migration <b>adds</b> are created here. Every index on an
-        /// existing <c>brand_id</c> column survives the <c>ALTER COLUMN ... TYPE uuid</c> untouched —
-        /// PostgreSQL keeps an index across a type change when the operator class still applies — so
-        /// recreating them would be wrong twice over: it would leave the originals in place under
-        /// their existing names <em>and</em> add duplicates under EF's, and the older migrations
-        /// that later <c>Down</c> expect those originals by name
-        /// (<c>20261018140426_StationsBecomeBrands</c> renames <c>IX_fuel_types_brand_id</c> back to
-        /// <c>IX_fuel_types_station_id</c>). A rolling back past this migration would abort on a
-        /// relation it can no longer find.
+        /// <c>ConvertEveryBrandForeignKeyToUuid</c> does <c>DROP COLUMN brand_id</c> and renames a
+        /// replacement into its place, which takes every index on the column with it — so these have
+        /// to be recreated or the uniqueness they state is gone.
         /// </para>
         /// <para>
-        /// Names, column orders, uniqueness and partial filters match the entity configurations
-        /// (<c>FuelTypeEntityConfiguration</c>, <c>FuelOfferConfiguration</c>,
-        /// <c>FuelTypeProductCodeConfiguration</c>, <c>BrandStationConfiguration</c>). A unique index
-        /// rebuilt without its filter is a different index: <c>ux_fuel_types_brand_name</c> exists so
-        /// two live fuels cannot share a name at one network, and without <c>NOT is_deleted</c> it would
-        /// forbid two archived ones as well.
+        /// <b>The names are the ones the schema already has, not EF's.</b> Every one of these was
+        /// renamed from its <c>station_id</c> form by <c>20261018140426_StationsBecomeBrands</c>, and
+        /// that migration's <c>Down</c> renames them back <em>by name</em>. Recreating them under EF's
+        /// default casing instead leaves the originals absent and the rollback aborting on
+        /// <c>42P01</c> — which is what a rolling back past this migration did.
+        /// </para>
+        /// <para>
+        /// Partial filters are load-bearing: <c>ux_fuel_types_brand_name</c> exists so two live fuels
+        /// cannot share a name at one network, and without <c>NOT is_deleted</c> it would forbid two
+        /// archived ones as well.
         /// </para>
         /// </remarks>
         private static void RecreateTheIndexesThatTheDroppedColumnsTookWithThem(MigrationBuilder migrationBuilder)
@@ -364,8 +363,27 @@ namespace FuelFlow.API.Migrations
             migrationBuilder.Sql("""
                 CREATE UNIQUE INDEX IF NOT EXISTS "IX_brands_slug" ON brands (slug);
 
+                CREATE INDEX IF NOT EXISTS "IX_brand_stations_brand_id" ON brand_stations (brand_id);
                 CREATE UNIQUE INDEX IF NOT EXISTS ux_brand_stations_brand_external
                     ON brand_stations (brand_id, external_id);
+
+                CREATE INDEX IF NOT EXISTS "IX_fuel_types_brand_id" ON fuel_types (brand_id);
+                CREATE UNIQUE INDEX IF NOT EXISTS ux_fuel_types_brand_name
+                    ON fuel_types (brand_id, name) WHERE NOT is_deleted;
+                CREATE UNIQUE INDEX IF NOT EXISTS ux_fuel_types_brand_brand_fuel_code
+                    ON fuel_types (brand_id, brand_fuel_code)
+                    WHERE brand_fuel_code IS NOT NULL AND NOT is_deleted;
+
+                CREATE INDEX IF NOT EXISTS "IX_fuel_offers_brand_id" ON fuel_offers (brand_id);
+                CREATE INDEX IF NOT EXISTS "IX_fuel_offers_brand_id_fuel_type_id"
+                    ON fuel_offers (brand_id, fuel_type_id);
+                CREATE UNIQUE INDEX IF NOT EXISTS ix_fuel_offers_brand_fuel_pool
+                    ON fuel_offers (brand_id, fuel_type_id, data_kind);
+
+                CREATE UNIQUE INDEX IF NOT EXISTS ux_fuel_type_product_codes_brand_code
+                    ON fuel_type_product_codes (brand_id, product_code);
+
+                CREATE INDEX IF NOT EXISTS "IX_contracts_brand_id" ON contracts (brand_id);
                 """);
         }
 
@@ -440,12 +458,20 @@ namespace FuelFlow.API.Migrations
         /// <c>42830 there is no unique constraint matching given keys</c> — the rollback would abort
         /// with both the data restored and the schema still uuid, which is the worst of the two.
         /// </para>
+        /// <para>
+        /// <b>Both primary keys are quoted, and that is not cosmetic.</b> An unquoted identifier folds
+        /// to lower case, so <c>ADD CONSTRAINT PK_brand_stations</c> would create
+        /// <c>pk_brand_stations</c> — and the migration below this one,
+        /// <c>20261018140426_StationsBecomeBrands.Down</c>, renames <c>"PK_brand_stations"</c> back by
+        /// its quoted name and answers <c>42704</c> when it is not there. A rollback that gets a
+        /// screen further and then stops is the worst way for this to be discovered.
+        /// </para>
         /// </remarks>
         private static void PutTheConstraintsBackAsTextChecks(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.Sql("""
-                ALTER TABLE brands ADD CONSTRAINT PK_brands PRIMARY KEY (id);
-                ALTER TABLE brand_stations ADD CONSTRAINT PK_brand_stations PRIMARY KEY (id);
+                ALTER TABLE brands ADD CONSTRAINT "PK_brands" PRIMARY KEY (id);
+                ALTER TABLE brand_stations ADD CONSTRAINT "PK_brand_stations" PRIMARY KEY (id);
 
                 ALTER TABLE brands ADD CONSTRAINT ck_brands_id_length CHECK (length(id) <= 100);
 
@@ -457,13 +483,23 @@ namespace FuelFlow.API.Migrations
                 ALTER TABLE fuel_type_product_codes ADD CONSTRAINT ck_fuel_type_product_codes_brand_id_length CHECK (length(brand_id) <= 100);
                 ALTER TABLE contracts ADD CONSTRAINT ck_contracts_brand_id_length CHECK (length(brand_id) <= 100);
 
-                -- No index is recreated here either. Every index this migration is about sits on a
-                -- brand_id column, which is altered rather than dropped, and PostgreSQL keeps an
-                -- index across a type change; recreating it would leave the original in place and
-                -- add a second one under another name - which is what made rolling back past this
-                -- migration abort inside StationsBecomeBrands.Down, which renames those originals
-                -- back by name. The one index genuinely born here rides the external id column,
-                -- which Down drops, and is deliberately not restored.
+
+                CREATE INDEX IF NOT EXISTS "IX_brands_Name" ON brands (name);
+                CREATE INDEX IF NOT EXISTS "IX_brand_stations_brand_id" ON brand_stations (brand_id);
+                CREATE INDEX IF NOT EXISTS "IX_fuel_types_brand_id" ON fuel_types (brand_id);
+                CREATE UNIQUE INDEX IF NOT EXISTS ux_fuel_types_brand_name
+                    ON fuel_types (brand_id, name) WHERE NOT is_deleted;
+                CREATE UNIQUE INDEX IF NOT EXISTS ux_fuel_types_brand_brand_fuel_code
+                    ON fuel_types (brand_id, brand_fuel_code)
+                    WHERE brand_fuel_code IS NOT NULL AND NOT is_deleted;
+                CREATE INDEX IF NOT EXISTS "IX_fuel_offers_brand_id" ON fuel_offers (brand_id);
+                CREATE INDEX IF NOT EXISTS "IX_fuel_offers_brand_id_fuel_type_id"
+                    ON fuel_offers (brand_id, fuel_type_id);
+                CREATE UNIQUE INDEX IF NOT EXISTS ix_fuel_offers_brand_fuel_pool
+                    ON fuel_offers (brand_id, fuel_type_id, data_kind);
+                CREATE UNIQUE INDEX IF NOT EXISTS ux_fuel_type_product_codes_brand_code
+                    ON fuel_type_product_codes (brand_id, product_code);
+                CREATE INDEX IF NOT EXISTS "IX_contracts_brand_id" ON contracts (brand_id);
 
                 ALTER TABLE brand_stations
                     ADD CONSTRAINT "FK_brand_stations_brands_brand_id"

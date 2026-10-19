@@ -183,8 +183,14 @@ export function radarWithinRadius(
 }
 
 export interface BrandRank {
-  /** Brand id, e.g. `'wog'` — the wire name on every catalogue payload. The leaderboard key. */
+  /** Brand **uuid** — the leaderboard key, and the only handle an API call needs. */
   brandId: string;
+  /**
+   * The network's code, e.g. `'wog'`. Carried so a row can be labelled and its logo found without
+   * a second lookup: `BRAND_LOGOS` is keyed by these codes, and a uuid sorts arbitrarily in the
+   * tie-break below.
+   */
+  brandSlug: string;
   /** Voucher грн/л for the fuel. Packages are per-brand, so every node shares it. */
   price: StationPrice;
   /** Distance to this brand's nearest АЗК in the set, or null when location is unknown. */
@@ -248,6 +254,7 @@ export function rankBrands(ranked: RankedStation[], radiusKm?: number | null): B
 
     brands.push({
       brandId,
+      brandSlug: nodes[0].node.brandSlug,
       price: nodes[0].price!,
       // The brand's true nearest, not its nearest *inside* the ring: a dimmed row exists
       // precisely to say how far away that is.
@@ -273,7 +280,9 @@ export function rankBrands(ranked: RankedStation[], radiusKm?: number | null): B
     }
     if (a.nearestDistanceKm != null && b.nearestDistanceKm == null) return -1;
     if (a.nearestDistanceKm == null && b.nearestDistanceKm != null) return 1;
-    return a.brandId.localeCompare(b.brandId);
+    // The last tie-break is by slug, not by uuid: two networks at the same price and the same
+    // distance must appear in a stable, readable order, and a uuid sorts arbitrarily.
+    return a.brandSlug.localeCompare(b.brandSlug);
   });
 
   return brands;
