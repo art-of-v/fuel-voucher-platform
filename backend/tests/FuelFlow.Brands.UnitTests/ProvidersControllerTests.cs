@@ -56,7 +56,7 @@ public sealed class BrandFuelControllerTests : IDisposable
     // below-cost tests can assert the loss-leader Telegram alert through a Moq IAlertNotifier.
     private BrandFuelController BuildController(NotificationDispatcher notifications) =>
         new(
-            new GetFuelPriceHistoryQueryHandler(_context),
+        new FuelFlow.Features.Brands.GetFuelPriceHistory.GetFuelPriceHistoryQueryHandler(_context),
             new GetFuelPriceAtQueryHandler(_context),
             new AuditEventService(_context),
             _context,
@@ -493,12 +493,12 @@ public sealed class BrandFuelControllerTests : IDisposable
         var bad = result.Should().BeOfType<BadRequestObjectResult>().Subject;
         JsonSerializer.Serialize(bad.Value).Should().Contain("below_cost");
 
-        (await _context.FuelTypes.AnyAsync(f => f.BrandId == TestOkko)).Should().BeFalse();
-        // Deleting a brand archives its offers AND their volumes now, so "no live package at this
-        // Brand" has to be asked of the volumes behind them - the offer alone would still answer.
+(await _context.FuelTypes.AnyAsync(f => f.BrandId == TestOkko)).Should().BeFalse();
+        // A refused write leaves nothing behind: no fuel, and no size either. The size used to be
+        // reachable only through the offer, which is what made this second assertion worth having;
+        // it is asked of the nominal directly now.
         (await _context.FuelNominals.AnyAsync(n => n.FuelTypeId == "test-fuel-a")).Should().BeFalse();
-        (await _context.FuelOffers.IgnoreQueryFilters().AnyAsync(o => o.BrandId == TestOkko && !o.IsDeleted))
-            .Should().BeFalse();
+    }
 
     [Fact]
     public async Task AddFuel_BelowCostOptedIn_SavesPrice_AndFiresDeliberateWarningAlert()

@@ -1,4 +1,5 @@
 using FuelFlow.Brands.UnitTests;
+using FluentAssertions;
 using FuelFlow.Features.Brands.GetFuelPriceHistory;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
@@ -100,22 +101,22 @@ public sealed class GetFuelPriceHistoryQueryHandlerTests : IDisposable
     {
         await SeedAsync(fuelTypeId: "fuel-f", at: 10, margin: 2m);
 
-        var entry = (await _handler.HandleAsync(new GetFuelPriceHistoryQuery("fuel-f"))).Single();
+var entry = (await _handler.HandleAsync(new GetFuelPriceHistoryQuery("fuel-f"))).Single();
 
-        entry.SupplierPricePerLiter.Should().Be(50m);
-        entry.MarginUahPerLiter.Should().Be(2m);
-        entry.FinalPricePerLiter.Should().Be(52m);
-        entry.PumpPricePerLiter.Should().Be(55m);
-        entry.MinDiscountPerLiter.Should().Be(1m);
-        entry.Reason.Should().Be(OfferPriceReasons.Operator);
-    }
+    entry.SupplierPricePerLiter.Should().Be(50m);
+    entry.MarginUahPerLiter.Should().Be(2m);
+    entry.FinalPricePerLiter.Should().Be(52m);
+    entry.PumpPricePerLiter.Should().Be(55m);
+    entry.MinDiscountPerLiter.Should().Be(1m);
+entry.Reason.Should().Be(OfferPriceReasons.Operator);
+}
 
-    private async Task SeedAsync(string fuelTypeId, int at, decimal margin, string? dataKind = null)
+private async Task SeedAsync(string fuelTypeId, int at, decimal margin, string? dataKind = null)
     {
         _context.FuelOfferPrices.Add(new FuelOfferPrice
         {
             Id = Guid.CreateVersion7(),
-            OfferId = offerId,
+            FuelTypeId = fuelTypeId,
             BrandId = BrandIds.Okko,
             DataKind = dataKind ?? DataKinds.Real,
             SupplierPricePerLiter = 50m,

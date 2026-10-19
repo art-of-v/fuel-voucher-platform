@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FuelFlow.API.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20261019093129_OfferPricingBecomesTheFuel")]
+    [Migration("20261019095748_OfferPricingBecomesTheFuel")]
     partial class OfferPricingBecomesTheFuel
     {
         /// <inheritdoc />

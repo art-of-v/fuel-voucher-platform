@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -13,37 +13,9 @@ namespace FuelFlow.API.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropForeignKey(
-                name: "FK_fuel_offer_prices_fuel_offers_offer_id",
-                table: "fuel_offer_prices");
-
-            migrationBuilder.DropForeignKey(
-                name: "FK_journal_lines_fuel_offers_offer_id",
-                table: "journal_lines");
-
-            migrationBuilder.DropTable(
-                name: "fuel_offers");
-
-            migrationBuilder.DropIndex(
-                name: "IX_journal_lines_offer_id",
-                table: "journal_lines");
-
-            migrationBuilder.DropIndex(
-                name: "ix_fuel_offer_prices_offer_effective",
-                table: "fuel_offer_prices");
-
-            migrationBuilder.DropCheckConstraint(
-                name: "ck_fuel_offer_prices_offer_id_length",
-                table: "fuel_offer_prices");
-
-            migrationBuilder.DropColumn(
-                name: "offer_id",
-                table: "journal_lines");
-
-            migrationBuilder.DropColumn(
-                name: "offer_id",
-                table: "fuel_offer_prices");
-
+            // ---------------------------------------------------------------------------------
+            // The columns come first. Everything below reads or writes them, and a copy that ran
+            // before they existed would be a copy into nothing.
             migrationBuilder.AddColumn<decimal>(
                 name: "margin_percent",
                 table: "fuel_types",
@@ -80,76 +52,6 @@ namespace FuelFlow.API.Migrations
                 type: "numeric(10,4)",
                 nullable: true);
 
-            migrationBuilder.UpdateData(
-                table: "fuel_types",
-                keyColumn: "id",
-                keyValue: "okko-95",
-                columns: new[] { "margin_percent", "min_discount_per_liter", "price_updated_at", "price_updated_by_user_id", "pump_price_per_liter", "supplier_price_per_liter" },
-                values: new object[] { null, null, null, null, null, null });
-
-            migrationBuilder.UpdateData(
-                table: "fuel_types",
-                keyColumn: "id",
-                keyValue: "okko-dp",
-                columns: new[] { "margin_percent", "min_discount_per_liter", "price_updated_at", "price_updated_by_user_id", "pump_price_per_liter", "supplier_price_per_liter" },
-                values: new object[] { null, null, null, null, null, null });
-
-            migrationBuilder.UpdateData(
-                table: "fuel_types",
-                keyColumn: "id",
-                keyValue: "okko-gas",
-                columns: new[] { "margin_percent", "min_discount_per_liter", "price_updated_at", "price_updated_by_user_id", "pump_price_per_liter", "supplier_price_per_liter" },
-                values: new object[] { null, null, null, null, null, null });
-
-            migrationBuilder.UpdateData(
-                table: "fuel_types",
-                keyColumn: "id",
-                keyValue: "okko-p95",
-                columns: new[] { "margin_percent", "min_discount_per_liter", "price_updated_at", "price_updated_by_user_id", "pump_price_per_liter", "supplier_price_per_liter" },
-                values: new object[] { null, null, null, null, null, null });
-
-            migrationBuilder.UpdateData(
-                table: "fuel_types",
-                keyColumn: "id",
-                keyValue: "okko-pulls-dp",
-                columns: new[] { "margin_percent", "min_discount_per_liter", "price_updated_at", "price_updated_by_user_id", "pump_price_per_liter", "supplier_price_per_liter" },
-                values: new object[] { null, null, null, null, null, null });
-
-            migrationBuilder.UpdateData(
-                table: "fuel_types",
-                keyColumn: "id",
-                keyValue: "wog-100",
-                columns: new[] { "margin_percent", "min_discount_per_liter", "price_updated_at", "price_updated_by_user_id", "pump_price_per_liter", "supplier_price_per_liter" },
-                values: new object[] { null, null, null, null, null, null });
-
-            migrationBuilder.UpdateData(
-                table: "fuel_types",
-                keyColumn: "id",
-                keyValue: "wog-95",
-                columns: new[] { "margin_percent", "min_discount_per_liter", "price_updated_at", "price_updated_by_user_id", "pump_price_per_liter", "supplier_price_per_liter" },
-                values: new object[] { null, null, null, null, null, null });
-
-            migrationBuilder.UpdateData(
-                table: "fuel_types",
-                keyColumn: "id",
-                keyValue: "wog-95-euro",
-                columns: new[] { "margin_percent", "min_discount_per_liter", "price_updated_at", "price_updated_by_user_id", "pump_price_per_liter", "supplier_price_per_liter" },
-                values: new object[] { null, null, null, null, null, null });
-
-            migrationBuilder.UpdateData(
-                table: "fuel_types",
-                keyColumn: "id",
-                keyValue: "wog-dp",
-                columns: new[] { "margin_percent", "min_discount_per_liter", "price_updated_at", "price_updated_by_user_id", "pump_price_per_liter", "supplier_price_per_liter" },
-                values: new object[] { null, null, null, null, null, null });
-
-            migrationBuilder.UpdateData(
-                table: "fuel_types",
-                keyColumn: "id",
-                keyValue: "wog-gas",
-                columns: new[] { "margin_percent", "min_discount_per_liter", "price_updated_at", "price_updated_by_user_id", "pump_price_per_liter", "supplier_price_per_liter" },
-                values: new object[] { null, null, null, null, null, null });
-
             // ---------------------------------------------------------------------------------
             // MOVE THE PRICES. This is the part a scaffolded migration never writes, and without it
             // every fuel in production comes out of this migration unpriced: the storefront skips
@@ -163,6 +65,7 @@ namespace FuelFlow.API.Migrations
             // carrying it forward into a single column would make the choice arbitrary. Ordered by
             // updated_at so the tie is at least the most recently touched row rather than whichever
             // Postgres returned first.
+
             migrationBuilder.Sql("""
                 UPDATE fuel_types AS f
                 SET supplier_price_per_liter = src.supplier_price_per_liter,
@@ -185,6 +88,40 @@ namespace FuelFlow.API.Migrations
                 ) AS src
                 WHERE f.id = src.fuel_type_id;
                 """);
+
+            migrationBuilder.DropForeignKey(
+                name: "FK_fuel_offer_prices_fuel_offers_offer_id",
+                table: "fuel_offer_prices");
+
+            migrationBuilder.DropForeignKey(
+                name: "FK_journal_lines_fuel_offers_offer_id",
+                table: "journal_lines");
+
+            migrationBuilder.DropTable(
+                name: "fuel_offers");
+
+            migrationBuilder.DropIndex(
+                name: "IX_journal_lines_offer_id",
+                table: "journal_lines");
+
+            migrationBuilder.DropIndex(
+                name: "ix_fuel_offer_prices_offer_effective",
+                table: "fuel_offer_prices");
+
+            migrationBuilder.DropCheckConstraint(
+                name: "ck_fuel_offer_prices_offer_id_length",
+                table: "fuel_offer_prices");
+
+            migrationBuilder.DropColumn(
+                name: "offer_id",
+                table: "journal_lines");
+
+            migrationBuilder.DropColumn(
+                name: "offer_id",
+                table: "fuel_offer_prices");
+
+
+
 
             migrationBuilder.AddCheckConstraint(
                 name: "ck_fuel_types_margin_signs",
