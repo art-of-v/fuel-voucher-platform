@@ -71,14 +71,16 @@ what to write.
 | File | Asks | Blocks |
 |---|---|---|
 | `011-fuel-type-name-twins.sql` | Does any station have more than one **live** fuel row under one name | yes |
-| `012-offer-station-matches-its-fuel-type.sql` | Does any offer name a station its own fuel type does not | no — a question, not a gate (see its header) |
 
 `011` is a precondition its migration refuses on: a failed deploy with the refusal on the box, versus
-thirty seconds and a list of rows to reconcile. `012` is different — it cannot be a precondition, because no
-constraint can span two tables, and it guards a state that is legal until proved otherwise. Both files exist
-because `DropTheStationPrefixFromOfferKeys` (2026-10-17) keys an offer by its fuel type id alone: one live
-fuel per name per station is what makes the name identify a fuel, and an offer's station has to be its fuel
-type's for that key to mean anything.
+thirty seconds and a list of rows to reconcile. One live fuel per name per station is what makes the name
+identify a fuel, which is what every other key in the schema depends on.
+
+`012-offer-station-matches-its-fuel-type.sql` was deleted on 2026-10-19, together with the table it asked
+about. It asked whether `fuel_offers.brand_id` disagreed with `fuel_types.brand_id`, to justify an offer key
+that carried no station in it. There is no offer row any more and the key is the fuel type's own id, so
+the question cannot be asked and there is nothing left for an answer to worry about. Its number is not
+reused, the way `010`'s is not.
 
 ## Adding a file
 

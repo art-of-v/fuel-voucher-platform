@@ -92,14 +92,4 @@ GROUP BY fuel_type_id
 ORDER BY fuel_type_id;
 \endif
 
-SELECT to_regclass('public.fuel_offers') IS NOT NULL AS t \gset
-\if :t
-SELECT 'fuel_offers' AS table_name, fuel_type_id AS id, count(*)::text AS rows
-FROM fuel_offers
-WHERE fuel_type_id IS NOT NULL
-  AND fuel_type_id !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-GROUP BY fuel_type_id
-ORDER BY fuel_type_id;
-\endif
-
 COMMIT;

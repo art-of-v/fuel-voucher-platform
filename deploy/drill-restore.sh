@@ -167,7 +167,7 @@ LAST_MIGRATION="$(psql_q -c 'SELECT "MigrationId" FROM "__EFMigrationsHistory" O
 echo "  $MIGRATIONS migrations applied; newest: $LAST_MIGRATION"
 
 info "2. Row counts"
-for t in brands fuel_types fuel_offers fuel_vouchers payments orders voucher_events; do
+for t in brands fuel_types fuel_vouchers payments orders voucher_events; do
   EXISTS="$(psql_q -c "SELECT to_regclass('public.$t') IS NOT NULL;")"
   if [[ "$EXISTS" != "t" ]]; then
     echo "  $t: absent"
