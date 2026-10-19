@@ -95,6 +95,12 @@ public sealed class ImportOkkoCatalogueCommandHandler
     /// <summary>See <see cref="BackfillBrandFuelCodesCommandHandler"/> for why this is a slug.</summary>
     private const string OkkoSlug = "okko";
 
+    /// <summary>
+    /// The sizes a grade this import creates is sold in: the same three every other importer gives a
+    /// grade it creates (UPG, WOG, KLO).
+    /// </summary>
+    private static readonly int[] DefaultNominals = [10, 20, 50];
+
     private readonly ApplicationDbContext _context;
     private readonly BrandSlugResolver _brands;
     private readonly AuditEventService _events;
@@ -267,13 +273,31 @@ if (knownCodes.Contains(code))
                 // operator sets a margin. The pump sync owns BasePrice/DiscountPrice from here on.
                 BasePrice = 0m,
                 DiscountPrice = 0m,
-                // The one supplier-owned figure. Cost, margin and discount stay null, and no nominal
-                // exists yet, so nothing is sellable and nothing is displayed.
+                // The one supplier-owned figure. Cost, margin and discount stay null, and the fuel
+                // is not sellable until an operator sets a margin.
                 PumpPricePerLiter = row.PricePerLiter,
                 CreatedAtUtc = now,
                 UpdatedAtUtc = now
             };
             _context.FuelTypes.Add(fuel);
+
+            // The sizes the fuel is sold in, the same three every other importer gives a grade it
+            // creates (UPG, WOG, KLO). A size is not a price: it says the fuel is sold in ten, twenty
+            // and fifty litres, and it is what puts the grade on the shelf at all - the storefront
+            // lists a fuel by its size, so a grade with no size is not listed and its column price
+            // never reaches a customer. What keeps it off sale is the missing MARGIN, not the missing
+            // size, and that is the part this importer has no business guessing.
+            foreach (var liters in DefaultNominals)
+            {
+                _context.FuelNominals.Add(new FuelNominal
+                {
+                    FuelTypeId = fuel.Id,
+                    Liters = liters,
+                    CreatedAtUtc = now,
+                    UpdatedAtUtc = now
+                });
+            }
+
             // The brand publishes it - we just learned that from this very sheet - so it must not be a
             // candidate for archiving at the end of this same run.
             seenFuelIds.Add(fuel.Id);
