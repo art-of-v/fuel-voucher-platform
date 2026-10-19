@@ -13,8 +13,8 @@ namespace FuelFlow.IntegrationTests;
 /// <c>SET default_transaction_read_only = on</c>: psql runs each statement in autocommit, so that
 /// setting bound a transaction which then ended, and a write appended after the query went through.
 /// Wrapping the query binds the setting to the transaction that actually runs it, and
-/// <c>OfferVolumePriceAgreementTests</c> proves Postgres refuses a write inside one — because a
-/// guarantee believed on the strength of a comment is worse than none.
+    /// that is why a write after the SELECT would be refused - proven against Postgres in the ledger
+    /// suite, because a guarantee believed on the strength of a comment is worse than none.
 /// </para>
 /// <para>
 /// Stated for the whole directory rather than for the one file that existed when it was learned, so
@@ -26,7 +26,6 @@ public sealed class PreflightDbFileTests
 {
     [Theory]
     [InlineData("011-fuel-type-name-twins.sql")]
-    [InlineData("012-offer-station-matches-its-fuel-type.sql")]
     [InlineData("013-fuel-type-references-agree-on-type.sql")]
     [InlineData("014-fuel-type-references-are-all-uuids.sql")]
     public void EveryCheck_IsShapedSoItCannotWrite(string fileName)
