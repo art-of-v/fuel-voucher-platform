@@ -241,7 +241,9 @@ public sealed class JournalPostingService
             LineNo = lineNo,
             AccountId = account.Id,
             PartyId = request.PartyId,
-            OfferId = request.OfferId,
+            // offer_id is gone with the offer (2026-10-19). The request carried it so a posting could
+            // name the offer it settled; a journal line already names the grade and the voucher, and
+            // the offer was a pointer that could only ever resolve to a row nothing writes.
             LegalEntityId = request.LegalEntityId,
             VoucherId = request.VoucherId,
             QuantityLiters = request.QuantityLiters,

@@ -404,9 +404,8 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<string>("BrandId")
-                        .IsRequired()
-                        .HasColumnType("text")
+                    b.Property<Guid>("BrandId")
+                        .HasColumnType("uuid")
                         .HasColumnName("brand_id");
 
                     b.Property<DateTime>("CreatedAtUtc")
@@ -429,10 +428,7 @@ namespace FuelFlow.API.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("contracts", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_contracts_brand_id_length", "length(brand_id) <= 100");
-                        });
+                    b.ToTable("contracts", (string)null);
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Contracts.SharedModels.LegalEntity", b =>
@@ -906,6 +902,34 @@ namespace FuelFlow.API.Migrations
                         });
                 });
 
+            modelBuilder.Entity("FuelFlow.Features.Ledger.SharedModels.DocumentSequence", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("LastValue")
+                        .HasColumnType("bigint")
+                        .HasColumnName("last_value");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("name");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("document_sequences", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_document_sequences_non_negative", "last_value >= 0");
+                        });
+                });
+
             modelBuilder.Entity("FuelFlow.Features.Ledger.SharedModels.JournalEntry", b =>
                 {
                     b.Property<Guid>("Id")
@@ -951,6 +975,12 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("reversed_by_entry_id");
 
+                    b.Property<string>("SourceEvent")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("source_event");
+
                     b.Property<Guid?>("SourceId")
                         .HasColumnType("uuid")
                         .HasColumnName("source_id");
@@ -987,6 +1017,9 @@ namespace FuelFlow.API.Migrations
 
                     b.HasIndex("SourceType", "SourceId");
 
+                    b.HasIndex("SourceEvent", "SourceType", "SourceId")
+                        .IsUnique();
+
                     b.ToTable("journal_entries", null, t =>
                         {
                             t.HasCheckConstraint("ck_journal_entries_description_not_blank", "btrim(description) <> ''");
@@ -998,6 +1031,8 @@ namespace FuelFlow.API.Migrations
                             t.HasCheckConstraint("ck_journal_entries_posted_shape", "(status = 'Draft') OR (posted_at_utc IS NOT NULL AND posted_by_user_id IS NOT NULL)");
 
                             t.HasCheckConstraint("ck_journal_entries_reversed_shape", "status <> 'Reversed' OR reversed_by_entry_id IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_journal_entries_source_event_not_blank", "btrim(source_event) <> ''");
 
                             t.HasCheckConstraint("ck_journal_entries_source_type", "source_type IN ('Payment','Refund','Fulfillment','Cost','Movement','Adjustment','Fiscalization','Reversal')");
 
@@ -1702,107 +1737,6 @@ namespace FuelFlow.API.Migrations
                     b.ToTable("outbox_events", null, t =>
                         {
                             t.HasCheckConstraint("ck_outbox_event_type", "event_type IN ('OrderCreated', 'OrderFulfilled', 'OrderCancelled',\n               'PaymentCompleted', 'VoucherExpired', 'VoucherUsed', 'VoucherActivated',\n               'VoucherIssued')");
-                        });
-                });
-
-            modelBuilder.Entity("FuelFlow.Features.Pricing.Rules.SharedModels.PricingRule", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime?>("ApprovedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("approved_at_utc");
-
-                    b.Property<Guid?>("ApprovedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("approved_by_user_id");
-
-                    b.Property<Guid?>("ContractId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("contract_id");
-
-                    b.Property<Guid?>("LegalEntityId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("legal_entity_id");
-
-                    b.Property<string>("RejectionReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("rejection_reason");
-
-                    b.Property<DateTime>("RequestedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("requested_at_utc");
-
-                    b.Property<Guid>("RequestedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("requested_by_user_id");
-
-                    b.Property<string>("RuleKind")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasColumnName("rule_kind");
-
-                    b.Property<string>("Scope")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("scope");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasDefaultValue("draft")
-                        .HasColumnName("status");
-
-                    b.Property<DateTime>("ValidFrom")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("valid_from");
-
-                    b.Property<DateTime?>("ValidTo")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("valid_to");
-
-                    b.Property<decimal>("Value")
-                        .HasColumnType("numeric(14,4)")
-                        .HasColumnName("value");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ApprovedByUserId");
-
-                    b.HasIndex("ContractId");
-
-                    b.HasIndex("LegalEntityId");
-
-                    b.HasIndex("RequestedByUserId", "RequestedAtUtc")
-                        .HasDatabaseName("ix_pricing_rules_requester");
-
-                    b.HasIndex("Scope", "LegalEntityId", "RuleKind", "ValidFrom")
-                        .HasDatabaseName("ix_pricing_rules_active")
-                        .HasFilter("status = 'approved'");
-
-                    b.ToTable("pricing_rules", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_pricing_rules_approved_has_approver", "(status = 'approved') = (approved_by_user_id IS NOT NULL)");
-
-                            t.HasCheckConstraint("ck_pricing_rules_exactly_one_scope_target", "    (scope = 'global'        AND legal_entity_id IS NULL AND contract_id IS NULL)\r\n OR (scope = 'legal_entity'  AND legal_entity_id IS NOT NULL AND contract_id IS NULL)\r\n OR (scope = 'contract'      AND legal_entity_id IS NULL AND contract_id IS NOT NULL)");
-
-                            t.HasCheckConstraint("ck_pricing_rules_kind", "rule_kind IN ('profit_per_liter','min_discount_per_liter','discount_percent','fixed_price_per_liter','term_discount_per_liter')");
-
-                            t.HasCheckConstraint("ck_pricing_rules_scope", "scope IN ('legal_entity','contract','global')");
-
-                            t.HasCheckConstraint("ck_pricing_rules_status", "status IN ('draft','pending_approval','approved','rejected','superseded')");
-
-                            t.HasCheckConstraint("ck_pricing_rules_valid_window", "valid_to IS NULL OR valid_to > valid_from");
-
-                            t.HasCheckConstraint("ck_pricing_rules_value_non_negative", "value >= 0");
                         });
                 });
 
@@ -3235,8 +3169,9 @@ namespace FuelFlow.API.Migrations
 
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.Brand", b =>
                 {
-                    b.Property<string>("Id")
-                        .HasColumnType("text")
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
                         .HasColumnName("id");
 
                     b.Property<string>("Color")
@@ -3271,6 +3206,12 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("slug");
+
                     b.Property<int>("SortOrder")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
@@ -3285,55 +3226,62 @@ namespace FuelFlow.API.Migrations
 
                     b.HasIndex("Name");
 
+                    b.HasIndex("Slug")
+                        .IsUnique();
+
                     b.ToTable("brands", null, t =>
                         {
-                            t.HasCheckConstraint("ck_brands_id_length", "length(id) <= 100");
-
                             t.HasCheckConstraint("ck_brands_name_length", "length(name) <= 200");
+
+                            t.HasCheckConstraint("ck_brands_slug_length", "length(slug) <= 100");
                         });
 
                     b.HasData(
                         new
                         {
-                            Id = "okko",
+                            Id = new Guid("11111111-1111-4111-8111-111111111111"),
                             Color = "#22c55e",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             LogoText = "OKKO",
                             Name = "OKKO",
+                            Slug = "okko",
                             SortOrder = 1,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
                         {
-                            Id = "wog",
+                            Id = new Guid("22222222-2222-4222-8222-222222222222"),
                             Color = "#10b981",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             LogoText = "WOG",
                             Name = "WOG",
+                            Slug = "wog",
                             SortOrder = 2,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
                         {
-                            Id = "upg",
+                            Id = new Guid("33333333-3333-4333-8333-333333333333"),
                             Color = "#06b6d4",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             LogoText = "UPG",
                             Name = "UPG",
+                            Slug = "upg",
                             SortOrder = 3,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         },
                         new
                         {
-                            Id = "klo",
+                            Id = new Guid("44444444-4444-4444-8444-444444444444"),
                             Color = "#eab308",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             IsDeleted = false,
                             LogoText = "KLO",
                             Name = "KLO",
+                            Slug = "klo",
                             SortOrder = 4,
                             UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
                         });
@@ -3341,8 +3289,9 @@ namespace FuelFlow.API.Migrations
 
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.BrandStation", b =>
                 {
-                    b.Property<string>("Id")
-                        .HasColumnType("text")
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
                         .HasColumnName("id");
 
                     b.Property<string>("Address")
@@ -3350,9 +3299,8 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("address");
 
-                    b.Property<string>("BrandId")
-                        .IsRequired()
-                        .HasColumnType("text")
+                    b.Property<Guid>("BrandId")
+                        .HasColumnType("uuid")
                         .HasColumnName("brand_id");
 
                     b.Property<string>("City")
@@ -3367,6 +3315,12 @@ namespace FuelFlow.API.Migrations
                     b.Property<DateTime?>("DeletedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_at_utc");
+
+                    b.Property<string>("ExternalId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("external_id");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
@@ -3404,12 +3358,11 @@ namespace FuelFlow.API.Migrations
 
                     b.HasIndex("BrandId");
 
-                    b.ToTable("brand_stations", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_brand_stations_brand_id_length", "length(brand_id) <= 100");
+                    b.HasIndex("BrandId", "ExternalId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_brand_stations_brand_external");
 
-                            t.HasCheckConstraint("ck_brand_stations_id_length", "length(id) <= 100");
-                        });
+                    b.ToTable("brand_stations", (string)null);
                 });
 
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.ErrorLog", b =>
@@ -3541,9 +3494,8 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<string>("BrandId")
-                        .IsRequired()
-                        .HasColumnType("text")
+                    b.Property<Guid>("BrandId")
+                        .HasColumnType("uuid")
                         .HasColumnName("brand_id");
 
                     b.Property<Guid?>("ChangedByUserId")
@@ -3608,8 +3560,6 @@ namespace FuelFlow.API.Migrations
 
                     b.ToTable("fuel_offer_prices", null, t =>
                         {
-                            t.HasCheckConstraint("ck_fuel_offer_prices_brand_id_length", "length(brand_id) <= 100");
-
                             t.HasCheckConstraint("ck_fuel_offer_prices_data_kind", "data_kind IN ('real', 'qa')");
 
                             t.HasCheckConstraint("ck_fuel_offer_prices_fuel_type_id_length", "length(fuel_type_id) <= 100");
@@ -3642,9 +3592,8 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("text")
                         .HasColumnName("brand_fuel_code");
 
-                    b.Property<string>("BrandId")
-                        .IsRequired()
-                        .HasColumnType("text")
+                    b.Property<Guid>("BrandId")
+                        .HasColumnType("uuid")
                         .HasColumnName("brand_id");
 
                     b.Property<DateTime>("CreatedAtUtc")
@@ -3720,8 +3669,6 @@ namespace FuelFlow.API.Migrations
                         {
                             t.HasCheckConstraint("ck_fuel_types_brand_fuel_code_length", "brand_fuel_code IS NULL OR length(brand_fuel_code) <= 50");
 
-                            t.HasCheckConstraint("ck_fuel_types_brand_id_length", "length(brand_id) <= 100");
-
                             t.HasCheckConstraint("ck_fuel_types_id_length", "length(id) <= 100");
 
                             t.HasCheckConstraint("ck_fuel_types_margin_signs", "margin_uah_per_liter IS NULL OR margin_uah_per_liter >= 0");
@@ -3740,7 +3687,7 @@ namespace FuelFlow.API.Migrations
                             AllowBelowCost = false,
                             BasePrice = 55m,
                             BrandFuelCode = "DP",
-                            BrandId = "okko",
+                            BrandId = new Guid("11111111-1111-4111-8111-111111111111"),
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DiscountPrice = 52m,
                             IsDeleted = false,
@@ -3753,7 +3700,7 @@ namespace FuelFlow.API.Migrations
                             AllowBelowCost = false,
                             BasePrice = 54m,
                             BrandFuelCode = "A-95",
-                            BrandId = "okko",
+                            BrandId = new Guid("11111111-1111-4111-8111-111111111111"),
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DiscountPrice = 51m,
                             IsDeleted = false,
@@ -3766,7 +3713,7 @@ namespace FuelFlow.API.Migrations
                             AllowBelowCost = false,
                             BasePrice = 60m,
                             BrandFuelCode = "Pulls 95",
-                            BrandId = "okko",
+                            BrandId = new Guid("11111111-1111-4111-8111-111111111111"),
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DiscountPrice = 56m,
                             IsDeleted = false,
@@ -3779,7 +3726,7 @@ namespace FuelFlow.API.Migrations
                             AllowBelowCost = false,
                             BasePrice = 58m,
                             BrandFuelCode = "Pulls Diesel",
-                            BrandId = "okko",
+                            BrandId = new Guid("11111111-1111-4111-8111-111111111111"),
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DiscountPrice = 55m,
                             IsDeleted = false,
@@ -3792,7 +3739,7 @@ namespace FuelFlow.API.Migrations
                             AllowBelowCost = false,
                             BasePrice = 29m,
                             BrandFuelCode = "SPBT",
-                            BrandId = "okko",
+                            BrandId = new Guid("11111111-1111-4111-8111-111111111111"),
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DiscountPrice = 27m,
                             IsDeleted = false,
@@ -3804,7 +3751,7 @@ namespace FuelFlow.API.Migrations
                             Id = "wog-dp",
                             AllowBelowCost = false,
                             BasePrice = 56m,
-                            BrandId = "wog",
+                            BrandId = new Guid("22222222-2222-4222-8222-222222222222"),
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DiscountPrice = 53m,
                             IsDeleted = false,
@@ -3816,7 +3763,7 @@ namespace FuelFlow.API.Migrations
                             Id = "wog-95",
                             AllowBelowCost = false,
                             BasePrice = 55m,
-                            BrandId = "wog",
+                            BrandId = new Guid("22222222-2222-4222-8222-222222222222"),
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DiscountPrice = 52m,
                             IsDeleted = false,
@@ -3828,7 +3775,7 @@ namespace FuelFlow.API.Migrations
                             Id = "wog-95-euro",
                             AllowBelowCost = false,
                             BasePrice = 56m,
-                            BrandId = "wog",
+                            BrandId = new Guid("22222222-2222-4222-8222-222222222222"),
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DiscountPrice = 53m,
                             IsDeleted = false,
@@ -3840,7 +3787,7 @@ namespace FuelFlow.API.Migrations
                             Id = "wog-100",
                             AllowBelowCost = false,
                             BasePrice = 65m,
-                            BrandId = "wog",
+                            BrandId = new Guid("22222222-2222-4222-8222-222222222222"),
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DiscountPrice = 61m,
                             IsDeleted = false,
@@ -3852,7 +3799,7 @@ namespace FuelFlow.API.Migrations
                             Id = "wog-gas",
                             AllowBelowCost = false,
                             BasePrice = 29m,
-                            BrandId = "wog",
+                            BrandId = new Guid("22222222-2222-4222-8222-222222222222"),
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DiscountPrice = 27m,
                             IsDeleted = false,
@@ -3871,9 +3818,8 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("text")
                         .HasColumnName("product_code");
 
-                    b.Property<string>("BrandId")
-                        .IsRequired()
-                        .HasColumnType("text")
+                    b.Property<Guid>("BrandId")
+                        .HasColumnType("uuid")
                         .HasColumnName("brand_id");
 
                     b.Property<DateTime?>("LastSeenAtUtc")
@@ -3891,8 +3837,6 @@ namespace FuelFlow.API.Migrations
 
                     b.ToTable("fuel_type_product_codes", null, t =>
                         {
-                            t.HasCheckConstraint("ck_fuel_type_product_codes_brand_id_length", "length(brand_id) <= 100");
-
                             t.HasCheckConstraint("ck_fuel_type_product_codes_code_not_blank", "btrim(product_code) <> ''");
 
                             t.HasCheckConstraint("ck_fuel_type_product_codes_fuel_type_id_length", "length(fuel_type_id) <= 100");
@@ -4600,38 +4544,6 @@ namespace FuelFlow.API.Migrations
                     b.Navigation("SourceVoucher");
                 });
 
-            modelBuilder.Entity("FuelFlow.Features.Pricing.Rules.SharedModels.PricingRule", b =>
-                {
-                    b.HasOne("FuelFlow.SharedKernel.Domain.User", "ApprovedBy")
-                        .WithMany()
-                        .HasForeignKey("ApprovedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("FuelFlow.Features.Contracts.SharedModels.Contract", "Contract")
-                        .WithMany()
-                        .HasForeignKey("ContractId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("FuelFlow.Features.Contracts.SharedModels.LegalEntity", "LegalEntity")
-                        .WithMany()
-                        .HasForeignKey("LegalEntityId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("FuelFlow.SharedKernel.Domain.User", "RequestedBy")
-                        .WithMany()
-                        .HasForeignKey("RequestedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("ApprovedBy");
-
-                    b.Navigation("Contract");
-
-                    b.Navigation("LegalEntity");
-
-                    b.Navigation("RequestedBy");
-                });
-
             modelBuilder.Entity("FuelFlow.Features.Settlement.SharedModels.SettlementMessage", b =>
                 {
                     b.HasOne("FuelFlow.Payments.SharedModels.Payment", "Payment")
@@ -4821,11 +4733,13 @@ namespace FuelFlow.API.Migrations
 
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.BrandStation", b =>
                 {
-                    b.HasOne("FuelFlow.SharedKernel.Domain.Brand", null)
-                        .WithMany()
+                    b.HasOne("FuelFlow.SharedKernel.Domain.Brand", "Brand")
+                        .WithMany("Stations")
                         .HasForeignKey("BrandId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Brand");
                 });
 
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.FuelNominal", b =>
@@ -4905,6 +4819,11 @@ namespace FuelFlow.API.Migrations
             modelBuilder.Entity("FuelFlow.Payments.SharedModels.Payment", b =>
                 {
                     b.Navigation("SettlementMessages");
+                });
+
+            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.Brand", b =>
+                {
+                    b.Navigation("Stations");
                 });
 #pragma warning restore 612, 618
         }

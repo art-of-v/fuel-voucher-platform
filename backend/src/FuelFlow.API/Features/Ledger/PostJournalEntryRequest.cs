@@ -28,7 +28,10 @@ public sealed record PostJournalEntryRequest
     public Guid? PartyId { get; init; }
     public Guid? LegalEntityId { get; init; }
     public Guid? VoucherId { get; init; }
-    public string? OfferId { get; init; }
+
+    // OfferId is gone with the offer (2026-10-19): a posting names the party, the entity and the
+    // voucher, and the offer it used to carry was a pointer to a row nothing writes.
+
     public decimal? QuantityLiters { get; init; }
 
     /// <summary>Who stands behind the posting. Required by ck_journal_entries_posted_shape.</summary>

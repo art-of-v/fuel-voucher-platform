@@ -635,9 +635,9 @@ result.Should().HaveCount(2);
 // the whole of what a package is now - there is no second row keeping the two in step.
         var nominal = new FuelNominal
         {
-            FuelTypeId = fuelTypeId,
-            DataKind = DataKinds.ForPool(isTestData),
-            Liters = liters,
+FuelTypeId = fuelTypeId,
+        DataKind = DataKinds.ForPool(isTestData),
+        Liters = liters,
         CreatedAtUtc = DateTime.UtcNow,
         UpdatedAtUtc = DateTime.UtcNow,
     };
@@ -661,9 +661,9 @@ result.Should().HaveCount(2);
             // A voucher names its network as TEXT - the import prints it, the fulfilment worker reads
             // it, and neither knows a uuid. That is why the stock key is slug-based, so the fixture
             // takes the brand row's own code rather than a literal that could drift from it.
-            Brand = brandText ?? EnsureBrand(brandId).Slug,
-            FuelTypeId = fuelTypeId,
+Brand = brandText ?? EnsureBrand(brandId).Slug,
         FuelTypeId = fuelTypeId,
+        Liters = liters,
             SupplierExpirationDate = expiry,
             CustomerExpirationDate = expiry,
             VoucherNumber = $"{brandText ?? EnsureBrand(brandId).Slug}-{Guid.NewGuid().ToString()[..8]}",
