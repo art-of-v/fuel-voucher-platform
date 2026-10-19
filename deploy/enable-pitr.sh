@@ -86,7 +86,9 @@ source "$SCRIPT_DIR/pitr-common.sh"
 : "${POSTGRES_USER:?POSTGRES_USER is not set in $ENV_FILE}"
 : "${POSTGRES_DB:?POSTGRES_DB is not set in $ENV_FILE}"
 echo "  role    : $POSTGRES_USER"
-echo# The postgres user inside the image. Not hardcoded: the uid is a property of the image,
+echo
+
+# The postgres user inside the image. Not hardcoded: the uid is a property of the image,
 # and the image is allowed to change.
 PG_UID="$(docker run --rm --entrypoint id "$PG_IMAGE" -u postgres | tr -d ' ')"
 PG_GID="$(docker run --rm --entrypoint id "$PG_IMAGE" -g postgres | tr -d ' ')"
@@ -104,9 +106,28 @@ else
   OWNER="$(stat -c '%u:%g' "$ARCHIVE_DIR")"
   if [[ "$OWNER" != "${PG_UID}:${PG_GID}" ]]; then
     echo "[$(date -Is)] Fixing the ownership of $ARCHIVE_DIR (was ${OWNER})."
-    chown "$PG_UID:$PG_GID" "$ARCHIVE_DIR"
+    # The CONTENTS as well as the directory. A directory that a previous deploy left
+    # behind as root holds root-owned WAL segments, and the postgres user cannot write
+    # over a file it does not own - so the archive silently stays empty even though the
+    # directory now looks right.
+    chown -R "$PG_UID:$PG_GID" "$ARCHIVE_DIR" || true
   fi
-  chmod 750 "$ARCHIVE_DIR"
+  chmod 750 "$ARCHIVE_DIR" || true
+fi
+
+# Verify the ownership rather than assuming the fix took. `chown` fails quietly on a
+# filesystem that does not do POSIX ownership, and the script would then say "Archive
+# directory ready" and carry on to a WAL switch that cannot possibly work. The whole
+# point of this script is that it proves archiving works - so it must not report a
+# directory as ready without looking.
+ACTUAL_OWNER="$(stat -c '%u:%g' "$ARCHIVE_DIR")"
+if [[ "$ACTUAL_OWNER" != "${PG_UID}:${PG_GID}" ]]; then
+  echo >&2
+  echo "ERROR: the archive directory is owned by ${ACTUAL_OWNER}, not ${PG_UID}:${PG_GID}," >&2
+  echo "       so the postgres user inside the container cannot write to it and nothing" >&2
+  echo "       would be archived. Fix it with:" >&2
+  echo "           chown -R ${PG_UID}:${PG_GID} ${ARCHIVE_DIR}" >&2
+  exit 1
 fi
 echo "[$(date -Is)] Archive directory ready: $(ls -ld "$ARCHIVE_DIR")"
 
