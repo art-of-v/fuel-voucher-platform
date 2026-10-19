@@ -125,7 +125,7 @@ public sealed class UpgWogPriceSyncServiceTests : IDisposable
             ? throw new UpgWogPriceScrapeException("HTTP 503")
             : [new UpgWogPrice("wog95", 95.90m)]);
 
-        await Service(client, enabled: true).SyncPricesAsync();
+        await Service(client, enabled: true).SyncCatalogueAndPricesAsync();
         _context.ChangeTracker.Clear();
 
         // UPG and WOG are separate sites: one of them being down says nothing about the other.
@@ -140,7 +140,9 @@ public sealed class UpgWogPriceSyncServiceTests : IDisposable
         await SeedBrandAsync(BrandIds.Upg, "upg");
         var client = new StubClient(_ => [new UpgWogPrice("upg95", 91.90m)]);
 
-        await Service(client, enabled: true).SyncPricesAsync();
+        // The weekly catalogue check is what brings a new grade in; the fifteen-minute price refresh
+        // only moves prices. The split is the whole reason there are two jobs.
+        await Service(client, enabled: true).SyncCatalogueAndPricesAsync();
         _context.ChangeTracker.Clear();
 
         var created = await _context.FuelTypes.SingleAsync(f => f.BrandId == BrandIds.Upg);
@@ -160,7 +162,7 @@ public sealed class UpgWogPriceSyncServiceTests : IDisposable
         await SeedBrandAsync(BrandIds.Upg, "upg");
         var client = new StubClient(_ => [new UpgWogPrice("upg95", 91.90m)]);
 
-        await Service(client, enabled: true).SyncPricesAsync();
+        await Service(client, enabled: true).SyncCatalogueAndPricesAsync();
         _context.ChangeTracker.Clear();
 
         // Nobody typed this number, so the history is the only way to answer "what was this fuel priced

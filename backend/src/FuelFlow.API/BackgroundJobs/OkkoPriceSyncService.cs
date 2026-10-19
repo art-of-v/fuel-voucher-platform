@@ -59,7 +59,7 @@ public sealed class OkkoPriceSyncService
         _logger = logger;
     }
 
-    public async Task SyncPricesAsync(CancellationToken cancellationToken = default)
+    public async Task SyncPricesAsync(CancellationToken ct = default)
     {
         if (!_options.Enabled)
         {
@@ -68,19 +68,65 @@ public sealed class OkkoPriceSyncService
             return;
         }
 
+        var prices = await FetchAsync(ct);
+        if (prices is null)
+        {
+            return;
+        }
+
+        await PriceAsync(prices, ct);
+    }
+
+    /// <summary>
+    /// The weekly check: whether OKKO sells a grade we do not carry, and then the price of it.
+    /// </summary>
+    /// <remarks>
+    /// A new grade is news on a scale of weeks, and creating one is a decision - it puts a row in
+    /// the catalogue and a size on the shelf - so it belongs to a job that runs weekly rather than to
+    /// the one that moves prices every fifteen minutes.
+    /// </remarks>
+    public async Task SyncCatalogueAndPricesAsync(CancellationToken ct = default)
+    {
+        if (!_options.Enabled)
+        {
+            _logger.LogDebug(
+                "OKKO catalogue sync skipped (OkkoPrice:Enabled=false); the catalogue keeps the grades it has");
+            return;
+        }
+
+        var prices = await FetchAsync(ct);
+        if (prices is null)
+        {
+            return;
+        }
+
+        await CatalogueAsync(prices, ct);
+        await PriceAsync(prices, ct);
+    }
+
+    private async Task<IReadOnlyList<OkkoPumpPrice>?> FetchAsync(CancellationToken ct)
+    {
         IReadOnlyList<OkkoPumpPrice> prices;
         try
         {
-            prices = await _client.FetchAsync(cancellationToken);
+            prices = await _client.FetchAsync(ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             // Deliberate: no fallback write. Today's fetch failing must not be able to change a price.
             _logger.LogError(
                 ex, "OKKO price sync failed to fetch prices; keeping the last known pump prices");
-            return;
+            return null;
         }
 
+        return prices;
+    }
+
+    /// <summary>
+    /// The catalogue half: the grades OKKO sells that we do not carry.
+    /// </summary>
+    private async Task CatalogueAsync(IReadOnlyList<OkkoPumpPrice> prices, CancellationToken ct)
+    {
         // Before pricing, because a fuel that does not exist yet cannot be priced: the pump has
         // nowhere to live until the fuel does. Its own try/catch because a catalogue failure must not
         // cost us today's prices - the two write disjoint columns.
@@ -88,7 +134,7 @@ public sealed class OkkoPriceSyncService
         {
             var catalogue = await _catalogue.ApplyAsync(
                 new ImportOkkoCatalogueCommand(prices, DryRun: false),
-                Guid.Empty, SyncActorName, cancellationToken);
+                Guid.Empty, SyncActorName, ct);
 
             if (catalogue.Created > 0)
             {
@@ -137,7 +183,13 @@ public sealed class OkkoPriceSyncService
             ForgetFailedWrites();
             _logger.LogError(ex, "OKKO sync failed to add missing fuels; prices are still applied");
         }
+    }
 
+    /// <summary>
+    /// The price half: the codes our fuels match by, and what OKKO charges.
+    /// </summary>
+    private async Task PriceAsync(IReadOnlyList<OkkoPumpPrice> prices, CancellationToken ct)
+    {
         // Before pricing, and after the catalogue half above: the price step matches a fuel by its code
         // where it has one, so the fuels an operator typed — which have none — are what is left
         // resolving by category. Filling them from the same sheet is idempotent and, once done, does
@@ -146,7 +198,7 @@ public sealed class OkkoPriceSyncService
         {
             var backfill = await _backfill.ApplyAsync(
                 new BackfillBrandFuelCodesCommand(prices, DryRun: false),
-                Guid.Empty, SyncActorName, cancellationToken);
+                Guid.Empty, SyncActorName, ct);
 
             if (backfill.Filled > 0)
             {
@@ -178,7 +230,7 @@ public sealed class OkkoPriceSyncService
         try
         {
             result = await _import.ApplyAsync(
-                prices, dryRun: false, actingUserId: Guid.Empty, SyncActorName, cancellationToken);
+                prices, dryRun: false, actingUserId: Guid.Empty, SyncActorName, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

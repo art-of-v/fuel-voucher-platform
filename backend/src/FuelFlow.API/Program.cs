@@ -275,6 +275,16 @@ recurringJobManager.AddOrUpdate<NotificationService>(
             service => service.SyncPricesAsync(CancellationToken.None),
             "*/15 * * * *");
 
+        // Whether a vendor sells a grade we do not carry is a different question from what it
+        // charges, and it moves on a different clock: a price changes every day, a new grade is
+        // news that arrives a few times a year. Creating one puts a row in the catalogue and a size
+        // on the shelf, so it is the weekly job's business - and the weekly job also prices what it
+        // created, so a new grade is priced the day it arrives rather than the next quarter.
+        recurringJobManager.AddOrUpdate<OkkoPriceSyncService>(
+            "sync-okko-catalogue",
+            service => service.SyncCatalogueAndPricesAsync(CancellationToken.None),
+            "5 3 * * 1");
+
         // The same cadence for UPG and WOG, which publish a page rather than an API. Their importer
         // creates a grade it has not seen before - with its sizes - and records the price, so a fuel
         // we did not carry appears on the shelf at the vendor's price, marked unavailable until an
@@ -283,6 +293,25 @@ recurringJobManager.AddOrUpdate<NotificationService>(
             "sync-upgwog-pump-prices",
             service => service.SyncPricesAsync(CancellationToken.None),
             "*/15 * * * *");
+
+        // The same split for the two vendors that publish a page: prices every fifteen minutes, the
+        // question "do they sell something we do not" once a week.
+        recurringJobManager.AddOrUpdate<UpgWogPriceSyncService>(
+            "sync-upgwog-catalogue",
+            service => service.SyncCatalogueAndPricesAsync(CancellationToken.None),
+            "11 3 * * 1");
+
+        // KLO publishes no prices of its own, so Minfin's table is the source: what the network
+        // charges, every fifteen minutes, and the grades we do not carry, once a week.
+        recurringJobManager.AddOrUpdate<KloPriceSyncService>(
+            "sync-klo-prices",
+            service => service.SyncPricesAsync(CancellationToken.None),
+            "*/15 * * * *");
+
+        recurringJobManager.AddOrUpdate<KloPriceSyncService>(
+            "sync-klo-catalogue",
+            service => service.SyncCatalogueAndPricesAsync(CancellationToken.None),
+            "23 3 * * 1");
     }
 
     // Production deploys only the API (Hangfire runs in-process, no JobsWorker), and
