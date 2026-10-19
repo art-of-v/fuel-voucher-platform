@@ -109,6 +109,7 @@ internal sealed class JournalLineConfiguration : IEntityTypeConfiguration<Journa
         builder.Property(e => e.AccountId).HasColumnName("account_id").IsRequired();
         builder.Property(e => e.PartyId).HasColumnName("party_id");
         // offer_id is gone with the offer (2026-10-19) - see the note where its foreign key was.
+        builder.Property(e => e.LegalEntityId).HasColumnName("legal_entity_id");
         builder.Property(e => e.VoucherId).HasColumnName("voucher_id");
         builder.Property(e => e.QuantityLiters).HasColumnName("quantity_liters").HasPrecision(10, 2);
         builder.Property(e => e.DebitUah).HasColumnName("debit_uah").HasPrecision(14, 2).HasDefaultValue(0m).IsRequired();
