@@ -309,9 +309,9 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
 
             await seed.SaveChangesAsync();
 
-            costBefore = (await seed.FuelOffers.AsNoTracking()
-                .Where(o => o.FuelTypeId == "okko-95")
-                .Select(o => o.SupplierPricePerLiter)
+            costBefore = (await seed.FuelTypes.AsNoTracking()
+                .Where(f => f.Id == "okko-95")
+                .Select(f => f.SupplierPricePerLiter)
                 .FirstAsync())!.Value;
         }
 
@@ -329,9 +329,9 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
 
         using var verify = CreateContext();
 
-        (await verify.FuelOffers.AsNoTracking()
-            .Where(o => o.FuelTypeId == "okko-95")
-            .Select(o => o.SupplierPricePerLiter)
+        (await verify.FuelTypes.AsNoTracking()
+            .Where(f => f.Id == "okko-95")
+            .Select(f => f.SupplierPricePerLiter)
             .FirstAsync()).Should().Be(
             costBefore,
             "three vouchers left the stock, but a sale is not a purchase and moves nothing");

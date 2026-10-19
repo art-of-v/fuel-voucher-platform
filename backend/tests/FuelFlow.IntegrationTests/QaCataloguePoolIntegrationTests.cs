@@ -56,12 +56,13 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
     private const decimal Liters = 10m;
 
     /// <summary>
-    /// What the live offer buys the litre at, and what the rehearsal offer buys it at. Two costs is
-    /// the whole demonstration that the pool is being honoured: the same fuel, the same size, two
-    /// different prices, one per pool.
+    /// The size only the rehearsal pool sells. The two pools no longer differ in what a litre costs -
+    /// one price per grade, since 2026-10-19 - so the size list is what still says "this is the other
+    /// pool", and a test that proved separation through two prices would now be proving nothing.
     /// </summary>
-    private const decimal RealCostPerLiter = 45m;
-    private const decimal QaCostPerLiter = 40m;
+    private const decimal QaLiters = 7m;
+
+    private const decimal CostPerLiter = 45m;
 
     private const string RealName = "А95";
 
@@ -106,40 +107,37 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
                 BrandId = Brand,
                 BasePrice = 50,
                 DiscountPrice = 47,
+                SupplierPricePerLiter = CostPerLiter,
+                MarginUahPerLiter = 2m,
                 CreatedAtUtc = now,
                 UpdatedAtUtc = now
             });
         }
 
-// One nominal, sold in both pools. The offer carries the cost, so the two pools price it
-        // differently - which is what makes the pool observable at all now that the size list is shared.
-        if (!await context.FuelNominals.AnyAsync(p => p.FuelTypeId == FuelType && p.Liters == Liters, CancellationToken.None))
-        {
-            context.SeedPackage("qa-pool-real-10", Brand, FuelType, Liters, 470m * Liters,
-                supplierPricePerLiter: RealCostPerLiter, marginUahPerLiter: 2m, finalPricePerLiter: 47m,
-                isTestData: false, createdAtUtc: now, updatedAtUtc: now);
-        }
+        // One nominal per pool, sold at the same price. The pools no longer differ in what a litre
+        // costs - one price per grade since 2026-10-19 - so the size list is what still says "this is
+        // the other pool", and this test proves separation through it rather than through two prices.
+        context.SeedPackage("qa-pool-real-10", Brand, FuelType, Liters, 470m * Liters,
+            supplierPricePerLiter: CostPerLiter, marginUahPerLiter: 2m, finalPricePerLiter: 47m,
+            isTestData: false, createdAtUtc: now, updatedAtUtc: now);
 
-        if (!await context.FuelOffers.AnyAsync(p => p.FuelTypeId == FuelType && p.DataKind == DataKinds.Qa, CancellationToken.None))
-        {
-            context.SeedPackage("qa-pool-qa-10", Brand, FuelType, Liters, 420m * Liters,
-                supplierPricePerLiter: QaCostPerLiter, marginUahPerLiter: 2m, finalPricePerLiter: 42m,
-                isTestData: true, createdAtUtc: now, updatedAtUtc: now);
-        }
+        context.SeedPackage("qa-pool-qa-7", Brand, FuelType, QaLiters, 470m * QaLiters,
+            supplierPricePerLiter: CostPerLiter, marginUahPerLiter: 2m, finalPricePerLiter: 47m,
+            isTestData: true, createdAtUtc: now, updatedAtUtc: now);
 
-    // One sellable voucher per pool, seeded once. Without both, "QA can see the QA package" would
-    // pass on a row that is merely visible but dark, which is not what the reviewer needs.
-    if (!await context.FuelVouchers.AnyAsync(
+        // One sellable voucher per pool, seeded once. Without both, "QA can see the QA package" would
+        // pass on a row that is merely visible but dark, which is not what the reviewer needs.
+        if (!await context.FuelVouchers.AnyAsync(
             v => v.FuelTypeId == FuelType && v.Liters == Liters && v.DataKind == DataKinds.Real, CancellationToken.None))
-    {
-        context.FuelVouchers.Add(SellableVoucher(Liters, isTestData: false));
-    }
+        {
+            context.FuelVouchers.Add(SellableVoucher(Liters, isTestData: false));
+        }
 
-    if (!await context.FuelVouchers.AnyAsync(
-            v => v.FuelTypeId == FuelType && v.Liters == Liters && v.DataKind == DataKinds.Qa, CancellationToken.None))
-    {
-        context.FuelVouchers.Add(SellableVoucher(Liters, isTestData: true));
-    }
+        if (!await context.FuelVouchers.AnyAsync(
+            v => v.FuelTypeId == FuelType && v.Liters == QaLiters && v.DataKind == DataKinds.Qa, CancellationToken.None))
+        {
+            context.FuelVouchers.Add(SellableVoucher(QaLiters, isTestData: true));
+        }
 
         await context.SaveChangesAsync();
     }
@@ -260,8 +258,11 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
         var packages = await PackagesAsync(client, byBrand, Brand);
 
         var qaPackage = Assert.Single(packages);
-        Assert.Equal(Liters, qaPackage.Liters);
-        Assert.Equal(42m, qaPackage.FinalPricePerLiter);
+        // The size is the rehearsal one, and that is what proves the pool: the live pool's 10 L is
+        // not in this list. The price is the same number the live caller sees, because there is one
+        // price per grade - the two pools cannot be told apart by it any more.
+        Assert.Equal(QaLiters, qaPackage.Liters);
+        Assert.Equal(47m, qaPackage.FinalPricePerLiter);
         Assert.True(qaPackage.IsAvailable,
             "the QA package is visible and its stock is sellable, which is the whole point — a QA run " +
             "that could see the catalogue but not buy from it would be no better than reusing the live one");
