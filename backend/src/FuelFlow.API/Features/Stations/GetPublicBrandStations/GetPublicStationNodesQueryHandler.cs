@@ -11,7 +11,8 @@ public sealed class GetPublicBrandStationsQueryHandler
     public async Task<List<PublicBrandStationResponse>> HandleAsync(GetPublicBrandStationsQuery query, CancellationToken ct = default) =>
         await _context.BrandStations
             .AsNoTracking()
-            .OrderBy(x => x.Name)
+            .OrderBy(x => EF.Property<string>(x, "NameSortKey"))
+            .ThenBy(x => x.Name)
             .Select(x => new PublicBrandStationResponse(
                 x.Id, x.BrandId, x.Brand!.Slug, x.Name, x.Address, x.Phone, x.City, x.StationType, x.Lat, x.Lng))
             .ToListAsync(ct);

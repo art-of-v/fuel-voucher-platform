@@ -86,5 +86,24 @@ internal sealed class BrandStationConfiguration : IEntityTypeConfiguration<Brand
         builder.HasIndex(e => new { e.BrandId, e.ExternalId })
             .IsUnique()
             .HasDatabaseName("ux_brand_stations_brand_external");
+
+        // The sort key, so that a station list reads in the order a person would write it.
+        //
+        // The names carry a number - "OKKO №01", "OKKO №10", "OKKO №100" - and a byte sort puts
+        // them in the order "№01", "№09", "№1", "№10", "№100", "№11", because "1" sorts before
+        // "2". The catalogue is 1,322 stations and 598 of the distinct names carry a number, so this
+        // is most of the list rather than an edge case.
+        //
+        // It is a GENERATED column rather than something the application sorts, for one reason: the
+        // admin list is paged, and Skip/Take run in the database. A sort that happened after the
+        // page was cut would put the same stations on two pages and leave others on none.
+        //
+        // A shadow property, so the column does not appear in the JSON the admin API returns. It is
+        // a sort key, not a field anybody reads.
+        builder.Property<string>("NameSortKey")
+            .HasColumnName("name_sort_key")
+            .HasComputedColumnSql("fuelflow_natural_sort_key(name)", stored: true);
+
+        builder.HasIndex("NameSortKey").HasDatabaseName("ix_brand_stations_name_sort_key");
     }
 }

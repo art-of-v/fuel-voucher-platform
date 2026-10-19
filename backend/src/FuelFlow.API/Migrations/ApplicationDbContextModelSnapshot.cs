@@ -3451,6 +3451,12 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
+                    b.Property<string>("NameSortKey")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("text")
+                        .HasColumnName("name_sort_key")
+                        .HasComputedColumnSql("fuelflow_natural_sort_key(name)", true);
+
                     b.Property<string>("Phone")
                         .HasMaxLength(45)
                         .HasColumnType("character varying(45)")
@@ -3469,6 +3475,9 @@ namespace FuelFlow.API.Migrations
 
                     b.HasIndex("BrandId")
                         .HasDatabaseName("ix_brand_stations_brand_id");
+
+                    b.HasIndex("NameSortKey")
+                        .HasDatabaseName("ix_brand_stations_name_sort_key");
 
                     b.HasIndex("BrandId", "ExternalId")
                         .IsUnique()
