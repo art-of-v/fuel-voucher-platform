@@ -70,12 +70,12 @@ public sealed class ImportUpgWogPricesCommandHandler
     private static readonly int[] DefaultNominals = [10, 20, 50];
 
     private readonly ApplicationDbContext _context;
-    private readonly OfferPriceRecorder _priceRecorder;
+    private readonly PriceHistoryRecorder _priceRecorder;
     private readonly BrandSlugResolver _brands;
 
     public ImportUpgWogPricesCommandHandler(
         ApplicationDbContext context,
-        OfferPriceRecorder priceRecorder,
+        PriceHistoryRecorder priceRecorder,
         BrandSlugResolver brands)
     {
         _context = context;
@@ -174,7 +174,7 @@ public sealed class ImportUpgWogPricesCommandHandler
 
             if (!command.DryRun)
             {
-                await _priceRecorder.RecordAsync(fuel, OfferPriceReasons.PumpImport, actor, now, ct);
+                await _priceRecorder.RecordAsync(fuel, PriceHistoryReasons.PumpImport, actor, now, ct);
             }
 
             // A nominal has no stored price, so a pump change rewrites nothing per size - it moves the
@@ -251,7 +251,7 @@ BasePrice = Math.Round(pump, 2, MidpointRounding.AwayFromZero),
 
             // History starts at the price it was born with, so the fuel's story begins at its creation
             // rather than at the first time an operator edited it.
-            await _priceRecorder.RecordAsync(fuel, OfferPriceReasons.PumpImport, actor, now, ct);
+            await _priceRecorder.RecordAsync(fuel, PriceHistoryReasons.PumpImport, actor, now, ct);
 
             foreach (var liters in DefaultNominals)
             {

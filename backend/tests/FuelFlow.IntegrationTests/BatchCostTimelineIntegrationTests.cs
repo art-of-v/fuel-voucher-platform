@@ -205,7 +205,7 @@ public sealed class BatchCostTimelineIntegrationTests : IClassFixture<TestDataba
         var context = CreateContext();
         var handler = new GetImportBatchCostTimelineQueryHandler(
             context,
-            new GetImportBatchCostsQueryHandler(context, new BlendedCostRecalculator(context, new OfferPriceRecorder(context))));
+            new GetImportBatchCostsQueryHandler(context, new BlendedCostRecalculator(context, new PriceHistoryRecorder(context))));
         return await handler.HandleAsync(new GetImportBatchCostTimelineQuery(importId));
     }
 

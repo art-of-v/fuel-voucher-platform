@@ -50,7 +50,7 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         });
         _context.SaveChanges();
 
-        _recalculator = new BlendedCostRecalculator(_context, new OfferPriceRecorder(_context));
+        _recalculator = new BlendedCostRecalculator(_context, new PriceHistoryRecorder(_context));
         _eventService = new AuditEventService(_context);
         _setHandler = new SetBatchCostCommandHandler(_context, _recalculator, _eventService, NotificationDispatcher.Disabled);
         _getHandler = new GetImportBatchCostsQueryHandler(_context, _recalculator);
@@ -196,7 +196,7 @@ private FuelNominal NewPackage(string fuelTypeId, decimal liters)
     }
 
     [Fact]
-    public async Task SetCost_AppendsTheNewCost_ToTheOfferHistory()
+    public async Task SetCost_AppendsTheNewCost_ToThePriceHistory()
     {
         var import = SeedImport();
         SeedVoucher(import, "okko-dp", 100m);
@@ -206,7 +206,7 @@ private FuelNominal NewPackage(string fuelTypeId, decimal liters)
         await _setHandler.HandleAsync(Cmd(import, "okko-dp", 25m));
 
     var fuel = await _context.FuelTypes.FirstAsync(f => f.Id == "okko-dp");
-    var history = await _context.FuelOfferPrices
+    var history = await _context.FuelPriceHistory
         .Where(p => p.FuelTypeId == fuel.Id)
             .ToListAsync();
 
@@ -215,7 +215,7 @@ private FuelNominal NewPackage(string fuelTypeId, decimal liters)
         // row is the only thing that says which happened.
         history.Should().HaveCount(1);
         history[0].SupplierPricePerLiter.Should().Be(25m);
-        history[0].Reason.Should().Be(OfferPriceReasons.BatchCost);
+        history[0].Reason.Should().Be(PriceHistoryReasons.BatchCost);
         history[0].ChangedByUserId.Should().Be(AdminId);
     }
 

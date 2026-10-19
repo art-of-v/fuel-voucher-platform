@@ -15,9 +15,9 @@ namespace FuelFlow.Features.Vouchers.PurchaseBatchCost;
 public sealed class BlendedCostRecalculator
 {
     private readonly ApplicationDbContext _context;
-    private readonly OfferPriceRecorder _priceRecorder;
+    private readonly PriceHistoryRecorder _priceRecorder;
 
-    public BlendedCostRecalculator(ApplicationDbContext context, OfferPriceRecorder priceRecorder)
+    public BlendedCostRecalculator(ApplicationDbContext context, PriceHistoryRecorder priceRecorder)
     {
         _context = context;
         _priceRecorder = priceRecorder;
@@ -59,11 +59,11 @@ public sealed class BlendedCostRecalculator
     /// <summary>
     /// Rewrites the fuel's price to sit off <paramref name="blendedCost"/>, preserving its
     /// pump/min-discount knobs, syncing its base/discount headline — mirroring
-    /// <c>BrandsController.UpdateFuel</c> — and appending the moved price to <c>fuel_offer_prices</c>.
+    /// <c>BrandsController.UpdateFuel</c> — and appending the moved price to <c>fuel_price_history</c>.
     /// Does NOT call SaveChanges (the caller batches the save); returns the number of packages repriced.
     /// </summary>
     /// <param name="reason">
-    /// Which door the cost came through, from <see cref="OfferPriceReasons"/>: an operator entering a
+    /// Which door the cost came through, from <see cref="PriceHistoryReasons"/>: an operator entering a
     /// batch cost, or a voucher exchange releasing expired stock back into the pool. Both end here, and
     /// the history row is the only thing that says which.
     /// </param>
@@ -71,7 +71,7 @@ public sealed class BlendedCostRecalculator
         string fuelTypeId,
         decimal blendedCost,
         Guid actingUserId,
-        string reason = OfferPriceReasons.BatchCost,
+        string reason = PriceHistoryReasons.BatchCost,
         CancellationToken ct = default)
     {
         // The cost is now the fuel's, and so are its profit/pump/min-discount knobs: there is one price

@@ -336,9 +336,9 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
             costBefore,
             "three vouchers left the stock, but a sale is not a purchase and moves nothing");
 
-        (await verify.FuelOfferPrices.AsNoTracking()
+        (await verify.FuelPriceHistory.AsNoTracking()
             .Where(p => p.FuelTypeId == "okko-95"
-                && p.Reason == SharedKernel.Domain.OfferPriceReasons.ExchangeRelease)
+                && p.Reason == SharedKernel.Domain.PriceHistoryReasons.ExchangeRelease)
             .CountAsync()).Should().Be(
             0,
             "and no price event was recorded for it either - the rule is that the price did not move");
@@ -726,7 +726,7 @@ var actingUserId = Guid.NewGuid();
 
     private static ConfirmVoucherExchangeCommandHandler BuildHandler(ApplicationDbContext ctx)
     {
-        var recalculator = new BlendedCostRecalculator(ctx, new OfferPriceRecorder(ctx));
+        var recalculator = new BlendedCostRecalculator(ctx, new PriceHistoryRecorder(ctx));
         var eventService = new AuditEventService(ctx);
 
         var backgroundJobClient = new Mock<IBackgroundJobClient>();

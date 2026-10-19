@@ -14,12 +14,12 @@ namespace FuelFlow.SharedKernel.Domain;
 /// importers or the operator screen produced it.
 /// </para>
 /// <para>
-/// The names are the write paths, one per caller of <c>OfferPriceRecorder</c>. Adding a path means
+/// The names are the write paths, one per caller of <c>PriceHistoryRecorder</c>. Adding a path means
 /// adding a name here and widening the CHECK in the same change - a caller cannot pass a reason the
 /// database has not heard of, so the list cannot silently drift from the paths that exist.
 /// </para>
 /// </remarks>
-public static class OfferPriceReasons
+public static class PriceHistoryReasons
 {
     /// <summary>An operator typed the price in the admin panel, or an admin API called it directly.</summary>
     public const string Operator = "operator";

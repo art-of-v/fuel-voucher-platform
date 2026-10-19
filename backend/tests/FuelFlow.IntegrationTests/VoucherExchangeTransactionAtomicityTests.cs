@@ -86,7 +86,7 @@ public sealed class VoucherExchangeTransactionAtomicityTests : IClassFixture<Tes
             var eventService = new AuditEventService(ctx);
             var handler = new ConfirmVoucherExchangeCommandHandler(
                 ctx,
-                new BlendedCostRecalculator(ctx, new OfferPriceRecorder(ctx)),
+                new BlendedCostRecalculator(ctx, new PriceHistoryRecorder(ctx)),
                 new BulkActionVouchersCommandHandler(ctx, new Mock<IBackgroundJobClient>().Object, eventService),
                 eventService);
 

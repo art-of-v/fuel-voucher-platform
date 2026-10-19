@@ -62,7 +62,7 @@ public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDataba
         ILogger<OkkoPriceSyncService>? logger = null)
     {
         var events = new AuditEventService(context);
-        var priceRecorder = new OfferPriceRecorder(context);
+        var priceRecorder = new PriceHistoryRecorder(context);
         return new OkkoPriceSyncService(
             new StubClient(sheet),
             new ImportOkkoPumpPricesCommandHandler(context, new BrandSlugResolver(context), events, priceRecorder),
@@ -97,7 +97,7 @@ public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDataba
             // The sizes are the fuel's and the seeded catalogue already states them; nothing per
             // offer has to be torn down here any more. The price history hangs off the fuel, so it
             // goes before the fuel it belongs to.
-            context.FuelOfferPrices.RemoveRange(await context.FuelOfferPrices
+            context.FuelPriceHistory.RemoveRange(await context.FuelPriceHistory
                 .Where(p => seededIds.Contains(p.FuelTypeId))
                 .ToListAsync());
 

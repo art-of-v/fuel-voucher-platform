@@ -9,8 +9,8 @@ using Xunit;
 namespace FuelFlow.Providers.UnitTests;
 
 /// <summary>
-/// The read side of <c>fuel_offer_prices</c>. The write side is pinned by
-/// <c>OfferPriceHistoryIntegrationTests</c> and by the controller tests; what is left to answer here is
+/// The read side of <c>fuel_price_history</c>. The write side is pinned by
+/// <c>ProvidersControllerTests</c> and by the price-at integration tests; what is left to answer here is
 /// the shape an operator gets - which is what a screen or an export will be built against.
 /// </summary>
 public sealed class GetFuelPriceHistoryQueryHandlerTests : IDisposable
@@ -108,12 +108,12 @@ var entry = (await _handler.HandleAsync(new GetFuelPriceHistoryQuery("fuel-f")))
     entry.FinalPricePerLiter.Should().Be(52m);
     entry.PumpPricePerLiter.Should().Be(55m);
     entry.MinDiscountPerLiter.Should().Be(1m);
-entry.Reason.Should().Be(OfferPriceReasons.Operator);
+entry.Reason.Should().Be(PriceHistoryReasons.Operator);
 }
 
 private async Task SeedAsync(string fuelTypeId, int at, decimal margin, string? dataKind = null)
     {
-        _context.FuelOfferPrices.Add(new FuelOfferPrice
+        _context.FuelPriceHistory.Add(new FuelPriceHistory
         {
             Id = Guid.CreateVersion7(),
             FuelTypeId = fuelTypeId,
@@ -126,7 +126,7 @@ private async Task SeedAsync(string fuelTypeId, int at, decimal margin, string? 
             MinDiscountPerLiter = 1m,
             EffectiveFromUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddMinutes(at),
             RecordedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddMinutes(at),
-            Reason = OfferPriceReasons.Operator
+            Reason = PriceHistoryReasons.Operator
         });
 
         await _context.SaveChangesAsync();

@@ -54,7 +54,7 @@ public sealed class FuelArchiveRuleIntegrationTests : IClassFixture<TestDatabase
         ApplicationDbContext context, IReadOnlyList<OkkoPumpPrice> sheet)
     {
         var events = new Features.Brands.AuditEventService(context);
-        var handler = new ImportOkkoCatalogueCommandHandler(context, new BrandSlugResolver(context), events, new OfferPriceRecorder(context));
+        var handler = new ImportOkkoCatalogueCommandHandler(context, new BrandSlugResolver(context), events, new PriceHistoryRecorder(context));
         return await handler.ApplyAsync(new ImportOkkoCatalogueCommand(sheet, DryRun: false), Guid.Empty, "test");
     }
 
