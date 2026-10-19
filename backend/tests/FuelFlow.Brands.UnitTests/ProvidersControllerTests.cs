@@ -1,4 +1,3 @@
-using FuelFlow.Features.Brands.GetFuelPriceHistory;
 using FuelFlow.Features.Brands.GetFuelPriceAt;
 using FuelFlow.Features.Pricing;
 using FuelFlow.Brands.UnitTests;
@@ -500,7 +499,6 @@ public sealed class BrandFuelControllerTests : IDisposable
         (await _context.FuelNominals.AnyAsync(n => n.FuelTypeId == "test-fuel-a")).Should().BeFalse();
         (await _context.FuelOffers.IgnoreQueryFilters().AnyAsync(o => o.BrandId == TestOkko && !o.IsDeleted))
             .Should().BeFalse();
-    }
 
     [Fact]
     public async Task AddFuel_BelowCostOptedIn_SavesPrice_AndFiresDeliberateWarningAlert()

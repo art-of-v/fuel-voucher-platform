@@ -1,4 +1,3 @@
-using FuelFlow.Features.Brands.GetFuelPriceHistory;
 using FuelFlow.Features.Brands.GetFuelPriceAt;
 using FuelFlow.Features.Pricing;
 using System.Net;
@@ -108,8 +107,8 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         var bad = result.Should().BeOfType<BadRequestObjectResult>().Subject;
         bad.StatusCode.Should().Be((int)HttpStatusCode.BadRequest);
 
-          var offers = await _context.FuelOffers.Where(o => o.FuelTypeId == "qa-a95").ToListAsync();
-          offers.Should().OnlyContain(o => o.IsTestData,
+          var sizes = await _context.FuelNominals.Where(n => n.FuelTypeId == "qa-a95").ToListAsync();
+        sizes.Should().OnlyContain(n => n.DataKind == DataKinds.Qa,
             "an edit that does not say must not be able to put rehearsal stock on sale");
     }
 
@@ -275,8 +274,8 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
 
         (await _context.FuelTypes.CountAsync(f => f.BrandId == BrandIds.Okko && f.Name == "А95 ЄВРО(QA)"))
             .Should().Be(1, "a second row for the same fuel is a second offer the storefront would list twice");
-
-        (await _context.FuelOffers.CountAsync()).Should().Be(1, "and it must not have created one");
+        (await _context.FuelNominals.CountAsync(n => n.FuelTypeId == "qa-a95"))
+            .Should().Be(1, "and it must not have created a second size for the same pool");
         conflict.Value.Should().NotBeNull("the operator is told which fuel to reprice instead");
     }
 
@@ -465,9 +464,8 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
             CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
         };
         _context.FuelOffers.Add(offer);
-        _context.FuelNominals.Add(new FuelNominal
         {
-            FuelTypeId = offer.FuelTypeId, Liters = 10m,
+            FuelTypeId = "qa-a95", Liters = 10m, DataKind = DataKinds.Qa,
             CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
         });
     }

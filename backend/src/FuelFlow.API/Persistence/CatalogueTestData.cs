@@ -180,8 +180,9 @@ var computed = FuelPricing.FinalPerLiterOrNull(
         var alreadyListed =
             context.FuelNominals.Local.Any(n => n.FuelTypeId == fuelTypeId && n.DataKind == pool && n.Liters == liters)
             || context.FuelNominals.Any(n => n.FuelTypeId == fuelTypeId && n.DataKind == pool && n.Liters == liters);
+        if (alreadyListed)
             return context.FuelNominals.Local.FirstOrDefault(n => n.FuelTypeId == fuelTypeId && n.Liters == liters)
-                ?? new FuelNominal { FuelTypeId = fuelTypeId, Liters = liters };
+                ?? new FuelNominal { FuelTypeId = fuelTypeId, DataKind = pool, Liters = liters };
 
         context.FuelNominals.Add(nominal);
         return nominal;

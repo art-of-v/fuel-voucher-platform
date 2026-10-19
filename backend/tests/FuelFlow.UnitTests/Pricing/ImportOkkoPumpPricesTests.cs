@@ -490,22 +490,14 @@ prices.Should().OnlyContain(p => p.BrandId == BrandIds.Okko && p.DataKind == Dat
     }
 
     [Fact]
-    public async Task Import_ShouldReuseTheFirstPackageAsTheCostRepresentative()
+    public async Task Import_ReportsZeroPackages_ForAMatchedFuelWithNoSizes()
     {
         await SeedCatalogAsync();
 
-        // No packages at all for a matched fuel: the price still applies to the fuel-type headline
-        // and the import reports zero packages rather than throwing.
-        //
-        // "No packages" now means no VOLUMES, and the offer has to go with them - an offer with zero
-        // volumes is still an offer the import would reprice, so leaving it would test the wrong thing.
-        // Volumes first: the relation is RESTRICT, so the offer cannot be deleted while they point at it.
-        var gasOfferId = await _context.FuelOffers
-            .Where(o => o.FuelTypeId == "okko-gas")
-            .Select(o => o.Id)
-            .FirstAsync();
+        // No sizes at all for a matched fuel. There is nothing to reprice per size any more - the price
+        // is the fuel's - so the import still writes the pump, still records the history, and still
+        // reports the fuel rather than throwing.
         _context.FuelNominals.RemoveRange(_context.FuelNominals.Where(v => v.FuelTypeId == "okko-gas"));
-        _context.FuelOffers.RemoveRange(_context.FuelOffers.Where(o => o.Id == gasOfferId));
         await _context.SaveChangesAsync();
         _context.ChangeTracker.Clear();
 
@@ -513,6 +505,9 @@ prices.Should().OnlyContain(p => p.BrandId == BrandIds.Okko && p.DataKind == Dat
 
         result.Applied.Single(a => a.FuelTypeId == "okko-gas").PackagesRepriced.Should().Be(0);
         result.PackagesRepriced.Should().Be(12);
+
+        var fuel = await _context.FuelTypes.AsNoTracking().FirstAsync(f => f.Id == "okko-gas");
+        fuel.PumpPricePerLiter.Should().NotBeNull("a fuel with no sizes is still a fuel on the shelf");
     }
 
     [Fact]
