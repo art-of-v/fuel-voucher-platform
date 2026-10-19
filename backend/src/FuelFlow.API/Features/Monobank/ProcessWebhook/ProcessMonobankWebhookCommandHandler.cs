@@ -1,4 +1,5 @@
 using FuelFlow.API.BackgroundJobs;
+using FuelFlow.Features.Ledger;
 using FuelFlow.Payments;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
@@ -11,7 +12,7 @@ using FuelFlow.API.Features.Monobank.ProcessWebhook;
 
 namespace FuelFlow.Features.Monobank.ProcessWebhook;
 
-public sealed class ProcessMonobankWebhookCommandHandler
+public sealed partial class ProcessMonobankWebhookCommandHandler
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<ProcessMonobankWebhookCommandHandler> _logger;
@@ -19,6 +20,7 @@ public sealed class ProcessMonobankWebhookCommandHandler
     private readonly RefundStatusSyncService _refundStatusSyncService;
     private readonly FuelFlowMetrics _metrics;
     private readonly NotificationDispatcher _notifications;
+    private readonly JournalPostingService _journal;
 
     public ProcessMonobankWebhookCommandHandler(
         ApplicationDbContext context,
@@ -26,7 +28,8 @@ public sealed class ProcessMonobankWebhookCommandHandler
         IBackgroundJobClient backgroundJobClient,
         RefundStatusSyncService refundStatusSyncService,
         FuelFlowMetrics metrics,
-        NotificationDispatcher notifications)
+        NotificationDispatcher notifications,
+        JournalPostingService journal)
     {
         _context = context;
         _logger = logger;
@@ -34,6 +37,7 @@ public sealed class ProcessMonobankWebhookCommandHandler
         _refundStatusSyncService = refundStatusSyncService;
         _metrics = metrics;
         _notifications = notifications;
+        _journal = journal;
     }
 
     public async Task<ProcessMonobankWebhookResponse> HandleAsync(
@@ -405,10 +409,11 @@ var isRenewalOrder = targetStatus == OrderStatus.PendingFulfillment
         // After SaveChanges, so a message can never describe a transition that was not
         // persisted. Only real transitions reach here - duplicates, stale replays and
         // illegal transitions all returned earlier, so each payment is reported once.
-        if (targetStatus == OrderStatus.PendingFulfillment)
-        {
-            await _notifications.PaymentSucceededAsync(order.Id, order.Price, cancellationToken);
-        }
+if (targetStatus == OrderStatus.PendingFulfillment)
+    {
+        await PostReceiptToJournalAsync(order, cancellationToken);
+        await _notifications.PaymentSucceededAsync(order.Id, order.Price, cancellationToken);
+    }
         else if (targetStatus == OrderStatus.Cancelled)
         {
             await _notifications.PaymentFailedAsync(order.Id, command.Status, cancellationToken);

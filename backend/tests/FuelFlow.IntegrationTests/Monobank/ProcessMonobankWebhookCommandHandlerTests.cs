@@ -3,6 +3,8 @@ using FluentAssertions;
 using FuelFlow.API.BackgroundJobs;
 using FuelFlow.API.Features.Monobank.ProcessWebhook;
 using FuelFlow.API.Features.Orders.RefundOrder;
+using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Features.Ledger.SharedModels;
 using FuelFlow.Features.Monobank.ProcessWebhook;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
@@ -12,19 +14,32 @@ using Hangfire.States;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
+using Xunit;
 
-namespace FuelFlow.UnitTests.Monobank;
+namespace FuelFlow.IntegrationTests.Monobank;
 
-public sealed class ProcessMonobankWebhookCommandHandlerTests : IDisposable
+/// <summary>
+/// The Monobank webhook handler against a real Postgres, not the in-memory provider.
+/// </summary>
+/// <remarks>
+/// A settled payment now posts to the double-entry journal, and the journal takes its entry number
+/// with <c>INSERT ... ON CONFLICT DO UPDATE ... RETURNING</c> over <c>gen_random_uuid()</c> - neither
+/// of which the EF in-memory provider runs. Moving here buys the real engine: foreign keys,
+/// triggers, transactions and constraints, which is what a posting path deserves to be tested on.
+/// It also buys back an old blind spot: in-memory never enforced <c>FK_orders_users_user_id</c>, so
+/// these tests used to seed orders with a user id that production's database would have refused.
+/// </remarks>
+[Collection("Integration Tests")]
+public sealed class ProcessMonobankWebhookCommandHandlerTests : IClassFixture<TestDatabaseFixture>, IAsyncLifetime
 {
     private readonly ApplicationDbContext _context;
     private readonly ProcessMonobankWebhookCommandHandler _handler;
     private readonly Mock<IBackgroundJobClient> _backgroundJobClientMock;
 
-    public ProcessMonobankWebhookCommandHandlerTests()
+    public ProcessMonobankWebhookCommandHandlerTests(TestDatabaseFixture fixture)
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            .UseNpgsql(fixture.ConnectionString)
             .Options;
 
         _context = new ApplicationDbContext(options, TestQrCipher.Instance);
@@ -36,38 +51,65 @@ public sealed class ProcessMonobankWebhookCommandHandlerTests : IDisposable
             _backgroundJobClientMock.Object,
             new Mock<RefundStatusSyncService>(null!, null!, null!).Object,
             new FuelFlow.SharedKernel.Observability.FuelFlowMetrics(),
-            FuelFlow.SharedKernel.Observability.NotificationDispatcher.Disabled);
+            FuelFlow.SharedKernel.Observability.NotificationDispatcher.Disabled,
+            TestJournal.For(_context));
+
+        TestJournal.SeedChart(_context);
     }
 
-    public void Dispose()
+    /// <summary>Each test starts from empty: the class shares one cloned database.</summary>
+    public async Task InitializeAsync() => await PaymentTestReset.RunAsync(_context);
+
+    public Task DisposeAsync()
     {
-        _context.Database.EnsureDeleted();
         _context.Dispose();
+        return Task.CompletedTask;
     }
 
-    private static Order BuildOrder(Guid userId, string invoiceId, OrderStatus status) => new()
+    private static int _userSeq;
+
+    /// <summary>
+    /// Creates the customer behind an order. Seeded through the context so the insert order is the
+    /// database's to decide, rather than the test's.
+    /// </summary>
+    private User SeedUser() => new()
     {
         Id = Guid.NewGuid(),
-        UserId = userId,
-        Price = 2500,
-        Status = status,
-        MonobankInvoiceId = invoiceId,
+        PhoneNumber = $"+38050{Interlocked.Increment(ref _userSeq):D7}",
         CreatedAtUtc = DateTime.UtcNow,
         UpdatedAtUtc = DateTime.UtcNow,
-        LineItems =
-        {
-            new OrderLineItem
-            {
-                Id = Guid.NewGuid(),
-                Brand = "okko",
-                FuelTypeId = "okko-95",
-                Liters = 50,
-                Quantity = 1,
-                UnitPrice = 2500,
-                LineTotal = 2500
-            }
-        }
+        SettlementCode = string.Empty,
     };
+
+    private Order BuildOrder(string invoiceId, OrderStatus status)
+    {
+        var user = SeedUser();
+        _context.Users.Add(user);
+
+return new Order
+        {
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            Price = 2500,
+            Status = status,
+            MonobankInvoiceId = invoiceId,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+LineItems =
+            {
+                new OrderLineItem
+                {
+                    Id = Guid.NewGuid(),
+                    Brand = "okko",
+                    FuelTypeId = "okko-95",
+                    Liters = 50,
+                    Quantity = 1,
+                    UnitPrice = 2500,
+                    LineTotal = 2500
+                }
+            }
+        };
+    }
 
     private static ProcessMonobankWebhookCommand WebhookCommand(string invoiceId, string status) => new()
     {
@@ -81,7 +123,7 @@ public sealed class ProcessMonobankWebhookCommandHandlerTests : IDisposable
     [Fact]
     public async Task ProcessWebhook_Success_ShouldSetPendingFulfillment()
     {
-        var order = BuildOrder(Guid.NewGuid(), "INV-001", OrderStatus.PendingPayment);
+        var order = BuildOrder("INV-001", OrderStatus.PendingPayment);
         _context.Orders.Add(order);
         await _context.SaveChangesAsync();
 
@@ -109,7 +151,7 @@ public sealed class ProcessMonobankWebhookCommandHandlerTests : IDisposable
     [Fact]
     public async Task ProcessWebhook_Failure_ShouldCancelOrder()
     {
-        var order = BuildOrder(Guid.NewGuid(), "INV-002", OrderStatus.PendingPayment);
+        var order = BuildOrder("INV-002", OrderStatus.PendingPayment);
         _context.Orders.Add(order);
         await _context.SaveChangesAsync();
 
@@ -148,7 +190,7 @@ public sealed class ProcessMonobankWebhookCommandHandlerTests : IDisposable
         // #23: a customer can swipe-delete an unpaid checkout (soft delete) while its Monobank
         // invoice stays live. A later "success" must still find the order, restore it (un-hide),
         // and fulfill — never leave the customer charged with no voucher.
-        var order = BuildOrder(Guid.NewGuid(), "INV-DEL", OrderStatus.PendingPayment);
+        var order = BuildOrder("INV-DEL", OrderStatus.PendingPayment);
         order.IsDeleted = true;
         _context.Orders.Add(order);
         await _context.SaveChangesAsync();
@@ -172,7 +214,7 @@ public sealed class ProcessMonobankWebhookCommandHandlerTests : IDisposable
     [Fact]
     public async Task ProcessWebhook_Success_WithAmountMismatch_ShouldNotTransition()
     {
-        var order = BuildOrder(Guid.NewGuid(), "INV-AMT", OrderStatus.PendingPayment);
+        var order = BuildOrder("INV-AMT", OrderStatus.PendingPayment);
         _context.Orders.Add(order);
         await _context.SaveChangesAsync();
 
@@ -197,7 +239,7 @@ public sealed class ProcessMonobankWebhookCommandHandlerTests : IDisposable
     [Fact]
     public async Task ProcessWebhook_StaleModifiedDate_ShouldAcknowledgeWithoutTransition()
     {
-        var order = BuildOrder(Guid.NewGuid(), "INV-STALE", OrderStatus.PendingFulfillment);
+        var order = BuildOrder("INV-STALE", OrderStatus.PendingFulfillment);
         order.LastWebhookModifiedDateUtc = new DateTime(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc);
         _context.Orders.Add(order);
         await _context.SaveChangesAsync();
@@ -220,7 +262,7 @@ public sealed class ProcessMonobankWebhookCommandHandlerTests : IDisposable
     [Fact]
     public async Task ProcessWebhook_DuplicateSuccess_WhenAlreadyPendingFulfillment_ShouldNotReEnqueue()
     {
-        var order = BuildOrder(Guid.NewGuid(), "INV-DUP", OrderStatus.PendingFulfillment);
+        var order = BuildOrder("INV-DUP", OrderStatus.PendingFulfillment);
         order.LastWebhookModifiedDateUtc = new DateTime(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc);
         _context.Orders.Add(order);
         await _context.SaveChangesAsync();
@@ -243,7 +285,7 @@ public sealed class ProcessMonobankWebhookCommandHandlerTests : IDisposable
     [Fact]
     public async Task ProcessWebhook_Success_OnFulfilledOrder_ShouldBeRejectedAsIllegalTransition()
     {
-        var order = BuildOrder(Guid.NewGuid(), "INV-FUL", OrderStatus.Fulfilled);
+        var order = BuildOrder("INV-FUL", OrderStatus.Fulfilled);
         _context.Orders.Add(order);
         await _context.SaveChangesAsync();
 
@@ -277,7 +319,7 @@ public sealed class ProcessMonobankWebhookCommandHandlerTests : IDisposable
         // simply ACKed, leaving monobank_status on the last applied transition. The order then
         // read as unpaid: revenue excluded it, reconciliation never polled it (PendingPayment
         // only), and nothing on any screen pointed an operator at the trapped money.
-        var order = BuildOrder(Guid.NewGuid(), "INV-LATE", OrderStatus.Cancelled);
+        var order = BuildOrder("INV-LATE", OrderStatus.Cancelled);
         order.MonobankStatus = MonobankStatus.Failure;
         _context.Orders.Add(order);
         await _context.SaveChangesAsync();
@@ -308,7 +350,7 @@ public sealed class ProcessMonobankWebhookCommandHandlerTests : IDisposable
     {
         // Monobank retries webhooks. Once the payment truth is recorded there is nothing left to
         // change, so a replay must not rewrite history or bump updated_at_utc on every delivery.
-        var order = BuildOrder(Guid.NewGuid(), "INV-REPLAY", OrderStatus.Cancelled);
+        var order = BuildOrder("INV-REPLAY", OrderStatus.Cancelled);
         order.MonobankStatus = MonobankStatus.Success;
         _context.Orders.Add(order);
         await _context.SaveChangesAsync();
@@ -325,7 +367,7 @@ public sealed class ProcessMonobankWebhookCommandHandlerTests : IDisposable
     [Fact]
     public async Task ProcessWebhook_Reversed_ShouldCancelOrder()
     {
-        var order = BuildOrder(Guid.NewGuid(), "INV-REV", OrderStatus.PendingPayment);
+        var order = BuildOrder("INV-REV", OrderStatus.PendingPayment);
         _context.Orders.Add(order);
         await _context.SaveChangesAsync();
 
@@ -343,7 +385,7 @@ public sealed class ProcessMonobankWebhookCommandHandlerTests : IDisposable
     {
         // An expired invoice is terminal: its validity window elapsed with no payment. Cancelling
         // here stops the reconciliation poll from chasing it every cycle and clears admin views.
-        var order = BuildOrder(Guid.NewGuid(), "INV-EXP", OrderStatus.PendingPayment);
+        var order = BuildOrder("INV-EXP", OrderStatus.PendingPayment);
         _context.Orders.Add(order);
         await _context.SaveChangesAsync();
 
@@ -364,7 +406,7 @@ public sealed class ProcessMonobankWebhookCommandHandlerTests : IDisposable
     [Fact]
     public async Task ProcessWebhook_Success_ShouldRecordLastWebhookTracking()
     {
-        var order = BuildOrder(Guid.NewGuid(), "INV-TRACK", OrderStatus.PendingPayment);
+        var order = BuildOrder("INV-TRACK", OrderStatus.PendingPayment);
         _context.Orders.Add(order);
         await _context.SaveChangesAsync();
 
@@ -375,5 +417,53 @@ public sealed class ProcessMonobankWebhookCommandHandlerTests : IDisposable
         var updated = await _context.Orders.FindAsync(order.Id);
         updated!.LastWebhookProcessedAtUtc.Should().NotBeNull();
         updated.LastWebhookModifiedDateUtc.Should().NotBeNull();
+    }
+    [Fact]
+    public async Task ProcessWebhook_Success_Books_The_Money_In_The_Journal()
+    {
+        // The first posting the system has ever made, asserted end to end: a settled payment must
+        // leave two balanced entries - the gross and the VAT inside it - or the books are silently
+        // short and nobody finds out until the month closes.
+        var order = BuildOrder("INV-JRNL", OrderStatus.PendingPayment);
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        await _handler.HandleAsync(WebhookCommand("INV-JRNL", "success"));
+
+        var entries = await _context.JournalEntries
+            .Include(e => e.Lines)
+            .Where(e => e.SourceId == order.Id)
+            .ToListAsync();
+
+        entries.Should().HaveCount(2, "the gross and the VAT are separate facts and post separately");
+        entries.Should().OnlyContain(e => e.Status == JournalEntryStatus.Posted);
+        entries.Should().OnlyContain(e => e.Lines.Sum(l => l.DebitUah) == e.Lines.Sum(l => l.CreditUah));
+
+        // 2500 gross at 20% carries 416.67 of VAT, so the revenue leg is 2083.33.
+        var gross = entries.Single(e => e.SourceEvent == "payment.received");
+        gross.Lines.Sum(l => l.DebitUah).Should().Be(2500m);
+        gross.Lines.Single(l => l.DebitUah > 0).Account!.Code.Should().Be("311");
+        gross.Lines.Single(l => l.CreditUah > 0).Account!.Code.Should().Be("681");
+
+        var vat = entries.Single(e => e.SourceEvent == "payment.received.vat");
+        vat.Lines.Sum(l => l.DebitUah).Should().Be(416.67m);
+        vat.Lines.Single(l => l.DebitUah > 0).Account!.Code.Should().Be("703");
+        vat.Lines.Single(l => l.CreditUah > 0).Account!.Code.Should().Be("643");
+    }
+
+    [Fact]
+    public async Task ProcessWebhook_Replayed_After_Success_Does_Not_Book_The_Money_Twice()
+    {
+        // Both arrival paths converge here, so idempotency is what keeps a recovered payment from
+        // being counted twice. This is the property the whole "hook once, anywhere" design rests on.
+        var order = BuildOrder("INV-REPLAY2", OrderStatus.PendingPayment);
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        await _handler.HandleAsync(WebhookCommand("INV-REPLAY2", "success"));
+        await _handler.HandleAsync(WebhookCommand("INV-REPLAY2", "success"));
+
+        var count = await _context.JournalEntries.CountAsync(e => e.SourceId == order.Id);
+        count.Should().Be(2, "a replay returns the existing entries rather than adding more");
     }
 }
