@@ -83,3 +83,40 @@ check_wal_archive() {
   fi
   return $failures
 }
+
+# prune_wal_archive <dir> <max-age-days> <max-bytes>
+#
+# Keeps the WAL archive inside two bounds, and the second one is the important one.
+#
+# The age bound is policy: how long the archive stays on the box.
+#
+# The size bound is a guard, and it exists because of a measurement. An idle database
+# produces one 16 MiB segment per archive_timeout, and almost all of it is zeros, so the
+# archive grows at a rate set by the TIMEOUT rather than by the traffic. Measured on the
+# production box on 2026-10-19: archive_timeout=300 gave 288 segments a day, 4.6 GiB a
+# day. A 14-day window would be 63 GiB on a disk with 21 GiB free, and a full disk is
+# how the database stops accepting writes - so the age bound alone would have filled the
+# disk in four days, and the nightly run that would have noticed was itself the thing
+# that could not keep up.
+#
+# The oldest segment goes first, and the newest never goes: PostgreSQL is writing to it.
+prune_wal_archive() {
+  local dir="$1" max_age_days="$2" max_bytes="$3"
+  [[ -d "$dir" ]] || return 0
+
+  find "$dir" -maxdepth 1 -name '0000000*' -type f -mtime "+${max_age_days}" -print -delete 2>/dev/null || true
+
+  local total oldest newest
+  while true; do
+    total="$(du -sb "$dir" 2>/dev/null | cut -f1)"
+    [[ -z "$total" ]] && break
+    (( total <= max_bytes )) && break
+    oldest="$(find "$dir" -maxdepth 1 -name '0000000*' -type f -printf '%T@ %p\n' 2>/dev/null | sort -n | head -1 | cut -d' ' -f2-)"
+    [[ -z "$oldest" ]] && break
+    newest="$(find "$dir" -maxdepth 1 -name '0000000*' -type f -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-)"
+    # Never remove the newest segment: it is the one being written to.
+    [[ "$oldest" == "$newest" ]] && break
+    echo "  removing the oldest segment: $(basename "$oldest")"
+    rm -f "$oldest"
+  done
+}
