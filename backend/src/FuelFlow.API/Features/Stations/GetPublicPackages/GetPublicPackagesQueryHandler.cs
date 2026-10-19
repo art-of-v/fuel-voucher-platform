@@ -87,14 +87,21 @@ var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
         var available = await _stock.AvailableKeysAsync(isTestAccount, ct);
 
     return rows
-    // A fuel nobody has priced yet has no price to show. It is skipped rather than published at
-    // zero: a zero on the shelf is a free fuel, and it would be unbuyable.
-    .Where(x => x.SupplierPricePerLiter is not null && x.MarginUahPerLiter is not null)
+    // A fuel nobody has priced yet is NOT skipped. It used to be, on the grounds that "a zero on the
+    // shelf is a free fuel" - but skipping it makes the shelf EMPTY, and an empty shelf does not say
+    // "we have not costed this yet", it says "we do not sell this". The catalogue import creates
+    // fuels with the published pump price and no cost, and those fuels are exactly the ones a
+    // customer is looking for. The price shown is the column price the market publishes, and the
+    // stock badge says it cannot be bought - the checkout still refuses it, with a 400, because there
+    // is no cost to charge against.
     .Select(x =>
     {
-    var price = FuelPricing.PackagePrice(
-    x.SupplierPricePerLiter, x.MarginUahPerLiter, x.PumpPricePerLiter, x.MinDiscountPerLiter,
-    x.Liters);
+    // Our price when we can compute it; the column price when we cannot. The two are the same
+    // number once a cost is known, because the formula caps our price at the pump price anyway.
+    var ourPrice = FuelPricing.FinalPerLiterOrNull(
+        x.SupplierPricePerLiter, x.MarginUahPerLiter, x.PumpPricePerLiter, x.MinDiscountPerLiter);
+    var perLiter = ourPrice ?? x.PumpPricePerLiter ?? 0m;
+    var price = Math.Round(perLiter * x.Liters, 2, MidpointRounding.AwayFromZero);
 
     return new PublicPackageResponse(
                     PackageIds.For(x.FuelTypeId, x.DataKind, x.Liters),
@@ -105,9 +112,12 @@ var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
                     x.Liters,
                     price,
                     FuelPricing.OriginalPackagePrice(x.PumpPricePerLiter, x.Liters, price),
-                    FuelPricing.FinalPerLiterOrNull(
-                        x.SupplierPricePerLiter, x.MarginUahPerLiter, x.PumpPricePerLiter, x.MinDiscountPerLiter),
-                    available.Contains(StockKey.For(x.BrandSlug, x.FuelTypeId, x.Liters)));
+                    perLiter,
+                    // "Can this be bought" is not the same question as "is there stock". A fuel we
+                    // cannot price cannot be charged - the checkout refuses it with a 400 - so it is
+                    // marked unavailable even when vouchers are behind it, which is the only way the
+                    // badge and the checkout agree.
+                    available.Contains(StockKey.For(x.BrandSlug, x.FuelTypeId, x.Liters)) && ourPrice is not null);
             })
             .ToList();
     }

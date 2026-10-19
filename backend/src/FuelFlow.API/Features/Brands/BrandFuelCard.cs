@@ -3,42 +3,31 @@ using FuelFlow.SharedKernel.Domain;
 namespace FuelFlow.Features.Brands;
 
 /// <summary>
-/// Builds a fuel's pricing card from its packages. Shared by <c>/providers</c> and
+/// Builds a fuel's pricing card. Shared by <c>/providers</c> and
 /// <c>/providers/{id}</c> so the two can never describe the same fuel differently.
 /// </summary>
 /// <remarks>
-/// A card has one row per fuel but a fuel has one package per nominal, and the write path
-/// (<c>BrandsController.UpdateFuel</c>) writes the same six figures to <em>every</em> package of
-/// the fuel. So the card's job is to report one canonical row — and, when the packages disagree, to
-/// say so, because a save from this screen will silently flatten them to whatever is shown.
-///
-/// The previous behaviour was <c>packages.FirstOrDefault()</c> over an unordered result: six
-/// pricing fields read off whichever row the database happened to return. With four packages for
-/// one fuel that meant the card could show a price that exists nowhere the customer can buy — and
-/// the number could change between two identical page loads.
+/// <para>
+/// The pricing is read off the <b>fuel row</b>, because that is where it lives: since
+/// <c>20261019095748_OfferPricingBecomesTheFuel</c> the cost, the margin, the pump price and the
+/// minimum discount are columns on <c>fuel_types</c>, one set per fuel.
+/// </para>
+/// <para>
+/// It used to be read off the <em>packages</em> - the fuel's sizes - which was correct while the
+/// pricing lived on the offer and each size carried its own copy. It stopped being correct the
+/// moment the pricing moved onto the fuel, and the symptom was a fuel the catalogue import had just
+/// created showing an empty card: a freshly imported fuel has no size yet, so there was no package
+/// to read the numbers from, and the card said <c>0.00</c> and <c>-</c> while the row held the
+/// pump price the import had just written. The card was asking the wrong question - "what does the
+/// smallest size cost" - when the only question now is "what does this fuel cost".
+/// </para>
+/// <para>
+/// The packages are still read, for the two things only they know: the sizes the operator may sell
+/// and whether the stock is the rehearsal pool.
+/// </para>
 /// </remarks>
 internal static class BrandFuelCard
 {
-    /// <summary>
-    /// Cost per litre, weighted by the litres each package actually sells. This is the figure the
-    /// below-cost decision is about, and it matches how the pool's blended cost is computed, so the
-    /// card describes what will be enforced rather than one nominal's share of it.
-    /// </summary>
-    public static decimal WeightedCostPerLiter(IReadOnlyList<SellablePackage> packages)
-    {
-        if (packages.Count == 0) return 0m;
-        var weighted = packages.Where(p => p.SupplierPricePerLiter is not null).ToList();
-        if (weighted.Count == 0) return 0m;
-
-        var litres = weighted.Sum(p => p.Liters);
-        if (litres <= 0m) return weighted.Average(p => p.SupplierPricePerLiter!.Value);
-
-        var weightedTotal = weighted.Sum(p => p.SupplierPricePerLiter!.Value * p.Liters);
-        // 4 decimals, AwayFromZero: the same scale and rounding as the stored cost_per_liter, so a
-        // displayed average and a stored one cannot disagree by a rounding step.
-        return Math.Round(weightedTotal / litres, 4, MidpointRounding.AwayFromZero);
-    }
-
     /// <summary>
     /// The nominal the remaining per-package figures are read from: the smallest one, ties broken by
     /// id. Deterministic, and the nominal an operator reads the card as ("what does a litre of this
@@ -68,14 +57,24 @@ internal static class BrandFuelCard
         {
             Id = fuel.Id,
             Name = fuel.Name,
-            SupplierPricePerLiter = WeightedCostPerLiter(packages),
-            MarginUahPerLiter = reference?.MarginUahPerLiter ?? 0,
-            MarginPercent = reference?.MarginPercent,
-            FinalPricePerLiter = reference?.ComputedFinalPricePerLiter ?? 0,
-            PumpPricePerLiter = reference?.PumpPricePerLiter,
+            // What we pay. The column is the truth, and the pool's blended cost is written back into
+            // it by BlendedCostRecalculator when a batch of vouchers is costed - so the card shows
+            // the column until a position is imported at another price, and the column's new value
+            // afterwards. Reading it through the sizes instead (as this card used to) averaged the
+            // fuel's own figure over the fuel's own sizes, which is the same number on a fuel that
+            // has any, and nothing at all on one that has none.
+            SupplierPricePerLiter = fuel.SupplierPricePerLiter ?? 0m,
+            MarginUahPerLiter = fuel.MarginUahPerLiter ?? 0m,
+            MarginPercent = fuel.MarginPercent,
+            // The price the customer pays: ours when we can compute it, and otherwise the column
+            // price the catalogue import published. A zero on this card is not "free", it is "we do
+            // not know yet" - and the column price is a better answer than that, and the one the
+            // operator is looking at anyway.
+            FinalPricePerLiter = fuel.FinalPerLiter() ?? fuel.PumpPricePerLiter ?? 0m,
+            PumpPricePerLiter = fuel.PumpPricePerLiter,
             // Fall back to the historical marketing discount (base - final) so a fuel
             // priced before the min-discount column existed shows a sane initial knob.
-            MinDiscountPerLiter = reference?.MinDiscountPerLiter ?? Math.Max(0, fuel.BasePrice - fuel.DiscountPrice),
+            MinDiscountPerLiter = fuel.MinDiscountPerLiter ?? Math.Max(0, fuel.BasePrice - fuel.DiscountPrice),
             // base_price is the pump/reference price; the actual customer discount
             // is base - final. Derived here (display only) so the admin UI can show it.
             DiscountPerLiter = Math.Max(0, fuel.BasePrice - fuel.DiscountPrice),

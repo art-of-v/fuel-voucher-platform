@@ -35,6 +35,42 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
     }
 
     [Fact]
+    public async Task Handle_AFuelWithNoSizes_StillShowsTheColumnPrice()
+    {
+        _context.Brands.Add(new Brand
+        {
+            Id = TestOkko,
+            Slug = "test-okko",
+            Name = "OKKO",
+            LogoText = "OKKO",
+            Color = "#fff",
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+
+        // Exactly what the catalogue import leaves behind: a fuel with the published pump price, no
+        // cost, and - because nobody has set a size yet - no sizes either.
+        _context.FuelTypes.Add(new FuelTypeEntity
+        {
+            Id = "test-fuel-imported",
+            Name = "А-95",
+            BrandId = TestOkko,
+            PumpPricePerLiter = 92.90m,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        await _context.SaveChangesAsync();
+
+        var providers = await _handler.HandleAsync(new GetBrandsQuery());
+
+        var fuel = providers.Single(p => p.Id == TestOkko).Fuels.Single(f => f.Id == "test-fuel-imported");
+        fuel.PumpPricePerLiter.Should().Be(92.90m, "the card reads the fuel's own columns, not its sizes");
+        fuel.FinalPricePerLiter.Should().Be(92.90m, "the column price stands in until there is a cost");
+        fuel.SupplierPricePerLiter.Should().Be(0m, "there is no cost yet, and the card says so");
+        fuel.PackageLiters.Should().BeEmpty("a fuel with no sizes has no sizes to sell");
+    }
+
+    [Fact]
     public async Task Handle_ReturnsFuelsWithPricingAndDistinctNominals()
     {
         _context.Brands.Add(new Brand
