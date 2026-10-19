@@ -27,7 +27,7 @@ public sealed class PreflightDbFileTests
     [Theory]
     [InlineData("011-fuel-type-name-twins.sql")]
     [InlineData("012-offer-station-matches-its-fuel-type.sql")]
-    [InlineData("013-fuel-type-id-is-not-a-text-key.sql")]
+    [InlineData("013-fuel-type-references-agree-on-type.sql")]
     [InlineData("014-fuel-type-references-are-all-uuids.sql")]
     public void EveryCheck_IsShapedSoItCannotWrite(string fileName)
     {
