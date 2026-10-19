@@ -296,18 +296,31 @@ WHERE name = 'QA Supplier (emulated)'
 
 -- The catalogue itself: the QA size list, and the QA price history.
 --
--- `fuel_price_history` since 20261017142210 (AddFuelOfferPriceHistory), renamed on 2026-10-19
--- (20261019132728): a price row is a record of something sold, so the fuel it was sold under
--- RESTRICTs - which is the point, and which means the history has to go first when a whole pool is
--- decommissioned. The table is guarded rather than assumed, so a database that has not taken the
--- migration yet still runs this script.
+-- `fuel_offer_prices` since 20261017142210 (AddFuelOfferPriceHistory), renamed on 2026-10-19
+-- (20261019132728) to `fuel_price_history`: a price row is a record of something sold, so the fuel it
+-- was sold under RESTRICTs - which is the point, and which means the history has to go first when a
+-- whole pool is decommissioned.
+--
+-- BOTH names are checked, because a precondition that names a table that does not exist is a no-op:
+-- on a database that has not taken the rename yet, the QA price history is in `fuel_offer_prices`,
+-- and asking only about the new name would leave it behind while the rest of the pool went. The
+-- rename is a rename and nothing more, so the old table and the new one hold the same rows - which
+-- means asking about both is safe, and asking about only one is not.
 SELECT EXISTS (
     SELECT 1 FROM information_schema.tables
     WHERE table_schema = 'public' AND table_name = 'fuel_price_history'
-) AS has_price_history \gset
+) AS has_price_history,
+EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'fuel_offer_prices'
+) AS has_legacy_price_history \gset
 
 \if :has_price_history
 DELETE FROM fuel_price_history WHERE data_kind = 'qa';
+\endif
+
+\if :has_legacy_price_history
+DELETE FROM fuel_offer_prices WHERE data_kind = 'qa';
 \endif
 
 -- The QA nominals. There is no offer row to delete any more: the twin IS a nominal, and the pool
@@ -323,26 +336,20 @@ WHERE data_kind = 'qa'
 -- ---------------------------------------------------------------------------------------------
 
 \echo '--- after ---'
+-- The price history is checked under whichever name this database carries - the two checks are
+-- separate statements rather than two branches of one, because a table that is not here must not
+-- cost the reader the other five numbers.
 \if :has_price_history
-SELECT 'qa_price_history_left' AS check, count(*) AS value FROM fuel_price_history WHERE data_kind = 'qa'
-UNION ALL
-SELECT 'qa_nominals_left', count(*) FROM fuel_nominals WHERE data_kind = 'qa'
-UNION ALL
-SELECT 'qa_vouchers_left', count(*) FROM fuel_vouchers WHERE data_kind = 'qa'
-UNION ALL
-SELECT 'qa_imports_left', count(*) FROM voucher_imports WHERE file_name LIKE 'QA-EMULATED-%'
-UNION ALL
-SELECT 'qa_supplier_left', count(*) FROM suppliers WHERE name = 'QA Supplier (emulated)'
-UNION ALL
-SELECT 'real_nominals_kept', count(*) FROM fuel_nominals WHERE data_kind = 'real';
-\else
-\echo 'fuel_price_history is not present on this database - skipped that check.'
-SELECT 'qa_nominals_left' AS check, count(*) AS value FROM fuel_nominals WHERE data_kind = 'qa'
+SELECT 'qa_price_history_left' AS check, count(*) AS value FROM fuel_price_history WHERE data_kind = 'qa';
+\endif
+\if :has_legacy_price_history
+SELECT 'qa_offer_prices_left' AS check, count(*) AS value FROM fuel_offer_prices WHERE data_kind = 'qa';
+\endif
+SELECT 'qa_nominals_left' AS check, count(*) FROM fuel_nominals WHERE data_kind = 'qa'
 UNION ALL SELECT 'qa_vouchers_left', count(*) FROM fuel_vouchers WHERE data_kind = 'qa'
 UNION ALL SELECT 'qa_imports_left', count(*) FROM voucher_imports WHERE file_name LIKE 'QA-EMULATED-%'
 UNION ALL SELECT 'qa_supplier_left', count(*) FROM suppliers WHERE name = 'QA Supplier (emulated)'
 UNION ALL SELECT 'real_nominals_kept', count(*) FROM fuel_nominals WHERE data_kind = 'real';
-\endif
 
 \echo 'Orders that mix pools and were therefore left alone - inspect by hand, not an error:'
 SELECT id, status FROM qa_mixed_orders ORDER BY id;

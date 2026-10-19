@@ -121,6 +121,150 @@ public sealed class SeedScriptsExecuteTests : IClassFixture<TestDatabaseFixture>
     }
 
     /// <summary>
+    /// The removal script has to REMOVE, not merely run.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Running is not enough for this one, and the difference is the whole point. A script that
+    /// guards a table by asking whether it exists, and then deletes from the name it asked about,
+    /// runs cleanly whether or not the rows are there - so a table that was renamed under it leaves
+    /// its rows behind and the script still says it did its job. That is exactly what happened here:
+    /// <c>fuel_offer_prices</c> was renamed <c>fuel_price_history</c> on 2026-10-19
+    /// (<c>20261019132728</c>), and a script that asked only about the new name would leave the QA
+    /// price history on a database that has not taken the rename - silently, because the report at
+    /// the end would be reading the same table.
+    /// </para>
+    /// <para>
+    /// So this seeds a QA pool, runs the script, and asks the only question that matters: is any of
+    /// it still there? The real pool is checked too - a removal script that takes the live
+    /// catalogue with it is the other way this could be wrong.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task TheRemovalScript_RemovesTheQaPoolAndLeavesTheRealOne()
+    {
+        await SeedTheFixtureAsync();
+        await SeedQaPoolAsync();
+
+        var before = await ReadQaPoolAsync();
+
+        // The QA pool is really there, or the test below proves nothing.
+        before.Should().ContainKey("qa nominals");
+        before["qa nominals"].Should().BeGreaterThan(0, "the QA pool was seeded and must be there to remove");
+        before["qa price history"].Should().BeGreaterThan(0, "the QA price history is the row a rename would leave behind");
+
+        var path = Path.Combine(RepoRoot(), "scripts", "remove-qa-catalogue.sql");
+        var script = File.ReadAllText(path);
+
+        await using var connection = new NpgsqlConnection(_fixture.ConnectionString);
+        await connection.OpenAsync();
+
+        var runner = new PsqlInterpreter(connection);
+        var failures = await runner.RunAsync(script);
+
+        failures.Should().BeEmpty(
+            "remove-qa-catalogue.sql does not run against the current schema. Data failures: " +
+            string.Join(" | ", runner.DataFailures));
+
+        var after = await ReadQaPoolAsync();
+
+        after.Where(pair => pair.Key.StartsWith("qa ", StringComparison.Ordinal) && pair.Value > 0)
+            .Select(pair => $"{pair.Key}: {pair.Value}")
+            .Should().BeEmpty("the QA pool is still there after the removal script ran");
+
+        after["real nominals"].Should().Be(before["real nominals"],
+            "the removal script must leave the real catalogue alone");
+    }
+
+    /// <summary>
+    /// A QA pool of the shape the scripts create: a size list, stock behind it, a price history, and
+    /// the supplier -> import -> batch chain that holds them.
+    /// </summary>
+    private async Task SeedQaPoolAsync()
+    {
+        await using var connection = new NpgsqlConnection(_fixture.ConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new NpgsqlCommand(
+            """
+            INSERT INTO fuel_nominals (fuel_type_id, data_kind, liters, created_at_utc, updated_at_utc)
+            VALUES ('33333333-3333-4333-8333-0000000000cc', 'qa', 10.00, now(), now())
+            ON CONFLICT (fuel_type_id, data_kind, liters) DO NOTHING;
+
+            INSERT INTO fuel_vouchers
+                (id, brand, fuel_type_id, liters, supplier_expiration_date, customer_expiration_date,
+                 voucher_number, qr_payload, qr_payload_sha256, status, data_kind, acquisition_source,
+                 is_deleted, created_at_utc, updated_at_utc)
+            VALUES ('44444444-4444-4444-8444-0000000000aa', 'okko', '33333333-3333-4333-8333-0000000000cc',
+                    10.00, current_date + 180, current_date + 7, 'QA-REMOVE-1', 'QA-QR-REMOVE-1',
+                    sha256(convert_to('QA-QR-REMOVE-1', 'UTF8')), 'Available', 'qa', 'direct', false, now(), now())
+            ON CONFLICT (id) DO NOTHING;
+
+            INSERT INTO fuel_price_history
+                (id, brand_id, fuel_type_id, data_kind, effective_from_utc, recorded_at_utc, reason,
+                 final_price_per_liter, supplier_price_per_liter)
+            SELECT '55555555-5555-4555-8555-0000000000aa', b.id, '33333333-3333-4333-8333-0000000000cc',
+                   'qa', now(), now(), 'operator', 45.00, 40.00
+            FROM brands b WHERE b.slug = 'okko'
+            ON CONFLICT (id) DO NOTHING;
+
+            INSERT INTO suppliers (id, name, is_active, created_at_utc, updated_at_utc)
+            VALUES ('66666666-6666-4666-8666-0000000000aa', 'QA Supplier (emulated)', true, now(), now())
+            ON CONFLICT (id) DO NOTHING;
+
+            INSERT INTO voucher_imports
+                (id, file_name, page_count, started_at_utc, completed_at_utc, status,
+                 imported_count, duplicate_count, failed_count, verification_failed_count,
+                 verified_with_warnings_count)
+            VALUES ('77777777-7777-4777-8777-0000000000aa', 'QA-EMULATED-okko.pdf', 1, now(), now(),
+                    'Completed', 1, 0, 0, 0, 0)
+            ON CONFLICT (id) DO NOTHING;
+
+            INSERT INTO purchase_batches
+                (id, import_job_id, fuel_type_id, brand, supplier_id, created_at_utc, updated_at_utc)
+            VALUES ('88888888-8888-4888-8888-0000000000aa', '77777777-7777-4777-8777-0000000000aa',
+                    '33333333-3333-4333-8333-0000000000cc', 'okko',
+                    '66666666-6666-4666-8666-0000000000aa', now(), now())
+            ON CONFLICT (id) DO NOTHING;
+            """,
+            connection);
+
+        await command.ExecuteNonQueryAsync();
+    }
+
+    /// <summary>
+    /// What is there, counted: the QA pool and the real pool.
+    /// </summary>
+    private async Task<Dictionary<string, long>> ReadQaPoolAsync()
+    {
+        await using var connection = new NpgsqlConnection(_fixture.ConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = new NpgsqlCommand(
+            """
+            SELECT 'qa nominals' AS what, count(*) AS rows FROM fuel_nominals WHERE data_kind = 'qa'
+            UNION ALL SELECT 'qa vouchers', count(*) FROM fuel_vouchers WHERE data_kind = 'qa'
+            UNION ALL SELECT 'qa price history', count(*) FROM fuel_price_history WHERE data_kind = 'qa'
+            UNION ALL SELECT 'qa imports', count(*) FROM voucher_imports WHERE file_name LIKE 'QA-EMULATED-%'
+            UNION ALL SELECT 'qa supplier', count(*) FROM suppliers WHERE name = 'QA Supplier (emulated)'
+            UNION ALL SELECT 'qa batches', count(*) FROM purchase_batches
+                WHERE supplier_id = '66666666-6666-4666-8666-0000000000aa'
+            UNION ALL SELECT 'real nominals', count(*) FROM fuel_nominals WHERE data_kind = 'real'
+            """,
+            connection);
+
+        await using var reader = await command.ExecuteReaderAsync();
+        var counts = new Dictionary<string, long>();
+
+        while (await reader.ReadAsync())
+        {
+            counts[reader.GetString(0)] = reader.GetInt64(1);
+        }
+
+        return counts;
+    }
+
+    /// <summary>
     /// The minimum the scripts need to get past their own guards: the QA account the emulation
     /// script refuses to run without, and one brand with one fuel and one nominal so the catalogue
     /// mirrors have something to mirror.
@@ -370,11 +514,18 @@ public sealed class SeedScriptsExecuteTests : IClassFixture<TestDatabaseFixture>
             {
                 var name = condition[1..].Trim();
                 var conditionValue = _variables.TryGetValue(name, out var found) ? found : string.Empty;
-                return conditionValue switch
+
+                // Lower-cased, because a boolean that came out of the database arrives as "True" and
+                // psql's own truth test is case-insensitive. Reading it as anything else turned a
+                // `\if` on a query result into "false", and the branch it guards did not run - which
+                // is how a DELETE could be skipped by a script that reported no error.
+                var normalized = conditionValue.Trim().ToLowerInvariant();
+
+                return normalized switch
                 {
                     "t" or "true" or "on" or "yes" or "1" => true,
                     "f" or "false" or "off" or "no" or "0" or "" => false,
-                    _ => double.TryParse(conditionValue, out var number) && number != 0,
+                    _ => double.TryParse(normalized, out var number) && number != 0,
                 };
             }
 
