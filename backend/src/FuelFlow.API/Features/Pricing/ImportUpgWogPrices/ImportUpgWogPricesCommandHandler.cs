@@ -129,14 +129,6 @@ public sealed class ImportUpgWogPricesCommandHandler
             .GroupBy(f => FuelTypeEntity.NormaliseBrandFuelCode(f.BrandFuelCode)!, StringComparer.Ordinal)
             .ToDictionary(g => g.Key, g => g.OrderBy(f => f.Id, StringComparer.Ordinal).First());
 
-        var fuelIds = byCode.Values.Select(f => f.Id).ToList();
-        var offersByFuel = (await _context.FuelOffers
-                .AsTracking()
-                .Where(o => fuelIds.Contains(o.FuelTypeId))
-                .ToListAsync(ct))
-            .GroupBy(o => o.FuelTypeId)
-            .ToDictionary(g => g.Key, g => g.OrderBy(o => o.Id, StringComparer.Ordinal).ToList());
-
         var now = DateTime.UtcNow;
         var actor = actingUserId == Guid.Empty ? (Guid?)null : actingUserId;
         var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -158,60 +150,45 @@ public sealed class ImportUpgWogPricesCommandHandler
                 continue;
             }
 
-            var offers = offersByFuel.TryGetValue(fuel.Id, out var found) ? found : [];
-            var changedAny = false;
+            var previousPump = fuel.PumpPricePerLiter;
+            var changed = previousPump != row.PricePerLiter;
             var volumesRepriced = 0;
 
-            foreach (var offer in offers)
+            // Identical guard to the OKKO automatic path: a third party's price move must not be
+            // able to take a fuel below cost unattended, or the checkout guard refuses to sell it.
+            var cost = fuel.SupplierPricePerLiter ?? 0m;
+            var profit = fuel.MarginUahPerLiter ?? 0m;
+            var minDiscount = fuel.MinDiscountPerLiter ?? DefaultMinDiscountPerLiter;
+
+            if (!fuel.AllowBelowCost && FuelPricing.IsBelowCost(cost, profit, row.PricePerLiter, minDiscount))
             {
-                var cost = offer.SupplierPricePerLiter ?? 0m;
-                var profit = fuel.MarginUahPerLiter ?? 0m;
-                var minDiscount = offer.MinDiscountPerLiter ?? DefaultMinDiscountPerLiter;
-
-                // Identical guard to the OKKO automatic path: a third party's price move must not be
-                // able to take a fuel below cost unattended, or the checkout guard refuses to sell it.
-                if (!fuel.AllowBelowCost && FuelPricing.IsBelowCost(cost, profit, row.PricePerLiter, minDiscount))
-                {
-                    belowCost.Add(fuel.Name);
-                    continue;
-                }
-
-                var previous = offer.PumpPricePerLiter;
-                var changed = previous != row.PricePerLiter;
-
-                if (!command.DryRun && changed)
-                {
-                    offer.PumpPricePerLiter = row.PricePerLiter;
-                    offer.UpdatedAtUtc = now;
-                }
-
-                if (!command.DryRun)
-                {
-                    await _priceRecorder.RecordAsync(offer, OfferPriceReasons.PumpImport, actor, now, ct);
-                }
-
-                changedAny |= changed;
-        // A nominal has no stored price, so a pump change rewrites nothing per size - it moves
-        // the offer's rate and every size follows. The count the report gives back is the
-        // fuel's nominal count, because the sizes belong to the fuel rather than to one
-        // pool's offer.
-        volumesRepriced += await _context.FuelNominals
-            .CountAsync(n => n.FuelTypeId == offer.FuelTypeId, ct);
+                belowCost.Add(fuel.Name);
+                continue;
             }
 
-            // The headline figures follow the offers, exactly as the operator write path does, and only
+            if (!command.DryRun && changed)
+            {
+                fuel.PumpPricePerLiter = row.PricePerLiter;
+                fuel.UpdatedAtUtc = now;
+            }
+
+            if (!command.DryRun)
+            {
+                await _priceRecorder.RecordAsync(fuel, OfferPriceReasons.PumpImport, actor, now, ct);
+            }
+
+            // A nominal has no stored price, so a pump change rewrites nothing per size - it moves the
+            // fuel's rate and every size of both pools follows. The count the report gives back is the
+            // fuel's nominal count, because the sizes belong to the fuel rather than to one pool.
+            volumesRepriced = await _context.FuelNominals
+                .CountAsync(n => n.FuelTypeId == fuel.Id, ct);
+
+            // The headline figures follow the fuel, exactly as the operator write path does, and only
             // when something actually moved - an unchanged sheet must leave the row untouched, so a
             // second run over the same file writes nothing at all.
-            if (!command.DryRun && changedAny)
+            if (!command.DryRun && changed)
             {
-                var headline = offers.FirstOrDefault();
-                var final = headline is null
-                    ? FuelPricing.FinalPerLiter(0m, 0m, row.PricePerLiter, DefaultMinDiscountPerLiter)
-                    : FuelPricing.FinalPerLiter(
-                        headline.SupplierPricePerLiter ?? 0m,
-                        fuel.MarginUahPerLiter ?? 0m,
-                        row.PricePerLiter,
-                        headline.MinDiscountPerLiter ?? DefaultMinDiscountPerLiter);
+                var final = FuelPricing.FinalPerLiter(cost, profit, row.PricePerLiter, minDiscount);
 
                 fuel.BasePrice = Math.Round(row.PricePerLiter, 2, MidpointRounding.AwayFromZero);
                 fuel.DiscountPrice = Math.Round(final, 2, MidpointRounding.AwayFromZero);
@@ -219,8 +196,7 @@ public sealed class ImportUpgWogPricesCommandHandler
             }
 
             repriced.Add(new UpgWogFuelRepriced(
-                fuel.Id, fuel.Name, code, row.PricePerLiter,
-                offers.FirstOrDefault()?.PumpPricePerLiter, changedAny, volumesRepriced));
+                fuel.Id, fuel.Name, code, row.PricePerLiter, previousPump, changed, volumesRepriced));
         }
 
         if (!command.DryRun)
@@ -232,12 +208,13 @@ public sealed class ImportUpgWogPricesCommandHandler
     }
 
     /// <summary>
-    /// Creates one grade the brand sells and we do not, with its offer and default nominals.
+    /// Creates one grade the brand sells and we do not, with its price and default nominals.
     /// </summary>
     /// <remarks>
-    /// An offer is created with the fuel because a fuel with no offer has no cost to price from and
-    /// would sit on the shelf at a derived zero - the very state planning #360 forbids. The offer
-    /// carries the pump and no supplier cost, which is the honest description of what we know.
+    /// The pump is written straight onto the fuel, because a fuel with no recorded price has nothing
+    /// to price from and would sit on the shelf at a derived zero - the very state planning #360
+    /// forbids. It carries the pump and no supplier cost, which is the honest description of what we
+    /// know.
     /// </remarks>
     private async Task<UpgWogFuelCreated> CreateAsync(
         Guid brandId,
@@ -261,8 +238,10 @@ public sealed class ImportUpgWogPricesCommandHandler
                 // Priced at the pump on purpose. We know what they charge and nothing about what we
                 // pay, so the pump is the only figure we can honestly show; an operator sets the margin
                 // and it becomes a real price. Zero here would claim we sell this fuel for nothing.
-                BasePrice = Math.Round(pump, 2, MidpointRounding.AwayFromZero),
+BasePrice = Math.Round(pump, 2, MidpointRounding.AwayFromZero),
                 DiscountPrice = Math.Round(pump, 2, MidpointRounding.AwayFromZero),
+                PumpPricePerLiter = Math.Round(pump, 2, MidpointRounding.AwayFromZero),
+                MinDiscountPerLiter = DefaultMinDiscountPerLiter,
                 MarginUahPerLiter = null,
                 AllowBelowCost = false,
                 CreatedAtUtc = now,
@@ -270,30 +249,15 @@ public sealed class ImportUpgWogPricesCommandHandler
             };
             _context.FuelTypes.Add(fuel);
 
-            var offer = new FuelOffer
-            {
-                Id = OfferKeys.For(fuel.Id, DataKinds.Real),
-                BrandId = brandId,
-                FuelTypeId = fuel.Id,
-                SupplierPricePerLiter = null,
-                MarginPercent = null,
-                PumpPricePerLiter = Math.Round(pump, 2, MidpointRounding.AwayFromZero),
-                MinDiscountPerLiter = DefaultMinDiscountPerLiter,
-                DataKind = DataKinds.Real,
-                CreatedAtUtc = now,
-                UpdatedAtUtc = now
-            };
-            _context.FuelOffers.Add(offer);
-
             // History starts at the price it was born with, so the fuel's story begins at its creation
             // rather than at the first time an operator edited it.
-            await _priceRecorder.RecordAsync(offer, OfferPriceReasons.PumpImport, actor, now, ct);
+            await _priceRecorder.RecordAsync(fuel, OfferPriceReasons.PumpImport, actor, now, ct);
 
-        foreach (var liters in DefaultNominals)
-        {
-            _context.FuelNominals.Add(new FuelNominal
+            foreach (var liters in DefaultNominals)
             {
-                FuelTypeId = offer.FuelTypeId,
+                _context.FuelNominals.Add(new FuelNominal
+                {
+                    FuelTypeId = fuel.Id,
                 Liters = liters,
                 CreatedAtUtc = now,
                 UpdatedAtUtc = now

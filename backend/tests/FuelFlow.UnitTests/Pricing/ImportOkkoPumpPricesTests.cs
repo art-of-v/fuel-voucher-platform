@@ -124,38 +124,37 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
         await SeedCatalogAsync();
 
         await Handler().HandleAsync(Import(ScrapedSheet), Guid.Empty, "tester");
-// The per-litre figures now live on the offer, once, and the volumes carry only the frozen package
+// The per-litre figures now live on the fuel, once, and the volumes carry only the frozen package
         // total - so the import is asserted at that grain. Asserting it per package is what let the
         // copies drift apart unnoticed.
         _context.ChangeTracker.Clear();
 
-        var offer = await _context.FuelOffers
-            .FirstAsync(o => o.FuelTypeId == "okko-95" && o.DataKind == DataKinds.Real);
+        var fuel = await _context.FuelTypes.FirstAsync(f => f.Id == "okko-95");
 
     var a95 = await _context.FuelNominals
         .Where(v => v.FuelTypeId == "okko-95")
         .OrderBy(v => v.Liters)
         .ToListAsync();
         // cost 54 + profit 5 = 59, under the 92.90 - 1 = 91.90 ceiling.
-        offer.FinalPerLiterWith(await MarginFor(offer)).Should().Be(59m);
+        fuel.FinalPerLiter().Should().Be(59m);
         foreach (var volume in a95)
         {
             // No stored total and no override: the package price is the rate × litres, and it is
             // computed by the same function the storefront and checkout use.
             var price = FuelPricing.PackagePrice(
-                offer.SupplierPricePerLiter,
-                await MarginFor(offer),
-                offer.PumpPricePerLiter,
-                offer.MinDiscountPerLiter,
+                fuel.SupplierPricePerLiter,
+                await MarginFor(fuel),
+                fuel.PumpPricePerLiter,
+                fuel.MinDiscountPerLiter,
                 volume.Liters);
             price.Should().Be(Math.Round(59m * volume.Liters, 2, MidpointRounding.AwayFromZero));
             // The struck "before" price is the pump price × litres, recomputed from the offer rather than
             // stored - it was never authoritative, and a stale stored copy could leak a supplier cost.
-            FuelPricing.OriginalPackagePrice(offer.PumpPricePerLiter, volume.Liters, price)
+            FuelPricing.OriginalPackagePrice(fuel.PumpPricePerLiter, volume.Liters, price)
                 .Should().Be(Math.Round(92.90m * volume.Liters, 2, MidpointRounding.AwayFromZero));
         }
 
-        offer.PriceUpdatedAt.Should().NotBeNull();
+        fuel.PriceUpdatedAt.Should().NotBeNull();
     }
 
     [Fact]
@@ -166,13 +165,13 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
         await Handler().HandleAsync(Import(ScrapedSheet), Guid.Empty, "tester");
         _context.ChangeTracker.Clear();
 
-        var (_, offer) = await ReadAsync("okko-95-20");
+        var (_, fuel) = await ReadAsync("okko-95-20");
 
         // A pump change is not a cost event: cost and margin must be untouched. These live on the offer
         // now, so one read covers every volume of the fuel - there is no per-package copy left to miss.
-        offer.SupplierPricePerLiter.Should().Be(54m);
-        (await MarginFor(offer)).Should().Be(5m, "the margin lives on the fuel; the offer's own copy is never written");
-        offer.MinDiscountPerLiter.Should().Be(1m);
+        fuel.SupplierPricePerLiter.Should().Be(54m);
+        (await MarginFor(fuel)).Should().Be(5m, "the margin lives on the fuel; the offer's own copy is never written");
+        fuel.MinDiscountPerLiter.Should().Be(1m);
     }
 
     [Fact]
@@ -199,19 +198,19 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
         await Handler().HandleAsync(Import("fuelCode,pricePerLiter\r\nA-95,57.00\r\n"), Guid.Empty, "tester");
         _context.ChangeTracker.Clear();
 
-var (volume, offer) = await ReadAsync("okko-95-20");
-        offer.PumpPricePerLiter.Should().Be(57m);
-        offer.FinalPerLiterWith(await MarginFor(offer)).Should().Be(56m);
+var (volume, fuel) = await ReadAsync("okko-95-20");
+        fuel.PumpPricePerLiter.Should().Be(57m);
+        fuel.FinalPerLiter().Should().Be(56m);
         var price = FuelPricing.PackagePrice(
-            offer.SupplierPricePerLiter,
-            await MarginFor(offer),
-            offer.PumpPricePerLiter,
-            offer.MinDiscountPerLiter,
+            fuel.SupplierPricePerLiter,
+            await MarginFor(fuel),
+            fuel.PumpPricePerLiter,
+            fuel.MinDiscountPerLiter,
                 volume.Liters);
         price.Should().Be(1120m);
         // The struck "before" price is pump × litres, recomputed from the offer rather than read from a
         // stored column - which is what stops a stale copy from leaking a supplier cost.
-        FuelPricing.OriginalPackagePrice(offer.PumpPricePerLiter, volume.Liters, price)
+        FuelPricing.OriginalPackagePrice(fuel.PumpPricePerLiter, volume.Liters, price)
             .Should().Be(1140m);
     }
 
@@ -230,8 +229,8 @@ var (volume, offer) = await ReadAsync("okko-95-20");
         result.BelowCostSkipped.Should().ContainSingle().Which.Should().Be("A-95");
         result.FuelsChanged.Should().Be(0);
 
-        var (_, offer) = await ReadAsync("okko-95-20");
-        offer.PumpPricePerLiter.Should().Be(56m); // unchanged from the seed
+        var (_, fuel) = await ReadAsync("okko-95-20");
+        fuel.PumpPricePerLiter.Should().Be(56m); // unchanged from the seed
     }
 
     [Fact]
@@ -249,14 +248,14 @@ var (volume, offer) = await ReadAsync("okko-95-20");
         result.BelowCostSkipped.Should().BeEmpty();
         result.FuelsChanged.Should().Be(1);
         _context.ChangeTracker.Clear();
-        (await ReadAsync("okko-95-20")).Offer.PumpPricePerLiter.Should().Be(50m);
+        (await ReadAsync("okko-95-20")).Fuel.PumpPricePerLiter.Should().Be(50m);
     }
 
     [Fact]
     public async Task Import_DryRun_ShouldNotMutateAnything()
     {
         await SeedCatalogAsync();
-        var (_, beforeOffer) = await ReadAsync("okko-95-20");
+        var (_, beforeFuel) = await ReadAsync("okko-95-20");
 
         var result = await Handler().HandleAsync(Import(ScrapedSheet, dryRun: true), Guid.Empty, "tester");
 
@@ -264,8 +263,8 @@ var (volume, offer) = await ReadAsync("okko-95-20");
         result.FuelsMatched.Should().Be(5);
         result.FuelsChanged.Should().Be(5);
         _context.ChangeTracker.Clear();
-        var (afterVolume, afterOffer) = await ReadAsync("okko-95-20");
-        afterOffer.PumpPricePerLiter.Should().Be(beforeOffer.PumpPricePerLiter);
+        var (afterVolume, afterFuel) = await ReadAsync("okko-95-20");
+        afterFuel.PumpPricePerLiter.Should().Be(beforeFuel.PumpPricePerLiter);
         _context.AuditEventOutbox.Should().BeEmpty();
     }
 
@@ -277,13 +276,13 @@ var (volume, offer) = await ReadAsync("okko-95-20");
         await Handler().HandleAsync(Import(ScrapedSheet), Guid.Empty, "tester");
         _context.ChangeTracker.Clear();
 
-var (wogVolume, wogOffer) = await ReadAsync("wog-95-20");
-        wogOffer.PumpPricePerLiter.Should().Be(58m);
+var (wogVolume, wogFuel) = await ReadAsync("wog-95-20");
+        wogFuel.PumpPricePerLiter.Should().Be(58m);
         // Untouched: this brand's rate did not move, so its nominals still work out from the fuel's
         // own rate - 56 cost + 5 margin = 61, capped by the ceiling at pump 58 less the guaranteed
         // 1 UAH discount, which is 57 and therefore what the customer pays. Derived through the
         // formula rather than from a stored total, which is all there has ever been.
-        wogOffer.FinalPerLiterWith(await MarginFor(wogOffer)).Should().Be(57m);
+        wogFuel.FinalPerLiter().Should().Be(57m);
     }
 
     [Fact]
@@ -322,8 +321,8 @@ var (wogVolume, wogOffer) = await ReadAsync("wog-95-20");
         result.Applied.Should().Contain(a => a.FuelTypeId == "okko-95" && a.SiteFuelCode == "A-95");
 
         _context.ChangeTracker.Clear();
-        var offer = await _context.FuelOffers.FirstAsync(o => o.FuelTypeId == "okko-95" && o.DataKind == DataKinds.Real);
-        offer.PumpPricePerLiter.Should().Be(92.90m);
+        var fuel = await _context.FuelTypes.FirstAsync(f => f.Id == "okko-95");
+        fuel.PumpPricePerLiter.Should().Be(92.90m);
     }
 
     [Fact]
@@ -402,21 +401,21 @@ var (wogVolume, wogOffer) = await ReadAsync("wog-95-20");
         // it has to be the one that cannot forget the history: nobody is watching it not to.
         var prices = await _context.FuelOfferPrices.ToListAsync();
 
-        prices.Should().HaveCount(5, "one opening row per offer the import repriced");
+        prices.Should().HaveCount(5, "one opening row per fuel the import repriced");
         prices.Should().OnlyContain(p => p.Reason == OfferPriceReasons.PumpImport);
         prices.Should().OnlyContain(p => p.ChangedByUserId == null, "no person typed these");
-        prices.Should().OnlyContain(p => p.BrandId == BrandIds.Okko && p.DataKind == DataKinds.Real);
+prices.Should().OnlyContain(p => p.BrandId == BrandIds.Okko && p.DataKind == DataKinds.Real);
 
-        // Each row holds what its offer now holds - the invariant the history rests on, checked here at
+        // Each row holds what its fuel now holds - the invariant the history rests on, checked here at
         // the path that writes most rows rather than only in the schema-level suite.
         foreach (var price in prices)
         {
-            var offer = await _context.FuelOffers.FirstAsync(o => o.Id == price.OfferId);
-            price.PumpPricePerLiter.Should().Be(offer.PumpPricePerLiter);
+            var fuel = await _context.FuelTypes.FirstAsync(f => f.Id == price.FuelTypeId);
+            price.PumpPricePerLiter.Should().Be(fuel.PumpPricePerLiter);
             // The recorded figure is the derived one: the history stores what the customer paid, not the
             // inputs it came from, which is the whole reason the column exists.
-            price.FinalPricePerLiter.Should().Be(offer.FinalPerLiterWith(await MarginFor(offer)));
-            price.SupplierPricePerLiter.Should().Be(offer.SupplierPricePerLiter);
+            price.FinalPricePerLiter.Should().Be(fuel.FinalPerLiter());
+            price.SupplierPricePerLiter.Should().Be(fuel.SupplierPricePerLiter);
         }
     }
 
@@ -486,8 +485,8 @@ var (wogVolume, wogOffer) = await ReadAsync("wog-95-20");
         await Handler().HandleAsync(Import(ScrapedSheet), actor, "tester");
         _context.ChangeTracker.Clear();
 
-        var (_, offer) = await ReadAsync("okko-95-20");
-        offer.PriceUpdatedByUserId.Should().Be(actor);
+        var (_, fuel) = await ReadAsync("okko-95-20");
+        fuel.PriceUpdatedByUserId.Should().Be(actor);
     }
 
     [Fact]
@@ -584,32 +583,31 @@ var (wogVolume, wogOffer) = await ReadAsync("wog-95-20");
         doc.RootElement.GetProperty("PumpPricePerLiter").GetDecimal().Should().Be(102.90m);
     }
     /// <summary>
-    /// Reads a package the way the application does: the volume, plus the offer that carries the
+    /// Reads a package the way the application does: the volume, plus the fuel that carries the
     /// per-litre figures. Tests that assert on a single package almost always want both halves.
-private async Task<(FuelNominal Volume, FuelOffer Offer)> ReadAsync(string fuelTypeIdAndLiters)
-    {
-    // "okko-95-20" is a fuel id and a size, joined by the last dash. The size used to be the tail
-    // of a volume row's id; a nominal has no id at all, so the fixture names the pair it means.
-    var split = fuelTypeIdAndLiters.LastIndexOf('-');
-    var fuelTypeId = fuelTypeIdAndLiters[..split];
-    var liters = decimal.Parse(
-    fuelTypeIdAndLiters[(split + 1)..],
-    System.Globalization.CultureInfo.InvariantCulture);
-
-    var volume = await _context.FuelNominals.AsNoTracking()
-    .FirstAsync(v => v.FuelTypeId == fuelTypeId && v.Liters == liters);
-    var offer = await _context.FuelOffers.AsNoTracking()
-    .FirstAsync(o => o.FuelTypeId == fuelTypeId && o.DataKind == DataKinds.Real);
-    return (volume, offer);
-    }
-    /// <summary>
-    /// The margin an offer sells at, which is its fuel's - the same place production reads it since
-    /// the offer stopped carrying a copy. A test that asserted the offer's own column would have been
-    /// asserting a number nothing writes.
     /// </summary>
-    private async Task<decimal?> MarginFor(FuelOffer offer)
+    private async Task<(FuelNominal Volume, FuelTypeEntity Fuel)> ReadAsync(string fuelTypeIdAndLiters)
+    {
+        // "okko-95-20" is a fuel id and a size, joined by the last dash. The size used to be the tail
+        // of a volume row's id; a nominal has no id at all, so the fixture names the pair it means.
+        var split = fuelTypeIdAndLiters.LastIndexOf('-');
+        var fuelTypeId = fuelTypeIdAndLiters[..split];
+        var liters = decimal.Parse(
+            fuelTypeIdAndLiters[(split + 1)..],
+            System.Globalization.CultureInfo.InvariantCulture);
+
+        var volume = await _context.FuelNominals.AsNoTracking()
+            .FirstAsync(v => v.FuelTypeId == fuelTypeId && v.Liters == liters);
+        var fuel = await _context.FuelTypes.AsNoTracking().FirstAsync(f => f.Id == fuelTypeId);
+        return (volume, fuel);
+    }
+
+    /// <summary>
+    /// The margin a fuel sells at, read from the fuel - the one place it lives.
+    /// </summary>
+    private async Task<decimal?> MarginFor(FuelTypeEntity fuel)
         => await _context.FuelTypes
-            .Where(f => f.Id == offer.FuelTypeId)
+            .Where(f => f.Id == fuel.Id)
             .Select(f => f.MarginUahPerLiter)
             .FirstOrDefaultAsync();
 }

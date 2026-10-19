@@ -178,20 +178,19 @@ private FuelNominal NewPackage(string fuelTypeId, decimal liters)
         costed.Should().AllBeEquivalentTo(25m);
         result.VouchersCosted.Should().Be(2);
 
-        // Cost and final price are the OFFER's, written once; the per-package totals are the volumes'.
+        // Cost and final price are the FUEL's, written once; the per-package totals are the volumes'.
         // Asserting on the volumes alone would pass even if every per-litre figure stayed at zero,
         // which is precisely what this test exists to catch.
-        var offer = await _context.FuelOffers.FirstAsync(o => o.FuelTypeId == "okko-dp");
-        offer.SupplierPricePerLiter.Should().Be(25m);
-        offer.FinalPerLiterWith(await MarginFor(offer)).Should().Be(27m);   // 25 cost + 2 margin
+        var fuel = await _context.FuelTypes.FirstAsync(f => f.Id == "okko-dp");
+        fuel.SupplierPricePerLiter.Should().Be(25m);
+        fuel.FinalPerLiter().Should().Be(27m);   // 25 cost + 2 margin
 
         var sizes = await _context.FuelNominals
             .Where(v => v.FuelTypeId == "okko-dp").OrderBy(v => v.Liters).ToListAsync();
-        // Nothing per size any more: the cost moved the offer's rate, and every nominal follows it.
+        // Nothing per size any more: the cost moved the fuel's rate, and every nominal follows it.
         sizes.Should().HaveCount(2);
-        var fuel = await _context.FuelTypes.FirstAsync(f => f.Id == "okko-dp");
         fuel.DiscountPrice.Should().Be(27);   // final/L rounded
-        fuel.BasePrice.Should().Be(27);       // pump null ⇒ final + minDiscount(0)
+        fuel.BasePrice.Should().Be(27);       // pump null -> final + minDiscount(0)
 
         _context.AuditEventOutbox.Should().ContainSingle(e => e.EventType == "BatchCostEntered");
     }
@@ -206,10 +205,9 @@ private FuelNominal NewPackage(string fuelTypeId, decimal liters)
 
         await _setHandler.HandleAsync(Cmd(import, "okko-dp", 25m));
 
-        var offer = await _context.FuelOffers.FirstAsync(o => o.FuelTypeId == "okko-dp");
-        var history = await _context.FuelOfferPrices
-            .Where(p => p.OfferId == offer.Id)
-            .OrderBy(p => p.EffectiveFromUtc).ThenBy(p => p.Id)
+    var fuel = await _context.FuelTypes.FirstAsync(f => f.Id == "okko-dp");
+    var history = await _context.FuelOfferPrices
+        .Where(p => p.FuelTypeId == fuel.Id)
             .ToListAsync();
 
         // A batch cost is a price change like any other, and it arrives through a door of its own: an
@@ -318,9 +316,9 @@ private FuelNominal NewPackage(string fuelTypeId, decimal liters)
         var result = await _setHandler.HandleAsync(Cmd(import2, "okko-dp", 30m));
 
         result.BlendedCostPerLiter.Should().Be(25m);   // (100×20 + 100×30) / 200
-        var offer = await _context.FuelOffers.FirstAsync(o => o.FuelTypeId == "okko-dp");
-        offer.SupplierPricePerLiter.Should().Be(25m); // priced off blended, not the just-entered 30
-        offer.FinalPerLiterWith(await MarginFor(offer)).Should().Be(27m);
+    var fuel = await _context.FuelTypes.FirstAsync(f => f.Id == "okko-dp");
+    fuel.SupplierPricePerLiter.Should().Be(25m); // priced off blended, not the just-entered 30
+    fuel.FinalPerLiter().Should().Be(27m);
     }
 
     /// <summary>
@@ -481,13 +479,12 @@ private FuelNominal NewPackage(string fuelTypeId, decimal liters)
     }
 
     /// <summary>
-    /// The margin an offer sells at, which is its fuel's - the same place production reads it since
-    /// the offer stopped carrying a copy. A test that asserted the offer's own column would have been
-    /// asserting a number nothing writes.
+    /// The margin a fuel sells at, read from the fuel - the one place it lives.
     /// </summary>
-    private async Task<decimal?> MarginFor(FuelOffer offer)
+    private async Task<decimal?> MarginFor(FuelTypeEntity fuel)
         => await _context.FuelTypes
-            .Where(f => f.Id == offer.FuelTypeId)
+            .Where(f => f.Id == fuel.Id)
             .Select(f => f.MarginUahPerLiter)
             .FirstOrDefaultAsync();
+
 }

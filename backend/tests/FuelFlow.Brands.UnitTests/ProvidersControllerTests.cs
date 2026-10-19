@@ -222,8 +222,7 @@ public sealed class BrandFuelControllerTests : IDisposable
 
         liters.Should().Equal(2, 3, 5, 10, 20, 50);
 
-        var offer = await _context.FuelOffers.SingleAsync(o => o.FuelTypeId == fuel.Id);
-        offer.FinalPerLiterWith(await MarginFor(offer)).Should().Be(100.5m);
+        fuel.FinalPerLiter().Should().Be(100.5m);
     }
 
     [Fact]
@@ -303,8 +302,8 @@ public sealed class BrandFuelControllerTests : IDisposable
             .ToListAsync();
         liters.Should().Equal(2, 3, 5, 10, 20, 50);
 
-        var offer = await _context.FuelOffers.SingleAsync(o => o.FuelTypeId == "test-fuel-ttt");
-        offer.FinalPerLiterWith(await MarginFor(offer)).Should().Be(100.5m);
+        var fuel = await _context.FuelTypes.SingleAsync(f => f.Id == "test-fuel-ttt");
+        fuel.FinalPerLiter().Should().Be(100.5m);
     }
 
     [Fact]
@@ -360,15 +359,15 @@ public sealed class BrandFuelControllerTests : IDisposable
 
         result.Should().BeOfType<OkObjectResult>();
 
-        var offer = await _context.FuelOffers.SingleAsync(o => o.FuelTypeId == "test-fuel-a");
-        offer.FinalPerLiterWith(await MarginFor(offer)).Should().Be(63m);
-        offer.SupplierPricePerLiter.Should().Be(60m);
+        var fuel = await _context.FuelTypes.SingleAsync(f => f.Id == "test-fuel-a");
+        fuel.FinalPerLiter().Should().Be(63m);
+        fuel.SupplierPricePerLiter.Should().Be(60m);
 
         // The frozen package total is restated on every volume from the new per-litre price. Asserting
         // this separately from the offer is the point: it is what stops a stale package total from
         // surviving a reprice, which is the failure the old per-package columns allowed.
         var volumes = await _context.FuelNominals
-            .Where(n => n.FuelTypeId == offer.FuelTypeId).ToListAsync();
+            .Where(n => n.FuelTypeId == fuel.Id).ToListAsync();
         // Nothing to restate per volume any more: the offer's rate moved, and every nominal follows it.
         // What used to be checked here - that each volume's stored total was rewritten - is now
         // structural: there is no stored total, so there is nothing that could have gone stale.
@@ -454,11 +453,11 @@ public sealed class BrandFuelControllerTests : IDisposable
 
         result.Should().BeOfType<OkObjectResult>();
 
-        var offer = await _context.FuelOffers.SingleAsync(o => o.FuelTypeId == "test-fuel-a");
-        offer.FinalPerLiterWith(await MarginFor(offer)).Should().Be(51m);
-        offer.SupplierPricePerLiter.Should().Be(49m);
+        var fuel = await _context.FuelTypes.SingleAsync(f => f.Id == "test-fuel-a");
+        fuel.FinalPerLiter().Should().Be(51m);
+        fuel.SupplierPricePerLiter.Should().Be(49m);
         // The margin is the fuel's; the offer's own copy is never written any more.
-        (await MarginFor(offer)).Should().Be(2m);
+        fuel.MarginUahPerLiter.Should().Be(2m);
 
         // The new size exists, and the old one is gone from the fuel's list. What this endpoint no
         // longer does is touch the volume table: it wrote a second copy of the same answer there,
@@ -519,8 +518,7 @@ public sealed class BrandFuelControllerTests : IDisposable
 
         var fuel = await _context.FuelTypes.SingleAsync(f => f.BrandId == TestOkko);
         fuel.AllowBelowCost.Should().BeTrue();
-        var pricedOffer = await _context.FuelOffers.SingleAsync(o => o.FuelTypeId == fuel.Id);
-        pricedOffer.FinalPerLiterWith(await MarginFor(pricedOffer)).Should().Be(48.5m);   // min(cost 50 + margin 2, pump 49 − minDisc 0.5)
+        fuel.FinalPerLiter().Should().Be(48.5m);   // min(cost 50 + margin 2, pump 49 - minDisc 0.5)
 
         alerts.Verify(a => a.SendAsync(
             AlertSeverity.Warning, It.IsAny<string>(), It.IsAny<string>(),
@@ -543,9 +541,8 @@ public sealed class BrandFuelControllerTests : IDisposable
         var bad = result.Should().BeOfType<BadRequestObjectResult>().Subject;
         JsonSerializer.Serialize(bad.Value).Should().Contain("below_cost");
 
-        var offer = await _context.FuelOffers.SingleAsync(o => o.FuelTypeId == "test-fuel-a");
-        offer.FinalPerLiterWith(await MarginFor(offer)).Should().Be(51m);
         var fuel = await _context.FuelTypes.SingleAsync(f => f.Id == "test-fuel-a");
+        fuel.FinalPerLiter().Should().Be(51m);
         fuel.AllowBelowCost.Should().BeFalse();
     }
 
@@ -565,9 +562,8 @@ public sealed class BrandFuelControllerTests : IDisposable
 
         result.Should().BeOfType<OkObjectResult>();
 
-        var offer = await _context.FuelOffers.SingleAsync(o => o.FuelTypeId == "test-fuel-a");
-        offer.FinalPerLiterWith(await MarginFor(offer)).Should().Be(48.5m);
         var fuel = await _context.FuelTypes.SingleAsync(f => f.Id == "test-fuel-a");
+        fuel.FinalPerLiter().Should().Be(48.5m);
         fuel.AllowBelowCost.Should().BeTrue();
 
         alerts.Verify(a => a.SendAsync(
@@ -575,16 +571,11 @@ public sealed class BrandFuelControllerTests : IDisposable
             It.IsAny<IReadOnlyDictionary<string, string>>(), false, It.IsAny<CancellationToken>()),
             Times.Once);
 
-}
+    }
 
     /// <summary>
-    /// The margin an offer sells at, which is its fuel's - the same place production reads it since
-    /// the offer stopped carrying a copy. A test that asserted the offer's own column would have been
-    /// asserting a number nothing writes.
+    /// The margin a fuel sells at, read from the fuel - the one place it lives.
     /// </summary>
-    private async Task<decimal?> MarginFor(FuelOffer offer)
-        => await _context.FuelTypes
-            .Where(f => f.Id == offer.FuelTypeId)
-            .Select(f => f.MarginUahPerLiter)
-            .FirstOrDefaultAsync();
-    }
+    private static decimal? MarginFor(FuelTypeEntity fuel) => fuel.MarginUahPerLiter;
+
+}

@@ -267,6 +267,9 @@ if (knownCodes.Contains(code))
                 // operator sets a margin. The pump sync owns BasePrice/DiscountPrice from here on.
                 BasePrice = 0m,
                 DiscountPrice = 0m,
+                // The one supplier-owned figure. Cost, margin and discount stay null, and no nominal
+                // exists yet, so nothing is sellable and nothing is displayed.
+                PumpPricePerLiter = row.PricePerLiter,
                 CreatedAtUtc = now,
                 UpdatedAtUtc = now
             };
@@ -275,24 +278,10 @@ if (knownCodes.Contains(code))
             // candidate for archiving at the end of this same run.
             seenFuelIds.Add(fuel.Id);
 
-            var offer = new FuelOffer
-            {
-                Id = OfferKeys.For(fuel.Id, DataKinds.Real),
-                BrandId = okkoId.Value,
-                FuelTypeId = fuel.Id,
-                DataKind = DataKinds.Real,
-                // The one supplier-owned figure on the offer. Cost, margin and final stay null, and no
-                // volumes exist yet, so nothing is sellable and nothing is displayed.
-                PumpPricePerLiter = row.PricePerLiter,
-                CreatedAtUtc = now,
-                UpdatedAtUtc = now
-            };
-            _context.FuelOffers.Add(offer);
-
-            // The price the offer was born with, so a fuel's history starts at its creation instead of at
-            // the first time somebody repriced it. A row of mostly nulls is the honest record here: the
+// The price the fuel was born with, so its history starts at its creation instead of at the
+    // first time somebody repriced it. A row of mostly nulls is the honest record here: the
             // catalogue knows the pump and nothing else.
-            await _priceRecorder.RecordAsync(offer, OfferPriceReasons.CatalogueImport, actingUserId, now, ct);
+            await _priceRecorder.RecordAsync(fuel, OfferPriceReasons.CatalogueImport, actingUserId, now, ct);
 
             created.Add(new OkkoCatalogueCreated(fuel.Id, name, code, row.PricePerLiter));
         }
@@ -413,19 +402,9 @@ if (knownCodes.Contains(code))
                 // Tracked writes rather than ExecuteUpdateAsync: the latter is a relational-only
                 // operator, and this handler is unit-tested on the in-memory provider where it throws
                 // at translation time. One fuel per fifteen minutes is not a volume problem.
-                var now = DateTime.UtcNow;
-                var offers = await _context.FuelOffers.IgnoreQueryFilters()
-                    .Where(o => o.FuelTypeId == fuel.Id && !o.IsDeleted)
-                    .ToListAsync(ct);
-                var offerIds = offers.Select(o => o.Id).ToList();
-
-
-                foreach (var offer in offers)
-                {
-                    offer.IsDeleted = true;
-                    offer.DeletedAtUtc = now;
-                    offer.UpdatedAtUtc = now;
-                }
+                // There is no offer left to archive: it existed to carry the pump, and the fuel
+                // carries it.
+                fuelRow.UpdatedAtUtc = DateTime.UtcNow;
 
                 await _context.SaveChangesAsync(ct);
 

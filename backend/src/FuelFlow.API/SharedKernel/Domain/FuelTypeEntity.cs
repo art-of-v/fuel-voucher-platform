@@ -114,6 +114,19 @@ public sealed class FuelTypeEntity
     public decimal? MarginPercent { get; set; }
 
     /// <summary>
+    /// The customer price per litre these knobs produce, or <c>null</c> while no cost or no margin is
+    /// recorded.
+    /// <para>
+    /// A method, not a property, and that is the whole point: it was a property on the offer reading a
+    /// margin column nothing wrote. Every knob it needs lives here, so there is no argument left to get
+    /// in the wrong order at a call site - the one failure mode that shape invited.
+    /// </para>
+    /// </summary>
+    public decimal? FinalPerLiter() =>
+        FuelPricing.FinalPerLiterOrNull(
+            SupplierPricePerLiter, MarginUahPerLiter, PumpPricePerLiter, MinDiscountPerLiter);
+
+    /// <summary>
     /// When this fuel was last repriced, and by whom - stamped whether or not the number came out
     /// different. Moved here from the offer on 2026-10-19 with the rest of the pricing.
     /// </summary>
