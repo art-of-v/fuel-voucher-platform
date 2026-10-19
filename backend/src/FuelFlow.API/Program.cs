@@ -281,6 +281,20 @@ try
             service => service.BookExpiredLossAsync(CancellationToken.None),
             "50 3 * * *");
 
+        // Nightly backstop for Hangfire's own expiration manager, and the alarm that says whether it
+        // is still working. The manager does reap finished jobs — measured on production on
+        // 2026-10-19, every job row carried an expiry and the table sat at a steady one day of
+        // history — but it is a third party's background process, and nothing notices when it stops.
+        // This job removes what the manager missed, and logs the table's shape every night.
+        //
+        // Daily at 04:10 UTC — after the other three nightly sweeps (03:17, 03:40, 03:50) and
+        // before the nightly Docker prune on the box (04:20), so the database is not being
+        // rewritten in the same minute the images are.
+        recurringJobManager.AddOrUpdate<HangfireHistoryCleanupService>(
+            "cleanup-hangfire-history",
+            service => service.CleanupAsync(CancellationToken.None),
+            "10 4 * * *");
+
         // Daily refresh of OKKO's published pump prices (колонка) into the catalogue. Every price the
         // customer sees — the sale price, the struck "до" price, the per-litre saving — is derived
         // from it, so a stale pump quietly advertises a discount against a price nobody can get.

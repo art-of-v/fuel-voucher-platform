@@ -21,9 +21,10 @@
 --
 -- NOT TOUCHED, deliberately:
 --   Hangfire storage (job, jobparameter, state, server, set, hash, counter, aggregatedcounter).
---   Those tables are full — roughly 38k rows of dead one-shot jobs — but they are the scheduler's own
---   bookkeeping, and hand-deleting rows from them can leave a job claimed but never executed. Use
---   Hangfire's own pruning, or stop the worker first, if they ever need trimming.
+--   The finished-job history in there is no longer anyone's problem: the nightly
+--   `cleanup-hangfire-history` job prunes it, and only rows whose job is already Succeeded. This
+--   script still leaves the storage alone, because deleting from it by hand — in bulk, while the
+--   worker is running — can leave a job claimed but never executed.
 --
 -- Delete order is forced by ON DELETE RESTRICT from several tables onto fuel_vouchers
 -- (fulfillments.voucher_id, order_line_items.source_voucher_id, voucher_exchanges.old_voucher_id,

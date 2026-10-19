@@ -68,6 +68,24 @@ public static class AppSettingKeys
     public const string ExpiredVoucherLossEnabled = "ExpiredVoucherLoss:Enabled";
 
     /// <summary>
+    /// Master switch for the nightly Hangfire backstop (<c>HangfireHistoryCleanupService</c>), which
+    /// removes the finished-job history that Hangfire's own expiration manager should have taken and
+    /// did not. Unlike the other cleanup switches this one defaults to <b>on</b>: the rows it removes
+    /// are the scheduler's own record of work that already completed, not business data, and a
+    /// manager that has quietly stopped is a failure nobody would otherwise notice. Only the exact
+    /// text <c>false</c> turns it off — anything else, including a missing row, leaves it running.
+    /// See <see cref="HangfireCleanupRetentionDays"/>.
+    /// </summary>
+    public const string HangfireCleanupEnabled = "HangfireCleanup:Enabled";
+
+    /// <summary>
+    /// The hard bound on how long a finished job's history is kept, in whole days. It is the
+    /// backstop behind the backstop: it applies to the jobs whose expiry stamp was never written at
+    /// all, which the manager would never notice and the grace would never reach. Defaults to 7.
+    /// </summary>
+    public const string HangfireCleanupRetentionDays = "HangfireCleanup:RetentionDays";
+
+    /// <summary>
     /// Master switch for the paid voucher renewal/replacement flow. Fail-safe: defaults to false, so
     /// the mobile button never appears and no renewal order can be created until a manager has both
     /// turned it on and configured tier prices. See the per-tier keys below.

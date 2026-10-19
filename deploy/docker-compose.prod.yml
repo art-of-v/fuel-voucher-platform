@@ -234,7 +234,7 @@ services:
       # Set VOUCHER_EXPIRATION_ENABLED=false in .env only on a disposable/staging box.
       VoucherExpiration__Enabled: ${VOUCHER_EXPIRATION_ENABLED:-true}
 
-      # --- Daily OKKO pump-price sync (Hangfire, 03:05) ---
+      # --- OKKO pump-price sync (Hangfire, every 15 minutes) ---
       # Pulls the current pump price from https://www.okko.ua/api/uk/fuels and reprices
       # FinalPricePerLiter / OriginalPrice. SupplierPricePerLiter is deliberately NOT
       # touched - a pump change is not a cost event, and the supplier cost is what the

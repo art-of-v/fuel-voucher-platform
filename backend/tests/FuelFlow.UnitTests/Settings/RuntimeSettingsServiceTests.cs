@@ -1,6 +1,7 @@
 using FluentAssertions;
 using FuelFlow.Features.Pricing.Terms.SharedModels;
 using FuelFlow.Features.Settings;
+using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -96,6 +97,42 @@ public sealed class RuntimeSettingsServiceTests : IDisposable
 
         await _service.UpsertAsync("DataRetention:Enabled", "false");
         (await _service.IsDataRetentionEnabledAsync()).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task HangfireCleanup_ShouldDefaultToOn_AndToAWeek()
+    {
+        // The opposite of every other cleanup switch, and deliberately. The rows it removes are the
+        // scheduler's own record of work that already completed — no money, no customer, no
+        // settlement — and they are the only thing on the box with an unbounded growth curve. Off by
+        // default would leave that curve going.
+        (await _service.IsHangfireCleanupEnabledAsync()).Should().BeTrue();
+        (await _service.GetHangfireCleanupRetentionDaysAsync())
+            .Should().Be(RuntimeSettingsService.DefaultHangfireCleanupRetentionDays)
+            .And.Be(7);
+    }
+
+    [Fact]
+    public async Task HangfireCleanup_ShouldReflectPersistedValues()
+    {
+        await _service.UpsertAsync(AppSettingKeys.HangfireCleanupEnabled, "false");
+        (await _service.IsHangfireCleanupEnabledAsync()).Should().BeFalse();
+
+        await _service.UpsertAsync(AppSettingKeys.HangfireCleanupEnabled, "true");
+        (await _service.IsHangfireCleanupEnabledAsync()).Should().BeTrue();
+
+        await _service.UpsertAsync(AppSettingKeys.HangfireCleanupRetentionDays, "30");
+        (await _service.GetHangfireCleanupRetentionDaysAsync()).Should().Be(30);
+    }
+
+    [Fact]
+    public async Task HangfireCleanup_AMalformedValue_LeavesItRunning()
+    {
+        // A typo must not silently stop the one thing that keeps the scheduler's table bounded. The
+        // price of the typo is that the cleanup keeps running, which is the documented default —
+        // the opposite of the "1" or "yes" trap the other switches have, where the typo stops them.
+        await _service.UpsertAsync(AppSettingKeys.HangfireCleanupEnabled, "definitely-not-a-bool");
+        (await _service.IsHangfireCleanupEnabledAsync()).Should().BeTrue();
     }
 
     [Fact]
