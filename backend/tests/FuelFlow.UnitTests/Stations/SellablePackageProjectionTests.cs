@@ -48,17 +48,11 @@ public sealed class SellablePackageProjectionTests : IDisposable
             BrandId = BrandIds.Okko,
             BasePrice = 0m,
             DiscountPrice = 0m,
-            MarginUahPerLiter = 2m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
-        };
-        var offer = new FuelOffer
-        {
-            Id = "projection-fuel",
-            BrandId = BrandIds.Okko,
-            FuelTypeId = fuel.Id,
-            DataKind = DataKinds.Real,
-            SupplierPricePerLiter = 49m,
+MarginUahPerLiter = 2m,
+        // Every pricing figure lives on the fuel since 2026-10-19. The projection and
+        // SellablePackage.From must read the same columns, or one of them is pricing off a row
+        // nothing else looks at.
+        SupplierPricePerLiter = 49m,
             MarginPercent = 4m,
             PumpPricePerLiter = 55m,
             MinDiscountPerLiter = 0.5m,
@@ -68,35 +62,34 @@ public sealed class SellablePackageProjectionTests : IDisposable
 
         var nominal = new FuelNominal
         {
-            FuelTypeId = fuel.Id,
+            FuelTypeId = "projection-fuel",
+            DataKind = DataKinds.Real,
             Liters = 10m
         };
 
         _context.FuelTypes.Add(fuel);
-        _context.FuelOffers.Add(offer);
         _context.FuelNominals.Add(nominal);
         await _context.SaveChangesAsync();
         _context.ChangeTracker.Clear();
 
         // Filtered by id: EnsureCreated also loads the HasData catalogue into this context, and this
-        // test is about one offer, not about whatever the seed brought with it.
-        var projected = await _context.FuelOffers
-            .Where(o => o.Id == offer.Id)
-            .Project(_context.FuelNominals.Where(n => n.FuelTypeId == fuel.Id), _context.Brands.AsNoTracking())
-            .SingleAsync();
-        var composed = SellablePackage.From(
-            await _context.FuelOffers.SingleAsync(o => o.Id == offer.Id),
-            // Third of the join, for the same reason the projection takes it: the margin is the fuel's.
-            await _context.FuelTypes.SingleAsync(f => f.Id == offer.FuelTypeId),
-// The slug is the fourth half of the identity: it is what the storefront groups and labels
-            // by, and what the stock key matches a voucher's brand NAME against.
-            nominal.Liters, "okko");
+// test is about one fuel, not about whatever the seed brought with it.
+    var projected = await _context.FuelTypes
+        .Where(f => f.Id == fuel.Id)
+        .Project(_context.FuelNominals.Where(n => n.FuelTypeId == fuel.Id), _context.Brands.AsNoTracking())
+        .SingleAsync();
+    var composed = SellablePackage.From(
+        await _context.FuelTypes.SingleAsync(f => f.Id == fuel.Id),
+        DataKinds.Real,
+        // The slug is the fourth half of the identity: it is what the storefront groups and labels
+        // by, and what the stock key matches a voucher's brand NAME against.
+        nominal.Liters, "okko");
 
         projected.Should().BeEquivalentTo(composed);
 
         // And the id both sides synthesise is the same string, or a package the shop advertised
         // could not be resolved at checkout.
-        projected.PackageId.Should().Be(PackageIds.For(offer.Id, 10m));
+        projected.PackageId.Should().Be(PackageIds.For(fuel.Id, DataKinds.Real, 10m));
 
         // The price both paths resolve: derived, and equal on both sides.
         projected.ComputedFinalPricePerLiter.Should().Be(51m);

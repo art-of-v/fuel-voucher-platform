@@ -36,38 +36,34 @@ public sealed class GetPublicPackagesByBrandQueryHandler
         // `data_kind` is on the offer, so the filter is on the offer; the fuel's display name is
         // joined from fuel_types for the same reason as there - the offer knows which fuel, not what
         // it is called.
-        var rows = await (
-            from offer in _context.FuelOffers.AsNoTracking()
-            join fuel in _context.FuelTypes.AsNoTracking() on offer.FuelTypeId equals fuel.Id
-    // The network's own code travels with the row: the stock keys below are matched on it, and
-    // it is what the client renders next to the uuid it now orders by.
-    join brand in _context.Brands.AsNoTracking() on offer.BrandId equals brand.Id
-// The sizes belong to the fuel AND the pool - see GetPublicPackagesQueryHandler, which is
-    // the same query narrowed to one Brand.
-    from nominal in _context.FuelNominals.AsNoTracking()
-    where nominal.FuelTypeId == fuel.Id
-          && nominal.DataKind == DataKinds.ForPool(isTestAccount)
-    where offer.BrandId == query.BrandId
-               && offer.DataKind == DataKinds.ForPool(isTestAccount)
-            orderby fuel.Name, nominal.Liters
-            select new
-            {
-                offer.Id,
-                offer.BrandId,
-                // The slug travels with the row: the stock keys below are matched on it, and it is
-                // what the client renders next to the uuid it now orders by.
-                BrandSlug = brand.Slug,
-                offer.FuelTypeId,
-                FuelName = fuel.Name,
-                nominal.Liters,
-                // Resolved against the offer's rate below — see GetPublicPackagesQueryHandler, which is
-                // the same query narrowed to one Brand.
-                offer.SupplierPricePerLiter,
-                fuel.MarginUahPerLiter,
-                offer.PumpPricePerLiter,
-                offer.MinDiscountPerLiter,
-            })
-            .ToListAsync(ct);
+var rows = await (
+        // The fuel and its sizes; see GetPublicPackagesQueryHandler, which is the same query narrowed
+        // to one Brand. No offer: the price is the fuel's own.
+        from fuel in _context.FuelTypes.AsNoTracking()
+        where !fuel.IsDeleted && fuel.BrandId == query.BrandId
+        // The network's own code travels with the row: the stock keys below are matched on it, and
+        // it is what the client renders next to the uuid it now orders by.
+        join brand in _context.Brands.AsNoTracking() on fuel.BrandId equals brand.Id
+        // The sizes belong to the fuel AND the pool - see GetPublicPackagesQueryHandler.
+        from nominal in _context.FuelNominals.AsNoTracking()
+        where nominal.FuelTypeId == fuel.Id
+              && nominal.DataKind == DataKinds.ForPool(isTestAccount)
+        orderby fuel.Name, nominal.Liters
+        select new
+        {
+            fuel.BrandId,
+            BrandSlug = brand.Slug,
+            FuelTypeId = fuel.Id,
+            FuelName = fuel.Name,
+            nominal.DataKind,
+            nominal.Liters,
+            // Resolved against the fuel's own rate below - see GetPublicPackagesQueryHandler.
+            fuel.SupplierPricePerLiter,
+            fuel.MarginUahPerLiter,
+            fuel.PumpPricePerLiter,
+            fuel.MinDiscountPerLiter,
+        })
+        .ToListAsync(ct);
 
         var available = await _stock.AvailableKeysAsync(isTestAccount, ct);
 
@@ -84,7 +80,7 @@ public sealed class GetPublicPackagesByBrandQueryHandler
                     x.Liters);
 
                 return new PublicPackageResponse(
-                    PackageIds.For(x.Id, x.Liters),
+                    PackageIds.For(x.FuelTypeId, x.DataKind, x.Liters),
                     x.BrandId,
                     x.BrandSlug,
                     x.FuelTypeId,

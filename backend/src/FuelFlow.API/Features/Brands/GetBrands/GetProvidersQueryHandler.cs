@@ -15,13 +15,13 @@ public sealed class GetBrandsQueryHandler
             .OrderBy(s => s.SortOrder).ThenBy(s => s.Name)
             .ToListAsync(ct);
         var fuels = await _context.FuelTypes.AsNoTracking().ToListAsync(ct);
-// The fuel's sizes joined to the offers that sell them: the brand card reads a per-litre figure per
-    // package, and that figure belongs to the offer. Projected in one query so the card is not
-    // assembled N times.
-    var packages = await _context.FuelOffers
-    .AsNoTracking()
-    .Project(_context.FuelNominals.AsNoTracking(), _context.Brands.AsNoTracking())
-    .ToListAsync(ct);
+// The fuels and their sizes. The card reads a per-litre figure per package, and every one of
+        // those figures is the fuel's own, so the projection takes fuels and nothing else. Projected
+        // in one query so the card is not assembled N times.
+        var packages = await _context.FuelTypes
+            .AsNoTracking()
+            .Project(_context.FuelNominals.AsNoTracking(), _context.Brands.AsNoTracking())
+            .ToListAsync(ct);
 
         return Brands.Select(Brand =>
         {

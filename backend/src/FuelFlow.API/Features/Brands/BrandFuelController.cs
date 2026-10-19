@@ -239,36 +239,24 @@ public sealed class BrandFuelController : ControllerBase
             litersToCreate = DefaultNominals;
         }
 
-        // One offer and N volumes, not N packages. Every per-litre knob the request carries is a
-        // property of WHAT IS BEING SOLD, not of how much of it: a 5 L bottle and a 50 L canister of
-        // the same fuel at the same Brand have one price per litre and therefore one offer. The old
-        // row-per-volume shape wrote that same price N times and could not stop the copies drifting -
-        // which is what the backfill had to reconcile when the split landed.
-        var pool = DataKinds.ForPool(request.IsTestData.Value);
-        var offer = new FuelOffer
-        {
-            Id = OfferKeys.For(fuel.Id, pool),
-            BrandId = id,
-            FuelTypeId = fuel.Id,
-            SupplierPricePerLiter = request.SupplierPricePerLiter,
-            // No margin here: it belongs to the fuel, set above. Repeating it on the offer is what
-            // this column was, and two copies of one number is how they drift.
-            MarginPercent = request.MarginPercent,
-            // No FinalPricePerLiter: the offer stopped storing the derived figure on 2026-10-17.
-            // inalPerLiter above is still used - to price the volumes this creates, and in the audit
-            // payload - so the formula is evaluated once here and never written down.
-            PumpPricePerLiter = request.PumpPricePerLiter,
-            MinDiscountPerLiter = request.MinDiscountPerLiter,
-            DataKind = pool,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
-        };
-        _context.FuelOffers.Add(offer);
+// Every per-litre knob the request carries is a property of WHAT IS BEING SOLD, not of how much of
+    // it: a 5 L bottle and a 50 L canister of the same fuel have one price per litre. They used to
+    // be written on an offer, because an offer per pool could hold two prices for one grade; with
+    // the pool on the size list they are written on the fuel and there is no second place to keep
+    // them in step.
+    var pool = DataKinds.ForPool(request.IsTestData.Value);
+    // The cost and the guaranteed discount are not nullable on the request: an operator who leaves
+    // them blank means zero, and the fuel records that. Only the ceiling and the margin percent are
+    // "not stated", and those stay null rather than being invented as zero.
+    fuel.SupplierPricePerLiter = request.SupplierPricePerLiter;
+    fuel.MinDiscountPerLiter = request.MinDiscountPerLiter;
+    if (request.MarginPercent is not null) fuel.MarginPercent = request.MarginPercent;
+    if (request.PumpPricePerLiter is not null) fuel.PumpPricePerLiter = request.PumpPricePerLiter;
 
-        // A new offer has no previous price, so this row is not a change but the price it was born with
-        // - the same as every later row's role, and the reason a fuel's history starts at its creation
-        // rather than at the first time somebody edited it.
-        await _priceRecorder.RecordAsync(offer, OfferPriceReasons.Operator, GetUserId(), ct: ct);
+    // A fuel that has never been priced has no previous price, so this row is not a change but the
+    // price it was born with - the same as every later row's role, and the reason a fuel's history
+    // starts at its creation rather than at the first time somebody edited it.
+    await _priceRecorder.RecordAsync(fuel, OfferPriceReasons.Operator, GetUserId(), ct: ct);
 
             foreach (var liters in litersToCreate)
         {
@@ -365,37 +353,8 @@ public sealed class BrandFuelController : ControllerBase
         // base = pump/reference (колонка) when known, else legacy final + min discount.
         var baseUahPerLiter = request.PumpPricePerLiter ?? (finalPerLiter + request.MinDiscountPerLiter);
 
-        var offerId = OfferKeys.For(fuel.Id, pool);
-        var offer = await _context.FuelOffers.FirstOrDefaultAsync(o => o.Id == offerId, ct);
-
-        // Flipping isTestData is not an update any more, and pretending otherwise is the bug this shape
-        // removes. `data_kind` is part of the offer's identity - UNIQUE (brand_id, fuel_type_id,
-        // data_kind) - so the same fuel at the same Brand has TWO offers, one per pool, and they are
-        // different rows rather than one row with a flag. Moving a fuel from real to rehearsal
-        // therefore means moving its volumes onto the rehearsal offer and archiving the real one.
-        var otherPool = pool == DataKinds.Real ? DataKinds.Qa : DataKinds.Real;
-        var otherOfferId = OfferKeys.For(fuel.Id, otherPool);
-        var otherOffer = await _context.FuelOffers.FirstOrDefaultAsync(o => o.Id == otherOfferId, ct);
-
-        // Whether this request is the one that made the offer. An entity it created is already
-        // Added; calling Update on it turns that into an UPDATE against a row that is not there yet,
-        // which the database answers with a concurrency failure.
-        var offerCreatedNow = offer is null;
-
-        if (offer is null)
-        {
-            offer = new FuelOffer
-            {
-                Id = offerId,
-                BrandId = fuel.BrandId,
-                FuelTypeId = fuel.Id,
-                DataKind = pool,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow,
-            };
-            _context.FuelOffers.Add(offer);
-        }
-
+        // There is no offer to find, create or flip. Flipping `isTestData` moves the SIZES to the
+        // other pool, below; the price is the fuel's and there is nothing pool-shaped left to move.
 var seededNominals = await _context.FuelNominals
     .AnyAsync(n => n.FuelTypeId == fuel.Id, ct);
     if (!seededNominals)
@@ -412,56 +371,37 @@ var seededNominals = await _context.FuelNominals
         var Brand = await _context.Brands.FirstOrDefaultAsync(s => s.Id == fuel.BrandId, ct);
         var BrandName = Brand?.Name ?? "?";
 
-        // Snapshot BEFORE anything is written below. Reading "old" from `otherOffer` looks right when the
-        // edit is flipping a fuel between pools - the other pool's offer is what it had - and silently
-        // records nothing at all otherwise, because on an ordinary reprice `otherOffer` is null. The
-        // audit then reads "supplier  -> 100.00" and the operator has no record of what they changed.
-        var previousOffer = offer ?? otherOffer;
-        var oldSupplierPrice = previousOffer?.SupplierPricePerLiter;
-        // The fuel already carries its current margin at this point - the snapshot below runs before any
-        // write - and the offer's copy is no longer written, so this is the only "old" that still exists.
+        // Snapshot BEFORE anything is written below. The "before" is the fuel's own figures, which
+        // is where every price figure lives now; there is no offer to fall back to for the old one.
+        var oldSupplierPrice = fuel.SupplierPricePerLiter;
         var oldMarginPrice = fuel.MarginUahPerLiter;
-        // Computed from the offer's own knobs and the fuel's margin rather than read from a column: the
         // audit payload records what the customer paid per litre, and that number is still a fact even
         // though nothing stores it.
-        var oldFinalPrice = previousOffer is null
-            ? null
-            : FuelPricing.FinalPerLiterOrNull(
-                previousOffer.SupplierPricePerLiter,
-                oldMarginPrice,
-                previousOffer.PumpPricePerLiter,
-                previousOffer.MinDiscountPerLiter);
+        var oldFinalPrice = FuelPricing.FinalPerLiterOrNull(
+            oldSupplierPrice,
+            oldMarginPrice,
+            fuel.PumpPricePerLiter,
+            fuel.MinDiscountPerLiter);
+
         var oldValue = JsonSerializer.Serialize(new
         {
             fuel.Name,
             SupplierPricePerLiter = oldSupplierPrice,
             MarginUahPerLiter = oldMarginPrice,
-            MarginPercent = previousOffer?.MarginPercent,
+            MarginPercent = fuel.MarginPercent,
             FinalPricePerLiter = oldFinalPrice,
             fuel.BasePrice,
             fuel.DiscountPrice
         });
 
-        // The per-litre knobs are written to the offer, once, instead of to every package row. The
-        // volume only carries the frozen package total, which is a function of litres - and litres
-        // never change when the price does, so this recomputes cleanly.
-        offer.SupplierPricePerLiter = request.SupplierPricePerLiter;
-        // The margin's home is the fuel, and it is written there first. A margin is a fact about a
-        // fuel rather than about a sale of it — the same diesel carries the same margin whether we
-        // sell two litres or a hundred — so on the offer it was per (brand × fuel × pool), which meant
-        // two pools of one fuel could quote two prices.
+        // Every knob lands on the fuel. There is one price per grade, so there is no second
+        // place to write it and no second writer that could forget.
+        fuel.SupplierPricePerLiter = request.SupplierPricePerLiter;
         fuel.MarginUahPerLiter = request.MarginUahPerLiter;
-        // The offer's copy of the margin is gone as of this change: every reader - storefront, checkout,
-        // dashboard, below-cost guard and the price recorder - takes it from the fuel, so a second
-        // column holding it would be a number nobody reads and one writer could forget.
-        offer.MarginPercent = request.MarginPercent;
-        offer.PumpPricePerLiter = request.PumpPricePerLiter;
-        offer.MinDiscountPerLiter = request.MinDiscountPerLiter;
-        // offer.FinalPricePerLiter = finalPerLiter used to live here. The customer price is
-        // min(cost + profit, pump - minDiscount) over the four lines above, so writing it down beside
-        // them was a second copy of the same number - and one the audit trail then compared against.
-        offer.UpdatedAtUtc = DateTime.UtcNow;
-
+        fuel.MarginPercent = request.MarginPercent;
+        fuel.PumpPricePerLiter = request.PumpPricePerLiter;
+        fuel.MinDiscountPerLiter = request.MinDiscountPerLiter;
+        fuel.UpdatedAtUtc = DateTime.UtcNow;
         // The loop that restated every volume's total after a reprice is gone, and its absence is the
         // improvement rather than a gap: a volume's price is now the offer's rate x its litres unless
         // somebody set an override, so there is nothing to restate - and an override is no longer erased
@@ -470,18 +410,10 @@ var seededNominals = await _context.FuelNominals
         // The history row, before the save that persists the offer - and it also stamps
         // price_updated_at / price_updated_by_user_id, which this endpoint previously left at their
         // creation-time values, so the audit trail could not say when an operator repriced a fuel.
-        await _priceRecorder.RecordAsync(offer, OfferPriceReasons.Operator, GetUserId(), ct: ct);
+        await _priceRecorder.RecordAsync(fuel, OfferPriceReasons.Operator, GetUserId(), ct: ct);
 
-        // Archive rather than delete the offer we just emptied: it carries the pricing history that
-        // `fuel_packages.is_deleted` rows carried before the split, and a delete here would take the
-        // volumes' old home with it.
-        if (otherOffer is not null && otherOffer.Id != offer.Id)
-        {
-            otherOffer.IsDeleted = true;
-            otherOffer.DeletedAtUtc = DateTime.UtcNow;
-            otherOffer.UpdatedAtUtc = DateTime.UtcNow;
-        }
-
+        // The other pool has nothing to archive: an offer existed to hold a price, and the
+        // price is the fuel's. What separates the pools now is the size list, handled above.
         fuel.Name = request.Name;
         // base = pump/reference (колонка) when known, else legacy final + min discount;
         // discount = customer price (final).
@@ -521,7 +453,6 @@ var seededNominals = await _context.FuelNominals
         }
 
 
-        if (!offerCreatedNow) _context.FuelOffers.Update(offer);
         _context.FuelTypes.Update(fuel);
 
         await _context.SaveChangesAsync(ct);

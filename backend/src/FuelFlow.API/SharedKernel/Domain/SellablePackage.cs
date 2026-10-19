@@ -34,8 +34,10 @@ public sealed record SellablePackage
     /// </summary>
     public string PackageId { get; init; } = string.Empty;
 
-    public string OfferId { get; init; } = string.Empty;
-
+/// <summary>
+    /// No offer id here. It went with the offer on 2026-10-19; <see cref="PackageId"/> already says
+    /// the fuel and the pool, and nothing downstream was reading it.
+    /// </summary>
     public Guid BrandId { get; init; }
 
     /// <summary>
@@ -105,22 +107,22 @@ public sealed record SellablePackage
     /// </para>
     /// </summary>
     public static SellablePackage From(
-        FuelOffer offer,
-        FuelTypeEntity fuel,
+FuelTypeEntity fuel,
+        string dataKind,
         decimal liters,
         string brandSlug) => new()
     {
-        PackageId = PackageIds.For(offer.Id, liters),
-        OfferId = offer.Id,
-        BrandId = offer.BrandId,
+        // Identity from the triple the nominal is keyed on, not from a row that no longer exists.
+        PackageId = PackageIds.For(fuel.Id, dataKind, liters),
+        BrandId = fuel.BrandId,
         BrandSlug = brandSlug,
-        FuelTypeId = offer.FuelTypeId,
+        FuelTypeId = fuel.Id,
         Liters = liters,
-        PumpPricePerLiter = offer.PumpPricePerLiter,
-        MinDiscountPerLiter = offer.MinDiscountPerLiter,
-        SupplierPricePerLiter = offer.SupplierPricePerLiter,
+        PumpPricePerLiter = fuel.PumpPricePerLiter,
+        MinDiscountPerLiter = fuel.MinDiscountPerLiter,
+        SupplierPricePerLiter = fuel.SupplierPricePerLiter,
         MarginUahPerLiter = fuel.MarginUahPerLiter,
-        MarginPercent = offer.MarginPercent,
-        DataKind = offer.DataKind,
+        MarginPercent = fuel.MarginPercent,
+        DataKind = dataKind,
     };
 }

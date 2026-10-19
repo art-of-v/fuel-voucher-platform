@@ -33,35 +33,34 @@ namespace FuelFlow.Persistence;
         /// The caller's pool. The offer supplies the price knobs and the identity; it no longer carries
         /// a list of sizes, so it cannot be the grain on its own.
         /// </param>
-/// <param name="nominals">Every size any fuel is sold in. Filtered to the offer's fuel below.</param>
+/// <param name="nominals">Every size any fuel is sold in, per pool. Filtered to the fuel below.</param>
     /// <param name="brands">
-    /// The networks, for the slug beside each offer's uuid. Joined rather than resolved afterwards:
+    /// The networks, for the slug beside each fuel's uuid. Joined rather than resolved afterwards:
     /// <see cref="SellablePackage.BrandSlug"/> is what the stock key matches a voucher's brand NAME
     /// against, so a projection that left it empty would produce packages nothing can be found by.
     /// </param>
     public static IQueryable<SellablePackage> Project(
-            this IQueryable<FuelOffer> offers,
+            this IQueryable<FuelTypeEntity> fuels,
             IQueryable<FuelNominal> nominals,
             IQueryable<Brand> brands)
-        => from offer in offers
-           join nominal in nominals on offer.FuelTypeId equals nominal.FuelTypeId
-           join brand in brands on offer.BrandId equals brand.Id
+        => from fuel in fuels
+           join nominal in nominals on fuel.Id equals nominal.FuelTypeId
+           join brand in brands on fuel.BrandId equals brand.Id
            select new SellablePackage
            {
-               PackageId = PackageIds.For(offer.Id, nominal.Liters),
-               OfferId = offer.Id,
-               BrandId = offer.BrandId,
+               PackageId = PackageIds.For(fuel.Id, nominal.DataKind, nominal.Liters),
+               BrandId = fuel.BrandId,
                BrandSlug = brand.Slug,
-               FuelTypeId = offer.FuelTypeId,
+               FuelTypeId = fuel.Id,
                Liters = nominal.Liters,
-               PumpPricePerLiter = offer.PumpPricePerLiter,
-               MinDiscountPerLiter = offer.MinDiscountPerLiter,
-               SupplierPricePerLiter = offer.SupplierPricePerLiter,
-               // The fuel's margin, not the offer's: a margin is a fact about the grade, so the two pools
-               // of one fuel cannot quote two prices. The join is the same server-side projection the rest
-               // of this query already is - no extra round trip, no Include.
-               MarginUahPerLiter = offer.FuelType!.MarginUahPerLiter,
-               MarginPercent = offer.MarginPercent,
-               DataKind = offer.DataKind,
+               // Every price figure is the fuel's now. The projection and
+               // SellablePackage.From read the same columns, and neither has an offer to disagree
+               // with the other.
+               PumpPricePerLiter = fuel.PumpPricePerLiter,
+               MinDiscountPerLiter = fuel.MinDiscountPerLiter,
+               SupplierPricePerLiter = fuel.SupplierPricePerLiter,
+               MarginUahPerLiter = fuel.MarginUahPerLiter,
+               MarginPercent = fuel.MarginPercent,
+               DataKind = nominal.DataKind,
            };
     }

@@ -172,7 +172,7 @@ CreateBrandStation(StationId(1), BrandId(1), "Node A"),
         var result = await handler.HandleAsync(new GetPublicPackagesQuery(CallerUserId: null));
 
         result.Should().ContainSingle("a rehearsal package reaching the store front is purchasable");
-        result[0].Id.Should().Be(PackageIds.For(OfferKeys.For("ft-a", DataKinds.Real), 10m));
+        result[0].Id.Should().Be(PackageIds.For("ft-a", DataKinds.Real, 10m));
     }
 
     /// <summary>
@@ -192,7 +192,7 @@ CreateBrandStation(StationId(1), BrandId(1), "Node A"),
         var result = await handler.HandleAsync(new GetPublicPackagesByBrandQuery(BrandId(1), CallerUserId: null));
 
         result.Should().ContainSingle();
-        result[0].Id.Should().Be(PackageIds.For(OfferKeys.For("ft-a", DataKinds.Real), 10m));
+        result[0].Id.Should().Be(PackageIds.For("ft-a", DataKinds.Real, 10m));
     }
 
     [Fact]
@@ -235,11 +235,11 @@ CreateBrandStation(StationId(1), BrandId(1), "Node A"),
         var result = await handler.HandleAsync(new GetPublicPackagesQuery(CallerUserId: null));
 
         var pkg = result.Should().ContainSingle().Which;
-        // The id is derived from the offer and the size, because a package is not a row any more.
-        // Asserted through PackageIds rather than spelled out, so a change to the format fails here
-        // instead of quietly splitting the shelf from the checkout resolver.
-        pkg.Id.Should().Be(PackageIds.For(OfferKeys.For("ft-a", DataKinds.Real), 10m));
-        pkg.BrandId.Should().Be(BrandId(1));
+// The id is derived from the fuel, the pool and the size, because a package is not a row
+    // any more. Asserted through PackageIds rather than spelled out, so a change to the format
+    // fails here instead of quietly splitting the shelf from the checkout resolver.
+    pkg.Id.Should().Be(PackageIds.For("ft-a", DataKinds.Real, 10m));
+    pkg.BrandId.Should().Be(BrandId(1));
         pkg.FuelTypeId.Should().Be("ft-a");
         pkg.FuelName.Should().Be("A-95");
         pkg.Liters.Should().Be(10m);
@@ -292,8 +292,8 @@ CreateBrandStation(StationId(1), BrandId(1), "Node A"),
         var result = await handler.HandleAsync(new GetPublicPackagesQuery(CallerUserId: null));
 
 result.Should().HaveCount(2, "an empty shelf is greyed out, not removed from the catalog");
-    var inStock = PackageIds.For(OfferKeys.For("ft-a", DataKinds.Real), 10m);
-    var empty = PackageIds.For(OfferKeys.For("ft-a", DataKinds.Real), 20m);
+    var inStock = PackageIds.For("ft-a", DataKinds.Real, 10m);
+    var empty = PackageIds.For("ft-a", DataKinds.Real, 20m);
     result.Single(p => p.Id == inStock).IsAvailable.Should().BeTrue();
     result.Single(p => p.Id == empty).IsAvailable.Should().BeFalse();
 }
@@ -407,8 +407,8 @@ result.Should().HaveCount(2, "an empty shelf is greyed out, not removed from the
         var result = await handler.HandleAsync(new GetPublicPackagesByBrandQuery(BrandId(1), CallerUserId: null));
 
 result.Should().HaveCount(2);
-    var inStock = PackageIds.For(OfferKeys.For("ft-a", DataKinds.Real), 10m);
-    var empty = PackageIds.For(OfferKeys.For("ft-a", DataKinds.Real), 20m);
+    var inStock = PackageIds.For("ft-a", DataKinds.Real, 10m);
+    var empty = PackageIds.For("ft-a", DataKinds.Real, 20m);
     result.Single(p => p.Id == inStock).IsAvailable.Should().BeTrue();
     result.Single(p => p.Id == empty).IsAvailable.Should().BeFalse();
 }

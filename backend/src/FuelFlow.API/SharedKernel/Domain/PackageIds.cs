@@ -1,13 +1,18 @@
 namespace FuelFlow.SharedKernel.Domain;
 
 /// <summary>
-/// Builds the id a sellable package is addressed by, from the two things that actually identify one.
+/// Builds the id a sellable package is addressed by, from the three things that identify one.
 /// </summary>
 /// <remarks>
 /// A package used to be a row and carried its own id, which is why the id looked like a
 /// <c>package</c> to everything downstream. It is not stored anywhere - no column, no foreign key -
-/// so it can be derived instead: the offer names the pool and the fuel, the nominal names the size,
-/// and <c>offerId:liters</c> is unique exactly where <c>UNIQUE (offer_id, liters)</c> used to be.
+/// so it can be derived instead: the fuel, the pool it is sold in, and the size. That triple is
+/// exactly what <c>(fuel_type_id, data_kind, liters)</c> is unique on.
+/// <para>
+/// It was keyed on the offer until 2026-10-19. The offer id was a string built from the fuel and the
+/// pool, so the identity did not change - what changed is that nothing has to keep the offer around
+/// to derive it.
+/// </para>
 /// <para>
 /// One place formats it. The shelf, availability and checkout must all produce the same string for
 /// the same package, and three string interpolations are three chances to disagree.
@@ -15,15 +20,15 @@ namespace FuelFlow.SharedKernel.Domain;
 /// </remarks>
 public static class PackageIds
 {
-    /// <summary>The separator between the offer and the size. Not valid in either part.</summary>
+    /// <summary>The separator between the parts. Not valid in any of them.</summary>
     private const char Separator = ':';
 
     /// <summary>
-    /// The id of the package that is <paramref name="liters"/> of whatever
-    /// <paramref name="offerId"/> offers.
+    /// The id of the package that is <paramref name="liters"/> of <paramref name="fuelTypeId"/>, sold
+    /// in <paramref name="dataKind"/>.
     /// </summary>
-    public static string For(string offerId, decimal liters)
-        => $"{offerId}{Separator}{FormatLiters(liters)}";
+    public static string For(string fuelTypeId, string dataKind, decimal liters)
+        => $"{fuelTypeId}{Separator}{dataKind}{Separator}{FormatLiters(liters)}";
 
     /// <summary>
     /// Litres as they are written in an id: a whole number stays whole, because

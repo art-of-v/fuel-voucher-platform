@@ -44,21 +44,27 @@ public sealed class TermQuoteQueryHandler
         // line gets rejected properly at checkout. Returning the bare ladder lets the picker render without
         // prices rather than failing the whole screen.
 var row = await (
-            from offer in _context.FuelOffers.AsNoTracking()
-            join nominal in _context.FuelNominals.AsNoTracking() on offer.FuelTypeId equals nominal.FuelTypeId
-            where offer.BrandId == BrandId
-                  && offer.FuelTypeId == fuelTypeId
-                  && nominal.Liters == liters
-                  && nominal.DataKind == pool
-                  && offer.DataKind == pool
-            select new { Offer = offer, Fuel = offer.FuelType! })
-            .FirstOrDefaultAsync(cancellationToken);
+        // The fuel, and whether it sells this size in this pool. There is no offer to join: the
+        // price is the fuel's, so joining one could only ever bring a second opinion about it.
+from fuel in _context.FuelTypes.AsNoTracking()
+    where fuel.BrandId == BrandId
+          && fuel.Id == fuelTypeId
+          && !fuel.IsDeleted
+    // The network's own code travels with the row: the stock check below matches by brand TEXT.
+    join brand in _context.Brands.AsNoTracking() on fuel.BrandId equals brand.Id
+    from nominal in _context.FuelNominals.AsNoTracking()
+    where nominal.FuelTypeId == fuel.Id
+          && nominal.Liters == liters
+          && nominal.DataKind == pool
+    select new { Fuel = fuel, DataKind = nominal.DataKind, BrandSlug = brand.Slug })
+        .FirstOrDefaultAsync(cancellationToken);
 
-// The stock check below needs the network's NAME, not its id - see StockKey. Taken from the
-        // package we just resolved; a null package means no stock to look for anyway.
-        var brandSlug = row is null ? null : await _brands.SlugOfAsync(row.Offer.BrandId, cancellationToken);
+// The stock check below needs the network's NAME, not its id - see StockKey.
+        var brandSlug = row?.BrandSlug;
 
-        var package = row is null ? null : SellablePackage.From(row.Offer, row.Fuel, liters, brandSlug ?? string.Empty);
+        var package = row is null
+            ? null
+            : SellablePackage.From(row.Fuel, row.DataKind, liters, brandSlug ?? string.Empty);
 
         // The below-cost guard needs the fuel's opt-in flag. The fuel is already joined above - the
         // package's margin is its margin - so this no longer costs a second query per quote.

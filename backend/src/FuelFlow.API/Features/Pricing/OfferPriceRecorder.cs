@@ -60,15 +60,14 @@ public sealed class OfferPriceRecorder
     /// </param>
     /// <param name="ct">Cancellation.</param>
     public async Task<bool> RecordAsync(
-        FuelOffer offer,
+        FuelTypeEntity fuel,
         string reason,
         Guid? actingUserId,
         DateTime? effectiveFromUtc = null,
         CancellationToken ct = default)
     {
-        var latest = await LatestForAsync([offer.Id], ct);
-        var fuels = await FuelsForAsync([offer.FuelTypeId], ct);
-        return Record(offer, reason, actingUserId, effectiveFromUtc, latest, fuels);
+        var latest = await LatestForAsync([fuel.Id], ct);
+        return Record(fuel, reason, actingUserId, effectiveFromUtc, latest);
     }
 
     /// <summary>
@@ -83,18 +82,17 @@ public sealed class OfferPriceRecorder
     /// <param name="ct">Cancellation.</param>
     /// <returns>How many rows were appended.</returns>
     public async Task<int> RecordRangeAsync(
-        IEnumerable<FuelOffer> offers,
+        IEnumerable<FuelTypeEntity> fuels,
         string reason,
         Guid? actingUserId,
         DateTime? effectiveFromUtc = null,
         CancellationToken ct = default)
     {
-        var tracked = offers.ToList();
+        var tracked = fuels.ToList();
         if (tracked.Count == 0) return 0;
 
-        var latest = await LatestForAsync(tracked.Select(o => o.Id).ToList(), ct);
-        var fuels = await FuelsForAsync(tracked.Select(o => o.FuelTypeId).Distinct().ToList(), ct);
-        return tracked.Count(o => Record(o, reason, actingUserId, effectiveFromUtc, latest, fuels));
+        var latest = await LatestForAsync(tracked.Select(f => f.Id).Distinct().ToList(), ct);
+        return tracked.Count(f => Record(f, reason, actingUserId, effectiveFromUtc, latest));
     }
 
     /// <summary>
@@ -173,47 +171,44 @@ public sealed class OfferPriceRecorder
     }
 
     /// <summary>The margin an offer sells at, which is its fuel's. Null when the fuel is not to hand.</summary>
-    private static decimal? MarginOf(FuelOffer offer, Dictionary<string, FuelTypeEntity> fuels)
-        => fuels.TryGetValue(offer.FuelTypeId, out var fuel) ? fuel.MarginUahPerLiter : null;
 
     /// <summary>
     /// The synchronous half, so both public methods decide identically: stamp, compare, append.
     /// </summary>
     /// <returns>Whether a row was appended.</returns>
     private bool Record(
-        FuelOffer offer,
+        FuelTypeEntity fuel,
         string reason,
         Guid? actingUserId,
         DateTime? effectiveFromUtc,
-        Dictionary<string, FuelOfferPrice> latest,
-        Dictionary<string, FuelTypeEntity> fuels)
+        Dictionary<string, FuelOfferPrice> latest)
     {
         var at = effectiveFromUtc ?? DateTime.UtcNow;
-        var margin = MarginOf(offer, fuels);
+        var margin = fuel.MarginUahPerLiter;
 
-        offer.PriceUpdatedAt = at;
-        offer.PriceUpdatedByUserId = actingUserId == Guid.Empty ? null : actingUserId;
+        fuel.PriceUpdatedAt = at;
+        fuel.PriceUpdatedByUserId = actingUserId == Guid.Empty ? null : actingUserId;
 
-        if (latest.TryGetValue(offer.Id, out var previous) && SamePrice(previous, offer, margin)) return false;
+        if (latest.TryGetValue(fuel.Id, out var previous) && SamePrice(previous, fuel)) return false;
 
         _context.FuelOfferPrices.Add(new FuelOfferPrice
         {
             Id = Guid.CreateVersion7(),
-            OfferId = offer.Id,
-            BrandId = offer.BrandId,
-            FuelTypeId = offer.FuelTypeId,
-            DataKind = offer.DataKind,
-            SupplierPricePerLiter = offer.SupplierPricePerLiter,
+            OfferId = fuel.Id,
+            BrandId = fuel.BrandId,
+            FuelTypeId = fuel.Id,
+            DataKind = DataKinds.Real,
+            SupplierPricePerLiter = fuel.SupplierPricePerLiter,
             MarginUahPerLiter = margin,
-            MarginPercent = offer.MarginPercent,
+            MarginPercent = fuel.MarginPercent,
             // The derived figure, recorded rather than read: the offer stopped storing it on
             // 2026-10-17, and a history row that left it null would answer "what did this cost?" with
             // the knobs instead of the number. Derived from the fuel's margin, not the offer's copy of
             // it, for the same reason the row above is.
             FinalPricePerLiter = FuelPricing.FinalPerLiterOrNull(
-                offer.SupplierPricePerLiter, margin, offer.PumpPricePerLiter, offer.MinDiscountPerLiter),
-            PumpPricePerLiter = offer.PumpPricePerLiter,
-            MinDiscountPerLiter = offer.MinDiscountPerLiter,
+        fuel.SupplierPricePerLiter, margin, fuel.PumpPricePerLiter, fuel.MinDiscountPerLiter),
+            PumpPricePerLiter = fuel.PumpPricePerLiter,
+            MinDiscountPerLiter = fuel.MinDiscountPerLiter,
             EffectiveFromUtc = at,
             RecordedAtUtc = DateTime.UtcNow,
             ChangedByUserId = actingUserId == Guid.Empty ? null : actingUserId,
@@ -234,12 +229,12 @@ public sealed class OfferPriceRecorder
     /// (which recorded the stored column) still compares correctly against a derived one.
     /// </para>
     /// </summary>
-    private static bool SamePrice(FuelOfferPrice previous, FuelOffer offer, decimal? margin) =>
-        previous.SupplierPricePerLiter == offer.SupplierPricePerLiter
-        && previous.MarginUahPerLiter == margin
-        && previous.MarginPercent == offer.MarginPercent
+    private static bool SamePrice(FuelOfferPrice previous, FuelTypeEntity fuel) =>
+        previous.SupplierPricePerLiter == fuel.SupplierPricePerLiter
+        && previous.MarginUahPerLiter == fuel.MarginUahPerLiter
+        && previous.MarginPercent == fuel.MarginPercent
         && previous.FinalPricePerLiter == FuelPricing.FinalPerLiterOrNull(
-            offer.SupplierPricePerLiter, margin, offer.PumpPricePerLiter, offer.MinDiscountPerLiter)
-        && previous.PumpPricePerLiter == offer.PumpPricePerLiter
-        && previous.MinDiscountPerLiter == offer.MinDiscountPerLiter;
+        fuel.SupplierPricePerLiter, fuel.MarginUahPerLiter, fuel.PumpPricePerLiter, fuel.MinDiscountPerLiter)
+        && previous.PumpPricePerLiter == fuel.PumpPricePerLiter
+        && previous.MinDiscountPerLiter == fuel.MinDiscountPerLiter;
 }
