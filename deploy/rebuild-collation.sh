@@ -57,6 +57,7 @@ cd "$SCRIPT_DIR"
 
 CONTAINER="${CONTAINER:-fuelflow-postgres}"
 BACKEND="${BACKEND:-fuelflow-backend}"
+CADDY="${CADDY:-fuelflow-caddy}"
 WORK="${WORK:-/root/collation-rebuild}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 
@@ -64,7 +65,15 @@ say()  { printf '\n=== %s\n' "$*"; }
 die()  { printf '\nERROR: %s\n' "$*" >&2; exit 1; }
 
 [[ -f "$SCRIPT_DIR/.env" ]] || die "no .env next to this script - run it from ~/FuelFlow/deploy"
-set -a; source "$SCRIPT_DIR/.env"; set +a
+
+# The database name and user are read from the CONTAINER, not from .env. Sourcing .env is not
+# safe: it holds a value with spaces in it (a mail app password) that a shell would split into
+# words and try to run. Every other deploy script here uses `docker compose --env-file` for
+# exactly that reason, and this one does the same - it only needs two names, and the container
+# already has them.
+POSTGRES_USER="$(docker exec "$CONTAINER" printenv POSTGRES_USER)"
+POSTGRES_DB="$(docker exec "$CONTAINER" printenv POSTGRES_DB)"
+[[ -n "$POSTGRES_USER" && -n "$POSTGRES_DB" ]] || die "could not read the database name and user from $CONTAINER"
 
 compose() { docker compose --env-file "$SCRIPT_DIR/.env" -f "$SCRIPT_DIR/docker-compose.prod.yml" "$@"; }
 
@@ -141,11 +150,13 @@ docker exec -i "$CONTAINER" psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAX \
 
 say "6/6  starting the backend and waiting for health"
 compose up -d dotnet-backend
+# The probe goes through caddy, not into the backend container: the backend image has no wget
+# (a distroless-ish .NET image), and caddy's is the path the outside world uses anyway.
 for _ in $(seq 1 60); do
-  if docker exec "$BACKEND" wget -qO- http://localhost:8080/health > /dev/null 2>&1; then break; fi
+  if docker exec "$CADDY" wget -qO- http://dotnet-backend:8080/health > /dev/null 2>&1; then break; fi
   sleep 2
 done
-docker exec "$BACKEND" wget -qO- http://localhost:8080/health \
+docker exec "$CADDY" wget -qO- http://dotnet-backend:8080/health \
   || echo "(the health endpoint did not answer - check the logs)"
 
 say "the Ukrainian order, from the restored database"
