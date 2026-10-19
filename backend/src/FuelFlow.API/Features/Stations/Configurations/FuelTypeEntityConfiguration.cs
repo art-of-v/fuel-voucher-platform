@@ -19,6 +19,13 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
         // keeps paid-for vouchers in existence (#217).
         builder.HasQueryFilter(e => !e.IsDeleted);
 
+        // Restrict, for the same reason brand_stations carries one: a fuel is archived through
+        // IsDeleted, and a DELETE arriving from anywhere else - including a hand-written psql
+        // session - must fail loudly rather than take every grade of a network with it.
+        builder.HasOne<Brand>()
+            .WithMany()
+            .HasForeignKey(e => e.BrandId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.Property(e => e.Id)
             .HasColumnName("id")
@@ -40,8 +47,13 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
         // Snake case like every other column here. Left unmapped, EF would scaffold
         // "MarginUahPerLiter" — a second spelling of one column in the same table, invisible until a
         // hand-written migration or a query names the other one.
+        // numeric(10,4), the same width every other per-litre money column in the schema uses.
+        // It was an unconstrained `numeric` here while fuel_offer_prices carried the same field at
+        // numeric(10,4) - two spellings of one number, and an unbounded one on the table that is
+        // now the single source of truth for it.
         builder.Property(e => e.MarginUahPerLiter)
-            .HasColumnName("margin_uah_per_liter");
+            .HasColumnName("margin_uah_per_liter")
+            .HasColumnType("numeric(10,4)");
 
         // The four pricing knobs, moved off fuel_offers on 2026-10-19. Same naming discipline as
         // the margin above: one column, one spelling - and the same numeric(10,4) they had on the
@@ -146,6 +158,19 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
             // below-cost opt-in (BrandsController), which is a business decision rather than a
             // constraint, so a hand-written PUT or a future code path can still land here.
             t.HasCheckConstraint("ck_fuel_types_prices_non_negative", "base_price >= 0 AND discount_price >= 0");
+
+            // Zero IS a price here: a giveaway grade sells at nothing, and
+            // DatabaseIntegrityTests.A_Zero_Price_Volume_Is_Allowed_But_Zero_Liters_Is_Not says so
+            // on purpose. Forbidding zero outright was wrong and that test caught it.
+            //
+            // What is not a price policy is a grade that knows its pump price and still sells at
+            // zero. That is the shape of the 1 UAH leak: OfferPricingBecomesTheFuel copied a NULL
+            // final_price_per_liter across as 0 on OKKO "Пульс 95", which carried a pump price of
+            // 95.90 and would have been listed for nothing. A giveaway has no pump price to
+            // contradict, so requiring one to be absent is the narrow rule that keeps both cases.
+            t.HasCheckConstraint(
+                "ck_fuel_types_zero_price_needs_no_pump_price",
+                "discount_price > 0 OR pump_price_per_liter IS NULL");
 
             // The four knobs the fuel took off the offer on 2026-10-19 keep the constraints the offer
             // carried. A negative cost makes every price computed from it negative as well, and a

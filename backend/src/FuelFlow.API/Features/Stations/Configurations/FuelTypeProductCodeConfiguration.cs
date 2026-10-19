@@ -37,6 +37,23 @@ internal sealed class FuelTypeProductCodeConfiguration : IEntityTypeConfiguratio
         builder.HasIndex(e => e.ProductCode)
             .HasDatabaseName("ix_fuel_type_product_codes_code");
 
+        // The lookup rows have no meaning without the two things they name, and a code that points
+        // at a fuel that is gone is a code that resolves to nothing - silently, because nothing
+        // queries it any more. RESTRICT on the brand, as everywhere else in the catalogue.
+        builder.HasOne<Brand>()
+            .WithMany()
+            .HasForeignKey(e => e.BrandId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // CASCADE on the fuel, and deliberately unlike the price history above: these are lookup
+        // rows derived from a fuel, not a record of it. fuel_nominals - the other per-fuel
+        // derivation - already cascades the same way, and a fuel cannot be deleted while its
+        // sizes still claim it exists.
+        builder.HasOne<FuelTypeEntity>()
+            .WithMany()
+            .HasForeignKey(e => e.FuelTypeId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         builder.ToTable(t =>
         {
             // 100 is the bound every catalog text column shares (F-24); the codes themselves are four
