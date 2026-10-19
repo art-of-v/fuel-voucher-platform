@@ -107,14 +107,14 @@ public sealed class OfferPriceRecorder
     {
         var rows = await _context.FuelOfferPrices
             .AsNoTracking()
-            .Where(p => offerIds.Contains(p.OfferId))
+            .Where(p => offerIds.Contains(p.FuelTypeId))
             .OrderBy(p => p.EffectiveFromUtc)
             .ThenBy(p => p.Id)
             .ToListAsync(ct);
 
-        // Ascending order plus overwrite-on-equal keeps the last row written for each offer.
+        // Ascending order plus overwrite-on-equal keeps the last row written for each fuel.
         var latest = new Dictionary<string, FuelOfferPrice>(StringComparer.Ordinal);
-        foreach (var row in rows) latest[row.OfferId] = row;
+        foreach (var row in rows) latest[row.FuelTypeId] = row;
         return latest;
     }
 
@@ -194,7 +194,7 @@ public sealed class OfferPriceRecorder
         _context.FuelOfferPrices.Add(new FuelOfferPrice
         {
             Id = Guid.CreateVersion7(),
-            OfferId = fuel.Id,
+
             BrandId = fuel.BrandId,
             FuelTypeId = fuel.Id,
             DataKind = DataKinds.Real,

@@ -29,7 +29,7 @@ public sealed record GetFuelPriceHistoryQuery(string FuelTypeId, int Limit = 50)
 /// </param>
 public sealed record FuelPriceHistoryEntry(
     Guid Id,
-    string OfferId,
+    string FuelTypeId,
     string DataKind,
     decimal? SupplierPricePerLiter,
     decimal? MarginUahPerLiter,
@@ -82,7 +82,7 @@ public sealed class GetFuelPriceHistoryQueryHandler
             .Take(PageLimits.ClampPageSize(query.Limit))
             .Select(p => new FuelPriceHistoryEntry(
                 p.Id,
-                p.OfferId,
+                p.FuelTypeId,
                 p.DataKind,
                 p.SupplierPricePerLiter,
                 p.MarginUahPerLiter,

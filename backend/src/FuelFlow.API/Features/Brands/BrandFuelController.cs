@@ -540,25 +540,11 @@ var seededNominals = await _context.FuelNominals
         var BrandName = Brand?.Name ?? "?";
         var fuelName = fuel.Name;
 
-        // Same as the brand branch: this path archives rows rather than reading them.
-        var offerIdsToArchive = await _context.FuelOffers
-            .Where(o => o.FuelTypeId == fuelId)
-            .Select(o => o.Id).ToListAsync(ct);
-        var offersToArchive = await _context.FuelOffers
-            .Where(o => offerIdsToArchive.Contains(o.Id))
-            .ToListAsync(ct);
-
         // Archive rather than remove - same reasoning as the brand branch above: the cascade from
-        // fuel_types reaches fuel_vouchers (#217).
+        // fuel_types reaches fuel_vouchers (#217). The sizes are not archived either: they belong to
+        // the fuel, and this row is the one that says no. It used to be a second row doing that job,
+        // and a live offer put the fuel back on the shelf the moment a nominals edit touched it.
         var archivedAt = DateTime.UtcNow;
-        // The sizes are not archived: they belong to the fuel, and the fuel row below is the one that
-        // says no. Archiving the offers is what takes the fuel off the shelf, and a live offer would
-        // put it back the moment a nominals edit touched the fuel.
-        foreach (var offer in offersToArchive)
-        {
-            offer.IsDeleted = true;
-            offer.DeletedAtUtc = archivedAt;
-        }
 
         fuel.IsDeleted = true;
         fuel.DeletedAtUtc = archivedAt;

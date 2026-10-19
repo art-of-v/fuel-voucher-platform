@@ -5,21 +5,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 namespace FuelFlow.Features.Brands.Configurations;
 
 /// <summary>
-/// <c>fuel_offer_prices</c> - the append-only record of what each offer was priced at, and when.
-/// </summary>
-/// <remarks>
-/// <para>
-/// No query filter, unlike <see cref="FuelOfferConfiguration"/>: a history row has no
-/// <c>is_deleted</c> because it is never deleted, and the point of it is that it stays readable after
-/// the offer is archived - an archived offer is out of the catalogue, not out of the record.
-/// </para>
-/// <para>
-/// The indexes follow the two questions asked of this table. <c>(offer_id, effective_from)</c> serves
-/// "what did this fuel cost, and when did each price start" - the chronological read of one offer's
-/// history. <c>(fuel_type_id, effective_from)</c> serves the cross-offer one: a fuel has an offer per
-/// pool, and "what happened to A95 across both pools this week" joins on the fuel rather than the key.
-/// </para>
-/// </remarks>
+/// <c>fuel_offer_prices</c> - the append-only record of what each fuel was priced at, and when.
 internal sealed class FuelOfferPriceConfiguration : IEntityTypeConfiguration<FuelOfferPrice>
 {
     public void Configure(EntityTypeBuilder<FuelOfferPrice> builder)
@@ -29,14 +15,12 @@ internal sealed class FuelOfferPriceConfiguration : IEntityTypeConfiguration<Fue
         builder.HasKey(e => e.Id);
 
         builder.Property(e => e.Id).HasColumnName("id").HasColumnType("uuid");
-        builder.Property(e => e.OfferId).HasColumnName("offer_id").HasColumnType("text").IsRequired();
-        builder.Property(e => e.BrandId).HasColumnName("brand_id").HasColumnType("uuid").IsRequired();
+builder.Property(e => e.BrandId).HasColumnName("brand_id").HasColumnType("uuid").IsRequired();
         builder.Property(e => e.FuelTypeId).HasColumnName("fuel_type_id").HasColumnType("text").IsRequired();
 
-        // Same six columns, same scale, as the offer they are copied from: a history row that stored a
-        // price at a different precision than the live price would make "the same number" a judgement
-        // call rather than an equality.
-        builder.Property(e => e.SupplierPricePerLiter).HasColumnName("supplier_price_per_liter").HasColumnType("numeric(10,4)");
+        // Same six columns, same scale, as the fuel they are copied from: a history row that stored
+        // a price at a different precision than the live price would make "the same number" a
+        // judgement call rather than an equality.
         builder.Property(e => e.MarginUahPerLiter).HasColumnName("margin_uah_per_liter").HasColumnType("numeric(10,4)");
         builder.Property(e => e.MarginPercent).HasColumnName("margin_percent").HasColumnType("numeric(10,4)");
         builder.Property(e => e.FinalPricePerLiter).HasColumnName("final_price_per_liter").HasColumnType("numeric(10,4)");
@@ -56,19 +40,11 @@ internal sealed class FuelOfferPriceConfiguration : IEntityTypeConfiguration<Fue
 
         builder.HasIndex(e => e.ChangedByUserId);
 
-        builder.HasIndex(e => new { e.OfferId, e.EffectiveFromUtc })
-            .HasDatabaseName("ix_fuel_offer_prices_offer_effective");
         builder.HasIndex(e => new { e.FuelTypeId, e.EffectiveFromUtc })
             .HasDatabaseName("ix_fuel_offer_prices_fuel_effective");
-
-        builder.HasOne(e => e.Offer)
-            .WithMany(o => o.Prices)
-            .HasForeignKey(e => e.OfferId)
-            // Restrict, like every other relation here. A price is a record of something sold, so the
-            // offer it was sold under must stay readable - which is why removing the rehearsal pool
-            // removes its history first.
-            .OnDelete(DeleteBehavior.Restrict);
-
+        // No foreign key: the fuel this row prices is the fuel it is about, and a fuel is never
+        // deleted - it is archived, and an archived fuel keeps its whole price history readable,
+        // which is the only reason the record is worth keeping.
         builder.ToTable(t =>
         {
             // The same value sets and sign constraints the offer itself carries, and deliberately so: a
@@ -84,9 +60,6 @@ internal sealed class FuelOfferPriceConfiguration : IEntityTypeConfiguration<Fue
                 "(pump_price_per_liter IS NULL OR pump_price_per_liter >= 0) AND " +
                 "(min_discount_per_liter IS NULL OR min_discount_per_liter >= 0)");
 
-            // A history row with no offer has no fuel to price and cannot be read back: refuse it at the
-            // database rather than in a remark that says "should not happen".
-            t.HasCheckConstraint("ck_fuel_offer_prices_offer_id_length", "length(offer_id) <= 103");
             t.HasCheckConstraint("ck_fuel_offer_prices_fuel_type_id_length", "length(fuel_type_id) <= 100");
         });
     }

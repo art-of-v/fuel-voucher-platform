@@ -108,8 +108,7 @@ internal sealed class JournalLineConfiguration : IEntityTypeConfiguration<Journa
         builder.Property(e => e.LineNo).HasColumnName("line_no").IsRequired();
         builder.Property(e => e.AccountId).HasColumnName("account_id").IsRequired();
         builder.Property(e => e.PartyId).HasColumnName("party_id");
-        builder.Property(e => e.OfferId).HasColumnName("offer_id").HasMaxLength(103);
-        builder.Property(e => e.LegalEntityId).HasColumnName("legal_entity_id");
+        // offer_id is gone with the offer (2026-10-19) - see the note where its foreign key was.
         builder.Property(e => e.VoucherId).HasColumnName("voucher_id");
         builder.Property(e => e.QuantityLiters).HasColumnName("quantity_liters").HasPrecision(10, 2);
         builder.Property(e => e.DebitUah).HasColumnName("debit_uah").HasPrecision(14, 2).HasDefaultValue(0m).IsRequired();
@@ -139,14 +138,9 @@ internal sealed class JournalLineConfiguration : IEntityTypeConfiguration<Journa
         builder.HasOne<FuelVoucher>().WithMany().HasForeignKey(e => e.VoucherId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // offer_id is text, not uuid: fuel_offers.id is a natural key today and D-21 replaces both at
-        // once. Referencing it as uuid would not compile into a migration that applies.
-        builder.HasOne<FuelOffer>()
-            .WithMany()
-            .HasForeignKey(e => e.OfferId)
-            .HasPrincipalKey(e => e.Id)
-            .OnDelete(DeleteBehavior.Restrict);
-
+        // offer_id went with the offer on 2026-10-19. A journal line records what happened to a
+        // voucher, and which grade it was is already on the line; the offer it was sold under
+        // added a pointer that could only ever point at a row nothing wrote.
         builder.ToTable(t =>
         {
             t.HasCheckConstraint("ck_journal_lines_quantity_positive",
