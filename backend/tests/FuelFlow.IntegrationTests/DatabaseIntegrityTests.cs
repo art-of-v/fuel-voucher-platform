@@ -110,14 +110,59 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
             """, new string('y', 150));
 
         var ex = await act.Should().ThrowAsync<PostgresException>();
+<<<<<<< HEAD
         ex.Which.MessageText.Should().Contain("ck_brands_id_length",
             "the catalog key limit, not some unrelated constraint, is what must stop this");
+=======
+        ex.Which.MessageText.Should().Contain("character varying(100)",
+            "the column type, not some unrelated constraint, is what must stop this");
+    }
+
+    /// <summary>
+    /// The re-import key of a station is bounded by its column type, not by a CHECK.
+    /// </summary>
+    /// <remarks>
+    /// It used to be the primary key, bounded by <c>ck_brand_stations_id_length</c>. Planning D-21
+    /// moved that value to <c>external_id varchar(100)</c> — the same limit, expressed as a type,
+    /// because a CHECK over a varchar's own length states nothing the type does not already.
+    /// </remarks>
+    /// </summary>
+    [Fact]
+    public async Task A_Station_ExternalId_Is_Bounded_By_Its_Column_Type()
+    {
+        await using var context = CreateContext();
+
+        var type = await context.Database
+            .SqlQueryRaw<string>(
+                """
+                SELECT data_type AS "Value" FROM information_schema.columns
+                WHERE table_name = 'brand_stations' AND column_name = 'external_id'
+                """)
+            .ToListAsync();
+
+        type.Should().ContainSingle().Which.Should().Be("character varying",
+            "the re-import key is the one column a station still has to keep short");
+
+        var maxLength = await context.Database
+            .SqlQueryRaw<int>(
+                """
+                SELECT character_maximum_length AS "Value" FROM information_schema.columns
+                WHERE table_name = 'brand_stations' AND column_name = 'external_id'
+                """)
+            .ToListAsync();
+
+        maxLength.Should().ContainSingle().Which.Should().Be(100);
+>>>>>>> 4d2c9877 (fix(catalogue): a rollback has to find what it is rolling back)
     }
 
     [Theory]
     [InlineData("brands", "ck_brands_id_length")]
     [InlineData("fuel_types", "ck_fuel_types_id_length")]
+<<<<<<< HEAD
     [InlineData("brand_stations", "ck_brand_stations_id_length")]
+=======
+    [InlineData("fuel_offer_volumes", "ck_fuel_offer_volumes_id_length")]
+>>>>>>> 4d2c9877 (fix(catalogue): a rollback has to find what it is rolling back)
     [InlineData("fuel_vouchers", "ck_fuel_vouchers_fuel_type_id_length")]
     [InlineData("purchase_batches", "ck_purchase_batches_fuel_type_id_length")]
     [InlineData("voucher_exchanges", "ck_voucher_exchanges_fuel_type_id_length")]

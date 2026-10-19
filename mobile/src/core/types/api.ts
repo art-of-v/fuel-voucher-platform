@@ -1,5 +1,11 @@
 export interface Station {
+  /** Surrogate key (uuid). What the API joins on; nothing a human reads. */
   id: string;
+  /**
+   * The network's own code — `"okko"`, `"wog"`. It outlives a re-keying, so it is what the design
+   * tokens (brand colours and logos) and a log line key on; a uuid would miss every entry.
+   */
+  slug: string;
   name: string;
   color: string;
   logoText: string;
@@ -10,12 +16,18 @@ export interface Station {
 export interface StationNode {
   id: string;
   /**
-   * The fuel network this АЗК belongs to, as a Brand id (`okko`, `wog`, …) — the wire name on
+   * The fuel network this АЗК belongs to, as a Brand **uuid** — the wire name on
    * `GET /api/brand-stations`. It was `stationId` until the 2026-10-18 rename, when `stations`
    * became `brands` and `station_nodes` became `brand_stations`; nothing pointed at a filling
-   * station in either name.
+   * station in either name. It became a uuid with planning D-21.
    */
   brandId: string;
+  /**
+   * The same network's code, carried beside the id so a node can be labelled — and its logo found —
+   * without a second round trip. `GET /api/brand-stations` has no id-by-slug route, so a client
+   * holding only a node would otherwise print a hex string where "OKKO" belongs.
+   */
+  brandSlug: string;
   name: string;
   address?: string;
   phone?: string;
@@ -28,8 +40,10 @@ export interface StationNode {
 export interface FuelType {
   id: string;
   name: string;
-  /** Brand id, matching {@link StationNode.brandId}. */
+  /** Brand uuid, matching {@link StationNode.brandId}. */
   brandId: string;
+  /** The network's code. The fuel id is still the natural key `okko-95`, so this is the only thing that says which network a fuel belongs to. */
+  brandSlug: string;
   basePrice: number;
   discountPrice: number;
 }
@@ -40,8 +54,10 @@ export interface StationWithFuels extends Station {
 
 export interface FuelPackage {
   id: string;
-  /** Brand id, matching {@link StationNode.brandId}. */
+  /** Brand uuid, matching {@link StationNode.brandId}. */
   brandId: string;
+  /** The network's code, matching {@link StationNode.brandSlug}. */
+  brandSlug: string;
   fuelTypeId: string;
   fuelName: string;
   liters: number;

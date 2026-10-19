@@ -95,8 +95,8 @@ public sealed class FuelTypeBrandFuelCodeTests : IClassFixture<TestDatabaseFixtu
         // which is how a test stops testing what its name says.
         await using var context = CreateContext();
 
-        context.FuelTypes.Add(Fuel("$1", BrandIds.Okko, "A-95 (code test)", "A-95 EXTRA"));
-        context.FuelTypes.Add(Fuel("$1", BrandIds.Wog, "A-95 Mustang (code test)", "A-95 EXTRA"));
+        context.FuelTypes.Add(Fuel("net-a", BrandIds.Okko, "A-95 (code test)", "A-95 EXTRA"));
+        context.FuelTypes.Add(Fuel("net-b", BrandIds.Wog, "A-95 Mustang (code test)", "A-95 EXTRA"));
 
         var act = async () => await context.SaveChangesAsync();
         await act.Should().NotThrowAsync();

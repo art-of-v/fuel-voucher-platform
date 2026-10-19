@@ -593,12 +593,16 @@ export default function MapScreen() {
                 latitude: parseFloat(point.lat!),
                 longitude: parseFloat(point.lng!),
               };
-              const brandId = isNode ? (point as StationNode).brandId : undefined;
+              const node = isNode ? (point as StationNode) : undefined;
+              // The palette is keyed by the network's code; the price map is keyed by its uuid.
+              const brandSlug = node?.brandSlug;
               // Pins carry each network's own logo (and colour as the border /
               // fallback — data, not theme, see BRAND_LOGOS / BRAND_COLORS).
-              const brandColor = (brandId && BRAND_COLORS[brandId]) || tokens.colors.primary;
-              const logo = brandId ? (BRAND_SYMBOLS[brandId] ?? BRAND_LOGOS[brandId]) : undefined;
-              const price = brandId ? (priceByBrand.get(brandId) ?? null) : null;
+              const brandColor = (brandSlug && BRAND_COLORS[brandSlug]) || tokens.colors.primary;
+              const logo = brandSlug
+                ? (BRAND_SYMBOLS[brandSlug] ?? BRAND_LOGOS[brandSlug])
+                : undefined;
+              const price = node ? (priceByBrand.get(node.brandId) ?? null) : null;
 
               return (
                 <StationMarker
@@ -805,7 +809,7 @@ export default function MapScreen() {
                                 emphasised and a network with no АЗК in range is dimmed. */}
               {!activeBrand &&
                 brandRanks.map((b, i) => {
-                  const brandColor = BRAND_COLORS[b.brandId] || tokens.colors.primary;
+                  const brandColor = BRAND_COLORS[b.brandSlug] || tokens.colors.primary;
                   // Only a brand the customer can actually reach may be "cheapest".
                   const isLeader = i === 0 && b.inRange;
                   const delta = b.price.voucherPerLiter - brandRanks[0].price.voucherPerLiter;
@@ -838,8 +842,8 @@ export default function MapScreen() {
                         {i + 1}
                       </Text>
                       <View style={b.inRange ? undefined : styles.brandOutOfRange}>
-                        {BRAND_LOGOS[b.brandId] ? (
-                          <BrandLogoChip logo={BRAND_LOGOS[b.brandId]} size={30} />
+                        {BRAND_LOGOS[b.brandSlug] ? (
+                          <BrandLogoChip logo={BRAND_LOGOS[b.brandSlug]} size={30} />
                         ) : (
                           <View style={[styles.brandDot, { backgroundColor: brandColor }]} />
                         )}
@@ -863,7 +867,7 @@ export default function MapScreen() {
                             ]}
                             numberOfLines={1}
                           >
-                            {b.brandId.toUpperCase()}
+                            {b.brandSlug.toUpperCase()}
                           </Text>
                           {isLeader && (
                             <View
@@ -1026,9 +1030,9 @@ export default function MapScreen() {
                     }}
                   >
                     {'brandId' in selectedStation &&
-                    BRAND_LOGOS[(selectedStation as StationNode).brandId] ? (
+                    BRAND_LOGOS[(selectedStation as StationNode).brandSlug] ? (
                       <BrandLogoChip
-                        logo={BRAND_LOGOS[(selectedStation as StationNode).brandId]}
+                        logo={BRAND_LOGOS[(selectedStation as StationNode).brandSlug]}
                         size={32}
                       />
                     ) : (
@@ -1038,7 +1042,7 @@ export default function MapScreen() {
                           {
                             backgroundColor:
                               ('brandId' in selectedStation &&
-                                BRAND_COLORS[(selectedStation as StationNode).brandId]) ||
+                                BRAND_COLORS[(selectedStation as StationNode).brandSlug]) ||
                               tokens.colors.primary,
                           },
                         ]}

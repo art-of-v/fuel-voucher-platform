@@ -11,6 +11,12 @@ namespace FuelFlow.Providers.UnitTests;
 
 public sealed class GetProviderByIdAndHistoryTests : IDisposable
 {
+    // The networks these fixtures name. A brand is a uuid since planning D-21; the natural
+    // key it used to be is now the slug, which the row below states separately.
+    private static readonly Guid TestOkko = new("0f0f0f0a-0000-4000-8000-00000000000a");
+    private static readonly Guid TestWog = new("0f0f0f0b-0000-4000-8000-00000000000b");
+    private static readonly Guid TestKlo = new("0f0f0f0c-0000-4000-8000-00000000000c");
+
     private readonly ApplicationDbContext _context;
 
     public GetProviderByIdAndHistoryTests()
@@ -37,7 +43,8 @@ public sealed class GetProviderByIdAndHistoryTests : IDisposable
         var now = DateTime.UtcNow;
         _context.Brands.Add(new Brand
         {
-            Id = "test-okko",
+            Id = TestOkko,
+            Slug = "test-okko",
             Name = "OKKO",
             LogoText = "OKKO",
             Color = "#22c55e",
@@ -45,24 +52,24 @@ public sealed class GetProviderByIdAndHistoryTests : IDisposable
             UpdatedAtUtc = now
         });
         _context.FuelTypes.AddRange(
-            new FuelTypeEntity { Id = "test-fuel-a", Name = "A-95", BrandId = "test-okko", BasePrice = 100, DiscountPrice = 100, CreatedAtUtc = now, UpdatedAtUtc = now },
-            new FuelTypeEntity { Id = "test-fuel-b", Name = "DP", BrandId = "test-okko", BasePrice = 100, DiscountPrice = 100, CreatedAtUtc = now, UpdatedAtUtc = now });
-        _context.SeedPackage("test-fuel-a-10", "test-okko", "test-fuel-a", 10m, 510m,
+            new FuelTypeEntity { Id = "test-fuel-a", Name = "A-95", BrandId = TestOkko, BasePrice = 100, DiscountPrice = 100, CreatedAtUtc = now, UpdatedAtUtc = now },
+            new FuelTypeEntity { Id = "test-fuel-b", Name = "DP", BrandId = TestOkko, BasePrice = 100, DiscountPrice = 100, CreatedAtUtc = now, UpdatedAtUtc = now });
+        _context.SeedPackage("test-fuel-a-10", TestOkko, "test-fuel-a", 10m, 510m,
             supplierPricePerLiter: 49m, marginUahPerLiter: 2m, finalPricePerLiter: 51m,
             createdAtUtc: now, updatedAtUtc: now);
-        _context.SeedPackage("test-fuel-a-20", "test-okko", "test-fuel-a", 20m, 1020m,
+        _context.SeedPackage("test-fuel-a-20", TestOkko, "test-fuel-a", 20m, 1020m,
             supplierPricePerLiter: 49m, marginUahPerLiter: 2m, finalPricePerLiter: 51m,
             createdAtUtc: now, updatedAtUtc: now);
-        _context.SeedPackage("test-fuel-b-50", "test-okko", "test-fuel-b", 50m, 2600m,
+        _context.SeedPackage("test-fuel-b-50", TestOkko, "test-fuel-b", 50m, 2600m,
             supplierPricePerLiter: 50m, marginUahPerLiter: 2m, finalPricePerLiter: 52m,
             createdAtUtc: now, updatedAtUtc: now);
         await _context.SaveChangesAsync();
 
         var handler = new GetBrandByIdQueryHandler(_context);
-        var brand = await handler.HandleAsync(new GetBrandByIdQuery("test-okko"), CancellationToken.None);
+        var brand = await handler.HandleAsync(new GetBrandByIdQuery(TestOkko), CancellationToken.None);
 
         brand.Should().NotBeNull();
-        brand!.Id.Should().Be("test-okko");
+        brand!.Id.Should().Be(TestOkko);
         brand.Name.Should().Be("OKKO");
         brand.LogoText.Should().Be("OKKO");
         brand.Color.Should().Be("#22c55e");
@@ -81,7 +88,7 @@ public sealed class GetProviderByIdAndHistoryTests : IDisposable
     public async Task GetProviderById_ShouldReturnNull_WhenBrandMissing()
     {
         var handler = new GetBrandByIdQueryHandler(_context);
-        var result = await handler.HandleAsync(new GetBrandByIdQuery("missing"), CancellationToken.None);
+        var result = await handler.HandleAsync(new GetBrandByIdQuery(Guid.NewGuid()), CancellationToken.None);
 
         result.Should().BeNull();
     }

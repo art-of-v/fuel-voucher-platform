@@ -100,7 +100,7 @@ public sealed class DataKindBackfillTests : IClassFixture<TestDatabaseFixture>
                 """
                 INSERT INTO fuel_types (id, name, station_id, base_price, discount_price,
                                         created_at_utc, updated_at_utc, is_deleted)
-                VALUES ('okko-0001-bk95', '95', 'okko-0001', 500, 520, now(), now(), false)
+                VALUES ('okko-0001-bk95', '95', 'okko', 500, 520, now(), now(), false)
                 ON CONFLICT (id) DO NOTHING
                 """);
 
@@ -110,8 +110,8 @@ public sealed class DataKindBackfillTests : IClassFixture<TestDatabaseFixture>
                                            original_price, created_at_utc, updated_at_utc,
                                            is_test_data, is_deleted)
                 VALUES
-                  ({0}, 'okko-0001', 'okko-0001-bk95', '95 (QA)', 10, 100, 120, now(), now(), true, false),
-                  ({1}, 'okko-0001', 'okko-0001-bk95', '95', 20, 500, 520, now(), now(), false, false)
+                  ({0}, 'okko', 'okko-0001-bk95', '95 (QA)', 10, 100, 120, now(), now(), true, false),
+                  ({1}, 'okko', 'okko-0001-bk95', '95', 20, 500, 520, now(), now(), false, false)
                 """, qaPackage, realPackage);
 #pragma warning restore EF1002
         });
