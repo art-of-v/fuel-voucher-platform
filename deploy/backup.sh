@@ -66,6 +66,10 @@ CONTAINER="${CONTAINER:-fuelflow-postgres}"
 # that this costs almost nothing, and it means the base is never more than a day old, so
 # the WAL that has to be replayed on top of it is short.
 WAL_ARCHIVE_DIR="${WAL_ARCHIVE_DIR:-/root/fuelflow-wal}"
+# The archive path is literal in the compose file, and it has to match this one. It cannot
+# be a compose variable: the parse gate resolves every referenced variable against a dummy
+# value, and a dummy value is not a path - compose would read it as the name of a volume
+# that does not exist, and the whole file would fail to load.
 # The WAL is kept on-box for as long as the dumps, and off-box for as long as the dumps.
 # A base backup and a WAL archive that does not overlap are a restore that cannot start.
 WAL_RETENTION_DAYS="${WAL_RETENTION_DAYS:-14}"
