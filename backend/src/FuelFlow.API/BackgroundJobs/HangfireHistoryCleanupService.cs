@@ -115,7 +115,9 @@ public class HangfireHistoryCleanupService
         {
             _logger.LogInformation(
                 "Hangfire history cleanup: nothing to remove. Hangfire's own expiration manager is "
-                + "keeping up with the finished jobs, and the table stays at its one-day steady state.");
+                + "keeping up with the finished jobs, and the table stays at its one-day steady state. "
+                + "{QueueCount} orphaned queue row(s) were removed.",
+                deletedQueueRows);
             return;
         }
 
@@ -125,8 +127,9 @@ public class HangfireHistoryCleanupService
         _logger.LogWarning(
             "Hangfire's own expiration manager left {JobCount} finished job(s) behind, and they were "
             + "removed here. The table is bounded again, but the manager is not doing its job: the "
-            + "grace is {GraceHours}h and the hard bound is {RetentionDays}d.",
-            deletedJobs, ReaperGraceHours, retentionDays);
+            + "grace is {GraceHours}h and the hard bound is {RetentionDays}d. {QueueCount} orphaned "
+            + "queue row(s) were removed as well.",
+            deletedJobs, ReaperGraceHours, retentionDays, deletedQueueRows);
     }
 
     /// <summary>
