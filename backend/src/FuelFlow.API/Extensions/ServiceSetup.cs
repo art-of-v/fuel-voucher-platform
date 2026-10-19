@@ -521,6 +521,7 @@ services.AddScoped<FuelFlow.Features.Vouchers.Availability.PackageStockAvailabil
         services.AddScoped<DeletedUnpaidOrderCleanupService>();
         services.AddScoped<DataRetentionService>();
         services.AddScoped<ExpiredVoucherLossService>();
+        services.AddScoped<HangfireHistoryCleanupService>();
         services.AddScoped<RuntimeSettingsService>();
         services.AddScoped<OkkoPriceSyncService>();
         // The same job for the two vendors that publish a page rather than an API.

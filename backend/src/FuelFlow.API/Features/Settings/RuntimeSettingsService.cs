@@ -18,6 +18,7 @@ public sealed class RuntimeSettingsService
     public const int DefaultDeletedUnpaidOrderCleanupRetentionDays = 30;
     public const int DefaultVoucherRenewalThresholdDays = 14;
     public const int DefaultExpiredVoucherLossGraceDays = 14;
+    public const int DefaultHangfireCleanupRetentionDays = 7;
 
     private readonly ApplicationDbContext _context;
 
@@ -112,6 +113,28 @@ public sealed class RuntimeSettingsService
     /// A value of 0 means the legacy behaviour — loss booked on the printed expiry date.</summary>
     public async Task<int> GetExpiredVoucherLossGraceDaysAsync(CancellationToken cancellationToken = default)
         => await GetIntAsync(AppSettingKeys.ExpiredVoucherLossGraceDays, DefaultExpiredVoucherLossGraceDays, cancellationToken);
+
+    /// <summary>
+    /// Whether the nightly Hangfire backstop may remove the finished-job history that Hangfire's own
+    /// expiration manager should have taken and did not. Defaults to <b>true</b>, which is the
+    /// opposite of every other destructive switch in this class, and the reason is what the rows are:
+    /// the scheduler's own bookkeeping about work that already completed. No money, no customer and
+    /// no settlement is in any of them, and a manager that has quietly stopped is a failure nothing
+    /// else would notice.
+    /// <para>
+    /// The default also decides what a malformed value does: <see cref="GetBoolAsync"/> falls back to
+    /// the default when the value does not parse, so a typo here leaves the backstop <em>running</em>
+    /// rather than silently stopping it. The only text that turns it off is the exact word
+    /// <c>false</c>.
+    /// </para>
+    /// </summary>
+    public async Task<bool> IsHangfireCleanupEnabledAsync(CancellationToken cancellationToken = default)
+        => await GetBoolAsync(AppSettingKeys.HangfireCleanupEnabled, defaultValue: true, cancellationToken);
+
+    /// <summary>The hard bound on how long a finished job's history is kept, in whole days. Defaults
+    /// to 7.</summary>
+    public async Task<int> GetHangfireCleanupRetentionDaysAsync(CancellationToken cancellationToken = default)
+        => await GetIntAsync(AppSettingKeys.HangfireCleanupRetentionDays, DefaultHangfireCleanupRetentionDays, cancellationToken);
 
     /// <summary>Whether the in-app feedback channel (Telegram bot) is offered to customers.
     /// Fail-safe: defaults to false, so the bottom-bar tab does not appear until a manager turns
