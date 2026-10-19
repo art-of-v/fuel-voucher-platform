@@ -801,7 +801,8 @@ jobs:
             --connection "Host=localhost;Port=5432;Database=fuelflow;Username=postgres;Password=postgres" \
             | awk '{print $1}' > assembly.ids
 
-          bash deploy/check-migration-history.sh history.ids assembly.ids
+          bash deploy/check-migration-history.sh history.ids assembly.ids \
+            deploy/compensated-migration-ids.txt
 
       - name: Summarise what the migration produced
         run: |

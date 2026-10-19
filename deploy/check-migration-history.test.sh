@@ -68,6 +68,34 @@ else
   bad "it says what to do about it" "$out" "a line saying to restore the files"
 fi
 
+# ---------------------------------------------------------------- the compensated list
+# Eight migrations were deleted on 2026-09-11 and are compensated for by
+# 20260919113317_AddMissingDriftedTables, which re-creates what they created. Restoring them
+# breaks every database that was migrated from zero while they were gone - which is how staging
+# stopped booting on 2026-10-19 with 42P07 "relation refunds already exists".
+write "$WORK/c1.txt" "# a comment" "20260803120600_AddRefunds" "20260817191435_AddOrderLegalEntity"
+out="$(bash "$SCRIPT" "$WORK/h2.ids" "$WORK/a2.ids" "$WORK/c1.txt" 2>&1)"; code=$?
+eq "a compensated migration is not a failure" "$code" "0"
+
+# One id compensated and one not: the one that is not must still fail, and only it.
+write "$WORK/c2.txt" "20260803120600_AddRefunds"
+out="$(bash "$SCRIPT" "$WORK/h2.ids" "$WORK/a2.ids" "$WORK/c2.txt" 2>&1)"; code=$?
+eq "a partly compensated set is still a failure" "$code" "1"
+if echo "$out" | grep -q "20260817191435_AddOrderLegalEntity" && ! echo "$out" | grep -q "20260803120600_AddRefunds"; then
+  ok "and it names only the uncompensated one"
+else
+  bad "and it names only the uncompensated one" "$out" "20260817191435_AddOrderLegalEntity and not 20260803120600_AddRefunds"
+fi
+
+# The real list, as it is in the repository: it has to cover exactly the eight migrations that
+# were deleted, or the gate is either red or blind.
+if [ -f "deploy/compensated-migration-ids.txt" ]; then
+  real_count="$(grep -cE '^[0-9]{14}_' deploy/compensated-migration-ids.txt)"
+  eq "the repository's compensated list names the eight deleted migrations" "$real_count" "8"
+else
+  bad "the repository has a compensated list" "" "deploy/compensated-migration-ids.txt"
+fi
+
 # ---------------------------------------------------------------- the shapes around it
 # Blank lines and anything that is not a migration id are noise, not history.
 printf '\n20260617125815_InitialCreate\nnot-a-migration\n\n' > "$WORK/h3.ids"
