@@ -21,6 +21,7 @@ builder.Property(e => e.BrandId).HasColumnName("brand_id").HasColumnType("uuid")
         // Same six columns, same scale, as the fuel they are copied from: a history row that stored
         // a price at a different precision than the live price would make "the same number" a
         // judgement call rather than an equality.
+        builder.Property(e => e.SupplierPricePerLiter).HasColumnName("supplier_price_per_liter").HasColumnType("numeric(10,4)");
         builder.Property(e => e.MarginUahPerLiter).HasColumnName("margin_uah_per_liter").HasColumnType("numeric(10,4)");
         builder.Property(e => e.MarginPercent).HasColumnName("margin_percent").HasColumnType("numeric(10,4)");
         builder.Property(e => e.FinalPricePerLiter).HasColumnName("final_price_per_liter").HasColumnType("numeric(10,4)");

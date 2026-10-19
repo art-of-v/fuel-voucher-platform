@@ -44,18 +44,25 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
             .HasColumnName("margin_uah_per_liter");
 
         // The four pricing knobs, moved off fuel_offers on 2026-10-19. Same naming discipline as
-        // the margin above: one column, one spelling.
+        // the margin above: one column, one spelling - and the same numeric(10,4) they had on the
+        // offer, so the copy across is a value move and not a precision change. A history row that
+        // stored a price at a different scale than the live price would make "the same number" a
+        // judgement call rather than an equality.
         builder.Property(e => e.SupplierPricePerLiter)
-            .HasColumnName("supplier_price_per_liter");
+            .HasColumnName("supplier_price_per_liter")
+            .HasColumnType("numeric(10,4)");
 
         builder.Property(e => e.PumpPricePerLiter)
-            .HasColumnName("pump_price_per_liter");
+            .HasColumnName("pump_price_per_liter")
+            .HasColumnType("numeric(10,4)");
 
         builder.Property(e => e.MinDiscountPerLiter)
-            .HasColumnName("min_discount_per_liter");
+            .HasColumnName("min_discount_per_liter")
+            .HasColumnType("numeric(10,4)");
 
         builder.Property(e => e.MarginPercent)
-            .HasColumnName("margin_percent");
+            .HasColumnName("margin_percent")
+            .HasColumnType("numeric(10,4)");
 
         builder.Property(e => e.PriceUpdatedAt)
             .HasColumnName("price_updated_at")
@@ -134,6 +141,16 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
             // below-cost opt-in (BrandsController), which is a business decision rather than a
             // constraint, so a hand-written PUT or a future code path can still land here.
             t.HasCheckConstraint("ck_fuel_types_prices_non_negative", "base_price >= 0 AND discount_price >= 0");
+
+            // The four knobs the fuel took off the offer on 2026-10-19 keep the constraints the offer
+            // carried. A negative cost makes every price computed from it negative as well, and a
+            // negative discount is the customer being paid to take the fuel.
+            t.HasCheckConstraint("ck_fuel_types_margin_signs",
+                "margin_uah_per_liter IS NULL OR margin_uah_per_liter >= 0");
+            t.HasCheckConstraint("ck_fuel_types_pricing_knobs_non_negative",
+                "(supplier_price_per_liter IS NULL OR supplier_price_per_liter >= 0) AND " +
+                "(pump_price_per_liter IS NULL OR pump_price_per_liter >= 0) AND " +
+                "(min_discount_per_liter IS NULL OR min_discount_per_liter >= 0)");
         });
     }
 }

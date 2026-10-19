@@ -298,18 +298,22 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
         var anonymous = await PackagesAsync(_fixture.CreateClient(), byBrand: true);
         var qa = await PackagesAsync(await ClientForAsync("+380991007005", isQaAccount: true), byBrand: true);
 
-        // The display name is the fuel's, and the fuel is shared by both pools - it comes from
-        // fuel_types now, not from a string each package row carried and could contradict. So the QA
-        // catalogue no longer renders its own "(QA)" label; the two pools are told apart by the offer
-        // pricing them, which is what actually differs. Anything identifying a pool by name here
-        // would have been asserting the old duplicated column.
-        var anonymousPackage = Assert.Single(anonymous);
-        var qaPackage = Assert.Single(qa);
-        Assert.Equal(RealName, anonymousPackage.FuelName);
-        Assert.Equal(RealName, qaPackage.FuelName);
-        Assert.Equal(Liters, anonymousPackage.Liters);
-        Assert.Equal(Liters, qaPackage.Liters);
-        Assert.NotEqual(anonymousPackage.Id, qaPackage.Id);
-        Assert.NotEqual(anonymousPackage.Price, qaPackage.Price);
+// The display name is the fuel's, and the fuel is shared by both pools - it comes from
+    // fuel_types now, not from a string each package row carried and could contradict. So the QA
+    // catalogue no longer renders its own "(QA)" label; the two pools are told apart by the SIZE they
+    // sell, which is what actually differs. Anything identifying a pool by name here would have
+    // been asserting the old duplicated column.
+    var anonymousPackage = Assert.Single(anonymous);
+    var qaPackage = Assert.Single(qa);
+    Assert.Equal(RealName, anonymousPackage.FuelName);
+    Assert.Equal(RealName, qaPackage.FuelName);
+    Assert.Equal(Liters, anonymousPackage.Liters);
+    Assert.Equal(QaLiters, qaPackage.Liters);
+    Assert.NotEqual(anonymousPackage.Id, qaPackage.Id);
+    // The rate is the same number for both, and that is the shape of the model now: one price per
+    // grade. It used to be asserted NOT equal, which was the old behaviour this branch removes. The
+    // package TOTALS still differ, because the two pools sell different sizes.
+    Assert.Equal(anonymousPackage.FinalPricePerLiter, qaPackage.FinalPricePerLiter);
+    Assert.NotEqual(anonymousPackage.Price, qaPackage.Price);
     }
 }
