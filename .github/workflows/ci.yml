@@ -639,22 +639,64 @@ jobs:
             exit 1
           fi
 
-      # `path` was simply absent, so upload-artifact exited "Input required and not supplied: path".
-      # The step above builds everything under $RUNNER_TEMP/dryrun, and the block is what guards that
-      # directory, so point the upload at the directory rather than re-listing the files - a list here
-      # would be a second, unguarded place where the contents are named.
+      # THE SECOND SHAPE, and the reason this job exists at all.
       #
-      # v7, not v4: v4's action.yml declares `runs.using: node20`, which GitHub has deprecated for
-      # actions - the runner force-runs it on Node 24 anyway and annotates every dry-run job with
-      # "Node.js 20 is deprecated". v6 is where Node 24 became the default and v7 only adds an
-      # opt-in `archive: false` upload plus the ESM migration, neither of which this step uses.
-      # Node 24 requires runner >= 2.327.1; the self-hosted box running this job reported
-      # "Current runner version: '2.337.0'" on run 39009049858 (2026-10-17), so it is already past it.
+      # The dry run restores PRODUCTION's schema and history, so it proves a migration applies to
+      # production. It says nothing about any other database - and a migration can be perfectly
+      # valid on production's shape and fatal on another one.
+      #
+      # That is not hypothetical. On 2026-10-19 eight migration files that production had applied
+      # were restored to the repository, and the production dry run passed: production's history
+      # MENTIONS those eight, so EF skipped them. Staging's history did not mention them, because
+      # staging had been migrated from zero while they were gone - so EF tried to apply them over a
+      # schema that already had their objects, and the first one died with
+      #   42P07: relation "refunds" already exists
+      # Staging stopped booting, and because staging deploys before production, that blocked every
+      # deploy including the one that would have fixed it.
+      #
+      # The gate that existed could not have seen it, because it only ever ran against one shape of
+      # database. A gate that only ever runs against production's shape cannot tell you what
+      # happens to another shape.
+      #
+      # Staging is that other shape, and it is a real one: a scratch database that people migrate,
+      # roll back and write to by hand, so its history is genuinely a different sequence of
+      # repository states than production's. Both dumps come off the same box in the same step, so
+      # there is no way for the two to disagree about what they are.
+      - name: Dump schema and history from staging
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/dryrun-staging"
+          rm -rf "$out"; mkdir -p "$out"
+
+          sgp() { docker exec -i fuelflow-staging-postgres psql -U fuelflow_staging -d fuelflow_staging -X "$@"; }
+
+          docker exec -i fuelflow-staging-postgres pg_dump -U fuelflow_staging -d fuelflow_staging \
+            --schema-only --no-owner --no-privileges > "$out/schema.sql"
+          echo "staging schema.sql $(wc -c < "$out/schema.sql") bytes"
+
+          sgp -q -t -A -c 'COPY (SELECT * FROM "__EFMigrationsHistory") TO STDOUT WITH (FORMAT csv, HEADER true)' \
+            > "$out/history.csv"
+          echo "staging history.csv $(wc -l < "$out/history.csv") lines"
+
+          # The same leak guard, for the same reason. Staging is a scratch box, but "scratch" is not
+          # a property to rely on: the guard is two lines.
+          if grep -lq 'qr_payload' "$out"/*.csv 2>/dev/null; then
+            echo "::error::the staging dump contains voucher data; refusing to upload it"
+            exit 1
+          fi
+
       - name: Upload the dump
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: migration-dryrun-dump
           path: ${{ runner.temp }}/dryrun
+          if-no-files-found: error
+
+      - name: Upload the staging dump
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: migration-dryrun-staging-dump
+          path: ${{ runner.temp }}/dryrun-staging
           if-no-files-found: error
 
   dryrun-migrate:
@@ -826,10 +868,83 @@ jobs:
             fi
           done
 
+  dryrun-staging-migrate:
+    name: 'Migration dry run (staging shape): apply'
+    runs-on: ubuntu-latest
+    needs: [changes, dryrun-dump]
+    # The same `always()` reasoning as the production dry run: a FAILED dump must not turn this
+    # job into a skip, because `ci-required` would then allow the merge on the exact failure the
+    # gate exists to catch.
+    if: always() && needs.changes.outputs.migrations == 'true'
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: fuelflow
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Install EF Core tools
+        run: dotnet tool install --global dotnet-ef --version 10.0.12
+
+      - name: Download the staging dump
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: migration-dryrun-staging-dump
+          path: dryrun
+
+      - name: Restore the staging dump
+        run: |
+          set -euo pipefail
+          cd dryrun
+          export PGPASSWORD=postgres
+          db() { psql "postgres://postgres:$PGPASSWORD@localhost:5432/fuelflow" "$@"; }
+          db -q -v ON_ERROR_STOP=1 -f schema.sql > /dev/null
+          db -q -c "\\copy \"__EFMigrationsHistory\" FROM 'history.csv' WITH (FORMAT csv, HEADER true)"
+          db -t -A -c "SELECT count(*) FROM \"__EFMigrationsHistory\"" | sed 's/^/staging migrations restored: /'
+
+      # The whole point of this job, and the reason it exists separately from the production one.
+      #
+      # A migration that applies cleanly to production's shape can still be fatal on staging's, and
+      # on 2026-10-19 it was: eight migrations production had applied were restored to the
+      # repository, the production dry run passed (production's history mentions them, so EF skipped
+      # them), and staging died with 42P07 "relation refunds already exists" - because staging's
+      # history did not mention them. Staging stopped booting, and since staging deploys before
+      # production, that blocked every deploy.
+      #
+      # So the same pending migrations are applied here, to a different shape, and the two answers
+      # have to agree.
+      - name: Apply pending migrations
+        run: |
+          set -euo pipefail
+          dotnet restore backend/src/FuelFlow.API/FuelFlow.API.csproj
+          dotnet ef database update --project backend/src/FuelFlow.API \
+            --connection "Host=localhost;Port=5432;Database=fuelflow;Username=postgres;Password=postgres"
+
+      - name: Check the history afterwards
+        run: |
+          set -euo pipefail
+          export PGPASSWORD=postgres
+          db() { psql "postgres://postgres:$PGPASSWORD@localhost:5432/fuelflow" "$@"; }
+          db -t -A -c "SELECT count(*) FROM \"__EFMigrationsHistory\"" | sed 's/^/migrations after: /'
+
   ci-required:
     name: CI required
     if: always()
-    needs: [changes, backend, backend-integration, admin, mobile, website, deploy-scripts, scripts, dryrun-dump, dryrun-migrate]
+    needs: [changes, backend, backend-integration, admin, mobile, website, deploy-scripts, scripts, dryrun-dump, dryrun-migrate, dryrun-staging-migrate]
     runs-on: ubuntu-latest
     steps:
       - name: Verify no required job failed
