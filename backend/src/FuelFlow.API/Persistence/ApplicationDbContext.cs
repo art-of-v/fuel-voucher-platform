@@ -6,7 +6,6 @@ using FuelFlow.Features.Ledger.SharedModels;
 using FuelFlow.Features.Notifications.SharedModels;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.Features.Orders.SharedModels;
-using FuelFlow.Features.Pricing.Rules.SharedModels;
 using FuelFlow.Features.Pricing.Terms.SharedModels;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Settlement.SharedModels;
@@ -98,7 +97,6 @@ private readonly FuelFlow.Features.Vouchers.Security.IQrCipher _qrCipher;
 
     // Pricing configuration as effective-dated, approval-gated rows rather than app_settings keys.
     // See D-09 in the planning repo; nothing reads this yet.
-    public DbSet<PricingRule> PricingRules => Set<PricingRule>();
     public DbSet<OutboxEvent> OutboxEvents => Set<OutboxEvent>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<UserPushToken> PushTokens => Set<UserPushToken>();
