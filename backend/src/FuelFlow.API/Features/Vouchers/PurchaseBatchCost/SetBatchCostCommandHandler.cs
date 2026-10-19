@@ -188,18 +188,16 @@ public sealed class SetBatchCostCommandHandler
                 .FirstOrDefaultAsync(f => f.Id == command.FuelTypeId, cancellationToken);
             // The margin the new cost would be sold at belongs to the fuel, once - reading it off
             // "the first package of this fuel" was an arbitrary pick between rows that now cannot differ
-            // at all, which is the point of the split. The fuel is already loaded for the opt-in flag
-            // above, so the two answers come from one row.
-            var offer = await _context.FuelOffers.AsNoTracking()
-                .Where(o => o.FuelTypeId == command.FuelTypeId && o.DataKind == DataKinds.Real)
-                .FirstOrDefaultAsync(cancellationToken);
-            if (fuelType is { AllowBelowCost: false } && offer is not null)
+            // at all, which is the point of the split. Every knob is on the one row loaded above, so
+            // the whole question - is this fuel allowed below cost, and against which ceiling - is
+            // answered without a second query.
+            if (fuelType is { AllowBelowCost: false })
             {
                 var profit = fuelType.MarginUahPerLiter ?? 0m;
-                var minDiscount = offer.MinDiscountPerLiter ?? 0m;
-                if (FuelPricing.IsBelowCost(b, profit, offer.PumpPricePerLiter, minDiscount))
+                var minDiscount = fuelType.MinDiscountPerLiter ?? 0m;
+                if (FuelPricing.IsBelowCost(b, profit, fuelType.PumpPricePerLiter, minDiscount))
                 {
-                    var finalPerLiter = FuelPricing.FinalPerLiter(b, profit, offer.PumpPricePerLiter, minDiscount);
+                    var finalPerLiter = FuelPricing.FinalPerLiter(b, profit, fuelType.PumpPricePerLiter, minDiscount);
                     await _notifications.BelowCostAsync(brand, command.FuelTypeId, b, finalPerLiter, deliberate: false, cancellationToken);
                 }
             }

@@ -57,10 +57,9 @@ public sealed class BlendedCostRecalculator
     }
 
     /// <summary>
-    /// Rewrites every offer for <paramref name="fuelTypeId"/> to price off <paramref name="blendedCost"/>,
-    /// preserving each offer's profit/pump/min-discount knobs, restating each volume's frozen package
-    /// total, syncing the fuel type's base/discount headline — mirroring
-    /// <c>BrandsController.UpdateFuel</c> — and appending each moved price to <c>fuel_offer_prices</c>.
+    /// Rewrites the fuel's price to sit off <paramref name="blendedCost"/>, preserving its
+    /// pump/min-discount knobs, syncing its base/discount headline — mirroring
+    /// <c>BrandsController.UpdateFuel</c> — and appending the moved price to <c>fuel_offer_prices</c>.
     /// Does NOT call SaveChanges (the caller batches the save); returns the number of packages repriced.
     /// </summary>
     /// <param name="reason">
@@ -75,16 +74,13 @@ public sealed class BlendedCostRecalculator
         string reason = OfferPriceReasons.BatchCost,
         CancellationToken ct = default)
     {
-        var offers = await _context.FuelOffers.Where(o => o.FuelTypeId == fuelTypeId).ToListAsync(ct);
-        if (offers.Count == 0) return 0;
+        // The cost is now the fuel's, and so are its profit/pump/min-discount knobs: there is one price
+        // per grade, so this method has a single row to write and no way for two pools of it to
+        // drift apart.
+        var fuel = await _context.FuelTypes.FirstOrDefaultAsync(f => f.Id == fuelTypeId, ct);
+        if (fuel is null) return 0;
 
-        // The margin belongs to the fuel, so every offer this call reprices carries the same one. Read
-        // it once rather than per offer: the cost and the rest of the knobs are the offer's, but what we
-        // add on top is the grade's, and two pools of one fuel cannot disagree about that.
-        var fuel = await _context.FuelTypes
-            .AsNoTracking()
-            .FirstOrDefaultAsync(f => f.Id == fuelTypeId, ct);
-        var margin = fuel?.MarginUahPerLiter ?? 0m;
+        var margin = fuel.MarginUahPerLiter ?? 0m;
 
 // How many sizes this fuel is sold in: what the cost correction moved the price of. A nominal
     // carries no stored total, so there is nothing to rewrite here - every size follows its fuel's
@@ -95,43 +91,27 @@ public sealed class BlendedCostRecalculator
 
     var now = DateTime.UtcNow;
         var actingUser = actingUserId == Guid.Empty ? (Guid?)null : actingUserId;
-        decimal firstFinal = 0m, firstBase = 0m;
 
-        foreach (var offer in offers)
-        {
-            var profit = margin;
-            var pump = offer.PumpPricePerLiter;
-            var minDiscount = offer.MinDiscountPerLiter ?? 0m;
+        var pump = fuel.PumpPricePerLiter;
+        var minDiscount = fuel.MinDiscountPerLiter ?? 0m;
 
-            // Same shared formula the operator panel uses: final = min(cost + profit, pump − minDiscount);
-            // pump null ⇒ cost + profit. Computed here to restate the volume totals below; the offer
-            // itself stopped storing it on 2026-10-17 and derives it from the two lines this writes.
-            var finalPerLiter = FuelPricing.FinalPerLiter(blendedCost, profit, pump, minDiscount);
+        // Same shared formula the operator panel uses: final = min(cost + profit, pump − minDiscount);
+        // pump null ⇒ cost + profit. Computed here to keep the fuel-type headline in step; the stored
+        // figures stopped duplicating it on 2026-10-17 and derive it from the lines this writes.
+        var finalPerLiter = FuelPricing.FinalPerLiter(blendedCost, margin, pump, minDiscount);
 
-            offer.SupplierPricePerLiter = blendedCost;
-            offer.UpdatedAtUtc = now;
+        fuel.SupplierPricePerLiter = blendedCost;
+        fuel.BasePrice = Math.Round(pump ?? (finalPerLiter + minDiscount), 2, MidpointRounding.AwayFromZero);
+        fuel.DiscountPrice = Math.Round(finalPerLiter, 2, MidpointRounding.AwayFromZero);
+        fuel.UpdatedAtUtc = now;
 
-            firstFinal = finalPerLiter;
-            firstBase = pump ?? (finalPerLiter + minDiscount);
-        }
+        _context.FuelTypes.Update(fuel);
 
-        _context.FuelOffers.UpdateRange(offers);
+        // The history, in one call: the recorder stamps
+        // price_updated_at / price_updated_by_user_id (this method used to) and appends a row if the
+        // cost or the final price actually moved. It does not save - the caller owns that.
+        await _priceRecorder.RecordRangeAsync([fuel], reason, actingUser, now, ct);
 
-        // The history, in one call for every pool's offer: the recorder stamps
-        // price_updated_at / price_updated_by_user_id (this method used to) and appends a row per offer
-        // whose cost or final price actually moved. It does not save - the caller owns that.
-        await _priceRecorder.RecordRangeAsync(offers, reason, actingUser, now, ct);
-
-        // Keep the fuel-type headline (base/discount UAH/L) in step, as UpdateFuel does.
-        var fuelType = await _context.FuelTypes.FirstOrDefaultAsync(f => f.Id == fuelTypeId, ct);
-        if (fuelType is not null)
-        {
-            fuelType.BasePrice = Math.Round(firstBase, 2, MidpointRounding.AwayFromZero);
-            fuelType.DiscountPrice = Math.Round(firstFinal, 2, MidpointRounding.AwayFromZero);
-            fuelType.UpdatedAtUtc = now;
-            _context.FuelTypes.Update(fuelType);
-        }
-
-    return nominalCount;
+        return nominalCount;
     }
 }

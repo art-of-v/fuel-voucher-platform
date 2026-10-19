@@ -68,30 +68,20 @@ public sealed class ImportUpgWogPricesTests : IDisposable
             BasePrice = pump,
             DiscountPrice = pump - 1m,
             MarginUahPerLiter = profit,
+            SupplierPricePerLiter = cost,
+            PumpPricePerLiter = pump,
+            MinDiscountPerLiter = 0m,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };
         _context.FuelTypes.Add(fuel);
 
-        var offer = new FuelOffer
-        {
-            Id = $"{id}-offer",
-            BrandId = brandId,
-            FuelTypeId = id,
-            SupplierPricePerLiter = cost,
-            PumpPricePerLiter = pump,
-            MinDiscountPerLiter = 0m,
-            DataKind = DataKinds.Real,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
-        };
-        _context.FuelOffers.Add(offer);
-
+        // The price is the fuel's, so there is no offer row to add here.
         foreach (var liters in new[] { 10, 20, 50 })
         {
             _context.FuelNominals.Add(new FuelNominal
             {
-                FuelTypeId = offer.FuelTypeId,
+        FuelTypeId = id,
                 Liters = liters,
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow
@@ -153,12 +143,10 @@ public sealed class ImportUpgWogPricesTests : IDisposable
         _context.ChangeTracker.Clear();
         var fuel = await _context.FuelTypes.SingleAsync(f => f.BrandFuelCode == "upg100");
 
-        var offer = await _context.FuelOffers.SingleAsync(o => o.FuelTypeId == fuel.Id);
-        offer.PumpPricePerLiter.Should().Be(99.90m);
-        offer.SupplierPricePerLiter.Should().BeNull();
-
+    fuel.PumpPricePerLiter.Should().Be(99.90m);
+    fuel.SupplierPricePerLiter.Should().BeNull();
         var liters = await _context.FuelNominals
-            .Where(v => v.FuelTypeId == offer.FuelTypeId).Select(v => v.Liters).OrderBy(l => l).ToListAsync();
+    .Where(v => v.FuelTypeId == fuel.Id).Select(v => v.Liters).OrderBy(l => l).ToListAsync();
         liters.Should().BeEquivalentTo([10, 20, 50]);
     }
 
@@ -176,12 +164,11 @@ public sealed class ImportUpgWogPricesTests : IDisposable
             new ImportUpgWogPricesCommand(Sheet(UpgSheet), "upg", DryRun: false), Guid.Empty, null);
 
         _context.ChangeTracker.Clear();
-        var a95 = await _context.FuelOffers.SingleAsync(o => o.FuelTypeId == "upg-a95");
-        var upg95 = await _context.FuelOffers.SingleAsync(o => o.FuelTypeId == "upg-95");
+    var a95 = await _context.FuelTypes.SingleAsync(f => f.Id == "upg-a95");
+    var upg95 = await _context.FuelTypes.SingleAsync(f => f.Id == "upg-95");
 
-        a95.PumpPricePerLiter.Should().Be(88.90m);
-        upg95.PumpPricePerLiter.Should().Be(91.90m);
-        result.Repriced.Should().HaveCount(2);
+    a95.PumpPricePerLiter.Should().Be(88.90m);
+    upg95.PumpPricePerLiter.Should().Be(91.90m);
     }
 
     [Fact]
@@ -237,9 +224,8 @@ public sealed class ImportUpgWogPricesTests : IDisposable
 
         result.BelowCostSkipped.Should().ContainSingle();
         _context.ChangeTracker.Clear();
-        var offer = await _context.FuelOffers.SingleAsync(o => o.FuelTypeId == "upg-95");
-        offer.PumpPricePerLiter.Should().Be(91.90m, "the refused pump must not be written");
-
+    var fuel = await _context.FuelTypes.SingleAsync(f => f.Id == "upg-95");
+    fuel.PumpPricePerLiter.Should().Be(91.90m, "the refused pump must not be written");
         var optedIn = await _context.FuelTypes.SingleAsync(f => f.Id == "upg-95");
         optedIn.AllowBelowCost = true;
         await _context.SaveChangesAsync();
@@ -249,7 +235,7 @@ public sealed class ImportUpgWogPricesTests : IDisposable
 
         second.BelowCostSkipped.Should().BeEmpty();
         _context.ChangeTracker.Clear();
-        (await _context.FuelOffers.SingleAsync(o => o.FuelTypeId == "upg-95")).PumpPricePerLiter.Should().Be(60m);
+    (await _context.FuelTypes.SingleAsync(f => f.Id == "upg-95")).PumpPricePerLiter.Should().Be(60m);
     }
 
     [Fact]

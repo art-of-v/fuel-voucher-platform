@@ -119,18 +119,18 @@ internal static class CatalogueTestData
         // three assertions later as an unexplained price on the storefront.
         if (finalPricePerLiter is not null)
         {
-            var computed = FuelPricing.FinalPerLiterOrNull(
-                offer.SupplierPricePerLiter,
-                margin,
-                offer.PumpPricePerLiter,
-                offer.MinDiscountPerLiter);
-            if (computed != finalPricePerLiter)
-            {
-                throw new InvalidOperationException(
-                    $"SeedOffer({offer.Id}): finalPricePerLiter {finalPricePerLiter} does not match what the "
-                    + $"knobs produce ({computed?.ToString() ?? "null - no cost or no margin"}). Pass cost and "
-                    + "margin that yield the price the test needs.");
-            }
+var computed = FuelPricing.FinalPerLiterOrNull(
+            fuel.SupplierPricePerLiter,
+            margin,
+            fuel.PumpPricePerLiter,
+            fuel.MinDiscountPerLiter);
+        if (computed != finalPricePerLiter)
+        {
+            throw new InvalidOperationException(
+                $"SeedOffer({fuelTypeId}): finalPricePerLiter {finalPricePerLiter} does not match what the "
+                + $"knobs produce ({computed?.ToString() ?? "null - no cost or no margin"}). Pass cost and "
+                + "margin that yield the price the test needs.");
+        }
         }
 
         return offer;

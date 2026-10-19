@@ -162,24 +162,10 @@ public sealed class ImportOkkoPumpPricesCommandHandler
             .OrderBy(ft => ft.Id, StringComparer.Ordinal)
             .ToList();
 
-        var okkoFuelTypeIds = okkoFuelTypes.Select(ft => ft.Id).ToList();
-
-        // A pump price is a property of WHAT IS SOLD, so it is written to the offer once rather than to
-        // every package row. The volumes are loaded alongside it only to restate their frozen package
-        // totals, because litres do not change when the pump does but the total derived from them does.
-        //
-        // Both pools are imported: the rehearsal catalogue is priced from the same public pump price, and
-        // restricting this to the live pool would silently freeze QA pricing on the last imported pump.
-        var offersByFuel = (await _context.FuelOffers
-                .AsTracking()
-                .Where(o => okkoFuelTypeIds.Contains(o.FuelTypeId))
-                .ToListAsync(ct))
-            .GroupBy(o => o.FuelTypeId)
-            .ToDictionary(g => g.Key, g => g.OrderBy(o => o.Id, StringComparer.Ordinal).ToList());
-
-// A nominal carries no stored price, so a pump change does not rewrite anything per size - it
-        // moves the offer's rate and every size follows. The counts the report gives back are the
-        // fuel's nominal count, because the sizes belong to the fuel rather than to one pool's offer.
+// A pump price is a property of WHAT IS SOLD, so it lands on the fuel, which is the row every
+        // reader already looks at. A nominal carries no stored price, so a pump change does not
+        // rewrite anything per size - it moves the fuel's rate and every size of both pools follows.
+        // The counts the report gives back are the fuel's nominal count across the pools.
         var now = DateTime.UtcNow;
         var nominalCountByFuel = await _context.FuelNominals
             .AsNoTracking()
@@ -197,10 +183,10 @@ public sealed class ImportOkkoPumpPricesCommandHandler
         var changedCount = 0;
         var packagesRepriced = 0;
 
-        // The offers this run touched, for the one history write at the end. Collected rather than
-        // recorded inside the loop, which would cost a query per offer on a path that runs unattended
+        // The fuels this run touched, for the one history write at the end. Collected rather than
+        // recorded inside the loop, which would cost a query per fuel on a path that runs unattended
         // over the whole catalogue every quarter hour.
-        var repricedOffers = new List<FuelOffer>();
+        var repricedFuels = new List<FuelTypeEntity>();
 
         foreach (var ft in okkoFuelTypes)
         {
@@ -237,116 +223,66 @@ public sealed class ImportOkkoPumpPricesCommandHandler
                 siteCode = classified.First(c => c.Category == category).Price.SiteFuelCode;
             }
 
-            var poolOffers = offersByFuel.TryGetValue(ft.Id, out var found) ? found : new List<FuelOffer>();
+            var vols = nominalCountByFuel.TryGetValue(ft.Id, out var vcount) ? vcount : 0;
 
-            // Cost is the offer's, and a fuel with more than one offer here (one per pool) is priced per pool -
-            // each offer keeps its own cost, and only the imported pump is shared. The margin is the
-            // fuel's, which is why the loop below can reprice several offers without them drifting
-            // apart: there is nothing left for the pools to disagree about. The loop therefore runs per
-            // offer rather than per package, which is what makes the "report the first and rewrite them
-            // all" branch unnecessary.
-            var repriced = 0;
+            // Cost, margin and discount are the fuel's, so both pools move together by
+            // construction rather than by a loop that happens to keep them in step.
+            var cost = ft.SupplierPricePerLiter ?? 0m; // held constant: a pump change is not a cost event
+            var profit = ft.MarginUahPerLiter ?? 0m;
+            var minDiscount = ft.MinDiscountPerLiter ?? 0m;
+            var finalPerLiter = FuelPricing.FinalPerLiter(cost, profit, pump, minDiscount);
 
-            foreach (var offer in poolOffers)
+            // A pump low enough that the ceiling (pump - minDiscount) drops under our own cost would
+            // make every sale of this fuel below cost - and checkout then refuses to sell it at all
+            // (BelowCostSaleBlockedException), so the fuel becomes unbuyable until a human intervenes.
+            // The manual path refuses the same write unless the fuel is opted in via AllowBelowCost
+            // (BrandsController.UpdateFuel); the automatic path must behave identically, or a
+            // third party's price move could take a fuel off sale unattended.
+            if (!ft.AllowBelowCost && FuelPricing.IsBelowCost(cost, profit, pump, minDiscount))
             {
-        var vols = nominalCountByFuel.TryGetValue(ft.Id, out var vcount) ? vcount : 0;
-
-                var cost = offer.SupplierPricePerLiter ?? 0m; // held constant: a pump change is not a cost event
-                var profit = ft.MarginUahPerLiter ?? 0m;
-                var minDiscount = offer.MinDiscountPerLiter ?? 0m;
-                var finalPerLiter = FuelPricing.FinalPerLiter(cost, profit, pump, minDiscount);
-
-                // A pump low enough that the ceiling (pump - minDiscount) drops under our own cost would
-                // make every sale of this fuel below cost - and checkout then refuses to sell it at all
-                // (BelowCostSaleBlockedException), so the fuel becomes unbuyable until a human intervenes.
-                // The manual path refuses the same write unless the fuel is opted in via AllowBelowCost
-                // (BrandsController.UpdateFuel); the automatic path must behave identically, or a
-                // third party's price move could take a fuel off sale unattended.
-                if (!ft.AllowBelowCost && FuelPricing.IsBelowCost(cost, profit, pump, minDiscount))
-                {
-                    belowCostSkipped.Add(ft.Name);
-                    continue;
-                }
-
-                if (category is { } matched) matchedCategories.Add(matched);
-
-                var previousPump = offer.PumpPricePerLiter;
-                var changed = previousPump != pump;
-
-                if (!dryRun)
-                {
-                    offer.PumpPricePerLiter = pump;
-                    offer.UpdatedAtUtc = now;
-
-                    // The volumes' prices are not restated here, and that is the change: a volume's price
-                    // is the offer's rate × its litres unless it carries an override, so this loop used
-                    // to write the same number into every row every quarter hour — and erased any
-                    // per-nominal override the moment a pump moved. The offer is the single price now,
-                    // which is what `PackagesRepriced` counts and what the operator screen shows.
-                    repricedOffers.Add(offer);
-                }
-
-                if (changed) changedCount++;
-        repriced += vols;
-                applied.Add(new OkkoPumpApplied(
-                    ft.Id, ft.Name, siteCode, pump, finalPerLiter, previousPump, changed, vols));
+                belowCostSkipped.Add(ft.Name);
+                continue;
             }
 
-            // Keep the fuel-type base/discount headline in step, as the operator write path does. It is
-            // a single figure per fuel, so it is written once rather than once per offer - the last
-            // pool's value wins, which is correct because both pools were priced from the same pump.
-            if (!dryRun && poolOffers.Count > 0)
+            if (category is { } matched) matchedCategories.Add(matched);
+
+            var previousPump = ft.PumpPricePerLiter;
+            var changed = previousPump != pump;
+
+            if (!dryRun)
             {
-                var headline = poolOffers[0];
-                var headlineFinal = FuelPricing.FinalPerLiter(
-                    headline.SupplierPricePerLiter ?? 0m,
-                    // The margin is `ft`'s - every pool of this fuel is priced from the same one, which is
-                    // the whole point of it living on the fuel.
-                    ft.MarginUahPerLiter ?? 0m,
-                    pump,
-                    headline.MinDiscountPerLiter ?? 0m);
+                ft.PumpPricePerLiter = pump;
+
+                // Keep the fuel-type base/discount headline in step, as the operator write path does.
                 ft.BasePrice = Math.Round(pump, 2, MidpointRounding.AwayFromZero);
-                ft.DiscountPrice = Math.Round(headlineFinal, 2, MidpointRounding.AwayFromZero);
+                ft.DiscountPrice = Math.Round(finalPerLiter, 2, MidpointRounding.AwayFromZero);
                 ft.UpdatedAtUtc = now;
+
+                // Nothing per nominal is restated, and that is the change: a nominal's price is the
+                // fuel's rate × its litres, so this loop used to write the same number into every row
+                // every quarter hour - and erased any per-nominal override the moment a pump moved. The
+                // fuel is the single price now, which is what `PackagesRepriced` counts and what the
+                // operator screen shows.
+                repricedFuels.Add(ft);
             }
 
-            // A fuel with no offer at all still gets reported, with zero packages. The per-offer loop above
-            // cannot produce that row on its own - there is no offer to iterate - and silently dropping
-            // the fuel from the receipt would be a behaviour change: the caller used to learn "this
-            // fuel matched, it simply has nothing to price", which is how an empty catalogue is
-            // distinguished from an unmatched one.
-            if (poolOffers.Count == 0)
-            {
-                if (category is { } matched) matchedCategories.Add(matched);
-
-                // No offer means no cost and no margin to hold, so these are the figures the old
-                // per-package loop produced off an empty list: zero cost, zero margin, and a final price
-                // the ceiling drives to zero.
-                var emptyFinal = FuelPricing.FinalPerLiter(0m, 0m, pump, 0m);
-
-                if (!dryRun)
-                {
-                    ft.BasePrice = Math.Round(pump, 2, MidpointRounding.AwayFromZero);
-                    ft.DiscountPrice = Math.Round(emptyFinal, 2, MidpointRounding.AwayFromZero);
-                    ft.UpdatedAtUtc = now;
-                }
-
-                changedCount++;
-                applied.Add(new OkkoPumpApplied(
-                    ft.Id, ft.Name, siteCode, pump, emptyFinal, PreviousPumpPricePerLiter: null, Changed: true, PackagesRepriced: 0));
-            }
-
-            packagesRepriced += repriced;
+            if (changed) changedCount++;
+            packagesRepriced += vols;
+            applied.Add(new OkkoPumpApplied(
+                ft.Id, ft.Name, siteCode, pump, finalPerLiter, previousPump, changed, vols));
         }
 
+            // The "a fuel matched but has nothing to price" row is gone with the offer it belonged to.
+        // There is no state in which a catalogue fuel has no cost row to write the pump into, so
+        // the branch could only ever fire on data that no longer exists.
         if (!dryRun && changedCount > 0)
         {
-            // One row per offer whose price actually moved, all stamped with this run's `now` so the run
-            // reads as one moment rather than twenty-five - and all appended in one call, so the recorder
-            // fetches the existing history in a single query instead of one per fuel. It also re-stamps
-            // price_updated_at / price_updated_by_user_id, which the loop above used to do itself.
+            // One row per fuel whose price actually moved, all stamped with this run's `now` so the
+            // run reads as one moment rather than twenty-five - and all appended in one call, so the
+            // recorder fetches the existing history in a single query instead of one per fuel. It
+            // also re-stamps price_updated_at / price_updated_by_user_id.
             await _priceRecorder.RecordRangeAsync(
-                repricedOffers, OfferPriceReasons.PumpImport, actor, now, ct);
+                repricedFuels, OfferPriceReasons.PumpImport, actor, now, ct);
             await _context.SaveChangesAsync(ct);
             await RecordEventsAsync(applied, actor, actingUserName, ct);
         }

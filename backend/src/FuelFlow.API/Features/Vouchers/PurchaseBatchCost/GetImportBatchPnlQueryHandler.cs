@@ -75,37 +75,17 @@ public sealed class GetImportBatchPnlQueryHandler
         // and the live pool is the one a P&L over real sales is about. The GroupBy().First() this
         // replaces could previously pick up a QA rehearsal offer.
         //
-        // Materialised and then computed, because the sale price is not a column: it is
-        // `min(cost + profit, pump - minDiscount)` over four nullable columns on the offer. One row
-        // per (fuel × pool) over the fuels in this import.
-        var pricedOffers = await _context.FuelOffers
-            .AsNoTracking()
-            .Where(o => fuelIds.Contains(o.FuelTypeId) && o.DataKind == DataKinds.Real)
-            .ToListAsync(cancellationToken);
-
-        // The final price is cost plus the FUEL's margin, so the fuels are read too. Reading it off the offer
-        // would use a copy nothing writes any more, and would silently price every batch at cost.
-        var fuels = await _context.FuelTypes
+        // The current sale price, read off the fuel for the same reason every other path reads it there:
+        // the four knobs live in one row, and a report that reads them from somewhere else reads a
+        // copy nothing writes. There is one price per grade now, so there is nothing to group.
+        var currentPrices = await _context.FuelTypes
             .AsNoTracking()
             .Where(f => fuelIds.Contains(f.Id))
-            .ToDictionaryAsync(f => f.Id, cancellationToken);
+            .ToListAsync(cancellationToken);
 
-        var currentPrices = pricedOffers
-            .Select(o => new
-            {
-                o.FuelTypeId,
-                Final = fuels.TryGetValue(o.FuelTypeId, out var fuel)
-                    ? FuelPricing.FinalPerLiterOrNull(
-                        o.SupplierPricePerLiter,
-                        fuel.MarginUahPerLiter,
-                        o.PumpPricePerLiter,
-                        o.MinDiscountPerLiter)
-                    : null
-            })
-            .Where(o => o.Final is not null)
-            .GroupBy(o => o.FuelTypeId)
-            .ToDictionary(g => g.Key, g => g.Min(o => o.Final!.Value));
-
+        var pricedFuelIds = currentPrices
+            .Where(f => f.FinalPerLiter() is not null)
+            .ToDictionary(f => f.Id, f => f.FinalPerLiter()!.Value, StringComparer.Ordinal);
         var voucherById = vouchers.ToDictionary(v => v.Id);
 
         // Vouchers with at least one non-reversed fulfillment = revenue realised. Used to keep
@@ -151,7 +131,7 @@ public sealed class GetImportBatchPnlQueryHandler
 
             // decimal? on purpose: an uncosted fuel has no current price, and the DTO carries null for that
             // rather than a zero that would read as "we sell it for nothing".
-            decimal? currentPrice = currentPrices.TryGetValue(fuelTypeId, out var cp) ? cp : null;
+            decimal? currentPrice = pricedFuelIds.TryGetValue(fuelTypeId, out var cp) ? cp : null;
 
             // Cost is per voucher, not per batch: a customer who extends one voucher of a batch pays for
             // exactly that voucher, so its cost drops while its siblings keep theirs. Every money figure
