@@ -501,6 +501,17 @@ jobs:
       - name: Test the migration dry-run dump
         run: bash deploy/dryrun-dump.test.sh
 
+      # The restore drill. Its value is entirely in what it proves about a real backup,
+      # which is exactly why it can only be run by a person holding the age key - and why
+      # FF-14 has been owed since 2026-08-21. What CI CAN hold it to is the part that
+      # makes a run worthless instead of dangerous: that it has no path to the live
+      # database, and that its integrity queries name columns that exist. The second
+      # one is not theoretical - the first draft of that script queried amount_UAH,
+      # kind = 'Payment' and event_type = 'Issued', none of which exist, and all three
+      # returned 0 and printed "ok".
+      - name: Test the restore drill
+        run: bash deploy/drill-restore.test.sh
+
   # The repo-root fetchers in scripts/ — the only write path into `station_nodes`. They parse a
   # third-party site nobody here controls (UPG rebuilds its map page periodically, KLO renders its
   # pins through a WordPress plugin), and a silent parse change would import a few hundred rows with
