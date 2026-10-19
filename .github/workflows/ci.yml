@@ -576,7 +576,7 @@ jobs:
       # point of the split - the job needs a shell and a running postgres, not the repository.
       - name: Dump schema, history and catalogue from production
         env:
-          TABLES: brands fuel_types fuel_offers fuel_offer_volumes
+          TABLES: brands fuel_types fuel_offers
         run: |
           set -euo pipefail
           out="$RUNNER_TEMP/dryrun"
@@ -706,16 +706,17 @@ jobs:
           db() { psql "postgres://postgres:$PGPASSWORD@localhost:5432/fuelflow" "$@"; }
           db -q -v ON_ERROR_STOP=1 -f schema.sql > /dev/null
           db -q -c "\\copy \"__EFMigrationsHistory\" FROM 'history.csv' WITH (FORMAT csv, HEADER true)"
-          # Order is EXPLICIT, and it must be, because the dump now contains a real foreign key:
-          # fuel_offer_volumes.offer_id -> fuel_offers.id. Alphabetically `fuel_offer_volumes`
-          # sorts BEFORE `fuel_offers` ('_' < 's'), so a glob-ordered restore loads the child first
-          # and dies on FK_fuel_offer_volumes_fuel_offers_offer_id. Nothing was wrong with the data;
-          # the restore was simply loading in an order the schema does not allow.
+          # Order is EXPLICIT, and it must be, because the dump contains real foreign keys:
+          # fuel_types.brand_id -> brands.id and fuel_offers.fuel_type_id -> fuel_types.id.
+          # Alphabetically `fuel_types` sorts BEFORE `brands` ('_' < 's' does not apply here, but the
+          # habit does): a glob-ordered restore loads the child first and dies on
+          # FK_fuel_types_brands_brand_id. Nothing is wrong with the data; the restore was simply
+          # loading in an order the schema does not allow.
           #
           # Parent first, then child. Kept as a literal list rather than re-derived from the glob so
           # that adding a table to TABLES is a deliberate act: a new CSV with no place in this order
           # is skipped, not silently loaded in the wrong place - and the loop says so when it does.
-          order=(brands fuel_types fuel_offers fuel_offer_volumes)
+          order=(brands fuel_types fuel_offers)
           for table in "${order[@]}"; do
             f="$table.csv"
             # A name in the order with no CSV is FATAL, not a warning. The two lists are written
@@ -762,10 +763,11 @@ jobs:
           # `SELECT count(*) FROM fuel_offers WHERE to_regclass('public.fuel_offers') IS NOT NULL`,
           # which looks guarded and is not: Postgres resolves the table at PARSE time, so on a run
           # where the migration created no offers table this step errors instead of reporting zero.
-          # fuel_packages is gone from the schema, so it is no longer counted here. The offers and volumes
-          # loop below reports both pools' worth of rows, and a migration that DROPS fuel_packages is exactly
-          # the case this step exists to show - its absence is the result, not a gap in the summary.
-          for t in fuel_offers fuel_offer_volumes; do
+          # fuel_packages and fuel_offer_volumes are gone from the schema, so neither is counted here -
+          # a migration that DROPS one is exactly the case this step exists to show, and their absence
+          # is the result rather than a gap in the summary. What is left is the network, the fuel it
+          # belongs to and the offer that prices it, which is the chain this PR rewrites.
+          for t in brands fuel_types fuel_offers; do
             if db -X -t -A -c "SELECT to_regclass('public.$t') IS NOT NULL" | grep -q t; then
               db -X -t -A -F' | ' -c "SELECT '$t', count(*) FROM $t"
             else

@@ -78,7 +78,7 @@ SCHEMA
   *COPY*fuel_types*)            echo "id,name"; echo "1,A-95" ;;
   *COPY*brands*)                echo "id,name"; echo "okko,OKKO" ;;
   *COPY*fuel_offers*)          echo "id,station_id"; echo "1,1" ;;
-  *COPY*fuel_offer_volumes*)   echo "id,offer_id"; echo "1,1" ;;
+ 
   *COPY*)                       [ -n "${LEAK_INTO:-}" ] && printf 'number,qr_payload\n1234,eyJzaWduYXR1cmUiOiJ4In0=\n' ;;
 esac
 exit 0
@@ -87,7 +87,7 @@ chmod +x "$WORK/bin/docker"
 
 # Runs the real extracted block and echoes the argv the stub docker collected.
 run_dump() {
-  local tables="${1:-brands fuel_types fuel_offers fuel_offer_volumes}"
+  local tables="${1:-brands fuel_types fuel_offers}"
   : > "$WORK/argv"
   ( PATH="$WORK/bin:$PATH" ARGV_LOG="$WORK/argv" RUNNER_TEMP="$WORK/runner" TABLES="$tables" \
     bash "$WORK/dump.raw" ) > "$WORK/out" 2>&1
@@ -131,7 +131,7 @@ eq "every call carries -U fuelflow -d fuelflow" "$missing" ""
 # The exit code is the assertion: 0 means the upload was allowed, non-zero means the block stopped.
 # These two cases bracket the bug that shipped - a guard that scans the schema dump refuses every
 # run, because "qr_payload" is a column name that pg_dump puts in the DDL.
-run_block() { : > "$WORK/argv"; ( PATH="$WORK/bin:$PATH" ARGV_LOG="$WORK/argv" RUNNER_TEMP="$WORK/runner" TABLES="brands fuel_types fuel_offers fuel_offer_volumes" bash "$WORK/dump.raw" ) >"$WORK/out" 2>&1; }
+run_block() { : > "$WORK/argv"; ( PATH="$WORK/bin:$PATH" ARGV_LOG="$WORK/argv" RUNNER_TEMP="$WORK/runner" TABLES="brands fuel_types fuel_offers" bash "$WORK/dump.raw" ) >"$WORK/out" 2>&1; }
 
 # Baseline: the block as it stands, against a stub schema that mentions qr_payload as a column name.
 run_block; rc=$?
@@ -145,7 +145,7 @@ fi
 # `rm -rf "$out"` and would delete anything written before it ran - which is exactly how a guard
 # test can pass for the wrong reason.
 ( PATH="$WORK/bin:$PATH" ARGV_LOG="$WORK/argv" RUNNER_TEMP="$WORK/runner" LEAK_INTO=1 \
-  TABLES="brands fuel_types fuel_offers fuel_offer_volumes fingerprint_leak" bash "$WORK/dump.raw" ) >"$WORK/leak" 2>&1
+  TABLES="brands fuel_types fuel_offers fingerprint_leak" bash "$WORK/dump.raw" ) >"$WORK/leak" 2>&1
 rc=$?
 if [ "$rc" -ne 0 ] && grep -q "refusing to upload" "$WORK/leak"; then
   ok "a qr_payload VALUE in a data file refuses the upload"
@@ -156,7 +156,7 @@ fi
 # And the other arm: TABLES is widened to name the vouchers table outright, so a file with that name
 # lands in the artifact whatever its content.
 ( PATH="$WORK/bin:$PATH" ARGV_LOG="$WORK/argv" RUNNER_TEMP="$WORK/runner" \
-  TABLES="brands fuel_types fuel_offers fuel_offer_volumes fuel_vouchers" bash "$WORK/dump.raw" ) >"$WORK/wide" 2>&1
+  TABLES="brands fuel_types fuel_offers fuel_vouchers" bash "$WORK/dump.raw" ) >"$WORK/wide" 2>&1
 rc=$?
 if [ "$rc" -ne 0 ] && [ -e "$WORK/runner/dryrun/fuel_vouchers.csv" ]; then
   ok "dumping the vouchers table still refuses the upload"
@@ -236,7 +236,7 @@ echo "MigrationId,ProductVersion" > "$WORK/restore-tree/dryrun/history.csv"
 echo "id,name" > "$WORK/restore-tree/dryrun/brands.csv"
 echo "id,name" > "$WORK/restore-tree/dryrun/fuel_types.csv"
 echo "id,station_id" > "$WORK/restore-tree/dryrun/fuel_offers.csv"
-echo "id,offer_id" > "$WORK/restore-tree/dryrun/fuel_offer_volumes.csv"
+
 echo "-- schema" > "$WORK/restore-tree/dryrun/schema.sql"
 ( cd "$WORK/restore-tree" && PATH="$WORK/bin:$PATH" PSQL_LOG="$WORK/psql.log" PGPASSWORD=postgres \
     bash "$WORK/restore.raw" ) > "$WORK/restore.out" 2>&1
@@ -260,17 +260,18 @@ else
   bad "the restore loads the tables it was given" "no fuel_types" "fuel_types restored"
 fi
 
-# The order the schema demands, asserted rather than assumed. fuel_offer_volumes.offer_id references
-# fuel_offers.id, and alphabetically "fuel_offer_volumes" sorts BEFORE "fuel_offers" ('_' < 's') -
-# so a glob-ordered restore loads the child first and the real dry run died on
-# FK_fuel_offer_volumes_fuel_offers_offer_id on 2026-10-16, against a perfectly good dump.
+# The order the schema demands, asserted rather than assumed. fuel_types.brand_id references
+# brands.id, and a glob-ordered restore is one edit away from loading the child first - which is what
+# the real dry run did on 2026-10-16, dying on FK_fuel_offer_volumes_fuel_offers_offer_id against a
+# perfectly good dump. The volumes table is gone; the chain it demonstrated on is not, and this PR
+# adds six more brand_id foreign keys along it, so the assertion stays.
+brands_line="$(grep -ni 'copy brands ' "$WORK/psql.log" | head -1 | cut -d: -f1)"
 offers_line="$(grep -ni 'copy fuel_offers ' "$WORK/psql.log" | head -1 | cut -d: -f1)"
-volumes_line="$(grep -ni 'copy fuel_offer_volumes ' "$WORK/psql.log" | head -1 | cut -d: -f1)"
-if [ -n "$offers_line" ] && [ -n "$volumes_line" ] && [ "$offers_line" -lt "$volumes_line" ]; then
+if [ -n "$brands_line" ] && [ -n "$offers_line" ] && [ "$brands_line" -lt "$offers_line" ]; then
   ok "the parent is restored before the child that references it"
 else
   bad "the parent is restored before the child that references it" \
-      "offers at '${offers_line:-none}', volumes at '${volumes_line:-none}'" "offers first"
+      "brands at '${brands_line:-none}', offers at '${offers_line:-none}'" "brands first"
 fi
 
 # A table in the dump that the restore order does not name is a silent gap, and the loop must say
