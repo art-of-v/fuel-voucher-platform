@@ -463,7 +463,14 @@ services:
       # A container that is recreated takes its data volume with it but not a bind mount's
       # contents - and the archive has to survive exactly that. And the backup script ships it
       # off-box with rclone, which is easier from the host than from inside a container.
-      - ${WAL_ARCHIVE_DIR:-/root/fuelflow-wal}:/var/lib/postgresql/wal
+      #
+      # The path is written out rather than taken from the environment, on purpose. The compose
+      # parse gate resolves every variable the file references against a dummy value, and a
+      # dummy value is not a path - it would be read as the NAME of a volume that does not
+      # exist, and the whole file would fail to load before a single container was touched.
+      # The path is therefore literal, and it has to match the one in deploy/backup.sh and
+      # deploy/enable-pitr.sh.
+      - /root/fuelflow-wal:/var/lib/postgresql/wal
     ports:
       - "127.0.0.1:5432:5432"   # localhost only — for backups / psql on the server, never public
     healthcheck:
