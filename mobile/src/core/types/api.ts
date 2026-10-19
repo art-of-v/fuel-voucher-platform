@@ -53,6 +53,23 @@ export interface FuelType {
   brandSlug: string;
   basePrice: number;
   discountPrice: number;
+  /**
+   * What the network charges at the pump - the column price. Null when it is not known.
+   *
+   * This is the price a customer is shown for a fuel we cannot sell yet: it is what the market
+   * charges, and the only honest number to show for a fuel nobody has costed.
+   */
+  pumpPricePerLiter?: number;
+  /**
+   * What WE charge - the cost plus the margin, capped at the pump price. Null when we have no
+   * margin set, which is the state an imported fuel is in until an operator prices it.
+   */
+  finalPricePerLiter?: number;
+  /**
+   * Whether this fuel can be bought right now: at least one of its sizes has live stock behind it in
+   * the caller's own pool.
+   */
+  isAvailable?: boolean;
 }
 
 export interface StationWithFuels extends Station {

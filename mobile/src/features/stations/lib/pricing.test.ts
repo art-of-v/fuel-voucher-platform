@@ -1,4 +1,4 @@
-import { fuelSaving } from './pricing';
+import { fuelHeadlinePrice, fuelSaving } from './pricing';
 
 describe('fuelSaving', () => {
   it('reports a real discount when basePrice is above discountPrice', () => {
@@ -25,5 +25,60 @@ describe('fuelSaving', () => {
     const r = fuelSaving({ basePrice: 0, discountPrice: 0 });
     expect(r.hasSaving).toBe(false);
     expect(r.amount).toBe(0);
+  });
+});
+
+describe('fuelHeadlinePrice', () => {
+  it('shows OUR price when the shop can sell the fuel', () => {
+    const price = fuelHeadlinePrice({
+      discountPrice: 97.86,
+      pumpPricePerLiter: 102.9,
+      finalPricePerLiter: 97.86,
+      isAvailable: true,
+    });
+    expect(price).toBeCloseTo(97.86, 2);
+  });
+
+  it('shows the COLUMN price when the shop cannot sell the fuel', () => {
+    // An imported fuel has no margin of ours yet, so the only honest number is what the network
+    // charges. The operator has not priced it, and the row must not claim otherwise.
+    const price = fuelHeadlinePrice({
+      discountPrice: 0,
+      pumpPricePerLiter: 92.9,
+      finalPricePerLiter: null,
+      isAvailable: false,
+    });
+    expect(price).toBeCloseTo(92.9, 2);
+  });
+
+  it('never shows zero for a fuel nobody has priced', () => {
+    // "0 UAH" is a free fuel. No number at all is a fuel we have not priced.
+    const price = fuelHeadlinePrice({
+      discountPrice: 0,
+      pumpPricePerLiter: 0,
+      finalPricePerLiter: null,
+      isAvailable: false,
+    });
+    expect(price).toBeNull();
+  });
+
+  it('falls back to the column price when we have no price of our own but the shop can sell it', () => {
+    const price = fuelHeadlinePrice({
+      discountPrice: 0,
+      pumpPricePerLiter: 92.9,
+      finalPricePerLiter: null,
+      isAvailable: true,
+    });
+    expect(price).toBeCloseTo(92.9, 2);
+  });
+
+  it('shows our price even when it is below the column price', () => {
+    const price = fuelHeadlinePrice({
+      discountPrice: 97.86,
+      pumpPricePerLiter: 102.9,
+      finalPricePerLiter: 97.86,
+      isAvailable: true,
+    });
+    expect(price).toBeCloseTo(97.86, 2);
   });
 });

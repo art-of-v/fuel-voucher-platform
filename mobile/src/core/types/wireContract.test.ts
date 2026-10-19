@@ -136,6 +136,12 @@ describe('GET /api/brands/fuel-types — FuelType[]', () => {
         name: 'string',
         basePrice: 'number',
         discountPrice: 'number',
+        // The column price, our own price, and whether the shop can sell it. The first two are
+        // nullable - a fuel nobody has priced has neither - and the third is what tells the client
+        // which of the two prices is the one to show.
+        pumpPricePerLiter: ['number', 'null'],
+        finalPricePerLiter: ['number', 'null'],
+        isAvailable: 'boolean',
       });
     }
   });

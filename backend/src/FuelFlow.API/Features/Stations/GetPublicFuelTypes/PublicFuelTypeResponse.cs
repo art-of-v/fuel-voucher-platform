@@ -21,4 +21,26 @@ public sealed record PublicFuelTypeResponse(
     string BrandSlug,
     string Name,
     decimal BasePrice,
-    decimal DiscountPrice);
+    decimal DiscountPrice,
+    /// <summary>
+    /// What the network charges at the pump - the column price. Null when it is not known.
+    /// </summary>
+    /// <remarks>
+    /// This is the number a customer sees for a fuel we cannot sell: it is what the market charges,
+    /// and it is the only honest price when we have no margin of our own to quote.
+    /// </remarks>
+    decimal? PumpPricePerLiter,
+    /// <summary>
+    /// What WE charge - the cost plus the margin, capped at the pump price. Null when we have no
+    /// margin set, which is the state an imported fuel is in until an operator prices it.
+    /// </summary>
+    decimal? FinalPricePerLiter,
+    /// <summary>
+    /// Whether this fuel can be bought right now: at least one of its sizes has live stock behind it
+    /// in the caller's own pool.
+    /// </summary>
+    /// <remarks>
+    /// A fuel the shop cannot sell is shown at the column price rather than at a price of ours, because
+    /// a zero or a market price presented as ours is a lie the customer pays for.
+    /// </remarks>
+    bool IsAvailable);

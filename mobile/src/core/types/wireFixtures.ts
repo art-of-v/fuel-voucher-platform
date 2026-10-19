@@ -124,6 +124,9 @@ export const wireFuelTypes = [
     name: '100 Mustang Євро5-Е0',
     basePrice: 102.9,
     discountPrice: 102.9,
+    pumpPricePerLiter: 102.9,
+    finalPricePerLiter: 102.9,
+    isAvailable: false,
   },
   {
     id: '01a13e35-3153-7682-92ec-e513e60dcbe4',
@@ -132,6 +135,9 @@ export const wireFuelTypes = [
     name: '100 PULLS',
     basePrice: 103.4,
     discountPrice: 102.9,
+    pumpPricePerLiter: 103.4,
+    finalPricePerLiter: 102.9,
+    isAvailable: false,
   },
   {
     id: '01a15198-2018-7cad-80ad-b02e167ffd22',
@@ -140,6 +146,9 @@ export const wireFuelTypes = [
     name: '95 Mustang Євро5-Е10',
     basePrice: 95.9,
     discountPrice: 95.9,
+    pumpPricePerLiter: 95.9,
+    finalPricePerLiter: 95.9,
+    isAvailable: false,
   },
   {
     id: 'c7fae808-d061-4929-8e78-2bf8e19e40a1',
@@ -148,6 +157,9 @@ export const wireFuelTypes = [
     name: '95 Євро5-Е10',
     basePrice: 92.9,
     discountPrice: 92.9,
+    pumpPricePerLiter: 92.9,
+    finalPricePerLiter: 92.9,
+    isAvailable: false,
   },
 ];
 
