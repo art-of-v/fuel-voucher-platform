@@ -224,7 +224,13 @@ public sealed class TestDatabaseFixture : WebApplicationFactory<Program>, IAsync
             // The flags only, no `postgres` prefix: the image's entrypoint prepends the binary
             // itself when the first argument starts with a dash, and passing it explicitly makes
             // the server read "postgres" as a data directory and exit 1.
+            //
+            // shared_preload_libraries carries production's setting, so the suite runs against the
+            // configuration the deploy actually ships. Without it the QueryStatisticsAreCollected
+            // migration installs the extension and nothing else, and the one thing an integration
+            // suite can teach us about deployment configuration is lost.
             .WithCommand("-c", "max_connections=300")
+            .WithCommand("-c", "shared_preload_libraries=pg_stat_statements")
             .Build();
         await container.StartAsync();
 
