@@ -25,7 +25,7 @@ public sealed record GetFuelPriceAtQuery(string FuelTypeId, DateTime AsOfUtc);
 /// </param>
 public sealed record FuelPriceAt(
     Guid Id,
-    string OfferId,
+    string FuelTypeId,
     string DataKind,
     decimal? SupplierPricePerLiter,
     decimal? MarginUahPerLiter,
@@ -100,7 +100,7 @@ public sealed class GetFuelPriceAtQueryHandler
             {
                 Price = new FuelPriceAt(
                     p.Id,
-                    p.OfferId,
+                    p.FuelTypeId,
                     p.DataKind,
                     p.SupplierPricePerLiter,
                     p.MarginUahPerLiter,
@@ -114,7 +114,7 @@ public sealed class GetFuelPriceAtQueryHandler
                     p.Reason),
                 PriceId = p.Id,
                 PriceFrom = p.EffectiveFromUtc,
-                p.OfferId
+                p.FuelTypeId
             })
             .FirstOrDefaultAsync(ct);
 

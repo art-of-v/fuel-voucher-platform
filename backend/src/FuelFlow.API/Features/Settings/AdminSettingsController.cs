@@ -138,59 +138,40 @@ public sealed class AdminSettingsController : ControllerBase
     /// </remarks>
     private async Task<List<VoucherTermFuelMarginDto>> TermMarginsAsync(CancellationToken cancellationToken)
     {
-        // Joined to the fuel table explicitly rather than through a navigation: an offer carries no FuelType
-        // navigation - Brand and fuel are natural keys in this schema - and the fuel's Brand is what
-        // makes a name readable when several Brands sell the same grade.
+        // This reads the FUEL, not the volume: the margin shown against a term ladder is a
+        // per-litre figure, and it exists once per fuel. There is nothing to group over any more -
+        // the `Min(...)` across pools existed because two pools of one fuel could be priced apart,
+        // and now they cannot.
         //
-        // This reads the OFFER, not the volume: the margin shown against a term ladder is a per-litre
-        // figure, and it now exists once per fuel rather than once per package. The `Min(...)` over a
-        // group is kept deliberately - a fuel can still own an offer per pool, and the tightest margin
-        // across them is the one that actually binds.
-        //
-        // Materialised before the grouping, because the customer price is not a column any more: it is
-        // `min(cost + profit, pump - minDiscount)` over four nullable columns, which SQL cannot express
-        // through the one function that owns it. The row count is one per (fuel × pool) - 25 on
+        // Materialised before the projection, because the customer price is not a column any more: it
+        // is `min(cost + profit, pump - minDiscount)` over four nullable columns, which SQL cannot
+        // express through the one function that owns it. The row count is one per fuel - 25 on
         // production - so this is a list, not a scan.
-        var priced = (await _context.FuelOffers
+        var priced = (await _context.FuelTypes
                 .AsNoTracking()
-                .Join(_context.FuelTypes,
-                    offer => offer.FuelTypeId,
-                    fuel => fuel.Id,
-                    (offer, fuel) => new
-                    {
-                        offer,
-                        fuel.Name,
-                        fuel.BrandId,
-                        MarginUahPerLiter = fuel.MarginUahPerLiter
-                    })
                 .ToListAsync(cancellationToken))
-            .Where(row => row.offer.SupplierPricePerLiter is not null)
-            .Select(row => new
+            .Where(fuel => fuel.SupplierPricePerLiter is not null)
+            .Select(fuel => new
             {
-                row.offer.FuelTypeId,
-                row.Name,
-                row.BrandId,
-                Supplier = row.offer.SupplierPricePerLiter!.Value,
-                // From the fuel's margin, joined above: the offer's own copy is no longer written.
-                Final = FuelPricing.FinalPerLiterOrNull(
-                    row.offer.SupplierPricePerLiter,
-                    row.MarginUahPerLiter,
-                    row.offer.PumpPricePerLiter,
-                    row.offer.MinDiscountPerLiter)
+                FuelTypeId = fuel.Id,
+                fuel.Name,
+                fuel.BrandId,
+                Supplier = fuel.SupplierPricePerLiter!.Value,
+                Final = fuel.FinalPerLiter()
             })
             .Where(row => row.Final is not null)
             .ToList();
 
         return priced
-            .GroupBy(row => new { row.FuelTypeId, row.Name, row.BrandId })
-            .Select(g => new VoucherTermFuelMarginDto
+            .Select(row => new VoucherTermFuelMarginDto
             {
-                FuelTypeId = g.Key.FuelTypeId,
-                Name = g.Key.Name,
-                BrandId = g.Key.BrandId.ToString(),
-                // Per offer, then the tightest across pools — the same two steps the SQL did, and the
-                // reason they are not merged: `final - cost` pairs figures from the SAME offer.
-                MarginPerLiterUah = g.Min(row => row.Final!.Value - row.Supplier)
+FuelTypeId = row.FuelTypeId,
+                Name = row.Name,
+                BrandId = row.BrandId.ToString(),
+                // `final - cost` off the one row that holds both figures, which is now the only row
+                // there is. When two pools could disagree this was a min() across them; with one
+                // price per grade there is nothing to choose between.
+                MarginPerLiterUah = row.Final!.Value - row.Supplier
             })
             .ToList();
     }

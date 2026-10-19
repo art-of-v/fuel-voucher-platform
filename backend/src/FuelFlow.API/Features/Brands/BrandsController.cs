@@ -195,32 +195,17 @@ private readonly GetBrandsQueryHandler _getAll;
         var name = Brand.Name;
         var slug = Brand.Slug;
         var fuelTypes = await _context.FuelTypes.Where(f => f.BrandId == id).ToListAsync(ct);
-        var fuelIds = fuelTypes.Select(f => f.Id).ToList();
-        // Archive-the-offers view of the same question as the brand list above: this deletion path needs
-        // the rows to mutate, not the read projection the card is built from.
-        var offerIdsToArchive = await _context.FuelOffers
-            .Where(o => fuelIds.Contains(o.FuelTypeId))
-            .Select(o => o.Id).ToListAsync(ct);
-        var offersToArchive = await _context.FuelOffers
-            .Where(o => offerIdsToArchive.Contains(o.Id))
-            .ToListAsync(ct);
 
         // Archive the whole branch instead of removing it. fuel_vouchers.fuel_type_id CASCADEs from
         // here, so the old RemoveRange cascade could take paid-for vouchers with it; #217 keeps
-        // anything that affects history. The !IsDeleted filters keep all three out of the catalog.
+        // anything that affects history. The !IsDeleted filters keep both out of the catalog.
         var archivedAt = DateTime.UtcNow;
-        // The sizes are not touched, because they belong to the fuel and the fuel is archived below -
-        // so they are already out of the catalogue. Archiving the offer is what says "this fuel is
-        // not on sale here", and it is the row that has to say no: a live offer would keep the fuel
-        // on the shelf even with every fuel row behind it flagged deleted.
-        foreach (var offer in offersToArchive)
-        {
-            offer.IsDeleted = true;
-            offer.DeletedAtUtc = archivedAt;
-        }
 
         foreach (var fuelType in fuelTypes)
         {
+            // Archiving the fuel IS saying "this fuel is not on sale here". It used to be a second row
+            // doing that job: a live offer kept the fuel on the shelf even with every fuel row behind
+            // it flagged deleted. One row that says no is one row that cannot be forgotten.
             fuelType.IsDeleted = true;
             fuelType.DeletedAtUtc = archivedAt;
         }

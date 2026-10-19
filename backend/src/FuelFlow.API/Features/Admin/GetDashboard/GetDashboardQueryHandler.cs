@@ -54,16 +54,13 @@ public sealed class GetDashboardQueryHandler
         // Projects the margin alone. Handing back the offer entity would load every offer column for
         // every volume in the catalogue to answer one question.
         var fpLookup = await (
-    from o in _context.FuelOffers.AsNoTracking()
-            // The margin is the fuel's, so the fuel joins too. Handing back the offer entity would load
-            // every offer column for every volume in the catalogue to answer one question.
-            join f in _context.FuelTypes.AsNoTracking() on o.FuelTypeId equals f.Id
-    // Keyed the way the consumer keys it: an order line stores the network as its slug, so the
-    // lookup is built from the slug rather than from the offer's uuid.
-    join b in _context.Brands.AsNoTracking() on o.BrandId equals b.Id
-    from n in _context.FuelNominals.AsNoTracking() where n.FuelTypeId == f.Id
-    where o.DataKind == DataKinds.Real
-    select new { BrandSlug = b.Slug, o.FuelTypeId, Liters = n.Liters, MarginUahPerLiter = f.MarginUahPerLiter })
+from f in _context.FuelTypes.AsNoTracking()
+            // Keyed the way the consumer keys it: an order line stores the network as its slug, so the
+            // lookup is built from the slug rather than from the fuel's uuid.
+            join b in _context.Brands.AsNoTracking() on f.BrandId equals b.Id
+            from n in _context.FuelNominals.AsNoTracking() where n.FuelTypeId == f.Id
+            where n.DataKind == DataKinds.Real
+            select new { BrandSlug = b.Slug, FuelTypeId = f.Id, Liters = n.Liters, MarginUahPerLiter = f.MarginUahPerLiter })
             .ToDictionaryAsync(
                 x => (x.BrandSlug, x.FuelTypeId, x.Liters),
                 x => x.MarginUahPerLiter,

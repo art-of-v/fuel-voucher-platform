@@ -146,12 +146,9 @@ public sealed class JournalLine
     /// <summary>Counterparty, for the subledger. Null when the posting has no counterparty.</summary>
     public Guid? PartyId { get; set; }
 
-    /// <summary>
-    /// The offer this line is about. Text, not uuid, because <c>fuel_offers.id</c> is still a natural
-    /// key; D-21 replaces both with surrogates and this becomes uuid in the same migration.
-    /// </summary>
-    public string? OfferId { get; set; }
-
+    // offer_id went with the offer on 2026-10-19. The line already carries the grade it is
+    // about (FuelTypeId), and the offer it was sold under was a pointer that could only ever
+    // resolve to a row nothing writes.
     /// <summary>The company the line belongs to. Keyed on <c>id</c> until D-02 re-keys it to party_id.</summary>
     public Guid? LegalEntityId { get; set; }
 

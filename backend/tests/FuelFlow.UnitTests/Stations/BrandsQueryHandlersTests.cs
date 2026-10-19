@@ -658,17 +658,12 @@ result.Should().HaveCount(2);
         return new FuelVoucher
         {
             Id = Guid.NewGuid(),
-<<<<<<< HEAD
             // A voucher names its network as TEXT - the import prints it, the fulfilment worker reads
             // it, and neither knows a uuid. That is why the stock key is slug-based, so the fixture
             // takes the brand row's own code rather than a literal that could drift from it.
             Brand = brandText ?? EnsureBrand(brandId).Slug,
             FuelTypeId = fuelTypeId,
-=======
-            Brand = brand,
         FuelTypeId = fuelTypeId,
->>>>>>> e6a4e833 (wip(pricing): every price writer writes the fuel)
-            Liters = liters,
             SupplierExpirationDate = expiry,
             CustomerExpirationDate = expiry,
             VoucherNumber = $"{brandText ?? EnsureBrand(brandId).Slug}-{Guid.NewGuid().ToString()[..8]}",

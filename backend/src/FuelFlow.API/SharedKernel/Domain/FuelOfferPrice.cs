@@ -1,17 +1,17 @@
 namespace FuelFlow.SharedKernel.Domain;
 
 /// <summary>
-/// One price an offer was sold at, from the moment it took effect until the next row for the same
-/// offer. Append-only: a price is never edited or deleted, only superseded.
+/// One price a fuel was sold at, from the moment it took effect until the next row for the same
+/// fuel. Append-only: a price is never edited or deleted, only superseded.
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Why this table exists.</b> Until now a price lived in exactly one place - the columns of
-/// <see cref="FuelOffer"/> - and was overwritten in place. <c>price_updated_at</c> recorded when it
-/// last moved and <c>price_updated_by_user_id</c> who moved it, so the question "what did this fuel
-/// cost last Tuesday" had no answer: there was one row, holding today's number. Two write paths did
-/// not even stamp those two columns, so for a fuel repriced through the operator screen the timestamp
-/// was the offer's creation time and the actor was null.
+/// <b>Why this table exists.</b> Until it was added a price lived in exactly one place - the columns of
+/// <c>fuel_offers</c> - and was overwritten in place. <c>price_updated_at</c> recorded when it last
+/// moved and <c>price_updated_by_user_id</c> who moved it, so the question "what did this fuel cost
+/// last Tuesday" had no answer: there was one row, holding today's number. Two write paths did not
+/// even stamp those two columns, so for a fuel repriced through the operator screen the timestamp was
+/// the creation time and the actor was null.
 /// </para>
 ///
 /// <para>
@@ -24,22 +24,24 @@ namespace FuelFlow.SharedKernel.Domain;
 /// </para>
 ///
 /// <para>
-/// <b>It is history, not the price.</b> <see cref="FuelOffer"/> keeps its own price columns and they
-/// stay the current price: the storefront, checkout and availability all read them, and rewriting
-/// those reads to resolve "the latest row" would put a per-row sort in the hot path of every
-/// package query for no gain. The invariant this table has to keep is therefore narrow and checkable:
-/// <b>the newest row for an offer equals the offer's own price columns</b>. It is maintained from a
-/// single choke point - <c>OfferPriceRecorder</c> - which every write path calls after mutating the
-/// offer, because a second place that remembered to append a row is a second place that can forget.
-/// <c>OfferPriceHistoryIntegrationTests</c> asserts the invariant against the database rather than
-/// trusting it.
+/// <b>It is history, not the price.</b> <see cref="FuelTypeEntity"/> keeps its own price columns and
+/// they stay the current price: the storefront, checkout and availability all read them, and
+/// rewriting those reads to resolve "the latest row" would put a per-row sort in the hot path of
+/// every package query for no gain. The invariant this table has to keep is therefore narrow and
+/// checkable: <b>the newest row for a fuel equals the fuel's own price columns</b>. It is maintained
+/// from a single choke point - <c>OfferPriceRecorder</c> - which every write path calls after
+/// mutating the fuel, because a second place that remembered to append a row is a second place that
+/// can forget. <c>FuelOfferPriceHistoryIntegrationTests</c> asserts the invariant against the
+/// database rather than trusting it.
 /// </para>
 ///
 /// <para>
-/// <b>The offer is the foreign key, and it RESTRICTs.</b> Matching every other relation in this
-/// schema: a history row is a record of something that was sold, so the offer it was sold under must
-/// stay readable. Removing the rehearsal pool therefore has to remove its history first - see
-/// <c>scripts/remove-qa-catalogue.sql</c>.
+/// <b>Keyed by fuel, RESTRICTing to nothing.</b> Until 2026-10-19 this keyed on <c>offer_id</c> and
+/// RESTRICTed to the offer, because a price was a record of something sold under an offer and the
+/// offer had to stay readable. The offer is gone, so the column is too: the row already carried
+/// <see cref="FuelTypeId"/>, so the offer id was a second way of saying which fuel this is. There is
+/// no pool either - one price per grade, because nothing can price one grade two ways any more, and
+/// <see cref="DataKind"/> now records only where the row was written from.
 /// </para>
 ///
 /// <para>
@@ -47,17 +49,8 @@ namespace FuelFlow.SharedKernel.Domain;
 /// <see cref="EffectiveFromUtc"/>, and where two rows share a timestamp - two reprices inside one
 /// transaction - the greater <see cref="Id"/>. <see cref="Id"/> is a version 7 UUID, whose leading
 /// bits are its creation time, so that tie-break is chronological rather than arbitrary. There is
-/// deliberately no unique index on (offer, effective_from): refusing a second reprice in the same
+/// deliberately no unique index on (fuel, effective_from): refusing a second reprice in the same
 /// millisecond would trade a cosmetic ambiguity for a write that can fail.
-/// </para>
-///
-/// <para>
-/// <b>The seeded catalogue is the one writer outside the choke point.</b> <c>SeedData</c> reaches
-/// <see cref="FuelOffer"/> through <c>HasData</c>, so EF emits the change as a migration's
-/// <c>UpdateData</c> rather than through the application. The initial row for every existing offer
-/// was written by the migration that created this table; a later migration that reprices a seeded
-/// offer has to append a history row in the same migration, or the seeded fuel's history starts at
-/// that migration instead of at the seed.
 /// </para>
 /// </remarks>
 public sealed class FuelOfferPrice
@@ -65,24 +58,16 @@ public sealed class FuelOfferPrice
     /// <summary>Key. Version 7 UUID, so the id alone orders the rows of one fuel chronologically.</summary>
     public Guid Id { get; set; }
 
-    /// <summary>
-    /// The fuel this price belongs to - the same key <c>offer_id</c> used to carry.
-    /// </summary>
-    /// <remarks>
-    /// The row already had a <see cref="FuelTypeId"/> column, so the offer id was a second way to
-    /// say which fuel this is, and the only one left pointing at a table that no longer exists.
-    /// There is no pool to record either: one price per grade, because nothing can price one grade
-    /// two ways any more.
-    /// </remarks>
-    public string OfferId { get; set; } = null!;
-
 /// <summary>The network, mirrored from the fuel so a price row is readable without the join.</summary>
     public Guid BrandId { get; set; }
 
-    /// <summary>Mirrors the offer's fuel type, for the same reason.</summary>
+    /// <summary>
+    /// The fuel this price belongs to - the key the row was always about. Moved here from
+    /// <c>offer_id</c> on 2026-10-19 with the rest of the pricing.
+    /// </summary>
     public string FuelTypeId { get; set; } = null!;
 
-    // The six per-litre facts, exactly as they stood on the offer at this instant. Copied rather than
+    // The six per-litre facts, exactly as the fuel held them at this instant. Copied rather than
     // referenced: the point of a history row is that it cannot change afterwards.
     public decimal? SupplierPricePerLiter { get; set; }
     public decimal? MarginUahPerLiter { get; set; }
@@ -91,11 +76,15 @@ public sealed class FuelOfferPrice
     public decimal? PumpPricePerLiter { get; set; }
     public decimal? MinDiscountPerLiter { get; set; }
 
-    /// <summary>Which pool the priced offer belongs to: <see cref="DataKinds.Real"/> or <see cref="DataKinds.Qa"/>.</summary>
+    /// <summary>
+    /// Which pool the write came from: <see cref="DataKinds.Real"/> or <see cref="DataKinds.Qa"/>.
+    /// It no longer selects a price - there is one price for both pools - and is kept so the audit
+    /// trail can say which side of the shelf an edit was made on.
+    /// </summary>
     public string DataKind { get; set; } = DataKinds.Real;
 
     /// <summary>
-    /// When this price took effect on the offer. The column a "what did it cost then" query reads,
+    /// When this price took effect on the fuel. The column a "what did it cost then" query reads,
     /// and the one the current price is resolved by.
     /// </summary>
     public DateTime EffectiveFromUtc { get; set; }
@@ -115,7 +104,4 @@ public sealed class FuelOfferPrice
     /// this says which door it came through.
     /// </summary>
     public string Reason { get; set; } = OfferPriceReasons.Operator;
-
-    /// <summary>The offer. <see cref="FuelOffer.Prices"/> is its side of the relation.</summary>
-    public FuelOffer Offer { get; set; } = null!;
 }
