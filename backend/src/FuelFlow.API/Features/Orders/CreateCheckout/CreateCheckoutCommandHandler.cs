@@ -145,8 +145,12 @@ public sealed class CreateCheckoutCommandHandler
                 command.Price, lineTotal, command.UserId);
         }
 
-        var roundedMinute = (DateTime.UtcNow.Minute / 5) * 5;
-        var bucketKey = $"{command.UserId}:{command.BrandId}:{command.FuelTypeId}:{command.Liters}:{command.Quantity}:{DateTime.UtcNow:yyyyMMddHH}{roundedMinute:D2}";
+        // The key names WHAT was bought and by whom; the window is the `CreatedAtUtc` filter below.
+// The minute of the clock used to be in here, rounded down to a five-minute bucket, which made
+        // the window discontinuous: a retry one millisecond before the bucket rolls over produced a
+        // different key, the dedupe missed, and the customer was charged twice for one tap. The
+        // filter below already asks "within the last hour", so nothing here needs the clock at all.
+        var bucketKey = $"{command.UserId}:{command.BrandId}:{command.FuelTypeId}:{command.Liters}:{command.Quantity}";
 
         // Dedupe only while the previous attempt is still awaiting payment:
         // retries and double-taps reuse the same invoice, but once an order is

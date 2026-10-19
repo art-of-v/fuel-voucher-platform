@@ -231,13 +231,15 @@ private readonly RuntimeSettingsService _runtimeSettings;
         // Must run BEFORE invoice creation so a duplicate never mints a second Monobank invoice.
         // The cart is hashed to a fixed-length digest so the key fits the 150-char column no matter
         // how many lines the cart has, and item order is normalized so the same cart always keys alike.
-        var roundedMinute = (DateTime.UtcNow.Minute / 5) * 5;
+        // The clock is deliberately not in the key: a five-minute bucket rolls over mid-cart, and a
+        // retry on the far side of the boundary keys differently and charges the customer twice. The
+        // `CreatedAtUtc` filter below is the whole window.
         var cartSignature = string.Join("|", command.Items
             .Select(i => $"{i.BrandId}:{i.FuelTypeId}:{i.Liters}:{i.Quantity}:{i.TermCode ?? "full"}")
             .OrderBy(s => s, StringComparer.Ordinal));
         var cartDigest = Convert.ToHexString(
             SHA256.HashData(Encoding.UTF8.GetBytes(cartSignature)))[..32];
-        var bucketKey = $"{command.UserId!.Value:N}:{DateTime.UtcNow:yyyyMMddHH}{roundedMinute:D2}:{cartDigest}";
+        var bucketKey = $"{command.UserId!.Value:N}:{cartDigest}";
 
         var existingOrder = await _context.Orders
             .Where(o => o.Status == OrderStatus.PendingPayment
