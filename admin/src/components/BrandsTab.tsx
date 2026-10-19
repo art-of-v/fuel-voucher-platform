@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DecimalSettingInput } from "@/components/DecimalSettingInput";
 import { FuelPriceHistory } from "@/components/FuelPriceHistory";
+import CatalogueSyncButton from "@/components/CatalogueSyncButton";
 import { apiRequest } from "@/lib/api-client";
 import { resolveAllowBelowCost } from "@/lib/belowCostOptIn";
 import { toast } from "sonner";
@@ -477,7 +478,9 @@ export default function BrandsTab({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end gap-2">
+        <CatalogueSyncButton />
+
         <Button
           variant="outline"
           size="sm"

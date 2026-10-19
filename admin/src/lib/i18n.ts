@@ -521,6 +521,13 @@ export const translations: Record<Language, Record<string, string>> = {
     "fuel.codePlaceholder": "e.g. A-95",
     "fuel.codeNone": "no code",
     "fuel.codeHint": "The code the network publishes for this grade. A fuel without one cannot be matched by the catalogue sync, so it is not repriced automatically.",
+    "brands.addBrand": "Add Brand",
+    "brands.syncCatalogue": "Update from the networks",
+    "brands.syncCatalogueHint":
+      "Reads each network's price list and adds the grades we do not carry yet. It runs on its own every week; this starts it now. It takes a minute - the vendors' pages are fetched one at a time.",
+    "brands.syncCatalogueStarted":
+      "The catalogue check is running for OKKO, UPG, WOG and KLO. What it found is in the backend log, and what it changed is on this screen.",
+    "brands.syncCatalogueFailed": "The catalogue check could not be started. See the backend log.",
     "brands.addProvider": "Add Brand",
     "brands.namePlaceholder": "Brand Name (e.g. OKKO)",
     "brands.logoText": "Logo Text",
@@ -1586,6 +1593,13 @@ export const translations: Record<Language, Record<string, string>> = {
     "fuel.codePlaceholder": "напр. A-95",
     "fuel.codeNone": "без коду",
     "fuel.codeHint": "Код, який мережа публікує для цієї марки. Паливо без коду не зіставляється каталогом, тому ціна для нього не оновлюватиметься автоматично.",
+    "brands.addBrand": "Додати бренд",
+    "brands.syncCatalogue": "Оновити з мереж",
+    "brands.syncCatalogueHint":
+      "Читає ціновий список кожної мережі і додає ті марки, яких у нас ще немає. Самостійно це робиться раз на тиждень; ця кнопка запускає перевірку зараз. Це займає хвилину - сторінки постачальників завантажуються по одній.",
+    "brands.syncCatalogueStarted":
+      "Перевірка каталогу йде для OKKO, UPG, WOG і KLO. Що вона знайшла - у логі бекенда, а що змінила - на цьому екрані.",
+    "brands.syncCatalogueFailed": "Перевірку каталогу не вдалося запустити. Дивись лог бекенда.",
     "brands.addProvider": "Додати Постачальника",
     "brands.namePlaceholder": "Назва (напр. OKKO)",
     "brands.logoText": "Текст Логотипу",
@@ -2578,6 +2592,13 @@ export const translations: Record<Language, Record<string, string>> = {
     "price.marginPlaceholder": "z.B. 2.00",
     "price.finalPlaceholder": "Ende (auto)",
     "price.nominalsAuto": "auto",
+    "brands.addBrand": "Marke hinzufügen",
+    "brands.syncCatalogue": "Von den Netzen aktualisieren",
+    "brands.syncCatalogueHint":
+      "Liest die Preisliste jedes Netzes und legt die Sorten an, die wir noch nicht führen. Das geschieht sonst jede Woche von selbst; diese Schaltfläche startet es jetzt. Es dauert eine Minute - die Seiten der Anbieter werden nacheinander geladen.",
+    "brands.syncCatalogueStarted":
+      "Die Katalogprüfung läuft für OKKO, UPG, WOG und KLO. Was sie gefunden hat, steht im Backend-Protokoll, was sie geändert hat, auf diesem Bildschirm.",
+    "brands.syncCatalogueFailed": "Die Katalogprüfung konnte nicht gestartet werden. Sieh im Backend-Protokoll nach.",
     "brands.addProvider": "Marke Hinzufügen",
     "brands.namePlaceholder": "Name (z.B. OKKO)",
     "brands.logoText": "Logo-Text",
@@ -3642,6 +3663,13 @@ export const translations: Record<Language, Record<string, string>> = {
     "fuel.codeHint": "El código que la red publica para este tipo de combustible. Sin él no se puede asociar con el catálogo, por lo que su precio no se actualiza automáticamente.",
     "price.finalPlaceholder": "Final (auto)",
     "price.nominalsAuto": "auto",
+    "brands.addBrand": "Agregar Marca",
+    "brands.syncCatalogue": "Actualizar desde las redes",
+    "brands.syncCatalogueHint":
+      "Lee la lista de precios de cada red y agrega los grados que aún no tenemos. Por sí sola se hace cada semana; este botón la inicia ahora. Tarda un minuto: las páginas de los proveedores se cargan una por una.",
+    "brands.syncCatalogueStarted":
+      "La revisión del catálogo está en marcha para OKKO, UPG, WOG y KLO. Lo que encontró está en el registro del backend, y lo que cambió, en esta pantalla.",
+    "brands.syncCatalogueFailed": "No se pudo iniciar la revisión del catálogo. Mira el registro del backend.",
     "brands.addProvider": "Agregar Marca",
     "brands.namePlaceholder": "Nombre (ej. OKKO)",
     "brands.logoText": "Texto del Logo",
