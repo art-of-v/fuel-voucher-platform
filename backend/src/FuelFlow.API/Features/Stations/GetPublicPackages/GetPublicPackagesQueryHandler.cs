@@ -84,7 +84,7 @@ var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
     // endpoint feeds the map radar as well as the shop, and the count is small enough to hold in
     // memory but far too large to ask about N times. Same pool as the row filter above - the two
     // must agree, or a package would advertise itself with another pool's stock behind it.
-    var available = await _stock.AvailableKeysAsync(isTestAccount, ct);
+        var available = await _stock.AvailableKeysAsync(isTestAccount, ct);
 
     return rows
     // A fuel nobody has priced yet has no price to show. It is skipped rather than published at

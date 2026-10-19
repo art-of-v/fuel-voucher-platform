@@ -48,7 +48,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         _context = new ApplicationDbContext(options, TestQrCipher.Instance);
 
         _controller = new BrandFuelController(
-            new GetFuelPriceHistoryQueryHandler(_context),
+        new FuelFlow.Features.Brands.GetFuelPriceHistory.GetFuelPriceHistoryQueryHandler(_context),
             new GetFuelPriceAtQueryHandler(_context),
             new AuditEventService(_context),
             _context,
@@ -453,17 +453,11 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
             BasePrice = 92.90m, DiscountPrice = 72.34m,
             CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
         });
-        // The rehearsal flag lives on the OFFER now - it is what the storefront filters on, and what
-        // `EnforceDataKind` backfilled onto. The volume is here because a fuel with no nominal on it
-        // is not a fuel the storefront can sell, and these assertions are about what the admin
-        // screens read back.
-        var offer = new FuelOffer
-        {
-            Id = "qa-offer-a95", BrandId = BrandIds.Okko, FuelTypeId = "qa-a95",
-            IsTestData = true,
-            CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
-        };
-        _context.FuelOffers.Add(offer);
+        // The rehearsal flag lives on the NOMINAL now - the pool is part of the size's identity, and it is
+        // what the storefront filters on. The size is here because a fuel with no nominal on it is
+        // not a fuel the storefront can sell, and these assertions are about what the admin screens
+        // read back.
+        _context.FuelNominals.Add(new FuelNominal
         {
             FuelTypeId = "qa-a95", Liters = 10m, DataKind = DataKinds.Qa,
             CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow

@@ -30,11 +30,20 @@ public sealed class FuelOffer
     public string Id { get; set; } = null!;
 
 
+    /// <summary>
+    /// The network, mirrored from the fuel. Typed as the uuid the rest of the schema now uses:
+    /// the historical seed sets it from <c>fuel_types.brand_id</c>, and a text copy would not
+    /// compile against the fuel it is mirroring.
+    /// </summary>
+    public Guid BrandId { get; set; }
+
     public string FuelTypeId { get; set; } = null!;
 
     /// <summary>Kept only because the historical seed sets it; nothing reads it back.</summary>
     public decimal? SupplierPricePerLiter { get; set; }
 
+    /// <summary>Same: the seeded rows of 20261015151014 carry it, nothing reads it back.</summary>
+    public decimal? MarginPercent { get; set; }
 
     public decimal? PumpPricePerLiter { get; set; }
 
