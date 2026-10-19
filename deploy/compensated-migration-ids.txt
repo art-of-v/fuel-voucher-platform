@@ -1,0 +1,36 @@
+# Migration ids that production has applied and this repository does not contain.
+#
+# Each id here is a migration that was deleted from the repository on 2026-09-11 (commit cf07936f)
+# and is compensated for by 20260919113317_AddMissingDriftedTables, which re-creates everything
+# those migrations made with IF NOT EXISTS guards.
+#
+# WHY THEY ARE NOT SIMPLY RESTORED
+#
+# Restoring them looks right and is not. A database that was migrated from zero WHILE they were
+# deleted holds the current schema and a history that does not mention them, so restoring the files
+# makes EF try to apply them to a database that already has their objects - and the first one,
+# 20260803120600_AddRefunds, does CREATE TABLE refunds, which by then is a VIEW:
+#
+#     ERROR: 42P07: relation "refunds" already exists
+#
+# That is how staging stopped booting on 2026-10-19. Production is unaffected - its history has
+# the ids, so EF skips them - which is exactly why a change that only touches production can look
+# harmless and break every other environment.
+#
+# So they stay deleted, and the compensation is what holds. This list is the gate's record of that:
+# a migration id from production's history that is missing from the repository is a hard failure
+# UNLESS it is named here, because then something else creates what it created.
+#
+# IF YOU DELETE ONE OF THESE FROM THE LIST, or remove the corresponding line from
+# 20260919113317_AddMissingDriftedTables, a fresh database diverges from production and the gate
+# will not notice. That is the trade this list makes, and it is a small one - eight lines against a
+# deploy that does not boot.
+#
+20260803120600_AddRefunds
+20260804123305_AddRuntimeSettingsAndPartialFulfillmentSince
+20260816121521_AddVerificationCodeAttempts
+20260816163113_AddRefreshTokenFamily
+20260816163849_WidenOrderIdempotencyKey
+20260817190228_AddCompanyMembership
+20260817190316_AddWorkerVoucherAssignment
+20260817191435_AddOrderLegalEntity
