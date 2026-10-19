@@ -140,8 +140,13 @@ var pool = DataKinds.ForPool(isTestAccount);
             join nominal in _context.FuelNominals.AsNoTracking() on offer.FuelTypeId equals nominal.FuelTypeId
             where offer.BrandId == BrandId
                   && offer.FuelTypeId == fuelTypeId
-                  && nominal.Liters == liters
-                  && offer.DataKind == pool
+                && nominal.Liters == liters
+// The caller's own pool, on BOTH sides: the size list is per pool, so a
+            // rehearsal size must resolve through the rehearsal offer and not the live one, which is
+            // the leak this guards. Filtering only the offer would let a live price answer for a
+            // rehearsal size.
+            && nominal.DataKind == pool
+            && offer.DataKind == pool
             select new { Offer = offer, Fuel = offer.FuelType! })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -174,8 +179,9 @@ var pool = DataKinds.ForPool(isTestAccount);
         var rows = await (
             from offer in _context.FuelOffers.AsNoTracking()
             join nominal in _context.FuelNominals.AsNoTracking() on offer.FuelTypeId equals nominal.FuelTypeId
-            where offer.DataKind == pool
-                  && brands.Contains(offer.BrandId.ToLower())
+where offer.DataKind == pool
+            && nominal.DataKind == pool
+            && brands.Contains(offer.BrandId.ToLower())
                   && fuelTypeIds.Contains(offer.FuelTypeId)
                   && literSizes.Contains(nominal.Liters)
             // Same precedence as the single-line path, so one line of a cart cannot resolve to a

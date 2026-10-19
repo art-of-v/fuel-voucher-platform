@@ -10,13 +10,23 @@ internal sealed class FuelNominalConfiguration : IEntityTypeConfiguration<FuelNo
     {
         builder.ToTable("fuel_nominals");
 
-        // The key is the fact: one fuel, one size, one row. No surrogate - see the type.
-        builder.HasKey(e => new { e.FuelTypeId, e.Liters });
+        // The key is the fact: one fuel, one pool, one size, one row. No surrogate - see the type.
+        builder.HasKey(e => new { e.FuelTypeId, e.DataKind, e.Liters });
 
         builder.Property(e => e.FuelTypeId)
             .HasColumnName("fuel_type_id")
             .HasColumnType("text")
             .IsRequired();
+
+        builder.Property(e => e.DataKind)
+            .HasColumnName("data_kind")
+            .HasColumnType("text")
+            .IsRequired();
+
+        // A named value, not a boolean: a rehearsal row that cannot be called anything else cannot be
+        // published as live by a caller who guessed wrong, which is how two 1 UAH rows reached
+        // customers before the pool was tracked at all.
+        builder.HasCheckConstraint("ck_fuel_nominals_data_kind", "data_kind IN ('real', 'qa')");
 
         builder.Property(e => e.Liters)
             .HasColumnName("liters")

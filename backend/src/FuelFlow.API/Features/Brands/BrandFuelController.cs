@@ -693,27 +693,33 @@ var BrandFuels = await _context.FuelTypes.Where(f => f.BrandId == id).ToListAsyn
         var wanted = nominals.Distinct().ToHashSet();
         var now = DateTime.UtcNow;
 
-// The sizes a fuel is sold in are the operator's answer, written once per fuel rather than once
-    // per offer. The volume loops that used to follow are gone: `fuel_offer_volumes` was a second
-    // copy of this same answer, and keeping both in step was the whole cost of having it.
-    foreach (var fuel in BrandFuels)
-    {
-        foreach (var leaving in existingNominals.Where(n => n.FuelTypeId == fuel.Id && !wanted.Contains((int)n.Liters)))
+// The sizes a fuel is sold in are the operator's answer, written once per fuel and pool. The
+        // volume loops that used to follow are gone: `fuel_offer_volumes` was a second copy of this
+        // same answer, and keeping both in step was the whole cost of having it.
+        foreach (var fuel in BrandFuels)
         {
-            _context.FuelNominals.Remove(leaving);
-        }
-
-        foreach (var liters in wanted.Where(l => existingNominals.All(n => n.FuelTypeId != fuel.Id || n.Liters != l)))
-        {
-            _context.FuelNominals.Add(new FuelNominal
+            foreach (var leaving in existingNominals.Where(n => n.FuelTypeId == fuel.Id
+                                                             && n.DataKind == DataKinds.Real
+                                                             && !wanted.Contains((int)n.Liters)))
             {
-                FuelTypeId = fuel.Id,
-                Liters = liters,
-                CreatedAtUtc = now,
-                UpdatedAtUtc = now
-            });
+                _context.FuelNominals.Remove(leaving);
+            }
+
+            foreach (var liters in wanted.Where(l => existingNominals.All(
+                         n => n.FuelTypeId != fuel.Id || n.DataKind != DataKinds.Real || n.Liters != l)))
+            {
+                // The brand screen edits the live catalogue. The rehearsal one is seeded by the QA
+                // scripts, exactly as it was before the sizes moved onto the fuel.
+                _context.FuelNominals.Add(new FuelNominal
+                {
+                    FuelTypeId = fuel.Id,
+                    DataKind = DataKinds.Real,
+                    Liters = liters,
+                    CreatedAtUtc = now,
+                    UpdatedAtUtc = now
+                });
+            }
         }
-    }
 
     await _context.SaveChangesAsync(ct);
 

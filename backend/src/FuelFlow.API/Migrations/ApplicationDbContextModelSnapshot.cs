@@ -3523,6 +3523,10 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("text")
                         .HasColumnName("fuel_type_id");
 
+                    b.Property<string>("DataKind")
+                        .HasColumnType("text")
+                        .HasColumnName("data_kind");
+
                     b.Property<decimal>("Liters")
                         .HasColumnType("numeric(10,2)")
                         .HasColumnName("liters");
@@ -3535,10 +3539,12 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at_utc");
 
-                    b.HasKey("FuelTypeId", "Liters");
+                    b.HasKey("FuelTypeId", "DataKind", "Liters");
 
                     b.ToTable("fuel_nominals", null, t =>
                         {
+                            t.HasCheckConstraint("ck_fuel_nominals_data_kind", "data_kind IN ('real', 'qa')");
+
                             t.HasCheckConstraint("ck_fuel_nominals_liters_positive", "liters > 0");
                         });
                 });
