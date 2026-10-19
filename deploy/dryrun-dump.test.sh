@@ -77,7 +77,6 @@ SCHEMA
   *COPY*__EFMigrationsHistory*) echo "MigrationId,ProductVersion"; echo "20240101_Initial,1.0.0" ;;
   *COPY*fuel_types*)            echo "id,name"; echo "1,A-95" ;;
   *COPY*brands*)                echo "id,name"; echo "okko,OKKO" ;;
-        *COPY*fuel_nominals*)        echo "fuel_type_id,liters"; echo "1,10" ;;
  
   *COPY*)                       [ -n "${LEAK_INTO:-}" ] && printf 'number,qr_payload\n1234,eyJzaWduYXR1cmUiOiJ4In0=\n' ;;
 esac
@@ -87,7 +86,7 @@ chmod +x "$WORK/bin/docker"
 
 # Runs the real extracted block and echoes the argv the stub docker collected.
 run_dump() {
-  local tables="${1:-brands fuel_types fuel_nominals}"
+  local tables="${1:-brands fuel_types}"
   : > "$WORK/argv"
   ( PATH="$WORK/bin:$PATH" ARGV_LOG="$WORK/argv" RUNNER_TEMP="$WORK/runner" TABLES="$tables" \
     bash "$WORK/dump.raw" ) > "$WORK/out" 2>&1
@@ -131,7 +130,7 @@ eq "every call carries -U fuelflow -d fuelflow" "$missing" ""
 # The exit code is the assertion: 0 means the upload was allowed, non-zero means the block stopped.
 # These two cases bracket the bug that shipped - a guard that scans the schema dump refuses every
 # run, because "qr_payload" is a column name that pg_dump puts in the DDL.
-run_block() { : > "$WORK/argv"; ( PATH="$WORK/bin:$PATH" ARGV_LOG="$WORK/argv" RUNNER_TEMP="$WORK/runner" TABLES="brands fuel_types fuel_nominals" bash "$WORK/dump.raw" ) >"$WORK/out" 2>&1; }
+run_block() { : > "$WORK/argv"; ( PATH="$WORK/bin:$PATH" ARGV_LOG="$WORK/argv" RUNNER_TEMP="$WORK/runner" TABLES="brands fuel_types" bash "$WORK/dump.raw" ) >"$WORK/out" 2>&1; }
 
 # Baseline: the block as it stands, against a stub schema that mentions qr_payload as a column name.
 run_block; rc=$?
@@ -145,7 +144,7 @@ fi
 # `rm -rf "$out"` and would delete anything written before it ran - which is exactly how a guard
 # test can pass for the wrong reason.
 ( PATH="$WORK/bin:$PATH" ARGV_LOG="$WORK/argv" RUNNER_TEMP="$WORK/runner" LEAK_INTO=1 \
-  TABLES="brands fuel_types fuel_nominals fingerprint_leak" bash "$WORK/dump.raw" ) >"$WORK/leak" 2>&1
+  TABLES="brands fuel_types fingerprint_leak" bash "$WORK/dump.raw" ) >"$WORK/leak" 2>&1
 rc=$?
 if [ "$rc" -ne 0 ] && grep -q "refusing to upload" "$WORK/leak"; then
   ok "a qr_payload VALUE in a data file refuses the upload"
@@ -156,7 +155,7 @@ fi
 # And the other arm: TABLES is widened to name the vouchers table outright, so a file with that name
 # lands in the artifact whatever its content.
 ( PATH="$WORK/bin:$PATH" ARGV_LOG="$WORK/argv" RUNNER_TEMP="$WORK/runner" \
-  TABLES="brands fuel_types fuel_nominals fuel_vouchers" bash "$WORK/dump.raw" ) >"$WORK/wide" 2>&1
+  TABLES="brands fuel_types fuel_vouchers" bash "$WORK/dump.raw" ) >"$WORK/wide" 2>&1
 rc=$?
 if [ "$rc" -ne 0 ] && [ -e "$WORK/runner/dryrun/fuel_vouchers.csv" ]; then
   ok "dumping the vouchers table still refuses the upload"
@@ -235,7 +234,6 @@ echo "decoy,not,ours" > "$WORK/restore-tree/decoy.csv"
 echo "MigrationId,ProductVersion" > "$WORK/restore-tree/dryrun/history.csv"
 echo "id,name" > "$WORK/restore-tree/dryrun/brands.csv"
 echo "id,name" > "$WORK/restore-tree/dryrun/fuel_types.csv"
-echo "fuel_type_id,liters" > "$WORK/restore-tree/dryrun/fuel_nominals.csv"
 
 echo "-- schema" > "$WORK/restore-tree/dryrun/schema.sql"
 ( cd "$WORK/restore-tree" && PATH="$WORK/bin:$PATH" PSQL_LOG="$WORK/psql.log" PGPASSWORD=postgres \
