@@ -78,7 +78,7 @@ namespace FuelFlow.API.Migrations
                             'way; a disagreement means an override set by hand, which is a decision to make rather '
                             'than to discard silently. Re-price them, or leave the column in place.', drifted;
                     END IF;
-                END $$
+                END $$;
                 """);
 
             migrationBuilder.DropColumn(

@@ -72,7 +72,7 @@ namespace FuelFlow.API.Migrations
                        NULL,
                        MIN(e.created_at_utc)
                 FROM voucher_exchanges e
-                GROUP BY e.exchange_batch_id
+                GROUP BY e.exchange_batch_id;
                 """);
 
             migrationBuilder.AddForeignKey(

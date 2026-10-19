@@ -18,8 +18,8 @@ namespace FuelFlow.API.Migrations
             migrationBuilder.DropTable(
                 name: "vouchers");
 
-            migrationBuilder.Sql("ALTER TABLE stations ALTER COLUMN lng TYPE double precision USING lng::double precision");
-            migrationBuilder.Sql("ALTER TABLE stations ALTER COLUMN lat TYPE double precision USING lat::double precision");
+            migrationBuilder.Sql("ALTER TABLE stations ALTER COLUMN lng TYPE double precision USING lng::double precision;");
+            migrationBuilder.Sql("ALTER TABLE stations ALTER COLUMN lat TYPE double precision USING lat::double precision;");
 
             migrationBuilder.AddColumn<DateTime>(
                 name: "updated_at_utc",
@@ -28,8 +28,8 @@ namespace FuelFlow.API.Migrations
                 nullable: false,
                 defaultValue: new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified));
 
-            migrationBuilder.Sql("ALTER TABLE station_nodes ALTER COLUMN lng TYPE double precision USING lng::double precision");
-            migrationBuilder.Sql("ALTER TABLE station_nodes ALTER COLUMN lat TYPE double precision USING lat::double precision");
+            migrationBuilder.Sql("ALTER TABLE station_nodes ALTER COLUMN lng TYPE double precision USING lng::double precision;");
+            migrationBuilder.Sql("ALTER TABLE station_nodes ALTER COLUMN lat TYPE double precision USING lat::double precision;");
 
             migrationBuilder.AddColumn<DateTime>(
                 name: "updated_at_utc",
@@ -38,7 +38,7 @@ namespace FuelFlow.API.Migrations
                 nullable: false,
                 defaultValue: new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified));
 
-            migrationBuilder.Sql("ALTER TABLE orders ALTER COLUMN user_id TYPE uuid USING user_id::uuid");
+            migrationBuilder.Sql("ALTER TABLE orders ALTER COLUMN user_id TYPE uuid USING user_id::uuid;");
 
             migrationBuilder.AlterColumn<decimal>(
                 name: "liters",
@@ -62,7 +62,7 @@ namespace FuelFlow.API.Migrations
                 nullable: false,
                 defaultValue: new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified));
 
-            migrationBuilder.Sql("ALTER TABLE fuel_vouchers ALTER COLUMN assigned_to_user_id TYPE uuid USING assigned_to_user_id::uuid");
+            migrationBuilder.Sql("ALTER TABLE fuel_vouchers ALTER COLUMN assigned_to_user_id TYPE uuid USING assigned_to_user_id::uuid;");
 
             migrationBuilder.AddColumn<string>(
                 name: "external_id",
@@ -533,13 +533,13 @@ namespace FuelFlow.API.Migrations
                 name: "updated_at_utc",
                 table: "fuel_packages");
 
-            migrationBuilder.Sql("ALTER TABLE stations ALTER COLUMN lng TYPE text USING lng::text");
-            migrationBuilder.Sql("ALTER TABLE stations ALTER COLUMN lat TYPE text USING lat::text");
+            migrationBuilder.Sql("ALTER TABLE stations ALTER COLUMN lng TYPE text USING lng::text;");
+            migrationBuilder.Sql("ALTER TABLE stations ALTER COLUMN lat TYPE text USING lat::text;");
 
-            migrationBuilder.Sql("ALTER TABLE station_nodes ALTER COLUMN lng TYPE text USING lng::text");
-            migrationBuilder.Sql("ALTER TABLE station_nodes ALTER COLUMN lat TYPE text USING lat::text");
+            migrationBuilder.Sql("ALTER TABLE station_nodes ALTER COLUMN lng TYPE text USING lng::text;");
+            migrationBuilder.Sql("ALTER TABLE station_nodes ALTER COLUMN lat TYPE text USING lat::text;");
 
-            migrationBuilder.Sql("ALTER TABLE orders ALTER COLUMN user_id TYPE character varying(100) USING user_id::text");
+            migrationBuilder.Sql("ALTER TABLE orders ALTER COLUMN user_id TYPE character varying(100) USING user_id::text;");
 
             migrationBuilder.AlterColumn<int>(
                 name: "liters",
@@ -549,7 +549,7 @@ namespace FuelFlow.API.Migrations
                 oldClrType: typeof(decimal),
                 oldType: "numeric(10,2)");
 
-            migrationBuilder.Sql("ALTER TABLE fuel_vouchers ALTER COLUMN assigned_to_user_id TYPE character varying(100) USING assigned_to_user_id::text");
+            migrationBuilder.Sql("ALTER TABLE fuel_vouchers ALTER COLUMN assigned_to_user_id TYPE character varying(100) USING assigned_to_user_id::text;");
 
             migrationBuilder.AlterColumn<int>(
                 name: "liters",

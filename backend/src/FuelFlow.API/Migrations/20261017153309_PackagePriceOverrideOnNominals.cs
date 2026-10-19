@@ -91,7 +91,7 @@ namespace FuelFlow.API.Migrations
                             'it as an explicit override. They were being sold at that number before this migration.',
                             carried;
                     END IF;
-                END $$
+                END $$;
                 """);
 
             migrationBuilder.DropColumn(

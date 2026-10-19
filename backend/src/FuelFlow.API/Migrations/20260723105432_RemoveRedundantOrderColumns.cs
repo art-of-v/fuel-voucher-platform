@@ -19,7 +19,7 @@ namespace FuelFlow.API.Migrations
                 defaultValue: "");
 
             migrationBuilder.Sql(
-                @"UPDATE ""order_line_items"" SET ""provider"" = ""orders"".""provider"" FROM ""orders"" WHERE ""order_line_items"".""order_id"" = ""orders"".""id""");
+                @"UPDATE ""order_line_items"" SET ""provider"" = ""orders"".""provider"" FROM ""orders"" WHERE ""order_line_items"".""order_id"" = ""orders"".""id"";");
 
             migrationBuilder.DropColumn(
                 name: "fuel_type_id",

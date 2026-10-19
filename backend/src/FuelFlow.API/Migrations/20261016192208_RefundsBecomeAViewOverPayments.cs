@@ -50,7 +50,7 @@ SELECT
     p.updated_at_utc              AS updated_at_utc
 FROM payments p
 JOIN orders o ON o.id = p.order_id
-WHERE p.kind = 'Refund'");
+WHERE p.kind = 'Refund';");
 
             migrationBuilder.CreateIndex(
                 name: "ux_payments_one_refund_per_order",
@@ -64,7 +64,7 @@ WHERE p.kind = 'Refund'");
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             // Dropped before the table is recreated below, or CreateTable would collide with it.
-            migrationBuilder.Sql("DROP VIEW IF EXISTS refunds");
+            migrationBuilder.Sql("DROP VIEW IF EXISTS refunds;");
 
             migrationBuilder.DropIndex(
                 name: "ux_payments_one_refund_per_order",

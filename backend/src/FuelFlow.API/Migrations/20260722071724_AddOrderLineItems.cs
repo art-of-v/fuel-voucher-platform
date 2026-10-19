@@ -45,7 +45,7 @@ namespace FuelFlow.API.Migrations
                 SELECT gen_random_uuid(), o.id, o.fuel_type_id, o.liters, o.quantity, o.price / o.quantity, o.price
                 FROM orders o
                 WHERE NOT EXISTS (SELECT 1 FROM order_line_items li WHERE li.order_id = o.id)
-                AND o.quantity > 0
+                AND o.quantity > 0;
             """);
         }
 
