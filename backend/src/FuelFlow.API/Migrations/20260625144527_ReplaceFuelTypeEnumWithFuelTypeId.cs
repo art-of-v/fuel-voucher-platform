@@ -46,7 +46,7 @@ namespace FuelFlow.API.Migrations
                     WHEN provider = 'OKKO' AND fuel_type = 'Gasoline98' THEN 'okko-p95'
                     WHEN provider = 'OKKO' AND fuel_type = 'LPG' THEN 'okko-gas'
                     ELSE 'okko-dp'
-                END
+                END;
             ");
 
             // Migrate data for orders
@@ -62,7 +62,7 @@ namespace FuelFlow.API.Migrations
                     WHEN provider = 'OKKO' AND fuel_type = 'Gasoline98' THEN 'okko-p95'
                     WHEN provider = 'OKKO' AND fuel_type = 'LPG' THEN 'okko-gas'
                     ELSE 'okko-dp'
-                END
+                END;
             ");
 
             // Now make columns non-nullable and drop old columns

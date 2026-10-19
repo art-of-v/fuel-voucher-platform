@@ -48,7 +48,7 @@ namespace FuelFlow.API.Migrations
                     FROM "fulfillments"
                     ORDER BY "voucher_id", "fulfilled_at_utc", "order_id"
                 ) AS f
-                WHERE f."voucher_id" = v."id" AND v."order_id" IS NULL
+                WHERE f."voucher_id" = v."id" AND v."order_id" IS NULL;
                 """);
 
             // kind defaults to Purchase, but an order carrying renewal items is a renewal - that is
@@ -61,7 +61,7 @@ namespace FuelFlow.API.Migrations
                 UPDATE "orders" AS o
                 SET "kind" = 'Renewal'
                 WHERE o."kind" = 'Purchase'
-                  AND EXISTS (SELECT 1 FROM "voucher_renewal_items" i WHERE i."order_id" = o."id")
+                  AND EXISTS (SELECT 1 FROM "voucher_renewal_items" i WHERE i."order_id" = o."id");
                 """);
 
             migrationBuilder.CreateIndex(

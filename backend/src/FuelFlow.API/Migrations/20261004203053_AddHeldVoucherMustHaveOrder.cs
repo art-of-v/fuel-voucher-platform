@@ -25,7 +25,7 @@ namespace FuelFlow.API.Migrations
             migrationBuilder.Sql(
                 """
                 ALTER TABLE "fuel_vouchers" ADD CONSTRAINT "ck_voucher_held_has_order"
-                CHECK (status NOT IN ('Assigned', 'Used', 'Blocked') OR "order_id" IS NOT NULL)
+                CHECK (status NOT IN ('Assigned', 'Used', 'Blocked') OR "order_id" IS NOT NULL);
                 """);
         }
 
