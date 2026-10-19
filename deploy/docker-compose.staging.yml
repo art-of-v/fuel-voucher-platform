@@ -195,6 +195,10 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env.staging}
       POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env.staging}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.staging}
+    # The same Ukrainian ICU collation production uses - see docker-compose.prod.yml for why
+    # ICU and not a glibc locale, and for the measured before/after. A staging database that
+    # sorts differently from production is one that cannot be used to answer a sorting question.
+    POSTGRES_INITDB_ARGS: "--locale-provider=icu --icu-locale=uk-UA --locale=C.UTF-8"
     # Same postgres configuration as production, scaled to this container's smaller cap. See
     # docker-compose.prod.yml for why each setting is what it is; keep the two in step, because a
     # setting that only exists on prod is one nobody remembers exists.
