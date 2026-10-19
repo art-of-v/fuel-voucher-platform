@@ -1,17 +1,26 @@
+using FuelFlow.Features.Ledger;
 using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace FuelFlow.Features.Vouchers.MarkVoucherAsUsed;
 
-public sealed class MarkVoucherAsUsedCommandHandler
+public sealed partial class MarkVoucherAsUsedCommandHandler
 {
     private readonly ApplicationDbContext _context;
+    private readonly JournalPostingService _journal;
+    private readonly ILogger<MarkVoucherAsUsedCommandHandler> _logger;
 
-    public MarkVoucherAsUsedCommandHandler(ApplicationDbContext context)
+    public MarkVoucherAsUsedCommandHandler(
+        ApplicationDbContext context,
+        JournalPostingService journal,
+        ILogger<MarkVoucherAsUsedCommandHandler> logger)
     {
         _context = context;
+        _journal = journal;
+        _logger = logger;
     }
 
     public async Task<MarkVoucherAsUsedResponse> HandleAsync(
@@ -21,7 +30,17 @@ public sealed class MarkVoucherAsUsedCommandHandler
         var voucher = await _context.FuelVouchers
             .AsNoTracking()
             .Where(v => v.Id == command.VoucherId)
-            .Select(v => new { v.Status, v.WorkerUserId, v.AssignedToUserId })
+            .Select(v => new RedeemedVoucher(
+                v.Id,
+                v.Status,
+                v.WorkerUserId,
+                v.AssignedToUserId,
+                v.Liters,
+                // The price WE paid the supplier, snapshotted at import from their invoice. Not the
+                // offer's current supplier_price_per_liter: offers are re-imported, and today's price
+                // is not what this voucher cost last month.
+                v.CostPerLiter,
+                v.OrderId))
             .FirstOrDefaultAsync(cancellationToken);
 
         if (voucher == null)
@@ -121,6 +140,10 @@ public sealed class MarkVoucherAsUsedCommandHandler
         });
 
         await _context.SaveChangesAsync(cancellationToken);
+
+        // Inside the same transaction as the transition above: a redemption that moved the status
+        // but left nothing in the books is a hole nobody finds until the month closes.
+        await PostSaleToJournalAsync(voucher, command.UserId, occurredAtUtc, cancellationToken);
 
         if (tx is not null)
         {

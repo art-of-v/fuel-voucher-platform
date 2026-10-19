@@ -7,6 +7,7 @@ using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace FuelFlow.IntegrationTests;
@@ -45,7 +46,7 @@ public sealed class MarkVoucherAsUsedConcurrencyIntegrationTests : IClassFixture
         await SeedAssignedVoucherAsync(userId, voucherId);
 
         await using var context = CreateContext();
-        var handler = new MarkVoucherAsUsedCommandHandler(context);
+        var handler = new MarkVoucherAsUsedCommandHandler(context, TestJournal.For(context), NullLogger<MarkVoucherAsUsedCommandHandler>.Instance);
 
         var response = await handler.HandleAsync(new MarkVoucherAsUsedCommand(voucherId, userId));
 
@@ -80,7 +81,7 @@ public sealed class MarkVoucherAsUsedConcurrencyIntegrationTests : IClassFixture
         await SeedAssignedVoucherAsync(userId, voucherId);
 
         await using var context = CreateContext();
-        var handler = new MarkVoucherAsUsedCommandHandler(context);
+        var handler = new MarkVoucherAsUsedCommandHandler(context, TestJournal.For(context), NullLogger<MarkVoucherAsUsedCommandHandler>.Instance);
 
         await handler.HandleAsync(new MarkVoucherAsUsedCommand(voucherId, userId));
 
@@ -118,14 +119,14 @@ public sealed class MarkVoucherAsUsedConcurrencyIntegrationTests : IClassFixture
 
         await using (var first = CreateContext())
         {
-            var handler = new MarkVoucherAsUsedCommandHandler(first);
+            var handler = new MarkVoucherAsUsedCommandHandler(first, TestJournal.For(first), NullLogger<MarkVoucherAsUsedCommandHandler>.Instance);
             (await handler.HandleAsync(new MarkVoucherAsUsedCommand(voucherId, userId))).Success
                 .Should().BeTrue();
         }
 
         await using (var second = CreateContext())
         {
-            var handler = new MarkVoucherAsUsedCommandHandler(second);
+            var handler = new MarkVoucherAsUsedCommandHandler(second, TestJournal.For(second), NullLogger<MarkVoucherAsUsedCommandHandler>.Instance);
             (await handler.HandleAsync(new MarkVoucherAsUsedCommand(voucherId, userId))).Message
                 .Should().Be("Voucher already marked as used");
         }
@@ -163,7 +164,7 @@ public sealed class MarkVoucherAsUsedConcurrencyIntegrationTests : IClassFixture
             voucherId);
 
         await using var handlerContext = CreateContext();
-        var handler = new MarkVoucherAsUsedCommandHandler(handlerContext);
+        var handler = new MarkVoucherAsUsedCommandHandler(handlerContext, TestJournal.For(handlerContext), NullLogger<MarkVoucherAsUsedCommandHandler>.Instance);
         var redemption = Task.Run(() => handler.HandleAsync(new MarkVoucherAsUsedCommand(voucherId, userId)));
 
         // Long enough for the handler to clear its pre-check and reach the UPDATE, where it parks
