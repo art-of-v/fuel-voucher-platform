@@ -247,6 +247,23 @@ services:
       OkkoPrice__EndpointUrl: ${OKKO_PRICE_ENDPOINT:-https://www.okko.ua/api/uk/fuels}
       OkkoPrice__TimeoutSeconds: ${OKKO_PRICE_TIMEOUT_SECONDS:-30}
 
+      # UPG and WOG publish their price list as a page, not an API, so the sheet is read by the
+      # backend itself - the same job, the same cadence, and the same failure policy: a page that
+      # cannot be read leaves the last known prices alone. The catalogue half of these jobs runs
+      # weekly, so a new grade appears on the week, not the quarter.
+      UpgWogPrice__Enabled: ${UPGWOG_PRICE_ENABLED:-false}
+      UpgWogPrice__UpgEndpointUrl: ${UPGWOG_PRICE_UPG_ENDPOINT:-https://upg.ua/}
+      UpgWogPrice__WogEndpointUrl: ${UPGWOG_PRICE_WOG_ENDPOINT:-https://www.wog.ua/ua/fuels/}
+      UpgWogPrice__TimeoutSeconds: ${UPGWOG_PRICE_TIMEOUT_SECONDS:-30}
+
+      # KLO publishes no prices of its own - its products page lists the grades and nothing else -
+      # so Minfin's table is the source: the average retail price of every network, KLO included.
+      # Its five grades are the five our KLO catalogue holds, so a grade read from here matches a
+      # fuel without a second table of correspondences.
+      MinfinPrice__Enabled: ${MINFIN_PRICE_ENABLED:-false}
+      MinfinPrice__EndpointUrl: ${MINFIN_PRICE_ENDPOINT:-https://index.minfin.com.ua/ua/markets/fuel/tm/}
+      MinfinPrice__TimeoutSeconds: ${MINFIN_PRICE_TIMEOUT_SECONDS:-30}
+
       # Database migrations auto-apply on boot. Set to "false" to manage them manually.
       RunMigrationsOnBoot: "true"
 
