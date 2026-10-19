@@ -3,6 +3,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.GetInventory;
 using FuelFlow.Features.Vouchers.GetUserVouchers;
 using FuelFlow.Features.Vouchers.Import;
+using FuelFlow.Features.Ledger;
 using FuelFlow.Features.Vouchers.MarkVoucherAsUsed;
 using FuelFlow.Features.Vouchers.RestoreVoucher;
 using FuelFlow.Features.Vouchers.SharedModels;
@@ -11,6 +12,7 @@ using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace FuelFlow.UnitTests.Vouchers;
 
@@ -250,7 +252,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         _context.FuelVouchers.Add(voucher);
         await _context.SaveChangesAsync();
 
-        var handler = new MarkVoucherAsUsedCommandHandler(_context);
+        var handler = new MarkVoucherAsUsedCommandHandler(_context, new JournalPostingService(_context, NullLogger<JournalPostingService>.Instance), NullLogger<MarkVoucherAsUsedCommandHandler>.Instance);
         var command = new MarkVoucherAsUsedCommand(voucherId, UserId);
 
         var response = await handler.HandleAsync(command);
@@ -283,7 +285,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         _context.FuelVouchers.Add(voucher);
         await _context.SaveChangesAsync();
 
-        var handler = new MarkVoucherAsUsedCommandHandler(_context);
+        var handler = new MarkVoucherAsUsedCommandHandler(_context, new JournalPostingService(_context, NullLogger<JournalPostingService>.Instance), NullLogger<MarkVoucherAsUsedCommandHandler>.Instance);
         var command = new MarkVoucherAsUsedCommand(voucherId, UserId);
 
         var response = await handler.HandleAsync(command);
@@ -318,7 +320,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         _context.FuelVouchers.Add(voucher);
         await _context.SaveChangesAsync();
 
-        var handler = new MarkVoucherAsUsedCommandHandler(_context);
+        var handler = new MarkVoucherAsUsedCommandHandler(_context, new JournalPostingService(_context, NullLogger<JournalPostingService>.Instance), NullLogger<MarkVoucherAsUsedCommandHandler>.Instance);
         var response = await handler.HandleAsync(new MarkVoucherAsUsedCommand(voucherId, UserId));
 
         response.Success.Should().BeFalse();
