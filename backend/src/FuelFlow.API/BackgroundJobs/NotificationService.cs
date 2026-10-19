@@ -33,8 +33,14 @@ public sealed class NotificationService
 
     public async Task ProcessOrderFulfilledEventsAsync(CancellationToken cancellationToken = default)
     {
+        // The safety net. The fast path is the job the outbox interceptor queued when this row
+        // was written, and it claims the event within seconds. This waits longer than that, so the
+        // two never race for the same row - which for a notification means the customer gets it
+        // twice.
+        var claimCutoff = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow;
+
         var events = await _context.OutboxEvents
-            .Where(e => !e.Processed && e.EventType == OutboxEventType.OrderFulfilled)
+            .Where(e => !e.Processed && e.EventType == OutboxEventType.OrderFulfilled && e.CreatedAtUtc < claimCutoff)
             .OrderBy(e => e.CreatedAtUtc)
             .Take(50)
             .ToListAsync(cancellationToken);
@@ -71,8 +77,11 @@ public sealed class NotificationService
     /// </summary>
     public async Task ProcessVoucherIssuedEventsAsync(CancellationToken cancellationToken = default)
     {
+        // The safety net - see ProcessOrderFulfilledEventsAsync.
+        var claimCutoff = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow;
+
         var events = await _context.OutboxEvents
-            .Where(e => !e.Processed && e.EventType == OutboxEventType.VoucherIssued)
+            .Where(e => !e.Processed && e.EventType == OutboxEventType.VoucherIssued && e.CreatedAtUtc < claimCutoff)
             .OrderBy(e => e.CreatedAtUtc)
             .Take(50)
             .ToListAsync(cancellationToken);
@@ -98,7 +107,7 @@ public sealed class NotificationService
         }
     }
 
-    private async Task ProcessVoucherIssuedEventAsync(OutboxEvent outboxEvent, CancellationToken cancellationToken)
+    public async Task ProcessVoucherIssuedEventAsync(OutboxEvent outboxEvent, CancellationToken cancellationToken)
     {
         var payload = System.Text.Json.JsonSerializer.Deserialize<VoucherIssuedPayload>(
             outboxEvent.Payload, PayloadJsonOptions);
@@ -175,7 +184,7 @@ public sealed class NotificationService
         return $"{count} талонів";
     }
 
-    private async Task ProcessEventAsync(OutboxEvent outboxEvent, CancellationToken cancellationToken)
+    public async Task ProcessEventAsync(OutboxEvent outboxEvent, CancellationToken cancellationToken)
     {
         var payload = System.Text.Json.JsonSerializer.Deserialize<OrderFulfilledPayload>(
             outboxEvent.Payload, PayloadJsonOptions);

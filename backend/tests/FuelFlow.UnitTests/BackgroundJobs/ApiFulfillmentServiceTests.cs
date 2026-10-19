@@ -1,4 +1,5 @@
 using FluentAssertions;
+using FuelFlow.API.BackgroundJobs;
 using FuelFlow.API.BackgroundJobs.Models;
 using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
@@ -116,7 +117,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             UserId = userId,
             Price = 2500,
             Status = OrderStatus.PendingFulfillment,
-            CreatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1),
             UpdatedAtUtc = DateTime.UtcNow,
             LineItems = new List<OrderLineItem>
             {
@@ -143,7 +144,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             VoucherNumber = "OKKO-12345",
             QrPayload = "test-payload",
             Status = VoucherStatus.Available,
-            CreatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1),
             UpdatedAtUtc = DateTime.UtcNow
         };
 
@@ -156,7 +157,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
                 UserId = userId.ToString()
             }),
             Processed = false,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1)
         };
 
         _context.Orders.Add(order);
@@ -205,7 +206,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             UserId = userId,
             Price = 7500,
             Status = OrderStatus.PendingFulfillment,
-            CreatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1),
             UpdatedAtUtc = DateTime.UtcNow,
             LineItems = new List<OrderLineItem>
             {
@@ -232,7 +233,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             VoucherNumber = "OKKO-1",
             QrPayload = "payload-1",
             Status = VoucherStatus.Available,
-            CreatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1),
             UpdatedAtUtc = DateTime.UtcNow
         };
 
@@ -245,7 +246,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
                 UserId = userId.ToString()
             }),
             Processed = false,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1)
         };
 
         _context.Orders.Add(order);
@@ -280,7 +281,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             UserId = userId,
             Price = 2500,
             Status = OrderStatus.PendingFulfillment,
-            CreatedAtUtc = DateTime.UtcNow.AddDays(-2),
+            CreatedAtUtc = DateTime.UtcNow.AddDays(-2) - OutboxDispatchJob.SafetyNetClaimWindow,
             UpdatedAtUtc = DateTime.UtcNow.AddDays(-2),
             LineItems = new List<OrderLineItem>
             {
@@ -307,7 +308,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             VoucherNumber = "OKKO-BACKFILL",
             QrPayload = "backfill",
             Status = VoucherStatus.Available,
-            CreatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1),
             UpdatedAtUtc = DateTime.UtcNow
         };
 
@@ -340,7 +341,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             EventType = OutboxEventType.VoucherExpired,
             Payload = System.Text.Json.JsonSerializer.Serialize(new { voucherId = Guid.NewGuid() }),
             Processed = false,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1)
         };
 
         _context.OutboxEvents.Add(outboxEvent);
@@ -362,7 +363,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             EventType = OutboxEventType.VoucherExpired,
             Payload = "{}",
             Processed = true,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1)
         };
 
         _context.OutboxEvents.Add(outboxEvent);
@@ -438,7 +439,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             // auto-refund is asked to return money for is one the customer paid for. Stated
             // explicitly because the refund amount is now gated on the brand saying so.
             MonobankStatus = MonobankStatus.Success,
-            CreatedAtUtc = DateTime.UtcNow.AddDays(-2),
+            CreatedAtUtc = DateTime.UtcNow.AddDays(-2) - OutboxDispatchJob.SafetyNetClaimWindow,
             UpdatedAtUtc = DateTime.UtcNow.AddDays(-2),
             LineItems = new List<OrderLineItem>
             {
@@ -467,7 +468,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
                 VoucherNumber = $"AR-{order.Id:N}-{i:D3}",
                 QrPayload = $"payload-{order.Id:N}-{i:D3}",
                 Status = VoucherStatus.Available,
-                CreatedAtUtc = DateTime.UtcNow,
+                CreatedAtUtc = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1),
                 UpdatedAtUtc = DateTime.UtcNow
             });
         }

@@ -64,7 +64,7 @@ public sealed class VoucherIssuedNotificationTests : IDisposable
                 legalEntityId,
             }),
             Processed = processed,
-            CreatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1),
         };
 
     private void Seed(OutboxEvent evt) => _context.OutboxEvents.Add(evt);
@@ -144,7 +144,7 @@ public sealed class VoucherIssuedNotificationTests : IDisposable
             Platform = "android",
             DeviceId = null,
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1),
             UpdatedAtUtc = DateTime.UtcNow,
         });
         Seed(CreateEvent(workerId, "ACME LLC", 1, companyId.ToString()));
@@ -172,7 +172,7 @@ public sealed class VoucherIssuedNotificationTests : IDisposable
             EventType = OutboxEventType.VoucherIssued,
             Payload = """{"workerUserId":"not-a-guid"}""",
             Processed = false,
-            CreatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1),
         });
         await _context.SaveChangesAsync();
 
