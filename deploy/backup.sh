@@ -350,6 +350,23 @@ if [[ -d "$WAL_ARCHIVE_DIR" ]]; then
   prune_wal_archive "$WAL_ARCHIVE_DIR" "$WAL_RETENTION_DAYS" "$WAL_MAX_BYTES"
 fi
 
+# The staging archive, pruned here for the same reason the production one is, and for
+# one more: THEY SHARE THE DISK.
+#
+# Staging is a scratch database, so its archive is disposable - nothing is shipped off
+# the box for it, and nothing else prunes it, because this script is the only thing that
+# runs nightly and the staging stack has no backup of its own. Left alone it would grow
+# at the same rate as production's, on the same 22 GiB, until the disk filled - and a
+# full disk takes production down with it.
+#
+# So the bounds are much tighter: a day, and a gibibyte. Enough to rehearse a restore
+# against staging, which is the reason staging archives at all.
+STAGING_WAL_ARCHIVE_DIR="${STAGING_WAL_ARCHIVE_DIR:-/root/fuelflow-wal-staging}"
+STAGING_WAL_MAX_BYTES="${STAGING_WAL_MAX_BYTES:-1073741824}"   # 1 GiB
+if [[ -d "$STAGING_WAL_ARCHIVE_DIR" ]]; then
+  prune_wal_archive "$STAGING_WAL_ARCHIVE_DIR" 1 "$STAGING_WAL_MAX_BYTES"
+fi
+
 # Prune old dumps. Both extensions: .dump.age is current, .dump catches any plaintext
 # file left over from before this script encrypted anything.
 find "$BACKUP_DIR" -name 'fuelflow_*.dump.age' -type f -mtime "+${RETENTION_DAYS}" -print -delete
