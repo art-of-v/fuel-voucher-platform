@@ -330,4 +330,57 @@ public class KloVoucherParserTests : IDisposable
         parsed.QrPayload.Should().Be("KLO-QR-PAYLOAD");
         parsed.Confidence.Should().BeGreaterThan(0);
     }
+
+    /// <summary>
+    /// A grade the catalogue does not have must leave the voucher without a fuel, not with a fuel
+    /// the parser made up.
+    /// </summary>
+    /// <remarks>
+    /// It used to fall back to the literal <c>"klo-dp"</c>, which is a natural key from the seed
+    /// migrations and matches none of the 28 fuels production holds - every one of those a generated
+    /// uuid. <c>fuel_vouchers.fuel_type_id</c> carries no foreign key, so the import wrote the row
+    /// and nothing complained: a voucher naming a fuel that does not exist, bought from nobody.
+    /// OkkoVoucherParser and WogVoucherParser have always resolved to <c>null</c> here.
+    /// </remarks>
+    [Fact]
+    public async Task ParseAsync_ShouldLeaveTheFuelUnresolved_WhenTheGradeIsNotInTheCatalogue()
+    {
+        var parser = new KloVoucherParser(_context, new BrandSlugResolver(_context), NullLogger<KloVoucherParser>.Instance);
+        _qrDecoderMock.Setup(x => x.Decode(It.IsAny<Image>()))
+            .Returns(new QrDecodeResult { Text = "KLO-QR-PAYLOAD", EccLevel = "L" });
+
+        var words = new List<Word>
+        {
+            WordTestHelper.CreateWord("KLO", 50, 100),
+            // No fuel in the fixture is called this, which is the whole point.
+            WordTestHelper.CreateWord("ГАЗ", 60, 80),
+            WordTestHelper.CreateWord("20", 70, 60),
+            WordTestHelper.CreateWord("99999600000020368127", 20, 40),
+            WordTestHelper.CreateWord("17.06.2026", 60, 20)
+        };
+
+        using var dummyImage = new Image<Rgba32>(100, 100);
+        var context = new ProviderParseContext
+        {
+            PageRender = new PageRender
+            {
+                PageNumber = 1,
+                Image = dummyImage,
+                WidthPoints = 200,
+                HeightPoints = 200,
+                Words = words
+            },
+            VoucherRegions = new[]
+            {
+                new VoucherRegion { Bounds = new Rectangle(0, 0, 100, 100), PdfBounds = new PdfRectangle(0, 0, 200, 200) }
+            },
+            QrDecoder = _qrDecoderMock.Object
+        };
+
+        var result = await parser.ParseAsync(context, CancellationToken.None);
+
+        var parsed = result.Should().ContainSingle().Subject;
+        parsed.FuelTypeId.Should().BeNull("an unresolved grade is not a licence to invent a fuel id");
+        parsed.FuelTypeId.Should().NotBe("klo-dp");
+    }
 }
