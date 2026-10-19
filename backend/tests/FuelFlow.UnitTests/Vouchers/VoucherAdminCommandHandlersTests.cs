@@ -47,6 +47,7 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
             .Options;
 
         _context = new ApplicationDbContext(options, TestQrCipher.Instance);
+        _context.AddMissing();
         SeedFuelTypes();
 
         _qrGeneratorMock = new Mock<IQrGenerator>();
@@ -784,7 +785,7 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
         result.Select(d => d.Id).Should().Equal(1, 2, 3);
 
         result[0].Status.Should().Be("available");
-        result[0].BrandId.Should().Be("okko");
+        result[0].BrandId.Should().Be(BrandIds.Okko.ToString());
         result[0].FuelType.Should().Be("A-95");
         result[1].Status.Should().Be("sold");
         result[2].Status.Should().Be("sold");

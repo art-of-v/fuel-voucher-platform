@@ -21,6 +21,7 @@ public sealed class GetReportQueryHandlerTests : IDisposable
             .Options;
 
         _context = new ApplicationDbContext(options, TestQrCipher.Instance);
+        _context.AddMissing();
     }
 
     public void Dispose()

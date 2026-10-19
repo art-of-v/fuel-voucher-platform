@@ -20,7 +20,7 @@ public sealed class GetBrandsQueryHandler
     // assembled N times.
     var packages = await _context.FuelOffers
     .AsNoTracking()
-    .Project(_context.FuelNominals.AsNoTracking())
+    .Project(_context.FuelNominals.AsNoTracking(), _context.Brands.AsNoTracking())
     .ToListAsync(ct);
 
         return Brands.Select(Brand =>

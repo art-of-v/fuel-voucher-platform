@@ -42,6 +42,7 @@ public OrderCommandHandlersTests()
                 .Options;
 
             _context = new ApplicationDbContext(options, TestQrCipher.Instance);
+            _context.AddMissing();
             SeedFuelTypes();
             SeedFuelPackages();
             SeedDefaultUser(); // active user for checkout tests

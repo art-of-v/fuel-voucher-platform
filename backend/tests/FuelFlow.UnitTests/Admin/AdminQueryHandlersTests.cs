@@ -25,6 +25,7 @@ public sealed class AdminQueryHandlersTests : IDisposable
             .Options;
 
         _context = new ApplicationDbContext(options, TestQrCipher.Instance);
+        _context.AddMissing();
         SeedFuelPackages();
     }
 

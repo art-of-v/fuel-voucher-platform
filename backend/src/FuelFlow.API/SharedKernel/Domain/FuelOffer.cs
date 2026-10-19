@@ -81,14 +81,7 @@ public sealed class FuelOffer
     // `FuelPricing.FinalPerLiterOrNull`, or the [NotMapped] property below.
     public decimal? SupplierPricePerLiter { get; set; }   // cost/л (собівартість)
 
-    /// <summary>
-    /// The offer's own copy of the margin. <b>Nothing writes or reads it any more</b> — the margin
-    /// belongs to <see cref="FuelTypeEntity.MarginUahPerLiter"/> and every read path has moved there.
-    /// The column goes in the migration that follows; the property stays until then so the entity and
-    /// that migration agree on the shape of the table.
-    /// </summary>
-    public decimal? MarginUahPerLiter { get; set; }       // profit/л (заробіток)
-    public decimal? MarginPercent { get; set; }
+public decimal? MarginPercent { get; set; }
 
     // Slice 1a pricing knobs. Pump (колонка) is the ceiling; MinDiscount is the
     // guaranteed gap under it. final = min(cost + profit, pump − minDiscount).

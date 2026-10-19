@@ -30,6 +30,7 @@ public class ParserTests : IDisposable
             .Options;
 
         _context = new ApplicationDbContext(options, TestQrCipher.Instance);
+        _context.AddMissing();
         SeedFuelTypes();
     }
 
@@ -473,6 +474,9 @@ public class ParserTests : IDisposable
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
         var context = new ApplicationDbContext(options, TestQrCipher.Instance);
+        // The parsers resolve the network they are reading through BrandSlugResolver, so a fixture
+        // that names BrandIds.Okko on a fuel has to have that network in the catalogue.
+        context.AddMissing();
         context.FuelTypes.AddRange(fuelTypes);
         context.SaveChanges();
         return context;
