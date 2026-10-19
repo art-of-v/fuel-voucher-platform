@@ -375,6 +375,23 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
       POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    # The cluster's collation, decided at initdb time and not changeable afterwards:
+    # PostgreSQL 16 cannot ALTER DATABASE ... LC_COLLATE.
+    #
+    # The Alpine image ships no usable system locale - initdb logs "no usable system locales
+    # were found" and silently falls back to en_US.utf8, whose collation defines no ordering
+    # for Cyrillic, so strings compare by code point. Measured 2026-10-19:
+    #
+    #   en_US.utf8   Є І Ї А Б В Г Д Е Ж З И Й ... Я Ґ     <- not the Ukrainian alphabet
+    #   uk-UA (ICU) А Б В Г Ґ Д Е Є Ж З И І Ї Й ... Я
+    #
+    # ICU rather than a glibc locale, because "uk-UA.utf8" cannot be generated on this image
+    # at all - the locale command is not present. ICU is compiled into the server and needs no
+    # OS locale; C.UTF-8 stays the libc default for the categories ICU does not govern.
+    #
+    # This only takes effect when initdb runs, i.e. on an empty volume. The cluster that
+    # exists today was created without it; deploy/rebuild-collation.sh is what changes that.
+    POSTGRES_INITDB_ARGS: "--locale-provider=icu --icu-locale=uk-UA --locale=C.UTF-8"
     # Postgres tuning and query visibility. Measured on this box 2026-10-19 and left as it was found:
     #
     #   effective_cache_size  was 4 GB on a 512 MB container (and a 4 GB host). The planner reads
