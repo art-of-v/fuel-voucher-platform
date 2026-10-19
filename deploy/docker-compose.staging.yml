@@ -221,7 +221,7 @@ services:
       - -c
       - archive_mode=on
       - -c
-      - archive_timeout=300
+      - archive_timeout=900
       - -c
       - archive_command=test ! -f /var/lib/postgresql/wal/%f && cp %p /var/lib/postgresql/wal/%f
     volumes:

@@ -444,9 +444,16 @@ services:
       #
       # archive_timeout is the part that matters here and is the part that is usually forgotten:
       # without it, a quiet database archives nothing, and the archive has a hole exactly when
-      # nothing is happening - which is when you would want to restore to. Five minutes bounds
-      # the gap in a quiet system to five minutes.
+      # nothing is happening - which is when you would want to restore to. It bounds the gap in
+      # a quiet system to the timeout.
       #
+      # It is FIFTEEN minutes, not five, and that number is a disk decision as much as a
+      # recovery one. An idle database produces one 16 MiB segment per timeout, and almost all
+      # of it is zeros, so the rate is set by the TIMEOUT and not by the traffic. Measured on
+      # this box on 2026-10-19: five minutes gave 288 segments a day, 4.6 GiB a day - which a
+      # 21 GiB disk holds for four days. Fifteen minutes gives 1.5 GiB a day, and the
+      # recovery point objective is still fifteen minutes on a quiet system, which is a
+      # fraction of what the dump's daily snapshot costs.
       # The command is idempotent and refuses to overwrite: PostgreSQL will not archive the same
       # segment twice, and a segment that is already there means the copy succeeded.
       - -c
@@ -454,7 +461,7 @@ services:
       - -c
       - archive_mode=on
       - -c
-      - archive_timeout=300
+      - archive_timeout=900
       - -c
       - archive_command=test ! -f /var/lib/postgresql/wal/%f && cp %p /var/lib/postgresql/wal/%f
     volumes:

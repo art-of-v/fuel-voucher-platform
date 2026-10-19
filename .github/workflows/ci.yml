@@ -529,6 +529,13 @@ jobs:
       - name: Test the PITR setup
         run: bash deploy/enable-pitr.test.sh
 
+      # The pruning that keeps the WAL archive from filling the disk. It is the guard
+      # between a full disk and a database that stops accepting writes, and it was
+      # written after the archive was measured growing at 4.6 GiB a day on a disk with
+      # 21 GiB free. No database and no network: the pruning works on a directory of
+      # files, so the test is a directory of files.
+      - name: Test the WAL archive pruning
+        run: bash deploy/pitr-common.test.sh
   # The repo-root fetchers in scripts/ — the only write path into `station_nodes`. They parse a
   # third-party site nobody here controls (UPG rebuilds its map page periodically, KLO renders its
   # pins through a WordPress plugin), and a silent parse change would import a few hundred rows with

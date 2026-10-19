@@ -66,13 +66,21 @@ CONTAINER="${CONTAINER:-fuelflow-postgres}"
 # that this costs almost nothing, and it means the base is never more than a day old, so
 # the WAL that has to be replayed on top of it is short.
 WAL_ARCHIVE_DIR="${WAL_ARCHIVE_DIR:-/root/fuelflow-wal}"
-# The archive path is literal in the compose file, and it has to match this one. It cannot
+# The path is literal in the compose file, and it has to match this one. It cannot
 # be a compose variable: the parse gate resolves every referenced variable against a dummy
 # value, and a dummy value is not a path - compose would read it as the name of a volume
 # that does not exist, and the whole file would fail to load.
+#
 # The WAL is kept on-box for as long as the dumps, and off-box for as long as the dumps.
 # A base backup and a WAL archive that does not overlap are a restore that cannot start.
-WAL_RETENTION_DAYS="${WAL_RETENTION_DAYS:-14}"
+#
+# The on-box window is SHORT on purpose, and the off-box one is long. The off-box copy is
+# a complete snapshot of the archive, taken nightly, so the history lives there and the
+# on-box copy only has to bridge the gap between two nightly snapshots. Measured on the
+# production box on 2026-10-19: an idle database archives a 16 MiB segment every
+# archive_timeout, so 4.6 GiB a day - a 14-day on-box window would be 63 GiB on a disk
+# with 21 GiB free. The size cap below is the hard guarantee; this is the policy.
+WAL_RETENTION_DAYS="${WAL_RETENTION_DAYS:-3}"
 WAL_REMOTE_RETENTION_DAYS="${WAL_REMOTE_RETENTION_DAYS:-30}"
 
 # Load POSTGRES_USER / POSTGRES_DB / BACKUP_AGE_RECIPIENT from the same .env the stack uses.
@@ -292,9 +300,23 @@ if [[ -n "${BACKUP_REMOTE:-}" ]] && command -v rclone >/dev/null 2>&1 && [[ -d "
   # complete, so anything matching the segment pattern is complete.
   tar --force-local -C "$WAL_ARCHIVE_DIR" -czf "$WAL_TMP/wal.tar.gz" --wildcards '0000000*' 2>/dev/null || true
   if [[ -s "$WAL_TMP/wal.tar.gz" ]]; then
-    ( umask 077; age -r "$BACKUP_AGE_RECIPIENT" -o "$BACKUP_DIR/fuelflow_wal.tar.gz.age" "$WAL_TMP/wal.tar.gz" )
-    rclone copy "$BACKUP_DIR/fuelflow_wal.tar.gz.age" "$BACKUP_REMOTE"
-    echo "[$(date -Is)] WAL archive shipped: $(du -h "$BACKUP_DIR/fuelflow_wal.tar.gz.age" | cut -f1)."
+    # The blob is NAMED AFTER THE NIGHT, not written to a fixed name. A fixed name means
+    # every night's copy replaces the one before it, and the off-box history is then
+    # exactly one snapshot deep - which defeats the point of shipping it at all. The
+    # whole point is that the history accumulates somewhere the box cannot take with it.
+    WAL_BLOB="$BACKUP_DIR/fuelflow_wal_${STAMP}.tar.gz.age"
+    ( umask 077; age -r "$BACKUP_AGE_RECIPIENT" -o "$WAL_BLOB" "$WAL_TMP/wal.tar.gz" )
+    rclone copy "$WAL_BLOB" "$BACKUP_REMOTE"
+    echo "[$(date -Is)] WAL archive shipped: $(du -h "$WAL_BLOB" | cut -f1) as $(basename "$WAL_BLOB")."
+
+    # Prune the remote blobs, or the bucket grows by one every night forever. The
+    # --include scopes the delete to our own files, so a shared bucket is never touched.
+    if rclone delete --min-age "${WAL_REMOTE_RETENTION_DAYS}d" \
+         --include 'fuelflow_wal_*.tar.gz.age' "$BACKUP_REMOTE"; then
+      echo "[$(date -Is)] Remote WAL prune done."
+    else
+      echo "WARNING: remote WAL prune failed (the copy above still succeeded)." >&2
+    fi
   else
     echo "WARNING: the WAL archive is empty - no segments have been archived yet." >&2
     echo "         Point-in-time recovery is not yet possible; check that archive_mode is on." >&2
@@ -307,11 +329,25 @@ else
   echo "         server alone, but not if the server is destroyed." >&2
 fi
 
-# Prune the local WAL archive. The oldest segment is the one whose age matters, and the
-# newest is always kept - PostgreSQL is writing to it right now. Pruning by mtime is
-# right here: a segment's age IS its age, and the archive is append-only.
+# Prune the local WAL archive. TWO bounds, because one is not enough.
+#
+# The age bound is the policy: how long the archive stays on the box. It is short on
+# purpose. The off-box copy is a complete snapshot of the archive, taken nightly, so the
+# history is preserved there - the on-box copy only has to bridge the gap between two
+# nightly snapshots.
+#
+# The size bound is the guard. An idle database produces a 16 MiB segment every
+# archive_timeout, and almost all of it is zeros, so the archive grows at a rate set by
+# the TIMEOUT and not by the traffic. Measured on the production box on 2026-10-19: 288
+# segments a day, 4.6 GiB a day. At that rate a 14-day window is 63 GiB, and the disk
+# holds 21 GiB - so the age bound alone would have filled the disk in four days, and a
+# full disk is how the database stops accepting writes.
+#
+# The size bound is what makes that impossible. Whatever the rate turns out to be, the
+# archive on the box cannot pass the cap.
+WAL_MAX_BYTES="${WAL_MAX_BYTES:-8589934592}"   # 8 GiB
 if [[ -d "$WAL_ARCHIVE_DIR" ]]; then
-  find "$WAL_ARCHIVE_DIR" -maxdepth 1 -name '0000000*' -type f -mtime "+${WAL_RETENTION_DAYS}" -print -delete
+  prune_wal_archive "$WAL_ARCHIVE_DIR" "$WAL_RETENTION_DAYS" "$WAL_MAX_BYTES"
 fi
 
 # Prune old dumps. Both extensions: .dump.age is current, .dump catches any plaintext
