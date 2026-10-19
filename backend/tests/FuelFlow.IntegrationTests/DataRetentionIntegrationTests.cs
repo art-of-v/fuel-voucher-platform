@@ -90,25 +90,31 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
         //
         // Asserted against pg_indexes rather than the model, because the point is what the
         // planner can actually use - a filter on the wrong table proves nothing.
+        //
+        // Found by the COLUMN each prune filters on, and by requiring that column to LEAD an
+        // index - which is the property the planner needs and the only thing a leftmost-prefix
+        // index can offer. Naming the indexes instead made this a hostage to the naming
+        // convention, and the rename of every EF-named index in the schema turned it into a
+        // failure with nothing about the database having changed.
         await using var context = CreateContext();
         var connection = context.Database.GetDbConnection();
         await connection.OpenAsync();
         await using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT indexname FROM pg_indexes
-            WHERE schemaname = current_schema()
-              AND indexname = ANY (@names)
+            SELECT want.tablename || '.' || want.col
+              FROM (VALUES ('push_tokens', 'last_seen_at_utc'),
+                           ('notifications', 'is_read'),
+                           ('devices', 'last_seen_at')) AS want(tablename, col)
+              JOIN pg_class t ON t.relname = want.tablename
+              JOIN pg_namespace n ON n.oid = t.relnamespace AND n.nspname = current_schema()
+              JOIN pg_attribute a ON a.attrelid = t.oid AND a.attname = want.col
+             WHERE EXISTS (
+                   SELECT 1
+                     FROM pg_index i
+                    WHERE i.indrelid = t.oid
+                      AND i.indkey[0] = a.attnum
+                 )
             """;
-
-        var parameter = command.CreateParameter();
-        parameter.ParameterName = "names";
-        parameter.Value = new[]
-        {
-            "IX_push_tokens_last_seen_at_utc",
-            "IX_notifications_is_read_created_at_utc",
-            "IX_devices_last_seen_at"
-        };
-        command.Parameters.Add(parameter);
 
         var present = new List<string>();
         await using var reader = await command.ExecuteReaderAsync();
@@ -119,10 +125,10 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
 
         present.Should().BeEquivalentTo(new[]
         {
-            "IX_push_tokens_last_seen_at_utc",
-            "IX_notifications_is_read_created_at_utc",
-            "IX_devices_last_seen_at"
-        });
+            "push_tokens.last_seen_at_utc",
+            "notifications.is_read",
+            "devices.last_seen_at"
+        }, "every prune column has to lead an index, or the nightly DELETE reads the whole table");
     }
 
     [Fact]
