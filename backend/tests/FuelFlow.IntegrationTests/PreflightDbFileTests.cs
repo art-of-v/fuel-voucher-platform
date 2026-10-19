@@ -27,6 +27,7 @@ public sealed class PreflightDbFileTests
     [Theory]
     [InlineData("011-fuel-type-name-twins.sql")]
     [InlineData("012-offer-station-matches-its-fuel-type.sql")]
+    [InlineData("013-fuel-type-id-is-not-a-text-key.sql")]
     public void EveryCheck_IsShapedSoItCannotWrite(string fileName)
     {
         var sql = File.ReadAllText(FindRepoFile(Path.Combine("deploy", "preflight-db", fileName)));
