@@ -518,11 +518,9 @@ export default function MapScreen() {
     setSelectedStation(node);
     setShowList(false);
     setSelectedBrand(null);
-    const lat = parseFloat(node.lat || '0');
-    const lng = parseFloat(node.lng || '0');
-    if (lat && lng) {
+    if (node.lat && node.lng) {
       mapRef.current?.animateToRegion(
-        { latitude: lat, longitude: lng, latitudeDelta: 0.05, longitudeDelta: 0.05 },
+        { latitude: node.lat, longitude: node.lng, latitudeDelta: 0.05, longitudeDelta: 0.05 },
         400,
       );
     }
@@ -590,8 +588,8 @@ export default function MapScreen() {
             {visiblePoints.map((point) => {
               const isNode = 'brandId' in point;
               const coordinate = {
-                latitude: parseFloat(point.lat!),
-                longitude: parseFloat(point.lng!),
+                latitude: point.lat!,
+                longitude: point.lng!,
               };
               const node = isNode ? (point as StationNode) : undefined;
               // The palette is keyed by the network's code; the price map is keyed by its uuid.

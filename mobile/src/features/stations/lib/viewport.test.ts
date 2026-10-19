@@ -9,8 +9,8 @@ const KYIV: MapRegion = {
 
 const at = (lat: number, lng: number) => ({
   id: `${lat},${lng}`,
-  lat: String(lat),
-  lng: String(lng),
+  lat,
+  lng,
 });
 
 describe('isPointInRegion', () => {
@@ -37,8 +37,8 @@ describe('isPointInRegion', () => {
   });
 
   it('drops coordinates it cannot read rather than mounting a broken marker', () => {
-    expect(isPointInRegion({ lat: null, lng: '30.52' }, KYIV)).toBe(false);
-    expect(isPointInRegion({ lat: 'not-a-number', lng: '30.52' }, KYIV)).toBe(false);
+    expect(isPointInRegion({ lat: null, lng: 30.52 }, KYIV)).toBe(false);
+    expect(isPointInRegion({ lat: 'not-a-number', lng: 30.52 }, KYIV)).toBe(false);
   });
 });
 
