@@ -46,35 +46,38 @@ public sealed class MigrationDiscoveryTests
     }
 
     /// <summary>
-    /// The eight migrations that were deleted from the repository and are back.
+    /// The eight migrations production has applied, and the one that stands in for them.
     /// </summary>
     /// <remarks>
     /// <para>
     /// On 2026-09-11 a commit deleted eight migration files with the reasoning that "EF scans the
     /// assembly, already-applied history rows are unaffected". That is true for the databases that
-    /// already have them and irrelevant for every database that does not: a fresh environment would
-    /// have migrated without them and come out with a different schema than production.
+    /// already have them and irrelevant for every database that does not.
     /// </para>
     /// <para>
-    /// It happened to be harmless — <c>20260919113317_AddMissingDriftedTables</c> re-creates
-    /// everything those eight made, with <c>IF NOT EXISTS</c> — but by luck rather than by design.
-    /// The files are back, and a from-zero build applies 172 migrations and produces the same
-    /// schema as production.
+    /// It happened to be harmless, because <c>20260919113317_AddMissingDriftedTables</c> re-creates
+    /// everything those eight made with <c>IF NOT EXISTS</c> — which is what that migration is for,
+    /// and why its name says so. <b>Restoring the eight would not be harmless.</b> A database
+    /// migrated from zero while they were gone — staging is one — holds the current schema and a
+    /// history that does not mention them, so EF would try to apply them over objects that already
+    /// exist, and the first one does <c>CREATE TABLE refunds</c>, which by then is a view:
+    /// <c>42P07: relation "refunds" already exists</c>. That is how staging stopped booting on
+    /// 2026-10-19, and because staging deploys before production it blocked every deploy.
     /// </para>
     /// <para>
-    /// <b>This is the pin, not the fix.</b> The general check is the CI gate,
-    /// <c>deploy/check-migration-history.sh</c>, which compares the migration folder against a
-    /// deployed database's <c>__EFMigrationsHistory</c> and refuses a repository that has lost one.
-    /// It needs a database, so it cannot run here; these eight are asserted locally so that the
-    /// exact deletion that happened is caught by a test that needs nothing.
+    /// So they stay deleted and the compensation is what holds. The general check is the CI gate,
+    /// <c>deploy/check-migration-history.sh</c>, which compares a deployed database's history
+    /// against the migration folder and refuses a repository that has lost a migration nothing else
+    /// compensates for. It needs a database, so it cannot run here; what is asserted locally is
+    /// that the compensation is in place and that the eight are accounted for.
     /// </para>
     /// </remarks>
     [Fact]
-    public void The_Migrations_Production_Applied_Are_Still_Here()
+    public void The_Deleted_Migrations_Are_Compensated_For_And_Not_Restored()
     {
         var ids = DiscoverMigrationIds();
 
-        ids.Should().Contain(new[]
+        var deleted = new[]
         {
             "20260803120600_AddRefunds",
             "20260804123305_AddRuntimeSettingsAndPartialFulfillmentSince",
@@ -84,7 +87,31 @@ public sealed class MigrationDiscoveryTests
             "20260817190228_AddCompanyMembership",
             "20260817190316_AddWorkerVoucherAssignment",
             "20260817191435_AddOrderLegalEntity"
-        }, "the migration history is append-only: a migration production has applied stays in the folder, under its original id");
+        };
+
+        ids.Should().NotContain(deleted,
+            "these eight are compensated for by AddMissingDriftedTables; restoring them makes every "
+            + "database that was migrated from zero while they were gone fail with 42P07");
+
+        ids.Should().Contain("20260919113317_AddMissingDriftedTables",
+            "the compensation has to be in the migration folder, and it is the thing that creates "
+            + "what the eight would have created");
+
+        // The list the gate reads has to name exactly those eight, or the gate is either red or
+        // blind. It is a file rather than a constant so that it can be read and reviewed.
+        // FindProjectRoot stops at the backend solution, and deploy/ is beside it, not under it.
+        var listPath = Path.GetFullPath(
+            Path.Combine(FindProjectRoot(), "..", "deploy", "compensated-migration-ids.txt"));
+        File.Exists(listPath).Should().BeTrue(
+            $"the gate's compensated list has to exist at {listPath}, and it is what makes the eight accounted for");
+
+        var listed = File.ReadAllLines(listPath)
+            .Select(l => l.Trim())
+            .Where(l => l.Length > 0 && !l.StartsWith('#'))
+            .ToList();
+
+        listed.Should().BeEquivalentTo(deleted,
+            "the list names the eight that are missing because something else creates what they created");
     }
 
     [Fact]
