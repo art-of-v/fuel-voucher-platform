@@ -140,6 +140,7 @@ private readonly FuelFlow.Features.Vouchers.Security.IQrCipher _qrCipher;
     public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
     public DbSet<JournalLine> JournalLines => Set<JournalLine>();
     public DbSet<LedgerMappingRule> LedgerMappingRules => Set<LedgerMappingRule>();
+    public DbSet<DocumentSequence> DocumentSequences => Set<DocumentSequence>();
     public DbSet<SupportMessage> SupportMessages => Set<SupportMessage>();
     public DbSet<ErrorLog> ErrorLogs => Set<ErrorLog>();
     public DbSet<FeedbackMessage> FeedbackMessages => Set<FeedbackMessage>();
