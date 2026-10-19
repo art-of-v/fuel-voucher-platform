@@ -287,7 +287,7 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
         var newIds = Enumerable.Range(0, 3).Select(_ => Guid.NewGuid()).ToList();
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
-        decimal costBefore;
+        decimal? costBefore;
         using (var seed = CreateContext())
         {
             await seed.Database.MigrateAsync();
@@ -309,10 +309,10 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
 
             await seed.SaveChangesAsync();
 
-            costBefore = (await seed.FuelTypes.AsNoTracking()
+            costBefore = await seed.FuelTypes.AsNoTracking()
                 .Where(f => f.Id == "okko-95")
                 .Select(f => f.SupplierPricePerLiter)
-                .FirstAsync())!.Value;
+                .FirstAsync();
         }
 
         using (var ctx = CreateContext())
