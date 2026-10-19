@@ -105,7 +105,15 @@ public sealed class KloVoucherParser : IVoucherProviderParser
             var fuelTypeEntity = await _context.FuelTypes
                 .FirstOrDefaultAsync(f => f.BrandId == kloId.Value && f.Name == fuelTypeName, cancellationToken);
 
-            var fuelTypeId = fuelTypeEntity?.Id ?? "klo-dp";
+            // No invented id when the name does not match, which is what this used to do: the fallback was the
+            // literal "klo-dp", a natural key that exists only in the rows
+            // `20260618224553_AddStationCatalog` seeded. Production has no such row - all 28 of its
+            // fuels carry a generated uuid - and `fuel_vouchers.fuel_type_id` carries no foreign key
+            // to catch it, so the import inserted a voucher naming a fuel that does not exist and
+            // nothing downstream complained. OkkoVoucherParser and WogVoucherParser have always left
+            // it null; this is the same shape, and the confidence score below already records that
+            // the grade was not identified.
+            var fuelTypeId = fuelTypeEntity?.Id;
             decimal confidence = fuelTypeEntity != null ? 20 : 0;
             if (liters > 0) confidence += 20;
             if (expirationDate != default) confidence += 20;
@@ -164,10 +172,10 @@ public sealed class KloVoucherParser : IVoucherProviderParser
         return match.Success ? match.Value : string.Empty;
     }
 
-    private static string ParseFuelTypeName(string text)
+    private static string? ParseFuelTypeName(string text)
     {
         var match = FuelTypeRegex.Match(text);
-        if (!match.Success) return "ДП Mustang";
+        if (!match.Success) return null;
 
         var raw = match.Groups["fuel"].Value
             .Replace(" ", "")
@@ -182,9 +190,9 @@ public sealed class KloVoucherParser : IVoucherProviderParser
         {
             "A95" or "A95+" or "95" => hasMustang ? "A-95 Mustang" : "A 95 EURO",
             "A98" or "98" => "Mustang 100",
-            "ДП" or "Д" => hasMustang ? "ДП Mustang" : "ДП Mustang",
+            "ДП" or "Д" => "ДП Mustang",
             "ГАЗ" => "ГАЗ",
-            _ => "ДП Mustang"
+            _ => null
         };
     }
 

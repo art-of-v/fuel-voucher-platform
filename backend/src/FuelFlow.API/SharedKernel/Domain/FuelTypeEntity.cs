@@ -30,12 +30,20 @@ public sealed class FuelTypeEntity
     /// twin the importer picked.
     /// </para>
     /// <para>
-    /// The code is the stable half of the fuel's identity, and the half the brand can be asked for: its
-    /// price sheet names every fuel it sells. It is what an import of the catalogue matches on, and it
-    /// is not a name - "А-95" and "A-95" are the same fuel and two different strings, which no index
-    /// on <see cref="Name"/> can reconcile. The QR product codes the voucher side uses (9018, 45290)
+    /// This code - not the id, and not <see cref="Name"/> - is the half of the fuel's identity that
+    /// an external party can state: the brand's price sheet names every fuel it sells, in the brand's
+    /// own spelling, and that is what an import of the catalogue matches on. It is not a name - "А-95"
+    /// and "A-95" are the same fuel and two different strings, which no index on
+    /// <see cref="Name"/> can reconcile. The QR product codes the voucher side uses (9018, 45290)
     /// are a <em>second</em> crosswalk to the same grades and are deliberately not stored here; one
     /// grade has several product codes and several codes can name one grade.
+    ///
+    /// <para>
+    /// Planning #349 settled on 2026-10-19 that <see cref="Id"/> is a generated uuid and carries no
+    /// meaning - so this is the stable half, and the id never was one except in the rows
+    /// <c>20260618224553_AddStationCatalog</c> seeded, which is every row a freshly migrated
+    /// database has and none of the 28 on production. An importer resolves a PDF row to this code;
+    /// it never parses an id.
     /// </para>
     /// <para>
     /// Nothing writes it automatically yet, and nothing derives it from <see cref="Name"/>: guessing a

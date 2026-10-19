@@ -125,8 +125,13 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
             .HasFilter("brand_fuel_code IS NOT NULL AND NOT is_deleted")
             .HasDatabaseName("ux_fuel_types_brand_brand_fuel_code");
 
-        // Natural key ("okko-95"), deliberately not a UUID — planning D-21 moves this one in the
-        // follow-up slice, and a fuel's slug is what every importer resolves a PDF row by.
+        // The id is a generated uuid, not a natural key - it is 'okko-95' ONLY in the rows
+        // `20260618224553_AddStationCatalog` seeded, which is every row a freshly migrated
+        // database has and none of the 28 on production, where every fuel an operator added has
+        // carried a `Guid.CreateVersion7()` since. Planning #349 asks for one documented
+        // convention; the owner chose uuid on 2026-10-19, and D-21's second slice makes the column
+        // one. A fuel's NAME is still what every importer resolves a PDF row by, which is why
+        // `brand_fuel_code` exists beside the id - not a readable id.
         builder.ToTable(t =>
         {
             t.HasCheckConstraint("ck_fuel_types_id_length", "length(id) <= 100");
