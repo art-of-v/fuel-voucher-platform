@@ -13,6 +13,12 @@ public sealed class BrandsCommandHandlersTests : IDisposable
 {
     private readonly ApplicationDbContext _context;
 
+    /// <summary>
+    /// A brand that is not one of the seeded four, so a test cannot accidentally assert against real
+    /// catalogue data.
+    /// </summary>
+    private static readonly Guid TestBrand = new("0a0a0a0a-0000-4000-8000-000000000001");
+
     public BrandsCommandHandlersTests()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -31,7 +37,7 @@ public sealed class BrandsCommandHandlersTests : IDisposable
     [Fact]
     public async Task CreateBrand_ShouldAddBrand()
     {
-        var Brand = CreateBrand("Brand-1", "Test Brand", "#00ff80", "TS");
+        var Brand = CreateBrand(TestBrand, "Test Brand", "#00ff80", "TS");
 
         var handler = new CreateBrandCommandHandler(_context);
 
@@ -42,21 +48,29 @@ public sealed class BrandsCommandHandlersTests : IDisposable
         result.Error.Should().BeNull();
         result.Brand.Should().BeSameAs(Brand);
 
-        var persisted = await _context.Brands.FindAsync("Brand-1");
+        // The id is the server's, not the caller's: an id a client chose is an id nothing else can
+        // vouch for, so the row is looked up by the one the handler issued.
+        result.Brand!.Id.Should().NotBe(TestBrand);
+        result.Brand.Slug.Should().Be("test-brand");
+
+        var persisted = await _context.Brands.FindAsync(result.Brand.Id);
         persisted.Should().NotBeNull();
         persisted!.CreatedAtUtc.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
     }
 
     [Fact]
-    public async Task CreateBrand_ShouldReturnConflict_WhenIdExists()
+    public async Task CreateBrand_ShouldReturnConflict_WhenSlugExists()
     {
-        var Brand = CreateBrand("Brand-1", "Test Brand", "#00ff80", "TS");
+        var Brand = CreateBrand(TestBrand, "Test Brand", "#00ff80", "TS");
         _context.Brands.Add(Brand);
         await _context.SaveChangesAsync();
 
+        // A second row under a fresh id but the network's own code: the slug is what an operator and
+        // an import file both mean by "this network", so that is the collision that has to be caught.
+        var duplicate = CreateBrand(Guid.NewGuid(), "Another Name", "#00ff80", "AN", slug: "test-brand");
         var handler = new CreateBrandCommandHandler(_context);
 
-        var result = await handler.HandleAsync(new CreateBrandCommand(Brand));
+        var result = await handler.HandleAsync(new CreateBrandCommand(duplicate));
 
         result.Success.Should().BeFalse();
         result.Conflict.Should().BeTrue();
@@ -67,7 +81,7 @@ public sealed class BrandsCommandHandlersTests : IDisposable
     [Fact]
     public async Task CreateBrand_ShouldReturnError_WhenRequiredFieldsMissing()
     {
-        var Brand = CreateBrand("", "", "#00ff80", "");
+        var Brand = CreateBrand(Guid.Empty, "", "#00ff80", "");
 
         var handler = new CreateBrandCommandHandler(_context);
 
@@ -75,30 +89,30 @@ public sealed class BrandsCommandHandlersTests : IDisposable
 
         result.Success.Should().BeFalse();
         result.Conflict.Should().BeFalse();
-        result.Error.Should().Be("Id, Name and LogoText are required");
+        result.Error.Should().Be("Slug, Name and LogoText are required");
     }
 
     [Fact]
     public async Task UpdateBrand_ShouldUpdateFields()
     {
-        var Brand = CreateBrand("Brand-1", "Old Name", "#000000", "OLD");
+        var Brand = CreateBrand(TestBrand, "Old Name", "#000000", "OLD");
         _context.Brands.Add(Brand);
         await _context.SaveChangesAsync();
 
         var updated = new Brand
         {
-            Id = "Brand-1",
+            Id = TestBrand,
             Name = "New Name",
             Color = "#ffffff",
             LogoText = "NEW",
         };
         var handler = new UpdateBrandCommandHandler(_context);
 
-        var result = await handler.HandleAsync(new UpdateBrandCommand("Brand-1", updated));
+        var result = await handler.HandleAsync(new UpdateBrandCommand(TestBrand, updated));
 
         result.Should().BeTrue();
 
-var persisted = await _context.Brands.FindAsync("Brand-1");
+var persisted = await _context.Brands.FindAsync(TestBrand);
         persisted!.Name.Should().Be("New Name");
         persisted.Color.Should().Be("#ffffff");
         persisted.LogoText.Should().Be("NEW");
@@ -112,7 +126,7 @@ var persisted = await _context.Brands.FindAsync("Brand-1");
     {
         var handler = new UpdateBrandCommandHandler(_context);
 
-        var result = await handler.HandleAsync(new UpdateBrandCommand("missing", CreateBrand("missing", "X")));
+        var result = await handler.HandleAsync(new UpdateBrandCommand(BrandIds.NotFound, CreateBrand(BrandIds.NotFound, "X")));
 
         result.Should().BeFalse();
     }
@@ -120,19 +134,19 @@ var persisted = await _context.Brands.FindAsync("Brand-1");
     [Fact]
     public async Task DeleteBrand_ShouldRemove()
     {
-        var Brand = CreateBrand("Brand-1", "Test Brand", "#00ff80", "TS");
+        var Brand = CreateBrand(TestBrand, "Test Brand", "#00ff80", "TS");
         _context.Brands.Add(Brand);
         await _context.SaveChangesAsync();
 
         var handler = new DeleteBrandCommandHandler(_context);
 
-        var result = await handler.HandleAsync(new DeleteBrandCommand("Brand-1"));
+        var result = await handler.HandleAsync(new DeleteBrandCommand(TestBrand));
 
         result.Should().BeTrue();
-        var persisted = await _context.Brands.IgnoreQueryFilters().SingleAsync(s => s.Id == "Brand-1");
+        var persisted = await _context.Brands.IgnoreQueryFilters().SingleAsync(s => s.Id == TestBrand);
         persisted.IsDeleted.Should().BeTrue();
         persisted.DeletedAtUtc.Should().NotBeNull();
-        (await _context.Brands.CountAsync(s => s.Id == "Brand-1")).Should().Be(0,
+        (await _context.Brands.CountAsync(s => s.Id == TestBrand)).Should().Be(0,
             "#217: a delete archives rather than removes - hidden from the catalog, row intact");
     }
 
@@ -141,7 +155,7 @@ var persisted = await _context.Brands.FindAsync("Brand-1");
     {
         var handler = new DeleteBrandCommandHandler(_context);
 
-        var result = await handler.HandleAsync(new DeleteBrandCommand("missing"));
+        var result = await handler.HandleAsync(new DeleteBrandCommand(BrandIds.NotFound));
 
         result.Should().BeFalse();
     }
@@ -157,18 +171,21 @@ var persisted = await _context.Brands.FindAsync("Brand-1");
     // "Never recorded" is not a disagreement: the pricing engine already skips null-cost rows, and
     // refusing here would block the ordinary case of pricing a fuel in two steps.
 
-    private static Brand CreateBrand(string id, string name, string color = "#00ff80", string logoText = "LOGO")
+    private static Brand CreateBrand(Guid id, string name, string color = "#00ff80", string logoText = "LOGO", string? slug = null)
     {
         return new Brand
         {
             Id = id,
             Name = name,
+            // The slug is the network's own code and is unique, so a fixture states one even when the
+            // test never looks at it - the alternative is a brand row the database would refuse.
+            Slug = slug ?? name.ToLowerInvariant().Replace(' ', '-'),
             Color = color,
             LogoText = logoText
         };
     }
 
-    private static FuelTypeEntity CreateFuelType(string id, string name, string BrandId, int basePrice = 50, int discountPrice = 45)
+    private static FuelTypeEntity CreateFuelType(string id, string name, Guid BrandId, int basePrice = 50, int discountPrice = 45)
     {
         return new FuelTypeEntity
         {

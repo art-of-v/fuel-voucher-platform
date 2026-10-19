@@ -114,7 +114,7 @@ public sealed class CreateCheckoutCommandHandler
         // stock to deliver. Checked before the below-cost block so an empty shelf does not fire an
         // operator alert about a sale that was never going to happen. Answers about the same pool
         // the package above was taken from.
-        if (!await _stock.IsInStockAsync(isTestAccount, command.BrandId.Value, command.FuelTypeId, command.Liters, cancellationToken))
+        if (!await _stock.IsInStockAsync(isTestAccount, package.BrandSlug, command.FuelTypeId, command.Liters, cancellationToken))
         {
             throw new PackageOutOfStockException(package.BrandSlug, command.FuelTypeId, command.Liters);
         }

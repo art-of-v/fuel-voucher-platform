@@ -155,7 +155,7 @@ public sealed class VoucherTermSaleTests : IDisposable
     /// needs a seeded <c>Available</c> voucher behind the line it buys.
     /// </summary>
     private PackageStockAvailability Stock()
-        => new(_context, new ConfigurationBuilder().Build(), new BrandSlugResolver(_context));
+        => new(_context, new ConfigurationBuilder().Build());
 
     /// <summary>
     /// Puts one <c>Available</c> voucher in stock with the given paper term. The term ladder is gated on

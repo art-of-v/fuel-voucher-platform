@@ -45,7 +45,7 @@ public sealed class UnpricedPackageIntegrationTests : IClassFixture<TestDatabase
         {
             Id = fuelId,
             Name = "Unpriced test fuel",
-            BrandId = "okko",
+            BrandId = BrandIds.Okko,
             BasePrice = 0m,
             DiscountPrice = 0m,
             CreatedAtUtc = DateTime.UtcNow,
@@ -57,7 +57,7 @@ public sealed class UnpricedPackageIntegrationTests : IClassFixture<TestDatabase
         var offer = new FuelOffer
         {
             Id = fuelId,
-            BrandId = "okko",
+            BrandId = BrandIds.Okko,
             FuelTypeId = fuelId,
             DataKind = DataKinds.Real,
             PumpPricePerLiter = 92.90m,
@@ -108,5 +108,7 @@ public sealed class UnpricedPackageIntegrationTests : IClassFixture<TestDatabase
     }
 
 private static SellablePackage AsPackage(FuelOffer offer, FuelTypeEntity fuel, decimal liters)
-    => SellablePackage.From(offer, fuel, liters);
+    // The slug travels with the package: the stock key and the voucher both name the network by text,
+    // so a package that came back without one could not be found by either.
+    => SellablePackage.From(offer, fuel, liters, "okko");
 }

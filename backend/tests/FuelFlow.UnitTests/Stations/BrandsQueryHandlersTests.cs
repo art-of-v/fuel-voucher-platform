@@ -42,8 +42,8 @@ public sealed class BrandsQueryHandlersTests : IDisposable
     public async Task GetPublicBrands_ShouldReturnSeededBrands()
     {
         _context.Brands.AddRange(
-            CreateBrand("Brand-b", "Beta Brand"),
-            CreateBrand("Brand-a", "Alpha Brand"));
+            CreateBrand(BrandId(2), "Beta Brand", "beta"),
+            CreateBrand(BrandId(1), "Alpha Brand", "alpha"));
         await _context.SaveChangesAsync();
 
         var handler = new GetPublicBrandsQueryHandler(_context);
@@ -51,7 +51,7 @@ public sealed class BrandsQueryHandlersTests : IDisposable
         var result = await handler.HandleAsync(new GetPublicBrandsQuery());
 
         result.Should().HaveCount(2);
-        result.Select(s => s.Id).Should().Contain(new[] { "Brand-a", "Brand-b" });
+        result.Select(s => s.Id).Should().Contain(new[] { BrandId(1), BrandId(2) });
         result[0].Name.Should().Be("Alpha Brand");
         result[1].Name.Should().Be("Beta Brand");
     }
@@ -71,7 +71,7 @@ public sealed class BrandsQueryHandlersTests : IDisposable
     {
         for (var i = 1; i <= 5; i++)
         {
-            _context.Brands.Add(CreateBrand($"Brand-{i}", $"Brand {i}"));
+            _context.Brands.Add(CreateBrand(BrandId(i), $"Brand {i}"));
         }
         await _context.SaveChangesAsync();
 
@@ -80,7 +80,7 @@ public sealed class BrandsQueryHandlersTests : IDisposable
         var result = await handler.HandleAsync(new GetAdminBrandsQuery(Page: 1, PageSize: 2));
 
         result.Items.Should().HaveCount(2);
-        result.Items.Select(s => s.Id).Should().Equal("Brand-1", "Brand-2");
+        result.Items.Select(s => s.Id).Should().Equal(BrandId(1), BrandId(2));
         result.TotalCount.Should().Be(5);
         result.Page.Should().Be(1);
         result.PageSize.Should().Be(2);
@@ -94,7 +94,7 @@ public sealed class BrandsQueryHandlersTests : IDisposable
     {
         for (var i = 1; i <= 5; i++)
         {
-            _context.Brands.Add(CreateBrand($"Brand-{i}", $"Brand {i}"));
+            _context.Brands.Add(CreateBrand(BrandId(i), $"Brand {i}"));
         }
         await _context.SaveChangesAsync();
 
@@ -103,7 +103,7 @@ public sealed class BrandsQueryHandlersTests : IDisposable
         var result = await handler.HandleAsync(new GetAdminBrandsQuery(Page: 3, PageSize: 2));
 
         result.Items.Should().ContainSingle();
-        result.Items[0].Id.Should().Be("Brand-5");
+        result.Items[0].Id.Should().Be(BrandId(5));
         result.HasPreviousPage.Should().BeTrue();
         result.HasNextPage.Should().BeFalse();
     }
@@ -112,8 +112,8 @@ public sealed class BrandsQueryHandlersTests : IDisposable
     public async Task GetPublicBrandStations_ShouldReturnAllNodes()
     {
         _context.BrandStations.AddRange(
-CreateBrandStation("node-1", "Brand-a", "Node A"),
-                CreateBrandStation("node-2", "Brand-b", "Node B"));
+CreateBrandStation(StationId(1), BrandId(1), "Node A"),
+                CreateBrandStation(StationId(2), BrandId(2), "Node B"));
         await _context.SaveChangesAsync();
 
         var handler = new GetPublicBrandStationsQueryHandler(_context);
@@ -127,25 +127,25 @@ CreateBrandStation("node-1", "Brand-a", "Node A"),
     public async Task GetPublicBrandStationsByBrand_ShouldFilterByBrandId()
     {
         _context.BrandStations.AddRange(
-            CreateBrandStation("node-1", "Brand-a", "Node A1"),
-            CreateBrandStation("node-2", "Brand-a", "Node A2"),
-            CreateBrandStation("node-3", "Brand-b", "Node B"));
+            CreateBrandStation(StationId(1), BrandId(1), "Node A1"),
+            CreateBrandStation(StationId(2), BrandId(1), "Node A2"),
+            CreateBrandStation(StationId(3), BrandId(2), "Node B"));
         await _context.SaveChangesAsync();
 
         var handler = new GetPublicBrandStationsByBrandQueryHandler(_context);
 
-        var result = await handler.HandleAsync(new GetPublicBrandStationsByBrandQuery("Brand-a"));
+        var result = await handler.HandleAsync(new GetPublicBrandStationsByBrandQuery(BrandId(1)));
 
         result.Should().HaveCount(2);
-        result.Should().OnlyContain(n => n.BrandId == "Brand-a");
+        result.Should().OnlyContain(n => n.BrandId == BrandId(1));
     }
 
     [Fact]
     public async Task GetPublicPackages_ShouldReturnAllPackages()
     {
         _context.FuelNominals.AddRange(
-            CreatePackage("pkg-1", "Brand-a", "ft-a", "A-95", 10m),
-            CreatePackage("pkg-2", "Brand-b", "ft-b", "Diesel", 20m));
+            CreatePackage("pkg-1", BrandId(1), "ft-a", "A-95", 10m),
+            CreatePackage("pkg-2", BrandId(2), "ft-b", "Diesel", 20m));
         await _context.SaveChangesAsync();
 
         var handler = new GetPublicPackagesQueryHandler(_context, Stock());
@@ -163,8 +163,8 @@ CreateBrandStation("node-1", "Brand-a", "Node A"),
     public async Task GetPublicPackages_ShouldNotServeAFlaggedTestPackage()
     {
         _context.FuelNominals.AddRange(
-            CreatePackage("pkg-real", "Brand-a", "ft-a", "A-95", 10m),
-            CreatePackage("pkg-qa", "Brand-a", "ft-qa", "QA-CHECK-95", 5m, isTestData: true));
+            CreatePackage("pkg-real", BrandId(1), "ft-a", "A-95", 10m),
+            CreatePackage("pkg-qa", BrandId(1), "ft-qa", "QA-CHECK-95", 5m, isTestData: true));
         await _context.SaveChangesAsync();
 
         var handler = new GetPublicPackagesQueryHandler(_context, Stock());
@@ -183,13 +183,13 @@ CreateBrandStation("node-1", "Brand-a", "Node A"),
     public async Task GetPublicPackagesByBrand_ShouldNotServeAFlaggedTestPackage()
     {
         _context.FuelNominals.AddRange(
-            CreatePackage("pkg-real", "Brand-a", "ft-a", "A-95", 10m),
-            CreatePackage("pkg-qa", "Brand-a", "ft-qa", "QA-CHECK-95", 5m, isTestData: true));
+            CreatePackage("pkg-real", BrandId(1), "ft-a", "A-95", 10m),
+            CreatePackage("pkg-qa", BrandId(1), "ft-qa", "QA-CHECK-95", 5m, isTestData: true));
         await _context.SaveChangesAsync();
 
         var handler = new GetPublicPackagesByBrandQueryHandler(_context, Stock());
 
-        var result = await handler.HandleAsync(new GetPublicPackagesByBrandQuery("Brand-a", CallerUserId: null));
+        var result = await handler.HandleAsync(new GetPublicPackagesByBrandQuery(BrandId(1), CallerUserId: null));
 
         result.Should().ContainSingle();
         result[0].Id.Should().Be(PackageIds.For(OfferKeys.For("ft-a", DataKinds.Real), 10m));
@@ -199,17 +199,17 @@ CreateBrandStation("node-1", "Brand-a", "Node A"),
     public async Task GetPublicPackagesByBrand_ShouldFilterByBrandId()
     {
         _context.FuelNominals.AddRange(
-            CreatePackage("pkg-1", "Brand-a", "ft-a", "A-95", 10m),
-            CreatePackage("pkg-2", "Brand-a", "ft-a", "A-95", 20m),
-            CreatePackage("pkg-3", "Brand-b", "ft-b", "Diesel", 20m));
+            CreatePackage("pkg-1", BrandId(1), "ft-a", "A-95", 10m),
+            CreatePackage("pkg-2", BrandId(1), "ft-a", "A-95", 20m),
+            CreatePackage("pkg-3", BrandId(2), "ft-b", "Diesel", 20m));
         await _context.SaveChangesAsync();
 
         var handler = new GetPublicPackagesByBrandQueryHandler(_context, Stock());
 
-        var result = await handler.HandleAsync(new GetPublicPackagesByBrandQuery("Brand-a", CallerUserId: null));
+        var result = await handler.HandleAsync(new GetPublicPackagesByBrandQuery(BrandId(1), CallerUserId: null));
 
         result.Should().HaveCount(2);
-        result.Should().OnlyContain(p => p.BrandId == "Brand-a");
+        result.Should().OnlyContain(p => p.BrandId == BrandId(1));
     }
 
     [Fact]
@@ -221,8 +221,8 @@ CreateBrandStation("node-1", "Brand-a", "Node A"),
         // cost-derived OriginalPrice column is ignored and the supplier cost can never leak (#73).
 // No stored "before" price any more: it was never authoritative, and the storefront recomputes it
         // from the pump price - which is what stops a stale cost-derived value reaching anonymous callers.
-        _context.FuelNominals.Add(CreatePackage("pkg-1", "Brand-a", "ft-a", "A-95", 10m));
-        _context.SeedOffer("Brand-a", "ft-a",
+        _context.FuelNominals.Add(CreatePackage("pkg-1", BrandId(1), "ft-a", "A-95", 10m));
+        _context.SeedOffer(BrandId(1), "ft-a",
             pumpPricePerLiter: 60m,      // public list price -> fresh "before" = 600
             finalPricePerLiter: 50m,
             supplierPricePerLiter: 42m,
@@ -239,7 +239,7 @@ CreateBrandStation("node-1", "Brand-a", "Node A"),
         // Asserted through PackageIds rather than spelled out, so a change to the format fails here
         // instead of quietly splitting the shelf from the checkout resolver.
         pkg.Id.Should().Be(PackageIds.For(OfferKeys.For("ft-a", DataKinds.Real), 10m));
-        pkg.BrandId.Should().Be("Brand-a");
+        pkg.BrandId.Should().Be(BrandId(1));
         pkg.FuelTypeId.Should().Be("ft-a");
         pkg.FuelName.Should().Be("A-95");
         pkg.Liters.Should().Be(10m);
@@ -257,8 +257,8 @@ CreateBrandStation("node-1", "Brand-a", "Node A"),
         // stored cost-derived OriginalPrice (planning #73).
 // The legacy case: a package with no pump price at all. There is nothing to recompute the struck
         // price from, so the storefront falls back to the sale price and shows no fabricated saving.
-        _context.FuelNominals.Add(CreatePackage("pkg-legacy", "Brand-a", "ft-a", "A-95", 10m));
-        _context.SeedOffer("Brand-a", "ft-a",
+        _context.FuelNominals.Add(CreatePackage("pkg-legacy", BrandId(1), "ft-a", "A-95", 10m));
+        _context.SeedOffer(BrandId(1), "ft-a",
             pumpPricePerLiter: null,
             finalPricePerLiter: 50m,
             supplierPricePerLiter: 42m,
@@ -282,9 +282,9 @@ CreateBrandStation("node-1", "Brand-a", "Node A"),
     public async Task GetPublicPackages_ShouldFlagAvailability_PromotingNothingAndHidingNothing()
     {
         _context.FuelNominals.AddRange(
-            CreatePackage("pkg-in-stock", "Brand-a", "ft-a", "A-95", 10m),
-            CreatePackage("pkg-empty", "Brand-a", "ft-a", "A-95", 20m));
-        _context.FuelVouchers.Add(CreateVoucher("Brand-a", "ft-a", 10m));
+            CreatePackage("pkg-in-stock", BrandId(1), "ft-a", "A-95", 10m),
+            CreatePackage("pkg-empty", BrandId(1), "ft-a", "A-95", 20m));
+        _context.FuelVouchers.Add(CreateVoucher(BrandId(1), "ft-a", 10m));
         await _context.SaveChangesAsync();
 
         var handler = new GetPublicPackagesQueryHandler(_context, Stock());
@@ -306,8 +306,8 @@ result.Should().HaveCount(2, "an empty shelf is greyed out, not removed from the
     [Fact]
     public async Task GetPublicPackages_ShouldNotCountUnactivatedImportedStockAsAvailable()
     {
-        _context.FuelNominals.Add(CreatePackage("pkg-1", "Brand-a", "ft-a", "A-95", 10m));
-        _context.FuelVouchers.Add(CreateVoucher("Brand-a", "ft-a", 10m, status: VoucherStatus.Imported));
+        _context.FuelNominals.Add(CreatePackage("pkg-1", BrandId(1), "ft-a", "A-95", 10m));
+        _context.FuelVouchers.Add(CreateVoucher(BrandId(1), "ft-a", 10m, status: VoucherStatus.Imported));
         await _context.SaveChangesAsync();
 
         var handler = new GetPublicPackagesQueryHandler(_context, Stock());
@@ -325,8 +325,8 @@ result.Should().HaveCount(2, "an empty shelf is greyed out, not removed from the
     [Fact]
     public async Task GetPublicPackages_ShouldNotShowTestStockToARegularCustomer()
     {
-        _context.FuelNominals.Add(CreatePackage("pkg-1", "Brand-a", "ft-a", "A-95", 10m));
-        _context.FuelVouchers.Add(CreateVoucher("Brand-a", "ft-a", 10m, isTestData: true));
+        _context.FuelNominals.Add(CreatePackage("pkg-1", BrandId(1), "ft-a", "A-95", 10m));
+        _context.FuelVouchers.Add(CreateVoucher(BrandId(1), "ft-a", 10m, isTestData: true));
         await _context.SaveChangesAsync();
 
         var handler = new GetPublicPackagesQueryHandler(_context, Stock());
@@ -339,10 +339,11 @@ result.Should().HaveCount(2, "an empty shelf is greyed out, not removed from the
     [Fact]
     public async Task GetPublicPackages_ShouldMatchStockByBrandCaseInsensitively()
     {
-        // The catalog carries "Brand-a"; imported stock carries whatever the supplier printed.
-        // Fulfilment compares case-insensitively, so a case difference must not read as "no stock".
-        _context.FuelNominals.Add(CreatePackage("pkg-1", "Brand-a", "ft-a", "A-95", 10m));
-        _context.FuelVouchers.Add(CreateVoucher("Brand-A", "ft-a", 10m));
+        // The catalogue carries the network's code in its own case; imported stock carries whatever
+        // the supplier printed. Fulfilment compares case-insensitively, so a case difference must not
+        // read as "no stock".
+        _context.FuelNominals.Add(CreatePackage("pkg-1", BrandId(1), "ft-a", "A-95", 10m));
+        _context.FuelVouchers.Add(CreateVoucher(BrandId(1), "ft-a", 10m, brandText: "ALPHA"));
         await _context.SaveChangesAsync();
 
         var handler = new GetPublicPackagesQueryHandler(_context, Stock());
@@ -355,9 +356,9 @@ result.Should().HaveCount(2, "an empty shelf is greyed out, not removed from the
     [Fact]
     public async Task GetPublicPackages_ShouldIgnoreExpiredStock_WhileExpiryIsEnforced()
     {
-        _context.FuelNominals.Add(CreatePackage("pkg-1", "Brand-a", "ft-a", "A-95", 10m));
+        _context.FuelNominals.Add(CreatePackage("pkg-1", BrandId(1), "ft-a", "A-95", 10m));
         _context.FuelVouchers.Add(CreateVoucher(
-            "Brand-a", "ft-a", 10m, providerExpiration: DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1))));
+            BrandId(1), "ft-a", 10m, providerExpiration: DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1))));
         await _context.SaveChangesAsync();
 
         var handler = new GetPublicPackagesQueryHandler(_context, Stock());
@@ -375,9 +376,9 @@ result.Should().HaveCount(2, "an empty shelf is greyed out, not removed from the
     [Fact]
     public async Task GetPublicPackages_ShouldCountExpiredStock_WhileExpiryIsDisabled()
     {
-        _context.FuelNominals.Add(CreatePackage("pkg-1", "Brand-a", "ft-a", "A-95", 10m));
+        _context.FuelNominals.Add(CreatePackage("pkg-1", BrandId(1), "ft-a", "A-95", 10m));
         _context.FuelVouchers.Add(CreateVoucher(
-            "Brand-a", "ft-a", 10m, providerExpiration: DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1))));
+            BrandId(1), "ft-a", 10m, providerExpiration: DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1))));
         await _context.SaveChangesAsync();
 
         var handler = new GetPublicPackagesQueryHandler(_context, Stock(
@@ -396,14 +397,14 @@ result.Should().HaveCount(2, "an empty shelf is greyed out, not removed from the
     public async Task GetPublicPackagesByBrand_ShouldFlagAvailabilityToo()
     {
         _context.FuelNominals.AddRange(
-            CreatePackage("pkg-in-stock", "Brand-a", "ft-a", "A-95", 10m),
-            CreatePackage("pkg-empty", "Brand-a", "ft-a", "A-95", 20m));
-        _context.FuelVouchers.Add(CreateVoucher("Brand-a", "ft-a", 10m));
+            CreatePackage("pkg-in-stock", BrandId(1), "ft-a", "A-95", 10m),
+            CreatePackage("pkg-empty", BrandId(1), "ft-a", "A-95", 20m));
+        _context.FuelVouchers.Add(CreateVoucher(BrandId(1), "ft-a", 10m));
         await _context.SaveChangesAsync();
 
         var handler = new GetPublicPackagesByBrandQueryHandler(_context, Stock());
 
-        var result = await handler.HandleAsync(new GetPublicPackagesByBrandQuery("Brand-a", CallerUserId: null));
+        var result = await handler.HandleAsync(new GetPublicPackagesByBrandQuery(BrandId(1), CallerUserId: null));
 
 result.Should().HaveCount(2);
     var inStock = PackageIds.For(OfferKeys.For("ft-a", DataKinds.Real), 10m);
@@ -435,8 +436,8 @@ result.Should().HaveCount(2);
     public async Task GetAdminFuelTypes_ShouldReturnAllFuelTypes()
     {
         _context.FuelTypes.AddRange(
-            CreateFuelType("ft-a", "A-95", "Brand-a"),
-            CreateFuelType("ft-b", "Diesel", "Brand-b"));
+            CreateFuelType("ft-a", "A-95", BrandId(1)),
+            CreateFuelType("ft-b", "Diesel", BrandId(2)));
         await _context.SaveChangesAsync();
 
         var handler = new GetAdminFuelTypesQueryHandler(_context);
@@ -449,7 +450,7 @@ result.Should().HaveCount(2);
     [Fact]
     public async Task GetAdminFuelTypeById_ShouldReturnFound()
     {
-        _context.FuelTypes.Add(CreateFuelType("ft-a", "A-95", "Brand-a"));
+        _context.FuelTypes.Add(CreateFuelType("ft-a", "A-95", BrandId(1)));
         await _context.SaveChangesAsync();
 
         var handler = new GetAdminFuelTypeByIdQueryHandler(_context);
@@ -473,12 +474,12 @@ result.Should().HaveCount(2);
     [Fact]
     public async Task GetAdminBrandById_ShouldReturnFound()
     {
-        _context.Brands.Add(CreateBrand("Brand-a", "Alpha Brand"));
+        _context.Brands.Add(CreateBrand(BrandId(1), "Alpha Brand", "alpha"));
         await _context.SaveChangesAsync();
 
         var handler = new GetAdminBrandByIdQueryHandler(_context);
 
-        var result = await handler.HandleAsync(new GetAdminBrandByIdQuery("Brand-a"));
+        var result = await handler.HandleAsync(new GetAdminBrandByIdQuery(BrandId(1)));
 
         result.Should().NotBeNull();
         result!.Name.Should().Be("Alpha Brand");
@@ -489,7 +490,7 @@ result.Should().HaveCount(2);
     {
         var handler = new GetAdminBrandByIdQueryHandler(_context);
 
-        var result = await handler.HandleAsync(new GetAdminBrandByIdQuery("missing"));
+        var result = await handler.HandleAsync(new GetAdminBrandByIdQuery(BrandIds.NotFound));
 
         result.Should().BeNull();
     }
@@ -504,28 +505,88 @@ result.Should().HaveCount(2);
             .AddInMemoryCollection(settings ?? new Dictionary<string, string?>())
             .Build());
 
-    private static Brand CreateBrand(string id, string name)
+    private static Brand CreateBrand(Guid id, string name, string? slug = null)
     {
         return new Brand
         {
             Id = id,
             Name = name,
+            // Unique per row: a test that seeds five brands cannot have them share a network code,
+            // and a slug derived from the name alone collides the moment two fixtures share one.
+            Slug = slug ?? $"brand-{id:N}"[..12],
             LogoText = "LOGO"
         };
     }
 
-    private static BrandStation CreateBrandStation(string id, string BrandId, string name)
+    /// <summary>
+    /// A stable id for the <paramref name="index"/>-th fixture brand, so a paging test can assert on
+    /// which rows came back without the ids changing between runs.
+    /// </summary>
+    private static Guid BrandId(int index)
+        => new($"0b0b0b0b-0000-4000-8000-{index:D12}");
+
+    /// <summary>
+    /// The brand row behind <paramref name="brandId"/>, created if this fixture has not made one.
+    /// </summary>
+    /// <remarks>
+    /// Every read path joins to <c>brands</c> for the slug - the stock key is matched on it, and the
+    /// DTO carries it beside the uuid - so a station or an offer pointed at a brand nobody inserted
+    /// answers nothing. The failure then reads "found 0", which points at the filter rather than at
+    /// the row that is missing. The brand used to <em>be</em> its own name and needed no row, which
+    /// is why so many fixtures here never made one.
+    /// </remarks>
+    private Brand EnsureBrand(Guid brandId, string? name = null)
     {
+        var existing = _context.Brands.Local.FirstOrDefault(b => b.Id == brandId)
+            ?? _context.Brands.FirstOrDefault(b => b.Id == brandId);
+        if (existing is not null)
+        {
+            return existing;
+        }
+
+        var slug = SlugOf(brandId);
+        var brand = CreateBrand(brandId, name ?? char.ToUpperInvariant(slug[0]) + slug[1..], slug);
+        _context.Brands.Add(brand);
+        return brand;
+    }
+
+    /// <summary>
+    /// The network's own code for a fixture brand. The two named ones exist so an assertion can read
+    /// <c>"alpha"</c> rather than a slice of a guid; anything else falls back to one derived from the
+    /// id, which is unique by construction and which no test asserts on by name.
+    /// </summary>
+    private static string SlugOf(Guid brandId) => brandId switch
+    {
+        _ when brandId == BrandId(1) => "alpha",
+        _ when brandId == BrandId(2) => "beta",
+        _ => $"brand-{brandId:N}"[..12],
+    };
+
+    /// <summary>
+    /// The same idea for the <paramref name="index"/>-th station: an identity the assertion can name,
+    /// with the network's own node id carried beside it as the re-import key.
+    /// </summary>
+    private static Guid StationId(int index)
+        => new($"0c0c0c0c-0000-4000-8000-{index:D12}");
+
+    private BrandStation CreateBrandStation(Guid id, Guid BrandId, string name)
+    {
+        EnsureBrand(BrandId);
+
         return new BrandStation
         {
             Id = id,
             BrandId = BrandId,
+            // The re-import key: the network's own node id, which is what the import writes back.
+            ExternalId = $"{BrandId}-{id:N}",
             Name = name
         };
     }
 
-    private static FuelTypeEntity CreateFuelType(string id, string name, string BrandId)
+    private FuelTypeEntity CreateFuelType(string id, string name, Guid BrandId)
     {
+        EnsureBrand(BrandId);
+
         return new FuelTypeEntity
         {
             Id = id,
@@ -544,8 +605,10 @@ result.Should().HaveCount(2);
     /// this file keeps working with only the DbSet renamed. The offer is added here because EF will
     /// cascade the volumes in, but will not invent the parent they point at.
     /// </remarks>
-    private FuelNominal CreatePackage(string id, string BrandId, string fuelTypeId, string fuelName, decimal liters, bool isTestData = false)
+    private FuelNominal CreatePackage(string id, Guid BrandId, string fuelTypeId, string fuelName, decimal liters, bool isTestData = false)
     {
+        EnsureBrand(BrandId);
+
         // The storefront joins volumes -> offers -> fuel_types for the display name. On the in-memory
         // provider that join is executed for real, so a fixture that seeds a package without seeding its
         // fuel now returns an EMPTY catalogue rather than one with a blank label - and the test fails
@@ -581,24 +644,28 @@ result.Should().HaveCount(2);
     return nominal;
     }
 
-    private static FuelVoucher CreateVoucher(
-        string brand,
+    private FuelVoucher CreateVoucher(
+        Guid brandId,
         string fuelTypeId,
         decimal liters,
         VoucherStatus status = VoucherStatus.Available,
         bool isTestData = false,
-        DateOnly? providerExpiration = null)
+        DateOnly? providerExpiration = null,
+        string? brandText = null)
     {
         var expiry = providerExpiration ?? DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1));
         return new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Brand = brand,
+            // A voucher names its network as TEXT - the import prints it, the fulfilment worker reads
+            // it, and neither knows a uuid. That is why the stock key is slug-based, so the fixture
+            // takes the brand row's own code rather than a literal that could drift from it.
+            Brand = brandText ?? EnsureBrand(brandId).Slug,
             FuelTypeId = fuelTypeId,
             Liters = liters,
             SupplierExpirationDate = expiry,
             CustomerExpirationDate = expiry,
-            VoucherNumber = $"{brand}-{Guid.NewGuid().ToString()[..8]}",
+            VoucherNumber = $"{brandText ?? EnsureBrand(brandId).Slug}-{Guid.NewGuid().ToString()[..8]}",
             QrPayload = Guid.NewGuid().ToString(),
             Status = status,
             IsTestData = isTestData,

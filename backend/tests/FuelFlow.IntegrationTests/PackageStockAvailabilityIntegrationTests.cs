@@ -316,7 +316,7 @@ var chosen = await availability.FindPackageAsync(false, BrandIds.Okko, "okko-95"
     private PackageStockAvailability CreateAvailability()
         => new(CreateContext(), new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["VoucherExpiration:Enabled"] = "true" })
-            .Build(), new BrandSlugResolver(CreateContext()));
+            .Build());
 
     private static FuelVoucher Stock(string brand, string fuelTypeId, decimal liters, DateOnly expiry)
         => new()

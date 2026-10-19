@@ -124,7 +124,7 @@ public sealed class PackageStockAvailability
     /// </remarks>
     public async Task<SellablePackage?> FindPackageAsync(
         bool isTestAccount,
-        string BrandId,
+        Guid brandId,
         string fuelTypeId,
         decimal liters,
         CancellationToken cancellationToken = default)
@@ -138,7 +138,11 @@ var pool = DataKinds.ForPool(isTestAccount);
         var row = await (
             from offer in _context.FuelOffers.AsNoTracking()
             join nominal in _context.FuelNominals.AsNoTracking() on offer.FuelTypeId equals nominal.FuelTypeId
-            where offer.BrandId == BrandId
+            // The slug is joined rather than resolved afterwards: the caller matches vouchers and order
+            // lines by brand TEXT, so a package that came back without one could not be stocked or
+            // ordered.
+            join brand in _context.Brands.AsNoTracking() on offer.BrandId equals brand.Id
+            where offer.BrandId == brandId
                   && offer.FuelTypeId == fuelTypeId
                 && nominal.Liters == liters
 // The caller's own pool, on BOTH sides: the size list is per pool, so a
@@ -147,10 +151,13 @@ var pool = DataKinds.ForPool(isTestAccount);
             // rehearsal size.
             && nominal.DataKind == pool
             && offer.DataKind == pool
-            select new { Offer = offer, Fuel = offer.FuelType! })
+            // The slug is carried through the query rather than read off the entity afterwards: the
+            // caller matches vouchers and order lines by brand TEXT, so a package that came back
+            // without one could not be stocked or ordered.
+            select new { Offer = offer, Fuel = offer.FuelType!, BrandSlug = brand.Slug })
             .FirstOrDefaultAsync(cancellationToken);
 
-        return row is null ? null : SellablePackage.From(row.Offer, row.Fuel, liters);
+        return row is null ? null : SellablePackage.From(row.Offer, row.Fuel, liters, row.BrandSlug);
     }
 
     /// <summary>
@@ -179,28 +186,31 @@ var pool = DataKinds.ForPool(isTestAccount);
         var rows = await (
             from offer in _context.FuelOffers.AsNoTracking()
             join nominal in _context.FuelNominals.AsNoTracking() on offer.FuelTypeId equals nominal.FuelTypeId
+            // The cart names its brands by slug, so the narrowing below compares against the
+            // network's own code rather than an id the cart never had.
+            join brand in _context.Brands.AsNoTracking() on offer.BrandId equals brand.Id
 where offer.DataKind == pool
             && nominal.DataKind == pool
-            && brands.Contains(offer.BrandId.ToLower())
+            && brands.Contains(brand.Slug.ToLower())
                   && fuelTypeIds.Contains(offer.FuelTypeId)
                   && literSizes.Contains(nominal.Liters)
             // Same precedence as the single-line path, so one line of a cart cannot resolve to a
             // different package than the same line ordered on its own. Both keys are unique, so this
             // ordering is free belt-and-braces rather than a tie-break anything depends on.
             orderby offer.Id, nominal.Liters
-            select new { Offer = offer, Fuel = offer.FuelType!, Liters = nominal.Liters })
+            select new { Offer = offer, Fuel = offer.FuelType!, Liters = nominal.Liters, BrandSlug = brand.Slug })
             .ToListAsync(cancellationToken);
 
         var resolved = new Dictionary<StockKey, SellablePackage>(wanted.Count);
         foreach (var row in rows)
         {
-            var key = StockKey.For(row.Offer.BrandId, row.Offer.FuelTypeId, row.Liters);
+            var key = StockKey.For(row.BrandSlug, row.Offer.FuelTypeId, row.Liters);
             if (!wanted.Contains(key))
                 continue;
 
             // First write wins, and the ordering above means "first" is the same package the
             // single-line path would have taken.
-            resolved.TryAdd(key, SellablePackage.From(row.Offer, row.Fuel, row.Liters));
+            resolved.TryAdd(key, SellablePackage.From(row.Offer, row.Fuel, row.Liters, row.BrandSlug));
         }
 
         return resolved;
@@ -251,13 +261,15 @@ where offer.DataKind == pool
     /// </summary>
     public Task<bool> IsInStockAsync(
         bool isTestAccount,
-        string BrandId,
+        string brandSlug,
         string fuelTypeId,
         decimal liters,
         CancellationToken cancellationToken = default)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var brand = BrandId.ToLower();
+        // Vouchers still carry the network by text, so this gate - unlike the offer lookups above -
+        // is matched on the slug rather than on a uuid.
+        var brand = brandSlug.ToLower();
         var pool = DataKinds.ForPool(isTestAccount);
 
         return _context.FuelVouchers
