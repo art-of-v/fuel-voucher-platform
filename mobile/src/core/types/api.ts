@@ -33,8 +33,15 @@ export interface StationNode {
   phone?: string;
   city?: string;
   stationType?: string;
-  lat?: string;
-  lng?: string;
+  /**
+   * Decimal degrees, as JSON numbers. They were typed `string` for as long as the
+   * API existed and the API never sent one — `PublicBrandStationResponse` maps
+   * `Lat`/`Lng` as decimal — so every read went through `parseFloat` to bridge a
+   * gap that was never on the wire. Caught by `wireContract.ts`, which assigns a
+   * captured production response to this interface and is compiled by `tsc`.
+   */
+  lat?: number;
+  lng?: number;
 }
 
 export interface FuelType {

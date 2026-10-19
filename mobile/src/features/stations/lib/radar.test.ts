@@ -28,8 +28,8 @@ function node(overrides: Partial<StationNode> = {}): StationNode {
     id: 'n',
     brandId: 'okko',
     name: 'Node',
-    lat: '50.45',
-    lng: '30.52',
+    lat: 50.45,
+    lng: 30.52,
     ...overrides,
   };
 }
@@ -131,8 +131,8 @@ describe('rankStations', () => {
   });
 
   it('breaks price ties by distance when the user location is known', () => {
-    const near = node({ id: 'near', brandId: 'okko', name: 'Near', lat: '50.46', lng: '30.52' });
-    const far = node({ id: 'far', brandId: 'okko', name: 'Far', lat: '50.90', lng: '30.52' });
+    const near = node({ id: 'near', brandId: 'okko', name: 'Near', lat: 50.46, lng: 30.52 });
+    const far = node({ id: 'far', brandId: 'okko', name: 'Far', lat: 50.9, lng: 30.52 });
     const prices = bestPriceByBrand([pkg({ brandId: 'okko', finalPricePerLiter: 48 })], 'a-95');
     const ranked = rankStations([far, near], prices, { lat: 50.45, lng: 30.52 });
     expect(ranked.map((r) => r.node.id)).toEqual(['near', 'far']);
@@ -148,8 +148,8 @@ describe('radarWithinRadius', () => {
 
   it('returns every priced station with a null radius when the location is unknown', () => {
     const nodes = [
-      node({ id: 'a', brandId: 'okko', lat: '50.036', lng: '30' }),
-      node({ id: 'x', brandId: 'klo', lat: '50.036', lng: '30' }), // unpriced
+      node({ id: 'a', brandId: 'okko', lat: 50.036, lng: 30 }),
+      node({ id: 'x', brandId: 'klo', lat: 50.036, lng: 30 }), // unpriced
     ];
     const res = radarWithinRadius(rankStations(nodes, prices, null), null);
     expect(res.radiusKm).toBeNull();
@@ -158,10 +158,10 @@ describe('radarWithinRadius', () => {
 
   it('expands to the smallest ring that holds at least minResults priced stations', () => {
     const nodes = [
-      node({ id: 'a', lat: '50.036', lng: '30' }), // ~4 km
-      node({ id: 'b', lat: '50.072', lng: '30' }), // ~8 km
-      node({ id: 'c', lat: '50.36', lng: '30' }), //  ~40 km
-      node({ id: 'd', lat: '51.35', lng: '30' }), //  ~150 km
+      node({ id: 'a', lat: 50.036, lng: 30 }), // ~4 km
+      node({ id: 'b', lat: 50.072, lng: 30 }), // ~8 km
+      node({ id: 'c', lat: 50.36, lng: 30 }), //  ~40 km
+      node({ id: 'd', lat: 51.35, lng: 30 }), //  ~150 km
     ];
     const res = radarWithinRadius(rank(nodes), user); // minResults defaults to 3
     expect(res.radiusKm).toBe(50);
@@ -170,8 +170,8 @@ describe('radarWithinRadius', () => {
 
   it('picks the tightest ring that already satisfies a smaller minResults', () => {
     const nodes = [
-      node({ id: 'a', lat: '50.036', lng: '30' }), // ~4 km
-      node({ id: 'b', lat: '50.36', lng: '30' }), //  ~40 km
+      node({ id: 'a', lat: 50.036, lng: 30 }), // ~4 km
+      node({ id: 'b', lat: 50.36, lng: 30 }), //  ~40 km
     ];
     const res = radarWithinRadius(rank(nodes), user, 1);
     expect(res.radiusKm).toBe(5);
@@ -179,7 +179,7 @@ describe('radarWithinRadius', () => {
   });
 
   it('shows all priced stations (null radius) when none fall within the widest ring', () => {
-    const nodes = [node({ id: 'd', lat: '51.35', lng: '30' })]; // ~150 km
+    const nodes = [node({ id: 'd', lat: 51.35, lng: 30 })]; // ~150 km
     const res = radarWithinRadius(rank(nodes), user);
     expect(res.radiusKm).toBeNull();
     expect(res.stations.map((r) => r.node.id)).toEqual(['d']);
@@ -198,9 +198,9 @@ describe('rankBrands', () => {
 
   it('collapses nodes into one row per brand, cheapest voucher грн/л first', () => {
     const nodes = [
-      node({ id: 'okko-near', brandId: 'okko', lat: '50.036', lng: '30' }), // ~4 km
-      node({ id: 'okko-far', brandId: 'okko', lat: '50.36', lng: '30' }), //  ~40 km
-      node({ id: 'wog-1', brandId: 'wog', lat: '50.09', lng: '30' }), //    ~10 km
+      node({ id: 'okko-near', brandId: 'okko', lat: 50.036, lng: 30 }), // ~4 km
+      node({ id: 'okko-far', brandId: 'okko', lat: 50.36, lng: 30 }), //  ~40 km
+      node({ id: 'wog-1', brandId: 'wog', lat: 50.09, lng: 30 }), //    ~10 km
     ];
     const brands = rankBrands(rankStations(nodes, prices, user));
     expect(brands.map((b) => b.brandId)).toEqual(['wog', 'okko']); // 46 before 48
@@ -211,8 +211,8 @@ describe('rankBrands', () => {
 
   it('ignores unpriced brands — the leaderboard is a price ranking', () => {
     const nodes = [
-      node({ id: 'okko-1', brandId: 'okko', lat: '50.036', lng: '30' }),
-      node({ id: 'klo-1', brandId: 'klo', lat: '50.036', lng: '30' }), // no price
+      node({ id: 'okko-1', brandId: 'okko', lat: 50.036, lng: 30 }),
+      node({ id: 'klo-1', brandId: 'klo', lat: 50.036, lng: 30 }), // no price
     ];
     const brands = rankBrands(rankStations(nodes, prices, user));
     expect(brands.map((b) => b.brandId)).toEqual(['okko']);
@@ -231,10 +231,10 @@ describe('rankBrands', () => {
       'a-95',
     );
     const nodes = [
-      node({ id: 'okko-1', brandId: 'okko', lat: '50.036', lng: '30' }), //  ~4 km
-      node({ id: 'okko-far', brandId: 'okko', lat: '50.36', lng: '30' }), // ~40 km
-      node({ id: 'wog-1', brandId: 'wog', lat: '50.09', lng: '30' }), //   ~10 km
-      node({ id: 'klo-1', brandId: 'klo', lat: '51.4', lng: '30' }), //  ~155 km
+      node({ id: 'okko-1', brandId: 'okko', lat: 50.036, lng: 30 }), //  ~4 km
+      node({ id: 'okko-far', brandId: 'okko', lat: 50.36, lng: 30 }), // ~40 km
+      node({ id: 'wog-1', brandId: 'wog', lat: 50.09, lng: 30 }), //   ~10 km
+      node({ id: 'klo-1', brandId: 'klo', lat: 51.4, lng: 30 }), //  ~155 km
     ];
     const ranked = rankStations(nodes, threeBrands, user);
 

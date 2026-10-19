@@ -18,7 +18,7 @@ export type MapRegion = {
  */
 export const VIEWPORT_PADDING = 0.2;
 
-type Coords = { lat?: string | null; lng?: string | null };
+type Coords = { lat?: number | null; lng?: number | null };
 
 /**
  * A point is inside the padded region when it falls within the region's delta on both axes.
@@ -33,10 +33,12 @@ export function isPointInRegion(
   region: MapRegion,
   padding = VIEWPORT_PADDING,
 ): boolean {
-  const lat = parseFloat(point.lat ?? '');
-  const lng = parseFloat(point.lng ?? '');
+  const lat = point.lat;
+  const lng = point.lng;
 
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
+  // A point with no coordinates is not in any region, and it must not be rendered:
+  // NaN in a coordinate is how a marker ends up at the top of the world.
+  if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) return false;
 
   const latPad = (region.latitudeDelta / 2) * (1 + padding);
   const lngPad = (region.longitudeDelta / 2) * (1 + padding);

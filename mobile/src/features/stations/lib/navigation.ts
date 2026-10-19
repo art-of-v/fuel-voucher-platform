@@ -132,9 +132,20 @@ export function toPlatformOS(os: string): PlatformOS {
  * missing one used to be deep-linked as 0,0 — a route to Null Island in the Atlantic. Out-of-range
  * and (0,0) values are rejected for the same reason.
  */
-export function routeTarget(lat?: string | null, lng?: string | null): RouteTarget | null {
-  const parsedLat = parseFloat(lat ?? '');
-  const parsedLng = parseFloat(lng ?? '');
+/**
+ * Turn a node's coordinates into something worth handing a navigation app.
+ *
+ * Accepts `number | string` because the wire sends numbers but a cached payload
+ * from before D-21 may still carry the strings this used to be typed as, and a
+ * dead deep link is worse than one extra branch. `null`/absent/0-0 is not a place
+ * a person can drive to, so none of those become a target.
+ */
+export function routeTarget(
+  lat?: number | string | null,
+  lng?: number | string | null,
+): RouteTarget | null {
+  const parsedLat = parseFloat(String(lat ?? ''));
+  const parsedLng = parseFloat(String(lng ?? ''));
   if (!Number.isFinite(parsedLat) || !Number.isFinite(parsedLng)) return null;
   if (parsedLat < -90 || parsedLat > 90 || parsedLng < -180 || parsedLng > 180) return null;
   if (parsedLat === 0 && parsedLng === 0) return null;

@@ -131,12 +131,12 @@ describe('filterStationsByQuery', () => {
     it('drops a station whose coordinates are zero', () => {
       // Null Island is in the Gulf of Guinea. It is never a real АЗК, and keeping
       // it would make the results count disagree with the pins on screen.
-      const atOrigin = [station({ name: 'Null Island', lat: '0', lng: '0' })];
+      const atOrigin = [station({ name: 'Null Island', lat: 0, lng: 0 })];
       expect(filterStationsByQuery(atOrigin, '')).toHaveLength(0);
     });
 
     it('drops a station missing only one of the two coordinates', () => {
-      const halfCoords = [station({ name: 'Half', lat: '50.45', lng: '0' })];
+      const halfCoords = [station({ name: 'Half', lat: 50.45, lng: 0 })];
       expect(filterStationsByQuery(halfCoords, '')).toHaveLength(0);
     });
 
@@ -146,7 +146,7 @@ describe('filterStationsByQuery', () => {
     });
 
     it('keeps the usable stations and drops only the broken ones', () => {
-      const mixed = [...list, station({ id: 'd', name: 'Ghost', lat: '0', lng: '0' })];
+      const mixed = [...list, station({ id: 'd', name: 'Ghost', lat: 0, lng: 0 })];
       expect(filterStationsByQuery(mixed, '').map((s) => s.id)).toEqual(['a', 'b', 'c']);
     });
   });

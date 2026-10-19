@@ -97,9 +97,12 @@ export interface RankedStation {
 }
 
 function nodeLatLng(node: StationNode): LatLng | null {
-  const lat = parseFloat(node.lat ?? '');
-  const lng = parseFloat(node.lng ?? '');
-  if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) return null;
+  const lat = node.lat;
+  const lng = node.lng;
+  // (0, 0) is the Gulf of Guinea, not a filling station - it is what a node with
+  // no coordinates looks like after a bad import, and it would distort every
+  // distance in the radar.
+  if (lat == null || lng == null || (lat === 0 && lng === 0)) return null;
   return { lat, lng };
 }
 

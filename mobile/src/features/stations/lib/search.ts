@@ -69,9 +69,9 @@ export function filterStationsByQuery(
   if (!nodes) return [];
 
   return nodes.filter((node) => {
-    const lat = parseFloat(node.lat || '0');
-    const lng = parseFloat(node.lng || '0');
-    if (!lat || !lng) return false;
+    // Decimal degrees off the wire; a node with no coordinates cannot be shown on
+    // a map, so it drops out of a text search too - there is nothing to navigate to.
+    if (!node.lat || !node.lng) return false;
 
     return matchesQuery(node, query);
   });
