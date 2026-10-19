@@ -99,42 +99,31 @@ public sealed class CatalogueReferentialIntegrityTests : IClassFixture<TestDatab
     }
 
     [Fact]
-    public async Task A_Zero_Discount_Price_Alongside_A_Pump_Price_Is_Refused()
+    public async Task A_Zero_Discount_Price_Is_Allowed()
     {
-        // A fuel that knows its pump price and still sells at zero is the 1 UAH leak: OKKO
-        // "Пульс 95" carried discount_price 0.00 against a pump price of 95.90, because a NULL
-        // final_price_per_liter was copied across as 0.
+        // Zero is a price state, not a violation. A grade the network lists but nobody has priced
+        // yet has a published pump price, no cost and no margin, and a discount price of 0 - which
+        // is exactly what the OKKO catalogue import leaves behind, and exactly what
+        // UnpricedPackageIntegrationTests.A_Nominal_With_Neither_Rate_Nor_Margin_Is_Not_Charged
+        // builds. A row-level CHECK that forbade it would refuse every grade the catalogue sync
+        // creates.
+        //
+        // What keeps such a grade off the shelf is not the column: its price computes to null,
+        // and the storefront does not list a package with no price. This test is here so that the
+        // next person to "fix" the zero does not have to rediscover that.
         await using var context = CreateContext();
         var brandId = await SeededBrand(context);
 
-        var fuel = NewFuel("catalogue-zero-price", brandId);
+        var fuel = NewFuel("catalogue-unpriced", brandId);
         fuel.DiscountPrice = 0m;
-        fuel.PumpPricePerLiter = 95.90m;
-
-        var act = async () => { context.Set<FuelTypeEntity>().Add(fuel); await context.SaveChangesAsync(); };
-
-        await AssertRefusedAsync(act, PostgresErrorCodes.CheckViolation);
-    }
-
-    [Fact]
-    public async Task A_Zero_Discount_Price_With_No_Pump_Price_Is_Allowed()
-    {
-        // Zero is a price. A giveaway grade sells at nothing and carries no pump price to
-        // contradict - DatabaseIntegrityTests.A_Zero_Price_Volume_Is_Allowed_But_Zero_Liters_Is_Not
-        // says so on purpose, and forbidding zero outright was wrong.
-        await using var context = CreateContext();
-        var brandId = await SeededBrand(context);
-
-        var fuel = NewFuel("catalogue-giveaway", brandId);
-        fuel.DiscountPrice = 0m;
-        fuel.PumpPricePerLiter = null;
+        fuel.PumpPricePerLiter = 92.90m;
 
         await context.Set<FuelTypeEntity>().AddAsync(fuel);
         var act = async () => await context.SaveChangesAsync();
 
         await act.Should().NotThrowAsync();
 
-        await context.Set<FuelTypeEntity>().Where(f => f.Id == "catalogue-giveaway").ExecuteDeleteAsync();
+        await context.Set<FuelTypeEntity>().Where(f => f.Id == "catalogue-unpriced").ExecuteDeleteAsync();
     }
 
     [Fact]

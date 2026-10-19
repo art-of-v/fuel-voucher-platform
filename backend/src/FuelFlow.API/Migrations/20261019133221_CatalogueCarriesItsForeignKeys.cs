@@ -29,19 +29,14 @@ namespace FuelFlow.API.Migrations
                    AND discount_price IS DISTINCT FROM pump_price_per_liter;
                 """);
 
-            // Refuse whatever the UPDATE could not settle, rather than accept it. A zero selling
-            // price next to a known pump price is the leak; one with no pump price is the giveaway
-            // case the constraint deliberately permits, and this is here so the migration stops and
-            // asks rather than quietly deciding a price. Verified against a copy of production on
-            // 2026-10-19: the single offending row is repaired above and this finds nothing.
-            migrationBuilder.Sql("""
-                DO $$ DECLARE bad int; BEGIN
-                    SELECT count(*) INTO bad FROM fuel_types
-                        WHERE discount_price <= 0 AND pump_price_per_liter IS NOT NULL;
-                    IF bad > 0 THEN RAISE EXCEPTION
-                        'fuel_types: % row(s) sell at zero or less while carrying a pump price. Price them deliberately and re-run.', bad; END IF;
-                END $$;
-                """);
+            // Nothing else is refused here. Zero is a legitimate price state - a grade the network
+            // lists but nobody has priced yet - so a row the UPDATE could not settle is not an
+            // error, it is a grade with no pump price to take its price from. It is left alone,
+            // and its price computes to null, which is what keeps it off the shelf.
+            //
+            // The row that WAS wrong is the one above. Its zero came from a copy that wrote 0
+            // where the offer held NULL, and a number - rather than a missing one - is what
+            // reaches a customer.
 
             // Refuse before the ALTERs, not after. Each of these counts rows that already point at
             // a parent that does not exist; every count is zero on production as measured on
@@ -103,13 +98,7 @@ namespace FuelFlow.API.Migrations
                 oldClrType: typeof(decimal),
                 oldType: "numeric",
                 oldNullable: true);
-
-            migrationBuilder.AddCheckConstraint(
-                name: "ck_fuel_types_zero_price_needs_no_pump_price",
-                table: "fuel_types",
-                sql: "discount_price > 0 OR pump_price_per_liter IS NULL");
-
-            migrationBuilder.CreateIndex(
+migrationBuilder.CreateIndex(
                 name: "ix_fuel_offer_prices_brand_id",
                 table: "fuel_offer_prices",
                 column: "brand_id");
@@ -177,12 +166,7 @@ namespace FuelFlow.API.Migrations
             migrationBuilder.DropForeignKey(
                 name: "FK_fuel_types_brands_brand_id",
                 table: "fuel_types");
-
-            migrationBuilder.DropCheckConstraint(
-                name: "ck_fuel_types_zero_price_needs_no_pump_price",
-                table: "fuel_types");
-
-            migrationBuilder.DropIndex(
+migrationBuilder.DropIndex(
                 name: "ix_fuel_offer_prices_brand_id",
                 table: "fuel_offer_prices");
 
