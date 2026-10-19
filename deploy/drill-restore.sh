@@ -177,22 +177,27 @@ for t in brands fuel_types fuel_offers fuel_vouchers payments orders voucher_eve
 done
 
 info "3. qr_payload is ciphertext, not plaintext (D-14)"
-# D-14 encrypts qr_payload on write and stores it base64-encoded
-# (20261016220058_EncryptVoucherQrPayload: `ALTER COLUMN qr_payload TYPE varchar(2000)
-# USING encode(qr_payload, 'base64')`). So every payload in a correctly encrypted
-# dump matches the base64 alphabet. One that does not is a row written before
-# encryption, or by a path that bypasses QrCipher - and there is no other place
-# in the system that would tell you.
-PLAINTEXT_ROWS="$(psql_q -c "
+# `qr_payload` is bytea, not text. Migration 20261016220058_EncryptVoucherQrPayload
+# converted it with `encode(qr_payload,'base64')` into varchar(2000); the model now
+# maps it back to byte[]. So "is it base64?" cannot be asked at all - a regex against
+# a bytea column is a type error, which the first real run of this drill discovered
+# (2026-10-19) after passing every static check in CI.
+#
+# What can be asked, and is the thing that matters: does the stored blob still contain
+# the voucher number in the clear? If D-14 is not in force - or a row was written by a
+# path that bypasses QrCipher - the number sits in there as text, and everyone holding
+# the dump can read a redeemable voucher.
+PAYLOAD_ROWS="$(psql_q -c 'SELECT count(*) FROM fuel_vouchers WHERE qr_payload IS NOT NULL;')"
+VULNERABLE="$(psql_q -c "
   SELECT count(*) FROM fuel_vouchers
    WHERE qr_payload IS NOT NULL
-     AND qr_payload !~ '^[A-Za-z0-9+/]+={0,2}\$';")"
-TOTAL_ROWS="$(psql_q -c 'SELECT count(*) FROM fuel_vouchers WHERE qr_payload IS NOT NULL;')"
-if [[ "$TOTAL_ROWS" == "0" ]]; then
+     AND voucher_number IS NOT NULL
+     AND position(convert_to(voucher_number, 'UTF8') in qr_payload) > 0;")"
+if [[ "$PAYLOAD_ROWS" == "0" ]]; then
   echo "  no vouchers carry a QR payload yet - nothing to assert (0 rows is NOT a pass)"
 else
-  [[ "$PLAINTEXT_ROWS" == "0" ]] || fail "$PLAINTEXT_ROWS row(s) carry a qr_payload that is not base64."
-  echo "  $TOTAL_ROWS payload(s), all base64 - D-14 in force in this dump"
+  [[ "$VULNERABLE" == "0" ]] || fail "$VULNERABLE row(s) carry their voucher number in cleartext inside qr_payload."
+  echo "  $PAYLOAD_ROWS payload(s), 0 readable voucher numbers - D-14 in force in this dump"
 fi
 
 info "4. Data integrity (the audit's three)"
