@@ -25,9 +25,10 @@
 --   * `fulfillments` now cascades from its order (FK added in AddFulfillmentOrderForeignKey), but
 --     its `voucher_id` restricts, so vouchers have to go too.
 --   * every row an operator renewal writes -- `operator_voucher_renewals.voucher_id`,
---     `voucher_renewal_items.source_voucher_id`, `voucher_exchanges.old_voucher_id` -- restricts
---     against `fuel_vouchers`, so a session that produced a renewal cannot be reset until those
---     audit rows are cleared first.
+--     `order_line_items.source_voucher_id` (the renewal lines themselves, since
+--     `voucher_renewal_items` was dropped in `20261017073518`),
+--     `voucher_exchanges.old_voucher_id` -- restricts against `fuel_vouchers`, so a session that
+--     produced a renewal cannot be reset until those audit rows are cleared first.
 -- Running it inside one transaction means a failure anywhere leaves the database untouched.
 
 \set ON_ERROR_STOP on
@@ -75,10 +76,16 @@ WHERE old_voucher_id IN (SELECT id FROM reset_vouchers)
 DELETE FROM movement_batches b
 WHERE NOT EXISTS (SELECT 1 FROM voucher_exchanges e WHERE e.exchange_batch_id = b.id);
 
-DELETE FROM voucher_renewal_items
-WHERE source_voucher_id IN (SELECT id FROM reset_vouchers)
-   OR fulfilled_voucher_id IN (SELECT id FROM reset_vouchers)
-   OR order_id IN (SELECT id FROM reset_orders);
+-- `voucher_renewal_items` was dropped in `20261017073518_DropVoucherRenewalItems`, and the renewal
+-- rows live in `order_line_items` now: `source_voucher_id` is the column that points at the voucher
+-- a line renews, and it RESTRICTs, so the line has to go before the voucher does. The same is true
+-- of `order_id`, and it is the reason a session that produced a renewal cannot be reset until
+-- those audit rows are cleared first.
+--
+-- This statement is the old one, rewritten for the table that replaced it. It deletes only the
+-- renewal lines - the order's own lines are deleted further down, with the order.
+DELETE FROM order_line_items
+WHERE source_voucher_id IN (SELECT id FROM reset_vouchers);
 
 -- An operator renewal writes an audit row whose `voucher_id` restricts, so it has to go BEFORE the
 -- voucher it points at -- otherwise the DELETE below dies on the FK and the whole reset rolls back.

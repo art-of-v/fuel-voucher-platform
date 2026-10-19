@@ -7,12 +7,20 @@
 -- (`file_name LIKE 'QA-EMULATED-%'`, `name = 'QA Supplier (emulated)'`). The one place a QA order is
 -- identified rather than its contents is spelled out below.
 --
--- WHAT IT DELETES, and why each part has to go with the offers:
---   * `fuel_offers` / `fuel_offer_volumes` / `fuel_offer_prices` - the QA twins themselves. Both FKs
---     onto `fuel_offers` are RESTRICT, so the volumes and the price history have to go before the
---     offers; nothing else in the schema points at an offer.
---   * `fuel_vouchers` - the QA stock and the QA wallet vouchers. They hang off the offer only by
---     (brand, fuel_type_id, liters) and carry `data_kind` themselves, so they would survive as
+-- REWRITTEN 2026-10-19 against the fuel-centric schema. The previous version deleted
+-- `fuel_offers` / `fuel_offer_volumes` - the QA twins themselves - and both tables are gone
+-- (`fuel_offer_volumes` in `20261018224126`, `fuel_offers` in `20261019095748`). The twin now IS a
+-- `fuel_nominals` row with `data_kind = 'qa'`, and the price history that hung off the offer hangs
+-- off the fuel instead.
+--
+-- WHAT IT DELETES, and why each part has to go with the catalogue:
+--   * `fuel_nominals` (the `data_kind = 'qa'` rows) - the QA twins themselves. The pool lives on
+--     the nominal, so a QA size with no twin is a size nobody should be offered.
+--   * `fuel_offer_prices` - the QA price history. It arrives with 20261017142210
+--     (AddFuelOfferPriceHistory) and carries `data_kind` of its own; a price row is a record of
+--     something sold, so it has to go when the pool it belongs to is decommissioned.
+--   * `fuel_vouchers` - the QA stock and the QA wallet vouchers. They hang off the catalogue only
+--     by (brand, fuel_type_id, liters) and carry `data_kind` themselves, so they would survive as
 --     orphans of a catalogue that no longer exists.
 --   * the wallet half - orders the reviewer bought with, plus their lines, fulfillments and
 --     payments. A held QA voucher cannot be deleted without its order, and an order whose only
@@ -50,8 +58,8 @@
 --   # print what would go, change nothing:
 --   ... -v dry_run=true -f - < scripts/remove-qa-catalogue.sql
 --
---   # one station only (same filter the seed scripts take):
---   ... -v station_id=okko -f - < scripts/remove-qa-catalogue.sql
+--   # one brand only (same filter the seed scripts take):
+--   ... -v brand=okko -f - < scripts/remove-qa-catalogue.sql
 --
 -- Re-seeding afterwards is what puts the QA catalogue back:
 -- scripts/seed-qa-full-emulation.sql rebuilds supplier -> import -> batch -> stock -> wallet, and
@@ -64,13 +72,15 @@
 \set dry_run false
 \endif
 
--- `station_id` is optional, for the same reason it is optional in the seeds: with none given the
--- whole QA pool goes, which is what a decommissioning wants.
-\if :{?station_id}
-\set qa_all_stations false
+-- `brand` is optional, for the same reason it is optional in the seeds: with none given the
+-- whole QA pool goes, which is what a decommissioning wants. It is the brand's SLUG ('okko'), which
+-- is what `fuel_vouchers.brand` carries; the parameter used to be called `station_id` and carried
+-- the same value, because a station was a brand.
+\if :{?brand}
+\set qa_all_brands false
 \else
-\set qa_all_stations true
-\set station_id ''
+\set qa_all_brands true
+\set brand ''
 \endif
 
 BEGIN;
@@ -80,21 +90,15 @@ BEGIN;
 -- and the deletion can never disagree about which rows were chosen.
 -- ---------------------------------------------------------------------------------------------
 
--- The QA offers. `data_kind` is the pool marker and is the only thing trusted here: the id suffix
--- (`-qa`) is cosmetic, and an offer imported or repriced by an operator still carries the kind.
-CREATE TEMP TABLE qa_offers ON COMMIT DROP AS
-SELECT o.id, o.station_id, o.fuel_type_id
-FROM fuel_offers o
-WHERE o.data_kind = 'qa'
-  AND (:'qa_all_stations'::boolean OR o.station_id = :'station_id');
-
--- Their volumes. The volume row has no `data_kind` - the pool lives on the offer above it - so it is
--- reached through the offer, which is also what makes the RESTRICT on `offer_id` decidable here
--- rather than at the end.
-CREATE TEMP TABLE qa_volumes ON COMMIT DROP AS
-SELECT v.id, v.offer_id, v.liters
-FROM fuel_offer_volumes v
-JOIN qa_offers o ON o.id = v.offer_id;
+-- The QA catalogue: the `data_kind = 'qa'` nominals, with the brand they belong to. `data_kind` is
+-- the pool marker and is the only thing trusted here.
+CREATE TEMP TABLE qa_nominals ON COMMIT DROP AS
+SELECT n.fuel_type_id, n.liters, lower(b.slug) AS brand
+FROM fuel_nominals n
+JOIN fuel_types f ON f.id = n.fuel_type_id
+JOIN brands b ON b.id = f.brand_id
+WHERE n.data_kind = 'qa'
+  AND (:'qa_all_brands'::boolean OR lower(b.slug) = lower(:'brand'));
 
 -- The emulated chain. Keyed on the seeds' own markers, so an operator who renamed a file or a
 -- supplier by hand leaves a row behind rather than having it swept up.
@@ -102,27 +106,27 @@ CREATE TEMP TABLE qa_imports ON COMMIT DROP AS
 SELECT i.id, i.file_name
 FROM voucher_imports i
 WHERE i.file_name LIKE 'QA-EMULATED-%'
-  AND (:'qa_all_stations'::boolean
-       OR i.file_name = 'QA-EMULATED-' || :'station_id' || '.pdf');
+  AND (:'qa_all_brands'::boolean
+       OR i.file_name = 'QA-EMULATED-' || :'brand' || '.pdf');
 
 CREATE TEMP TABLE qa_batches ON COMMIT DROP AS
 SELECT b.id
 FROM purchase_batches b
 JOIN qa_imports i ON i.id = b.import_job_id;
 
--- The QA vouchers. `brand` is the station id, lower-cased - it is the key
+-- The QA vouchers. `brand` is the brand's slug, lower-cased - it is the key
 -- `PackageStockAvailability` and the fulfilment claim match on, so it is the only column that can
--- attribute a voucher to a station. The fuel type is the second handle: a voucher whose `brand` was
+-- attribute a voucher to a brand. The fuel type is the second handle: a voucher whose `brand` was
 -- filled with something else (a hand-edited fixture, a supplier name) is still found through the
--- offer's fuel type, which is the other half of the availability key.
+-- nominal's fuel type, which is the other half of the availability key.
 CREATE TEMP TABLE qa_vouchers ON COMMIT DROP AS
 SELECT v.id
 FROM fuel_vouchers v
 WHERE v.data_kind = 'qa'
   AND (
-      :'qa_all_stations'::boolean
-      OR lower(v.brand) = lower(:'station_id')
-      OR v.fuel_type_id IN (SELECT fuel_type_id FROM qa_offers)
+      :'qa_all_brands'::boolean
+      OR lower(v.brand) = lower(:'brand')
+      OR v.fuel_type_id IN (SELECT fuel_type_id FROM qa_nominals)
   );
 
 -- The QA orders. An order is in scope when it touches the QA pool - it holds a QA voucher, or it has
@@ -158,19 +162,17 @@ WHERE EXISTS (
           WHERE v.order_id = o.id AND v.id NOT IN (SELECT id FROM qa_vouchers));
 
 -- ---------------------------------------------------------------------------------------------
--- Report. Before the DELETEs, so a wrong `-v station_id` is visible in the scrollback.
+-- Report. Before the DELETEs, so a wrong `-v brand` is visible in the scrollback.
 -- ---------------------------------------------------------------------------------------------
 
-\echo '--- QA offers to remove ---'
-SELECT o.station_id, o.fuel_type_id,
-       (SELECT count(*) FROM qa_volumes v WHERE v.offer_id = o.id) AS volumes,
-       (SELECT count(*) FROM fuel_vouchers v
-        WHERE v.data_kind = 'qa' AND v.fuel_type_id = o.fuel_type_id
-          AND (:'qa_all_stations'::boolean OR lower(v.brand) = lower(o.station_id))) AS qa_vouchers
-FROM qa_offers o ORDER BY station_id, fuel_type_id;
-
-\echo '--- QA volumes to remove ---'
-SELECT count(*) AS volumes FROM qa_volumes;
+\echo '--- QA catalogue to remove ---'
+SELECT n.brand, n.fuel_type_id, n.liters,
+       (SELECT count(*) FROM qa_vouchers q
+          JOIN fuel_vouchers v ON v.id = q.id
+         WHERE v.fuel_type_id = n.fuel_type_id
+           AND v.liters = n.liters
+           AND lower(v.brand) = n.brand) AS qa_vouchers
+FROM qa_nominals n ORDER BY brand, fuel_type_id, liters;
 
 \echo '--- QA vouchers to remove, by status ---'
 SELECT v.status, count(*)
@@ -290,25 +292,27 @@ WHERE name = 'QA Supplier (emulated)'
   AND NOT EXISTS (SELECT 1 FROM movement_batches m WHERE m.supplier_id = suppliers.id)
   AND NOT EXISTS (SELECT 1 FROM voucher_exchanges e WHERE e.supplier_id = suppliers.id);
 
--- The catalogue itself. Volumes first, then prices, then offers: `FK_fuel_offer_volumes_fuel_offers_offer_id`
--- and `FK_fuel_offer_prices_fuel_offers_offer_id` are both RESTRICT. Deleted rows included - the twins
--- were never archived, and an archived QA offer is still a QA offer.
+-- The catalogue itself: the QA size list, and the QA price history.
 --
 -- `fuel_offer_prices` since 20261017142210 (AddFuelOfferPriceHistory): a price row is a record of
--- something sold, so the offer it was sold under RESTRICTs - which is the point, and which means the
--- history has to go first when a whole pool is decommissioned.
-DELETE FROM fuel_offer_volumes WHERE id IN (SELECT id FROM qa_volumes);
-
+-- something sold, so the fuel it was sold under RESTRICTs - which is the point, and which means the
+-- history has to go first when a whole pool is decommissioned. The table is guarded rather than
+-- assumed, so a database that has not taken the migration yet still runs this script.
 SELECT EXISTS (
     SELECT 1 FROM information_schema.tables
     WHERE table_schema = 'public' AND table_name = 'fuel_offer_prices'
 ) AS has_price_history \gset
 
 \if :has_price_history
-DELETE FROM fuel_offer_prices WHERE offer_id IN (SELECT id FROM qa_offers);
+DELETE FROM fuel_offer_prices WHERE data_kind = 'qa';
 \endif
 
-DELETE FROM fuel_offers WHERE id IN (SELECT id FROM qa_offers);
+-- The QA nominals. There is no offer row to delete any more: the twin IS a nominal, and the pool
+-- lives on it.
+DELETE FROM fuel_nominals
+WHERE data_kind = 'qa'
+  AND fuel_type_id IN (SELECT fuel_type_id FROM qa_nominals)
+  AND liters IN (SELECT liters FROM qa_nominals WHERE qa_nominals.fuel_type_id = fuel_nominals.fuel_type_id);
 
 -- ---------------------------------------------------------------------------------------------
 -- After. Each check is a hard question about what the run was supposed to achieve, so a leftover
@@ -319,20 +323,22 @@ DELETE FROM fuel_offers WHERE id IN (SELECT id FROM qa_offers);
 \if :has_price_history
 SELECT 'qa_offer_prices_left' AS check, count(*) AS value FROM fuel_offer_prices WHERE data_kind = 'qa'
 UNION ALL
+SELECT 'qa_nominals_left', count(*) FROM fuel_nominals WHERE data_kind = 'qa'
+UNION ALL
 SELECT 'qa_vouchers_left', count(*) FROM fuel_vouchers WHERE data_kind = 'qa'
 UNION ALL
 SELECT 'qa_imports_left', count(*) FROM voucher_imports WHERE file_name LIKE 'QA-EMULATED-%'
 UNION ALL
 SELECT 'qa_supplier_left', count(*) FROM suppliers WHERE name = 'QA Supplier (emulated)'
 UNION ALL
-SELECT 'real_offers_kept', count(*) FROM fuel_offers WHERE data_kind = 'real' AND NOT is_deleted;
+SELECT 'real_nominals_kept', count(*) FROM fuel_nominals WHERE data_kind = 'real';
 \else
 \echo 'fuel_offer_prices is not present on this database - skipped that check.'
-SELECT 'qa_offers_left' AS check, count(*) AS value FROM fuel_offers WHERE data_kind = 'qa'
+SELECT 'qa_nominals_left' AS check, count(*) AS value FROM fuel_nominals WHERE data_kind = 'qa'
 UNION ALL SELECT 'qa_vouchers_left', count(*) FROM fuel_vouchers WHERE data_kind = 'qa'
 UNION ALL SELECT 'qa_imports_left', count(*) FROM voucher_imports WHERE file_name LIKE 'QA-EMULATED-%'
 UNION ALL SELECT 'qa_supplier_left', count(*) FROM suppliers WHERE name = 'QA Supplier (emulated)'
-UNION ALL SELECT 'real_offers_kept', count(*) FROM fuel_offers WHERE data_kind = 'real' AND NOT is_deleted;
+UNION ALL SELECT 'real_nominals_kept', count(*) FROM fuel_nominals WHERE data_kind = 'real';
 \endif
 
 \echo 'Orders that mix pools and were therefore left alone - inspect by hand, not an error:'

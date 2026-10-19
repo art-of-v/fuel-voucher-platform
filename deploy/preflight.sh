@@ -92,11 +92,11 @@ done
 # ------------------------------------------------------------------------------
 check_data_preconditions() {
   echo "== data preconditions =="
-  local violated=0 checked=0 sql name rows
+  local violated=0 checked=0 unreadable=0 sql name rows psql_out psql_status
   # The names, not just the count. A blocking message that says "1 precondition violated" sends
   # someone hunting through the log for which file; the file is already known here and is the one
   # thing worth reading, because its header explains what the condition means and what to do.
-  local -a violated_files=()
+  local -a violated_files=() unreadable_files=()
 
   if [[ ! -d preflight-db ]]; then
     echo "  no preflight-db directory (nothing to check)"
@@ -117,16 +117,36 @@ check_data_preconditions() {
       continue
     fi
 
-    checked=$((checked + 1))
     # Count lines carrying the field separator, NOT non-empty lines. psql writes its own output to
-    # stdout — "BEGIN", "SET", "(0 rows)", "COMMIT" — and counting those made this report
+    # stdout - "BEGIN", "SET", "(0 rows)", "COMMIT" - and counting those made this report
     # "VIOLATED - 3 row(s)" against a completely clean production database, then print "(0 rows)"
     # as the detail underneath. It shipped that way and fired on the first real deploy.
     #
     # A gate that fires on a healthy system is worse than no gate, because it is a gate people
     # learn to skip. Every row this query emits is pipe-separated, because the runner asks psql for
     # -F'|'; psql's own chatter contains no pipe.
-    rows="$(docker exec -i fuelflow-postgres psql -U fuelflow -d fuelflow -X -t -A -F'|' -f - < "$sql" 2>/dev/null | grep -c '|' || true)"
+    #
+    # ON_ERROR_STOP=1 AND THE OUTPUT ARE BOTH NEEDED, and they are one fix rather than two.
+    # `2>/dev/null | grep -c '|'` counted an aborted query as zero rows, because a SQL error
+    # produces no stdout and psql exits 0 anyway: `011` grouped by `f.station_id` for a week after
+    # that column was renamed to `brand_id`, and every deploy printed
+    # "011-fuel-type-name-twins.sql: ok" over a query PostgreSQL had refused. The two halves are
+    # what make that impossible: the setting is what makes psql exit non-zero on a SQL error, and
+    # capturing it is what lets the exit code be seen at all instead of being thrown away with the
+    # stderr. A check that cannot run is now reported as one that did not run.
+    psql_status=0
+    psql_out="$(docker exec -i fuelflow-postgres psql -U fuelflow -d fuelflow -X -t -A -F'|' \
+      -v ON_ERROR_STOP=1 -f - < "$sql" 2>&1)" || psql_status=$?
+    if [[ "$psql_status" -ne 0 ]]; then
+      unreadable=$((unreadable + 1))
+      unreadable_files+=("$name")
+      # The first ERROR line is the whole answer; the rest of psql's chatter is noise.
+      warn "$name: COULD NOT RUN - the query failed (psql exit ${psql_status}), so nothing was checked: $(grep -m1 -E '^(psql:)?ERROR' <<<"$psql_out" || echo 'psql reported no error line')"
+      continue
+    fi
+
+    checked=$((checked + 1))
+    rows="$(grep -c '|' <<<"$psql_out" || true)"
     if [[ "${rows:-0}" -eq 0 ]]; then
       echo "  $name: ok"
     else
@@ -141,8 +161,17 @@ check_data_preconditions() {
   # printed it whenever nothing was violated - including when the database was unreachable and no
   # query had run at all - which is precisely the failure this file exists to stop: silence read as
   # a clean system. A check that cannot tell "clean" from "did not run" is worse than none.
+  #
+  # "did not run" has two shapes, and both count here: the database was unreachable (nothing
+  # checked), and a query PostgreSQL refused (that one file, the rest still answered). The second
+  # is the one that shipped silently - a check naming a column that no longer exists reported
+  # "ok" for a week. So a file that could not run is excluded from the satisfied line rather than
+  # counted into it.
+  if [[ $unreadable -gt 0 ]]; then
+    echo "  ${unreadable} precondition(s) could NOT be run: ${unreadable_files[*]}"
+  fi
   if [[ $violated -eq 0 && $checked -gt 0 ]]; then
-    echo "  all data preconditions satisfied (${checked} checked)"
+    echo "  all data preconditions that ran are satisfied (${checked} checked)"
   elif [[ $checked -eq 0 ]]; then
     echo "  NO precondition was checked - see the warnings above"
   fi
