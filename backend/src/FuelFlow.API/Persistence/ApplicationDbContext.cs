@@ -152,6 +152,34 @@ private readonly FuelFlow.Features.Vouchers.Security.IQrCipher _qrCipher;
 
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
 
+        // One naming convention for every index EF named for itself.
+        //
+        // EF's default index name is "IX_<table>_<column>", in the table's own PascalCase style.
+        // The hand-written indexes in this schema have been "ix_..." and "ux_..." from the start, so
+        // the two conventions sat side by side in one database: 134 indexes called IX_ and 93
+        // called ix_ or ux_. Two thirds of the answer to "what is this index called" was "it depends
+        // on who made it".
+        //
+        // Lowercasing the prefix is the whole change, and it is done in one place rather than in
+        // fifty configuration files: the alternative is a HasDatabaseName call on every index, which
+        // is a diff nobody can review and a name nobody has to think about twice.
+        //
+        // Only the prefix moves. The table and column parts are EF's own, and they stay exactly
+        // what they were - so "IX_orders_user_id" becomes "ix_orders_user_id" and nothing else
+        // about the index changes. An index that already has a name is left alone: those are the
+        // hand-written ones, and their names are deliberate.
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            foreach (var index in entityType.GetIndexes())
+            {
+                var name = index.GetDatabaseName();
+                if (name is null || !name.StartsWith("IX_", StringComparison.Ordinal))
+                    continue;
+
+                index.SetDatabaseName("ix_" + name[3..]);
+            }
+        }
+
         // The QR payload is encrypted on its way into the column and decrypted on the way out, so
         // the ~19 call sites that read or write it are unchanged. Applied here rather than in
         // FuelVoucherConfiguration because the converter needs the cipher instance and that

@@ -106,14 +106,18 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("InvoiceId");
+                    b.HasIndex("InvoiceId")
+                        .HasDatabaseName("ix_monobank_statement_entries_invoice_id");
 
-                    b.HasIndex("Reference");
+                    b.HasIndex("Reference")
+                        .HasDatabaseName("ix_monobank_statement_entries_reference");
 
-                    b.HasIndex("Merchant", "AcquirerCreatedAtUtc");
+                    b.HasIndex("Merchant", "AcquirerCreatedAtUtc")
+                        .HasDatabaseName("ix_monobank_statement_entries_merchant_acquirer_created_at_utc");
 
                     b.HasIndex("Merchant", "StatementId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_monobank_statement_entries_merchant_statement_id");
 
                     b.ToTable("monobank_statement_entries", (string)null);
                 });
@@ -172,11 +176,14 @@ namespace FuelFlow.API.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("DeviceId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_devices_device_id");
 
-                    b.HasIndex("LastSeenAt");
+                    b.HasIndex("LastSeenAt")
+                        .HasDatabaseName("ix_devices_last_seen_at");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_devices_user_id");
 
                     b.ToTable("devices", null, t =>
                         {
@@ -233,16 +240,21 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("FamilyId");
+                    b.HasIndex("FamilyId")
+                        .HasDatabaseName("ix_refresh_tokens_family_id");
 
                     b.HasIndex("Token")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_refresh_tokens_token");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_refresh_tokens_user_id");
 
-                    b.HasIndex("UserId", "DeviceId");
+                    b.HasIndex("UserId", "DeviceId")
+                        .HasDatabaseName("ix_refresh_tokens_user_id_device_id");
 
-                    b.HasIndex("UserId", "IsRevoked");
+                    b.HasIndex("UserId", "IsRevoked")
+                        .HasDatabaseName("ix_refresh_tokens_user_id_is_revoked");
 
                     b.ToTable("refresh_tokens", (string)null);
                 });
@@ -290,12 +302,15 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ExpiresAtUtc");
+                    b.HasIndex("ExpiresAtUtc")
+                        .HasDatabaseName("ix_verification_codes_expires_at_utc");
 
-                    b.HasIndex("PhoneNumber");
+                    b.HasIndex("PhoneNumber")
+                        .HasDatabaseName("ix_verification_codes_phone_number");
 
                     b.HasIndex("PhoneNumber", "IsUsed", "ExpiresAtUtc")
-                        .IsDescending(false, false, true);
+                        .IsDescending(false, false, true)
+                        .HasDatabaseName("ix_verification_codes_phone_number_is_used_expires_at_utc");
 
                     b.ToTable("verification_codes", (string)null);
                 });
@@ -341,13 +356,17 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("LegalEntityId");
+                    b.HasIndex("LegalEntityId")
+                        .HasDatabaseName("ix_company_invitations_legal_entity_id");
 
-                    b.HasIndex("OwnerUserId");
+                    b.HasIndex("OwnerUserId")
+                        .HasDatabaseName("ix_company_invitations_owner_user_id");
 
-                    b.HasIndex("WorkerUserId");
+                    b.HasIndex("WorkerUserId")
+                        .HasDatabaseName("ix_company_invitations_worker_user_id");
 
-                    b.HasIndex("WorkerUserId", "Status");
+                    b.HasIndex("WorkerUserId", "Status")
+                        .HasDatabaseName("ix_company_invitations_worker_user_id_status");
 
                     b.ToTable("company_invitations", null, t =>
                         {
@@ -384,7 +403,8 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("LegalEntityId");
+                    b.HasIndex("LegalEntityId")
+                        .HasDatabaseName("ix_company_members_legal_entity_id");
 
                     b.HasIndex("WorkerUserId")
                         .HasDatabaseName("ix_company_members_worker_user_id");
@@ -422,11 +442,14 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("BrandId");
+                    b.HasIndex("BrandId")
+                        .HasDatabaseName("ix_contracts_brand_id");
 
-                    b.HasIndex("LegalEntityId");
+                    b.HasIndex("LegalEntityId")
+                        .HasDatabaseName("ix_contracts_legal_entity_id");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_contracts_user_id");
 
                     b.ToTable("contracts", (string)null);
                 });
@@ -490,9 +513,11 @@ namespace FuelFlow.API.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Edrpou")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_legal_entities_edrpou");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_legal_entities_user_id");
 
                     b.ToTable("legal_entities", (string)null);
                 });
@@ -522,9 +547,11 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ContractId");
+                    b.HasIndex("ContractId")
+                        .HasDatabaseName("ix_user_contracts_contract_id");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_user_contracts_user_id");
 
                     b.ToTable("user_contracts", (string)null);
                 });
@@ -548,7 +575,8 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("TelegramChatId");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_feedback_chat_bindings_user_id");
 
                     b.ToTable("feedback_chat_bindings", (string)null);
                 });
@@ -651,14 +679,18 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Category");
+                    b.HasIndex("Category")
+                        .HasDatabaseName("ix_feedback_messages_category");
 
-                    b.HasIndex("CreatedAtUtc");
+                    b.HasIndex("CreatedAtUtc")
+                        .HasDatabaseName("ix_feedback_messages_created_at_utc");
 
-                    b.HasIndex("Status");
+                    b.HasIndex("Status")
+                        .HasDatabaseName("ix_feedback_messages_status");
 
                     b.HasIndex("TelegramChatId", "TelegramMessageId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_feedback_messages_telegram_chat_id_telegram_message_id");
 
                     b.ToTable("feedback_messages", null, t =>
                         {
@@ -715,9 +747,11 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("FeedbackMessageId");
+                    b.HasIndex("FeedbackMessageId")
+                        .HasDatabaseName("ix_feedback_message_replies_feedback_message_id");
 
-                    b.HasIndex("SentAtUtc");
+                    b.HasIndex("SentAtUtc")
+                        .HasDatabaseName("ix_feedback_message_replies_sent_at_utc");
 
                     b.ToTable("feedback_message_replies", (string)null);
                 });
@@ -755,12 +789,15 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ClosedByUserId");
+                    b.HasIndex("ClosedByUserId")
+                        .HasDatabaseName("ix_accounting_periods_closed_by_user_id");
 
                     b.HasIndex("PeriodStart")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_accounting_periods_period_start");
 
-                    b.HasIndex("PeriodStart", "PeriodEnd");
+                    b.HasIndex("PeriodStart", "PeriodEnd")
+                        .HasDatabaseName("ix_accounting_periods_period_start_period_end");
 
                     b.ToTable("accounting_periods", null, t =>
                         {
@@ -815,10 +852,12 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("OperatorLegalEntityId");
+                    b.HasIndex("OperatorLegalEntityId")
+                        .HasDatabaseName("ix_bank_accounts_operator_legal_entity_id");
 
                     b.HasIndex("OperatorLegalEntityId", "BankCode", "AccountRef")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_bank_accounts_operator_legal_entity_id_bank_code_account_ref");
 
                     b.ToTable("bank_accounts", null, t =>
                         {
@@ -884,9 +923,11 @@ namespace FuelFlow.API.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Code")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_chart_of_accounts_code");
 
-                    b.HasIndex("ParentId");
+                    b.HasIndex("ParentId")
+                        .HasDatabaseName("ix_chart_of_accounts_parent_id");
 
                     b.ToTable("chart_of_accounts", null, t =>
                         {
@@ -922,7 +963,8 @@ namespace FuelFlow.API.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Name")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_document_sequences_name");
 
                     b.ToTable("document_sequences", null, t =>
                         {
@@ -1006,19 +1048,25 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CreatedByUserId");
+                    b.HasIndex("CreatedByUserId")
+                        .HasDatabaseName("ix_journal_entries_created_by_user_id");
 
-                    b.HasIndex("PostedByUserId");
+                    b.HasIndex("PostedByUserId")
+                        .HasDatabaseName("ix_journal_entries_posted_by_user_id");
 
-                    b.HasIndex("ReversedByEntryId");
+                    b.HasIndex("ReversedByEntryId")
+                        .HasDatabaseName("ix_journal_entries_reversed_by_entry_id");
 
                     b.HasIndex("PeriodId", "EntryNo")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_journal_entries_period_id_entry_no");
 
-                    b.HasIndex("SourceType", "SourceId");
+                    b.HasIndex("SourceType", "SourceId")
+                        .HasDatabaseName("ix_journal_entries_source_type_source_id");
 
                     b.HasIndex("SourceEvent", "SourceType", "SourceId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_journal_entries_source_event_source_type_source_id");
 
                     b.ToTable("journal_entries", null, t =>
                         {
@@ -1094,16 +1142,21 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AccountId");
+                    b.HasIndex("AccountId")
+                        .HasDatabaseName("ix_journal_lines_account_id");
 
-                    b.HasIndex("LegalEntityId");
+                    b.HasIndex("LegalEntityId")
+                        .HasDatabaseName("ix_journal_lines_legal_entity_id");
 
-                    b.HasIndex("PartyId");
+                    b.HasIndex("PartyId")
+                        .HasDatabaseName("ix_journal_lines_party_id");
 
-                    b.HasIndex("VoucherId");
+                    b.HasIndex("VoucherId")
+                        .HasDatabaseName("ix_journal_lines_voucher_id");
 
                     b.HasIndex("EntryId", "LineNo")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_journal_lines_entry_id_line_no");
 
                     b.ToTable("journal_lines", null, t =>
                         {
@@ -1148,10 +1201,12 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AccountId");
+                    b.HasIndex("AccountId")
+                        .HasDatabaseName("ix_ledger_mapping_rules_account_id");
 
                     b.HasIndex("SourceEvent", "Side")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_ledger_mapping_rules_source_event_side");
 
                     b.ToTable("ledger_mapping_rules", null, t =>
                         {
@@ -1250,7 +1305,8 @@ namespace FuelFlow.API.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Edrpou")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_operator_legal_entities_edrpou");
 
                     b.HasIndex("IsActive")
                         .IsUnique()
@@ -1343,12 +1399,15 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("IsRead", "CreatedAtUtc");
+                    b.HasIndex("IsRead", "CreatedAtUtc")
+                        .HasDatabaseName("ix_notifications_is_read_created_at_utc");
 
                     b.HasIndex("UserId", "CreatedAtUtc")
-                        .IsDescending(false, true);
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_notifications_user_id_created_at_utc");
 
-                    b.HasIndex("UserId", "IsRead");
+                    b.HasIndex("UserId", "IsRead")
+                        .HasDatabaseName("ix_notifications_user_id_is_read");
 
                     b.ToTable("notifications", (string)null);
                 });
@@ -1399,12 +1458,15 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("LastSeenAtUtc");
+                    b.HasIndex("LastSeenAtUtc")
+                        .HasDatabaseName("ix_push_tokens_last_seen_at_utc");
 
                     b.HasIndex("Token")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_push_tokens_token");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_push_tokens_user_id");
 
                     b.ToTable("push_tokens", (string)null);
                 });
@@ -1450,12 +1512,15 @@ namespace FuelFlow.API.Migrations
                         .HasFilter("released_at_utc IS NULL");
 
                     b.HasIndex("OrderId")
+                        .HasDatabaseName("ix_fulfillments_order_id")
                         .HasFilter("released_at_utc IS NULL");
 
                     b.HasIndex("ReleasedAtUtc")
+                        .HasDatabaseName("ix_fulfillments_released_at_utc")
                         .HasFilter("released_at_utc IS NOT NULL");
 
-                    b.HasIndex("VoucherId");
+                    b.HasIndex("VoucherId")
+                        .HasDatabaseName("ix_fulfillments_voucher_id");
 
                     b.ToTable("fulfillments", (string)null);
                 });
@@ -1560,25 +1625,31 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CreatedAtUtc");
+                    b.HasIndex("CreatedAtUtc")
+                        .HasDatabaseName("ix_orders_created_at_utc");
 
                     b.HasIndex("IdempotencyKey")
                         .IsUnique()
+                        .HasDatabaseName("ix_orders_idempotency_key")
                         .HasFilter("idempotency_key IS NOT NULL");
 
-                    b.HasIndex("LegalEntityId");
+                    b.HasIndex("LegalEntityId")
+                        .HasDatabaseName("ix_orders_legal_entity_id");
 
                     b.HasIndex("MonobankInvoiceId")
                         .IsUnique()
-                        .HasDatabaseName("IX_orders_monobank_invoice_id")
+                        .HasDatabaseName("ix_orders_monobank_invoice_id")
                         .HasFilter("monobank_invoice_id IS NOT NULL");
 
-                    b.HasIndex("SourceOrderId");
+                    b.HasIndex("SourceOrderId")
+                        .HasDatabaseName("ix_orders_source_order_id");
 
                     b.HasIndex("UserId", "CreatedAtUtc")
-                        .IsDescending(false, true);
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_orders_user_id_created_at_utc");
 
-                    b.HasIndex("UserId", "Status");
+                    b.HasIndex("UserId", "Status")
+                        .HasDatabaseName("ix_orders_user_id_status");
 
                     b.ToTable("orders", null, t =>
                         {
@@ -1663,11 +1734,14 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Brand");
+                    b.HasIndex("Brand")
+                        .HasDatabaseName("ix_order_line_items_brand");
 
-                    b.HasIndex("FuelTypeId");
+                    b.HasIndex("FuelTypeId")
+                        .HasDatabaseName("ix_order_line_items_fuel_type_id");
 
-                    b.HasIndex("OrderId");
+                    b.HasIndex("OrderId")
+                        .HasDatabaseName("ix_order_line_items_order_id");
 
                     b.HasIndex("SourceVoucherId")
                         .HasDatabaseName("ix_order_line_items_source_voucher_id");
@@ -1730,9 +1804,11 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CreatedAtUtc");
+                    b.HasIndex("CreatedAtUtc")
+                        .HasDatabaseName("ix_outbox_events_created_at_utc");
 
-                    b.HasIndex("Processed");
+                    b.HasIndex("Processed")
+                        .HasDatabaseName("ix_outbox_events_processed");
 
                     b.ToTable("outbox_events", null, t =>
                         {
@@ -1916,7 +1992,8 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("PaymentId");
+                    b.HasIndex("PaymentId")
+                        .HasDatabaseName("ix_settlement_messages_payment_id");
 
                     b.HasIndex("SentAtUtc")
                         .HasDatabaseName("ix_settlement_messages_refusals")
@@ -1981,7 +2058,8 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CreatedAtUtc");
+                    b.HasIndex("CreatedAtUtc")
+                        .HasDatabaseName("ix_support_messages_created_at_utc");
 
                     b.ToTable("support_messages", (string)null);
                 });
@@ -2223,14 +2301,18 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ExchangeBatchId");
+                    b.HasIndex("ExchangeBatchId")
+                        .HasDatabaseName("ix_voucher_exchanges_exchange_batch_id");
 
-                    b.HasIndex("NewVoucherId");
+                    b.HasIndex("NewVoucherId")
+                        .HasDatabaseName("ix_voucher_exchanges_new_voucher_id");
 
                     b.HasIndex("OldVoucherId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_voucher_exchanges_old_voucher_id");
 
-                    b.HasIndex("SupplierId");
+                    b.HasIndex("SupplierId")
+                        .HasDatabaseName("ix_voucher_exchanges_supplier_id");
 
                     b.ToTable("voucher_exchanges", null, t =>
                         {
@@ -2408,37 +2490,51 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CustomerExpirationDate");
+                    b.HasIndex("CustomerExpirationDate")
+                        .HasDatabaseName("ix_fuel_vouchers_customer_expiration_date");
 
-                    b.HasIndex("ImportJobId");
+                    b.HasIndex("ImportJobId")
+                        .HasDatabaseName("ix_fuel_vouchers_import_job_id");
 
-                    b.HasIndex("OrderId");
+                    b.HasIndex("OrderId")
+                        .HasDatabaseName("ix_fuel_vouchers_order_id");
 
-                    b.HasIndex("QrParametersId");
+                    b.HasIndex("QrParametersId")
+                        .HasDatabaseName("ix_fuel_vouchers_qr_parameters_id");
 
                     b.HasIndex("QrPayloadSha256")
                         .IsUnique()
+                        .HasDatabaseName("ix_fuel_vouchers_qr_payload_sha256")
                         .HasFilter("is_deleted = false");
 
-                    b.HasIndex("SupplierExpirationDate");
+                    b.HasIndex("SupplierExpirationDate")
+                        .HasDatabaseName("ix_fuel_vouchers_supplier_expiration_date");
 
-                    b.HasIndex("SupplierId");
+                    b.HasIndex("SupplierId")
+                        .HasDatabaseName("ix_fuel_vouchers_supplier_id");
 
                     b.HasIndex("VoucherNumber")
                         .IsUnique()
+                        .HasDatabaseName("ix_fuel_vouchers_voucher_number")
                         .HasFilter("is_deleted = false");
 
-                    b.HasIndex("WorkerUserId");
+                    b.HasIndex("WorkerUserId")
+                        .HasDatabaseName("ix_fuel_vouchers_worker_user_id");
 
-                    b.HasIndex("AssignedToUserId", "Status");
+                    b.HasIndex("AssignedToUserId", "Status")
+                        .HasDatabaseName("ix_fuel_vouchers_assigned_to_user_id_status");
 
-                    b.HasIndex("FuelTypeId", "Status", "IsDeleted");
+                    b.HasIndex("FuelTypeId", "Status", "IsDeleted")
+                        .HasDatabaseName("ix_fuel_vouchers_fuel_type_id_status_is_deleted");
 
-                    b.HasIndex("Status", "DataKind", "IsDeleted");
+                    b.HasIndex("Status", "DataKind", "IsDeleted")
+                        .HasDatabaseName("ix_fuel_vouchers_status_data_kind_is_deleted");
 
-                    b.HasIndex("Brand", "FuelTypeId", "Liters", "Status");
+                    b.HasIndex("Brand", "FuelTypeId", "Liters", "Status")
+                        .HasDatabaseName("ix_fuel_vouchers_brand_fuel_type_id_liters_status");
 
-                    b.HasIndex("LegalEntityId", "WorkerUserId", "Status", "IsDeleted");
+                    b.HasIndex("LegalEntityId", "WorkerUserId", "Status", "IsDeleted")
+                        .HasDatabaseName("ix_fuel_vouchers_legal_entity_id_worker_user_id_status_is_dele~");
 
                     b.ToTable("fuel_vouchers", null, t =>
                         {
@@ -2604,7 +2700,8 @@ namespace FuelFlow.API.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("EccLevel", "Version", "MaskPattern", "EncodingMode")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_qr_parameters_ecc_level_version_mask_pattern_encoding_mode");
 
                     NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("EccLevel", "Version", "MaskPattern", "EncodingMode"), false);
 
@@ -2691,13 +2788,17 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CreatedAtUtc");
+                    b.HasIndex("CreatedAtUtc")
+                        .HasDatabaseName("ix_operator_voucher_renewals_created_at_utc");
 
-                    b.HasIndex("CustomerUserId");
+                    b.HasIndex("CustomerUserId")
+                        .HasDatabaseName("ix_operator_voucher_renewals_customer_user_id");
 
-                    b.HasIndex("ReplacementVoucherId");
+                    b.HasIndex("ReplacementVoucherId")
+                        .HasDatabaseName("ix_operator_voucher_renewals_replacement_voucher_id");
 
-                    b.HasIndex("VoucherId");
+                    b.HasIndex("VoucherId")
+                        .HasDatabaseName("ix_operator_voucher_renewals_voucher_id");
 
                     b.ToTable("operator_voucher_renewals", null, t =>
                         {
@@ -2763,9 +2864,11 @@ namespace FuelFlow.API.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("StartedAtUtc")
-                        .IsDescending();
+                        .IsDescending()
+                        .HasDatabaseName("ix_voucher_imports_started_at_utc");
 
-                    b.HasIndex("Status");
+                    b.HasIndex("Status")
+                        .HasDatabaseName("ix_voucher_imports_status");
 
                     b.ToTable("voucher_imports", null, t =>
                         {
@@ -2812,7 +2915,8 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ImportId");
+                    b.HasIndex("ImportId")
+                        .HasDatabaseName("ix_voucher_import_errors_import_id");
 
                     b.ToTable("voucher_import_errors", (string)null);
                 });
@@ -2937,7 +3041,8 @@ namespace FuelFlow.API.Migrations
                         .HasDatabaseName("ix_payments_unallocated")
                         .HasFilter("order_id IS NULL AND status = 'Succeeded'");
 
-                    b.HasIndex("CreatedByUserId");
+                    b.HasIndex("CreatedByUserId")
+                        .HasDatabaseName("ix_payments_created_by_user_id");
 
                     b.HasIndex("OrderId")
                         .IsUnique()
@@ -2947,7 +3052,8 @@ namespace FuelFlow.API.Migrations
                     b.HasIndex("ParentPaymentId")
                         .HasDatabaseName("ix_payments_parent_payment_id");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_payments_user_id");
 
                     b.HasIndex("WebhookEventId")
                         .HasDatabaseName("ix_payments_webhook_event_id");
@@ -3157,12 +3263,15 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AggregateId");
+                    b.HasIndex("AggregateId")
+                        .HasDatabaseName("ix_provider_event_outbox_aggregate_id");
 
-                    b.HasIndex("ChangedAtUtc");
+                    b.HasIndex("ChangedAtUtc")
+                        .HasDatabaseName("ix_provider_event_outbox_changed_at_utc");
 
                     b.HasIndex("EventType", "ChangedAtUtc")
-                        .IsDescending(false, true);
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_provider_event_outbox_event_type_changed_at_utc");
 
                     b.ToTable("provider_event_outbox", (string)null);
                 });
@@ -3224,10 +3333,12 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Name");
+                    b.HasIndex("Name")
+                        .HasDatabaseName("ix_brands_name");
 
                     b.HasIndex("Slug")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_brands_slug");
 
                     b.ToTable("brands", null, t =>
                         {
@@ -3356,7 +3467,8 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("BrandId");
+                    b.HasIndex("BrandId")
+                        .HasDatabaseName("ix_brand_stations_brand_id");
 
                     b.HasIndex("BrandId", "ExternalId")
                         .IsUnique()
@@ -3442,15 +3554,20 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Level");
+                    b.HasIndex("Level")
+                        .HasDatabaseName("ix_error_logs_level");
 
-                    b.HasIndex("LoggedAtUtc");
+                    b.HasIndex("LoggedAtUtc")
+                        .HasDatabaseName("ix_error_logs_logged_at_utc");
 
-                    b.HasIndex("Source");
+                    b.HasIndex("Source")
+                        .HasDatabaseName("ix_error_logs_source");
 
-                    b.HasIndex("TraceId");
+                    b.HasIndex("TraceId")
+                        .HasDatabaseName("ix_error_logs_trace_id");
 
-                    b.HasIndex("ResolvedAtUtc", "LoggedAtUtc");
+                    b.HasIndex("ResolvedAtUtc", "LoggedAtUtc")
+                        .HasDatabaseName("ix_error_logs_resolved_at_utc_logged_at_utc");
 
                     b.ToTable("error_logs", (string)null);
                 });
@@ -3556,7 +3673,8 @@ namespace FuelFlow.API.Migrations
                     b.HasIndex("BrandId")
                         .HasDatabaseName("ix_fuel_offer_prices_brand_id");
 
-                    b.HasIndex("ChangedByUserId");
+                    b.HasIndex("ChangedByUserId")
+                        .HasDatabaseName("ix_fuel_offer_prices_changed_by_user_id");
 
                     b.HasIndex("FuelTypeId", "EffectiveFromUtc")
                         .HasDatabaseName("ix_fuel_offer_prices_fuel_effective");
@@ -3654,9 +3772,11 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("BrandId");
+                    b.HasIndex("BrandId")
+                        .HasDatabaseName("ix_fuel_types_brand_id");
 
-                    b.HasIndex("Name");
+                    b.HasIndex("Name")
+                        .HasDatabaseName("ix_fuel_types_name");
 
                     b.HasIndex("BrandId", "BrandFuelCode")
                         .IsUnique()
@@ -3895,11 +4015,14 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ExternalRef");
+                    b.HasIndex("ExternalRef")
+                        .HasDatabaseName("ix_order_events_external_ref");
 
-                    b.HasIndex("OccurredAtUtc");
+                    b.HasIndex("OccurredAtUtc")
+                        .HasDatabaseName("ix_order_events_occurred_at_utc");
 
-                    b.HasIndex("OrderId", "OccurredAtUtc");
+                    b.HasIndex("OrderId", "OccurredAtUtc")
+                        .HasDatabaseName("ix_order_events_order_id_occurred_at_utc");
 
                     b.ToTable("order_events", null, t =>
                         {
@@ -3949,10 +4072,12 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("SupplierId");
+                    b.HasIndex("SupplierId")
+                        .HasDatabaseName("ix_purchase_batches_supplier_id");
 
                     b.HasIndex("ImportJobId", "FuelTypeId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_purchase_batches_import_job_id_fuel_type_id");
 
                     b.ToTable("purchase_batches", null, t =>
                         {
@@ -3988,7 +4113,8 @@ namespace FuelFlow.API.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Name")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_roles_name");
 
                     b.ToTable("roles", (string)null);
                 });
@@ -4063,10 +4189,12 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("IsActive");
+                    b.HasIndex("IsActive")
+                        .HasDatabaseName("ix_suppliers_is_active");
 
                     b.HasIndex("Name")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_suppliers_name");
 
                     b.ToTable("suppliers", null, t =>
                         {
@@ -4199,20 +4327,25 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("PartyId");
+                    b.HasIndex("PartyId")
+                        .HasDatabaseName("ix_users_party_id");
 
                     b.HasIndex("PhoneNumber")
                         .IsUnique()
+                        .HasDatabaseName("ix_users_phone_number")
                         .HasFilter("is_deleted = false");
 
                     b.HasIndex("ReferralCode")
                         .IsUnique()
+                        .HasDatabaseName("ix_users_referral_code")
                         .HasFilter("referral_code IS NOT NULL AND is_deleted = false");
 
-                    b.HasIndex("RoleId");
+                    b.HasIndex("RoleId")
+                        .HasDatabaseName("ix_users_role_id");
 
                     b.HasIndex("SettlementCode")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("ix_users_settlement_code");
 
                     b.ToTable("users", null, t =>
                         {
