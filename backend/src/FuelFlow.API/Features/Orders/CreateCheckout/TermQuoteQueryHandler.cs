@@ -43,6 +43,7 @@ var row = await (
             where offer.BrandId == BrandId
                   && offer.FuelTypeId == fuelTypeId
                   && nominal.Liters == liters
+                  && nominal.DataKind == pool
                   && offer.DataKind == pool
             select new { Offer = offer, Fuel = offer.FuelType! })
             .FirstOrDefaultAsync(cancellationToken);

@@ -39,10 +39,12 @@ public sealed class GetPublicPackagesByBrandQueryHandler
         var rows = await (
             from offer in _context.FuelOffers.AsNoTracking()
             join fuel in _context.FuelTypes.AsNoTracking() on offer.FuelTypeId equals fuel.Id
-            // The sizes are the fuel's, not the offer's - see GetPublicPackagesQueryHandler, which is
-            // the same query narrowed to one Brand.
-            from nominal in _context.FuelNominals.AsNoTracking() where nominal.FuelTypeId == fuel.Id
-            where offer.BrandId == query.BrandId
+// The sizes belong to the fuel AND the pool - see GetPublicPackagesQueryHandler, which is
+    // the same query narrowed to one Brand.
+    from nominal in _context.FuelNominals.AsNoTracking()
+    where nominal.FuelTypeId == fuel.Id
+          && nominal.DataKind == DataKinds.ForPool(isTestAccount)
+    where offer.BrandId == query.BrandId
                && offer.DataKind == DataKinds.ForPool(isTestAccount)
             orderby fuel.Name, nominal.Liters
             select new

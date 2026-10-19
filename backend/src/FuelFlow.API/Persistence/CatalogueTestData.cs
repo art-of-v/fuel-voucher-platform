@@ -184,6 +184,9 @@ var offer = context.SeedOffer(
         var nominal = new FuelNominal
         {
             FuelTypeId = fuelTypeId,
+            // The pool the fixture asked for: a rehearsal size is invisible to the live shelf, and
+            // a live size is not a rehearsal one. The caller says which by isTestData.
+            DataKind = offer.DataKind,
             Liters = liters,
             CreatedAtUtc = createdAtUtc ?? DateTime.UtcNow,
             UpdatedAtUtc = updatedAtUtc ?? DateTime.UtcNow,
@@ -193,8 +196,8 @@ var offer = context.SeedOffer(
         // collides on the primary key. The size is a fact about the fuel, not about this fixture, so
         // finding it already there is the correct answer rather than something to fail over.
         var alreadyListed =
-            context.FuelNominals.Local.Any(n => n.FuelTypeId == fuelTypeId && n.Liters == liters)
-            || context.FuelNominals.Any(n => n.FuelTypeId == fuelTypeId && n.Liters == liters);
+            context.FuelNominals.Local.Any(n => n.FuelTypeId == fuelTypeId && n.DataKind == offer.DataKind && n.Liters == liters)
+            || context.FuelNominals.Any(n => n.FuelTypeId == fuelTypeId && n.DataKind == offer.DataKind && n.Liters == liters);
         if (alreadyListed)
             return context.FuelNominals.Local.FirstOrDefault(n => n.FuelTypeId == fuelTypeId && n.Liters == liters)
                 ?? new FuelNominal { FuelTypeId = fuelTypeId, Liters = liters };

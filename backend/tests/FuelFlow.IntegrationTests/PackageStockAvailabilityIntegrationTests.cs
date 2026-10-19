@@ -298,15 +298,17 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
             });
         }
 
-        // Availability resolves sizes from fuel_nominals, so a fuel without one is a package the
-        // resolver cannot see. Stated once per (fuel, size): both pools of a fuel sell the same sizes.
-
-        // Availability resolves sizes from fuel_nominals, so a volume without one is a package the
-        // resolver cannot see. Stated once per (fuel, size): both pools of a fuel sell the same sizes.
-        if (!seed.FuelNominals.Local.Any(n => n.FuelTypeId == "okko-95" && n.Liters == liters)
-            && !seed.FuelNominals.Any(n => n.FuelTypeId == "okko-95" && n.Liters == liters))
+        // Availability resolves sizes from fuel_nominals, and the size list is per pool - so a
+        // rehearsal size exists only in the rehearsal pool and is invisible to the live shelf.
+        if (!seed.FuelNominals.Local.Any(n => n.FuelTypeId == "okko-95" && n.DataKind == pool && n.Liters == liters)
+            && !seed.FuelNominals.Any(n => n.FuelTypeId == "okko-95" && n.DataKind == pool && n.Liters == liters))
         {
-            seed.FuelNominals.Add(new FuelNominal { FuelTypeId = "okko-95", Liters = liters });
+            seed.FuelNominals.Add(new FuelNominal
+            {
+                FuelTypeId = "okko-95",
+                DataKind = pool,
+                Liters = liters
+            });
         }
     }
 

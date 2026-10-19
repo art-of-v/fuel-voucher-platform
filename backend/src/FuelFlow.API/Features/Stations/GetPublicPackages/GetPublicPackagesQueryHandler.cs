@@ -51,12 +51,13 @@ var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
     var rows = await (
     from offer in _context.FuelOffers.AsNoTracking()
     join fuel in _context.FuelTypes.AsNoTracking() on offer.FuelTypeId equals fuel.Id
-    // The sizes are the fuel's, not the offer's: a nominal row says the operator allows this size
-    // for sale, and the offer says what it costs in this pool. So the shelf is every nominal of
-    // every fuel the pool offers - the two pools of one fuel show the same sizes, which is the
-    // point: the pool separates stock and data, not the catalogue's shape.
-    from nominal in _context.FuelNominals.AsNoTracking() where nominal.FuelTypeId == fuel.Id
-    // `data_kind` lives on the offer, so the filter is on the offer.
+    // The sizes belong to the fuel AND the pool: a nominal row says the operator allows this size in
+    // this catalogue, so a 7 L canister that exists only to rehearse a pickup is not a size the
+    // public site lists. The filter is on the NOMINAL's pool, not the offer's - they answer the same
+    // question today and only the nominal's is load-bearing once the offer is gone.
+    from nominal in _context.FuelNominals.AsNoTracking()
+    where nominal.FuelTypeId == fuel.Id
+          && nominal.DataKind == DataKinds.ForPool(isTestAccount)
     where offer.DataKind == DataKinds.ForPool(isTestAccount)
     orderby offer.BrandId, fuel.Name, nominal.Liters
     // Fuel name moved to fuel_types with the rest of the fuel's identity when the offer was
