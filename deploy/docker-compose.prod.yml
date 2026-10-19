@@ -435,8 +435,35 @@ services:
       - log_min_duration_statement=1000
       - -c
       - track_io_timing=on
+      # WAL archiving, which is what turns the nightly dump into a recoverable history.
+      #
+      # The dump alone is a snapshot at 03:23. Everything that happened between the previous
+      # snapshot and it is gone, so the RPO is a full day - and this is a payment system, where
+      # a day of orders is a day of money. With archiving on, the write-ahead log is copied off
+      # the server as it fills, and a restore can replay it to any point in time.
+      #
+      # archive_timeout is the part that matters here and is the part that is usually forgotten:
+      # without it, a quiet database archives nothing, and the archive has a hole exactly when
+      # nothing is happening - which is when you would want to restore to. Five minutes bounds
+      # the gap in a quiet system to five minutes.
+      #
+      # The command is idempotent and refuses to overwrite: PostgreSQL will not archive the same
+      # segment twice, and a segment that is already there means the copy succeeded.
+      - -c
+      - wal_level=replica
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_timeout=300
+      - -c
+      - archive_command=test ! -f /var/lib/postgresql/wal/%f && cp %p /var/lib/postgresql/wal/%f
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      # The archive lives on the HOST, not inside the container's data volume, for two reasons.
+      # A container that is recreated takes its data volume with it but not a bind mount's
+      # contents - and the archive has to survive exactly that. And the backup script ships it
+      # off-box with rclone, which is easier from the host than from inside a container.
+      - ${WAL_ARCHIVE_DIR:-/root/fuelflow-wal}:/var/lib/postgresql/wal
     ports:
       - "127.0.0.1:5432:5432"   # localhost only — for backups / psql on the server, never public
     healthcheck:

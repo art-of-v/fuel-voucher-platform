@@ -212,8 +212,23 @@ services:
       - log_min_duration_statement=1000
       - -c
       - track_io_timing=on
+      # WAL archiving, same as production. Staging is a scratch database, so its recovery
+      # point objective is not the one that matters - but the CONFIGURATION has to be the same,
+      # because a setting that only exists on production is one nobody remembers exists, and
+      # the first time it matters is the day somebody needs to use it.
+      - -c
+      - wal_level=replica
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_timeout=300
+      - -c
+      - archive_command=test ! -f /var/lib/postgresql/wal/%f && cp %p /var/lib/postgresql/wal/%f
     volumes:
       - staging_postgres_data:/var/lib/postgresql/data
+      # A separate archive directory from production's: staging must never write into (or
+      # prune) production's WAL archive.
+      - ${STAGING_WAL_ARCHIVE_DIR:-/root/fuelflow-wal-staging}:/var/lib/postgresql/wal
     ports:
       # localhost only, and a DIFFERENT port from prod's 5432 so both can bind the loopback.
       - "127.0.0.1:55432:5432"
