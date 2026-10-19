@@ -22,3 +22,38 @@ export function fuelSaving(fuel: Pick<FuelType, 'basePrice' | 'discountPrice'>):
   const hasSaving = base > discount;
   return { amount: hasSaving ? base - discount : 0, hasSaving };
 }
+
+/**
+ * The price to show for a fuel, per litre.
+ *
+ * <p>WHICH price depends on whether the shop can sell it:
+ *
+ * <ul>
+ *   <li><b>available</b> — our own price: the cost plus the margin, capped at the pump. That is what
+ *       the customer pays, so it is what the row has to say.</li>
+ *   <li><b>not available</b> — the column price: what the network charges. We have no price of our
+ *       own to quote (an imported fuel has no margin until an operator sets one), and showing a zero
+ *       or a market price presented as ours is a lie the customer pays for.</li>
+ * </ul>
+ *
+ * <p>Null means there is no number to show at all, and the caller must NOT render a price in that
+ * case. A row that says "0 ₴" is a free fuel; a row that says nothing is a fuel we have not priced.
+ */
+export function fuelHeadlinePrice(
+  fuel: Pick<
+    FuelType,
+    'discountPrice' | 'pumpPricePerLiter' | 'finalPricePerLiter' | 'isAvailable'
+  >,
+): number | null {
+  const ours = fuel.finalPricePerLiter ?? undefined;
+  const column = fuel.pumpPricePerLiter ?? undefined;
+  const legacy = fuel.discountPrice || undefined;
+
+  const price = fuel.isAvailable
+    ? (ours ?? column ?? legacy)
+    : (column ?? ours ?? legacy);
+
+  // Zero is not a price. It is what an unpriced fuel carries in the column, and rendering it would
+  // put "0 ₴" on the shelf.
+  return price !== undefined && price > 0 ? price : null;
+}

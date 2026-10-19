@@ -223,6 +223,21 @@ var key = StockKey.For(row.BrandSlug, row.Fuel.Id, row.Liters);
     }
 
     /// <summary>
+    /// The fuels the given customer can buy today, in their own pool: every fuel with at least one
+    /// size that has live stock behind it.
+    /// </summary>
+    /// <remarks>
+    /// The same stock the packages endpoint counts, asked a different question. This one is for a
+    /// screen that lists FUELS rather than packages - a brand's page, where the customer asks "can I
+    /// buy this fuel" and not "can I buy this exact size of it".
+    /// </remarks>
+    public async Task<HashSet<string>> AvailableFuelIdsAsync(bool isTestAccount, CancellationToken cancellationToken = default)
+    {
+        var rows = await SellableKeys(isTestAccount).ToListAsync(cancellationToken);
+        return rows.Select(r => r.FuelTypeId).ToHashSet(StringComparer.Ordinal);
+    }
+
+    /// <summary>
     /// The sellable stock keys, restricted to <paramref name="wanted"/> — one query for a whole cart,
     /// where probing per line would mean up to fifty identical round trips.
     /// </summary>
