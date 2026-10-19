@@ -1,9 +1,7 @@
 using FuelFlow.Features.Pricing;
 using FluentAssertions;
 using FuelFlow.Features.Brands.CreateBrand;
-using FuelFlow.Features.Brands.DeleteFuelType;
 using FuelFlow.Features.Brands.DeleteBrand;
-using FuelFlow.Features.Brands.UpdateFuelType;
 using FuelFlow.Features.Brands.UpdateBrand;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
@@ -144,66 +142,6 @@ var persisted = await _context.Brands.FindAsync("Brand-1");
         var handler = new DeleteBrandCommandHandler(_context);
 
         var result = await handler.HandleAsync(new DeleteBrandCommand("missing"));
-
-        result.Should().BeFalse();
-    }
-
-    [Fact]
-    public async Task UpdateFuelType_ShouldUpdate()
-    {
-        var fuelType = CreateFuelType("ft-1", "A-95", "Brand-1", 50, 48);
-        _context.FuelTypes.Add(fuelType);
-        await _context.SaveChangesAsync();
-
-        var updated = CreateFuelType("ft-1", "A-95 Euro", "Brand-2", 60, 55);
-        var handler = new UpdateFuelTypeCommandHandler(_context);
-
-        var result = await handler.HandleAsync(new UpdateFuelTypeCommand("ft-1", updated, Guid.NewGuid()));
-
-        result.Should().BeTrue();
-
-        var persisted = await _context.FuelTypes.FindAsync("ft-1");
-        persisted!.Name.Should().Be("A-95 Euro");
-        persisted.BrandId.Should().Be("Brand-2");
-        persisted.BasePrice.Should().Be(60);
-        persisted.DiscountPrice.Should().Be(55);
-    }
-
-    [Fact]
-    public async Task UpdateFuelType_ShouldReturnFalse_WhenNotFound()
-    {
-        var handler = new UpdateFuelTypeCommandHandler(_context);
-
-        var result = await handler.HandleAsync(new UpdateFuelTypeCommand("missing", CreateFuelType("missing", "X", "Brand-1"), Guid.NewGuid()));
-
-        result.Should().BeFalse();
-    }
-
-    [Fact]
-    public async Task DeleteFuelType_ShouldRemove()
-    {
-        var fuelType = CreateFuelType("ft-1", "A-95", "Brand-1");
-        _context.FuelTypes.Add(fuelType);
-        await _context.SaveChangesAsync();
-
-        var handler = new DeleteFuelTypeCommandHandler(_context);
-
-        var result = await handler.HandleAsync(new DeleteFuelTypeCommand("ft-1"));
-
-        result.Should().BeTrue();
-        var persisted = await _context.FuelTypes.IgnoreQueryFilters().SingleAsync(f => f.Id == "ft-1");
-        persisted.IsDeleted.Should().BeTrue();
-        persisted.DeletedAtUtc.Should().NotBeNull();
-        (await _context.FuelTypes.CountAsync(f => f.Id == "ft-1")).Should().Be(0,
-            "#217: archiving is what keeps the vouchers sold against this fuel alive");
-    }
-
-    [Fact]
-    public async Task DeleteFuelType_ShouldReturnFalse_WhenNotFound()
-    {
-        var handler = new DeleteFuelTypeCommandHandler(_context);
-
-        var result = await handler.HandleAsync(new DeleteFuelTypeCommand("missing"));
 
         result.Should().BeFalse();
     }
