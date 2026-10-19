@@ -50,6 +50,27 @@ RETENTION_DAYS="${RETENTION_DAYS:-14}"
 BACKUP_REMOTE_RETENTION_DAYS="${BACKUP_REMOTE_RETENTION_DAYS:-30}"
 CONTAINER="${CONTAINER:-fuelflow-postgres}"
 
+# --- Point-in-time recovery ----------------------------------------------------------
+# The dump above is a snapshot: it is the database as of 03:23, and everything that happened
+# between the previous snapshot and it is gone. On a payment system that is a day of orders,
+# so the recovery point objective is a full day - and a day is not a number anybody in this
+# business is comfortable with.
+#
+# WAL archiving fixes that: PostgreSQL copies the write-ahead log off the server as it
+# fills, and a restore can replay it to any moment in time. A base backup is what the
+# replay starts from, so both are needed - the base is the starting point, the WAL is the
+# way to move forward from it.
+#
+# The base backup is taken every night, alongside the dump, for the same reason the dump
+# is: one schedule, one set of files, one restore procedure. The database is small enough
+# that this costs almost nothing, and it means the base is never more than a day old, so
+# the WAL that has to be replayed on top of it is short.
+WAL_ARCHIVE_DIR="${WAL_ARCHIVE_DIR:-/root/fuelflow-wal}"
+# The WAL is kept on-box for as long as the dumps, and off-box for as long as the dumps.
+# A base backup and a WAL archive that does not overlap are a restore that cannot start.
+WAL_RETENTION_DAYS="${WAL_RETENTION_DAYS:-14}"
+WAL_REMOTE_RETENTION_DAYS="${WAL_REMOTE_RETENTION_DAYS:-30}"
+
 # Load POSTGRES_USER / POSTGRES_DB / BACKUP_AGE_RECIPIENT from the same .env the stack uses.
 # load_env PARSES .env instead of sourcing it, so a secret containing a space (e.g. a
 # Gmail app password) or shell metacharacters can't break or inject into this run.
@@ -98,6 +119,25 @@ trap cleanup EXIT
 
 echo "[$(date -Is)] Backing up '${POSTGRES_DB}' -> ${OUT}"
 
+# --- Is the WAL archive actually working? ---------------------------------------------
+# `archive_mode=on` is a setting, not a guarantee.
+#
+# The normal way this breaks: the archive directory is created on the host as root and
+# bind-mounted into the container, and the container's postgres user (uid 70) cannot write
+# to it. Every archive attempt then fails, the database carries on running perfectly, and
+# the backup looks completely healthy - while there is no archive at all. It was found
+# exactly this way, by watching the server's log complain about it.
+#
+# The check is made again at the end of the run, and the run FAILS then if the archive is
+# still broken: a backup that cannot be replayed to a point in time is not a backup, it
+# is a snapshot with extra steps.
+#
+# shellcheck source=pitr-common.sh
+source "$SCRIPT_DIR/pitr-common.sh"
+
+ARCHIVER_OK=0
+check_wal_archive "$CONTAINER" "$WAL_ARCHIVE_DIR" "$POSTGRES_USER" "$POSTGRES_DB" 1800 || ARCHIVER_OK=1
+
 # -Fc = compressed custom format, which restore.sh expects.
 docker exec "$CONTAINER" pg_dump \
   -U "$POSTGRES_USER" \
@@ -135,6 +175,53 @@ fi
 
 echo "[$(date -Is)] OK: $(du -h "$OUT" | cut -f1) encrypted to ${BACKUP_AGE_RECIPIENT}"
 
+# --- Base backup (the starting point for a point-in-time restore) --------------------
+# pg_basebackup copies the data directory itself, plus the WAL needed to make it
+# consistent. Unlike pg_dump it is a PHYSICAL copy, so a restore replays the WAL on top
+# of it rather than replaying SQL - which is what makes "restore to 14:37" possible.
+#
+# -Ft is the plain tar format: a single stream that can be piped straight out of the
+# container and encrypted on the host.
+# -X fetch pulls the WAL needed for a consistent snapshot into the backup itself. (-X
+# stream would be nicer, but PostgreSQL refuses to stream WAL in tar mode to stdout:
+# "cannot stream write-ahead logs in tar mode to stdout".)
+# --checkpoint=fast does not wait for a scheduled checkpoint; on a busy server that wait
+# is the difference between a backup that takes a minute and one that takes an hour.
+#
+# The manifest is left ON (no --no-manifest): pg_verifybackup needs it, and without it
+# there is no way to prove the backup is not corrupt.
+BASE_TMP="$(mktemp -d "${TMPDIR:-/tmp}/fuelflow-base.XXXXXX")"
+chmod 700 "$BASE_TMP"
+BASE_OUT="$BACKUP_DIR/fuelflow_base_${STAMP}.tar.age"
+
+echo "[$(date -Is)] Taking base backup -> ${BASE_OUT}"
+if docker exec "$CONTAINER" pg_basebackup \
+      -U "$POSTGRES_USER" \
+      -D - -Ft -X fetch --checkpoint=fast \
+      > "$BASE_TMP/base.tar" 2>"$BASE_TMP/base.err"; then
+  # Verify it before it becomes the thing we rely on. pg_verifybackup walks the manifest
+  # and checks every file's checksum - a base backup that fails here is corrupt, and
+  # finding that out now is the entire point.
+  #
+  # It needs a DIRECTORY, so the tar is unpacked into the container's /tmp first. If the
+  # check cannot be performed, that is a failure, not a pass: a backup nobody verified is
+  # a belief, not a backup.
+  if docker exec -i "$CONTAINER" sh -c \
+      'rm -rf /tmp/bbcheck && mkdir -p /tmp/bbcheck && tar -xf - -C /tmp/bbcheck && pg_verifybackup /tmp/bbcheck; rc=$?; rm -rf /tmp/bbcheck; exit $rc' \
+      < "$BASE_TMP/base.tar" >/dev/null 2>&1; then
+    echo "[$(date -Is)] Base backup verified by pg_verifybackup."
+  else
+    echo "ERROR: pg_verifybackup could not verify the base backup - treating as failed." >&2
+    exit 1
+  fi
+  ( umask 077; age -r "$BACKUP_AGE_RECIPIENT" -o "$BASE_OUT" "$BASE_TMP/base.tar" )
+  echo "[$(date -Is)] OK: base backup $(du -h "$BASE_OUT" | cut -f1) encrypted."
+else
+  echo "ERROR: pg_basebackup failed:" >&2
+  cat "$BASE_TMP/base.err" >&2
+  exit 1
+fi
+
 # --- Off-host copy -----------------------------------------------------------------
 # Encryption protects the contents. It does nothing about the server being destroyed,
 # which is the other half of the problem: a backup stored only on the machine it backs
@@ -146,6 +233,9 @@ if [[ -n "${BACKUP_REMOTE:-}" ]]; then
   if command -v rclone >/dev/null 2>&1; then
     echo "[$(date -Is)] Copying to ${BACKUP_REMOTE} ..."
     rclone copy "$OUT" "$BACKUP_REMOTE"
+    # The base backup goes off-box too, and it matters as much as the dump does: without
+    # it, the WAL archive on the remote is a log nobody can replay.
+    rclone copy "$BASE_OUT" "$BACKUP_REMOTE"
     echo "[$(date -Is)] Off-host copy done."
 
     # Prune the REMOTE too. Without this, `rclone copy` adds a dump every night and never
@@ -161,6 +251,12 @@ if [[ -n "${BACKUP_REMOTE:-}" ]]; then
       echo "WARNING: remote prune failed (the copy above still succeeded). The remote may" >&2
       echo "         accumulate old dumps until the next successful run." >&2
     fi
+    if rclone delete --min-age "${BACKUP_REMOTE_RETENTION_DAYS}d" \
+         --include 'fuelflow_base_*.tar.age' "$BACKUP_REMOTE"; then
+      echo "[$(date -Is)] Remote base backup prune done."
+    else
+      echo "WARNING: remote base backup prune failed (the copy above still succeeded)." >&2
+    fi
   else
     echo "WARNING: BACKUP_REMOTE is set but rclone is not installed. Backup is ON-SERVER ONLY." >&2
   fi
@@ -170,10 +266,55 @@ else
   echo "         BACKUP_REMOTE to an rclone remote or enable Hetzner volume snapshots." >&2
 fi
 
+# --- The WAL archive ----------------------------------------------------------------
+# The archive is what makes a point-in-time restore possible, so it has to leave the box
+# as well - a base backup on its own is a snapshot with a very precise, very unhelpful
+# timestamp.
+#
+# The archive is NOT encrypted file by file: it is thousands of small segments, and
+# encrypting each one separately means thousands of age invocations and a restore that has
+# to decrypt them one at a time. Instead the whole archive is tarred and encrypted as one
+# blob, and re-encrypted nightly. The cost is that the newest segment is only off-box
+# once a night - which is the same granularity the dump has, and still an enormous
+# improvement on "the archive is only on the disk that died".
+if [[ -n "${BACKUP_REMOTE:-}" ]] && command -v rclone >/dev/null 2>&1 && [[ -d "$WAL_ARCHIVE_DIR" ]]; then
+  SEGMENTS="$(find "$WAL_ARCHIVE_DIR" -maxdepth 1 -name '0000000*' -type f | wc -l)"
+  echo "[$(date -Is)] Shipping the WAL archive (${SEGMENTS} segments) off-box ..."
+  WAL_TMP="$(mktemp -d "${TMPDIR:-/tmp}/fuelflow-wal.XXXXXX")"
+  chmod 700 "$WAL_TMP"
+  # Only the segments that are actually complete: a segment still being written is
+  # truncated, and shipping a truncated segment means a restore that stops in the middle
+  # of it. PostgreSQL writes each segment to a temporary name and renames it when it is
+  # complete, so anything matching the segment pattern is complete.
+  tar --force-local -C "$WAL_ARCHIVE_DIR" -czf "$WAL_TMP/wal.tar.gz" --wildcards '0000000*' 2>/dev/null || true
+  if [[ -s "$WAL_TMP/wal.tar.gz" ]]; then
+    ( umask 077; age -r "$BACKUP_AGE_RECIPIENT" -o "$BACKUP_DIR/fuelflow_wal.tar.gz.age" "$WAL_TMP/wal.tar.gz" )
+    rclone copy "$BACKUP_DIR/fuelflow_wal.tar.gz.age" "$BACKUP_REMOTE"
+    echo "[$(date -Is)] WAL archive shipped: $(du -h "$BACKUP_DIR/fuelflow_wal.tar.gz.age" | cut -f1)."
+  else
+    echo "WARNING: the WAL archive is empty - no segments have been archived yet." >&2
+    echo "         Point-in-time recovery is not yet possible; check that archive_mode is on." >&2
+  fi
+  rm -rf "$WAL_TMP"
+else
+  echo "WARNING: the WAL archive was NOT shipped off-box (remote=${BACKUP_REMOTE:-unset}," >&2
+  echo "         rclone=$(command -v rclone >/dev/null 2>&1 && echo yes || echo no)," >&2
+  echo "         dir=${WAL_ARCHIVE_DIR}). Point-in-time recovery still works from this" >&2
+  echo "         server alone, but not if the server is destroyed." >&2
+fi
+
+# Prune the local WAL archive. The oldest segment is the one whose age matters, and the
+# newest is always kept - PostgreSQL is writing to it right now. Pruning by mtime is
+# right here: a segment's age IS its age, and the archive is append-only.
+if [[ -d "$WAL_ARCHIVE_DIR" ]]; then
+  find "$WAL_ARCHIVE_DIR" -maxdepth 1 -name '0000000*' -type f -mtime "+${WAL_RETENTION_DAYS}" -print -delete
+fi
+
 # Prune old dumps. Both extensions: .dump.age is current, .dump catches any plaintext
 # file left over from before this script encrypted anything.
 find "$BACKUP_DIR" -name 'fuelflow_*.dump.age' -type f -mtime "+${RETENTION_DAYS}" -print -delete
 find "$BACKUP_DIR" -name 'fuelflow_*.dump' -type f -mtime "+${RETENTION_DAYS}" -print -delete
+find "$BACKUP_DIR" -name 'fuelflow_base_*.tar.age' -type f -mtime "+${RETENTION_DAYS}" -print -delete
 
 echo "[$(date -Is)] Done. Kept the last ${RETENTION_DAYS} days:"
 ls -lh "$BACKUP_DIR" | tail -n 5
@@ -187,3 +328,17 @@ if (( LEGACY > 0 )); then
   echo "         Remove them once you have an encrypted backup you trust:" >&2
   echo "             find $BACKUP_DIR -name 'fuelflow_*.dump' -type f -exec shred -u {} +" >&2
 fi
+
+# The last word on the archive. The check at the start of the run may have found the
+# archive broken; this one says whether it is still broken NOW, after the base backup was
+# taken and shipped. A run that produced a dump but cannot produce a replayable history
+# has not succeeded, and says so with a non-zero exit - which is what the OnFailure
+# alert is for.
+if [[ "$ARCHIVER_OK" -ne 0 ]]; then
+  echo >&2
+  echo "ERROR: the WAL archive was not healthy, so this backup cannot be replayed to a" >&2
+  echo "       point in time. The dump itself was made and shipped, but the recovery" >&2
+  echo "       point objective is still a full day until archiving is fixed." >&2
+  exit 1
+fi
+check_wal_archive "$CONTAINER" "$WAL_ARCHIVE_DIR" "$POSTGRES_USER" "$POSTGRES_DB" 1800 || exit 1
