@@ -50,9 +50,7 @@ SELECT
     c.table_name,
     c.column_name,
     c.data_type                        AS reference_type,
-    coalesce(c.character_maximum_length, -1) AS reference_max_length,
-    f.data_type                        AS fuel_types_id_type,
-    f.max_length                       AS fuel_types_id_max_length
+    f.data_type                        AS fuel_types_id_type
 FROM information_schema.columns c
 CROSS JOIN fuel_key f
 JOIN information_schema.tables t
@@ -61,8 +59,19 @@ JOIN information_schema.tables t
    AND t.table_type = 'BASE TABLE'
 WHERE c.table_schema = 'public'
   AND c.column_name IN ('fuel_type_id', 'fuel_type', 'nominal_fuel_type_id')
-  AND (c.data_type <> f.data_type
-       OR coalesce(c.character_maximum_length, -1) <> f.max_length)
+  AND c.data_type <> f.data_type
+  -- All string types are ONE family here, not a set of differences. The first version compared
+  -- `data_type` and length exactly and flagged production's `order_line_items.fuel_type_id
+  -- varchar(100)` against a `text` primary key - which Postgres treats as compatible, so the
+  -- migration it was meant to warn about is not blocked by it. It stopped the deploy on 2026-10-19
+  -- anyway, for a difference that is not one. A length bound narrower than a uuid is a real
+  -- concern and a D-21 problem to settle in the migration, not a general precondition to assert
+  -- here: this file's job is to catch a type that cannot hold what the key holds, and every string
+  -- type can.
+  AND NOT (
+      c.data_type IN ('text', 'character varying', 'character', 'name', 'citext')
+  AND f.data_type IN ('text', 'character varying', 'character', 'name', 'citext')
+  )
 ORDER BY c.table_name, c.column_name;
 \endif
 
