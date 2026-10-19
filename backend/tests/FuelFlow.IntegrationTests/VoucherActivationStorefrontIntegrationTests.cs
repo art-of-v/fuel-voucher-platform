@@ -95,7 +95,7 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
     /// <c>fuel_vouchers.fuel_type_id</c> is a real FK (Restrict), and without a package the storefront
     /// has nothing to report availability for.
     /// </summary>
-    private async Task SeedFuelAndPackageAsync(string BrandId, string fuelTypeId, decimal liters)
+    private async Task SeedFuelAndPackageAsync(Guid BrandId, string fuelTypeId, decimal liters)
     {
         using var scope = _fixture.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -156,7 +156,7 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
             UpdatedAtUtc = DateTime.UtcNow
         };
 
-    private async Task<bool> IsPackageAvailableAsync(string BrandId, string fuelTypeId, decimal liters)
+    private async Task<bool> IsPackageAvailableAsync(Guid BrandId, string fuelTypeId, decimal liters)
     {
         var response = await _client.GetAsync("/api/packages");
         response.EnsureSuccessStatusCode();
@@ -185,8 +185,8 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
     public async Task ActivatingAnImportedBatch_TurnsThatPackageOn_AndLeavesItsSiblingsOff()
     {
         await AuthenticateStaffAsync();
-        await SeedFuelAndPackageAsync("okko", "act-95", 10m);
-        await SeedFuelAndPackageAsync("okko", "act-95", 20m);
+        await SeedFuelAndPackageAsync(BrandIds.Okko, "act-95", 10m);
+        await SeedFuelAndPackageAsync(BrandIds.Okko, "act-95", 20m);
 
         using (var scope = _fixture.Services.CreateScope())
         {
@@ -199,8 +199,8 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
 
         // Before activation: both nominals sit on the shelf and neither can be bought. This is the
         // precondition the campaign assumes and, before this change, was silently untrue.
-        Assert.False(await IsPackageAvailableAsync("okko", "act-95", 10m));
-        Assert.False(await IsPackageAvailableAsync("okko", "act-95", 20m));
+        Assert.False(await IsPackageAvailableAsync(BrandIds.Okko, "act-95", 10m));
+        Assert.False(await IsPackageAvailableAsync(BrandIds.Okko, "act-95", 20m));
 
         // Activate ONLY the 10 L voucher — the same single-package act the demo performs.
         Guid tenLitre;
@@ -219,10 +219,10 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
 
         // The whole point: activation is what turns the storefront on. Without this, "import A95 OKKO
         // 10 L and only that package is buyable" would not happen and no other test would say so.
-        Assert.True(await IsPackageAvailableAsync("okko", "act-95", 10m));
+        Assert.True(await IsPackageAvailableAsync(BrandIds.Okko, "act-95", 10m));
 
         // Its sibling stays dark. Availability is per (brand, fuel, nominal), not per fuel.
-        Assert.False(await IsPackageAvailableAsync("okko", "act-95", 20m));
+        Assert.False(await IsPackageAvailableAsync(BrandIds.Okko, "act-95", 20m));
     }
 
     /// <summary>
@@ -234,7 +234,7 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
     public async Task AnUncostedBatch_CannotBeActivated_AndSoLeavesThePackageDark()
     {
         await AuthenticateStaffAsync();
-        await SeedFuelAndPackageAsync("okko", "act-uncosted", 5m);
+        await SeedFuelAndPackageAsync(BrandIds.Okko, "act-uncosted", 5m);
 
         using (var scope = _fixture.Services.CreateScope())
         {
@@ -243,7 +243,7 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
             await context.SaveChangesAsync();
         }
 
-        Assert.False(await IsPackageAvailableAsync("okko", "act-uncosted", 5m));
+        Assert.False(await IsPackageAvailableAsync(BrandIds.Okko, "act-uncosted", 5m));
 
         Guid id;
         using (var scope = _fixture.Services.CreateScope())
@@ -256,7 +256,7 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
 
         Assert.Contains("Cannot activate", body);
         Assert.Contains("cost", body, StringComparison.OrdinalIgnoreCase);
-        Assert.False(await IsPackageAvailableAsync("okko", "act-uncosted", 5m),
+        Assert.False(await IsPackageAvailableAsync(BrandIds.Okko, "act-uncosted", 5m),
             "a batch that could not be activated must not have lit the storefront");
     }
 
@@ -268,7 +268,7 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
     public async Task DeactivatingAPackage_PutsItBackOutOfStock()
     {
         await AuthenticateStaffAsync();
-        await SeedFuelAndPackageAsync("okko", "act-toggle", 10m);
+        await SeedFuelAndPackageAsync(BrandIds.Okko, "act-toggle", 10m);
 
         using (var scope = _fixture.Services.CreateScope())
         {
@@ -285,7 +285,7 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
         }
 
         Assert.Equal(HttpStatusCode.OK, (await ActivateAsync(id)).Status);
-        Assert.True(await IsPackageAvailableAsync("okko", "act-toggle", 10m));
+        Assert.True(await IsPackageAvailableAsync(BrandIds.Okko, "act-toggle", 10m));
 
         var off = await _client.PostAsJsonAsync("/api/admin/vouchers/bulk-action", new
         {
@@ -294,6 +294,6 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
         });
         Assert.Equal(HttpStatusCode.OK, off.StatusCode);
 
-        Assert.False(await IsPackageAvailableAsync("okko", "act-toggle", 10m));
+        Assert.False(await IsPackageAvailableAsync(BrandIds.Okko, "act-toggle", 10m));
     }
 }

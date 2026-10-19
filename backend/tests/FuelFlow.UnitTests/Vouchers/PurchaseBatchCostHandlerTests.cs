@@ -36,7 +36,7 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         _context = new ApplicationDbContext(options, TestQrCipher.Instance);
 
         // okko-dp fuel with two nominals; margin 2 UAH/L, no pump (so final = blended cost + 2).
-        _context.FuelTypes.Add(new FuelTypeEntity { Id = "okko-dp", Name = "ДП ЄВРО", BrandId = "okko", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
+        _context.FuelTypes.Add(new FuelTypeEntity { Id = "okko-dp", Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
         _context.FuelNominals.AddRange(
             NewPackage("okko-dp", 10m),
             NewPackage("okko-dp", 20m));
@@ -66,7 +66,7 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
     /// </remarks>
 private FuelNominal NewPackage(string fuelTypeId, decimal liters)
     {
-    _context.SeedOffer("okko", fuelTypeId, marginUahPerLiter: 2m);
+    _context.SeedOffer(BrandIds.Okko, fuelTypeId, marginUahPerLiter: 2m);
     return new FuelNominal
     {
     FuelTypeId = fuelTypeId,
@@ -393,9 +393,9 @@ private FuelNominal NewPackage(string fuelTypeId, decimal liters)
     {
         // A pump ceiling of 49 − 0.5 = 48.5 binds below the entered cost 50, and the fuel is
         // NOT opted in → the reprice pushes it below cost, so an emergent (Critical) alert fires.
-        _context.FuelTypes.Add(new FuelTypeEntity { Id = "okko-loss", Name = "ДП збиток", BrandId = "okko", BasePrice = 49, DiscountPrice = 49, AllowBelowCost = false, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
+        _context.FuelTypes.Add(new FuelTypeEntity { Id = "okko-loss", Name = "ДП збиток", BrandId = BrandIds.Okko, BasePrice = 49, DiscountPrice = 49, AllowBelowCost = false, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
         _context.SeedPackage(
-            id: Guid.NewGuid().ToString(), BrandId: "okko", fuelTypeId: "okko-loss",
+            id: Guid.NewGuid().ToString(), BrandId: BrandIds.Okko, fuelTypeId: "okko-loss",
             liters: 10m, price: 0m,
             marginUahPerLiter: 2m, pumpPricePerLiter: 49m, minDiscountPerLiter: 0.5m);
         _context.SaveChanges();

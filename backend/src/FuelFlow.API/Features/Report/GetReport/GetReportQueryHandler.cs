@@ -97,11 +97,14 @@ public sealed class GetReportQueryHandler
     from o in _context.FuelOffers.AsNoTracking()
             // The margin is the fuel's, so the fuel joins too - see GetDashboardQueryHandler.
             join f in _context.FuelTypes.AsNoTracking() on o.FuelTypeId equals f.Id
+    // Keyed the way the consumer keys it: an order line stores the network as its slug, so the
+    // lookup is built from the slug rather than from the offer's uuid.
+    join b in _context.Brands.AsNoTracking() on o.BrandId equals b.Id
     from n in _context.FuelNominals.AsNoTracking() where n.FuelTypeId == f.Id
     where o.DataKind == DataKinds.Real
-    select new { o.BrandId, o.FuelTypeId, Liters = n.Liters, MarginUahPerLiter = f.MarginUahPerLiter })
+    select new { BrandSlug = b.Slug, o.FuelTypeId, Liters = n.Liters, MarginUahPerLiter = f.MarginUahPerLiter })
             .ToDictionaryAsync(
-                x => (x.BrandId, x.FuelTypeId, x.Liters),
+                x => (x.BrandSlug, x.FuelTypeId, x.Liters),
                 x => x.MarginUahPerLiter,
                 cancellationToken);
 

@@ -53,9 +53,9 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
 
         var act = () => context.Database.ExecuteSqlRawAsync(
             """
-            INSERT INTO brand_stations (id, brand_id, name, station_type, lat, lng, created_at_utc, updated_at_utc, is_deleted)
-            VALUES ('bounds-probe', 'okko', 'Probe', {0}, 50.4, 30.4, NOW(), NOW(), false)
-            """, new string('x', 300));
+            INSERT INTO brand_stations (id, brand_id, external_id, name, station_type, lat, lng, created_at_utc, updated_at_utc, is_deleted)
+            VALUES (gen_random_uuid(), {0}, 'bounds-probe', 'Probe', {1}, 50.4, 30.4, NOW(), NOW(), false)
+            """, BrandIds.Okko, new string('x', 300));
 
         var ex = await act.Should().ThrowAsync<PostgresException>();
         ex.Which.MessageText.Should().Contain("character varying(64)",
@@ -103,17 +103,16 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
     {
         await using var context = CreateContext();
 
+        // `brands.id` is a uuid and cannot be overlong, so the bound that survives D-21 is the one on
+        // the slug: it is what an import file and an operator both name a network by, and it is the
+        // only catalog key left that is a string.
         var act = () => context.Database.ExecuteSqlRawAsync(
             """
-            INSERT INTO brands (id, name, color, logo_text, sort_order, created_at_utc, updated_at_utc, is_deleted)
-            VALUES ({0}, 'Too Long', '#00ff80', 'TL', 999, NOW(), NOW(), false)
+            INSERT INTO brands (id, slug, name, color, logo_text, sort_order, created_at_utc, updated_at_utc, is_deleted)
+            VALUES (gen_random_uuid(), {0}, 'Too Long', '#00ff80', 'TL', 999, NOW(), NOW(), false)
             """, new string('y', 150));
 
         var ex = await act.Should().ThrowAsync<PostgresException>();
-<<<<<<< HEAD
-        ex.Which.MessageText.Should().Contain("ck_brands_id_length",
-            "the catalog key limit, not some unrelated constraint, is what must stop this");
-=======
         ex.Which.MessageText.Should().Contain("character varying(100)",
             "the column type, not some unrelated constraint, is what must stop this");
     }
@@ -152,17 +151,10 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
             .ToListAsync();
 
         maxLength.Should().ContainSingle().Which.Should().Be(100);
->>>>>>> 4d2c9877 (fix(catalogue): a rollback has to find what it is rolling back)
     }
 
     [Theory]
-    [InlineData("brands", "ck_brands_id_length")]
     [InlineData("fuel_types", "ck_fuel_types_id_length")]
-<<<<<<< HEAD
-    [InlineData("brand_stations", "ck_brand_stations_id_length")]
-=======
-    [InlineData("fuel_offer_volumes", "ck_fuel_offer_volumes_id_length")]
->>>>>>> 4d2c9877 (fix(catalogue): a rollback has to find what it is rolling back)
     [InlineData("fuel_vouchers", "ck_fuel_vouchers_fuel_type_id_length")]
     [InlineData("purchase_batches", "ck_purchase_batches_fuel_type_id_length")]
     [InlineData("voucher_exchanges", "ck_voucher_exchanges_fuel_type_id_length")]
@@ -228,10 +220,11 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
     /// rate and the storefront listed it.
     ///
     /// The guards moved with the data, and are worth asserting by their new names rather than
-    /// assumed: <c>ck_fuel_offer_volumes_liters_positive</c> holds the nominal positive,
-    /// <c>ck_fuel_offer_volumes_package_price_non_negative</c> holds the total, and
-    /// <c>ck_fuel_offers_prices_non_negative</c> holds the per-litre rate — which the old table had
-    /// no guard on at all, because on the old table the rate was only ever derived.
+    /// assumed: <c>ck_fuel_nominals_liters_positive</c> holds the size positive — the size now
+    /// belongs to the fuel, so the constraint sits on <c>fuel_nominals</c> rather than on the row
+    /// that used to carry it — and <c>ck_fuel_offers_prices_non_negative</c> holds the per-litre
+    /// rate, which the old table had no guard on at all, because on the old table the rate was only
+    /// ever derived.
     /// </summary>
     [Theory]
     [InlineData(0)]

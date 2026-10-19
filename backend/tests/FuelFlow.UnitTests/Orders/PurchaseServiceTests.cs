@@ -131,7 +131,7 @@ public OrderCommandHandlersTests()
     }
 
     private PackageStockAvailability Stock()
-        => new(_context, new ConfigurationBuilder().Build(), new BrandSlugResolver(_context));
+        => new(_context, new ConfigurationBuilder().Build());
 
     public void Dispose()
     {

@@ -39,6 +39,9 @@ public sealed class GetPublicPackagesByBrandQueryHandler
         var rows = await (
             from offer in _context.FuelOffers.AsNoTracking()
             join fuel in _context.FuelTypes.AsNoTracking() on offer.FuelTypeId equals fuel.Id
+    // The network's own code travels with the row: the stock keys below are matched on it, and
+    // it is what the client renders next to the uuid it now orders by.
+    join brand in _context.Brands.AsNoTracking() on offer.BrandId equals brand.Id
 // The sizes belong to the fuel AND the pool - see GetPublicPackagesQueryHandler, which is
     // the same query narrowed to one Brand.
     from nominal in _context.FuelNominals.AsNoTracking()
@@ -51,6 +54,9 @@ public sealed class GetPublicPackagesByBrandQueryHandler
             {
                 offer.Id,
                 offer.BrandId,
+                // The slug travels with the row: the stock keys below are matched on it, and it is
+                // what the client renders next to the uuid it now orders by.
+                BrandSlug = brand.Slug,
                 offer.FuelTypeId,
                 FuelName = fuel.Name,
                 nominal.Liters,
@@ -80,6 +86,7 @@ public sealed class GetPublicPackagesByBrandQueryHandler
                 return new PublicPackageResponse(
                     PackageIds.For(x.Id, x.Liters),
                     x.BrandId,
+                    x.BrandSlug,
                     x.FuelTypeId,
                     x.FuelName,
                     x.Liters,
@@ -87,7 +94,7 @@ public sealed class GetPublicPackagesByBrandQueryHandler
                     FuelPricing.OriginalPackagePrice(x.PumpPricePerLiter, x.Liters, price),
                     FuelPricing.FinalPerLiterOrNull(
                         x.SupplierPricePerLiter, x.MarginUahPerLiter, x.PumpPricePerLiter, x.MinDiscountPerLiter),
-                    available.Contains(StockKey.For(x.BrandId, x.FuelTypeId, x.Liters)));
+                    available.Contains(StockKey.For(x.BrandSlug, x.FuelTypeId, x.Liters)));
             })
             .ToList();
     }

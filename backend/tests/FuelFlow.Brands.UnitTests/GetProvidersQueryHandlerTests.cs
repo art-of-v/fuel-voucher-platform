@@ -12,6 +12,10 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
     private readonly ApplicationDbContext _context;
     private readonly GetBrandsQueryHandler _handler;
 
+    /// <summary>A brand row needs an id AND its network code; the fixture states both.</summary>
+    private static readonly Guid TestOkko = new("0f0f0f0f-0000-4000-8000-00000000000f");
+    private static readonly Guid TestKlo = new("0f0f0f0f-0000-4000-8000-0000000000f1");
+
     public GetBrandsQueryHandlerTests()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -35,7 +39,8 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
     {
         _context.Brands.Add(new Brand
         {
-            Id = "test-okko",
+            Id = TestOkko,
+            Slug = "test-okko",
             Name = "OKKO",
             LogoText = "OKKO",
             Color = "#fff",
@@ -43,21 +48,21 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
             UpdatedAtUtc = DateTime.UtcNow
         });
         _context.FuelTypes.AddRange(
-            new FuelTypeEntity { Id = "test-fuel-a", Name = "A-95", BrandId = "test-okko", BasePrice = 5100, DiscountPrice = 5100, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "test-fuel-b", Name = "ДП", BrandId = "test-okko", BasePrice = 5200, DiscountPrice = 5200, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
-        _context.SeedPackage("test-fuel-a-10", "test-okko", "test-fuel-a", 10m, 510m,
+            new FuelTypeEntity { Id = "test-fuel-a", Name = "A-95", BrandId = TestOkko, BasePrice = 5100, DiscountPrice = 5100, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = "test-fuel-b", Name = "ДП", BrandId = TestOkko, BasePrice = 5200, DiscountPrice = 5200, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
+        _context.SeedPackage("test-fuel-a-10", TestOkko, "test-fuel-a", 10m, 510m,
             supplierPricePerLiter: 49m, marginUahPerLiter: 2m, finalPricePerLiter: 51m);
-        _context.SeedPackage("test-fuel-a-20", "test-okko", "test-fuel-a", 20m, 1020m,
+        _context.SeedPackage("test-fuel-a-20", TestOkko, "test-fuel-a", 20m, 1020m,
             supplierPricePerLiter: 49m, marginUahPerLiter: 2m, finalPricePerLiter: 51m);
-        _context.SeedPackage("test-fuel-b-20", "test-okko", "test-fuel-b", 20m, 1040m,
+        _context.SeedPackage("test-fuel-b-20", TestOkko, "test-fuel-b", 20m, 1040m,
             supplierPricePerLiter: 50m, marginUahPerLiter: 2m, finalPricePerLiter: 52m);
-        _context.SeedPackage("test-fuel-b-50", "test-okko", "test-fuel-b", 50m, 2600m,
+        _context.SeedPackage("test-fuel-b-50", TestOkko, "test-fuel-b", 50m, 2600m,
             supplierPricePerLiter: 50m, marginUahPerLiter: 2m, finalPricePerLiter: 52m);
         await _context.SaveChangesAsync();
 
         var providers = await _handler.HandleAsync(new GetBrandsQuery());
 
-        var brand = providers.Single(p => p.Id == "test-okko");
+        var brand = providers.Single(p => p.Id == TestOkko);
         brand.Nominals.Should().Equal(10, 20, 50);
 
         brand.Fuels.Should().HaveCount(2);
@@ -80,7 +85,8 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
     {
         _context.Brands.Add(new Brand
         {
-            Id = "test-okko",
+            Id = TestOkko,
+            Slug = "test-okko",
             Name = "OKKO",
             LogoText = "OKKO",
             Color = "#fff",
@@ -88,13 +94,13 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
             UpdatedAtUtc = DateTime.UtcNow
         });
         _context.FuelTypes.AddRange(
-            new FuelTypeEntity { Id = "test-coded", Name = "А-95", BrandId = "test-okko", BrandFuelCode = "A-95", BasePrice = 92.9m, DiscountPrice = 89.06m, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "test-uncoded", Name = "А 92", BrandId = "test-okko", BrandFuelCode = null, BasePrice = 85m, DiscountPrice = 84.5m, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
+            new FuelTypeEntity { Id = "test-coded", Name = "А-95", BrandId = TestOkko, BrandFuelCode = "A-95", BasePrice = 92.9m, DiscountPrice = 89.06m, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = "test-uncoded", Name = "А 92", BrandId = TestOkko, BrandFuelCode = null, BasePrice = 85m, DiscountPrice = 84.5m, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
         await _context.SaveChangesAsync();
 
         var providers = await _handler.HandleAsync(new GetBrandsQuery());
 
-        var brand = providers.Single(p => p.Id == "test-okko");
+        var brand = providers.Single(p => p.Id == TestOkko);
         brand.Fuels.Single(f => f.Id == "test-coded").BrandFuelCode.Should().Be("A-95");
         // Null must stay null rather than becoming "" - the screen tells the two apart, and the API
         // reads an empty string on a write as "clear this".
@@ -110,7 +116,8 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
     {
         _context.Brands.Add(new Brand
         {
-            Id = "test-okko",
+            Id = TestOkko,
+            Slug = "test-okko",
             Name = "OKKO",
             LogoText = "OKKO",
             Color = "#fff",
@@ -121,7 +128,7 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
         {
             Id = "test-dp",
             Name = "ДП ЄВРО",
-            BrandId = "test-okko",
+            BrandId = TestOkko,
             BasePrice = 110,
             DiscountPrice = 100,
             CreatedAtUtc = DateTime.UtcNow,
@@ -135,7 +142,7 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
             Package("test-dp-10", 10m, cost: 100.00m, final: 99.90m));
         await _context.SaveChangesAsync();
         var providers = await _handler.HandleAsync(new GetBrandsQuery());
-        var fuel = providers.Single(p => p.Id == "test-okko").Fuels.Single();
+        var fuel = providers.Single(p => p.Id == TestOkko).Fuels.Single();
 
         // The card reads ONE price per fuel, from the offer. The 0.01 L leftover is now a volume of the
         // same offer as every other nominal rather than a row carrying a competing cost, so it can
@@ -169,7 +176,8 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
     {
         _context.Brands.Add(new Brand
         {
-            Id = "test-okko",
+            Id = TestOkko,
+            Slug = "test-okko",
             Name = "OKKO",
             LogoText = "OKKO",
             Color = "#fff",
@@ -180,7 +188,7 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
         {
             Id = "test-dp",
             Name = "ДП ЄВРО",
-            BrandId = "test-okko",
+            BrandId = TestOkko,
             BasePrice = 110,
             DiscountPrice = 100,
             CreatedAtUtc = DateTime.UtcNow,
@@ -194,7 +202,7 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
         await _context.SaveChangesAsync();
 
         var providers = await _handler.HandleAsync(new GetBrandsQuery());
-        var fuel = providers.Single(p => p.Id == "test-okko").Fuels.Single();
+        var fuel = providers.Single(p => p.Id == TestOkko).Fuels.Single();
 
         // The spread is null because there is nothing to spread. If this ever becomes non-null, the
         // data is genuinely disagreeing again and the operator is meant to be told.
@@ -213,7 +221,8 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
     {
         _context.Brands.Add(new Brand
         {
-            Id = "test-okko",
+            Id = TestOkko,
+            Slug = "test-okko",
             Name = "OKKO",
             LogoText = "OKKO",
             Color = "#fff",
@@ -224,7 +233,7 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
         {
             Id = "test-dp",
             Name = "ДП ЄВРО",
-            BrandId = "test-okko",
+            BrandId = TestOkko,
             BasePrice = 110,
             DiscountPrice = 100,
             CreatedAtUtc = DateTime.UtcNow,
@@ -259,7 +268,7 @@ private FuelNominal Package(
         decimal? margin = null, decimal? pump = null)
     {
     _context.SeedOffer(
-        "test-okko", "test-dp",
+        TestOkko, "test-dp",
         supplierPricePerLiter: cost,
         marginUahPerLiter: margin ?? (final - cost),
         finalPricePerLiter: final,
@@ -282,7 +291,8 @@ private FuelNominal Package(
     {
         _context.Brands.Add(new Brand
         {
-            Id = "test-klo",
+            Id = TestKlo,
+            Slug = "test-klo",
             Name = "KLO",
             LogoText = "KLO",
             Color = "#fff",
@@ -293,7 +303,7 @@ private FuelNominal Package(
 
         var providers = await _handler.HandleAsync(new GetBrandsQuery());
 
-        var brand = providers.Single(p => p.Id == "test-klo");
+        var brand = providers.Single(p => p.Id == TestKlo);
         brand.Fuels.Should().BeEmpty();
         brand.Nominals.Should().BeEmpty();
     }

@@ -71,7 +71,7 @@ public sealed class UpdateNominalsReuseTests : IDisposable
     {
         await SeedAsync(10, 20);
 
-        await CreateController().UpdateNominals("okko", new List<int> { 10, 20, 30 }, default);
+        await CreateController().UpdateNominals(BrandIds.Okko, new List<int> { 10, 20, 30 }, default);
 
         // The size is now stated once, on the fuel. Everything else - the volumes per pool, the shelf -
         // follows from this list rather than being its own copy of the answer.
@@ -89,7 +89,7 @@ public sealed class UpdateNominalsReuseTests : IDisposable
     {
         await SeedAsync(10, 20);
 
-        await CreateController().UpdateNominals("okko", new List<int> { 10 }, default);
+        await CreateController().UpdateNominals(BrandIds.Okko, new List<int> { 10 }, default);
 
         var sizes = await _context.FuelNominals.AsNoTracking()
             .Where(n => n.FuelTypeId == "okko-a95")
@@ -102,7 +102,8 @@ public sealed class UpdateNominalsReuseTests : IDisposable
     {
         _context.Brands.Add(new Brand
         {
-            Id = "okko",
+            Id = BrandIds.Okko,
+            Slug = "okko",
             Name = "OKKO",
             Color = "#00ff80",
             LogoText = "OK",
@@ -114,7 +115,7 @@ public sealed class UpdateNominalsReuseTests : IDisposable
         {
             Id = "okko-a95",
             Name = "А95",
-            BrandId = "okko",
+            BrandId = BrandIds.Okko,
             BasePrice = 50m,
             DiscountPrice = 45m,
             CreatedAtUtc = DateTime.UtcNow,
@@ -124,7 +125,7 @@ public sealed class UpdateNominalsReuseTests : IDisposable
 // Seeded as one offer plus a volume per nominal, and returned so the tests can assert on volume ids -
         // that is what the nominals edit now reuses instead of the package rows. The per-litre figures
         // go on the offer: the edit restates each volume's total from them.
-        _context.SeedOffer("okko", "okko-a95",
+        _context.SeedOffer(BrandIds.Okko, "okko-a95",
             supplierPricePerLiter: 90m, marginUahPerLiter: 10m, finalPricePerLiter: 100m);
         var rows = nominals.Select(l => new FuelNominal
         {
@@ -144,7 +145,7 @@ public sealed class UpdateNominalsReuseTests : IDisposable
     {
         await SeedAsync(10, 20);
 
-        await CreateController().UpdateNominals("okko", new List<int> { 10 }, default);
+        await CreateController().UpdateNominals(BrandIds.Okko, new List<int> { 10 }, default);
 
         var sizes = await _context.FuelNominals.AsNoTracking()
             .Where(n => n.FuelTypeId == "okko-a95")
@@ -165,11 +166,11 @@ public sealed class UpdateNominalsReuseTests : IDisposable
         await SeedAsync(10, 20);
 
         var controller = CreateController();
-        await controller.UpdateNominals("okko", new List<int> { 10, 20 }, default);
+        await controller.UpdateNominals(BrandIds.Okko, new List<int> { 10, 20 }, default);
         var afterFirst = await _context.FuelNominals.AsNoTracking()
             .Select(n => new { n.FuelTypeId, n.Liters }).ToListAsync();
 
-        await controller.UpdateNominals("okko", new List<int> { 10, 20 }, default);
+        await controller.UpdateNominals(BrandIds.Okko, new List<int> { 10, 20 }, default);
         var afterSecond = await _context.FuelNominals.AsNoTracking()
             .Select(n => new { n.FuelTypeId, n.Liters }).ToListAsync();
 
@@ -194,7 +195,7 @@ public sealed class UpdateNominalsReuseTests : IDisposable
         await SeedAsync(10, 20);
         var before = await _context.FuelNominals.AsNoTracking().CountAsync();
 
-        var result = await CreateController().UpdateNominals("okko", nominals.ToList(), default);
+        var result = await CreateController().UpdateNominals(BrandIds.Okko, nominals.ToList(), default);
 
         var bad = result as BadRequestObjectResult;
         bad.Should().NotBeNull("a negative volume is not a product");

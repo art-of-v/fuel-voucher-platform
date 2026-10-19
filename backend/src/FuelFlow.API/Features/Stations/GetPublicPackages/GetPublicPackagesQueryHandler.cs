@@ -51,6 +51,9 @@ var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
     var rows = await (
     from offer in _context.FuelOffers.AsNoTracking()
     join fuel in _context.FuelTypes.AsNoTracking() on offer.FuelTypeId equals fuel.Id
+    // The network's own code travels with the row: the stock keys below are matched on it, and
+    // it is what the client renders next to the uuid it now orders by.
+    join brand in _context.Brands.AsNoTracking() on offer.BrandId equals brand.Id
     // The sizes belong to the fuel AND the pool: a nominal row says the operator allows this size in
     // this catalogue, so a 7 L canister that exists only to rehearse a pickup is not a size the
     // public site lists. The filter is on the NOMINAL's pool, not the offer's - they answer the same
@@ -68,6 +71,9 @@ var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
     {
     offer.Id,
     offer.BrandId,
+    // The slug travels with the row: the stock keys below are matched on it, and it is what the
+    // client renders next to the uuid it now orders by.
+    BrandSlug = brand.Slug,
     offer.FuelTypeId,
     FuelName = fuel.Name,
     nominal.Liters,
@@ -99,6 +105,7 @@ var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
     return new PublicPackageResponse(
     PackageIds.For(x.Id, x.Liters),
                     x.BrandId,
+                    x.BrandSlug,
                     x.FuelTypeId,
                     x.FuelName,
                     x.Liters,
@@ -106,7 +113,7 @@ var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
                     FuelPricing.OriginalPackagePrice(x.PumpPricePerLiter, x.Liters, price),
                     FuelPricing.FinalPerLiterOrNull(
                         x.SupplierPricePerLiter, x.MarginUahPerLiter, x.PumpPricePerLiter, x.MinDiscountPerLiter),
-                    available.Contains(StockKey.For(x.BrandId, x.FuelTypeId, x.Liters)));
+                    available.Contains(StockKey.For(x.BrandSlug, x.FuelTypeId, x.Liters)));
             })
             .ToList();
     }
