@@ -42,6 +42,10 @@ COMPOSE_FILE="${COMPOSE_FILE:-$SCRIPT_DIR/docker-compose.prod.yml}"
 ENV_FILE="${ENV_FILE:-$SCRIPT_DIR/.env}"
 CONTAINER="${CONTAINER:-fuelflow-postgres}"
 ARCHIVE_DIR="${WAL_ARCHIVE_DIR:-/root/fuelflow-wal}"
+# This path is literal in the compose file and has to match. It cannot be a compose
+# variable: the parse gate resolves every referenced variable against a dummy value, and
+# a dummy value is not a path - compose would read it as the name of a volume that does
+# not exist, and the whole file would fail to load.
 PG_IMAGE="${PG_IMAGE:-postgres:16-alpine}"
 STAGING=0
 
