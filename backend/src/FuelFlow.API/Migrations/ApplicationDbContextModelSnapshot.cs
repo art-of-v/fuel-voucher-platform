@@ -3801,8 +3801,6 @@ namespace FuelFlow.API.Migrations
                             t.HasCheckConstraint("ck_fuel_types_prices_non_negative", "base_price >= 0 AND discount_price >= 0");
 
                             t.HasCheckConstraint("ck_fuel_types_pricing_knobs_non_negative", "(supplier_price_per_liter IS NULL OR supplier_price_per_liter >= 0) AND (pump_price_per_liter IS NULL OR pump_price_per_liter >= 0) AND (min_discount_per_liter IS NULL OR min_discount_per_liter >= 0)");
-
-                            t.HasCheckConstraint("ck_fuel_types_zero_price_needs_no_pump_price", "discount_price > 0 OR pump_price_per_liter IS NULL");
                         });
 
                     b.HasData(

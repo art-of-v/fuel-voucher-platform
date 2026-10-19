@@ -174,20 +174,23 @@ public sealed class QrParametersAndImportStatusIntegrityTests : IClassFixture<Te
     {
         await using var context = CreateContext();
 
-        // Named explicitly: the table also carries its primary key, which is a plain unique btree
-        // (indnullsnotdistinct = false) and would otherwise be counted here and read as a failure.
+        // Found by its COLUMNS, not by its name. The table also carries its primary key, which is
+        // a plain unique btree (indnullsnotdistinct = false) and would otherwise be counted here
+        // and read as a failure. Naming the index instead would make this test a hostage to the
+        // index naming convention - and it was: a rename of every EF-named index in the schema
+        // turned this into a failure with nothing about the database having changed.
         var flags = await context.Database
             .SqlQueryRaw<string>(
                 """
                 SELECT i.indnullsnotdistinct::text
                   FROM pg_index i
-                  JOIN pg_class c ON c.oid = i.indexrelid
                  WHERE i.indrelid = 'qr_parameters'::regclass
-                   AND c.relname = 'IX_qr_parameters_ecc_level_version_mask_pattern_encoding_mode'
+                   AND i.indisunique
+                   AND NOT i.indisprimary
                 """)
             .ToListAsync();
 
-        flags.Should().ContainSingle("the QR-configuration index is the only one named that way");
+        flags.Should().ContainSingle("the QR-configuration index is the only unique one that is not the primary key");
         flags[0].Should().Be("true",
             "indnullsnotdistinct = TRUE is NULLS NOT DISTINCT; false is the plain btree that let the duplicates through");
     }

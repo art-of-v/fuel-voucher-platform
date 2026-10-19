@@ -157,20 +157,20 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
             // discount policy anyone has agreed to. The only guard today is the application-level
             // below-cost opt-in (BrandsController), which is a business decision rather than a
             // constraint, so a hand-written PUT or a future code path can still land here.
-            t.HasCheckConstraint("ck_fuel_types_prices_non_negative", "base_price >= 0 AND discount_price >= 0");
-
-            // Zero IS a price here: a giveaway grade sells at nothing, and
-            // DatabaseIntegrityTests.A_Zero_Price_Volume_Is_Allowed_But_Zero_Liters_Is_Not says so
-            // on purpose. Forbidding zero outright was wrong and that test caught it.
             //
-            // What is not a price policy is a grade that knows its pump price and still sells at
-            // zero. That is the shape of the 1 UAH leak: OfferPricingBecomesTheFuel copied a NULL
-            // final_price_per_liter across as 0 on OKKO "Пульс 95", which carried a pump price of
-            // 95.90 and would have been listed for nothing. A giveaway has no pump price to
-            // contradict, so requiring one to be absent is the narrow rule that keeps both cases.
-            t.HasCheckConstraint(
-                "ck_fuel_types_zero_price_needs_no_pump_price",
-                "discount_price > 0 OR pump_price_per_liter IS NULL");
+            // Zero is allowed, and it means something: a grade the network lists but nobody has
+            // priced yet. The OKKO catalogue import leaves exactly that behind - the pump is
+            // published, no cost and no margin are set - and
+            // UnpricedPackageIntegrationTests.A_Nominal_With_Neither_Rate_Nor_Margin_Is_Not_Charged
+            // says so in its own name. Forbidding zero here would refuse every grade the
+            // catalogue sync creates, which is the opposite of what a guard is for.
+            //
+            // What keeps a zero-priced grade off the shelf is not this column. It is that its price
+            // computes to null: SellablePackage.ComputedFinalPricePerLiter is null without a cost
+            // or a margin, and the storefront does not list a package with no price. The 1 UAH leak
+            // was a copy that wrote a number where the offer held NULL, and the number - not the
+            // missing one - is what reaches the customer.
+            t.HasCheckConstraint("ck_fuel_types_prices_non_negative", "base_price >= 0 AND discount_price >= 0");
 
             // The four knobs the fuel took off the offer on 2026-10-19 keep the constraints the offer
             // carried. A negative cost makes every price computed from it negative as well, and a
