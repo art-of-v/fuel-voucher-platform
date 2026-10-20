@@ -56,6 +56,25 @@ docker image prune -af
 log "Pruning build cache ..."
 docker builder prune -af
 
+# 3. Containers that were CREATED and never started. Compose makes them with a temporary
+#    name (`<hash>_<name>`) when an `up` is interrupted, and they hold the name the real
+#    container wants - so the NEXT deploy fails with
+#    "Conflict. The container name ... is already in use by container 5b3bc7e...".
+#
+#    `docker compose up -d --remove-orphans` handles the case where a SERVICE was renamed
+#    (the compose file's own fix, in the deploy). It does NOT handle these: their service
+#    label still names a service the compose file has, so compose does not consider them
+#    orphans - but they are not running anything either, and they are only holding a name.
+#
+#    Only containers in "created" state are touched. A stopped container is somebody's
+#    deliberate state; a created-but-never-started one is debris.
+log "Removing containers that were created and never started ..."
+for id in $(docker ps -aq --filter "status=created" 2>/dev/null); do
+  name="$(docker inspect -f '{{.Name}}' "$id" 2>/dev/null | sed 's|^/||')"
+  log "  removing $name - created, never started, and holding a name"
+  docker rm -f "$id" > /dev/null 2>&1 || true
+done
+
 after="$(disk_use_pct)"
 [[ -n "$after" ]] || { log "ERROR: could not read disk usage after prune."; exit 1; }
 log "Docker GC done. ${WATCH_PATH} ${before}% -> ${after}% used."
