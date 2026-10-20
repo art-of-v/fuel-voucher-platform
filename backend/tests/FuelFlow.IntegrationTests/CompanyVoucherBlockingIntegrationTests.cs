@@ -187,11 +187,11 @@ public sealed class CompanyVoucherBlockingIntegrationTests : IClassFixture<TestD
         var handler = new GetUserVouchersCommandHandler(
             query, new StubQrGenerator(), NullLogger<GetUserVouchersCommandHandler>.Instance);
 
-        var ownerView = await handler.HandleAsync(new GetUserVouchersCommand(ownerId));
+        var ownerView = await handler.HandleAsync(new GetUserVouchersCommand(ownerId, new PagedRequest(PageSize: PageLimits.MaxPageSize)));
         ownerView.Vouchers.Should().ContainSingle(v => v.Id == voucherId,
             "the owner must see a voucher they froze so they can unblock it");
 
-        var workerView = await handler.HandleAsync(new GetUserVouchersCommand(workerId));
+        var workerView = await handler.HandleAsync(new GetUserVouchersCommand(workerId, new PagedRequest(PageSize: PageLimits.MaxPageSize)));
         workerView.Vouchers.Should().NotContain(v => v.Id == voucherId,
             "a blocked voucher drops out of the worker's wallet until the owner lifts the freeze");
     }

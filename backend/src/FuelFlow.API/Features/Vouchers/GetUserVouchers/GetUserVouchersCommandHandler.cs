@@ -25,19 +25,33 @@ public sealed class GetUserVouchersCommandHandler
         GetUserVouchersCommand command,
         CancellationToken cancellationToken = default)
     {
-        var entities = await _context.FuelVouchers
-            .AsNoTracking()
-            .Include(v => v.QrParameters)
-            .Include(v => v.WorkerUser)
-            .Include(v => v.FuelType)
+        // The filter is built ONCE and used twice: once to count, once to read the page.
+        // The count is asked of the filtered query WITHOUT the includes, because EF logs
+        // "the include operation was ignored" for a count over an included query - and the
+        // count is the one query here that must stay cheap.
+        var wallet = _context.FuelVouchers
             .Where(v => v.AssignedToUserId == command.UserId || v.WorkerUserId == command.UserId)
             // Owners also see vouchers they froze on a worker (Blocked) so they can unblock
             // them (#103 S3b); workers never see a blocked voucher — it drops out of their wallet
             // until the owner lifts the freeze.
             .Where(v => v.Status == VoucherStatus.Assigned
                         || v.Status == VoucherStatus.Used
-                        || (v.Status == VoucherStatus.Blocked && v.AssignedToUserId == command.UserId))
+                        || (v.Status == VoucherStatus.Blocked && v.AssignedToUserId == command.UserId));
+
+        var totalCount = await wallet.CountAsync(cancellationToken);
+
+        var entities = await wallet
+            .AsNoTracking()
+            .Include(v => v.QrParameters)
+            .Include(v => v.WorkerUser)
+            .Include(v => v.FuelType)
             .OrderByDescending(v => v.CreatedAtUtc)
+            // The tie-break. Without it a voucher could appear on two pages or on none,
+            // because several vouchers can share a creation timestamp - and a page boundary
+            // that skips a row is a customer's fuel missing from their wallet.
+            .ThenBy(v => v.Id)
+            .Skip(command.Paging.Skip)
+            .Take(command.Paging.PageSize)
             .ToListAsync(cancellationToken);
 
         var vouchers = entities.Select(v =>
@@ -83,7 +97,8 @@ public sealed class GetUserVouchersCommandHandler
             );
         }).ToList();
 
-        return new GetUserVouchersResponse(vouchers);
+        var hasNextPage = totalCount > command.Paging.Skip + vouchers.Count;
+        return new GetUserVouchersResponse(vouchers, totalCount, hasNextPage);
     }
 
     private string? GenerateQrImage(FuelVoucher voucher)
