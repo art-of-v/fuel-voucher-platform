@@ -89,7 +89,7 @@ public sealed class VoucherListSortingIntegrationTests : IClassFixture<TestDatab
         var supplierA = Guid.NewGuid();
         var supplierB = Guid.NewGuid();
         var fuelTypeId = $"sort-{tag}";
-        var brand = $"SORT{tag}";
+        var brand = $"sort{tag}";
 
         using var ctx = CreateContext();
         await ctx.Database.MigrateAsync();

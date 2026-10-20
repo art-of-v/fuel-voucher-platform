@@ -236,7 +236,7 @@ public sealed class OutboxFastPathIntegrationTests : IClassFixture<TestDatabaseF
             context.FuelVouchers.Add(new FuelVoucher
             {
                 Id = Guid.CreateVersion7(),
-                Brand = brandSlug.ToUpperInvariant(),
+                Brand = brandSlug,
                 FuelTypeId =   ToUuid(fuelTypeId),
                 Liters = liters,
                 SupplierExpirationDate = expiry,
