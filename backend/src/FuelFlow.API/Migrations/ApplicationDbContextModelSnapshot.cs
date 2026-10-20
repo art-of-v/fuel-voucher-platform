@@ -1536,7 +1536,9 @@ namespace FuelFlow.API.Migrations
                         .HasFilter("released_at_utc IS NOT NULL");
 
                     b.HasIndex("VoucherId")
-                        .HasDatabaseName("ix_fulfillments_voucher_id");
+                        .IsUnique()
+                        .HasDatabaseName("ux_fulfillments_one_live_per_voucher")
+                        .HasFilter("released_at_utc IS NULL");
 
                     b.ToTable("fulfillments", (string)null);
                 });

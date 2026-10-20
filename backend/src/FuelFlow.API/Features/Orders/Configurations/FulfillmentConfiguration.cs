@@ -52,7 +52,24 @@ internal sealed class FulfillmentConfiguration : IEntityTypeConfiguration<Fulfil
         builder.HasQueryFilter(e => e.ReleasedAtUtc == null);
         builder.HasIndex(e => e.OrderId)
             .HasFilter("released_at_utc IS NULL");
-        builder.HasIndex(e => e.VoucherId);
+
+        // **One voucher, one live fulfilment** - and the DATABASE says so, not only the
+        // application's compare-and-swap. The claim is atomic in the application, and the
+        // application is the thing that can be wrong: a second live fulfilment for one voucher
+        // would hand the same bearer instrument to two customers, and the voucher is money.
+        //
+        // The index is partial on the same predicate as the query filter, so it covers
+        // exactly the rows that are live - which is every row the application can see through
+        // EF, and every row the raw claim statement touches. Nothing reads the released rows
+        // by voucher id (the history is assembled in memory from the order's line items), so
+        // the plain index this replaces was serving the same rows and nothing else.
+        //
+        // The name follows the one convention: `ux_<table>_<what it is true of>`, the same
+        // shape as `ux_payments_one_refund_per_order`.
+        builder.HasIndex(e => e.VoucherId)
+            .IsUnique()
+            .HasFilter("released_at_utc IS NULL")
+            .HasDatabaseName("ux_fulfillments_one_live_per_voucher");
 
         // Every release is a thing an operator may need to see. This is the only query that reports
         // them, so nothing else is lost.
