@@ -125,7 +125,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
             context.FuelVouchers.Add(new FuelVoucher
             {
                 Id = Guid.CreateVersion7(),
-                Brand = BrandId.ToUpperInvariant(),
+                Brand = BrandId,
                 FuelTypeId =   ToUuid(fuelTypeId),
                 Liters = liters,
                 SupplierExpirationDate = expiry,
