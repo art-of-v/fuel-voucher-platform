@@ -280,6 +280,17 @@ voucherNumber: string;
   isDeleted: boolean;
 }
 
+  /** A page of rows and the count behind it, the shape the paged admin endpoints answer with. */
+  interface PagedResult<T> {
+    items: T[];
+    totalCount: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+    hasPreviousPage: boolean;
+    hasNextPage: boolean;
+  }
+
   interface PurchaseType {
     id: string;
     userId: string;
@@ -448,8 +459,17 @@ voucherNumber: string;
   const actorRole = user?.role ?? '';
   const currentUserId = user?.id ?? '';
 
-  const { data: purchases = [] } = useQuery<PurchaseType[]>({
-    queryKey: ["/api/admin/purchases"],
+  // The purchases list is a PAGE, not the whole table. The endpoint used to answer with every
+  // order the shop had ever taken, and the table grew with it: the screen got slower as the
+  // business did, and the server held every order in memory to draw a screen that shows
+  // fifty rows.
+  const PURCHASES_PAGE_SIZE = 50;
+  const [purchasesPage, setPurchasesPage] = useState(1);
+
+  const { data: purchasesPageData } = useQuery<PagedResult<PurchaseType>>({
+    queryKey: ["/api/admin/purchases", purchasesPage],
+    queryFn: () =>
+      apiRequest("GET", `/api/admin/purchases?page=${purchasesPage}&limit=${PURCHASES_PAGE_SIZE}`),
     enabled: !!user,
     // The orders table has to converge on its own because the changes that matter arrive
     // out-of-band, not from an action taken in this tab:
@@ -464,7 +484,7 @@ voucherNumber: string;
     // order status hasn't caught up) for quick convergence, falling back to the same 15s baseline
     // otherwise. refetchOnWindowFocus is kept explicit for clarity.
     refetchInterval: (query) => {
-      const rows = query.state.data;
+      const rows = (query.state.data as PagedResult<PurchaseType> | undefined)?.items;
       const settling = rows?.some(
         (p) =>
           p.refundStatus === "Processing" ||
@@ -476,6 +496,9 @@ voucherNumber: string;
     },
     refetchOnWindowFocus: true,
   });
+
+  const purchases = purchasesPageData?.items ?? [];
+  const purchasesTotalPages = purchasesPageData?.totalPages ?? 0;
 
   // The purchases table shows human-readable values instead of raw IDs: resolve the fuel-type
   // UUID to its name and the buyer's userId to their phone (both datasets loaded above).
@@ -1332,16 +1355,48 @@ if (status === "booting") {
                   ))}
                   {purchases.length === 0 && (
                     <tr>
-<td colSpan={11} className="p-8 text-center text-muted-foreground">
-                      No purchases found
+                      <td colSpan={11} className="p-8 text-center text-muted-foreground">
+                        No purchases found
                       </td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
+
+            {purchasesTotalPages > 1 && (
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span>
+                  {t('purchases.total')}: {purchasesPageData?.totalCount ?? 0}
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={purchasesPage <= 1}
+                    onClick={() => setPurchasesPage((p) => Math.max(1, p - 1))}
+                    className="h-8"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  <span className="text-xs">
+                    {purchasesPage} / {purchasesTotalPages}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={purchasesPage >= purchasesTotalPages}
+                    onClick={() => setPurchasesPage((p) => p + 1)}
+                    className="h-8"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
+
 
         {/* Import Tab */}
         {activeTab === 'vouchers' && (
@@ -2171,6 +2226,7 @@ if (status === "booting") {
                 </div>
               </>
             )}
+
           </div>
         )}
 

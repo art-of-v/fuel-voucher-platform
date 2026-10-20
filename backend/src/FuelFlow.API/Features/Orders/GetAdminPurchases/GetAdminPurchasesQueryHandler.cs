@@ -37,18 +37,33 @@ public sealed class GetAdminPurchasesQueryHandler
         _context = context;
     }
 
-    public async Task<List<AdminPurchaseDto>> HandleAsync(
+    public async Task<PagedResult<AdminPurchaseDto>> HandleAsync(
         GetAdminPurchasesQuery query,
         CancellationToken cancellationToken = default)
     {
-        var purchases = await _context.Orders
+        // The count is taken from the query WITHOUT the includes: a count that joined the
+        // fulfillments and the line items would count rows, not orders.
+        var baseQuery = _context.Orders
             .IgnoreQueryFilters()
-            .AsNoTracking()
+            .AsNoTracking();
+
+        var total = await baseQuery.CountAsync(cancellationToken);
+
+        var limit = PageLimits.ClampPageSize(query.Limit);
+
+        // The page is taken from the same query WITH the includes, and the includes are split
+        // because both of them are collections: joined, they would multiply each other.
+        var purchases = await baseQuery
             .AsSplitQuery()
             .Include(o => o.Fulfillments)
                 .ThenInclude(f => f.Voucher)
             .Include(o => o.LineItems)
             .OrderByDescending(o => o.CreatedAtUtc)
+            // A stable order needs a tie-break, or two orders created in the same tick can swap
+            // places between two pages and one of them is shown twice.
+            .ThenBy(o => o.Id)
+            .Skip(PageLimits.SkipFor(PageLimits.ClampPage(query.Page), limit))
+            .Take(limit)
             .ToListAsync(cancellationToken);
 
 // A refund reverses a capture, and a capture always has an order. The filter says so rather than
@@ -62,7 +77,7 @@ public sealed class GetAdminPurchasesQueryHandler
 
     var refundByOrderId = refunds.ToDictionary(p => p.OrderId!.Value);
 
-        return purchases.Select(o =>
+        var items = purchases.Select(o =>
         {
             var lineItemsList = o.LineItems.ToList();
             var firstLi = lineItemsList.FirstOrDefault();
@@ -99,6 +114,14 @@ public sealed class GetAdminPurchasesQueryHandler
                 }).ToList()
             };
         }).ToList();
+
+        return new PagedResult<AdminPurchaseDto>
+        {
+            Items = items,
+            TotalCount = total,
+            Page = PageLimits.ClampPage(query.Page),
+            PageSize = limit
+        };
     }
 
     /// <summary>

@@ -695,6 +695,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // Purchases
     "table.client": "Client",
     "table.vouchers": "Vouchers",
+    "purchases.total": "Total",
     "purchases.refund": "Refund",
     "purchases.refundTitle": "Confirm refund",
     "purchases.refundConfirm":
@@ -1768,6 +1769,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // Purchases
     "table.client": "Клієнт",
     "table.vouchers": "Ваучери",
+    "purchases.total": "Всього",
     "purchases.refund": "Повернення",
     "purchases.refundTitle": "Підтвердити повернення",
     "purchases.refundConfirm":
@@ -2764,6 +2766,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // Purchases
     "table.client": "Kunde",
     "table.vouchers": "Gutscheine",
+    "purchases.total": "Gesamt",
     "purchases.refund": "Erstattung",
     "purchases.refundTitle": "Erstattung bestätigen",
     "purchases.refundConfirm":
@@ -3835,6 +3838,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // Purchases
     "table.client": "Cliente",
     "table.vouchers": "Vales",
+    "purchases.total": "Total",
     "purchases.refund": "Reembolso",
     "purchases.refundTitle": "Confirmar reembolso",
     "purchases.refundConfirm":

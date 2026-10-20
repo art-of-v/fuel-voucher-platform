@@ -3,6 +3,7 @@ using FuelFlow.Features.Orders.DeleteOrder;
 using FuelFlow.Features.Orders.GetAdminOrderById;
 using FuelFlow.Features.Orders.GetAdminOrders;
 using FuelFlow.Features.Orders.UpdateOrderStatus;
+using FuelFlow.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -35,9 +36,14 @@ public sealed class AdminOrderController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(PagedResult<OrderDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAll(
+        [FromQuery] int page = 1,
+        [FromQuery] int limit = 50,
+        CancellationToken cancellationToken = default)
     {
-        var result = await _getAllHandler.HandleAsync(new GetAdminOrdersQuery(), cancellationToken);
+        var result = await _getAllHandler.HandleAsync(
+            new GetAdminOrdersQuery(page, limit), cancellationToken);
         return Ok(result);
     }
 
