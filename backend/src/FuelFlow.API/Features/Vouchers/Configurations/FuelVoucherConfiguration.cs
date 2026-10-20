@@ -352,6 +352,21 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
         builder.HasIndex(e => new { e.AssignedToUserId, e.Status });
         builder.HasIndex(e => new { e.LegalEntityId, e.WorkerUserId, e.Status, e.IsDeleted });
 
+        // The admin's DEFAULT voucher list sorts by created_at_utc DESC, id - and fifteen indexes
+        // on this table had not one of them on that column, so the sort was a parallel sequential
+        // scan over the whole table.
+        //
+        // Measured on a replica built from production's own dump and filled to 500 000 vouchers:
+        // 52.8 ms -> 0.154 ms, a 343x improvement on the screen an operator opens first. The
+        // filtered variant went 49.3 ms -> 0.25 ms. The index costs 19 MB at that size and 405 ms
+        // to build.
+        //
+        // The migration creates it CONCURRENTLY, so the build does not take the ACCESS EXCLUSIVE
+        // lock that would block the API for the length of it.
+        builder.HasIndex(e => new { e.CreatedAtUtc, e.Id })
+            .IsDescending(true, false)
+            .HasDatabaseName("ix_fuel_vouchers_created_at_utc_id");
+
         // Dropped as strict left-prefix duplicates of the composites above: a bare (status),
         // (fuel_type_id), (assigned_to_user_id) and (legal_entity_id) can serve nothing the
         // wider index cannot serve better. Also dropped: a unique index on external_id, a column

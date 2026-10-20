@@ -2546,6 +2546,10 @@ namespace FuelFlow.API.Migrations
                     b.HasIndex("AssignedToUserId", "Status")
                         .HasDatabaseName("ix_fuel_vouchers_assigned_to_user_id_status");
 
+                    b.HasIndex("CreatedAtUtc", "Id")
+                        .IsDescending(true, false)
+                        .HasDatabaseName("ix_fuel_vouchers_created_at_utc_id");
+
                     b.HasIndex("FuelTypeId", "Status", "IsDeleted")
                         .HasDatabaseName("ix_fuel_vouchers_fuel_type_id_status_is_deleted");
 
@@ -4389,6 +4393,10 @@ namespace FuelFlow.API.Migrations
                     b.HasIndex("SettlementCode")
                         .IsUnique()
                         .HasDatabaseName("ix_users_settlement_code");
+
+                    b.HasIndex("CreatedAtUtc", "Id")
+                        .IsDescending(true, false)
+                        .HasDatabaseName("ix_users_created_at_utc_id");
 
                     b.ToTable("users", null, t =>
                         {

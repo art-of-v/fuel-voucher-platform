@@ -183,5 +183,15 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         // Postgres does not index a foreign key column on its own, and the parent's delete check and
         // every join down this column scan without one.
         builder.HasIndex(e => e.PartyId);
+
+        // The admin's customers list sorts by created_at_utc DESC, id - and no index on this table
+        // led with that column, so the sort was a scan of the whole table. The list is a page now,
+        // and a paged list still has to SORT: the page is the last fifty of the whole table.
+        //
+        // The migration creates it CONCURRENTLY, so the build does not take the ACCESS EXCLUSIVE
+        // lock that would block the API for the length of it.
+        builder.HasIndex(e => new { e.CreatedAtUtc, e.Id })
+            .IsDescending(true, false)
+            .HasDatabaseName("ix_users_created_at_utc_id");
     }
 }
