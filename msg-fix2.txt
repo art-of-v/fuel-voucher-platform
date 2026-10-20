@@ -1,0 +1,28 @@
+fix(suppliers): the registry code is optional, and unique when it is there
+
+The previous change made the supplier's registry code mandatory, and that was wrong:
+the business's rule is that a supplier can be recorded before anyone has looked the
+code up. Requiring it would mean a supplier who cannot be invoiced cannot be bought
+from either.
+
+**What is right**
+
+- **Optional.** The column stays nullable, the API accepts a blank, the form asks for it
+  but does not insist. A blank is stored as NULL rather than as an empty string, so the
+  database's format constraint never sees one.
+- **Unique when it is there.** Two rows with the same code are the same counterparty
+  recorded twice, and a business that pays "two" suppliers who is one person pays twice
+  and reconciles the difference by hand. A code that is not there cannot collide, so the
+  uniqueness costs nothing for a supplier who has not been identified yet.
+- **A code that is given has to be a code** - 8-10 digits, checked in the database as
+  well as in the API.
+
+`legal_entities.edrpou` is a different registry and a different rule, and it is untouched:
+it is unique and mandatory there, because it is our own company.
+
+**The history is left alone.** The migration that made the column mandatory had already
+run on staging - the in-flight deploy applied it - so it is not removed and re-added
+under a new name. Its body is corrected where it was wrong (it refused to run on a
+database with a supplier that has no code, and it forced the column NOT NULL), and a new
+migration drops the NOT NULL again where it was applied. The history is append-only, and
+the way back from a migration that has run is another migration, not a rewrite.
