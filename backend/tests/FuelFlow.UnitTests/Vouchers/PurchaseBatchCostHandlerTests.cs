@@ -43,6 +43,7 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
             NewPackage("okko-dp", 20m));
         _context.Suppliers.Add(new Supplier
         {
+            EdrIpn = "9000000019",
             Id = SupplierId,
             Name = "ТОВ Постачальник",
             IsActive = true,

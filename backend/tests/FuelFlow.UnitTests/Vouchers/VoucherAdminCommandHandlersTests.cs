@@ -904,6 +904,7 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
         var id = Guid.NewGuid();
         _context.Suppliers.Add(new Supplier
         {
+            EdrIpn = "9000000021",
             Id = id,
             Name = "Seed Supplier",
             IsActive = true,

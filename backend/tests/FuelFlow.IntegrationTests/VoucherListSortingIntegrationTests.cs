@@ -95,8 +95,8 @@ public sealed class VoucherListSortingIntegrationTests : IClassFixture<TestDatab
         await ctx.Database.MigrateAsync();
 
         ctx.Suppliers.AddRange(
-            new Supplier { Id = supplierA, Name = $"SORT-{tag}-Альфа", CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new Supplier { Id = supplierB, Name = $"SORT-{tag}-Бета", CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
+            new Supplier { Id = supplierA, Name = $"SORT-{tag}-Альфа", EdrIpn = TestEdrIpns.Next(), CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new Supplier { Id = supplierB, Name = $"SORT-{tag}-Бета", EdrIpn = TestEdrIpns.Next(), CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
 
         ctx.FuelTypes.Add(new FuelTypeEntity
         {

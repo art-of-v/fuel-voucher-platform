@@ -58,6 +58,7 @@ public class SupplierAcquisitionSourceTests : WebApplicationFactory<Program>, IC
 
         var supplier = new Supplier
         {
+            EdrIpn = TestEdrIpns.Next(),
             Id = Guid.NewGuid(),
             Name = $"acq-test-{Guid.NewGuid():N}",
             IsActive = true,
@@ -111,6 +112,7 @@ public class SupplierAcquisitionSourceTests : WebApplicationFactory<Program>, IC
 
         context.Suppliers.Add(new Supplier
         {
+            EdrIpn = TestEdrIpns.Next(),
             Id = Guid.NewGuid(),
             Name = $"acq-bad-{Guid.NewGuid():N}",
             IsActive = true,
@@ -222,8 +224,8 @@ public class SupplierAcquisitionSourceTests : WebApplicationFactory<Program>, IC
             // ask for a column that does not exist yet - not the situation under test.
 #pragma warning disable EF1002
             await context.Database.ExecuteSqlInterpolatedAsync($"""
-                INSERT INTO suppliers (id, name, is_active, created_at_utc, updated_at_utc)
-                VALUES ({preExisting}, {name}, true, now(), now())
+                INSERT INTO suppliers (id, name, is_active, edr_ipn, created_at_utc, updated_at_utc)
+                VALUES ({preExisting}, {name}, true, {TestEdrIpns.Next()}, now(), now())
                 """);
 #pragma warning restore EF1002
 

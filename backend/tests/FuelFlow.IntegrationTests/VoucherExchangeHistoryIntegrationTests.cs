@@ -273,6 +273,7 @@ private async Task SeedExchangeAsync(
         {
             seed.Suppliers.Add(new Supplier
             {
+                EdrIpn = TestEdrIpns.Next(),
                 Id = supplierId,
                 Name = supplierName,
                 IsActive = true,

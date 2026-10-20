@@ -112,6 +112,7 @@ public sealed class PurchaseBatchPnlHandlerTests : IDisposable
         var id = Guid.NewGuid();
         _context.Suppliers.Add(new Supplier
         {
+            EdrIpn = "9000000020",
             Id = id,
             Name = "ТОВ Постачальник",
             IsActive = true,

@@ -438,6 +438,7 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
             supplierId = Guid.NewGuid();
             seed.Suppliers.Add(new Supplier
             {
+                EdrIpn = TestEdrIpns.Next(),
                 Id = supplierId,
                 Name = "Seed Supplier",
                 IsActive = true,

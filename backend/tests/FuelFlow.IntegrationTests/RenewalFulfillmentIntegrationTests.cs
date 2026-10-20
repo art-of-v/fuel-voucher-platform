@@ -1144,6 +1144,7 @@ var exchangedId = Guid.NewGuid();
 
             seed.Suppliers.Add(new Supplier
             {
+                EdrIpn = TestEdrIpns.Next(),
                 Id = supplierId,
                 Name = "Seed Supplier",
                 IsActive = true,

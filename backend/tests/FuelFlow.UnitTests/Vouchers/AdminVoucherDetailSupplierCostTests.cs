@@ -44,6 +44,7 @@ public sealed class AdminVoucherDetailSupplierCostTests : IDisposable
 
         _context.Suppliers.Add(new Supplier
         {
+            EdrIpn = "9000000101",
             Id = SupplierId,
             Name = SupplierName,
             CreatedAtUtc = DateTime.UtcNow,

@@ -48,6 +48,7 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
         _supplierId = Guid.NewGuid();
         context.Suppliers.Add(new Supplier
         {
+            EdrIpn = TestEdrIpns.Next(),
             Id = _supplierId,
             Name = "Seed Supplier",
             IsActive = true,

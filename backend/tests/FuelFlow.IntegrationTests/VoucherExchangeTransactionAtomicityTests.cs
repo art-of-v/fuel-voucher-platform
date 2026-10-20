@@ -168,6 +168,7 @@ public sealed class VoucherExchangeTransactionAtomicityTests : IClassFixture<Tes
 
     private static void SeedSupplier(ApplicationDbContext ctx, Guid supplierId) => ctx.Suppliers.Add(new Supplier
     {
+        EdrIpn = TestEdrIpns.Next(),
         Id = supplierId,
         Name = "Seed Supplier",
         LegalForm = "ФОП",

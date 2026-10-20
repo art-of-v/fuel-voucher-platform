@@ -4136,6 +4136,7 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("created_at_utc");
 
                     b.Property<string>("EdrIpn")
+                        .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("edr_ipn");
@@ -4180,6 +4181,10 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("updated_at_utc");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("EdrIpn")
+                        .IsUnique()
+                        .HasDatabaseName("ix_suppliers_edr_ipn");
 
                     b.HasIndex("IsActive")
                         .HasDatabaseName("ix_suppliers_is_active");

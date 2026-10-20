@@ -450,6 +450,7 @@ private async Task SeedAsync()
         {
             seed.Suppliers.Add(new Supplier
             {
+                EdrIpn = TestEdrIpns.Next(),
                 Id = Guid.NewGuid(),
                 Name = "S",
                 IsActive = true,

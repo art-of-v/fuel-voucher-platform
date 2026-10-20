@@ -36,7 +36,14 @@ internal sealed class SupplierConfiguration : IEntityTypeConfiguration<Supplier>
         // caller reading a supplier needs one field regardless of form.
         builder.Property(e => e.EdrIpn)
             .HasColumnName("edr_ipn")
-            .HasMaxLength(20);
+            .HasMaxLength(20)
+            .IsRequired();
+
+        // One supplier, one registry code. Two rows with the same code are the same counterparty
+        // recorded twice, and a business that pays "two" suppliers who are one person pays twice
+        // and reconciles the difference by hand.
+        builder.HasIndex(e => e.EdrIpn)
+            .IsUnique();
 
         builder.Property(e => e.Rnkrr)
             .HasColumnName("rnkrr")
