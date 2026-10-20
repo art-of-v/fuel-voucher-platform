@@ -23,7 +23,9 @@ public sealed class ApplicationDbContextFactory : IDesignTimeDbContextFactory<Ap
     public ApplicationDbContext CreateDbContext(string[] args)
     {
         var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
-        optionsBuilder.UseNpgsql("Host=localhost;Port=5432;Database=fuelflow;Username=postgres;Password=postgres;SSL Mode=Disable;Trust Server Certificate=true");
+        // The cap is on this string too: the guard that keeps every pool capped does not make an
+        // exception for design-time tooling, and one capped connection changes nothing here.
+        optionsBuilder.UseNpgsql("Host=localhost;Port=5432;Database=fuelflow;Username=postgres;Password=postgres;SSL Mode=Disable;Trust Server Certificate=true;Maximum Pool Size=5");
 
         return new ApplicationDbContext(
             optionsBuilder.Options,

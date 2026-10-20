@@ -13,6 +13,7 @@ using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Settings;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.Persistence;
@@ -70,12 +71,18 @@ try
     builder.Services.Configure<DatabaseOptions>(builder.Configuration.GetSection(DatabaseOptions.SectionName));
     var connectionString = builder.Configuration.GetSection("Database")["ConnectionString"];
 
+    // One cap for every pool in this process - the worker's own data source, the Hangfire storage
+    // and the Postgres health check. The worker shares the database with the API, so an uncapped
+    // pool here eats the server's max_connections budget without the API's cap noticing.
+    var maxPoolSize = DatabaseConnectionPool.ResolveMaxPoolSize(builder.Configuration);
+    var cappedConnectionString = DatabaseConnectionPool.WithMaxPoolSize(connectionString!, maxPoolSize);
+
     builder.Services.AddHealthChecks()
-        .AddNpgSql(connectionString!, name: "postgres", tags: ["ready"]);
+        .AddNpgSql(cappedConnectionString, name: "postgres", tags: ["ready"]);
 
     builder.Services.AddDbContext<ApplicationDbContext>(options =>
         options.UseNpgsql(
-            connectionString));
+            cappedConnectionString));
 
     builder.Services.AddScoped<NotificationService>();
     builder.Services.AddScoped<VoucherStockMonitor>();
@@ -115,7 +122,7 @@ try
         .UseSimpleAssemblyNameTypeSerializer()
         .UseRecommendedSerializerSettings()
         .UsePostgreSqlStorage(c =>
-            c.UseNpgsqlConnection(connectionString)));
+            c.UseNpgsqlConnection(cappedConnectionString)));
 
     builder.Services.AddHangfireServer(options =>
     {

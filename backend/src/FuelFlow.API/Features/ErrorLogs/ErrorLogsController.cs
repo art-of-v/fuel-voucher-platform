@@ -112,6 +112,9 @@ public sealed class ErrorLogsController : ControllerBase
 
         var items = await query
             .OrderByDescending(e => e.LoggedAtUtc)
+            // The tie-break: many log rows share one timestamp, and without a unique second key
+            // the sort is unstable - a row can land on two pages or on none.
+            .ThenBy(e => e.Id)
             .Skip(PageLimits.ClampOffset(offset))
             .Take(PageLimits.ClampPageSize(limit))
             .Select(e => new ErrorLogDto

@@ -66,6 +66,9 @@ from f in _context.FuelTypes.AsNoTracking()
         // list below still shows it, because an auditor must be able to see the handover.
         var fulfilledOrders = await _context.Orders
             .AsNoTracking()
+            // Two collections in one query (LineItems x Fulfillments) - without the split query the
+            // JOIN is their cross product and every order comes back multiplied.
+            .AsSplitQuery()
             .Include(o => o.LineItems)
             .Include(o => o.Fulfillments)
                 .ThenInclude(f => f.Voucher)
@@ -119,6 +122,8 @@ from f in _context.FuelTypes.AsNoTracking()
 
         var orders = await _context.Orders
             .AsNoTracking()
+            // Same cross product as above: LineItems x Fulfillments.
+            .AsSplitQuery()
             .Include(o => o.Fulfillments)
                 .ThenInclude(f => f.Voucher)
             .Include(o => o.LineItems)
