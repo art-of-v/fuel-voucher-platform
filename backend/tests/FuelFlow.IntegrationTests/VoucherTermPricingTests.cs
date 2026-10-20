@@ -75,10 +75,23 @@ public sealed class VoucherTermPricingTests : IClassFixture<TestDatabaseFixture>
         await using var db = CreateContext();
         await CleanAsync(db);
 
-        var past = Tier(VoucherTermPricingSchemes.RenewalRate, "2w", true, 24.5m,
-            validTo: DateTime.UtcNow.AddHours(-1));
+        // The closed window ends exactly where the open one begins. That is the shape the write
+        // path produces, and it is what "history" means here: the price was X until the moment
+        // it became Y, with no instant in between belonging to neither.
+        //
+        // The two windows must NOT overlap. A closed window that reaches into the open one leaves
+        // the lookup with two candidates for the same date - which is what the exclusion
+        // constraint refuses, and what this test's neighbour refuses.
+        var boundary = DateTime.UtcNow.AddHours(-1);
+
+        var past = Tier(VoucherTermPricingSchemes.RenewalRate, "2w", true, 24.5m, validTo: boundary);
+        past.ValidFrom = boundary.AddDays(-1);
         db.VoucherTermPricings.Add(past);
-        db.VoucherTermPricings.Add(Tier(VoucherTermPricingSchemes.RenewalRate, "2w", true, 26m));
+
+        var open = Tier(VoucherTermPricingSchemes.RenewalRate, "2w", true, 26m);
+        open.ValidFrom = boundary;
+        db.VoucherTermPricings.Add(open);
+
         await db.SaveChangesAsync();
 
         var rows = await db.VoucherTermPricings
