@@ -136,9 +136,6 @@ public sealed class PublicFuelTypesIntegrationTests : IClassFixture<TestDatabase
 
         // 40 + 3 = 43, and the pump ceiling of 92.90 does not bind, so our price is 43.
         fuel.FinalPricePerLiter.Should().Be(43m);
-        // The legacy field carries the same number, so a client that has not picked up the new fields
-        // is not wrong either.
-        fuel.DiscountPrice.Should().Be(43m);
         fuel.PumpPricePerLiter.Should().Be(92.90m);
         fuel.IsAvailable.Should().BeTrue("there is stock behind it");
     }
@@ -152,10 +149,8 @@ public sealed class PublicFuelTypesIntegrationTests : IClassFixture<TestDatabase
 
         // No cost and no margin, so there is no price of ours - null, not zero.
         fuel.FinalPricePerLiter.Should().BeNull();
-        // The column price is still there, and it is what the row shows - in BOTH the new field and the
-        // legacy one, because a client that has not been updated still reads the legacy one.
+        // The column price is still there, and it is what the row shows.
         fuel.PumpPricePerLiter.Should().Be(101.90m);
-        fuel.DiscountPrice.Should().Be(101.90m);
         fuel.IsAvailable.Should().BeFalse();
     }
 

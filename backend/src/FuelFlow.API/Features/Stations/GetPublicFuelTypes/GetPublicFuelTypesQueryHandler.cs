@@ -65,38 +65,17 @@ public sealed class GetPublicFuelTypesQueryHandler
         var available = await _stock.AvailableFuelIdsAsync(isTestAccount, ct);
 
         return fuels
-            .Select(f =>
-            {
-                var isAvailable = available.Contains(f.Id);
-                var ours = FuelPricing.FinalPerLiterOrNull(
-                    f.SupplierPricePerLiter, f.MarginUahPerLiter, f.PumpPricePerLiter, f.MinDiscountPerLiter);
-
-                // The price this fuel is shown at, decided ONCE here so that every client shows the
-                // same number: ours when the shop can sell it, the column price when it cannot, and
-                // the column price is also what a client that has not yet picked up the new fields
-                // reads - because `discountPrice` IS that number here.
-                //
-                // The rule was the owner's, and it is a rule about what a customer is told: a fuel
-                // nobody has costed must not read as free, and the market's price must not be
-                // presented as ours.
-                var shown = isAvailable
-                    ? (ours ?? f.PumpPricePerLiter)
-                    : (f.PumpPricePerLiter ?? ours);
-
-                return new PublicFuelTypeResponse(
-                    f.Id,
-                    f.BrandId,
-                    slugs.TryGetValue(f.BrandId, out var slug) ? slug : string.Empty,
-                    f.Name,
-                    f.BasePrice,
-                    // The legacy field, and it now carries the price TO SHOW rather than a stale
-                    // column: a client that has not picked up the new fields yet reads this one, and
-                    // it must not read "0 UAH" for a fuel the market charges 92.90 for.
-                    shown ?? 0m,
-                    f.PumpPricePerLiter,
-                    ours,
-                    isAvailable);
-            })
+            .Select(f => new PublicFuelTypeResponse(
+                f.Id,
+                f.BrandId,
+                slugs.TryGetValue(f.BrandId, out var slug) ? slug : string.Empty,
+                f.Name,
+                f.BasePrice,
+                f.DiscountPrice,
+                f.PumpPricePerLiter,
+                FuelPricing.FinalPerLiterOrNull(
+                    f.SupplierPricePerLiter, f.MarginUahPerLiter, f.PumpPricePerLiter, f.MinDiscountPerLiter),
+                available.Contains(f.Id)))
             .ToList();
     }
 }
