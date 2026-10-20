@@ -774,7 +774,7 @@ if (!fullyAttributed && fulfillments.Count > 0)
                             .FirstOrDefaultAsync(cancellationToken);
 
                         var fuelLabel = string.IsNullOrEmpty(fuelTypeName)
-                            ? lineItem.FuelTypeId
+                            ? lineItem.FuelTypeId.ToString().ToString()
                             : $"{fuelTypeName} ({lineItem.Brand.ToUpperInvariant()}, {lineItem.Liters:0.##} L)";
 
                         await _notifications.OrderUnfulfillableAsync(
@@ -1378,7 +1378,7 @@ var lastFailedAtUtc = await _context.Payments
                             .FirstOrDefaultAsync(cancellationToken);
 
                         var fuelLabel = string.IsNullOrEmpty(fuelTypeName)
-                            ? source.FuelTypeId
+                            ? source.FuelTypeId.ToString().ToString()
                             : $"{fuelTypeName} ({source.Brand.ToUpperInvariant()}, {source.Liters:0.##} L)";
 
                         _logger.LogWarning(

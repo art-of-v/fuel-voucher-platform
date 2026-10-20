@@ -12,6 +12,7 @@ using SixLabors.ImageSharp.PixelFormats;
 using UglyToad.PdfPig.Content;
 using UglyToad.PdfPig.Core;
 using System.Reflection;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.UnitTests.Parsers;
 
@@ -241,8 +242,8 @@ public class KloVoucherParserTests : IDisposable
         _context = new ApplicationDbContext(options, TestQrCipher.Instance);
         _context.AddMissing();
         _context.FuelTypes.AddRange(
-            new FuelTypeEntity { Id = "klo-dp", Name = "ДП Mustang", BrandId = BrandIds.Klo, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "klo-95", Name = "A 95 EURO", BrandId = BrandIds.Klo, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow });
+            new FuelTypeEntity { Id = ToUuid("klo-dp"), Name = "ДП Mustang", BrandId = BrandIds.Klo, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("klo-95"), Name = "A 95 EURO", BrandId = BrandIds.Klo, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow });
         _context.SaveChanges();
     }
 
@@ -381,6 +382,6 @@ public class KloVoucherParserTests : IDisposable
 
         var parsed = result.Should().ContainSingle().Subject;
         parsed.FuelTypeId.Should().BeNull("an unresolved grade is not a licence to invent a fuel id");
-        parsed.FuelTypeId.Should().NotBe("klo-dp");
+        parsed.FuelTypeId.Should().NotBe(ToUuid("klo-dp"));
     }
 }

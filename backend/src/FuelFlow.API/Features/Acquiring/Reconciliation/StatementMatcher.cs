@@ -63,13 +63,13 @@ public static class StatementMatcher
         var ordersByInvoice = orders
             .Where(o => !string.IsNullOrEmpty(o.MonobankInvoiceId))
             .GroupBy(o => o.MonobankInvoiceId!)
-            .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+            .ToDictionary(g => g.Key, g => g.First());
 
         // Same reasoning: a refund is identified by the invoice it reverses.
         var refundsByInvoice = refunds
             .Where(r => r.Kind == PaymentKind.Refund && !string.IsNullOrEmpty(r.ProviderInvoiceId))
             .GroupBy(r => r.ProviderInvoiceId)
-            .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+            .ToDictionary(g => g.Key, g => g.First());
 
         // For the human-readable note on a matched reversal. refunds.ext_ref was a copy of the
         // order's idempotency key that could drift from it; reading the order directly is both the

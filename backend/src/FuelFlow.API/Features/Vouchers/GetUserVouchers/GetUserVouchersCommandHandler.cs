@@ -57,7 +57,7 @@ public sealed class GetUserVouchersCommandHandler
             return new VoucherDto(
                 v.Id,
                 v.Brand,
-                v.FuelTypeId,
+                v.FuelTypeId.ToString(),
                 v.Liters,
                 v.Liters,
                 v.CustomerExpirationDate,
@@ -79,7 +79,7 @@ public sealed class GetUserVouchersCommandHandler
                 // Human-readable fuel name from the catalog (e.g. "ДП ЄВРО"); the mobile UI
                 // falls back to the raw FuelTypeId when it is missing, which rendered as
                 // "OKKO-DP" on the voucher cards.
-                v.FuelType?.Name ?? v.FuelTypeId
+                v.FuelType?.Name ?? v.FuelTypeId.ToString()
             );
         }).ToList();
 

@@ -34,7 +34,7 @@ public static class TermStockCoverage
     public static async Task<DateOnly?> BestStockExpirationAsync(
         ApplicationDbContext context,
         string brandSlug,
-        string fuelTypeId,
+        Guid fuelTypeId,
         decimal liters,
         CancellationToken cancellationToken = default)
     {

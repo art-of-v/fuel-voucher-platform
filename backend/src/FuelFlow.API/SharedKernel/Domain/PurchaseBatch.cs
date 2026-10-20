@@ -15,7 +15,7 @@ public sealed class PurchaseBatch
 {
     public Guid Id { get; set; }
     public Guid ImportJobId { get; set; }
-    public string FuelTypeId { get; set; } = null!;
+    public Guid FuelTypeId { get; set; }
 
     /// <summary>Supplier Brand id (e.g. "okko"), denormalized from the batch's vouchers for reporting.</summary>
     public string Brand { get; set; } = null!;

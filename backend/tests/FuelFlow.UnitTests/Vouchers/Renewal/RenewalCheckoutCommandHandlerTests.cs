@@ -17,6 +17,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.UnitTests.Vouchers.Renewal;
 
@@ -419,7 +420,7 @@ public sealed class RenewalCheckoutCommandHandlerTests : IDisposable
         {
             Id = Guid.NewGuid(),
             Brand = "OKKO",
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = liters,
             SupplierExpirationDate = providerExpiry ?? expiry.AddYears(1),
             CustomerExpirationDate = expiry,

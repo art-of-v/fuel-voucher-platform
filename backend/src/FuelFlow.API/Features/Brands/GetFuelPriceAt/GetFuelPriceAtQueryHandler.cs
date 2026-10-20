@@ -12,7 +12,7 @@ namespace FuelFlow.Features.Brands.GetFuelPriceAt;
 /// The instant to answer for. Not "the last change before now" — a specific moment, so an order line
 /// from a month ago can be priced from the record rather than from today's margin.
 /// </param>
-public sealed record GetFuelPriceAtQuery(string FuelTypeId, DateTime AsOfUtc);
+public sealed record GetFuelPriceAtQuery(Guid FuelTypeId, DateTime AsOfUtc);
 
 /// <summary>
 /// The row that was in effect at <c>asOf</c>, with the moment it took effect and how long it stood.
@@ -25,7 +25,7 @@ public sealed record GetFuelPriceAtQuery(string FuelTypeId, DateTime AsOfUtc);
 /// </param>
 public sealed record FuelPriceAt(
     Guid Id,
-    string FuelTypeId,
+    Guid FuelTypeId,
     string DataKind,
     decimal? SupplierPricePerLiter,
     decimal? MarginUahPerLiter,

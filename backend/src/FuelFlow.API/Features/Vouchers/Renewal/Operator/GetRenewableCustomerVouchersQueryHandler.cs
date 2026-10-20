@@ -18,7 +18,7 @@ public sealed class RenewableCustomerVoucherDto
     public Guid Id { get; set; }
     public string VoucherNumber { get; set; } = string.Empty;
     public string Brand { get; set; } = string.Empty;
-    public string FuelTypeId { get; set; } = string.Empty;
+    public Guid FuelTypeId { get; set; }
     public string? FuelName { get; set; }
     public decimal Liters { get; set; }
     public DateOnly ExpirationDate { get; set; }

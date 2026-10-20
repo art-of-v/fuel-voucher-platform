@@ -11,9 +11,10 @@ namespace FuelFlow.Features.Brands.GetPublicFuelTypes;
 /// timestamps, which no client reads, are dropped.
 /// </summary>
 /// <remarks>
-/// <c>BrandId</c> became a uuid with planning D-21 and <c>BrandSlug</c> came with it: the fuel id is
-/// still the natural key <c>"okko-95"</c> in this slice, so a client holding only a fuel has no other
-/// way to know which network it belongs to.
+/// <c>BrandId</c> became a uuid with planning D-21 and <c>BrandSlug</c> came with it: a client holding
+/// only a fuel has no other way to know which network it belongs to. The fuel's own id became a uuid
+/// with it, and <c>Id</c> stays a string so the wire format a client declares does not change - the
+/// value in it is the uuid now, not the natural key it used to spell.
 /// </remarks>
 public sealed record PublicFuelTypeResponse(
     string Id,

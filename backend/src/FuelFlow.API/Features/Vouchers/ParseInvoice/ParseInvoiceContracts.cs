@@ -61,7 +61,7 @@ public sealed class ParsedInvoiceLineDto
     public decimal? Total { get; set; }
 
     public bool Matched { get; set; }
-    public string? FuelTypeId { get; set; }
+    public Guid? FuelTypeId { get; set; }
     public string? FuelTypeName { get; set; }
     public string? Brand { get; set; }
 

@@ -1,5 +1,6 @@
 using System.Globalization;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Vouchers.ParseInvoice;
@@ -52,7 +53,7 @@ public sealed class ParseInvoiceCommandHandler
             .ToList();
 
         var dto = new ParseInvoiceResultDto { Errors = command.ParseErrors.ToList() };
-        var matched = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var matched = new HashSet<Guid>();
 
         foreach (var line in command.Lines)
         {
@@ -106,7 +107,7 @@ public sealed class ParseInvoiceCommandHandler
 
         dto.UnmatchedImportFuels = batches
             .Where(b => !matched.Contains(b.FuelTypeId))
-            .Select(b => b.FuelTypeName ?? b.FuelTypeId)
+            .Select(b => b.FuelTypeName ?? b.FuelTypeId.ToString())
             .OrderBy(x => x)
             .ToList();
 
@@ -114,11 +115,23 @@ public sealed class ParseInvoiceCommandHandler
     }
 
     /// <summary>Resolve an invoice line to a batch: exact code first, then a normalised name/id overlap.</summary>
+    /// <remarks>
+    /// <para>
+    /// The code on the invoice is a natural key - the fuel's own name for itself, the way the
+    /// catalogue used to spell it. A fuel's id is a uuid now, and <see cref="FuelIdMapper"/> maps
+    /// the key onto exactly the uuid the fuel carries, so a line matched by code before the
+    /// conversion matches the same fuel after it.
+    /// </para>
+    /// <para>
+    /// The name overlap is the second chance, and it is a real one: an invoice prints "ДП ЄВРО"
+    /// where the catalogue once said "okko-dp", and a human reads both as the same diesel.
+    /// </para>
+    /// </remarks>
     private static ImportFuel? Match(InvoiceLine line, List<ImportFuel> batches)
     {
         if (!string.IsNullOrWhiteSpace(line.Code))
         {
-            var byCode = batches.FirstOrDefault(b => string.Equals(b.FuelTypeId, line.Code, StringComparison.OrdinalIgnoreCase));
+            var byCode = batches.FirstOrDefault(b => b.FuelTypeId == FuelIdMapper.ToUuid(line.Code));
             if (byCode is not null) return byCode;
         }
 
@@ -132,8 +145,10 @@ public sealed class ParseInvoiceCommandHandler
             if (name.Length > 0 && (name.Contains(label) || label.Contains(name)))
                 return b;
 
-            var id = Normalize(b.FuelTypeId);
-            if (id.Length > 0 && (label.Contains(id) || id.Contains(label)))
+            // The label spelled as the key the id was made from ("okko-95" in a column that is
+            // otherwise prose). The mapping is the same one the conversion used, so this finds the
+            // fuel the old id would have found.
+            if (b.FuelTypeId == FuelIdMapper.ToUuid(label))
                 byId ??= b;
         }
         return byId;
@@ -147,5 +162,5 @@ public sealed class ParseInvoiceCommandHandler
     private static string Append(string? existing, string add) =>
         string.IsNullOrEmpty(existing) ? add : $"{existing}; {add}";
 
-    private sealed record ImportFuel(string FuelTypeId, string? FuelTypeName, string Brand, decimal TotalLiters);
+    private sealed record ImportFuel(Guid FuelTypeId, string? FuelTypeName, string Brand, decimal TotalLiters);
 }

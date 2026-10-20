@@ -1,3 +1,3 @@
 namespace FuelFlow.Features.Brands.GetAdminFuelTypeById;
 
-public sealed record GetAdminFuelTypeByIdQuery(string Id);
+public sealed record GetAdminFuelTypeByIdQuery(Guid Id);

@@ -5,6 +5,7 @@ using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.UnitTests.Vouchers;
 
@@ -21,8 +22,8 @@ public sealed class ParseInvoiceHandlerTests : IDisposable
         _context = new ApplicationDbContext(options, TestQrCipher.Instance);
 
         _context.FuelTypes.AddRange(
-            new FuelTypeEntity { Id = "okko-dp", Name = "Дизельне паливо ОККО", BrandId = BrandIds.Okko, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "okko-a95", Name = "Бензин А-95 ОККО", BrandId = BrandIds.Okko, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
+            new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "Дизельне паливо ОККО", BrandId = BrandIds.Okko, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("okko-a95"), Name = "Бензин А-95 ОККО", BrandId = BrandIds.Okko, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
         _context.SaveChanges();
 
         _handler = new ParseInvoiceCommandHandler(_context);
@@ -54,7 +55,7 @@ public sealed class ParseInvoiceHandlerTests : IDisposable
         {
             Id = Guid.NewGuid(),
             Brand = brand,
-            FuelTypeId = fuelTypeId,
+            FuelTypeId = ToUuid(fuelTypeId),
             Liters = liters,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
@@ -93,7 +94,7 @@ public sealed class ParseInvoiceHandlerTests : IDisposable
 
         var line = result.Dto!.Lines.Should().ContainSingle().Subject;
         line.Matched.Should().BeTrue();
-        line.FuelTypeId.Should().Be("okko-dp");
+        line.FuelTypeId.Should().Be(ToUuid("okko-dp"));
         line.FuelTypeName.Should().Be("Дизельне паливо ОККО");
         line.Brand.Should().Be("OKKO");
         line.CostPerLiter.Should().Be(48.5m);
@@ -114,7 +115,7 @@ public sealed class ParseInvoiceHandlerTests : IDisposable
 
         var line = result.Dto!.Lines.Should().ContainSingle().Subject;
         line.Matched.Should().BeTrue();
-        line.FuelTypeId.Should().Be("okko-a95");
+        line.FuelTypeId.Should().Be(ToUuid("okko-a95"));
     }
 
     [Fact]

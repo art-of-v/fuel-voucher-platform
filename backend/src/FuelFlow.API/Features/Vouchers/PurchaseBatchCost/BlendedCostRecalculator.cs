@@ -40,7 +40,7 @@ public sealed class BlendedCostRecalculator
     /// <c>!IsDeleted</c> filter, and this number reprices every package, so a deleted voucher must not
     /// keep influencing what buyers are quoted (#216).
     /// </remarks>
-    public async Task<decimal?> ComputeBlendedAsync(string fuelTypeId, CancellationToken ct = default)
+    public async Task<decimal?> ComputeBlendedAsync(Guid fuelTypeId, CancellationToken ct = default)
     {
         var pool = await (
             from v in _context.FuelVouchers.IgnoreQueryFilters()
@@ -68,7 +68,7 @@ public sealed class BlendedCostRecalculator
     /// the history row is the only thing that says which.
     /// </param>
     public async Task<int> RepriceAsync(
-        string fuelTypeId,
+        Guid fuelTypeId,
         decimal blendedCost,
         Guid actingUserId,
         string reason = PriceHistoryReasons.BatchCost,

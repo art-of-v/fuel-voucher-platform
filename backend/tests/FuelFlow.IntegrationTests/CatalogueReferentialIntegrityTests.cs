@@ -5,6 +5,7 @@ using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -123,7 +124,7 @@ public sealed class CatalogueReferentialIntegrityTests : IClassFixture<TestDatab
 
         await act.Should().NotThrowAsync();
 
-        await context.Set<FuelTypeEntity>().Where(f => f.Id == "catalogue-unpriced").ExecuteDeleteAsync();
+        await context.Set<FuelTypeEntity>().Where(f => f.Id == ToUuid("catalogue-unpriced")).ExecuteDeleteAsync();
     }
 
     [Fact]
@@ -154,10 +155,10 @@ public sealed class CatalogueReferentialIntegrityTests : IClassFixture<TestDatab
 
         (await context.Set<FuelTypeEntity>()
             .IgnoreQueryFilters()
-            .SingleAsync(f => f.Id == "catalogue-positive-price")).DiscountPrice
+            .SingleAsync(f => f.Id == ToUuid("catalogue-positive-price"))).DiscountPrice
             .Should().Be(1m);
 
-        await context.Set<FuelTypeEntity>().Where(f => f.Id == "catalogue-positive-price").ExecuteDeleteAsync();
+        await context.Set<FuelTypeEntity>().Where(f => f.Id == ToUuid("catalogue-positive-price")).ExecuteDeleteAsync();
     }
 
     // ---- helpers ---------------------------------------------------------------------------
@@ -188,13 +189,13 @@ public sealed class CatalogueReferentialIntegrityTests : IClassFixture<TestDatab
     private static async Task<string> SeededFuelTypeId(ApplicationDbContext context)
     {
         var id = await context.Set<FuelTypeEntity>().IgnoreQueryFilters().Select(f => f.Id).FirstOrDefaultAsync();
-        id.Should().NotBeNull("the fixture seeds the catalogue");
-        return id!;
+        id.Should().NotBe(Guid.Empty, "the fixture seeds the catalogue");
+        return id.ToString();
     }
 
     private static FuelTypeEntity NewFuel(string id, Guid brandId) => new()
     {
-        Id = id,
+        Id =   ToUuid(id),
         BrandId = brandId,
         Name = id,
         BasePrice = 50m,
@@ -207,7 +208,7 @@ public sealed class CatalogueReferentialIntegrityTests : IClassFixture<TestDatab
     {
         Id = Guid.NewGuid(),
         BrandId = brandId,
-        FuelTypeId = fuelTypeId,
+        FuelTypeId =   ToUuid(fuelTypeId),
         DataKind = "real",
         EffectiveFromUtc = DateTime.UtcNow,
         RecordedAtUtc = DateTime.UtcNow,
@@ -216,7 +217,7 @@ public sealed class CatalogueReferentialIntegrityTests : IClassFixture<TestDatab
 
     private static FuelTypeProductCode NewProductCode(string fuelTypeId, Guid brandId, string productCode) => new()
     {
-        FuelTypeId = fuelTypeId,
+        FuelTypeId =   ToUuid(fuelTypeId),
         BrandId = brandId,
         ProductCode = productCode,
     };

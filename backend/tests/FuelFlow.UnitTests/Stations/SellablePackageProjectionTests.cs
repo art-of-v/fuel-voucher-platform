@@ -3,6 +3,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.UnitTests.Brands;
 
@@ -43,7 +44,7 @@ public sealed class SellablePackageProjectionTests : IDisposable
         // wants a real database.
         var fuel = new FuelTypeEntity
         {
-            Id = "projection-fuel",
+            Id = ToUuid("projection-fuel"),
             Name = "А-95 (projection fixture)",
             BrandId = BrandIds.Okko,
             BasePrice = 0m,
@@ -62,7 +63,7 @@ MarginUahPerLiter = 2m,
 
         var nominal = new FuelNominal
         {
-            FuelTypeId = "projection-fuel",
+            FuelTypeId = ToUuid("projection-fuel"),
             DataKind = DataKinds.Real,
             Liters = 10m
         };

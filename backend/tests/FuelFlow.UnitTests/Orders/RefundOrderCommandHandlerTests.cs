@@ -10,6 +10,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Options;
 using Microsoft.EntityFrameworkCore;
 using Moq;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.UnitTests.Orders;
 
@@ -126,7 +127,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
             {
                 Id = Guid.NewGuid(),
                 Brand = "okko",
-                FuelTypeId = "okko-95",
+                FuelTypeId = ToUuid("okko-95"),
                 Liters = 50,
                 Quantity = 2,
                 UnitPrice = 2500,
@@ -139,7 +140,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
     {
         Id = Guid.NewGuid(),
         Brand = brand,
-        FuelTypeId = fuelTypeId,
+        FuelTypeId = ToUuid(fuelTypeId),
         Liters = liters,
         VoucherNumber = $"V-{Guid.NewGuid():N}",
         QrPayload = "q",

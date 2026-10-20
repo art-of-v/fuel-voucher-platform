@@ -17,6 +17,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -94,7 +95,7 @@ public sealed class VoucherExchangeTransactionAtomicityTests : IClassFixture<Tes
                 new ConfirmVoucherExchangeCommand(
                     OldVoucherIds: new List<Guid> { old1, old2 },
                     NewImportId: importId,
-                    Costs: new List<ExchangeFuelCost> { new("okko-95", 30m) },
+                    Costs: new List<ExchangeFuelCost> { new(ToUuid("okko-95"), 30m) },
                     SurchargeUah: 200m,
                     ActingUserId: actingUserId,
                     ActingUserName: "Operator")));
@@ -196,7 +197,7 @@ public sealed class VoucherExchangeTransactionAtomicityTests : IClassFixture<Tes
         {
             Id = id,
             Brand = "okko",
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
             SupplierExpirationDate = expiry,
             CustomerExpirationDate = expiry,

@@ -25,6 +25,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -986,7 +987,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
                         Id = Guid.NewGuid(),
                         OrderId = secondOrderId,
                         Brand = "OKKO",
-                        FuelTypeId = "okko-95",
+                        FuelTypeId = ToUuid("okko-95"),
                         Liters = 50m,
                         Quantity = 1,
                         UnitPrice = 500,
@@ -1163,7 +1164,7 @@ var exchangedId = Guid.NewGuid();
                 Id = Guid.NewGuid(),
                 ExchangeBatchId = exchangeBatchId,
                 OldVoucherId = exchangedId,
-                FuelTypeId = "okko-95",
+                FuelTypeId = ToUuid("okko-95"),
                 Brand = "OKKO",
                 SupplierId = supplierId,
                 SurchargeUah = 0m,
@@ -1422,7 +1423,7 @@ var exchangedId = Guid.NewGuid();
         {
             Id = id,
             Brand = brand,
-            FuelTypeId = fuelTypeId,
+            FuelTypeId =   ToUuid(fuelTypeId),
             Liters = liters,
             SupplierExpirationDate = providerExpiry ?? expiry.AddYears(1),
             CustomerExpirationDate = expiry,
@@ -1440,7 +1441,7 @@ var exchangedId = Guid.NewGuid();
         {
             Id = id,
             Brand = brand,
-            FuelTypeId = fuelTypeId,
+            FuelTypeId =   ToUuid(fuelTypeId),
             Liters = liters,
             SupplierExpirationDate = expiry,
             CustomerExpirationDate = expiry,
@@ -1504,7 +1505,7 @@ var exchangedId = Guid.NewGuid();
                 Id = Guid.NewGuid(),
                 OrderId = orderId,
                 Brand = brand,
-                FuelTypeId = fuelTypeId,
+                FuelTypeId =   ToUuid(fuelTypeId),
                 Liters = liters,
                 Quantity = 1,
                 UnitPrice = amount,

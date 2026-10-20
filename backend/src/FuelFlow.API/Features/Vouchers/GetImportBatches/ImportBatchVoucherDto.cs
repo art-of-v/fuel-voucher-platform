@@ -4,7 +4,7 @@ public sealed class ImportBatchVoucherDto
 {
     public Guid Id { get; set; }
     public string Brand { get; set; } = null!;
-    public string FuelTypeId { get; set; } = null!;
+    public Guid FuelTypeId { get; set; }
     public string? FuelTypeName { get; set; }
     public decimal Liters { get; set; }
     /// <summary>Real term printed on the supplier's document - the ceiling for this stock.</summary>

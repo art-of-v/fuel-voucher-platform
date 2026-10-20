@@ -95,7 +95,7 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
             if (item.BrandId is null || item.BrandId == Guid.Empty)
                 return BadRequest("BrandId is required for every item");
 
-            if (string.IsNullOrWhiteSpace(item.FuelTypeId))
+            if (item.FuelTypeId == Guid.Empty)
                 return BadRequest("FuelTypeId is required for every item");
 
             if (item.Liters <= 0)
@@ -178,11 +178,11 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetTermQuote(
         [FromQuery] Guid BrandId,
-        [FromQuery] string fuelTypeId,
+        [FromQuery] Guid fuelTypeId,
         [FromQuery] decimal liters,
         CancellationToken cancellationToken)
     {
-        if (BrandId == Guid.Empty || string.IsNullOrWhiteSpace(fuelTypeId) || liters <= 0m)
+        if (BrandId == Guid.Empty || fuelTypeId == Guid.Empty || liters <= 0m)
             return BadRequest("BrandId, fuelTypeId and a positive liters are required.");
 
         // The ladder is priced off a catalogue package, so the quote has to be priced off the SAME
@@ -313,7 +313,7 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
         if (command.BrandId is null || command.BrandId == Guid.Empty)
             return BadRequest("BrandId is required");
 
-        if (string.IsNullOrWhiteSpace(command.FuelTypeId))
+        if (command.FuelTypeId == Guid.Empty)
             return BadRequest("FuelTypeId is required");
 
         if (command.Liters <= 0)

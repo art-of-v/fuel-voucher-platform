@@ -6,6 +6,7 @@ using FuelFlow.Features.Brands.GetProviderHistory;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.Providers.UnitTests;
 
@@ -52,8 +53,8 @@ public sealed class GetProviderByIdAndHistoryTests : IDisposable
             UpdatedAtUtc = now
         });
         _context.FuelTypes.AddRange(
-            new FuelTypeEntity { Id = "test-fuel-a", Name = "A-95", BrandId = TestOkko, BasePrice = 100, DiscountPrice = 100, CreatedAtUtc = now, UpdatedAtUtc = now },
-            new FuelTypeEntity { Id = "test-fuel-b", Name = "DP", BrandId = TestOkko, BasePrice = 100, DiscountPrice = 100, CreatedAtUtc = now, UpdatedAtUtc = now });
+            new FuelTypeEntity { Id = ToUuid("test-fuel-a"), Name = "A-95", BrandId = TestOkko, BasePrice = 100, DiscountPrice = 100, CreatedAtUtc = now, UpdatedAtUtc = now },
+            new FuelTypeEntity { Id = ToUuid("test-fuel-b"), Name = "DP", BrandId = TestOkko, BasePrice = 100, DiscountPrice = 100, CreatedAtUtc = now, UpdatedAtUtc = now });
         _context.SeedPackage("test-fuel-a-10", TestOkko, "test-fuel-a", 10m, 510m,
             supplierPricePerLiter: 49m, marginUahPerLiter: 2m, finalPricePerLiter: 51m,
             createdAtUtc: now, updatedAtUtc: now);
@@ -76,7 +77,7 @@ public sealed class GetProviderByIdAndHistoryTests : IDisposable
         brand.Nominals.Should().Equal(10, 20, 50);
         brand.Fuels.Should().HaveCount(2);
 
-        var fuelA = brand.Fuels.Single(f => f.Id == "test-fuel-a");
+        var fuelA = brand.Fuels.Single(f => f.Id == ToUuid("test-fuel-a").ToString());
         fuelA.Name.Should().Be("A-95");
         fuelA.SupplierPricePerLiter.Should().Be(49m);
         fuelA.MarginUahPerLiter.Should().Be(2m);

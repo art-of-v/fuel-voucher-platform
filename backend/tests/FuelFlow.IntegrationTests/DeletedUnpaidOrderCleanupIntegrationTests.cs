@@ -10,6 +10,7 @@ using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -141,7 +142,7 @@ public sealed class DeletedUnpaidOrderCleanupIntegrationTests : IClassFixture<Te
             {
                 Id = voucherId,
                 Brand = "OKKO",
-                FuelTypeId = "okko-dp",
+                FuelTypeId = ToUuid("okko-dp"),
                 Liters = 10m,
                 SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
                 CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
@@ -223,7 +224,7 @@ public sealed class DeletedUnpaidOrderCleanupIntegrationTests : IClassFixture<Te
                     Id = Guid.NewGuid(),
                     OrderId = orderId,
                     Brand = "OKKO",
-                    FuelTypeId = "okko-dp",
+                    FuelTypeId = ToUuid("okko-dp"),
                     Liters = 10m,
                     Quantity = 2,
                     UnitPrice = 1000,

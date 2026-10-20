@@ -36,7 +36,7 @@ namespace FuelFlow.Features.Vouchers.PurchaseBatchCost;
 /// </remarks>
 public sealed record SetBatchCostCommand(
     Guid ImportJobId,
-    string FuelTypeId,
+    Guid FuelTypeId,
     decimal CostPerLiter,
     Guid ActingUserId,
     string? ActingUserName);
@@ -198,7 +198,7 @@ public sealed class SetBatchCostCommandHandler
                 if (FuelPricing.IsBelowCost(b, profit, fuelType.PumpPricePerLiter, minDiscount))
                 {
                     var finalPerLiter = FuelPricing.FinalPerLiter(b, profit, fuelType.PumpPricePerLiter, minDiscount);
-                    await _notifications.BelowCostAsync(brand, command.FuelTypeId, b, finalPerLiter, deliberate: false, cancellationToken);
+                    await _notifications.BelowCostAsync(brand, command.FuelTypeId.ToString(), b, finalPerLiter, deliberate: false, cancellationToken);
                 }
             }
         }

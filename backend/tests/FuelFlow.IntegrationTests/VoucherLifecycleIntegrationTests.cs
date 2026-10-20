@@ -12,6 +12,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -277,7 +278,7 @@ public sealed class VoucherLifecycleIntegrationTests : IClassFixture<TestDatabas
     {
         Id = id,
         Brand = "OKKO",
-        FuelTypeId = "okko-95",
+        FuelTypeId = ToUuid("okko-95"),
         Liters = liters,
         SupplierExpirationDate = new DateOnly(2027, 1, 1),
         CustomerExpirationDate = new DateOnly(2027, 1, 1),
@@ -334,7 +335,7 @@ public sealed class VoucherLifecycleIntegrationTests : IClassFixture<TestDatabas
             Id = lineId,
             OrderId = orderId,
             Brand = "OKKO",
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
             Quantity = 1,
             UnitPrice = amount,

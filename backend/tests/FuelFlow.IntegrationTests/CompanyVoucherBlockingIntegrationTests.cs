@@ -16,6 +16,7 @@ using FuelFlow.SharedKernel.Observability;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -293,7 +294,7 @@ public sealed class CompanyVoucherBlockingIntegrationTests : IClassFixture<TestD
         {
             Id = id,
             Brand = "OKKO",
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),

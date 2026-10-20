@@ -10,6 +10,7 @@ using FuelFlow.SharedKernel.Options;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.UnitTests.BackgroundJobs;
 
@@ -116,7 +117,7 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
     {
         Id = Guid.NewGuid(),
         Brand = "okko",
-        FuelTypeId = "okko-95",
+        FuelTypeId = ToUuid("okko-95"),
         Liters = 50,
         VoucherNumber = $"V-{Guid.NewGuid():N}",
         QrPayload = "q",

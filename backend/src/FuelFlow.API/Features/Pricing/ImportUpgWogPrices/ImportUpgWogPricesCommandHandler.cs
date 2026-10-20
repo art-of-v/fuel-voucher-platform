@@ -26,7 +26,7 @@ public sealed record UpgWogFuelCreated(string BrandId, string Name, string Code,
 
 /// <summary>One existing grade repriced. <paramref name="Changed"/> is false when the pump already matched.</summary>
 public sealed record UpgWogFuelRepriced(
-    string FuelTypeId, string Name, string Code, decimal PumpPerLiter,
+    Guid FuelTypeId, string Name, string Code, decimal PumpPerLiter,
     decimal? PreviousPumpPerLiter, bool Changed, int VolumesRepriced);
 
 public sealed record UpgWogPriceImportResult(
@@ -138,7 +138,7 @@ public sealed class ImportUpgWogPricesCommandHandler
                 .ToListAsync(ct))
             .Where(f => FuelTypeEntity.NormaliseBrandFuelCode(f.BrandFuelCode) is not null)
             .GroupBy(f => FuelTypeEntity.NormaliseBrandFuelCode(f.BrandFuelCode)!, StringComparer.Ordinal)
-            .ToDictionary(g => g.Key, g => g.OrderBy(f => f.Id, StringComparer.Ordinal).First());
+            .ToDictionary(g => g.Key, g => g.OrderBy(f => f.Id).First());
 
         var now = DateTime.UtcNow;
         var actor = actingUserId == Guid.Empty ? (Guid?)null : actingUserId;
@@ -247,7 +247,7 @@ public sealed class ImportUpgWogPricesCommandHandler
         {
             var fuel = new FuelTypeEntity
             {
-                Id = Guid.CreateVersion7().ToString(),
+                Id = Guid.CreateVersion7(),
                 BrandId = brandId,
                 // The brand's own word for the grade, which is what it prints to its customers. Not
                 // derived, not normalised: `ДП Mustang+` and `upg95` are both already the name.

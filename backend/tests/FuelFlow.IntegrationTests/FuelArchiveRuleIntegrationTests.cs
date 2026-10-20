@@ -11,6 +11,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -71,7 +72,7 @@ public sealed class FuelArchiveRuleIntegrationTests : IClassFixture<TestDatabase
         var fuelId = $"arch-fuel-{suffix}";
         context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = fuelId, Name = name, BrandId = brandId,
+            Id = ToUuid(fuelId), Name = name, BrandId =   brandId,
             // A code the sheet does not carry: the brand published it once and does not any more.
             // Without a code there is nothing saying this row was ever one of the brand's grades,
             // and absence from the sheet would prove nothing. Unique per test because the live
@@ -104,7 +105,7 @@ public sealed class FuelArchiveRuleIntegrationTests : IClassFixture<TestDatabase
         {
             Id = Guid.CreateVersion7(),
             Brand = "okko",
-            FuelTypeId = fuelId,
+            FuelTypeId =   ToUuid(fuelId),
             Liters = 10m,
             VoucherNumber = $"ARCH-{suffix}",
             QrPayload = $"9018$500$;arch={suffix}",
@@ -132,13 +133,13 @@ public sealed class FuelArchiveRuleIntegrationTests : IClassFixture<TestDatabase
         var result = await ImportAsync(context, FullSheet);
 
         var fuel = await context.FuelTypes.IgnoreQueryFilters()
-            .SingleAsync(f => f.Id == "arch-fuel-live");
+            .SingleAsync(f => f.Id == ToUuid("arch-fuel-live"));
 
         fuel.IsDeleted.Should().BeFalse(
             "customers still hold vouchers for it, and hiding the fuel would leave them unpriceable");
 
-        result.ArchivedFuels.Should().Contain(f => f.FuelTypeId == "arch-fuel-live" && !f.Archived);
-        result.ArchivedFuels.Single(f => f.FuelTypeId == "arch-fuel-live").LiveVouchers.Should().Be(1,
+        result.ArchivedFuels.Should().Contain(f => f.FuelTypeId == ToUuid("arch-fuel-live") && !f.Archived);
+        result.ArchivedFuels.Single(f => f.FuelTypeId == ToUuid("arch-fuel-live")).LiveVouchers.Should().Be(1,
             "the receipt says how many are holding it, so the reason is visible rather than inferred");
     }
 
@@ -151,13 +152,13 @@ public sealed class FuelArchiveRuleIntegrationTests : IClassFixture<TestDatabase
         var result = await ImportAsync(context, FullSheet);
 
         var fuel = await context.FuelTypes.IgnoreQueryFilters()
-            .SingleAsync(f => f.Id == "arch-fuel-spent");
+            .SingleAsync(f => f.Id == ToUuid("arch-fuel-spent"));
 
         fuel.IsDeleted.Should().BeTrue(
             "the brand no longer publishes it and there is nothing left to sell");
         fuel.DeletedAtUtc.Should().NotBeNull();
 
-        result.ArchivedFuels.Should().Contain(f => f.FuelTypeId == "arch-fuel-spent" && f.Archived);
+        result.ArchivedFuels.Should().Contain(f => f.FuelTypeId == ToUuid("arch-fuel-spent") && f.Archived);
     }
 
     [Fact]
@@ -168,7 +169,7 @@ public sealed class FuelArchiveRuleIntegrationTests : IClassFixture<TestDatabase
 
         await ImportAsync(context, FullSheet);
 
-        (await context.FuelTypes.IgnoreQueryFilters().SingleAsync(f => f.Id == "arch-fuel-expired"))
+        (await context.FuelTypes.IgnoreQueryFilters().SingleAsync(f => f.Id == ToUuid("arch-fuel-expired")))
             .IsDeleted.Should().BeTrue("an expired voucher is a loss, not a claim on the fuel");
     }
 
@@ -181,11 +182,11 @@ public sealed class FuelArchiveRuleIntegrationTests : IClassFixture<TestDatabase
         // Present on the sheet, under our own spelling — the grade matches even though the name does not.
         var result = await ImportAsync(context, FullSheet);
 
-        (await context.FuelTypes.IgnoreQueryFilters().SingleAsync(f => f.Id == "arch-fuel-stilllisted"))
+        (await context.FuelTypes.IgnoreQueryFilters().SingleAsync(f => f.Id == ToUuid("arch-fuel-stilllisted")))
             .IsDeleted.Should().BeFalse(
             "an idle grade the brand still sells is simply one we happen not to carry today");
 
-        result.ArchivedFuels.Should().NotContain(f => f.FuelTypeId == "arch-fuel-stilllisted");
+        result.ArchivedFuels.Should().NotContain(f => f.FuelTypeId == ToUuid("arch-fuel-stilllisted"));
     }
 
 

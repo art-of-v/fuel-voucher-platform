@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Vouchers.Import;
 
-public sealed record GetVouchersQuery(int Page = 1, int PageSize = 50, string? FuelTypeId = null);
+public sealed record GetVouchersQuery(int Page = 1, int PageSize = 50, Guid? FuelTypeId = null);
 
 /// <summary>
 /// Admin catalog list row. Deliberately carries NO redeemable material: the QR payload is
@@ -13,7 +13,7 @@ public sealed record GetVouchersQuery(int Page = 1, int PageSize = 50, string? F
 public sealed record VoucherDto(
     Guid Id,
     string Brand,
-    string FuelTypeId,
+    Guid FuelTypeId,
     string FuelTypeName,
     decimal Liters,
     DateOnly ExpirationDate,
@@ -49,7 +49,7 @@ public sealed class GetVouchersQueryHandler
 
         var queryable = _context.FuelVouchers.AsQueryable();
 
-        if (!string.IsNullOrEmpty(query.FuelTypeId))
+        if (query.FuelTypeId.HasValue)
         {
             queryable = queryable.Where(v => v.FuelTypeId == query.FuelTypeId);
         }
@@ -67,7 +67,7 @@ public sealed class GetVouchersQueryHandler
             v.Id,
             v.Brand,
             v.FuelTypeId,
-            v.FuelType?.Name ?? v.FuelTypeId,
+            v.FuelType?.Name ?? v.FuelTypeId.ToString(),
             v.Liters,
             v.SupplierExpirationDate,
             v.VoucherNumber,

@@ -7,6 +7,7 @@ using FuelFlow.SharedKernel.Domain;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.UnitTests.Pricing;
 
@@ -70,7 +71,7 @@ public sealed class ImportKloPricesCommandHandlerTests : IDisposable
         {
             _context.FuelTypes.Add(new FuelTypeEntity
             {
-                Id = Guid.CreateVersion7().ToString(),
+                Id = Guid.CreateVersion7(),
                 BrandId = BrandIds.Klo,
                 Name = name,
                 CreatedAtUtc = DateTime.UtcNow,
@@ -143,7 +144,7 @@ public sealed class ImportKloPricesCommandHandlerTests : IDisposable
         await SeedBrandAsync();
         _context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = "klo-a95",
+            Id = ToUuid("klo-a95"),
             Name = "А95",
             BrandId = BrandIds.Klo,
             SupplierPricePerLiter = 40m,
@@ -159,7 +160,7 @@ public sealed class ImportKloPricesCommandHandlerTests : IDisposable
         _context.ChangeTracker.Clear();
 
         // Minfin knows what the driver pays and nothing about what we pay.
-        var fuel = await _context.FuelTypes.SingleAsync(f => f.Id == "klo-a95");
+        var fuel = await _context.FuelTypes.SingleAsync(f => f.Id == ToUuid("klo-a95"));
         fuel.SupplierPricePerLiter.Should().Be(40m);
         fuel.MarginUahPerLiter.Should().Be(3m);
         fuel.PumpPricePerLiter.Should().Be(87.90m);
@@ -171,7 +172,7 @@ public sealed class ImportKloPricesCommandHandlerTests : IDisposable
         await SeedBrandAsync();
         _context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = "klo-a95",
+            Id = ToUuid("klo-a95"),
             Name = "А95",
             BrandId = BrandIds.Klo,
             SupplierPricePerLiter = 90m,
@@ -189,7 +190,7 @@ public sealed class ImportKloPricesCommandHandlerTests : IDisposable
         // 87,90 against a cost of 90 is under it. A third party's price move must not be able to
         // take a fuel off sale unattended.
         result.BelowCostSkipped.Should().ContainSingle();
-        (await _context.FuelTypes.SingleAsync(f => f.Id == "klo-a95")).PumpPricePerLiter.Should().BeNull();
+        (await _context.FuelTypes.SingleAsync(f => f.Id == ToUuid("klo-a95"))).PumpPricePerLiter.Should().BeNull();
     }
 
     [Fact]

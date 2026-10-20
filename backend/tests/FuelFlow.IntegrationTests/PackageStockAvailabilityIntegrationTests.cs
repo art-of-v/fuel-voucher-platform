@@ -8,6 +8,7 @@ using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -64,15 +65,15 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
 
         var wanted = new[]
         {
-            StockKey.For("okko", "okko-95", 50m),
-            StockKey.For("wog", "wog-95", 50m),
+            StockKey.For("okko", ToUuid("okko-95"), 50m),
+            StockKey.For("wog", ToUuid("wog-95"), 50m),
         };
 
         var availability = CreateAvailability();
         var keys = await availability.AvailableKeysAsync(wanted, isTestAccount: false, CancellationToken.None);
 
         keys.Should().BeEquivalentTo(
-            new[] { StockKey.For("okko", "okko-95", 50m), StockKey.For("wog", "wog-95", 50m) });
+            new[] { StockKey.For("okko", ToUuid("okko-95"), 50m), StockKey.For("wog", ToUuid("wog-95"), 50m) });
     }
 
     /// <summary>
@@ -93,14 +94,14 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
 
         var wanted = new[]
         {
-            StockKey.For("okko", "okko-95", 50m),
-            StockKey.For("upg", "upg-95", 50m),   // nothing stocked
+            StockKey.For("okko", ToUuid("okko-95"), 50m),
+            StockKey.For("upg", ToUuid("upg-95"), 50m),   // nothing stocked
         };
 
         var availability = CreateAvailability();
         var keys = await availability.AvailableKeysAsync(wanted, isTestAccount: false, CancellationToken.None);
 
-        keys.Should().BeEquivalentTo(new[] { StockKey.For("okko", "okko-95", 50m) });
+        keys.Should().BeEquivalentTo(new[] { StockKey.For("okko", ToUuid("okko-95"), 50m) });
     }
 
     /// <summary>
@@ -147,10 +148,10 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
 
         var availability = CreateAvailability();
 
-(await availability.FindPackageAsync(false, BrandIds.Okko, "okko-95", 10m))!.PackageId
-    .Should().Be(PackageIds.For("okko-95", DataKinds.Real, 10m));
-        (await availability.FindPackageAsync(true, BrandIds.Okko, "okko-95", 10m))!.PackageId
-            .Should().Be(PackageIds.For("okko-95", DataKinds.Qa, 10m));
+(await availability.FindPackageAsync(false, BrandIds.Okko, ToUuid("okko-95"), 10m))!.PackageId
+    .Should().Be(PackageIds.For(ToUuid("okko-95"), DataKinds.Real, 10m));
+        (await availability.FindPackageAsync(true, BrandIds.Okko, ToUuid("okko-95"), 10m))!.PackageId
+            .Should().Be(PackageIds.For(ToUuid("okko-95"), DataKinds.Qa, 10m));
     }
 
     /// <summary>
@@ -195,7 +196,7 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
     {
         direct.FuelNominals.Add(new FuelNominal
         {
-            FuelTypeId = "okko-95", DataKind = DataKinds.Real, Liters = 20m
+            FuelTypeId = ToUuid("okko-95"), DataKind = DataKinds.Real, Liters = 20m
         });
 
         var act = async () => await direct.SaveChangesAsync();
@@ -205,12 +206,12 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
         // And with the duplicate refused, the key resolves to the one row that exists - no ordering
         // involved, because there is nothing to order.
         var availability = CreateAvailability();
-var chosen = await availability.FindPackageAsync(false, BrandIds.Okko, "okko-95", 20m);
-        chosen!.PackageId.Should().Be(PackageIds.For("okko-95", DataKinds.Real, 20m));
+var chosen = await availability.FindPackageAsync(false, BrandIds.Okko, ToUuid("okko-95"), 20m);
+        chosen!.PackageId.Should().Be(PackageIds.For(ToUuid("okko-95"), DataKinds.Real, 20m));
 
         var bulk = await availability.FindPackagesAsync(
-            false, new[] { StockKey.For("okko", "okko-95", 20m) });
-        bulk[StockKey.For("okko", "okko-95", 20m)].PackageId.Should().Be(chosen.PackageId);
+            false, new[] { StockKey.For("okko", ToUuid("okko-95"), 20m) });
+        bulk[StockKey.For("okko", ToUuid("okko-95"), 20m)].PackageId.Should().Be(chosen.PackageId);
     }
 
     /// <summary>
@@ -231,7 +232,7 @@ var chosen = await availability.FindPackageAsync(false, BrandIds.Okko, "okko-95"
 
         var availability = CreateAvailability();
 
-        (await availability.FindPackageAsync(false, BrandIds.Okko, "okko-95", 5m)).Should().BeNull(
+        (await availability.FindPackageAsync(false, BrandIds.Okko, ToUuid("okko-95"), 5m)).Should().BeNull(
             "a real customer must not be priced off a rehearsal package");
     }
 
@@ -252,17 +253,17 @@ var chosen = await availability.FindPackageAsync(false, BrandIds.Okko, "okko-95"
 
         var wanted = new[]
         {
-            StockKey.For("okko", "okko-95", 2m),
-            StockKey.For("okko", "okko-95", 5m),
-            StockKey.For("wog", "wog-95", 10m),   // nothing at all behind this one
+            StockKey.For("okko", ToUuid("okko-95"), 2m),
+            StockKey.For("okko", ToUuid("okko-95"), 5m),
+            StockKey.For("wog", ToUuid("wog-95"), 10m),   // nothing at all behind this one
         };
         await seed.SaveChangesAsync();
 
         var resolved = await CreateAvailability().FindPackagesAsync(false, wanted);
 
         resolved.Keys.Should().BeEquivalentTo(
-            new[] { StockKey.For("okko", "okko-95", 2m), StockKey.For("okko", "okko-95", 5m) });
-        resolved.Should().NotContainKey(StockKey.For("wog", "wog-95", 10m),
+            new[] { StockKey.For("okko", ToUuid("okko-95"), 2m), StockKey.For("okko", ToUuid("okko-95"), 5m) });
+        resolved.Should().NotContainKey(StockKey.For("wog", ToUuid("wog-95"), 10m),
             "an absent key is what makes the line refuse rather than fall through");
     }
 
@@ -294,20 +295,20 @@ var chosen = await availability.FindPackageAsync(false, BrandIds.Okko, "okko-95"
     {
         var pool = DataKinds.ForPool(isTestData);
 
-        var fuel = seed.FuelTypes.Local.FirstOrDefault(f => f.Id == "okko-95")
-            ?? seed.FuelTypes.FirstOrDefault(f => f.Id == "okko-95");
+        var fuel = seed.FuelTypes.Local.FirstOrDefault(f => f.Id == ToUuid("okko-95"))
+            ?? seed.FuelTypes.FirstOrDefault(f => f.Id == ToUuid("okko-95"));
         fuel!.MarginUahPerLiter = pricePerLiter - 30m;
         fuel.SupplierPricePerLiter = 30m;
         fuel.UpdatedAtUtc = DateTime.UtcNow.AddMinutes(-updatedMinutesAgo);
 
         // Availability resolves sizes from fuel_nominals, and the size list is per pool - so a
         // rehearsal size exists only in the rehearsal pool and is invisible to the live shelf.
-        if (!seed.FuelNominals.Local.Any(n => n.FuelTypeId == "okko-95" && n.DataKind == pool && n.Liters == liters)
-            && !seed.FuelNominals.Any(n => n.FuelTypeId == "okko-95" && n.DataKind == pool && n.Liters == liters))
+        if (!seed.FuelNominals.Local.Any(n => n.FuelTypeId == ToUuid("okko-95") && n.DataKind == pool && n.Liters ==  liters)
+            && !seed.FuelNominals.Any(n => n.FuelTypeId == ToUuid("okko-95") && n.DataKind == pool && n.Liters == liters))
         {
             seed.FuelNominals.Add(new FuelNominal
             {
-                FuelTypeId = "okko-95",
+                FuelTypeId = ToUuid("okko-95"),
                 DataKind = pool,
                 Liters = liters
             });
@@ -324,7 +325,7 @@ var chosen = await availability.FindPackageAsync(false, BrandIds.Okko, "okko-95"
         {
             Id = Guid.NewGuid(),
             Brand = brand,
-            FuelTypeId = fuelTypeId,
+            FuelTypeId =   ToUuid(fuelTypeId),
             Liters = liters,
             SupplierExpirationDate = expiry,
             CustomerExpirationDate = expiry,

@@ -69,7 +69,7 @@ public sealed class RenewalQuoteCommandHandler
 
         // For replace lines we need, per (brand, fuel, litres) group, the best stock expiry in hand.
         // Gather the groups of eligible replace vouchers, then one lookup each.
-        var replaceGroups = new Dictionary<(string Brand, string FuelTypeId, decimal Liters), DateOnly?>();
+        var replaceGroups = new Dictionary<(string Brand, Guid FuelTypeId, decimal Liters), DateOnly?>();
 
         foreach (var voucherId in command.VoucherIds)
         {
@@ -89,7 +89,7 @@ public sealed class RenewalQuoteCommandHandler
             quote.FuelTypeId = source.FuelTypeId;
             quote.FuelName = fuelNames.TryGetValue(source.FuelTypeId, out var name) && !string.IsNullOrEmpty(name)
                 ? name
-                : source.FuelTypeId;
+                : source.FuelTypeId.ToString();
             quote.Liters = source.Liters;
             quote.ExpirationDate = source.CustomerExpirationDate;
 
@@ -182,7 +182,7 @@ public sealed class RenewalQuoteCommandHandler
     /// one query. A tier is buyable when this reaches at least today + term.
     /// </summary>
     private async Task<DateOnly?> BestStockExpiryAsync(
-        Dictionary<(string Brand, string FuelTypeId, decimal Liters), DateOnly?> cache,
+        Dictionary<(string Brand, Guid FuelTypeId, decimal Liters), DateOnly?> cache,
         FuelVoucher source,
         CancellationToken cancellationToken)
     {

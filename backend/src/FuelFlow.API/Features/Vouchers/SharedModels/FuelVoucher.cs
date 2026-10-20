@@ -10,7 +10,7 @@ public class FuelVoucher
 {
     public Guid Id { get; set; }
     public string Brand { get; set; } = null!;
-    public string FuelTypeId { get; set; } = null!;
+    public Guid FuelTypeId { get; set; }
     public FuelTypeEntity? FuelType { get; set; }
     public decimal Liters { get; set; }
 

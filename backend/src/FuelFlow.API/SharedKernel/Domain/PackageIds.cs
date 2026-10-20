@@ -27,7 +27,7 @@ public static class PackageIds
     /// The id of the package that is <paramref name="liters"/> of <paramref name="fuelTypeId"/>, sold
     /// in <paramref name="dataKind"/>.
     /// </summary>
-    public static string For(string fuelTypeId, string dataKind, decimal liters)
+    public static string For(Guid fuelTypeId, string dataKind, decimal liters)
         => $"{fuelTypeId}{Separator}{dataKind}{Separator}{FormatLiters(liters)}";
 
     /// <summary>

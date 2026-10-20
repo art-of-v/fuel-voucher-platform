@@ -22,6 +22,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Npgsql;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -488,7 +489,7 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
         {
             Id = id,
             Brand = brand,
-            FuelTypeId = fuelTypeId,
+            FuelTypeId =   ToUuid(fuelTypeId),
             Liters = liters,
             SupplierExpirationDate = expiry ?? DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
             CustomerExpirationDate = expiry ?? DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
@@ -504,7 +505,7 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
         {
             Id = id,
             Brand = brand,
-            FuelTypeId = fuelTypeId,
+            FuelTypeId =   ToUuid(fuelTypeId),
             Liters = liters,
             SupplierExpirationDate = expiry,
             CustomerExpirationDate = expiry,
@@ -536,7 +537,7 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
                 Id = Guid.NewGuid(),
                 OrderId = orderId,
                 Brand = brand,
-                FuelTypeId = fuelTypeId,
+                FuelTypeId =   ToUuid(fuelTypeId),
                 Liters = liters,
                 Quantity = 1,
                 UnitPrice = amount,
@@ -571,7 +572,7 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
                     Id = Guid.NewGuid(),
                     OrderId = orderId,
                     Brand = "WOG",
-                    FuelTypeId = "wog-95",
+                    FuelTypeId = ToUuid("wog-95"),
                     Liters = 40m,
                     Quantity = 1,
                     UnitPrice = price,

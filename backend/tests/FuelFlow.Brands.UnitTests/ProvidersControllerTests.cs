@@ -18,6 +18,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.Providers.UnitTests;
 
@@ -136,7 +137,7 @@ public sealed class BrandFuelControllerTests : IDisposable
     {
         _context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = id,
+            Id = ToUuid(id),
             BrandId = BrandId,
             Name = name,
             BasePrice = 100,
@@ -239,7 +240,7 @@ public sealed class BrandFuelControllerTests : IDisposable
 
         result.Should().BeOfType<CreatedResult>();
 
-        var newFuel = await _context.FuelTypes.SingleAsync(f => f.BrandId == TestOkko && f.Id != "test-fuel-a");
+        var newFuel = await _context.FuelTypes.SingleAsync(f => f.BrandId == TestOkko && f.Id != ToUuid("test-fuel-a"));
         var liters = await _context.FuelNominals
             .Where(n => n.FuelTypeId == newFuel.Id)
             .Select(n => (int)n.Liters)
@@ -288,20 +289,20 @@ public sealed class BrandFuelControllerTests : IDisposable
         await AddFuelAsync("test-fuel-ttt", TestKlo, "ttt");
 
         var result = await _controller.UpdateFuel(
-            "test-fuel-ttt",
+            ToUuid("test-fuel-ttt"),
             FuelDto("test-fuel-ttt", "ttt", 100m, 0.5m, 100.5m),
             CancellationToken.None);
 
         result.Should().BeOfType<OkObjectResult>();
 
         var liters = await _context.FuelNominals
-            .Where(n => n.FuelTypeId == "test-fuel-ttt")
+            .Where(n => n.FuelTypeId == ToUuid("test-fuel-ttt"))
             .Select(n => (int)n.Liters)
             .OrderBy(l => l)
             .ToListAsync();
         liters.Should().Equal(2, 3, 5, 10, 20, 50);
 
-        var fuel = await _context.FuelTypes.SingleAsync(f => f.Id == "test-fuel-ttt");
+        var fuel = await _context.FuelTypes.SingleAsync(f => f.Id == ToUuid("test-fuel-ttt"));
         fuel.FinalPerLiter().Should().Be(100.5m);
     }
 
@@ -316,13 +317,13 @@ public sealed class BrandFuelControllerTests : IDisposable
             _controller.ControllerContext.HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
 
         await _controller.UpdateFuel(
-            "test-fuel-h",
+            ToUuid("test-fuel-h"),
             FuelDto("test-fuel-h", "A-95", 60m, 3m, 63m),
             CancellationToken.None);
         _context.ChangeTracker.Clear();
 
         await _controller.UpdateFuel(
-            "test-fuel-h",
+            ToUuid("test-fuel-h"),
             FuelDto("test-fuel-h", "A-95", 60m, 4m, 64m),
             CancellationToken.None);
         _context.ChangeTracker.Clear();
@@ -352,13 +353,13 @@ public sealed class BrandFuelControllerTests : IDisposable
         await AddPackageAsync("test-fuel-a", TestOkko, 20m, 51m, 49m, 2m);
 
         var result = await _controller.UpdateFuel(
-            "test-fuel-a",
+            ToUuid("test-fuel-a"),
             FuelDto("test-fuel-a", "A-95", 60m, 3m, 63m),
             CancellationToken.None);
 
         result.Should().BeOfType<OkObjectResult>();
 
-        var fuel = await _context.FuelTypes.SingleAsync(f => f.Id == "test-fuel-a");
+        var fuel = await _context.FuelTypes.SingleAsync(f => f.Id == ToUuid("test-fuel-a"));
         fuel.FinalPerLiter().Should().Be(63m);
         fuel.SupplierPricePerLiter.Should().Be(60m);
 
@@ -381,7 +382,7 @@ public sealed class BrandFuelControllerTests : IDisposable
         await AddPackageAsync("test-fuel-a", TestOkko, 10m, 51m, 49m, 2m);
 
         await _controller.UpdateFuel(
-            "test-fuel-a",
+            ToUuid("test-fuel-a"),
             FuelDto("test-fuel-a", "A-95", 100m, 0.5m, 100.5m),
             CancellationToken.None);
 
@@ -400,7 +401,7 @@ public sealed class BrandFuelControllerTests : IDisposable
     public async Task UpdateFuel_UnknownFuel_ReturnsNotFound()
     {
         var result = await _controller.UpdateFuel(
-            "missing",
+            ToUuid("missing"),
             FuelDto("missing", "X", 50m, 1m, 51m),
             CancellationToken.None);
 
@@ -430,7 +431,7 @@ public sealed class BrandFuelControllerTests : IDisposable
         foreach (var fuelId in new[] { "test-fuel-a", "test-fuel-b" })
         {
             var liters = await _context.FuelNominals
-                .Where(n => n.FuelTypeId == fuelId)
+                .Where(n => n.FuelTypeId == ToUuid(fuelId))
                 .Select(n => (int)n.Liters)
                 .OrderBy(l => l)
                 .ToListAsync();
@@ -452,7 +453,7 @@ public sealed class BrandFuelControllerTests : IDisposable
 
         result.Should().BeOfType<OkObjectResult>();
 
-        var fuel = await _context.FuelTypes.SingleAsync(f => f.Id == "test-fuel-a");
+        var fuel = await _context.FuelTypes.SingleAsync(f => f.Id == ToUuid("test-fuel-a"));
         fuel.FinalPerLiter().Should().Be(51m);
         fuel.SupplierPricePerLiter.Should().Be(49m);
         // The margin is the fuel's; the offer's own copy is never written any more.
@@ -462,7 +463,7 @@ public sealed class BrandFuelControllerTests : IDisposable
         // longer does is touch the volume table: it wrote a second copy of the same answer there,
         // once per pool, and keeping the two in step was the cost of having it.
         var liters = await _context.FuelNominals
-            .Where(n => n.FuelTypeId == "test-fuel-a")
+            .Where(n => n.FuelTypeId == ToUuid("test-fuel-a"))
             .Select(n => (int)n.Liters)
             .ToListAsync();
 
@@ -497,7 +498,7 @@ public sealed class BrandFuelControllerTests : IDisposable
         // A refused write leaves nothing behind: no fuel, and no size either. The size used to be
         // reachable only through the offer, which is what made this second assertion worth having;
         // it is asked of the nominal directly now.
-        (await _context.FuelNominals.AnyAsync(n => n.FuelTypeId == "test-fuel-a")).Should().BeFalse();
+        (await _context.FuelNominals.AnyAsync(n => n.FuelTypeId == ToUuid("test-fuel-a"))).Should().BeFalse();
     }
 
     [Fact]
@@ -532,14 +533,14 @@ public sealed class BrandFuelControllerTests : IDisposable
         await AddPackageAsync("test-fuel-a", TestOkko, 10m, 51m, 49m, 2m);
 
         var result = await _controller.UpdateFuel(
-            "test-fuel-a",
+            ToUuid("test-fuel-a"),
             BelowCostUpdate("test-fuel-a", "ДП збиток-upd-block", allowBelowCost: false),
             CancellationToken.None);
 
         var bad = result.Should().BeOfType<BadRequestObjectResult>().Subject;
         JsonSerializer.Serialize(bad.Value).Should().Contain("below_cost");
 
-        var fuel = await _context.FuelTypes.SingleAsync(f => f.Id == "test-fuel-a");
+        var fuel = await _context.FuelTypes.SingleAsync(f => f.Id == ToUuid("test-fuel-a"));
         fuel.FinalPerLiter().Should().Be(51m);
         fuel.AllowBelowCost.Should().BeFalse();
     }
@@ -554,13 +555,13 @@ public sealed class BrandFuelControllerTests : IDisposable
         var controller = BuildController(DispatcherWith(alerts));
 
         var result = await controller.UpdateFuel(
-            "test-fuel-a",
+            ToUuid("test-fuel-a"),
             BelowCostUpdate("test-fuel-a", "ДП збиток-upd-ok", allowBelowCost: true),
             CancellationToken.None);
 
         result.Should().BeOfType<OkObjectResult>();
 
-        var fuel = await _context.FuelTypes.SingleAsync(f => f.Id == "test-fuel-a");
+        var fuel = await _context.FuelTypes.SingleAsync(f => f.Id == ToUuid("test-fuel-a"));
         fuel.FinalPerLiter().Should().Be(48.5m);
         fuel.AllowBelowCost.Should().BeTrue();
 

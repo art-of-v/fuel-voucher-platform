@@ -4,6 +4,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -59,7 +60,7 @@ public sealed class GetFuelPriceAtIntegrationTests : IClassFixture<TestDatabaseF
         });
         context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = fuelTypeId,
+            Id =   ToUuid(fuelTypeId),
             Name = $"AT {suffix}",
             BrandId = _brandId,
             PumpPricePerLiter = 50m,
@@ -84,7 +85,7 @@ public sealed class GetFuelPriceAtIntegrationTests : IClassFixture<TestDatabaseF
         {
             Id = Guid.CreateVersion7(),
             BrandId = _brandId,
-            FuelTypeId = fuelTypeId,
+            FuelTypeId =   ToUuid(fuelTypeId),
             DataKind = DataKinds.Real,
             PumpPricePerLiter = pump,
             FinalPricePerLiter = pump,
@@ -110,11 +111,11 @@ public sealed class GetFuelPriceAtIntegrationTests : IClassFixture<TestDatabaseF
             Row(fuelTypeId, t3, 49m));
         await context.SaveChangesAsync();
 
-        (await handler.HandleAsync(new GetFuelPriceAtQuery(fuelTypeId, t1.AddSeconds(1))))
+        (await handler.HandleAsync(new GetFuelPriceAtQuery(ToUuid(fuelTypeId), t1.AddSeconds(1))))
             .PumpPricePerLiter.Should().Be(50m);
-        (await handler.HandleAsync(new GetFuelPriceAtQuery(fuelTypeId, t2)))
+        (await handler.HandleAsync(new GetFuelPriceAtQuery(ToUuid(fuelTypeId), t2)))
             .PumpPricePerLiter.Should().Be(51m, "a row is in effect from the instant it took effect, inclusive");
-        (await handler.HandleAsync(new GetFuelPriceAtQuery(fuelTypeId, t3.AddDays(30))))
+        (await handler.HandleAsync(new GetFuelPriceAtQuery(ToUuid(fuelTypeId), t3.AddDays(30))))
             .PumpPricePerLiter.Should().Be(49m, "and keeps standing until the next one takes over");
     }
 
@@ -130,7 +131,7 @@ public sealed class GetFuelPriceAtIntegrationTests : IClassFixture<TestDatabaseF
         await context.SaveChangesAsync();
 
         var answer = await handler.HandleAsync(new GetFuelPriceAtQuery(
-            fuelTypeId, firstPrice.AddTicks(-1)));
+            ToUuid(fuelTypeId), firstPrice.AddTicks(-1)));
 
         answer.Should().BeNull(
             "a fuel that was not priced yet has no price in effect, which is an answer and not a failure");
@@ -146,7 +147,7 @@ public sealed class GetFuelPriceAtIntegrationTests : IClassFixture<TestDatabaseF
         context.FuelPriceHistory.Add(Row(fuelTypeId, new DateTime(2026, 3, 1, 8, 0, 0, DateTimeKind.Utc), 50m));
         await context.SaveChangesAsync();
 
-        var answer = await handler.HandleAsync(new GetFuelPriceAtQuery(fuelTypeId, DateTime.UtcNow.AddYears(5)));
+        var answer = await handler.HandleAsync(new GetFuelPriceAtQuery(ToUuid(fuelTypeId), DateTime.UtcNow.AddYears(5)));
 
         answer!.PumpPricePerLiter.Should().Be(50m);
         answer.SupersededAtUtc.Should().BeNull("nothing displaced it, so it is the price in effect now");
@@ -169,7 +170,7 @@ public sealed class GetFuelPriceAtIntegrationTests : IClassFixture<TestDatabaseF
         await context.SaveChangesAsync();
 
         var answer = await handler.HandleAsync(new GetFuelPriceAtQuery(
-            fuelTypeId, lastTuesday.AddHours(2)));
+            ToUuid(fuelTypeId), lastTuesday.AddHours(2)));
 
         answer!.PumpPricePerLiter.Should().Be(
             47.25m,
@@ -193,7 +194,7 @@ public sealed class GetFuelPriceAtIntegrationTests : IClassFixture<TestDatabaseF
         context.FuelPriceHistory.AddRange(first, second);
         await context.SaveChangesAsync();
 
-        var winner = await handler.HandleAsync(new GetFuelPriceAtQuery(fuelTypeId, at.AddMinutes(1)));
+        var winner = await handler.HandleAsync(new GetFuelPriceAtQuery(ToUuid(fuelTypeId), at.AddMinutes(1)));
 
         var expected = first.Id > second.Id ? 50m : 53m;
         winner!.PumpPricePerLiter.Should().Be(expected, "the greater id wins, exactly as 'current' does");
@@ -215,7 +216,7 @@ public sealed class GetFuelPriceAtIntegrationTests : IClassFixture<TestDatabaseF
             Row(fuelTypeId, t2, 51m));
         await context.SaveChangesAsync();
 
-        var answer = await handler.HandleAsync(new GetFuelPriceAtQuery(fuelTypeId, t2.AddHours(-1)));
+        var answer = await handler.HandleAsync(new GetFuelPriceAtQuery(ToUuid(fuelTypeId), t2.AddHours(-1)));
 
         answer!.EffectiveFromUtc.Should().Be(t1);
         answer.SupersededAtUtc.Should().Be(t2, "derived from the next row rather than stored twice");
@@ -228,7 +229,7 @@ public sealed class GetFuelPriceAtIntegrationTests : IClassFixture<TestDatabaseF
         var handler = new GetFuelPriceAtQueryHandler(context);
         var fuelTypeId = await SeedFuelAsync(context, "empty");
 
-        var answer = await handler.HandleAsync(new GetFuelPriceAtQuery(fuelTypeId, DateTime.UtcNow));
+        var answer = await handler.HandleAsync(new GetFuelPriceAtQuery(ToUuid(fuelTypeId), DateTime.UtcNow));
 
         answer.Should().BeNull();
     }
@@ -255,9 +256,9 @@ public sealed class GetFuelPriceAtIntegrationTests : IClassFixture<TestDatabaseF
 
         foreach (var moment in new[] { t1, t2.AddHours(3), t3.AddDays(1) })
         {
-            var single = await atHandler.HandleAsync(new GetFuelPriceAtQuery(fuelTypeId, moment));
+            var single = await atHandler.HandleAsync(new GetFuelPriceAtQuery(ToUuid(fuelTypeId), moment));
             var series = await historyHandler.HandleAsync(
-                new FuelFlow.Features.Brands.GetFuelPriceHistory.GetFuelPriceHistoryQuery(fuelTypeId));
+                new FuelFlow.Features.Brands.GetFuelPriceHistory.GetFuelPriceHistoryQuery(ToUuid(fuelTypeId)));
 
             var standing = series.Last(p => p.EffectiveFromUtc <= moment);
 

@@ -152,7 +152,7 @@ public sealed class RealizedMarginLine
     public Guid OrderId { get; init; }
     public DateTime CreatedAtUtc { get; init; }
     public string Brand { get; init; } = null!;
-    public string FuelTypeId { get; init; } = null!;
+    public Guid FuelTypeId { get; init; }
     public decimal LitersSold { get; init; }
     public int VouchersDelivered { get; init; }
     public decimal RevenueUah { get; init; }

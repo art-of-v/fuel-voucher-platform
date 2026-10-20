@@ -12,6 +12,7 @@ using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -63,7 +64,7 @@ public sealed class OutboxFastPathIntegrationTests : IClassFixture<TestDatabaseF
 
         var createResponse = await _client.PostAsJsonAsync("/api/purchases", new CreateCheckoutCommand
         {
-            FuelTypeId = "okko-dp",
+            FuelTypeId = ToUuid("okko-dp"),
             Liters = 50,
             Quantity = 1,
             Price = 2000,
@@ -108,7 +109,7 @@ public sealed class OutboxFastPathIntegrationTests : IClassFixture<TestDatabaseF
 
         var createResponse = await _client.PostAsJsonAsync("/api/purchases", new CreateCheckoutCommand
         {
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
             Quantity = 1,
             Price = 2000,
@@ -204,11 +205,11 @@ public sealed class OutboxFastPathIntegrationTests : IClassFixture<TestDatabaseF
 
         var brandId = context.Brands.First(b => b.Slug == brandSlug).Id;
 
-        if (!context.FuelTypes.Any(f => f.Id == fuelTypeId))
+        if (!context.FuelTypes.Any(f => f.Id ==  ToUuid(fuelTypeId)))
         {
             context.FuelTypes.Add(new FuelTypeEntity
             {
-                Id = fuelTypeId,
+                Id =   ToUuid(fuelTypeId),
                 Name = fuelTypeId,
                 BrandId = brandId,
                 BasePrice = 50m,
@@ -218,11 +219,11 @@ public sealed class OutboxFastPathIntegrationTests : IClassFixture<TestDatabaseF
             });
         }
 
-        if (!context.FuelNominals.Any(n => n.FuelTypeId == fuelTypeId && n.Liters == liters))
+        if (!context.FuelNominals.Any(n => n.FuelTypeId == ToUuid(fuelTypeId) && n.Liters ==  liters))
         {
             context.FuelNominals.Add(new FuelNominal
             {
-                FuelTypeId = fuelTypeId,
+                FuelTypeId =   ToUuid(fuelTypeId),
                 Liters = liters,
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow
@@ -236,7 +237,7 @@ public sealed class OutboxFastPathIntegrationTests : IClassFixture<TestDatabaseF
             {
                 Id = Guid.CreateVersion7(),
                 Brand = brandSlug.ToUpperInvariant(),
-                FuelTypeId = fuelTypeId,
+                FuelTypeId =   ToUuid(fuelTypeId),
                 Liters = liters,
                 SupplierExpirationDate = expiry,
                 CustomerExpirationDate = expiry,

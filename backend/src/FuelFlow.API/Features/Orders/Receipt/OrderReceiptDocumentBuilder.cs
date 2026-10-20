@@ -7,7 +7,11 @@ using QuestPDF.Infrastructure;
 namespace FuelFlow.Features.Orders.Receipt;
 
 /// <summary>One line of a receipt, already resolved to what the customer should read.</summary>
-public sealed record ReceiptLine(string FuelTypeId, decimal Liters, int Quantity, decimal UnitPrice, decimal LineTotal);
+/// <param name="FuelName">
+/// The fuel as the customer reads it - the name from the catalogue the offer came from, never the
+/// id. The id is a uuid, and a receipt that printed one would be unreadable.
+/// </param>
+public sealed record ReceiptLine(string FuelName, decimal Liters, int Quantity, decimal UnitPrice, decimal LineTotal);
 
 /// <summary>
 /// Everything a receipt needs. Resolved by the caller from the order, so this type stays a document
@@ -126,7 +130,7 @@ public static class OrderReceiptDocumentBuilder
 
                 foreach (var line in d.Lines)
                 {
-                    table.Cell().PaddingVertical(4).Text(line.FuelTypeId);
+                    table.Cell().PaddingVertical(4).Text(line.FuelName);
                     table.Cell().PaddingVertical(4).AlignRight().Text(FormatNumber(line.Liters));
                     table.Cell().PaddingVertical(4).AlignRight().Text(line.Quantity.ToString(CultureInfo.InvariantCulture));
                     table.Cell().PaddingVertical(4).AlignRight().Text(FormatMoney(line.UnitPrice));

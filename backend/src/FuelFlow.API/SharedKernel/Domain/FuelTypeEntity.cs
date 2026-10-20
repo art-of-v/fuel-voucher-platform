@@ -2,7 +2,15 @@ namespace FuelFlow.SharedKernel.Domain;
 
 public sealed class FuelTypeEntity
 {
-    public string Id { get; set; } = null!;
+    /// <summary>
+    /// The fuel's identity: a uuid, since planning D-21.
+    /// </summary>
+    /// <remarks>
+    /// It used to be the natural key - <c>"okko-95"</c> - and the brand's own code for the grade lives
+    /// in <see cref="BrandFuelCode"/> instead. A uuid column is what lets the tables pointing at a fuel
+    /// carry a real foreign key, which is what D-02 has been waiting for.
+    /// </remarks>
+    public Guid Id { get; set; }
     public string Name { get; set; } = null!;
     public Guid BrandId { get; set; }
 

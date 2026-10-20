@@ -6,7 +6,7 @@ namespace FuelFlow.Features.Vouchers.PurchaseBatchCost;
 /// </summary>
 public sealed class ImportBatchCostDto
 {
-    public string FuelTypeId { get; set; } = null!;
+    public Guid FuelTypeId { get; set; }
     public string? FuelTypeName { get; set; }
     public string Brand { get; set; } = null!;
     public int VoucherCount { get; set; }
@@ -32,7 +32,7 @@ public sealed class SetBatchCostRequest
 /// </summary>
 public sealed class ImportBatchPnlDto
 {
-    public string FuelTypeId { get; set; } = null!;
+    public Guid FuelTypeId { get; set; }
     public string? FuelTypeName { get; set; }
     public string Brand { get; set; } = null!;
 

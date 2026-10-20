@@ -6,6 +6,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.UnitTests.Company;
 
@@ -100,7 +101,7 @@ internal static class CompanyTestFactory
         {
             Id = id,
             Brand = brand,
-            FuelTypeId = fuelTypeId,
+            FuelTypeId = ToUuid(fuelTypeId),
             Liters = liters,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),

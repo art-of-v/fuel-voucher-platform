@@ -11,6 +11,7 @@ using FuelFlow.SharedKernel.Options;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -193,7 +194,7 @@ public sealed class OrderReceiptIntegrationTests : IClassFixture<TestDatabaseFix
             Id = Guid.NewGuid(),
             OrderId = order.Id,
             Brand = "okko",
-            FuelTypeId = "diesel",
+            FuelTypeId = ToUuid("diesel"),
             Liters = 50m,
             Quantity = 2,
             UnitPrice = 500.00m,

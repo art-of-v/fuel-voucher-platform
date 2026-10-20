@@ -14,7 +14,7 @@ public sealed class BelowCostSaleBlockedException : Exception
     /// The fuel that blocked the sale, kept as a property for logs and telemetry rather than
     /// interpolated into <see cref="Exception.Message"/>.
     /// </summary>
-    public string FuelTypeId { get; }
+    public Guid FuelTypeId { get; }
 
     /// <param name="fuelTypeId">
     /// The fuel's identifier. It lands in logs, never in the message: <see cref="Message"/> reaches
@@ -23,7 +23,7 @@ public sealed class BelowCostSaleBlockedException : Exception
     /// "priced below supplier cost", which is our margin decision, not an explanation of anything
     /// the customer did or can do.
     /// </param>
-    public BelowCostSaleBlockedException(string fuelTypeId)
+    public BelowCostSaleBlockedException(Guid fuelTypeId)
         : base("This fuel is currently unavailable for purchase.")
     {
         FuelTypeId = fuelTypeId;

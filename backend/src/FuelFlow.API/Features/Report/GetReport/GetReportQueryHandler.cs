@@ -131,8 +131,8 @@ from f in _context.FuelTypes.AsNoTracking()
                 o.Status.ToString(),
                 o.CreatedAtUtc,
                 firstLi?.Brand ?? "",
-                firstLi?.FuelTypeId ?? "",
-                firstLi is null ? "" : fuelTypeNames.GetValueOrDefault(firstLi.FuelTypeId) ?? firstLi.FuelTypeId,
+                firstLi?.FuelTypeId ?? Guid.Empty,
+                firstLi is null ? "" : fuelTypeNames.GetValueOrDefault(firstLi.FuelTypeId) ?? firstLi.FuelTypeId.ToString(),
                 totalLiters,
                 totalQuantity,
                 o.MonobankStatus?.ToString(),
@@ -147,7 +147,7 @@ from f in _context.FuelTypes.AsNoTracking()
             v.Id,
             v.Brand,
             v.FuelTypeId,
-            fuelTypeNames.GetValueOrDefault(v.FuelTypeId) ?? v.FuelTypeId,
+            fuelTypeNames.GetValueOrDefault(v.FuelTypeId) ?? v.FuelTypeId.ToString(),
             v.Liters,
             v.UpdatedAtUtc
         )).ToList();

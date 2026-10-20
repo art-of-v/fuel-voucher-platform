@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -276,7 +277,7 @@ public sealed class WorkerUsageReportIntegrationTests : IClassFixture<TestDataba
         {
             Id = Guid.NewGuid(),
             Brand = "OKKO",
-            FuelTypeId = "okko-dp",
+            FuelTypeId = ToUuid("okko-dp"),
             Liters = liters,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6)),

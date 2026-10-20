@@ -26,7 +26,7 @@ public sealed record GetReconciliationResponse(
         Guid OrderId,
         string? UserPhone,
         string Brand,
-        string FuelType,
+        Guid FuelType,
         decimal Liters,
         int Quantity,
         decimal TotalPrice,

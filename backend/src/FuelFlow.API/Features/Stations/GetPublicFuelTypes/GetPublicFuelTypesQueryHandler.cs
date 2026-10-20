@@ -66,7 +66,7 @@ public sealed class GetPublicFuelTypesQueryHandler
 
         return fuels
             .Select(f => new PublicFuelTypeResponse(
-                f.Id,
+                f.Id.ToString(),
                 f.BrandId,
                 slugs.TryGetValue(f.BrandId, out var slug) ? slug : string.Empty,
                 f.Name,

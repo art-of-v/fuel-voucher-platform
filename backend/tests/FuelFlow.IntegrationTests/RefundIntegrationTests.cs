@@ -16,6 +16,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -339,7 +340,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
             {
                 Id = Guid.NewGuid(),
                 Brand = "OKKO",
-                FuelTypeId = "okko-dp",
+                FuelTypeId = ToUuid("okko-dp"),
                 Liters = 10m,
                 SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
                 CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
@@ -406,7 +407,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
             {
                 Id = Guid.NewGuid(),
                 Brand = "OKKO",
-                FuelTypeId = "okko-dp",
+                FuelTypeId = ToUuid("okko-dp"),
                 Liters = 10m,
                 SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
                 CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
@@ -549,7 +550,7 @@ var order = CreateOrder(orderId, userId, $"test-invoice-{orderId:N}", OrderStatu
             {
                 Id = Guid.NewGuid(),
                 Brand = "OKKO",
-                FuelTypeId = "okko-dp",
+                FuelTypeId = ToUuid("okko-dp"),
                 Liters = 10m,
                 SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
                 CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
@@ -665,7 +666,7 @@ private static Order AddPaidOrder(
                 Id = Guid.NewGuid(),
                 OrderId = orderId,
                 Brand = "OKKO",
-                FuelTypeId = "okko-dp",
+                FuelTypeId = ToUuid("okko-dp"),
                 Liters = 10m,
                 Quantity = quantity,
                 UnitPrice = unitPrice,

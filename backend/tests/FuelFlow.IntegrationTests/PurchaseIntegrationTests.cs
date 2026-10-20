@@ -15,6 +15,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using FuelFlow.API.Features.Orders.CreateCheckout.Models;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -125,7 +126,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
             {
                 Id = Guid.CreateVersion7(),
                 Brand = BrandId.ToUpperInvariant(),
-                FuelTypeId = fuelTypeId,
+                FuelTypeId =   ToUuid(fuelTypeId),
                 Liters = liters,
                 SupplierExpirationDate = expiry,
                 CustomerExpirationDate = expiry,
@@ -151,7 +152,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
         var request = new CreateCheckoutCommand
         {
             
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
             Quantity = 1,
             Price = 2500,
@@ -178,7 +179,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
         var request = new CreateCheckoutCommand
         {
             BrandId = BrandIds.Okko,
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
             Quantity = 1,
             Price = 2500
@@ -201,7 +202,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
         var request = new CreateCheckoutCommand
         {
             BrandId = Guid.Empty, // Invalid
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
             Quantity = 1,
             Price = 2500
@@ -227,7 +228,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
         var createRequest = new CreateCheckoutCommand
         {
             
-            FuelTypeId = "wog-95",
+            FuelTypeId = ToUuid("wog-95"),
             Liters = 20,
             Quantity = 2,
             Price = 1800,
@@ -262,7 +263,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
         var createRequest = new CreateCheckoutCommand
         {
             
-            FuelTypeId = "okko-dp",
+            FuelTypeId = ToUuid("okko-dp"),
             Liters = 50,
             Quantity = 1,
             Price = 2000,
@@ -303,7 +304,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
         var createRequest = new CreateCheckoutCommand
         {
             
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 20,
             Quantity = 1,
             Price = 1250,
@@ -343,7 +344,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
         var request = new CreateCheckoutCommand
         {
             
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
             Quantity = 1,
             Price = 3000,
@@ -376,7 +377,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
         var request = new CreateCheckoutCommand
         {
             
-            FuelTypeId = "wog-dp",
+            FuelTypeId = ToUuid("wog-dp"),
             Liters = 10,
             Quantity = 1,
             Price = 500,
@@ -395,7 +396,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
         // Money never moved: no order, and therefore no invoice, exists for a refused line.
         using var scope = _fixture.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        Assert.False(context.Orders.Any(o => o.LineItems.Any(li => li.FuelTypeId == "wog-dp" && o.Status == OrderStatus.PendingPayment)));
+        Assert.False(context.Orders.Any(o => o.LineItems.Any(li => li.FuelTypeId == ToUuid("wog-dp") && o.Status == OrderStatus.PendingPayment)));
     }
 
     /// <summary>
@@ -418,10 +419,10 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
         var packages = await response.Content.ReadFromJsonAsync<List<PublicPackageResponse>>();
         Assert.NotNull(packages);
 
-        var stocked = packages!.Single(p => p.BrandId == BrandIds.Okko && p.FuelTypeId == "okko-95" && p.Liters == 10m);
+        var stocked = packages!.Single(p => p.BrandId == BrandIds.Okko && p.FuelTypeId == ToUuid("okko-95") && p.Liters == 10m);
         Assert.True(stocked.IsAvailable, "an activated voucher of exactly this nominal is behind this package");
 
-        var empty = packages.Single(p => p.BrandId == BrandIds.Wog && p.FuelTypeId == "wog-dp" && p.Liters == 10m);
+        var empty = packages.Single(p => p.BrandId == BrandIds.Wog && p.FuelTypeId == ToUuid("wog-dp") && p.Liters == 10m);
         Assert.False(empty.IsAvailable);
     }
 }

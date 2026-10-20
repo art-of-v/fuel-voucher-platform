@@ -22,6 +22,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.UnitTests.Vouchers;
 
@@ -95,7 +96,7 @@ public sealed class AdminVoucherControllerAttributionTests : IDisposable
         {
             Id = id,
             Brand = "OKKO",
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
             VoucherNumber = $"V-{id:N}"[..20],
             QrPayload = $"qr-{id:N}",

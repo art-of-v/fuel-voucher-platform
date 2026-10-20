@@ -38,7 +38,7 @@ public sealed class GetAdminOrderByIdQueryHandler
             Id = item.Id,
             UserId = item.UserId,
             Brand = firstLi?.Brand ?? "",
-            FuelTypeId = firstLi?.FuelTypeId ?? "",
+            FuelTypeId = firstLi?.FuelTypeId ?? Guid.Empty,
             Liters = totalLiters,
             Quantity = totalQuantity,
             Price = item.Price,
@@ -67,7 +67,7 @@ public sealed class OrderDetailDto
     public Guid Id { get; set; }
     public Guid UserId { get; set; }
     public string Brand { get; set; } = null!;
-    public string FuelTypeId { get; set; } = null!;
+    public Guid FuelTypeId { get; set; }
     public decimal Liters { get; set; }
     public int Quantity { get; set; }
     public decimal Price { get; set; }

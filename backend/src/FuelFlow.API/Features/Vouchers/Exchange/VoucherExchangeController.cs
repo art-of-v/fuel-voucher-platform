@@ -140,6 +140,6 @@ public sealed class ConfirmVoucherExchangeRequest
 
 public sealed class ExchangeFuelCostDto
 {
-    public string FuelTypeId { get; set; } = string.Empty;
+    public Guid FuelTypeId { get; set; }
     public decimal CostPerLiter { get; set; }
 }

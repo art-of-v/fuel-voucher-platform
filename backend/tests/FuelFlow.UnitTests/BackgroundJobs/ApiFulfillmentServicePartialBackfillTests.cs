@@ -13,6 +13,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.UnitTests.BackgroundJobs;
 
@@ -127,7 +128,7 @@ public sealed class ApiFulfillmentServicePartialBackfillTests : IDisposable
                 new OrderLineItem
                 {
                     Brand = "OKKO",
-                    FuelTypeId = "okko-95",
+                    FuelTypeId = ToUuid("okko-95"),
                     Liters = 20,
                     Quantity = 2,
                     UnitPrice = 1000,
@@ -140,7 +141,7 @@ public sealed class ApiFulfillmentServicePartialBackfillTests : IDisposable
         {
             Id = Guid.NewGuid(),
             Brand = "OKKO",
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 20,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
@@ -163,7 +164,7 @@ public sealed class ApiFulfillmentServicePartialBackfillTests : IDisposable
         {
             Id = Guid.NewGuid(),
             Brand = "OKKO",
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 20,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(2),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(2),

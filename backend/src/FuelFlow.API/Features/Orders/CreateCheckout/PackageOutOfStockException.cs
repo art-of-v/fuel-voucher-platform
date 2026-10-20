@@ -28,7 +28,7 @@ public sealed class PackageOutOfStockException : Exception
 {
     public const string Code = "package_out_of_stock";
 
-    public PackageOutOfStockException(string BrandId, string fuelTypeId, decimal liters)
+    public PackageOutOfStockException(string BrandId, Guid fuelTypeId, decimal liters)
         : base($"Fuel {fuelTypeId} at {BrandId} for {liters:0.##}L has no stock available and cannot be bought.")
     {
     }

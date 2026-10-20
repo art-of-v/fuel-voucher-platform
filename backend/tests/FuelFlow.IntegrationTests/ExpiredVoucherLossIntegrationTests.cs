@@ -13,6 +13,7 @@ using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -223,7 +224,7 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
             .HandleAsync(new GetImportBatchPnlQuery(ImportId));
 
         var row = rows.Should().ContainSingle().Subject;
-        row.FuelTypeId.Should().Be("okko-dp");
+        row.FuelTypeId.Should().Be(ToUuid("okko-dp"));
         row.CostPerLiter.Should().Be(25m);
         row.VouchersExpired.Should().Be(3);
         row.LitersExpired.Should().Be(300m);
@@ -458,7 +459,7 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
         {
             Id = Guid.NewGuid(),
             ImportJobId = ImportId,
-            FuelTypeId = "okko-dp",
+            FuelTypeId = ToUuid("okko-dp"),
             Brand = "OKKO",
             SupplierId = supplierId,
             CreatedAtUtc = now,
@@ -548,7 +549,7 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
     {
         Id = Guid.NewGuid(),
         Brand = "OKKO",
-        FuelTypeId = "okko-dp",
+        FuelTypeId = ToUuid("okko-dp"),
         Liters = 100m,
         SupplierExpirationDate = expirationDate,
         CustomerExpirationDate = expirationDate,

@@ -1,3 +1,4 @@
+using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -17,7 +18,8 @@ internal sealed class FuelPriceHistoryConfiguration : IEntityTypeConfiguration<F
 
         builder.Property(e => e.Id).HasColumnName("id").HasColumnType("uuid");
         builder.Property(e => e.BrandId).HasColumnName("brand_id").HasColumnType("uuid").IsRequired();
-        builder.Property(e => e.FuelTypeId).HasColumnName("fuel_type_id").HasColumnType("text").IsRequired();
+           builder.Property(e => e.FuelTypeId).HasColumnName("fuel_type_id").HasColumnType("uuid")
+               .IsRequired();
 
         // Same six columns, same scale, as the fuel they are copied from: a history row that stored
         // a price at a different precision than the live price would make "the same number" a
@@ -83,7 +85,6 @@ internal sealed class FuelPriceHistoryConfiguration : IEntityTypeConfiguration<F
                 "(pump_price_per_liter IS NULL OR pump_price_per_liter >= 0) AND " +
                 "(min_discount_per_liter IS NULL OR min_discount_per_liter >= 0)");
 
-            t.HasCheckConstraint("ck_fuel_price_history_fuel_type_id_length", "length(fuel_type_id) <= 100");
-        });
+            });
     }
 }

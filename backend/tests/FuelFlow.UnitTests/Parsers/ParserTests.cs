@@ -13,6 +13,7 @@ using SixLabors.ImageSharp.PixelFormats;
 using UglyToad.PdfPig.Content;
 using UglyToad.PdfPig.Core;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.UnitTests.Parsers;
 
@@ -38,11 +39,11 @@ public class ParserTests : IDisposable
     {
         var fuelTypes = new[]
         {
-            new FuelTypeEntity { Id = "okko-dp", Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "okko-95", Name = "A-95", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "wog-dp", Name = "ДП Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "wog-95", Name = "A-95 Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "wog-95-euro", Name = "A 95 EURO", BrandId = BrandIds.Wog, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow }
+            new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("okko-95"), Name = "A-95", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("wog-dp"), Name = "ДП Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("wog-95"), Name = "A-95 Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("wog-95-euro"), Name = "A 95 EURO", BrandId = BrandIds.Wog, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow }
         };
         _context.FuelTypes.AddRange(fuelTypes);
         _context.SaveChanges();
@@ -152,7 +153,7 @@ public class ParserTests : IDisposable
         result.Should().HaveCount(1);
         var parsed = result.First();
         parsed.Brand.Should().Be("OKKO");
-        parsed.FuelTypeId.Should().Be("okko-dp");
+        parsed.FuelTypeId.Should().Be(ToUuid("okko-dp"));
         parsed.Liters.Should().Be(20m);
         parsed.ExpirationDate.Should().Be(new DateOnly(2025, 6, 17));
         parsed.VoucherNumber.Should().Be("99999600000020368126");
@@ -295,7 +296,7 @@ public class ParserTests : IDisposable
         result.Should().HaveCount(1);
         var parsed = result.First();
         parsed.Brand.Should().Be("WOG");
-        parsed.FuelTypeId.Should().Be("wog-95-euro");
+        parsed.FuelTypeId.Should().Be(ToUuid("wog-95-euro"));
         parsed.Liters.Should().Be(10m);
         parsed.ExpirationDate.Should().Be(new DateOnly(2026, 5, 13));
         parsed.VoucherNumber.Should().Be("10094100096856672796");
@@ -365,9 +366,9 @@ public class ParserTests : IDisposable
         // against the drifted standard-95 row ("А-95 ЄВРО") — and to the standard (EURO) grade,
         // not the "A-95 Mustang" premium row, since the voucher carries no Mustang marker.
         using var context = CreateContextWith(
-            new FuelTypeEntity { Id = "wog-95-euro", Name = "А-95 ЄВРО", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "wog-95", Name = "A-95 Mustang", BrandId = BrandIds.Wog, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "wog-dp", Name = "ДП Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow });
+            new FuelTypeEntity { Id = ToUuid("wog-95-euro"), Name = "А-95 ЄВРО", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("wog-95"), Name = "A-95 Mustang", BrandId = BrandIds.Wog, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("wog-dp"), Name = "ДП Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow });
 
         var parser = new WogVoucherParser(context, new BrandSlugResolver(context), NullLogger<WogVoucherParser>.Instance);
         _qrDecoderMock.Setup(x => x.Decode(It.IsAny<Image>()))
@@ -409,7 +410,7 @@ public class ParserTests : IDisposable
         result.Should().HaveCount(1);
         var parsed = result.First();
         parsed.Brand.Should().Be("WOG");
-        parsed.FuelTypeId.Should().Be("wog-95-euro");
+        parsed.FuelTypeId.Should().Be(ToUuid("wog-95-euro"));
         parsed.Liters.Should().Be(20m);
         parsed.ExpirationDate.Should().Be(new DateOnly(2026, 2, 9));
         parsed.VoucherNumber.Should().Be("10094200095062108351");
@@ -423,8 +424,8 @@ public class ParserTests : IDisposable
         // no hyphen, EURO suffix). The QR product code 9015 (A-95) must resolve it, whereas
         // the old hardcoded-string match against "A-95" (Latin) rejected every such voucher.
         using var context = CreateContextWith(
-            new FuelTypeEntity { Id = "okko-95", Name = "А95 ЄВРО", BrandId = BrandIds.Okko, BasePrice = 54, DiscountPrice = 51, CreatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "okko-dp", Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow });
+            new FuelTypeEntity { Id = ToUuid("okko-95"), Name = "А95 ЄВРО", BrandId = BrandIds.Okko, BasePrice = 54, DiscountPrice = 51, CreatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow });
 
         var parser = new OkkoVoucherParser(context, new BrandSlugResolver(context), NullLogger<OkkoVoucherParser>.Instance);
         _qrDecoderMock.Setup(x => x.Decode(It.IsAny<Image>()))
@@ -464,7 +465,7 @@ public class ParserTests : IDisposable
 
         result.Should().HaveCount(1);
         var parsed = result.First();
-        parsed.FuelTypeId.Should().Be("okko-95");
+        parsed.FuelTypeId.Should().Be(ToUuid("okko-95"));
         parsed.Confidence.Should().Be(100m);
     }
 

@@ -201,8 +201,8 @@ Guid? ResolveOriginOrderId(Guid voucherId)
             var lineItemsList = order.LineItems.ToList();
             var firstLi = lineItemsList.FirstOrDefault();
             var brand = firstLi?.Brand ?? "";
-            var firstFuelTypeId = firstLi?.FuelTypeId ?? "";
-            var fuelName = fuelTypeNames.GetValueOrDefault(firstFuelTypeId) ?? firstFuelTypeId;
+            var firstFuelTypeId = firstLi?.FuelTypeId ?? Guid.Empty;
+            var fuelName = fuelTypeNames.GetValueOrDefault(firstFuelTypeId) ?? firstFuelTypeId.ToString();
             var totalLiters = lineItemsList.Sum(li => li.Liters * li.Quantity);
             var totalQuantity = lineItemsList.Sum(li => li.Quantity);
 
@@ -211,7 +211,7 @@ Guid? ResolveOriginOrderId(Guid voucherId)
                 Id = order.Id,
                 ProductType = "",
                 Brand = brand,
-                FuelType = firstFuelTypeId,
+                FuelType = firstFuelTypeId.ToString(),
                 FuelName = fuelName,
                 Liters = totalLiters,
                 Quantity = totalQuantity,
@@ -242,8 +242,8 @@ Guid? ResolveOriginOrderId(Guid voucherId)
                     {
                         Id = v.Id,
                         Brand = v.Brand,
-                        FuelType = v.FuelTypeId,
-                        FuelName = fuelTypeNames.GetValueOrDefault(v.FuelTypeId) ?? v.FuelTypeId,
+                        FuelType = v.FuelTypeId.ToString(),
+                        FuelName = fuelTypeNames.GetValueOrDefault(v.FuelTypeId) ?? v.FuelTypeId.ToString(),
                         Liters = v.Liters,
                         Amount = v.Liters,
                         ExpirationDate = v.CustomerExpirationDate,

@@ -23,6 +23,7 @@ using Microsoft.Extensions.Options;
 using Moq;
 
 using FuelFlow.SharedKernel.Observability;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 namespace FuelFlow.UnitTests.Orders;
 
 public sealed class OrderAdminCommandHandlersTests : IDisposable
@@ -84,11 +85,11 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
     {
         var fuelTypes = new[]
         {
-            new FuelTypeEntity { Id = "okko-dp", Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "okko-95", Name = "A-95", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "okko-p95", Name = "Pulls 95", BrandId = BrandIds.Okko, BasePrice = 62, DiscountPrice = 58, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "wog-dp", Name = "ДП Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "wog-95", Name = "A-95 Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow }
+            new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("okko-95"), Name = "A-95", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("okko-p95"), Name = "Pulls 95", BrandId = BrandIds.Okko, BasePrice = 62, DiscountPrice = 58, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("wog-dp"), Name = "ДП Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("wog-95"), Name = "A-95 Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow }
         };
         _context.FuelTypes.AddRange(fuelTypes);
         _context.SaveChanges();
@@ -121,7 +122,7 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
         {
             Id = Guid.NewGuid(),
             Brand = "OKKO",
-            FuelTypeId = fuelTypeId,
+            FuelTypeId = ToUuid(fuelTypeId),
             Liters = liters,
             SupplierExpirationDate = expiry,
             CustomerExpirationDate = expiry,
@@ -148,7 +149,7 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
             {
                 Id = Guid.NewGuid(),
                 Brand = "okko",
-                FuelTypeId = "okko-95",
+                FuelTypeId = ToUuid("okko-95"),
                 Liters = 50,
                 Quantity = 1,
                 UnitPrice = 2500,
@@ -163,7 +164,7 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
     private static CheckoutItem CheckoutItem(string fuelTypeId, int price, Guid? brandId = null) => new()
     {
         
-        FuelTypeId = fuelTypeId,
+        FuelTypeId = ToUuid(fuelTypeId),
         Liters = 50,
         Quantity = 1,
         Price = price,
@@ -274,8 +275,8 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
         order.MonobankInvoiceId.Should().Be("INV123");
         order.MonobankPaymentUrl.Should().Be("https://pay.test/INV123");
         order.LineItems.Should().HaveCount(2);
-        order.LineItems.Should().Contain(li => li.FuelTypeId == "okko-95");
-        order.LineItems.Should().Contain(li => li.FuelTypeId == "okko-p95");
+        order.LineItems.Should().Contain(li => li.FuelTypeId == ToUuid("okko-95"));
+        order.LineItems.Should().Contain(li => li.FuelTypeId == ToUuid("okko-p95"));
     }
 
     [Fact]
@@ -354,7 +355,7 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
             {
                 Id = Guid.NewGuid(),
                 Brand = "okko",
-                FuelTypeId = "okko-95",
+                FuelTypeId = ToUuid("okko-95"),
                 Liters = 50,
                 VoucherNumber = "V-test",
                 QrPayload = "q",

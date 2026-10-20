@@ -83,7 +83,7 @@ public sealed class BrandFuelController : ControllerBase
     /// </summary>
     [HttpGet("{fuelId}/price-history")]
     public async Task<IActionResult> GetFuelPriceHistory(
-        [FromRoute] string fuelId,
+        [FromRoute] Guid fuelId,
         [FromQuery] int limit = 50,
         CancellationToken ct = default) =>
         Ok(await _getPriceHistory.HandleAsync(new GetFuelPriceHistoryQuery(fuelId, limit), ct));
@@ -98,7 +98,7 @@ public sealed class BrandFuelController : ControllerBase
     /// </summary>
     [HttpGet("{fuelId}/price-at")]
     public async Task<IActionResult> GetFuelPriceAt(
-        [FromRoute] string fuelId,
+        [FromRoute] Guid fuelId,
         [FromQuery] DateTime asOf,
         CancellationToken ct = default) =>
         Ok(await _getPriceAt.HandleAsync(new GetFuelPriceAtQuery(fuelId, asOf), ct));
@@ -130,7 +130,7 @@ public sealed class BrandFuelController : ControllerBase
             .Select(f => f.Id)
             .FirstOrDefaultAsync(ct);
 
-        if (duplicate is not null)
+        if (duplicate != Guid.Empty)
         {
             return Conflict(new
             {
@@ -155,7 +155,7 @@ public sealed class BrandFuelController : ControllerBase
                 .Select(f => f.Id)
                 .FirstOrDefaultAsync(ct);
 
-            if (codeOwner is not null)
+            if (codeOwner != Guid.Empty)
             {
                 return Conflict(new
                 {
@@ -201,7 +201,7 @@ public sealed class BrandFuelController : ControllerBase
 
         var fuel = new FuelTypeEntity
         {
-            Id = Guid.CreateVersion7().ToString(),
+            Id = Guid.CreateVersion7(),
             BrandId = id,
             Name = request.Name,
             BrandFuelCode = brandFuelCode,
@@ -278,7 +278,7 @@ public sealed class BrandFuelController : ControllerBase
         var userId = GetUserId();
         var newValue = JsonSerializer.Serialize(new { fuel.Id, fuel.Name, request.SupplierPricePerLiter, request.MarginUahPerLiter, request.PumpPricePerLiter, request.MinDiscountPerLiter, FinalPricePerLiter = finalPerLiter });
         await _eventService.RecordEventAsync(
-            "Fuel", fuel.Id, "FuelAdded",
+            "Fuel", fuel.Id.ToString(), "FuelAdded",
             null, newValue, userId, GetUserName(),
             $"{Brand.Name} / {fuel.Name}: added at {finalPerLiter:F2} UAH/L",
             Brand!.Slug,
@@ -292,7 +292,7 @@ public sealed class BrandFuelController : ControllerBase
     }
 
 [HttpPut("{fuelId}")]
-    public async Task<IActionResult> UpdateFuel([FromRoute] string fuelId, [FromBody] BrandFuelDto request, CancellationToken ct)
+    public async Task<IActionResult> UpdateFuel([FromRoute] Guid fuelId, [FromBody] BrandFuelDto request, CancellationToken ct)
     {
         // Required, because the flag is written to every package of this fuel below. Answering with
         // a null would mean "the caller did not say", and the old non-nullable bool resolved that to
@@ -437,7 +437,7 @@ var seededNominals = await _context.FuelNominals
                     .Select(f => f.Id)
                     .FirstOrDefaultAsync(ct);
 
-                if (codeOwner is not null)
+                if (codeOwner != Guid.Empty)
                 {
                     return Conflict(new
                     {
@@ -485,7 +485,7 @@ var seededNominals = await _context.FuelNominals
             : $"{BrandName} / {fuel.Name}: updated";
 
         await _eventService.RecordEventAsync(
-            "Fuel", fuelId, "PriceChanged",
+            "Fuel", fuelId.ToString(), "PriceChanged",
             oldValue, newValue, userId, GetUserName(),
             summary,
             Brand!.Slug,
@@ -499,7 +499,7 @@ var seededNominals = await _context.FuelNominals
     }
 
     [HttpDelete("{fuelId}")]
-    public async Task<IActionResult> DeleteFuel([FromRoute] string fuelId, CancellationToken ct)
+    public async Task<IActionResult> DeleteFuel([FromRoute] Guid fuelId, CancellationToken ct)
     {
         var fuel = await _context.FuelTypes.FirstOrDefaultAsync(f => f.Id == fuelId, ct);
         if (fuel is null) return NotFound();
@@ -552,7 +552,7 @@ var seededNominals = await _context.FuelNominals
 
         var userId = GetUserId();
         await _eventService.RecordEventAsync(
-            "Fuel", fuelId, "FuelRemoved",
+            "Fuel", fuelId.ToString(), "FuelRemoved",
             JsonSerializer.Serialize(new { fuelName, BrandName }), "{}",
             userId, GetUserName(),
             $"{BrandName} / {fuelName}: removed",

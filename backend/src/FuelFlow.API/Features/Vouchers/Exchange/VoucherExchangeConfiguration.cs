@@ -44,10 +44,12 @@ internal sealed class VoucherExchangeConfiguration : IEntityTypeConfiguration<Vo
         builder.Property(e => e.NewVoucherId)
             .HasColumnName("new_voucher_id");
 
-        builder.Property(e => e.FuelTypeId)
-            .HasColumnName("fuel_type_id")
-            .HasColumnType("text")
-            .IsRequired();
+        // The fuel id is a uuid since planning D-21: a uuid column, so this can carry a real
+        // foreign key one day - which is what D-02 is waiting for.
+           builder.Property(e => e.FuelTypeId)
+               .HasColumnName("fuel_type_id")
+               .HasColumnType("uuid")
+               .IsRequired();
 
         builder.Property(e => e.Brand)
             .HasColumnName("brand")
@@ -125,8 +127,8 @@ internal sealed class VoucherExchangeConfiguration : IEntityTypeConfiguration<Vo
                 "cost_per_liter_applied IS NULL OR cost_per_liter_applied >= 0");
             t.HasCheckConstraint("ck_voucher_exchange_not_self",
                 "old_voucher_id IS DISTINCT FROM new_voucher_id");
-            // fuel_type_id is a catalog natural key, bounded by CHECK - see BrandConfiguration.
-            t.HasCheckConstraint("ck_voucher_exchanges_fuel_type_id_length", "length(fuel_type_id) <= 100");
+            // fuel_type_id is a uuid since planning D-21's second slice, and a uuid has no length to
+            // bound - the check that bounded it as text went with the text.
         });
     }
 }

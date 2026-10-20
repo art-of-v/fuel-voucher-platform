@@ -1,15 +1,16 @@
 using FluentAssertions;
 using FuelFlow.Features.Vouchers.Exchange;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.UnitTests.Vouchers.Exchange;
 
 public sealed class VoucherExchangePairingTests
 {
     private static VoucherExchangePairing.Candidate Old(string number, string brand = "okko", string fuel = "okko-a95", decimal liters = 50m)
-        => new(Guid.NewGuid(), brand, fuel, liters, number);
+        => new(Guid.NewGuid(), brand, ToUuid(fuel), liters, number);
 
     private static VoucherExchangePairing.Candidate New(string number, string brand = "okko", string fuel = "okko-a95", decimal liters = 50m)
-        => new(Guid.NewGuid(), brand, fuel, liters, number);
+        => new(Guid.NewGuid(), brand, ToUuid(fuel), liters, number);
 
     [Fact]
     public void Pair_EqualCountsSameBucket_PairsAllOneToOne()

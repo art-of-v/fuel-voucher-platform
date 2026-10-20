@@ -621,7 +621,7 @@ public sealed class VoucherTermSettingsDto
 /// </summary>
 public sealed class VoucherTermFuelMarginDto
 {
-    public string FuelTypeId { get; set; } = string.Empty;
+    public Guid FuelTypeId { get; set; }
     public string Name { get; set; } = string.Empty;
 
     /// <summary>

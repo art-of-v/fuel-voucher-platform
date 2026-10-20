@@ -8,6 +8,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.UnitTests.Pricing;
 
@@ -41,15 +42,15 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
             new Brand { Id = BrandIds.Okko, Slug = "okko", Name = "OKKO", Color = "#000000", LogoText = "OKKO" },
             new Brand { Id = BrandIds.Wog, Slug = "wog", Name = "WOG", Color = "#000000", LogoText = "WOG" });
         _context.FuelTypes.AddRange(
-            new FuelTypeEntity { Id = "okko-95", Name = "A-95", BrandId = BrandIds.Okko, BasePrice = 54, DiscountPrice = 51 },
-            new FuelTypeEntity { Id = "okko-dp", Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52 },
-            new FuelTypeEntity { Id = "okko-gas", Name = "ГАЗ", BrandId = BrandIds.Okko, BasePrice = 29, DiscountPrice = 27 },
-            new FuelTypeEntity { Id = "okko-p95", Name = "Pulls 95", BrandId = BrandIds.Okko, BasePrice = 60, DiscountPrice = 56 },
-            new FuelTypeEntity { Id = "okko-pulls-dp", Name = "ДП PULLS", BrandId = BrandIds.Okko, BasePrice = 58, DiscountPrice = 55 });
+            new FuelTypeEntity { Id = ToUuid("okko-95"), Name = "A-95", BrandId = BrandIds.Okko, BasePrice = 54, DiscountPrice = 51 },
+            new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52 },
+            new FuelTypeEntity { Id = ToUuid("okko-gas"), Name = "ГАЗ", BrandId = BrandIds.Okko, BasePrice = 29, DiscountPrice = 27 },
+            new FuelTypeEntity { Id = ToUuid("okko-p95"), Name = "Pulls 95", BrandId = BrandIds.Okko, BasePrice = 60, DiscountPrice = 56 },
+            new FuelTypeEntity { Id = ToUuid("okko-pulls-dp"), Name = "ДП PULLS", BrandId = BrandIds.Okko, BasePrice = 58, DiscountPrice = 55 });
 
         // A competitor fuel the import must not touch.
         _context.FuelTypes.Add(new FuelTypeEntity
-            { Id = "wog-95", Name = "A-95 Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53 });
+            { Id = ToUuid("wog-95"), Name = "A-95 Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53 });
 
         AddPackages("okko-95", "A-95", 10, 54, 5, 56);
         AddPackages("okko-dp", "ДП ЄВРО", 10, 55, 5, 57);
@@ -107,15 +108,15 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
         var result = await Handler().HandleAsync(Import(ScrapedSheet), Guid.Empty, "tester");
 
         result.FuelsMatched.Should().Be(5);
-        result.Applied.Select(a => a.FuelTypeId).Should().BeEquivalentTo(
-            ["okko-95", "okko-dp", "okko-gas", "okko-p95", "okko-pulls-dp"]);
+           result.Applied.Select(a => a.FuelTypeId).Should().BeEquivalentTo(
+               [ToUuid("okko-95"), ToUuid("okko-dp"), ToUuid("okko-gas"), ToUuid("okko-p95"), ToUuid("okko-pulls-dp")]);
 
         // The site code must land on the correct fuel, not merely onto "some" fuel.
-        result.Applied.Single(a => a.SiteFuelCode == "A-95").FuelTypeId.Should().Be("okko-95");
-        result.Applied.Single(a => a.SiteFuelCode == "DP").FuelTypeId.Should().Be("okko-dp");
-        result.Applied.Single(a => a.SiteFuelCode == "SPBT").FuelTypeId.Should().Be("okko-gas");
-        result.Applied.Single(a => a.SiteFuelCode == "Pulls 95").FuelTypeId.Should().Be("okko-p95");
-        result.Applied.Single(a => a.SiteFuelCode == "Pulls Diesel").FuelTypeId.Should().Be("okko-pulls-dp");
+        result.Applied.Single(a => a.SiteFuelCode == "A-95").FuelTypeId.Should().Be(ToUuid("okko-95"));
+        result.Applied.Single(a => a.SiteFuelCode == "DP").FuelTypeId.Should().Be(ToUuid("okko-dp"));
+        result.Applied.Single(a => a.SiteFuelCode == "SPBT").FuelTypeId.Should().Be(ToUuid("okko-gas"));
+        result.Applied.Single(a => a.SiteFuelCode == "Pulls 95").FuelTypeId.Should().Be(ToUuid("okko-p95"));
+        result.Applied.Single(a => a.SiteFuelCode == "Pulls Diesel").FuelTypeId.Should().Be(ToUuid("okko-pulls-dp"));
     }
 
     [Fact]
@@ -129,10 +130,10 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
         // copies drift apart unnoticed.
         _context.ChangeTracker.Clear();
 
-        var fuel = await _context.FuelTypes.FirstAsync(f => f.Id == "okko-95");
+        var fuel = await _context.FuelTypes.FirstAsync(f => f.Id == ToUuid("okko-95"));
 
     var a95 = await _context.FuelNominals
-        .Where(v => v.FuelTypeId == "okko-95")
+        .Where(v => v.FuelTypeId == ToUuid("okko-95"))
         .OrderBy(v => v.Liters)
         .ToListAsync();
         // cost 54 + profit 5 = 59, under the 92.90 - 1 = 91.90 ceiling.
@@ -182,7 +183,7 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
         await Handler().HandleAsync(Import(ScrapedSheet), Guid.Empty, "tester");
         _context.ChangeTracker.Clear();
 
-        var gas = await _context.FuelTypes.FirstAsync(f => f.Id == "okko-gas");
+        var gas = await _context.FuelTypes.FirstAsync(f => f.Id == ToUuid("okko-gas"));
         gas.BasePrice.Should().Be(46.90m);   // колонка
         gas.DiscountPrice.Should().Be(33m);   // cost 29 + profit 4, under 46.90 - 1
     }
@@ -237,7 +238,7 @@ var (volume, fuel) = await ReadAsync("okko-95-20");
     public async Task Import_ShouldApplyABelowCostPump_WhenTheFuelIsOptedIn()
     {
         await SeedCatalogAsync();
-        var a95 = await _context.FuelTypes.FirstAsync(f => f.Id == "okko-95");
+        var a95 = await _context.FuelTypes.FirstAsync(f => f.Id == ToUuid("okko-95"));
         a95.AllowBelowCost = true;
         await _context.SaveChangesAsync();
         _context.ChangeTracker.Clear();
@@ -318,10 +319,10 @@ var (wogVolume, wogFuel) = await ReadAsync("wog-95-20");
 
         var result = await Handler().HandleAsync(Import(ScrapedSheet), Guid.Empty, "tester");
 
-        result.Applied.Should().Contain(a => a.FuelTypeId == "okko-95" && a.SiteFuelCode == "A-95");
+        result.Applied.Should().Contain(a => a.FuelTypeId == ToUuid("okko-95") && a.SiteFuelCode == "A-95");
 
         _context.ChangeTracker.Clear();
-        var fuel = await _context.FuelTypes.FirstAsync(f => f.Id == "okko-95");
+        var fuel = await _context.FuelTypes.FirstAsync(f => f.Id == ToUuid("okko-95"));
         fuel.PumpPricePerLiter.Should().Be(92.90m);
     }
 
@@ -337,7 +338,7 @@ var (wogVolume, wogFuel) = await ReadAsync("wog-95-20");
 
         var result = await Handler().HandleAsync(Import(ScrapedSheet), Guid.Empty, "tester");
 
-        result.Applied.Should().NotContain(a => a.FuelTypeId == "okko-95",
+        result.Applied.Should().NotContain(a => a.FuelTypeId == ToUuid("okko-95"),
             "the name still classifies as A95, and that is exactly the guess the code replaces");
         result.OkkoFuelsWithoutPrice.Should().Contain("A-95");
     }
@@ -350,7 +351,7 @@ var (wogVolume, wogFuel) = await ReadAsync("wog-95-20");
         await SeedCatalogAsync();
         _context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = "okko-95-euro",
+            Id = ToUuid("okko-95-euro"),
             Name = "A-95 EURO",
             BrandId = BrandIds.Okko,
             BasePrice = 56,
@@ -364,7 +365,7 @@ var (wogVolume, wogFuel) = await ReadAsync("wog-95-20");
         var result = await Handler().HandleAsync(Import(ScrapedSheet), Guid.Empty, "tester");
 
         result.Applied.Should().ContainSingle(a => a.SiteFuelCode == "A-95").Which.FuelTypeId
-            .Should().Be("okko-95-euro", "the code says which A-95 the sheet is pricing");
+            .Should().Be(ToUuid("okko-95-euro"), "the code says which A-95 the sheet is pricing");
         result.OkkoFuelsWithoutPrice.Should().Contain("A-95");
     }
 
@@ -378,12 +379,12 @@ var (wogVolume, wogFuel) = await ReadAsync("wog-95-20");
 
         var result = await Handler().HandleAsync(Import(ScrapedSheet), Guid.Empty, "tester");
 
-        result.Applied.Should().Contain(a => a.FuelTypeId == "okko-95");
+        result.Applied.Should().Contain(a => a.FuelTypeId == ToUuid("okko-95"));
     }
 
     private async Task SetCodeAsync(string fuelTypeId, string code)
     {
-        var fuel = await _context.FuelTypes.FirstAsync(f => f.Id == fuelTypeId);
+        var fuel = await _context.FuelTypes.FirstAsync(f => f.Id == ToUuid(fuelTypeId));
         fuel.BrandFuelCode = code;
         await _context.SaveChangesAsync();
         _context.ChangeTracker.Clear();
@@ -450,8 +451,9 @@ prices.Should().OnlyContain(p => p.BrandId == BrandIds.Okko && p.DataKind == Dat
 
         events.Should().HaveCount(5);
         events.Should().OnlyContain(e => e.ScopeId == "okko");
-        events.Select(e => e.AggregateId).Should().BeEquivalentTo(
-            ["okko-95", "okko-dp", "okko-gas", "okko-p95", "okko-pulls-dp"]);
+           events.Select(e => e.AggregateId).Should().BeEquivalentTo(
+               [ToUuid("okko-95").ToString(), ToUuid("okko-dp").ToString(), ToUuid("okko-gas").ToString(),
+                ToUuid("okko-p95").ToString(), ToUuid("okko-pulls-dp").ToString()]);
         events.Should().OnlyContain(e => e.ChangedByUserName == "tester");
         events.Should().OnlyContain(e => e.Summary!.Contains("imported from site"));
     }
@@ -497,16 +499,16 @@ prices.Should().OnlyContain(p => p.BrandId == BrandIds.Okko && p.DataKind == Dat
         // No sizes at all for a matched fuel. There is nothing to reprice per size any more - the price
         // is the fuel's - so the import still writes the pump, still records the history, and still
         // reports the fuel rather than throwing.
-        _context.FuelNominals.RemoveRange(_context.FuelNominals.Where(v => v.FuelTypeId == "okko-gas"));
+        _context.FuelNominals.RemoveRange(_context.FuelNominals.Where(v => v.FuelTypeId == ToUuid("okko-gas")));
         await _context.SaveChangesAsync();
         _context.ChangeTracker.Clear();
 
         var result = await Handler().HandleAsync(Import(ScrapedSheet), Guid.Empty, "tester");
 
-        result.Applied.Single(a => a.FuelTypeId == "okko-gas").PackagesRepriced.Should().Be(0);
+        result.Applied.Single(a => a.FuelTypeId == ToUuid("okko-gas")).PackagesRepriced.Should().Be(0);
         result.PackagesRepriced.Should().Be(12);
 
-        var fuel = await _context.FuelTypes.AsNoTracking().FirstAsync(f => f.Id == "okko-gas");
+        var fuel = await _context.FuelTypes.AsNoTracking().FirstAsync(f => f.Id == ToUuid("okko-gas"));
         fuel.PumpPricePerLiter.Should().NotBeNull("a fuel with no sizes is still a fuel on the shelf");
     }
 
@@ -592,8 +594,8 @@ prices.Should().OnlyContain(p => p.BrandId == BrandIds.Okko && p.DataKind == Dat
             System.Globalization.CultureInfo.InvariantCulture);
 
         var volume = await _context.FuelNominals.AsNoTracking()
-            .FirstAsync(v => v.FuelTypeId == fuelTypeId && v.Liters == liters);
-        var fuel = await _context.FuelTypes.AsNoTracking().FirstAsync(f => f.Id == fuelTypeId);
+            .FirstAsync(v => v.FuelTypeId == ToUuid(fuelTypeId) && v.Liters == liters);
+        var fuel = await _context.FuelTypes.AsNoTracking().FirstAsync(f => f.Id == ToUuid(fuelTypeId));
         return (volume, fuel);
     }
 

@@ -14,6 +14,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.UnitTests.Providers;
 
@@ -76,7 +77,7 @@ public sealed class UpdateNominalsReuseTests : IDisposable
         // The size is now stated once, on the fuel. Everything else - the volumes per pool, the shelf -
         // follows from this list rather than being its own copy of the answer.
         var sizes = await _context.FuelNominals.AsNoTracking()
-            .Where(n => n.FuelTypeId == "okko-a95")
+            .Where(n => n.FuelTypeId == ToUuid("okko-a95"))
             .OrderBy(n => n.Liters)
             .Select(n => n.Liters)
             .ToListAsync();
@@ -92,7 +93,7 @@ public sealed class UpdateNominalsReuseTests : IDisposable
         await CreateController().UpdateNominals(BrandIds.Okko, new List<int> { 10 }, default);
 
         var sizes = await _context.FuelNominals.AsNoTracking()
-            .Where(n => n.FuelTypeId == "okko-a95")
+            .Where(n => n.FuelTypeId == ToUuid("okko-a95"))
             .Select(n => n.Liters)
             .ToListAsync();
 
@@ -113,7 +114,7 @@ public sealed class UpdateNominalsReuseTests : IDisposable
         });
         _context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = "okko-a95",
+            Id = ToUuid("okko-a95"),
             Name = "А95",
             BrandId = BrandIds.Okko,
             BasePrice = 50m,
@@ -129,7 +130,7 @@ public sealed class UpdateNominalsReuseTests : IDisposable
             supplierPricePerLiter: 90m, marginUahPerLiter: 10m, finalPricePerLiter: 100m);
         var rows = nominals.Select(l => new FuelNominal
         {
-            FuelTypeId = "okko-a95",
+            FuelTypeId = ToUuid("okko-a95"),
             Liters = l,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
@@ -148,7 +149,7 @@ public sealed class UpdateNominalsReuseTests : IDisposable
         await CreateController().UpdateNominals(BrandIds.Okko, new List<int> { 10 }, default);
 
         var sizes = await _context.FuelNominals.AsNoTracking()
-            .Where(n => n.FuelTypeId == "okko-a95")
+            .Where(n => n.FuelTypeId == ToUuid("okko-a95"))
             .Select(n => n.Liters)
             .ToListAsync();
 

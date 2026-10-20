@@ -7,6 +7,7 @@ using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.UnitTests.Report;
 
@@ -60,7 +61,7 @@ public sealed class GetReportQueryHandlerTests : IDisposable
             Id = Guid.NewGuid(),
             OrderId = paidOrder.Id,
             Brand = "okko",
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
             Quantity = 1,
             UnitPrice = 5100,
@@ -82,7 +83,7 @@ public sealed class GetReportQueryHandlerTests : IDisposable
             Id = Guid.NewGuid(),
             OrderId = pendingOrder.Id,
             Brand = "okko",
-            FuelTypeId = "okko-dp",
+            FuelTypeId = ToUuid("okko-dp"),
             Liters = 20m,
             Quantity = 2,
             UnitPrice = 1000,
@@ -103,7 +104,7 @@ public sealed class GetReportQueryHandlerTests : IDisposable
             Id = Guid.NewGuid(),
             OrderId = excludedOrder.Id,
             Brand = "okko",
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
             Quantity = 1,
             UnitPrice = 9999,
@@ -113,8 +114,8 @@ public sealed class GetReportQueryHandlerTests : IDisposable
         _context.Orders.AddRange(paidOrder, pendingOrder, excludedOrder);
 
         _context.FuelTypes.AddRange(
-            new FuelTypeEntity { Id = "okko-95", Name = "A-95", BrandId = BrandIds.Okko, BasePrice = 100, DiscountPrice = 100, CreatedAtUtc = now, UpdatedAtUtc = now },
-            new FuelTypeEntity { Id = "okko-dp", Name = "DP", BrandId = BrandIds.Okko, BasePrice = 100, DiscountPrice = 100, CreatedAtUtc = now, UpdatedAtUtc = now });
+            new FuelTypeEntity { Id = ToUuid("okko-95"), Name = "A-95", BrandId = BrandIds.Okko, BasePrice = 100, DiscountPrice = 100, CreatedAtUtc = now, UpdatedAtUtc = now },
+            new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "DP", BrandId = BrandIds.Okko, BasePrice = 100, DiscountPrice = 100, CreatedAtUtc = now, UpdatedAtUtc = now });
 
         // Seeded as offers plus volumes: the report resolves its margin through
         // (Brand, fuel, litres) -> fuel_offers, so per-litre figures belong on the offer.
@@ -129,7 +130,7 @@ public sealed class GetReportQueryHandlerTests : IDisposable
         {
             Id = Guid.NewGuid(),
             Brand = "okko",
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
             SupplierExpirationDate = DateOnly.FromDateTime(now.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(now.AddMonths(1)),
@@ -144,7 +145,7 @@ public sealed class GetReportQueryHandlerTests : IDisposable
         {
             Id = Guid.NewGuid(),
             Brand = "okko",
-            FuelTypeId = "okko-dp",
+            FuelTypeId = ToUuid("okko-dp"),
             Liters = 20m,
             SupplierExpirationDate = DateOnly.FromDateTime(now.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(now.AddMonths(1)),
@@ -162,7 +163,7 @@ public sealed class GetReportQueryHandlerTests : IDisposable
             {
                 Id = Guid.NewGuid(),
                 Brand = "okko",
-                FuelTypeId = "okko-95",
+                FuelTypeId = ToUuid("okko-95"),
                 Liters = 50m,
                 SupplierExpirationDate = DateOnly.FromDateTime(now.AddMonths(1)),
                 CustomerExpirationDate = DateOnly.FromDateTime(now.AddMonths(1)),
@@ -222,7 +223,7 @@ public sealed class GetReportQueryHandlerTests : IDisposable
         payment.Amount.Should().Be(5100);
         payment.Status.Should().Be("Paid");
         payment.Brand.Should().Be("okko");
-        payment.FuelType.Should().Be("okko-95");
+        payment.FuelType.Should().Be(ToUuid("okko-95"));
         payment.FuelName.Should().Be("A-95");
         payment.Liters.Should().Be(50m);
         payment.Quantity.Should().Be(1);
@@ -235,7 +236,7 @@ public sealed class GetReportQueryHandlerTests : IDisposable
         refundedPayment.RefundedKopecks.Should().Be(100000);
         refundedPayment.RefundStatus.Should().Be("Completed");
 
-        var redemption = response.Redemptions.Single(r => r.Brand == "okko" && r.FuelType == "okko-95");
+        var redemption = response.Redemptions.Single(r => r.Brand == "okko" && r.FuelType == ToUuid("okko-95"));
         redemption.FuelName.Should().Be("A-95");
         redemption.Liters.Should().Be(50m);
 
@@ -290,7 +291,7 @@ public sealed class GetReportQueryHandlerTests : IDisposable
             Id = Guid.NewGuid(),
             OrderId = orderA.Id,
             Brand = "okko",
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 10m,
             Quantity = 1,
             UnitPrice = 1000,
@@ -311,7 +312,7 @@ public sealed class GetReportQueryHandlerTests : IDisposable
             Id = Guid.NewGuid(),
             OrderId = orderB.Id,
             Brand = "okko",
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 10m,
             Quantity = 1,
             UnitPrice = 2000,

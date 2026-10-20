@@ -1,3 +1,4 @@
+using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -13,10 +14,10 @@ internal sealed class FuelNominalConfiguration : IEntityTypeConfiguration<FuelNo
         // The key is the fact: one fuel, one pool, one size, one row. No surrogate - see the type.
         builder.HasKey(e => new { e.FuelTypeId, e.DataKind, e.Liters });
 
-        builder.Property(e => e.FuelTypeId)
-            .HasColumnName("fuel_type_id")
-            .HasColumnType("text")
-            .IsRequired();
+           builder.Property(e => e.FuelTypeId)
+               .HasColumnName("fuel_type_id")
+               .HasColumnType("uuid")
+               .IsRequired();
 
         builder.Property(e => e.DataKind)
             .HasColumnName("data_kind")

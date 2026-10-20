@@ -170,7 +170,7 @@ public sealed class VoucherExchangePairDto
 
     public Guid? NewVoucherId { get; set; }
     public string? NewVoucherNumber { get; set; }
-    public string FuelTypeId { get; set; } = string.Empty;
+    public Guid FuelTypeId { get; set; }
     public string Brand { get; set; } = string.Empty;
 
     /// <summary>This pair's own share of the surcharge. One row of the batch total, never the total.</summary>

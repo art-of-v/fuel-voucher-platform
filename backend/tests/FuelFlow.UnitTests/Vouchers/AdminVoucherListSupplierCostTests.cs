@@ -5,6 +5,7 @@ using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.UnitTests.Vouchers;
 
@@ -42,7 +43,7 @@ public sealed class AdminVoucherListSupplierCostTests : IDisposable
 
         _context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = "okko-95",
+            Id = ToUuid("okko-95"),
             Name = "A-95",
             BrandId = BrandIds.Okko,
             BasePrice = 55,
@@ -65,7 +66,7 @@ public sealed class AdminVoucherListSupplierCostTests : IDisposable
         Id = Guid.NewGuid(),
         QrPayload = "qr",
         Liters = 5,
-        FuelTypeId = "okko-95",
+        FuelTypeId = ToUuid("okko-95"),
         Brand = "OKKO",
         SupplierExpirationDate = new DateOnly(2027, 1, 31),
         CustomerExpirationDate = new DateOnly(2027, 1, 31),

@@ -19,10 +19,10 @@ public sealed record ImportKloPricesCommand(
     bool CreateMissing = true);
 
 /// <summary>A grade the catalogue did not have and now has, or would have in a dry run.</summary>
-public sealed record KloPriceFuelCreated(string FuelTypeId, string Name, decimal PumpPricePerLiter);
+public sealed record KloPriceFuelCreated(Guid FuelTypeId, string Name, decimal PumpPricePerLiter);
 
 /// <summary>A grade that was repriced: what it cost before, and what it costs now.</summary>
-public sealed record KloPriceFuelRepriced(string FuelTypeId, string Name, string Grade, decimal PumpPricePerLiter, decimal? PreviousPumpPricePerLiter, bool Changed);
+public sealed record KloPriceFuelRepriced(Guid FuelTypeId, string Name, string Grade, decimal PumpPricePerLiter, decimal? PreviousPumpPricePerLiter, bool Changed);
 
 public sealed record KloPriceImportResult(
     IReadOnlyList<KloPriceFuelCreated> Created,
@@ -216,7 +216,7 @@ public sealed class ImportKloPricesCommandHandler
         {
             var fuel = new FuelTypeEntity
             {
-                Id = Guid.CreateVersion7().ToString(),
+                Id = Guid.CreateVersion7(),
                 BrandId = brandId,
                 // The grade's name, as the column states it: that is how an operator names it too.
                 Name = row.Grade,
@@ -249,7 +249,7 @@ public sealed class ImportKloPricesCommandHandler
             await _priceRecorder.RecordAsync(fuel, PriceHistoryReasons.PumpImport, actor, now, ct);
         }
 
-        return new KloPriceFuelCreated("(dry run)", row.Grade, row.PricePerLiter);
+            return new KloPriceFuelCreated(Guid.Empty, row.Grade, row.PricePerLiter);
     }
 
     /// <summary>

@@ -1,3 +1,4 @@
+using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -27,9 +28,12 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
             .HasForeignKey(e => e.BrandId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // The id is a uuid since planning D-21: the brand's own code for the grade lives in
+        // brand_fuel_code, and the id is an opaque handle the catalogue no longer spells. The
+        // property is a Guid and the column is a uuid, so there is nothing left to convert.
         builder.Property(e => e.Id)
             .HasColumnName("id")
-            .HasColumnType("text");
+            .HasColumnType("uuid");
 
         builder.Property(e => e.Name)
             .HasColumnName("name")
@@ -146,8 +150,7 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
         // `brand_fuel_code` exists beside the id - not a readable id.
         builder.ToTable(t =>
         {
-            t.HasCheckConstraint("ck_fuel_types_id_length", "length(id) <= 100");
-            t.HasCheckConstraint("ck_fuel_types_name_length", "length(name) <= 200");
+                t.HasCheckConstraint("ck_fuel_types_name_length", "length(name) <= 200");
 
             // 50 for a brand's own code for a grade - "A-95", "Pulls 95", "SPBT", a QR product
             // code. Generous for what it is, bounded because it is indexed and unique per Brand.

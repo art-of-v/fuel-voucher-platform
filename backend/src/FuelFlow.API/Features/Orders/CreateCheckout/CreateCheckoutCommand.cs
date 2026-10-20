@@ -5,7 +5,7 @@ public sealed class CreateCheckoutCommand
     public Guid? UserId { get; set; }
     public Guid? LegalEntityId { get; set; }
 
-    public string FuelTypeId { get; set; } = null!;
+    public Guid FuelTypeId { get; set; }
     public decimal Liters { get; set; }
     public int Quantity { get; set; }
     public decimal Price { get; set; }

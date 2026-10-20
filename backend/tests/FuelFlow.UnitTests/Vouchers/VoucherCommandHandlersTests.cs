@@ -13,6 +13,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Microsoft.Extensions.Logging.Abstractions;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.UnitTests.Vouchers;
 
@@ -47,11 +48,11 @@ public sealed class VoucherCommandHandlersTests : IDisposable
     {
         var fuelTypes = new[]
         {
-            new FuelTypeEntity { Id = "okko-dp", Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "okko-95", Name = "A-95", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "okko-p95", Name = "Pulls 95", BrandId = BrandIds.Okko, BasePrice = 62, DiscountPrice = 58, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "wog-dp", Name = "ДП Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "wog-95", Name = "A-95 Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow }
+            new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("okko-95"), Name = "A-95", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("okko-p95"), Name = "Pulls 95", BrandId = BrandIds.Okko, BasePrice = 62, DiscountPrice = 58, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("wog-dp"), Name = "ДП Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("wog-95"), Name = "A-95 Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow }
         };
         _context.FuelTypes.AddRange(fuelTypes);
         _context.SaveChanges();
@@ -70,7 +71,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         {
             Id = Guid.NewGuid(),
             Brand = "OKKO",
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
@@ -86,7 +87,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         {
             Id = Guid.NewGuid(),
             Brand = "OKKO",
-            FuelTypeId = "okko-dp",
+            FuelTypeId = ToUuid("okko-dp"),
             Liters = 50,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(2)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(2)),
@@ -102,7 +103,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         {
             Id = Guid.NewGuid(),
             Brand = "OKKO",
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
@@ -157,7 +158,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         {
             Id = Guid.NewGuid(),
             Brand = "OKKO",
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 20,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
@@ -207,17 +208,17 @@ public sealed class VoucherCommandHandlersTests : IDisposable
 
         response.Inventory.Should().HaveCount(3);
 
-        var okkoA95 = response.Inventory.First(i => i.Brand == "OKKO" && i.FuelTypeId == "okko-95");
+        var okkoA95 = response.Inventory.First(i => i.Brand == "OKKO" && i.FuelTypeId == ToUuid("okko-95"));
         okkoA95.Available.Should().Be(1);
         okkoA95.Assigned.Should().Be(1);
         okkoA95.Used.Should().Be(1);
         okkoA95.Total.Should().Be(3);
 
-        var okkoDiesel = response.Inventory.First(i => i.Brand == "OKKO" && i.FuelTypeId == "okko-dp");
+        var okkoDiesel = response.Inventory.First(i => i.Brand == "OKKO" && i.FuelTypeId == ToUuid("okko-dp"));
         okkoDiesel.Available.Should().Be(1);
         okkoDiesel.Total.Should().Be(1);
 
-        var wogA95 = response.Inventory.First(i => i.Brand == "WOG" && i.FuelTypeId == "wog-95");
+        var wogA95 = response.Inventory.First(i => i.Brand == "WOG" && i.FuelTypeId == ToUuid("wog-95"));
         wogA95.Available.Should().Be(1);
         wogA95.Total.Should().Be(1);
     }
@@ -237,7 +238,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         {
             Id = voucherId,
             Brand = "OKKO",
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
@@ -270,7 +271,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         {
             Id = voucherId,
             Brand = "OKKO",
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
@@ -304,7 +305,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         {
             Id = voucherId,
             Brand = "OKKO",
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
@@ -345,7 +346,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         {
             Id = voucherId,
             Brand = "OKKO",
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
@@ -381,7 +382,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         {
             Id = voucherId,
             Brand = "OKKO",
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
@@ -414,7 +415,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         {
             Id = voucherId,
             Brand = "OKKO",
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
@@ -447,7 +448,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         {
             Id = Guid.NewGuid(),
             Brand = brand,
-            FuelTypeId = fuelTypeId,
+            FuelTypeId = ToUuid(fuelTypeId),
             Liters = liters,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),

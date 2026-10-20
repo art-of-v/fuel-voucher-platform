@@ -61,7 +61,7 @@ public sealed class AdminFuelTypeController : ControllerBase
 
     [HttpGet("{id}")]
     [Authorize(Policy = "Staff")]
-    public async Task<IActionResult> GetById([FromRoute] string id, CancellationToken ct)
+    public async Task<IActionResult> GetById([FromRoute] Guid id, CancellationToken ct)
     {
         var result = await _getById.HandleAsync(new GetAdminFuelTypeByIdQuery(id), ct);
         return result is null ? NotFound() : Ok(result);

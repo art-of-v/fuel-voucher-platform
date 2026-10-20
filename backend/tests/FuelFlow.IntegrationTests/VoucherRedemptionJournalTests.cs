@@ -10,6 +10,7 @@ using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -79,7 +80,7 @@ public sealed class VoucherRedemptionJournalTests : IClassFixture<TestDatabaseFi
             SourceVoucherId = null,
             RenewalBranch = null,
             Brand = "OKKO",
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
             Quantity = 1,
             UnitPrice = 2500m,
@@ -90,7 +91,7 @@ public sealed class VoucherRedemptionJournalTests : IClassFixture<TestDatabaseFi
         {
             Id = voucherId,
             Brand = "OKKO",
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
             CostPerLiter = costPerLiter,
             SupplierExpirationDate = DateOnly.FromDateTime(now.AddMonths(1)),
@@ -262,7 +263,7 @@ public sealed class VoucherRedemptionJournalTests : IClassFixture<TestDatabaseFi
         {
             Id = voucherId,
             Brand = "OKKO",
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 10m,
             CostPerLiter = 45m,
             SupplierExpirationDate = DateOnly.FromDateTime(now.AddMonths(1)),

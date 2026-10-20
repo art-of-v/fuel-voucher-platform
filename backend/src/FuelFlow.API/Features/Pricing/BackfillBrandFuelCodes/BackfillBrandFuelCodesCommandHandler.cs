@@ -11,7 +11,7 @@ namespace FuelFlow.Features.Pricing.BackfillBrandFuelCodes;
 public sealed record BackfillBrandFuelCodesCommand(IReadOnlyList<OkkoPumpPrice> Sheet, bool DryRun);
 
 /// <summary>One fuel the backfill would code, with the published code it came from.</summary>
-public sealed record BrandFuelCodeFill(string FuelTypeId, string Name, string Category, string Code);
+public sealed record BrandFuelCodeFill(Guid FuelTypeId, string Name, string Category, string Code);
 
 /// <summary>A fuel the backfill refused to touch, and the reason it will not.</summary>
 public sealed record BrandFuelCodeSkipped(string Name, string Reason, string? Candidates);
@@ -112,7 +112,7 @@ public sealed class BackfillBrandFuelCodesCommandHandler
                 .AsTracking()
                 .Where(f => f.BrandId == okkoId.Value && f.BrandFuelCode == null && !f.IsDeleted)
                 .ToListAsync(ct))
-            .OrderBy(f => f.Id, StringComparer.Ordinal)
+            .OrderBy(f => f.Id)
             .ToList();
 
         var taken = (await _context.FuelTypes
@@ -176,7 +176,7 @@ public sealed class BackfillBrandFuelCodesCommandHandler
             foreach (var fill in fills)
             {
                 await _events.RecordEventAsync(
-                    "Fuel", fill.FuelTypeId, "BrandFuelCodeBackfilled",
+                    "Fuel", fill.FuelTypeId.ToString(), "BrandFuelCodeBackfilled",
                     null,
                     JsonSerializer.Serialize(new { fill.Name, Category = fill.Category, BrandFuelCode = fill.Code }),
                     actingUserId == Guid.Empty ? Guid.Empty : actingUserId,

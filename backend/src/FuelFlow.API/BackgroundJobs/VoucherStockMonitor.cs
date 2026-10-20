@@ -94,7 +94,7 @@ public sealed class VoucherStockMonitor
         {
             var fuelTypeLabel = fuelTypeNames.TryGetValue(combination.FuelTypeId, out var name)
                 ? name
-                : combination.FuelTypeId;
+                : combination.FuelTypeId.ToString();
 
             // Expiring first: a pool that is about to lose stock is the more urgent of the two, and
             // the low-count alert below would repeat a number that is still comfortably above zero.

@@ -85,7 +85,7 @@ public sealed class VoucherExchangeCostContextResponse
 
 public sealed class VoucherExchangeCostContextFuel
 {
-    public string FuelTypeId { get; set; } = string.Empty;
+    public Guid FuelTypeId { get; set; }
     public string? FuelName { get; set; }
     public string Brand { get; set; } = string.Empty;
     public int NewCount { get; set; }

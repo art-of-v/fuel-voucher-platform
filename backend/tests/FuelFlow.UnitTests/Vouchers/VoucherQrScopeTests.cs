@@ -9,6 +9,7 @@ using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.UnitTests.Vouchers;
 
@@ -38,7 +39,7 @@ public sealed class VoucherQrScopeTests : IDisposable
         // row the in-memory provider joins it away and the voucher never reaches the result.
         _context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = "okko-95",
+            Id = ToUuid("okko-95"),
             Name = "A-95",
             BrandId = BrandIds.Okko,
             BasePrice = 55,
@@ -62,7 +63,7 @@ public sealed class VoucherQrScopeTests : IDisposable
         {
             Id = Guid.NewGuid(),
             Brand = "OKKO",
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),

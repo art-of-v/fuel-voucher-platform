@@ -47,7 +47,7 @@ public sealed record SellablePackage
     /// </summary>
     public string BrandSlug { get; init; } = string.Empty;
 
-    public string FuelTypeId { get; init; } = string.Empty;
+    public Guid FuelTypeId { get; init; }
 
     public decimal Liters { get; init; }
 
