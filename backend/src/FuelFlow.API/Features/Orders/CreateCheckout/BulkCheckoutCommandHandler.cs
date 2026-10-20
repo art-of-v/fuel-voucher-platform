@@ -346,6 +346,10 @@ private readonly RuntimeSettingsService _runtimeSettings;
                 Id = Guid.CreateVersion7(),
                 OrderId = order.Id,
                 Brand = brandSlugs[item.BrandId!.Value],
+                // The brand's key beside its name. The composite foreign key over (fuel, brand)
+                // is what checks the two against each other; until the readers move, both are
+                // written.
+                BrandId = package.BrandId,
                 FuelTypeId = item.FuelTypeId,
                 Liters = item.Liters,
                 Quantity = item.Quantity,
