@@ -496,7 +496,11 @@ public sealed class ImportVouchersCommandHandler
 
                         if (verification.Result != QrMatrixVerifier.VerificationResult.Skipped)
                         {
-                            voucher.VerificationMismatchPercent = verification.MismatchPercent;
+                            // The verifier counts modules, and its answer is a double. The column is a
+                            // decimal, and the rounding happens on the decimal - a double rounded to
+                            // four places and then converted is a different number from a decimal
+                            // rounded to four places.
+                            voucher.VerificationMismatchPercent = Math.Round((decimal)verification.MismatchPercent, 4);
                             voucher.VerificationMismatchedModules = verification.MismatchedModules;
                             voucher.VerificationTotalModules = verification.TotalModules;
                         }

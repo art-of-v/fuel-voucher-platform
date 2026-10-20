@@ -303,7 +303,7 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
 
         builder.Property(e => e.VerificationMismatchPercent)
             .HasColumnName("verification_mismatch_percent")
-            .HasColumnType("double precision");
+            .HasColumnType("numeric(5,4)");
 
         builder.Property(e => e.VerificationMismatchedModules)
             .HasColumnName("verification_mismatched_modules");

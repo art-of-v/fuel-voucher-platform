@@ -619,9 +619,8 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("classifier_error");
 
-                    b.Property<double?>("Confidence")
-                        .HasPrecision(3, 2)
-                        .HasColumnType("double precision")
+                    b.Property<decimal?>("Confidence")
+                        .HasColumnType("numeric(5,4)")
                         .HasColumnName("confidence");
 
                     b.Property<DateTime>("CreatedAtUtc")
@@ -2482,8 +2481,8 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("used_at_utc");
 
-                    b.Property<double?>("VerificationMismatchPercent")
-                        .HasColumnType("double precision")
+                    b.Property<decimal?>("VerificationMismatchPercent")
+                        .HasColumnType("numeric(5,4)")
                         .HasColumnName("verification_mismatch_percent");
 
                     b.Property<int?>("VerificationMismatchedModules")

@@ -59,7 +59,7 @@ internal sealed class FeedbackMessageConfiguration : IEntityTypeConfiguration<Fe
 
         builder.Property(e => e.Confidence)
             .HasColumnName("confidence")
-            .HasPrecision(3, 2);
+            .HasColumnType("numeric(5,4)");
 
         builder.Property(e => e.ClassifierError)
             .HasColumnName("classifier_error")

@@ -99,7 +99,7 @@ public sealed class AdminFeedbackIntegrationTests : IClassFixture<TestDatabaseFi
         // visible anywhere else, because a dropped message looks exactly like a dropped message.
         var body = await ReadListAsync(c => c.GetAll(
             verdict: nameof(FeedbackVerdict.Junk),
-            maxConfidence: 0.6));
+            maxConfidence: 0.6m));
 
         Mine(body, unsure).Should().ContainSingle().Which.Text.Should().Be("йоук");
         Mine(body, sure).Should().BeEmpty();
@@ -328,7 +328,7 @@ public sealed class AdminFeedbackIntegrationTests : IClassFixture<TestDatabaseFi
             Verdict = verdict,
             Category = category,
             Severity = FeedbackSeverity.Low,
-            Confidence = Math.Round(confidence, 2),
+            Confidence = Math.Round((decimal)confidence, 2),
             Language = FeedbackLanguage.Uk,
             Summary = summary,
             Status = FeedbackStatus.New,

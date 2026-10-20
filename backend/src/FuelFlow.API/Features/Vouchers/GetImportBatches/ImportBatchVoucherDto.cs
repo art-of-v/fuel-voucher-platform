@@ -14,7 +14,7 @@ public sealed class ImportBatchVoucherDto
     public string VoucherNumber { get; set; } = null!;
     public string Status { get; set; } = null!;
     public DateTime CreatedAtUtc { get; set; }
-    public double? VerificationMismatchPercent { get; set; }
+    public decimal? VerificationMismatchPercent { get; set; }
     public int? VerificationMismatchedModules { get; set; }
     public int? VerificationTotalModules { get; set; }
 }
