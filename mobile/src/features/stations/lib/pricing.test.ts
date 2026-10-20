@@ -30,6 +30,7 @@ describe('fuelSaving', () => {
 
 describe('fuelHeadlinePrice', () => {
   it('shows OUR price when the shop can sell the fuel', () => {
+    // The server sends the price to show in discountPrice - one rule, one place.
     const price = fuelHeadlinePrice({
       discountPrice: 97.86,
       pumpPricePerLiter: 102.9,
@@ -43,7 +44,7 @@ describe('fuelHeadlinePrice', () => {
     // An imported fuel has no margin of ours yet, so the only honest number is what the network
     // charges. The operator has not priced it, and the row must not claim otherwise.
     const price = fuelHeadlinePrice({
-      discountPrice: 0,
+      discountPrice: 92.9,
       pumpPricePerLiter: 92.9,
       finalPricePerLiter: null,
       isAvailable: false,
@@ -60,6 +61,18 @@ describe('fuelHeadlinePrice', () => {
       isAvailable: false,
     });
     expect(price).toBeNull();
+  });
+
+  it('falls back to the fields the server decided from, for a payload that predates the rule', () => {
+    // An app that has not been updated still sends discountPrice = 0 for an imported fuel. The
+    // column price is in the payload too, so the row is still right.
+    const price = fuelHeadlinePrice({
+      discountPrice: 0,
+      pumpPricePerLiter: 92.9,
+      finalPricePerLiter: null,
+      isAvailable: false,
+    });
+    expect(price).toBeCloseTo(92.9, 2);
   });
 
   it('falls back to the column price when we have no price of our own but the shop can sell it', () => {

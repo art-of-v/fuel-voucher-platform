@@ -26,6 +26,9 @@ export function fuelSaving(fuel: Pick<FuelType, 'basePrice' | 'discountPrice'>):
 /**
  * The price to show for a fuel, per litre.
  *
+ * <p>The SERVER decides this and sends it in `discountPrice` - so this reads that number, and the
+ * fields below are the ones it was decided from, kept for the reference price and for the reason.
+ *
  * <p>WHICH price depends on whether the shop can sell it:
  *
  * <ul>
@@ -45,13 +48,19 @@ export function fuelHeadlinePrice(
     'discountPrice' | 'pumpPricePerLiter' | 'finalPricePerLiter' | 'isAvailable'
   >,
 ): number | null {
-  const ours = fuel.finalPricePerLiter ?? undefined;
-  const column = fuel.pumpPricePerLiter ?? undefined;
-  const legacy = fuel.discountPrice || undefined;
-
-  const price = fuel.isAvailable ? (ours ?? column ?? legacy) : (column ?? ours ?? legacy);
+  const shown = fuel.discountPrice || undefined;
 
   // Zero is not a price. It is what an unpriced fuel carries in the column, and rendering it would
-  // put "0 ₴" on the shelf.
+  // put "0 ₴" on the shelf. The fields the server decided from are the fallback, for a payload that
+  // predates the rule.
+  if (shown !== undefined && shown > 0) {
+    return shown;
+  }
+
+  const ours = fuel.finalPricePerLiter ?? undefined;
+  const column = fuel.pumpPricePerLiter ?? undefined;
+
+  const price = fuel.isAvailable ? (ours ?? column) : (column ?? ours);
+
   return price !== undefined && price > 0 ? price : null;
 }

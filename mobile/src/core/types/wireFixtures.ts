@@ -125,7 +125,7 @@ export const wireFuelTypes = [
     basePrice: 102.9,
     discountPrice: 102.9,
     pumpPricePerLiter: 102.9,
-    finalPricePerLiter: 102.9,
+    finalPricePerLiter: null,
     isAvailable: false,
   },
   {
@@ -136,7 +136,7 @@ export const wireFuelTypes = [
     basePrice: 103.4,
     discountPrice: 102.9,
     pumpPricePerLiter: 103.4,
-    finalPricePerLiter: 102.9,
+    finalPricePerLiter: null,
     isAvailable: false,
   },
   {
@@ -147,7 +147,7 @@ export const wireFuelTypes = [
     basePrice: 95.9,
     discountPrice: 95.9,
     pumpPricePerLiter: 95.9,
-    finalPricePerLiter: 95.9,
+    finalPricePerLiter: null,
     isAvailable: false,
   },
   {
@@ -158,7 +158,7 @@ export const wireFuelTypes = [
     basePrice: 92.9,
     discountPrice: 92.9,
     pumpPricePerLiter: 92.9,
-    finalPricePerLiter: 92.9,
+    finalPricePerLiter: null,
     isAvailable: false,
   },
 ];
