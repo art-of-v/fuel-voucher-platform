@@ -561,6 +561,17 @@ jobs:
       # Docker, so it runs the whole thing rather than skipping it.
       - name: Test the collation assertion
         run: bash deploy/assert-collation.test.sh
+
+      # The executable bit on the scripts in deploy/. Three of them are documented as
+      # being run - `./rebuild-collation.sh`, `./drill-restore.sh`, `./dev-admin.sh` -
+      # and all three were 100644 in git, so the documented command failed with
+      # "Permission denied" on a fresh checkout, and nothing in the pipeline said so:
+      # the deploy step does not chmod, so the mode in git is the mode on the box.
+      #
+      # The collation rebuild ran twice on the production box only because somebody
+      # had chmod-ed the file by hand there.
+      - name: Check the deploy scripts' executable bits
+        run: bash deploy/check-script-modes.test.sh
   # The repo-root fetchers in scripts/ — the only write path into `station_nodes`. They parse a
   # third-party site nobody here controls (UPG rebuilds its map page periodically, KLO renders its
   # pins through a WordPress plugin), and a silent parse change would import a few hundred rows with
