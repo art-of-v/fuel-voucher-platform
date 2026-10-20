@@ -337,6 +337,25 @@ voucherNumber: string;
     signatureData: string;
   }
 
+  /** A customer's name, and nothing else - what the screens that NAME a customer need. */
+  interface AdminUserOption {
+    id: string;
+    phone: string | null;
+    firstName: string | null;
+    lastName: string | null;
+  }
+
+  /** A page of rows and the count behind it, the shape the paged admin endpoints answer with. */
+  interface PagedResult<T> {
+    items: T[];
+    totalCount: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+    hasPreviousPage: boolean;
+    hasNextPage: boolean;
+  }
+
   interface UserType {
     id: string;
     email: string | null;
@@ -365,11 +384,36 @@ voucherNumber: string;
     createdAt: string;
   }
 
-  const { data: usersList = [] } = useQuery<UserType[]>({
-    queryKey: ["/api/admin/users"],
+  // The customers table is a PAGE, not the whole table. The endpoint used to answer with every
+  // customer the platform has ever registered, and the table grew with every registration: the
+  // screen got slower as the business did, and the server held every customer in memory to draw
+  // a screen that shows fifty rows.
+  const USERS_PAGE_SIZE = 50;
+  const [usersPage, setUsersPage] = useState(1);
+
+  const { data: usersPageData } = useQuery<PagedResult<UserType>>({
+    queryKey: ["/api/admin/users", usersPage],
     enabled: !!user,
     queryFn: async () => {
-      return await apiRequest<any, UserType[]>("GET", "/api/admin/users");
+      return await apiRequest<any, PagedResult<UserType>>(
+        "GET",
+        `/api/admin/users?page=${usersPage}&limit=${USERS_PAGE_SIZE}`,
+      );
+    }
+  });
+
+  const usersList = usersPageData?.items ?? [];
+  const usersTotalPages = usersPageData?.totalPages ?? 0;
+
+  // The names of every customer, and nothing else. Three screens need to name a customer who is
+  // not on the page the admin is looking at: the report's customer filter, the reconciliation
+  // header, and the client column of the purchases table. The customers table is paged, so the
+  // list it reads cannot be the source of those names.
+  const { data: userOptions = [] } = useQuery<AdminUserOption[]>({
+    queryKey: ["/api/admin/users/options"],
+    enabled: !!user,
+    queryFn: async () => {
+      return await apiRequest<any, AdminUserOption[]>("GET", "/api/admin/users/options");
     }
   });
 
@@ -503,7 +547,9 @@ voucherNumber: string;
   // The purchases table shows human-readable values instead of raw IDs: resolve the fuel-type
   // UUID to its name and the buyer's userId to their phone (both datasets loaded above).
   const fuelNameById = new Map(fuelTypesList.map((f) => [f.id, f.name] as const));
-  const usersById = new Map(usersList.map((u) => [u.id, u] as const));
+  // The names come from the OPTIONS list, not from the paged customers table: the purchases table
+  // shows orders of customers who are not on the page the admin happens to be looking at.
+  const usersById = new Map(userOptions.map((u) => [u.id, u] as const));
   const clientLabel = (userId: string) => {
     const u = usersById.get(userId);
     return u?.phone || [u?.firstName, u?.lastName].filter(Boolean).join(" ").trim() || userId.slice(0, 8);
@@ -1241,6 +1287,37 @@ if (status === "booting") {
                 </tbody>
               </table>
             </div>
+
+            {usersTotalPages > 1 && (
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span>
+                  {t('users.total')}: {usersPageData?.totalCount ?? 0}
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={usersPage <= 1}
+                    onClick={() => setUsersPage((p) => Math.max(1, p - 1))}
+                    className="h-8"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  <span className="text-xs">
+                    {usersPage} / {usersTotalPages}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={usersPage >= usersTotalPages}
+                    onClick={() => setUsersPage((p) => p + 1)}
+                    className="h-8"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -2515,7 +2592,7 @@ if (status === "booting") {
                     className="glass-input rounded-lg px-3 py-2 text-sm text-foreground w-64"
                   >
                     <option value="">{t('report.allUsers')}</option>
-                    {usersList.map((u: UserType) => {
+                    {userOptions.map((u: AdminUserOption) => {
                       const label = u.firstName || u.lastName
                         ? `${u.firstName || ''} ${u.lastName || ''}`.trim()
                         : u.phone || u.id?.slice(0, 8) || u.id;
@@ -2526,7 +2603,7 @@ if (status === "booting") {
                       );
                     })}
                   </select>
-                  <span className="text-xs text-muted-foreground">({usersList.length} users loaded)</span>
+                  <span className="text-xs text-muted-foreground">({userOptions.length} users loaded)</span>
                 </div>
               </div>
               <div>
@@ -2981,7 +3058,7 @@ if (status === "booting") {
                 {reportData.period.to ? formatDate(reportData.period.to) : t('reconciliation.periodTo')}
               </p>
               {(() => {
-                const u = reportUserId ? usersList.find((x: UserType) => x.id === reportUserId) : null;
+                const u = reportUserId ? userOptions.find((x: AdminUserOption) => x.id === reportUserId) : null;
                 if (!u) return null;
                 return (
                   <p className="text-gray-700 mt-2 font-medium">

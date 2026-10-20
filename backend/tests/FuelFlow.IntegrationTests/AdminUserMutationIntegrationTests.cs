@@ -304,7 +304,7 @@ public class AdminUserMutationIntegrationTests : WebApplicationFactory<Program>,
         using (var scope = Services.CreateScope())
         {
             var handler = scope.ServiceProvider.GetRequiredService<GetAdminUsersQueryHandler>();
-            var items = await handler.HandleAsync(new GetAdminUsersQuery());
+            var items = (await handler.HandleAsync(new GetAdminUsersQuery())).Items;
 
             var flagged = items.Single(u => u.Phone == qaPhone);
             flagged.IsQaAccount.Should().BeTrue();

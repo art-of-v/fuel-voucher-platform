@@ -1,3 +1,4 @@
+using FuelFlow.Features.Auth.AdminUser.GetAdminUserOptions;
 using FuelFlow.Features.Auth.AdminUser.GetAdminUsers;
 using FuelFlow.Features.Auth.AdminUser.SetUserActive;
 using FuelFlow.Features.Auth.AdminUser.SetUserBanned;
@@ -6,6 +7,7 @@ using FuelFlow.Features.Auth.AdminUser.SetUserRole;
 using FuelFlow.Features.Auth.DeleteUser;
 using FuelFlow.Features.Auth.EmailChange;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -19,6 +21,7 @@ namespace FuelFlow.Features.Auth.AdminUser;
 public sealed class AdminUserController : ControllerBase
 {
     private readonly GetAdminUsersQueryHandler _handler;
+    private readonly GetAdminUserOptionsQueryHandler _optionsHandler;
     private readonly SetUserActiveCommandHandler _setActiveHandler;
     private readonly SetUserRoleCommandHandler _setRoleHandler;
     private readonly SetUserBannedCommandHandler _setBannedHandler;
@@ -28,6 +31,7 @@ public sealed class AdminUserController : ControllerBase
 
     public AdminUserController(
         GetAdminUsersQueryHandler handler,
+        GetAdminUserOptionsQueryHandler optionsHandler,
         SetUserActiveCommandHandler setActiveHandler,
         SetUserRoleCommandHandler setRoleHandler,
         SetUserBannedCommandHandler setBannedHandler,
@@ -36,6 +40,7 @@ public sealed class AdminUserController : ControllerBase
         IOptions<AuthOptions> authOptions)
     {
         _handler = handler;
+        _optionsHandler = optionsHandler;
         _setActiveHandler = setActiveHandler;
         _setRoleHandler = setRoleHandler;
         _setBannedHandler = setBannedHandler;
@@ -45,12 +50,20 @@ public sealed class AdminUserController : ControllerBase
     }
 
     [HttpGet]
+    [ProducesResponseType(typeof(PagedResult<AdminUserDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll(
         [FromQuery] string? role,
         [FromQuery] bool? isActive,
         [FromQuery] string? q,
+        [FromQuery] int page = 1,
+        [FromQuery] int limit = 50,
         CancellationToken ct = default) =>
-        Ok(await _handler.HandleAsync(new GetAdminUsersQuery(role, isActive, q), ct));
+        Ok(await _handler.HandleAsync(new GetAdminUsersQuery(role, isActive, q, page, limit), ct));
+
+    [HttpGet("options")]
+    [ProducesResponseType(typeof(List<AdminUserOptionDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetOptions(CancellationToken ct = default) =>
+        Ok(await _optionsHandler.HandleAsync(ct));
 
     [HttpPost("{id}/activate")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
