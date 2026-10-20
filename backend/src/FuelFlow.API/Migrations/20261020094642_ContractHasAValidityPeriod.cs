@@ -26,14 +26,14 @@ namespace FuelFlow.API.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<DateTime>(
-                name: "expires_at_utc",
-                table: "contracts",
-                type: "timestamp with time zone",
-                nullable: true);
-
-            // The check first: a term for a contract that already exists is a decision, and
-            // nobody has made it.
+            // The check FIRST, and before the column exists.
+            //
+            // It looks for contracts that already exist, not for contracts without a term: the
+            // column does not exist yet, so every row would look term-less, and a check written
+            // against it would refuse on any table that had a single contract in it - for the
+            // wrong reason, and with a message that named a term nobody had set.
+            //
+            // A term for a contract that already exists is a decision, and nobody has made it.
             migrationBuilder.Sql("""
                 DO $$
                 DECLARE
@@ -41,17 +41,22 @@ namespace FuelFlow.API.Migrations
                 BEGIN
                     SELECT string_agg(id::text, ', ' ORDER BY id)
                     INTO existing
-                    FROM contracts
-                    WHERE expires_at_utc IS NULL;
+                    FROM contracts;
 
                     IF existing IS NOT NULL THEN
                         RAISE EXCEPTION
-                            'Cannot make contracts.expires_at_utc mandatory: % contract(s) have no validity term (%). A term is a decision, not a value this migration can invent - set it on each contract first.',
-                            (SELECT count(*) FROM contracts WHERE expires_at_utc IS NULL),
+                            'Cannot make contracts.expires_at_utc mandatory: % contract(s) already exist (%). A validity term is a decision, not a value this migration can invent - set it on each contract first.',
+                            (SELECT count(*) FROM contracts),
                             existing;
                     END IF;
                 END $$;
                 """);
+
+            migrationBuilder.AddColumn<DateTime>(
+                name: "expires_at_utc",
+                table: "contracts",
+                type: "timestamp with time zone",
+                nullable: true);
 
             migrationBuilder.Sql("""
                 ALTER TABLE "contracts" ALTER COLUMN "expires_at_utc" SET NOT NULL;
