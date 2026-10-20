@@ -1,5 +1,7 @@
 using FluentAssertions;
 using FuelFlow.API.BackgroundJobs;
+using FuelFlow.Features.Ledger;
+using FuelFlow.Features.Ledger.SharedModels;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Vouchers;
@@ -34,6 +36,56 @@ public sealed class ExpiredVoucherLossServiceTests : IDisposable
                 .UseInMemoryDatabase(Guid.NewGuid().ToString())
                 .Options, TestQrCipher.Instance);
         _context.Database.EnsureCreated();
+        SeedLedger();
+    }
+
+    /// <summary>
+    /// The two accounts and the one mapping rule the write-off needs, seeded the way the
+    /// migration seeds them in a real database. The job posts into the ledger, so without them
+    /// it would fail with "no debit account is mapped" - which is the point of the engine, but
+    /// not what these tests are about.
+    /// </summary>
+    private void SeedLedger()
+    {
+        var loss = new ChartOfAccount
+        {
+            Id = Guid.NewGuid(),
+            Code = "807",
+            NameUkr = "Витрати від утрати товарів",
+            AccountType = AccountType.Expense,
+            NormalBalance = NormalBalance.Debit,
+            IsPostable = true,
+            IsActive = true
+        };
+        var stock = new ChartOfAccount
+        {
+            Id = Guid.NewGuid(),
+            Code = "281",
+            NameUkr = "Товари на складі",
+            AccountType = AccountType.Asset,
+            NormalBalance = NormalBalance.Debit,
+            IsPostable = true,
+            IsActive = true
+        };
+        _context.ChartOfAccounts.AddRange(loss, stock);
+
+        _context.LedgerMappingRules.AddRange(
+            new LedgerMappingRule
+            {
+                Id = Guid.NewGuid(),
+                SourceType = JournalSourceType.Cost,
+                SourceEvent = "stock.expired.writeoff",
+                AccountId = loss.Id,
+                Side = NormalBalance.Debit
+            },
+            new LedgerMappingRule
+            {
+                Id = Guid.NewGuid(),
+                SourceType = JournalSourceType.Cost,
+                SourceEvent = "stock.expired.writeoff",
+                AccountId = stock.Id,
+                Side = NormalBalance.Credit
+            });
     }
 
     public void Dispose()
@@ -59,12 +111,21 @@ public sealed class ExpiredVoucherLossServiceTests : IDisposable
             UpdatedAtUtc = DateTime.UtcNow
         });
 
+    /// <summary>
+    /// The author of the setting. The journal will not take a posting that names nobody, and a
+    /// nightly sweep has nobody of its own - so the write-off is posted under the operator who
+    /// turned the sweep on, which is who the admin screen records.
+    /// </summary>
+    private readonly Guid _operatorId = Guid.NewGuid();
+
     private void SeedSetting(string key, string value)
         => _context.AppSettings.Add(new AppSetting
         {
             Key = key,
             Value = value,
-            UpdatedAtUtc = DateTime.UtcNow
+            UpdatedAtUtc = DateTime.UtcNow,
+            UpdatedByUserId = _operatorId,
+            UpdatedByUserName = "Test Operator"
         });
 
     private async Task RunAsync(int graceDays, bool enabled = true)
@@ -76,6 +137,7 @@ public sealed class ExpiredVoucherLossServiceTests : IDisposable
         var service = new ExpiredVoucherLossService(
             _context,
             new RuntimeSettingsService(_context),
+            new JournalPostingService(_context, NullLogger<JournalPostingService>.Instance),
             NullLogger<ExpiredVoucherLossService>.Instance);
 
         await service.BookExpiredLossAsync();
@@ -167,6 +229,7 @@ public sealed class ExpiredVoucherLossServiceTests : IDisposable
         var service = new ExpiredVoucherLossService(
             _context,
             new RuntimeSettingsService(_context),
+            new JournalPostingService(_context, NullLogger<JournalPostingService>.Instance),
             NullLogger<ExpiredVoucherLossService>.Instance);
         await service.BookExpiredLossAsync();
 
