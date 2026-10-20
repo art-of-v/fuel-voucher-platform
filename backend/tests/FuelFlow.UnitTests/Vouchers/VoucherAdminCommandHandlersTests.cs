@@ -846,9 +846,10 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
         var handler = new GetImportBatchVouchersQueryHandler(_context);
         var result = await handler.HandleAsync(new GetImportBatchVouchersQuery(import.Id));
 
-        result.Should().HaveCount(2);
-        result.Select(v => v.VoucherNumber).Should().Contain("OKKO-IMP-1");
-        result.Select(v => v.VoucherNumber).Should().NotContain("OKKO-OTHER-1");
+        result.Items.Should().HaveCount(2);
+        result.TotalCount.Should().Be(2, "the admin has to know what the page is a part of");
+        result.Items.Select(v => v.VoucherNumber).Should().Contain("OKKO-IMP-1");
+        result.Items.Select(v => v.VoucherNumber).Should().NotContain("OKKO-OTHER-1");
     }
 
     // ── 10. ImportVouchersCommandHandler ─────────────────────────────────────
