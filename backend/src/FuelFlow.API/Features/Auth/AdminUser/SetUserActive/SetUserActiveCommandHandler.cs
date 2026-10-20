@@ -42,7 +42,10 @@ public sealed class SetUserActiveCommandHandler
             _logger.LogWarning(
                 "User {TargetId} activate/deactivate rejected: actor role {ActingRole} cannot manage target role {TargetRole}",
                 command.UserId, command.ActingRole, target.Role?.Name);
-            return SetUserActiveResult.CreateForbidden();
+            // The reason travels with the refusal: the log line above is the only place it used
+            // to exist, and the operator had a toast that said nothing (planning #299).
+            return SetUserActiveResult.CreateForbidden(
+                RoleHierarchy.DescribeRefusal(command.ActingRole, target.Role?.Name));
         }
 
         if (target.IsActive == command.IsActive)

@@ -8,7 +8,9 @@ public sealed class SetUserRoleResult
     public string? Error { get; init; }
 
     public static SetUserRoleResult CreateSuccess() => new() { Success = true };
-    public static SetUserRoleResult CreateForbidden() => new() { Forbidden = true };
+
+    /// <summary>Refused, with the reason - an empty 403 told the operator nothing (planning #299).</summary>
+    public static SetUserRoleResult CreateForbidden(string reason) => new() { Forbidden = true, Error = reason };
     public static SetUserRoleResult CreateNotFound(string error) => new() { NotFound = true, Error = error };
     public static SetUserRoleResult Failure(string error) => new() { Error = error };
 }

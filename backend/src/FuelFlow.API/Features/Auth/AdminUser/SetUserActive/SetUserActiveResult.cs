@@ -8,6 +8,12 @@ public sealed class SetUserActiveResult
     public string? Error { get; init; }
 
     public static SetUserActiveResult CreateSuccess() => new() { Success = true };
-    public static SetUserActiveResult CreateForbidden() => new() { Forbidden = true };
+
+    /// <summary>
+    /// Refused, with the reason. The reason is not decoration: it is what the operator sees, and
+    /// an empty 403 left them with a toast that said nothing (planning #299).
+    /// </summary>
+    public static SetUserActiveResult CreateForbidden(string reason) => new() { Forbidden = true, Error = reason };
+
     public static SetUserActiveResult CreateNotFound(string error) => new() { NotFound = true, Error = error };
 }
