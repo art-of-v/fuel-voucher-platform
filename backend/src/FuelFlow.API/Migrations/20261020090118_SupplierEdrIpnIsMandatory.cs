@@ -27,6 +27,15 @@ namespace FuelFlow.API.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            // A blank is not a registry code, and the API now stores a blank as NULL rather than
+            // as an empty string - so the rows that carry one are the ones written before that
+            // rule. They are normalised here, before the constraint that would refuse them.
+            // Without this the migration fails on the very supplier it is about.
+            migrationBuilder.Sql("""
+                UPDATE "suppliers" SET "edr_ipn" = NULL
+                WHERE "edr_ipn" IS NOT NULL AND btrim("edr_ipn") = '';
+                """);
+
             // The format, in the database as well as in the API. The API refuses a bad value
             // with a sentence a person can act on; the database refuses one that arrived by any
             // other road, because a registry code that is not a registry code is not a registry
