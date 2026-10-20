@@ -47,7 +47,7 @@ public sealed class SupplierRegistryCodeTests : IClassFixture<TestDatabaseFixtur
     };
 
     [Fact]
-    public async Task The_Column_Is_Not_Null_In_The_Database()
+    public async Task The_Column_Is_Still_Nullable_In_The_Database()
     {
         await using var context = CreateContext();
         await context.Database.MigrateAsync();
@@ -62,11 +62,12 @@ public sealed class SupplierRegistryCodeTests : IClassFixture<TestDatabaseFixtur
             """)
             .ToListAsync();
 
-        isNullable.Should().ContainSingle().Which.Should().Be("NO");
+        isNullable.Should().ContainSingle().Which.Should().Be("YES",
+            "a supplier can be recorded before anyone has looked the registry code up");
     }
 
     [Fact]
-    public async Task A_Supplier_Without_A_Registry_Code_Is_Refused_By_The_Database()
+    public async Task A_Supplier_Without_A_Registry_Code_Is_Allowed()
     {
         await using var context = CreateContext();
         await context.Database.MigrateAsync();
@@ -74,8 +75,8 @@ public sealed class SupplierRegistryCodeTests : IClassFixture<TestDatabaseFixtur
         context.Suppliers.Add(NewSupplier(null));
 
         var act = () => context.SaveChangesAsync();
-        await act.Should().ThrowAsync<DbUpdateException>(
-            "the code is what the invoice is issued against, so a blank cannot be stored");
+        await act.Should().NotThrowAsync(
+            "the code is optional - requiring it would mean a supplier who cannot be invoiced cannot be bought from either");
     }
 
     [Fact]

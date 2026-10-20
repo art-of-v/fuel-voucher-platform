@@ -27,16 +27,20 @@ public sealed class Supplier
 
     /// <summary>ЄДРОПУ/ІПН — the company's or sole proprietor's registry code. Null for individuals.</summary>
     /// <summary>
-    /// The supplier's registry code - ЄДРОПУ for a company, ІПН for an individual. Mandatory:
-    /// it is what a VAT invoice is issued against, so a supplier without one cannot be invoiced
-    /// and the business carries the cost of that.
+    /// The supplier's registry code - ЄДРОПУ for a company, ІПН for an individual.
     /// <para>
-    /// Optional before 2026-10-20, and that was the business's call to make: a supplier without
-    /// a code could be recorded, and then the invoice could not. The rule now lives in the
-    /// database as well, so a direct API call cannot slip a blank past the form.
+    /// <b>Optional</b> (the business's call, 2026-10-20): a supplier can be recorded before
+    /// anyone has looked up their code, and requiring one would mean a supplier who cannot
+    /// be invoiced cannot be bought from either.
+    /// </para>
+    /// <para>
+    /// <b>Unique when it is there.</b> Two rows with the same code are the same counterparty
+    /// recorded twice, and a business that pays "two" suppliers who are one person pays twice
+    /// and reconciles the difference by hand. A code that is not there cannot collide, so the
+    /// uniqueness costs nothing for a supplier who has not been identified yet.
     /// </para>
     /// </summary>
-    public string EdrIpn { get; set; } = null!;
+    public string? EdrIpn { get; set; }
 
     /// <summary>РНОКР — the tax register number. Individuals have one too; companies may omit it.</summary>
     public string? Rnkrr { get; set; }

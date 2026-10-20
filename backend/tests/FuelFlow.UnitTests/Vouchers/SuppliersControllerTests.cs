@@ -93,13 +93,12 @@ public sealed class SuppliersControllerTests : IDisposable
     [Fact]
     public async Task Create_ShouldAcceptSupplierWithOnlyTheMandatoryRequisites()
     {
-        // The name and the registry code. Everything else stays optional - an ФОП has an ІПН
-        // and an LLC has an ЄДРОПУ, and rejecting a blank in the other fields would reject
-        // half the suppliers we actually deal with.
+        // Only the name. The registry code is optional - a supplier can be recorded before
+        // anyone has looked it up - and everything else depends on the legal form, so a blank
+        // in the other fields would reject half the suppliers we actually deal with.
         var result = await _controller.Create(new CreateSupplierRequest
         {
-            Name = "Постачальник тільки з обов'язковим",
-            EdrIpn = "1234567890"
+            Name = "Постачальник тільки з обов'язковим"
         });
 
         var ok = result.Result.Should().BeOfType<OkObjectResult>().Subject;
@@ -107,32 +106,29 @@ public sealed class SuppliersControllerTests : IDisposable
         dto.Name.Should().Be("Постачальник тільки з обов'язковим");
         dto.LegalForm.Should().BeNull();
         dto.IsActive.Should().BeTrue();
-        dto.EdrIpn.Should().Be("1234567890");
+        dto.EdrIpn.Should().BeNull();
 
         (await _context.Suppliers.SingleAsync()).Name.Should().Be("Постачальник тільки з обов'язковим");
     }
 
     /// <summary>
-    /// The registry code became mandatory on 2026-10-20: it is what a VAT invoice is issued
-    /// against, so a supplier without one cannot be invoiced.
-    /// <para>
-    /// The blank has to be refused with a sentence, not with a stack trace from the database -
-    /// which is the whole reason the API validates it, since the column is NOT NULL and the
-    /// database would answer a blank with a 23514 and a stack trace in the Error Logs.
-    /// </para>
+    /// The registry code is optional (the business's call, 2026-10-20), and a blank is
+    /// stored as NULL rather than as an empty string - because the database's format
+    /// constraint accepts NULL and rejects "", and a supplier with no code is a different
+    /// thing from a supplier with a blank "code".
     /// </summary>
     [Fact]
-    public async Task Create_ShouldRejectASupplierWithNoRegistryCode()
+    public async Task Create_ShouldAcceptASupplierWithNoRegistryCode()
     {
         var result = await _controller.Create(new CreateSupplierRequest { Name = "Без коду" });
 
-        ErrorOf(result).Should().Be("ЄДРОПУ/ІПН is required - it is what the invoice is issued against.");
-
-        (await _context.Suppliers.CountAsync()).Should().Be(0, "a refused supplier is not written");
+        result.Result.Should().BeOfType<OkObjectResult>();
+        (await _context.Suppliers.SingleAsync()).EdrIpn.Should().BeNull(
+            "a blank is stored as null, never as an empty string");
     }
 
     [Fact]
-    public async Task Create_ShouldRejectABlankRegistryCode()
+    public async Task Create_ShouldAcceptABlankRegistryCode_AndStoreItAsNull()
     {
         var result = await _controller.Create(new CreateSupplierRequest
         {
@@ -140,12 +136,12 @@ public sealed class SuppliersControllerTests : IDisposable
             EdrIpn = "   "
         });
 
-        result.Result.Should().BeOfType<BadRequestObjectResult>();
-        (await _context.Suppliers.CountAsync()).Should().Be(0);
+        result.Result.Should().BeOfType<OkObjectResult>();
+        (await _context.Suppliers.SingleAsync()).EdrIpn.Should().BeNull();
     }
 
     [Fact]
-    public async Task Update_ShouldRejectABlankRegistryCode()
+    public async Task Update_ShouldAcceptABlankRegistryCode_AndStoreItAsNull()
     {
         var supplier = Seed("Постачальник з кодом");
         var id = supplier.Id;
@@ -156,9 +152,9 @@ public sealed class SuppliersControllerTests : IDisposable
             EdrIpn = "  "
         });
 
-        result.Result.Should().BeOfType<BadRequestObjectResult>();
-        (await _context.Suppliers.SingleAsync(s => s.Id == id)).EdrIpn.Should().Be(supplier.EdrIpn,
-            "a refused update leaves the stored row untouched");
+        result.Result.Should().BeOfType<OkObjectResult>();
+        (await _context.Suppliers.SingleAsync(s => s.Id == id)).EdrIpn.Should().BeNull(
+            "clearing the code stores null, so the format constraint is never asked about a blank");
     }
 
 

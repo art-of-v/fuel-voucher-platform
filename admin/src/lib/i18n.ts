@@ -750,7 +750,6 @@ export const translations: Record<Language, Record<string, string>> = {
     "suppliers.error.nameTaken":
       "A supplier with this name already exists - the operator picks suppliers by name, so two rows would be ambiguous.",
     "suppliers.error.edrIpn": "EDR / IPN must be 8-10 digits.",
-    "suppliers.error.edrIpnRequired": "EDR / IPN is required - it is what the invoice is issued against.",
     "suppliers.error.rnkrr": "RNKR must be 5 digits.",
     "suppliers.empty":
       "No suppliers yet. Add the first one - the brand on a voucher does not say who issued it.",
@@ -1825,7 +1824,6 @@ export const translations: Record<Language, Record<string, string>> = {
     "suppliers.error.nameTaken":
       "Постачальник із такою назвою вже існує — оператор обирає постачальника за назвою, тож два рядки були б неоднозначними.",
     "suppliers.error.edrIpn": "ЄДРОПУ/ІПН має складатися з 8-10 цифр.",
-    "suppliers.error.edrIpnRequired": "ЄДРОПУ/ІПН обов'язкове — це код, за яким виставляється рахунок.",
     "suppliers.error.rnkrr": "РНОКР має складатися з 5 цифр.",
     "suppliers.empty":
       "Постачальників ще немає. Додайте першого — бренд на талоні не каже, хто його видав.",
@@ -2822,8 +2820,6 @@ export const translations: Record<Language, Record<string, string>> = {
       "Ein Lieferant mit diesem Namen existiert bereits - der Lieferant wird nach Name ausgewählt, zwei Zeilen wären daher mehrdeutig.",
     "suppliers.error.edrIpn":
       "EDR/Steuernummer muss aus 8-10 Ziffern bestehen.",
-    "suppliers.error.edrIpnRequired":
-      "EDR/Steuernummer ist erforderlich - sie ist die Grundlage der Rechnungsstellung.",
     "suppliers.error.rnkrr": "RNKR muss aus 5 Ziffern bestehen.",
     "suppliers.empty":
       "Noch keine Lieferanten. Legen Sie den ersten an - die Marke auf einem Gutschein sagt nicht, wer ihn ausgestellt hat.",
@@ -3894,7 +3890,6 @@ export const translations: Record<Language, Record<string, string>> = {
     "suppliers.error.nameTaken":
       "Ya existe un proveedor con ese nombre - el proveedor se elige por nombre, por lo que dos filas serían ambiguas.",
     "suppliers.error.edrIpn": "El EDR/ITN debe tener entre 8 y 10 dígitos.",
-    "suppliers.error.edrIpnRequired": "El EDR/ITN es obligatorio: es la base de la facturación.",
     "suppliers.error.rnkrr": "El RNKR debe tener 5 dígitos.",
     "suppliers.empty":
       "Aún no hay proveedores. Añade el primero - la marca del cupón no dice quién lo emitió.",
