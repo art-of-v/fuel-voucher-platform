@@ -144,6 +144,11 @@ private readonly RuntimeSettingsService _runtimeSettings;
         // each real package into the QA pool. See PackageStockAvailability.FindPackagesAsync.
         var packages = await _stock.FindPackagesAsync(isTestAccount, wantedStock, cancellationToken);
 
+        // The same question for the whole cart, answered before the loop: how far does the paper
+        // term of the stock reach. It used to be asked per line, inside the loop, so a cart of
+        // twenty lines asked the database the same thing twenty times.
+        var bestStockExpirations = await TermStockCoverage.BestStockExpirationsAsync(
+            _context, wantedStock, cancellationToken);
         foreach (var item in command.Items)
         {
             var fuelType = fuelTypes.FirstOrDefault(f =>
@@ -204,8 +209,8 @@ private readonly RuntimeSettingsService _runtimeSettings;
             if (termCode is not null
                 && VoucherRenewalTerms.TryFromCode(termCode, out var purchasedTerm))
             {
-                var bestStockExpiration = await TermStockCoverage.BestStockExpirationAsync(
-                    _context, brandSlugs[item.BrandId!.Value], item.FuelTypeId, item.Liters, cancellationToken);
+                var bestStockExpiration = bestStockExpirations.GetValueOrDefault(
+                    StockKey.For(brandSlugs[item.BrandId!.Value], item.FuelTypeId, item.Liters));
 
                 if (!TermStockCoverage.CanHonour(bestStockExpiration, DateOnly.FromDateTime(DateTime.UtcNow), purchasedTerm))
                 {
