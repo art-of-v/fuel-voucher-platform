@@ -31,7 +31,6 @@ namespace FuelFlow.IntegrationTests;
 public sealed class RealizedMarginSqlIntegrationTests : IClassFixture<TestDatabaseFixture>
 {
     private readonly TestDatabaseFixture _fixture;
-    private int _nextFulfillmentId = 5000;
 
     public RealizedMarginSqlIntegrationTests(TestDatabaseFixture fixture) => _fixture = fixture;
 
@@ -185,7 +184,8 @@ public sealed class RealizedMarginSqlIntegrationTests : IClassFixture<TestDataba
 
             context.Fulfillments.Add(new Fulfillment
             {
-                Id = Interlocked.Increment(ref _nextFulfillmentId),
+                // No id: the column is an identity, and the database gives it out. The unit test
+                // has to set one, because the in-memory provider has no identity to ask.
                 OrderId = orderId,
                 VoucherId = voucher.Id,
                 FulfilledAtUtc = DateTime.UtcNow.AddDays(-2)
