@@ -1,0 +1,55 @@
+feat(contracts): a contract has a validity term, and it stops a signature
+
+A contract without a term is not a contract, it is a record that something once
+happened — and the business said so on 2026-10-20. `contracts` had no term, no
+status, and no window of validity: `{Id, UserId, LegalEntityId, BrandId,
+CreatedAtUtc}`.
+
+**The term is mandatory, and the database says so.** `expires_at_utc` is NOT NULL,
+with `ck_contracts_expiry_after_creation` refusing a term that ends before it starts.
+A term is only worth having if it stops something, and the constraint is what stops
+a contract being stored with a term nobody decided.
+
+**The term stops a signature.** A contract that has already run out is not signed:
+a signature outliving the agreement it is a signature of is a contract that still
+binds. The rule is `ContractValidity` — no database, no entity, the same shape as
+`VoucherRenewalEligibility`, so it is trivially testable and the controller only
+calls it.
+
+**The lists say when a contract ends.** Both the contract list and the signed-contract
+list now carry `expiresAt` and `expired`, because a list that does not say when a
+contract ends cannot answer "which of these is about to expire" — and the signed list
+without it cannot answer "which of these signatures still bind".
+
+**EF's scaffold for this would have been a lie.** It adds the column NOT NULL with a
+default of 0001-01-01, which is a contract that expired at the beginning of time,
+and it would have written that onto every existing row without asking. This one adds
+the column nullable, checks that there is nothing to decide, and only then makes it
+mandatory — and if there is something to decide, it refuses and names the contracts,
+because a term is a decision somebody makes and not a value a migration invents.
+
+## What this does not do
+
+**Nothing creates a contract.** The table is written by nothing in the codebase: the
+admin panel reads contracts, the customer signs them, and there is no create path
+between the two. The feature is half built, and that is a separate piece of work —
+who creates a contract, for whom, and on what terms is a business flow, not a
+column.
+
+What this change does is make the term mandatory **before** that path is built, so
+that whoever builds it cannot ship a contract with no term.
+
+## Files
+
+**Changed**
+- `backend/src/FuelFlow.API/Features/Contracts/SharedModels/Contract.cs` — the term
+- `backend/src/FuelFlow.API/Features/Contracts/Configurations/ContractConfiguration.cs` — NOT NULL, the check, the index
+- `backend/src/FuelFlow.API/Features/Contracts/LegalEntityController.cs` — an expired contract is not signed; the lists carry the term
+- `backend/tests/FuelFlow.UnitTests/Contracts/ContractsQueryHandlersTests.cs` — the fixtures carry a term
+
+**Added**
+- `backend/src/FuelFlow.API/Features/Contracts/ContractValidity.cs` — the rule
+- `backend/src/FuelFlow.API/Migrations/20261020094642_ContractHasAValidityPeriod.cs` — the column, the check, the index
+- `backend/src/FuelFlow.API/Migrations/20261020094642_ContractHasAValidityPeriod.Designer.cs` — generated
+- `backend/tests/FuelFlow.UnitTests/Contracts/ContractValidityTests.cs` — the rule, including the boundary
+- `backend/tests/FuelFlow.IntegrationTests/ContractValidityIntegrationTests.cs` — the database's guarantees

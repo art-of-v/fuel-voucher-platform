@@ -83,7 +83,8 @@ public sealed class ContractsQueryHandlersTests : IDisposable
             UserId = user.Id,
             LegalEntityId = legalEntity.Id,
             BrandId = Brand.Id,
-            CreatedAtUtc = DateTime.UtcNow.AddHours(-1)
+            CreatedAtUtc = DateTime.UtcNow.AddHours(-1),
+            ExpiresAtUtc = DateTime.UtcNow.AddYears(1)
         };
         var later = new Contract
         {
@@ -91,7 +92,8 @@ public sealed class ContractsQueryHandlersTests : IDisposable
             UserId = user.Id,
             LegalEntityId = legalEntity.Id,
             BrandId = Brand.Id,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = DateTime.UtcNow,
+            ExpiresAtUtc = DateTime.UtcNow.AddYears(1)
         };
 
         _context.Contracts.AddRange(earlier, later);
@@ -134,7 +136,8 @@ public sealed class ContractsQueryHandlersTests : IDisposable
             UserId = user.Id,
             LegalEntityId = legalEntity.Id,
             BrandId = Brand.Id,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = DateTime.UtcNow,
+            ExpiresAtUtc = DateTime.UtcNow.AddYears(1)
         };
 
         _context.Users.Add(user);
