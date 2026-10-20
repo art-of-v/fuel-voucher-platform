@@ -21,20 +21,6 @@ public sealed record PublicFuelTypeResponse(
     string BrandSlug,
     string Name,
     decimal BasePrice,
-    /// <summary>
-    /// The price to SHOW for this fuel, per litre: ours when the shop can sell it, the column price
-    /// when it cannot.
-    /// </summary>
-    /// <remarks>
-    /// It was the raw <c>discount_price</c> column, which is a legacy the write path no longer
-    /// maintains - and for an imported fuel it is zero, because "the headline is the customer's price,
-    /// and there is none until an operator sets a margin". A client that reads this field therefore
-    /// showed "0 UAH" for a fuel the market charges 92.90 for, which is the same shape as the incident
-    /// the offer split came from (F-33, 1.00 UAH/l on the live site).
-    ///
-    /// The rule is decided once, on the server, so that every client shows the same number - including
-    /// a client that has not yet picked up the fields below.
-    /// </remarks>
     decimal DiscountPrice,
     /// <summary>
     /// What the network charges at the pump - the column price. Null when it is not known.
