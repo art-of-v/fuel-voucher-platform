@@ -10,18 +10,19 @@ public sealed class GetAdminUsersQueryHandler
 
     public async Task<List<AdminUserDto>> HandleAsync(GetAdminUsersQuery query, CancellationToken ct = default)
     {
-        var items = await _context.Users
+        // The filters are the DATABASE's job. This used to load every user into the process and
+        // filter the list there, so a search for one customer read the whole table to answer it -
+        // the endpoint already advertised role, isActive and q, and the handler ignored them
+        // until the rows were already in memory.
+        var users = _context.Users
             .AsNoTracking()
-            .Include(u => u.Role)
-            .Where(u => !u.IsDeleted)
-            .OrderByDescending(u => u.CreatedAtUtc)
-            .ToListAsync(ct);
+            .Where(u => !u.IsDeleted);
 
         if (query.Role != null)
-            items = items.Where(u => u.Role?.Name == query.Role).ToList();
+            users = users.Where(u => u.Role != null && u.Role.Name == query.Role);
 
         if (query.IsActive.HasValue)
-            items = items.Where(u => u.IsActive == query.IsActive.Value).ToList();
+            users = users.Where(u => u.IsActive == query.IsActive.Value);
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
@@ -30,43 +31,49 @@ public sealed class GetAdminUsersQueryHandler
             // Settlement code is searchable on purpose: an operator receiving a settlement message
             // pastes the code rather than the customer's name, and without this the only way from the
             // code to the customer is to scroll the whole list.
-            items = items.Where(u =>
-                (u.PhoneNumber?.ToLowerInvariant().Contains(search) == true) ||
-                (u.Email?.ToLowerInvariant().Contains(search) == true) ||
-                (u.FirstName?.ToLowerInvariant().Contains(search) == true) ||
-                (u.LastName?.ToLowerInvariant().Contains(search) == true) ||
-                (u.SettlementCode?.ToLowerInvariant().Contains(search) == true)).ToList();
+            users = users.Where(u =>
+                (u.PhoneNumber != null && u.PhoneNumber.ToLower().Contains(search)) ||
+                (u.Email != null && u.Email.ToLower().Contains(search)) ||
+                (u.FirstName != null && u.FirstName.ToLower().Contains(search)) ||
+                (u.LastName != null && u.LastName.ToLower().Contains(search)) ||
+                (u.SettlementCode != null && u.SettlementCode.ToLower().Contains(search)));
         }
 
-        return items.Select(u => new AdminUserDto
-        {
-            Id = u.Id.ToString(),
-            Phone = u.PhoneNumber,
-            Email = u.Email,
-            FirstName = u.FirstName,
-            LastName = u.LastName,
-            Birthdate = u.Birthdate?.ToString("yyyy-MM-dd"),
-            ProfileImageUrl = u.ProfileImageUrl,
-            ReferralCode = u.ReferralCode,
-            ReferredBy = u.ReferredBy,
-            // The column is NOT NULL, so this only ever sees a value for a row that has been inserted. Empty
-                // rather than null so the grid renders a visibly wrong cell instead of a blank one if
-                // that ever stops being true.
+        return await users
+            // The tie-break: many accounts share a registration timestamp, and without a unique
+            // second key the sort is unstable - a row can move between pages.
+            .OrderByDescending(u => u.CreatedAtUtc)
+            .ThenBy(u => u.Id)
+            .Select(u => new AdminUserDto
+            {
+                Id = u.Id.ToString(),
+                Phone = u.PhoneNumber,
+                Email = u.Email,
+                FirstName = u.FirstName,
+                LastName = u.LastName,
+                Birthdate = u.Birthdate.HasValue ? u.Birthdate.Value.ToString("yyyy-MM-dd") : null,
+                ProfileImageUrl = u.ProfileImageUrl,
+                ReferralCode = u.ReferralCode,
+                ReferredBy = u.ReferredBy,
+                // The column is NOT NULL, so this only ever sees a value for a row that has been inserted. Empty
+                    // rather than null so the grid renders a visibly wrong cell instead of a blank one if
+                    // that ever stops being true.
                 SettlementCode = u.SettlementCode ?? string.Empty,
-            BonusBalance = u.BonusBalance,
-            Role = u.Role?.Name,
-            IsActive = u.IsActive,
-            IsBanned = u.IsBanned,
-            IsDeleted = u.IsDeleted,
-            // Read-only visibility for staff. Without it the QA account is indistinguishable
-            // from an ordinary customer in the users grid, so a tester reporting "the QA account
-            // is broken" gives staff nothing to look at - the only QA surface in the panel was
-            // the test-access switch, which says nothing about the account's own state. There is
-            // deliberately no setter: the flag is granted by the seeding migration and by the
-            // QA-gated registration path, never from the admin UI.
-            IsQaAccount = u.IsQaAccount,
-            CreatedAt = u.CreatedAtUtc.ToString("o")
-        }).ToList();
+                BonusBalance = u.BonusBalance,
+                Role = u.Role != null ? u.Role.Name : null,
+                IsActive = u.IsActive,
+                IsBanned = u.IsBanned,
+                IsDeleted = u.IsDeleted,
+                // Read-only visibility for staff. Without it the QA account is indistinguishable
+                // from an ordinary customer in the users grid, so a tester reporting "the QA account
+                // is broken" gives staff nothing to look at - the only QA surface in the panel was
+                // the test-access switch, which says nothing about the account's own state. There is
+                // deliberately no setter: the flag is granted by the seeding migration and by the
+                // QA-gated registration path, never from the admin UI.
+                IsQaAccount = u.IsQaAccount,
+                CreatedAt = u.CreatedAtUtc.ToString("o")
+            })
+            .ToListAsync(ct);
     }
 }
 

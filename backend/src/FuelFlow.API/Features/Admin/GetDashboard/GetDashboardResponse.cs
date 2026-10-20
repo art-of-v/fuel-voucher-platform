@@ -22,5 +22,10 @@ public sealed record GetDashboardResponse(
         int Total,
         int Pending,
         int Fulfilled,
+        /// <summary>
+        /// The platform's margin in KOPIECKS. The name says Uah and the value has always been
+        /// kopecks - nothing consumes this endpoint yet, so the unit is written down here instead
+        /// of being changed under a caller that would then read a hundred times too little.
+        /// </summary>
         long RevenueUah);
 }

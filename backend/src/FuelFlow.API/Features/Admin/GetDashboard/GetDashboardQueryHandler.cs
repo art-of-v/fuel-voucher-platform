@@ -33,56 +33,37 @@ public sealed class GetDashboardQueryHandler
         var pendingOrders = await _context.Orders.CountAsync(o => o.Kind != OrderKind.ReceivedFromCompany && (o.Status == OrderStatus.PendingFulfillment || o.Status == OrderStatus.PartiallyFulfilled), cancellationToken);
         var fulfilledOrders = await _context.Orders.CountAsync(o => o.Kind != OrderKind.ReceivedFromCompany && o.Status == OrderStatus.Fulfilled, cancellationToken);
 
-        // Margin is a property of the offer, so the lookup is volumes joined to offers, pinned to the
-        // real pool: these are operator counters over real business, and the old lookup had no pool
-        // filter, so a QA rehearsal row could shadow a real one by being newer.
+        // The profit, summed by the database. This used to load every fulfilled order and every one
+        // of its line items into the process to add them up - a read that grows with every sale, for
+        // a number that is one SUM over a join.
         //
-        // The GroupBy(...).First() this replaces existed only to break ties the schema already
-        // forbids - UNIQUE (brand_id, fuel_type_id, data_kind) on fuel_offers times
-        // UNIQUE (offer_id, liters) on fuel_offer_volumes makes the triple unique inside a pool. A
-        // duplicate now throws rather than silently resolving to one arbitrary price.
-        // Projects the margin, not the offer entity. Handing back a whole tracked-free entity and then
-        // reading one column off it loads every offer column for every volume in the catalogue to
-        // answer one question, and - worse - depends on the provider materialising the navigation,
-        // which the in-memory provider does not and which would make this throw on a null rather than
-        // return a wrong number.
-        // An explicit join rather than `v.Offer.X`: relying on the navigation being materialised is a
-        // silent dependency on provider behaviour, and where it is not materialised this throws on a
-        // null instead of returning a wrong number - which is exactly the kind of failure that looks
-        // like a data problem and gets debugged as one.
+        // The margin lives on the FUEL TYPE, and the size is a row in fuel_nominals - whose key
+        // (fuel_type_id, data_kind, litres) is one row per fuel, pool and size - so a line can match
+        // at most one margin. Pinned to the real pool, like the counters above: a QA rehearsal row
+        // must not shadow a real one.
         //
-        // Projects the margin alone. Handing back the offer entity would load every offer column for
-        // every volume in the catalogue to answer one question.
-        var fpLookup = await (
-from f in _context.FuelTypes.AsNoTracking()
-            // Keyed the way the consumer keys it: an order line stores the network as its slug, so the
-            // lookup is built from the slug rather than from the fuel's uuid.
+        // The line names the brand and the fuel type belongs to one. A line whose brand and fuel
+        // type disagree has no margin - the lookup this replaces said the same, and answered zero.
+        //
+        // The per-line truncation is the shipped behaviour and is kept: each line's contribution is
+        // truncated to whole kopecks before it is added, so the total is the sum of the truncated
+        // lines and not the truncation of the total. Math.Truncate is trunc() in SQL, which is what
+        // keeps that true - a cast to an integer type would ROUND in Postgres.
+        var profitLines =
+            from o in _context.Orders.AsNoTracking()
+            join li in _context.OrderLineItems.AsNoTracking() on o.Id equals li.OrderId
+            join f in _context.FuelTypes.AsNoTracking() on li.FuelTypeId equals f.Id
             join b in _context.Brands.AsNoTracking() on f.BrandId equals b.Id
-            from n in _context.FuelNominals.AsNoTracking() where n.FuelTypeId == f.Id
-            where n.DataKind == DataKinds.Real
-            select new { BrandSlug = b.Slug, FuelTypeId = f.Id, Liters = n.Liters, MarginUahPerLiter = f.MarginUahPerLiter })
-            .ToDictionaryAsync(
-                x => (x.BrandSlug, x.FuelTypeId, x.Liters),
-                x => x.MarginUahPerLiter,
-                cancellationToken);
-
-        var fulfilledOrdersList = await _context.Orders
-            .AsNoTracking()
-            .Include(o => o.LineItems)
-            .Where(o => (o.Status == OrderStatus.Fulfilled || o.Status == OrderStatus.PartiallyFulfilled)
+            where (o.Status == OrderStatus.Fulfilled || o.Status == OrderStatus.PartiallyFulfilled)
                 // Same reasoning as the counters above: a handover carries no revenue for us.
-                && o.Kind != OrderKind.ReceivedFromCompany)
-            .ToListAsync(cancellationToken);
+                && o.Kind != OrderKind.ReceivedFromCompany
+                && b.Slug == li.Brand
+                // The size has to exist in the real pool: the lookup this replaces only contained the
+                // (fuel, litres) pairs that have a real nominal, so a line without one had no margin.
+                && _context.FuelNominals.Any(n => n.FuelTypeId == f.Id && n.Liters == li.Liters && n.DataKind == DataKinds.Real)
+            select Math.Truncate((f.MarginUahPerLiter ?? 0m) * li.Liters * li.Quantity);
 
-        var profitKopecks = fulfilledOrdersList.Sum(o =>
-            o.LineItems.Sum(li =>
-            {
-                if (fpLookup.TryGetValue((li.Brand, li.FuelTypeId, li.Liters), out var margin))
-                    return (long)((margin ?? 0) * (decimal)li.Liters * li.Quantity);
-                return 0L;
-            })
-        );
-
+        var profitKopecks = (long)await profitLines.SumAsync(cancellationToken);
         var revenueUah = profitKopecks;
 
         var byProvider = await _context.FuelVouchers
