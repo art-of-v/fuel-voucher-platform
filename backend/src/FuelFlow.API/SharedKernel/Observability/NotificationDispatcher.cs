@@ -304,10 +304,15 @@ public sealed class NotificationDispatcher
     /// </list>
     /// Throttled per fuel + shape so a burst of cost entries or blocked checkouts sends one message.
     /// </summary>
+    /// <param name="costPerLiter">
+    /// What we pay per litre, or NULL when nobody has stated it. A null is a real state - the catalogue
+    /// import creates fuels with no cost on purpose, because it knows the column price and nothing about
+    /// what we pay - so the message says so rather than printing a zero that reads like a number.
+    /// </param>
     public Task BelowCostAsync(
         string brand,
         string fuelType,
-        decimal costPerLiter,
+        decimal? costPerLiter,
         decimal finalPerLiter,
         bool deliberate,
         CancellationToken ct = default)
@@ -322,7 +327,7 @@ public sealed class NotificationDispatcher
             {
                 ["Мережа"] = brand,
                 ["Пальне"] = fuelType,
-                ["Собівартість, грн/л"] = costPerLiter.ToString("0.00"),
+                ["Собівартість, грн/л"] = costPerLiter?.ToString("0.00") ?? "?",
                 ["Ціна, грн/л"] = finalPerLiter.ToString("0.00"),
                 ["Режим"] = deliberate ? "свідомий продаж дешевше" : "заблоковано"
             },

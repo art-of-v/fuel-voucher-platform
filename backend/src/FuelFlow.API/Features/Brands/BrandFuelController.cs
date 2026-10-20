@@ -183,21 +183,38 @@ public sealed class BrandFuelController : ControllerBase
             }
         }
 
-        var finalPerLiter = FuelPricing.FinalPerLiter(
+        // The price, or null when we cannot know it. A cost that is not stated is not a zero: the
+        // model refuses to build a price out of a missing number, because "we do not know what we
+        // paid" is not the same fact as "we paid nothing".
+        var finalPerLiter = FuelPricing.FinalPerLiterOrNull(
             request.SupplierPricePerLiter, request.MarginUahPerLiter,
             request.PumpPricePerLiter, request.MinDiscountPerLiter);
 
         // Slice-3 hard block at the operator write path: refuse to persist a below-cost price
         // unless a manager has consciously opted this supplier+fuel in as a loss-leader.
-        var belowCost = FuelPricing.IsBelowCost(
-            request.SupplierPricePerLiter, request.MarginUahPerLiter,
-            request.PumpPricePerLiter, request.MinDiscountPerLiter);
+        //
+        // A fuel with no stated cost is NOT below cost - there is nothing to compare against - so it
+        // is saved as it is: unpriced. The storefront shows it at the column with "not in stock", and
+        // it cannot be sold until the cost is recorded. What it must never become is a fuel with a cost
+        // of zero, which would price itself at its margin and blind the guard.
+        var belowCost = request.SupplierPricePerLiter is { } knownCost
+                        && request.MarginUahPerLiter is { } knownMargin
+                        && FuelPricing.IsBelowCost(
+                            knownCost, knownMargin, request.PumpPricePerLiter, request.MinDiscountPerLiter);
         if (belowCost && !request.AllowBelowCost)
             return BadRequest(new { code = BelowCostSaleBlockedException.Code, message = "Price is below supplier cost; enable the below-cost opt-in to save it." });
 
         // base = pump/reference (колонка) when known, else legacy final + min discount;
         // discount = what the customer actually pays (final).
-        var baseUahPerLiter = request.PumpPricePerLiter ?? (finalPerLiter + request.MinDiscountPerLiter);
+        //
+        // With no stated cost there is no final price, so the fuel is recorded at the column: the
+        // price the driver pays, with no discount on it. That is a true statement about a fuel we
+        // have not costed, and it is what the storefront shows.
+        var baseUahPerLiter = request.PumpPricePerLiter
+                              ?? (finalPerLiter is { } known
+                                  ? known + request.MinDiscountPerLiter
+                                  : request.MinDiscountPerLiter);
+        var discountUahPerLiter = finalPerLiter ?? baseUahPerLiter;
 
         var fuel = new FuelTypeEntity
         {
@@ -208,7 +225,7 @@ public sealed class BrandFuelController : ControllerBase
             // base_price / discount_price are UAH per liter, decimal to the kopeck (spec §12, #90):
             // round to 2dp, never store kopecks-as-integer (that once made the app show 8492.00).
             BasePrice = Math.Round(baseUahPerLiter, 2, MidpointRounding.AwayFromZero),
-            DiscountPrice = Math.Round(finalPerLiter, 2, MidpointRounding.AwayFromZero),
+            DiscountPrice = Math.Round(discountUahPerLiter, 2, MidpointRounding.AwayFromZero),
             // The margin is born on the fuel. It used to be written only to the offer below, because the
             // offer was where every reader found it; now the fuel is where every reader looks, and a fuel
             // created without one prices at cost - silently, and correctly by the formula.
@@ -280,13 +297,15 @@ public sealed class BrandFuelController : ControllerBase
         await _eventService.RecordEventAsync(
             "Fuel", fuel.Id.ToString(), "FuelAdded",
             null, newValue, userId, GetUserName(),
-            $"{Brand.Name} / {fuel.Name}: added at {finalPerLiter:F2} UAH/L",
+            $"{Brand.Name} / {fuel.Name}: added at {(finalPerLiter ?? baseUahPerLiter):F2} UAH/L",
             Brand!.Slug,
             ct);
 
         // Record the deliberate loss-leader decision (we only reach here below-cost when opted in).
         if (belowCost)
-            await _notifications.BelowCostAsync(Brand.Name, fuel.Name, request.SupplierPricePerLiter, finalPerLiter, deliberate: true, ct);
+            await _notifications.BelowCostAsync(
+            Brand.Name, fuel.Name, request.SupplierPricePerLiter, finalPerLiter ?? baseUahPerLiter,
+            deliberate: true, ct);
 
         return Created($"/api/admin/brand-fuels/{fuel.Id}", new { id = fuel.Id });
     }
@@ -339,19 +358,25 @@ public sealed class BrandFuelController : ControllerBase
             }
         }
 
-        var finalPerLiter = FuelPricing.FinalPerLiter(
+        // The price, or null when we cannot know it - see the create path above.
+        var finalPerLiter = FuelPricing.FinalPerLiterOrNull(
             request.SupplierPricePerLiter, request.MarginUahPerLiter,
             request.PumpPricePerLiter, request.MinDiscountPerLiter);
 
         // Slice-3 hard block: reject a below-cost price unless this supplier+fuel is opted in.
-        var belowCost = FuelPricing.IsBelowCost(
-            request.SupplierPricePerLiter, request.MarginUahPerLiter,
-            request.PumpPricePerLiter, request.MinDiscountPerLiter);
+        // A cost that is not stated is not below cost; it is unpriced, and it is saved as it is.
+        var belowCost = request.SupplierPricePerLiter is { } knownCost
+                        && request.MarginUahPerLiter is { } knownMargin
+                        && FuelPricing.IsBelowCost(
+                            knownCost, knownMargin, request.PumpPricePerLiter, request.MinDiscountPerLiter);
         if (belowCost && !request.AllowBelowCost)
             return BadRequest(new { code = BelowCostSaleBlockedException.Code, message = "Price is below supplier cost; enable the below-cost opt-in to save it." });
 
         // base = pump/reference (колонка) when known, else legacy final + min discount.
-        var baseUahPerLiter = request.PumpPricePerLiter ?? (finalPerLiter + request.MinDiscountPerLiter);
+        var baseUahPerLiter = request.PumpPricePerLiter
+                              ?? (finalPerLiter is { } known
+                                  ? known + request.MinDiscountPerLiter
+                                  : request.MinDiscountPerLiter);
 
         // There is no offer to find, create or flip. Flipping `isTestData` moves the SIZES to the
         // other pool, below; the price is the fuel's and there is nothing pool-shaped left to move.
@@ -418,7 +443,8 @@ var seededNominals = await _context.FuelNominals
         // base = pump/reference (колонка) when known, else legacy final + min discount;
         // discount = customer price (final).
         fuel.BasePrice = Math.Round(baseUahPerLiter, 2, MidpointRounding.AwayFromZero);
-        fuel.DiscountPrice = Math.Round(finalPerLiter, 2, MidpointRounding.AwayFromZero);
+        // With no stated cost there is no final price, so the fuel is recorded at the column.
+        fuel.DiscountPrice = Math.Round(finalPerLiter ?? baseUahPerLiter, 2, MidpointRounding.AwayFromZero);
         fuel.AllowBelowCost = request.AllowBelowCost;
         fuel.UpdatedAtUtc = DateTime.UtcNow;
 
@@ -478,7 +504,7 @@ var seededNominals = await _context.FuelNominals
         if (oldMarginPrice != request.MarginUahPerLiter)
             changes.Add($"margin {oldMarginPrice:F2} → {request.MarginUahPerLiter:F2}");
         if (oldFinalPrice != finalPerLiter)
-            changes.Add($"final {oldFinalPrice:F2} → {finalPerLiter:F2}");
+            changes.Add($"final {oldFinalPrice:F2} → {(finalPerLiter ?? baseUahPerLiter):F2}");
 
         var summary = changes.Count > 0
             ? $"{BrandName} / {fuel.Name}: {string.Join(", ", changes)}"
@@ -493,7 +519,9 @@ var seededNominals = await _context.FuelNominals
 
         // Record the deliberate loss-leader decision (we only reach here below-cost when opted in).
         if (belowCost)
-            await _notifications.BelowCostAsync(BrandName, fuel.Name, request.SupplierPricePerLiter, finalPerLiter, deliberate: true, ct);
+            await _notifications.BelowCostAsync(
+                BrandName, fuel.Name, request.SupplierPricePerLiter, finalPerLiter ?? baseUahPerLiter,
+                deliberate: true, ct);
 
         return Ok(new { success = true });
     }

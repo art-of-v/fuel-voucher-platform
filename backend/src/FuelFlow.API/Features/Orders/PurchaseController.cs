@@ -125,6 +125,13 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
             var response = await _bulkCheckoutHandler.HandleAsync(command, cancellationToken);
             return Ok(response);
         }
+        catch (UnknownCostSaleBlockedException ex)
+        {
+            // The fuel is in stock and nobody has recorded what we paid for it, so the price cannot
+            // be checked against a cost. A distinct code, because "we do not know" is not "below
+            // cost" - the first needs a cost recorded, the second a price raised.
+            return Conflict(new { code = UnknownCostSaleBlockedException.Code, message = ex.Message });
+        }
         catch (BelowCostSaleBlockedException ex)
         {
             return Conflict(new { code = BelowCostSaleBlockedException.Code, message = ex.Message });

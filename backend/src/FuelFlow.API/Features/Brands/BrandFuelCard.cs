@@ -63,8 +63,12 @@ internal static class BrandFuelCard
             // afterwards. Reading it through the sizes instead (as this card used to) averaged the
             // fuel's own figure over the fuel's own sizes, which is the same number on a fuel that
             // has any, and nothing at all on one that has none.
-            SupplierPricePerLiter = fuel.SupplierPricePerLiter ?? 0m,
-            MarginUahPerLiter = fuel.MarginUahPerLiter ?? 0m,
+                // NULL, not zero. A zero here would be written straight back to the fuel by the save
+                // that posts this card, and a fuel with a cost of zero is priced at its margin and has
+                // no below-cost guard. "We do not know what we paid" is a fact the screen can show; a
+                // zero is a lie the database would believe.
+                SupplierPricePerLiter = fuel.SupplierPricePerLiter,
+                MarginUahPerLiter = fuel.MarginUahPerLiter,
             MarginPercent = fuel.MarginPercent,
             // The price the customer pays: ours when we can compute it, and otherwise the column
             // price the catalogue import published. A zero on this card is not "free", it is "we do
