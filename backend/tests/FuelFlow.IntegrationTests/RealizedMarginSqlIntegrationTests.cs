@@ -46,11 +46,12 @@ public sealed class RealizedMarginSqlIntegrationTests : IClassFixture<TestDataba
             lineTotal: 2150m,
             deliveredCostPerLiter: 50m,
             vouchers: 1,
-            liters: 50m);
+            liters: 50m,
+            createdAtUtc: new DateTime(2026, 1, 15, 12, 0, 0, DateTimeKind.Utc));
 
         await using var context = CreateContext();
         var report = await new GetRealizedMarginQueryHandler(context)
-            .HandleAsync(new GetRealizedMarginQuery(), CancellationToken.None);
+            .HandleAsync(new GetRealizedMarginQuery(FromDate: new DateTime(2026, 1, 1), ToDate: new DateTime(2026, 2, 1)), CancellationToken.None);
 
         report.RevenueUah.Should().Be(2150m, "the revenue is the frozen line total");
         report.CostUah.Should().Be(2500m, "the cost is what the delivered voucher cost us");
@@ -70,11 +71,12 @@ public sealed class RealizedMarginSqlIntegrationTests : IClassFixture<TestDataba
     [Fact]
     public async Task A_voucher_with_no_cost_is_reported_as_uncosted_and_carries_no_cost()
     {
-        await SeedAsync(lineTotal: 2500m, deliveredCostPerLiter: null, vouchers: 1, liters: 50m);
+        await SeedAsync(lineTotal: 2500m, deliveredCostPerLiter: null, vouchers: 1, liters: 50m,
+            createdAtUtc: new DateTime(2026, 3, 15, 12, 0, 0, DateTimeKind.Utc));
 
         await using var context = CreateContext();
         var report = await new GetRealizedMarginQueryHandler(context)
-            .HandleAsync(new GetRealizedMarginQuery(), CancellationToken.None);
+            .HandleAsync(new GetRealizedMarginQuery(FromDate: new DateTime(2026, 3, 1), ToDate: new DateTime(2026, 4, 1)), CancellationToken.None);
 
         report.RevenueUah.Should().Be(2500m);
         // A voucher with no cost contributes no cost - and the litres it represents are reported,
@@ -92,11 +94,12 @@ public sealed class RealizedMarginSqlIntegrationTests : IClassFixture<TestDataba
             lineTotal: 2500m,
             deliveredCostPerLiter: 50m,
             vouchers: 0,
-            liters: 50m);
+            liters: 50m,
+            createdAtUtc: new DateTime(2026, 5, 15, 12, 0, 0, DateTimeKind.Utc));
 
         await using var context = CreateContext();
         var report = await new GetRealizedMarginQueryHandler(context)
-            .HandleAsync(new GetRealizedMarginQuery(), CancellationToken.None);
+            .HandleAsync(new GetRealizedMarginQuery(FromDate: new DateTime(2026, 5, 1), ToDate: new DateTime(2026, 6, 1)), CancellationToken.None);
 
         report.RevenueUah.Should().Be(0m, "a group with no voucher handed over earns no margin");
         report.Lines.Should().Be(0);
@@ -106,7 +109,8 @@ public sealed class RealizedMarginSqlIntegrationTests : IClassFixture<TestDataba
         decimal lineTotal,
         decimal? deliveredCostPerLiter,
         int vouchers,
-        decimal liters)
+        decimal liters,
+        DateTime createdAtUtc)
     {
         var userId = Guid.NewGuid();
         var fuelTypeId = Guid.NewGuid();
@@ -143,7 +147,7 @@ public sealed class RealizedMarginSqlIntegrationTests : IClassFixture<TestDataba
             Status = OrderStatus.Fulfilled,
             Kind = OrderKind.Purchase,
             FulfilledAtUtc = DateTime.UtcNow.AddDays(-2),
-            CreatedAtUtc = DateTime.UtcNow.AddDays(-2),
+            CreatedAtUtc = createdAtUtc,
             UpdatedAtUtc = DateTime.UtcNow
         };
 
