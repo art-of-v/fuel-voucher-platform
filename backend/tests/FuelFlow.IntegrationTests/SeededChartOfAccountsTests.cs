@@ -82,7 +82,7 @@ public sealed class SeededChartOfAccountsTests : IClassFixture<TestDatabaseFixtu
 
         var accounts = await context.ChartOfAccounts.AsNoTracking().ToListAsync();
 
-        accounts.Should().HaveCount(24, "11 headers plus 13 subaccounts, and only what this business uses");
+        accounts.Should().HaveCount(25, "11 headers plus 14 subaccounts, and only what this business uses");
 
         // Spot-checks against the plan rather than an exhaustive list: these are the codes whose
         // meaning the earlier fabricated table got wrong.
@@ -97,6 +97,10 @@ public sealed class SeededChartOfAccountsTests : IClassFixture<TestDatabaseFixtu
         (await CodeOf("702")).Should().Be("Дохід від реалізації товарів");
         (await CodeOf("703")).Should().Be("Вирахування з доходу");
         (await CodeOf("808")).Should().Be("Витрати товарів");
+        // The write-off of expired unsold stock: lost goods, not the cost of a sale. It has to be
+        // its own element, because "how much did we lose to expired stock" is a question the
+        // accounts have to be able to answer on their own.
+        (await CodeOf("807")).Should().Be("Витрати від утрати товарів");
     }
 
     [Fact]

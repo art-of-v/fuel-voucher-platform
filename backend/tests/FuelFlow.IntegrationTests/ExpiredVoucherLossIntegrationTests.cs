@@ -1,5 +1,6 @@
 using FluentAssertions;
 using FuelFlow.API.BackgroundJobs;
+using FuelFlow.Features.Ledger;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Settings.SharedModels;
@@ -231,15 +232,196 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
         row.NetRealizedResult.Should().Be(-7500m);     // realized margin − expired loss
     }
 
+    /// <summary>
+    /// The ledger half of the write-off. Retiring a voucher is only half of it: without an entry,
+    /// account 281 still carries the voucher's cost, so the one book an accountant reads says the
+    /// stock is there while the stock has been written off. Two books, two answers.
+    /// <para>
+    /// The entry is Dr 807 (Витрати від утрати товарів) / Cr 281 (Товари на складі) - the cost
+    /// leaves the inventory account and lands on the element the Ukrainian Plan of Accounts gives
+    /// for lost goods. One entry per voucher, because the idempotency key is the voucher: a
+    /// re-run cannot write the same write-off twice.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task BookExpiredLoss_WhenEnabled_WritesTheStockOffInTheLedger()
+    {
+        await SeedAsync(seed =>
+        {
+            Enable(seed);
+            SeedFixture(seed);
+            SeedBatchCost(seed, 25m);
+        });
+
+        await RunAsync();
+
+        using var verify = CreateContext();
+        var entries = await verify.JournalEntries
+            .Include(e => e.Lines)
+            .Where(e => e.SourceEvent == "stock.expired.writeoff")
+            .ToListAsync();
+
+        entries.Should().HaveCount(3, "one write-off per voucher the job retired");
+
+        foreach (var entry in entries)
+        {
+            var debit = entry.Lines.Single(l => l.DebitUah > 0m);
+            var credit = entry.Lines.Single(l => l.CreditUah > 0m);
+
+            debit.DebitUah.Should().Be(2500m);      // 100 L x 25 UAH/L
+            credit.CreditUah.Should().Be(2500m);
+            debit.DebitUah.Should().Be(credit.CreditUah, "a journal entry that does not balance is not an entry");
+
+            var debitAccount = await verify.ChartOfAccounts.FindAsync(debit.AccountId);
+            var creditAccount = await verify.ChartOfAccounts.FindAsync(credit.AccountId);
+            debitAccount!.Code.Should().Be("807", "lost stock is written off on the loss element, not on the cost of sales");
+            creditAccount!.Code.Should().Be("281", "the cost leaves the inventory account");
+        }
+
+        // The ledger and the batch P&L must tell the same story - they are two books of the same
+        // fact, and a difference between them is the divergence this exists to remove.
+        var total = entries.Sum(e => e.Lines.Sum(l => l.DebitUah));
+        total.Should().Be(7500m);                   // 3 x 100 L x 25 UAH/L
+
+        var lines = await verify.JournalLines.ToListAsync();
+        lines.Sum(l => l.DebitUah).Should().Be(lines.Sum(l => l.CreditUah),
+            "the whole book has to balance, not just this entry");
+    }
+
+    /// <summary>
+    /// The write-off is keyed by the voucher, so a re-run cannot book it twice. The scenario is
+    /// real: the job posts the entry and then flips the status, and a crash between the two
+    /// leaves the voucher sellable and the entry posted - and the next night's run meets it again.
+    /// </summary>
+    [Fact]
+    public async Task BookExpiredLoss_RunAgain_DoesNotWriteTheSameWriteOffTwice()
+    {
+        await SeedAsync(seed =>
+        {
+            Enable(seed);
+            SeedFixture(seed);
+            SeedBatchCost(seed, 25m);
+        });
+
+        await RunAsync();
+
+        // The crash: the postings are in, the status flip is not.
+        using (var reset = CreateContext())
+        {
+            var lapsed = await reset.FuelVouchers
+                .Where(v => v.VoucherNumber.StartsWith("instock-"))
+                .ToListAsync();
+            foreach (var v in lapsed)
+            {
+                v.Status = VoucherStatus.Available;
+            }
+            await reset.SaveChangesAsync();
+        }
+
+        await RunAsync();
+
+        using var verify = CreateContext();
+        var entries = await verify.JournalEntries
+            .Include(e => e.Lines)
+            .Where(e => e.SourceEvent == "stock.expired.writeoff")
+            .ToListAsync();
+
+        entries.Should().HaveCount(3, "the second run met the same three vouchers and booked none of them twice");
+        entries.Sum(e => e.Lines.Sum(l => l.DebitUah)).Should().Be(7500m);
+    }
+
+    /// <summary>
+    /// A dry run says what it would do and changes nothing - the ledger included. The setting is
+    /// off by default, so a dry run that wrote to the ledger would be the default behaviour.
+    /// </summary>
+    [Fact]
+    public async Task BookExpiredLoss_WhenDisabled_WritesNothingToTheLedger()
+    {
+        await SeedAsync(seed =>
+        {
+            // ExpiredVoucherLoss:Enabled intentionally NOT set -> fail-safe default of false.
+            SeedFixture(seed);
+            SeedBatchCost(seed, 25m);
+        });
+
+        await RunAsync();
+
+        using var verify = CreateContext();
+        (await verify.JournalEntries.CountAsync(e => e.SourceEvent == "stock.expired.writeoff")).Should().Be(0);
+        (await verify.JournalEntries.CountAsync()).Should().Be(0, "a dry run writes nothing to the books at all");
+    }
+
+    /// <summary>
+    /// The journal will not take a posting that names nobody, and a nightly sweep has nobody of
+    /// its own. The operator who decided the policy does - but only if the setting recorded them.
+    /// <para>
+    /// When it did not, the job books nothing and says so. The alternative - retiring the stock
+    /// without the entry - is the exact divergence this exists to remove, and attributing the
+    /// entry to an invented user would be a worse lie.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task BookExpiredLoss_WhenTheSettingNamesNobody_BooksNothingAtAll()
+    {
+        await SeedAsync(seed =>
+        {
+            seed.AppSettings.Add(new AppSetting
+            {
+                Key = AppSettingKeys.ExpiredVoucherLossEnabled,
+                Value = "true",
+                UpdatedAtUtc = DateTime.UtcNow,
+                // No author: the setting was written by hand rather than through the admin screen.
+                UpdatedByUserId = null,
+                UpdatedByUserName = null
+            });
+            SeedFixture(seed);
+            SeedBatchCost(seed, 25m);
+        });
+
+        await RunAsync();
+
+        using var verify = CreateContext();
+        (await verify.FuelVouchers.CountAsync(v => v.Status == VoucherStatus.Expired)).Should().Be(0,
+            "a stock that cannot be written off in the ledger is not written off at all");
+        (await verify.JournalEntries.CountAsync()).Should().Be(0);
+    }
+
     private static async Task<VoucherStatus> StatusOf(ApplicationDbContext context, string number)
         => (await context.FuelVouchers.FirstAsync(v => v.VoucherNumber == number)).Status;
 
-    private static void Enable(ApplicationDbContext seed) => seed.AppSettings.Add(new AppSetting
+    /// <summary>
+    /// Turns the sweep on, the way the admin screen does: with a person behind it.
+    /// <para>
+    /// The author matters because the journal will not take a posting that names nobody
+    /// ("a posted entry without both a moment and a person is an entry nobody can be asked
+    /// about"), and a nightly sweep has no person of its own. The operator who decided that
+    /// lapsed stock is written off is the one who stands behind the entry - and the admin screen
+    /// records who changed a setting, so the answer is already in the database.
+    /// </para>
+    /// </summary>
+    private static Guid Enable(ApplicationDbContext seed)
     {
-        Key = AppSettingKeys.ExpiredVoucherLossEnabled,
-        Value = "true",
-        UpdatedAtUtc = DateTime.UtcNow
-    });
+        var operatorId = Guid.NewGuid();
+        seed.Users.Add(new User
+        {
+            Id = operatorId,
+            PhoneNumber = $"+38{operatorId:N}"[..20],
+            IsActive = true,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+
+        seed.AppSettings.Add(new AppSetting
+        {
+            Key = AppSettingKeys.ExpiredVoucherLossEnabled,
+            Value = "true",
+            UpdatedAtUtc = DateTime.UtcNow,
+            UpdatedByUserId = operatorId,
+            UpdatedByUserName = "Test Operator"
+        });
+
+        return operatorId;
+    }
 
     /// <summary>
     /// Costs the vouchers of the (import × okko-dp) batch so the P&amp;L can value expired stock at cost.
@@ -288,7 +470,10 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
     {
         using var context = CreateContext();
         var service = new ExpiredVoucherLossService(
-            context, new RuntimeSettingsService(context), NullLogger<ExpiredVoucherLossService>.Instance);
+            context,
+            new RuntimeSettingsService(context),
+            new JournalPostingService(context, NullLogger<JournalPostingService>.Instance),
+            NullLogger<ExpiredVoucherLossService>.Instance);
         await service.BookExpiredLossAsync();
     }
 
@@ -381,11 +566,21 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
     {
         using var context = CreateContext();
         await context.Database.MigrateAsync();
+
+        // The journal is cleared first, and WITHOUT CASCADE. A CASCADE here would reach
+        // chart_of_accounts and users - journal_entries points at both - and wipe the seeded chart
+        // out from under the whole ledger. All three go in ONE statement: PostgreSQL refuses to
+        // truncate a table that a foreign key references unless the referencing tables are
+        // truncated in the same command, and journal_lines references journal_entries.
         await context.Database.ExecuteSqlRawAsync(
-            "TRUNCATE TABLE \"fuel_vouchers\", \"purchase_batches\", \"voucher_imports\", \"app_settings\" RESTART IDENTITY CASCADE");
+            """TRUNCATE TABLE "journal_lines", "journal_entries", "accounting_periods" """);
+        await context.Database.ExecuteSqlRawAsync(
+            """TRUNCATE TABLE "fuel_vouchers", "purchase_batches", "voucher_imports", "app_settings" RESTART IDENTITY CASCADE""");
+
         seed(context);
         await context.SaveChangesAsync();
     }
+
 
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
