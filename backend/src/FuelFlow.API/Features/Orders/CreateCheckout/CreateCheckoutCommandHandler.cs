@@ -120,18 +120,44 @@ public sealed class CreateCheckoutCommandHandler
         }
 
         // Slice-3 hard block (safety net at checkout, mirroring the operator write path): refuse a
-        // sale whose recomputed price/╨╗ sits below blended cost unless this supplier+fuel is opted in.
-        if (!fuelTypeEntity.AllowBelowCost
-            && package.SupplierPricePerLiter is { } cost
-            && package.MarginUahPerLiter is { } profit
-            && FuelPricing.IsBelowCost(cost, profit, package.PumpPricePerLiter, package.MinDiscountPerLiter ?? 0m))
+        // sale whose recomputed price sits below blended cost unless this supplier+fuel is opted in.
+        //
+        // TWO REFUSALS, and the second one is the one this used to be missing.
+        //
+        // The block was written as `package.SupplierPricePerLiter is { } cost && ...`, which means a
+        // fuel with NO recorded cost skipped the whole check and THE SALE WENT THROUGH. The model
+        // already had the honest answer - ServerPricing.TryGetBelowCostVerdict returns UnknownCost
+        // for exactly this case - and nobody asked it. A fuel with no cost was freely sellable, at
+        // whatever price the package carried.
+        //
+        // The catalogue import creates fuels with no cost on purpose: it knows the column price
+        // (what the driver pays) and nothing about what we pay. So this is not a corner case, it
+        // is every fuel the import has ever made. A fuel that is in stock and has no recorded
+        // cost cannot be sold, because nobody can prove the price is above what we paid.
+        //
+        // The discount argument is 0 because THIS path has no term ladder - it sells the full
+        // remaining supplier term, so there is no term discount to apply (see the pricing basis
+        // further down). The bulk path has terms, and it passes the real one.
+        //
+        // And it is ServerPricing's verdict rather than FuelPricing's, because ServerPricing
+        // compares against the price the customer is ACTUALLY charged. FuelPricing recomputes it
+        // from cost + margin, which would never see a term discount - so a generous tier could
+        // sell under cost while the guard reported the line was fine.
+        var verdict = ServerPricing.TryGetBelowCostVerdict(package, 0m);
+        if (verdict == ServerPricing.BelowCostVerdict.UnknownCost)
+        {
+            throw new UnknownCostSaleBlockedException(command.FuelTypeId);
+        }
+
+        if (!fuelTypeEntity.AllowBelowCost && verdict == ServerPricing.BelowCostVerdict.BelowCost)
         {
             // A customer is standing at the payment screen being refused, and nothing tells anyone.
             // The pricing alert only fired on a manager saving a price or costing a batch, so a fuel
             // that drifted below cost blocked sales silently. Throttled per fuel inside the dispatcher,
             // so a customer retrying the same checkout does not flood the chat.
             await _notifications.BelowCostAsync(
-                package.BrandSlug, fuelTypeEntity.Name, cost, profit, deliberate: false, cancellationToken);
+                package.BrandSlug, fuelTypeEntity.Name, package.SupplierPricePerLiter,
+                ServerPricing.DiscountedPricePerLiter(package, 0m) ?? 0m, deliberate: false, cancellationToken);
             throw new BelowCostSaleBlockedException(command.FuelTypeId);
         }
 

@@ -67,7 +67,10 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
         var fuel = providers.Single(p => p.Id == TestOkko).Fuels.Single(f => f.Id == ToUuid("test-fuel-imported").ToString());
         fuel.PumpPricePerLiter.Should().Be(92.90m, "the card reads the fuel's own columns, not its sizes");
         fuel.FinalPricePerLiter.Should().Be(92.90m, "the column price stands in until there is a cost");
-        fuel.SupplierPricePerLiter.Should().Be(0m, "there is no cost yet, and the card says so");
+        fuel.SupplierPricePerLiter.Should().BeNull(
+            "there is no cost yet, and the card says so - NOT zero, because a zero here is written "
+            + "straight back to the fuel by the save that posts this card, and a fuel with a cost of "
+            + "zero is priced at its margin and has no below-cost guard");
         fuel.PackageLiters.Should().BeEmpty("a fuel with no sizes has no sizes to sell");
     }
 

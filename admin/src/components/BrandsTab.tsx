@@ -30,8 +30,11 @@ import {
 interface BrandFuelDto {
   id: string;
   name: string;
-  supplierPricePerLiter: number;
-  marginUahPerLiter: number;
+  // NULLABLE, and it has to stay nullable. The cost is "not stated" until an operator says what
+  // we pay - the catalogue import knows the column price and nothing about that - and a blank that
+  // arrives as a 0 becomes a fuel priced at its margin with no below-cost guard.
+  supplierPricePerLiter: number | null;
+  marginUahPerLiter: number | null;
   marginPercent: number | null;
   finalPricePerLiter: number;
   pumpPricePerLiter: number | null;
@@ -91,11 +94,15 @@ const DEFAULT_MIN_DISCOUNT = 0.5;
 // cost + profit (legacy cost-plus). The server is authoritative and recomputes on
 // write — this only keeps the operator's Фінал column honest while editing.
 function computeFinal(
-  cost: number,
-  profit: number,
+  cost: number | null,
+  profit: number | null,
   pump: number | null,
   minDiscount: number,
 ): number {
+  // No cost means no price of ours: the column is the only figure we honestly have, and the
+  // storefront shows that with "not in stock" next to it. Before this, a blank cost was a
+  // ZERO here and in the payload, which priced the fuel at its margin.
+  if (cost === null || profit === null) return pump ?? 0;
   const costPlus = cost + profit;
   if (pump && pump > 0) return Math.min(costPlus, pump - minDiscount);
   return costPlus;
@@ -159,14 +166,16 @@ export default function BrandsTab({
 
   const newFuelPumpNum =
     newFuelPump.trim() === "" ? null : parseFloat(newFuelPump) || 0;
-  const newFuelCost = parseFloat(newFuelSupplierPrice) || 0;
+  // A blank cost is "not stated", not zero. Zero would price the fuel at its margin and blind the
+  // below-cost guard - and the fuel would sell for 2.75 UAH/litre.
+  const newFuelCost = newFuelSupplierPrice.trim() === "" ? null : parseFloat(newFuelSupplierPrice);
   const newFuelFinalPrice = computeFinal(
     newFuelCost,
-    parseFloat(newFuelMargin) || 0,
+    newFuelMargin.trim() === "" ? null : parseFloat(newFuelMargin),
     newFuelPumpNum,
     parseFloat(newFuelMinDiscount) || 0,
   );
-  const newFuelBelowCost = newFuelCost > 0 && newFuelFinalPrice < newFuelCost;
+  const newFuelBelowCost = newFuelCost !== null && newFuelCost > 0 && newFuelFinalPrice < newFuelCost;
 
   const [editingNominals, setEditingNominals] = useState<string | null>(null);
   const [nominalInput, setNominalInput] = useState("");
@@ -448,8 +457,10 @@ export default function BrandsTab({
       brandId,
       data: {
         name: newFuelName,
-        supplierPricePerLiter: parseFloat(newFuelSupplierPrice) || 0,
-        marginUahPerLiter: parseFloat(newFuelMargin) || 0,
+        // A blank cost is "not stated", not zero. Zero would price the fuel at its margin and
+        // blind the below-cost guard.
+        supplierPricePerLiter: newFuelSupplierPrice.trim() === "" ? null : parseFloat(newFuelSupplierPrice),
+        marginUahPerLiter: newFuelMargin.trim() === "" ? null : parseFloat(newFuelMargin),
         finalPricePerLiter: newFuelFinalPrice,
         pumpPricePerLiter: newFuelPumpNum,
         minDiscountPerLiter: parseFloat(newFuelMinDiscount) || 0,
@@ -946,8 +957,13 @@ export default function BrandsTab({
                           const shownCost = isEditing
                             ? editCost
                             : fuel.supplierPricePerLiter;
+                          // A null cost is "we do not know what we paid", not "we paid nothing",
+                          // so it is NOT a below-cost price - and the row shows the column beside it.
                           const belowCost =
-                            shownCost > 0 && shownFinal < shownCost;
+                            shownCost !== null &&
+                            shownCost > 0 &&
+                            shownFinal !== null &&
+                            shownFinal < shownCost;
 
                           return (
                             <tr
@@ -1015,7 +1031,9 @@ export default function BrandsTab({
                                       className="block text-right tabular-nums text-muted-foreground"
                                       title={t("price.supplierDerivedHint")}
                                     >
-                                      {fuel.supplierPricePerLiter.toFixed(2)}
+                                      {fuel.supplierPricePerLiter !== null
+                                        ? fuel.supplierPricePerLiter.toFixed(2)
+                                        : "—"}
                                     </span>
                                     <button
                                       type="button"
@@ -1029,7 +1047,9 @@ export default function BrandsTab({
                                   </div>
                                 ) : (
                                   <span className="block text-right tabular-nums">
-                                    {fuel.supplierPricePerLiter.toFixed(2)}
+                                    {fuel.supplierPricePerLiter !== null
+                                      ? fuel.supplierPricePerLiter.toFixed(2)
+                                      : "—"}
                                   </span>
                                 )}
                               </td>
@@ -1054,7 +1074,9 @@ className="w-24 h-8 text-right text-xs"
                                    />
                                 ) : (
                                   <span className="block text-right tabular-nums text-primary">
-                                    {fuel.marginUahPerLiter.toFixed(2)}
+                                    {fuel.marginUahPerLiter !== null
+                                      ? fuel.marginUahPerLiter.toFixed(2)
+                                      : "—"}
                                   </span>
                                 )}
                               </td>

@@ -173,7 +173,18 @@ private readonly RuntimeSettingsService _runtimeSettings;
             // Evaluated against the DISCOUNTED figure: FuelPricing.IsBelowCost recomputes the price
             // from cost + margin and would never see a term discount, letting a generous tier sell
             // under cost while the guard reported the line was fine.
-            if (!fuelType.AllowBelowCost && ServerPricing.IsBelowCost(package, discountPerLiter))
+            // TWO REFUSALS, and the second is the one that used to be missing. A fuel with NO
+            // recorded cost has nothing to compare the price against, so the answer is "cannot tell"
+            // - and a "cannot tell" that lets the sale through is not a guard. The catalogue import
+            // creates fuels with no cost on purpose (it knows the column price and nothing about
+            // what we pay), so this is every fuel the import has ever made, not a corner case.
+            var verdict = ServerPricing.TryGetBelowCostVerdict(package, discountPerLiter);
+            if (verdict == ServerPricing.BelowCostVerdict.UnknownCost)
+            {
+                throw new UnknownCostSaleBlockedException(item.FuelTypeId);
+            }
+
+            if (!fuelType.AllowBelowCost && verdict == ServerPricing.BelowCostVerdict.BelowCost)
             {
                 // Same as the single-line path: a blocked basket tells nobody unless we say so.
                 // Throttled per fuel inside the dispatcher, so one customer's retry loop is one message.

@@ -28,17 +28,37 @@ public sealed record BrandFuelDto
     public string Id { get; init; } = null!;
     public string Name { get; init; } = null!;
 
-    /// <summary>Cost per liter (собівартість). Manual entry in MVP.</summary>
-    public decimal SupplierPricePerLiter { get; init; }
+    /// <summary>
+    /// Cost per liter (собівартість) — what we pay. Manual entry in MVP.
+    /// </summary>
+    /// <remarks>
+    /// <b>Nullable, and it has to stay nullable.</b> It was a plain <c>decimal</c>, which made "the operator
+    /// left it blank" indistinguishable from "zero" — and the wire turns a JSON null into a zero before the
+    /// value ever reaches this property. A fuel with no recorded cost therefore became a fuel with a cost of
+    /// zero, and two things followed from that, both of them money:
+    /// <list type="bullet">
+    /// <item>the customer price became <c>min(0 + margin, column − discount)</c> — the MARGIN, not the price.
+    /// A grade worth 92.90 became a 2.75 bargain, or 0.00 when the margin was blank too;</item>
+    /// <item>the below-cost guard went blind, because it only fires when the cost is greater than zero — it
+    /// reads "we paid nothing" as "nothing can be below what we paid".</item>
+    /// </list>
+    /// A null here means "not stated", and it stays that way: the price is then the column (what the driver
+    /// pays) and the fuel is not sold until someone says what we paid.
+    /// </remarks>
+    public decimal? SupplierPricePerLiter { get; init; }
 
-    /// <summary>Profit per liter (заробіток / МАРЖА knob).</summary>
-    public decimal MarginUahPerLiter { get; init; }
+    /// <summary>
+    /// Profit per liter (заробіток / МАРЖА knob). Null means "not stated", on the same terms as the cost
+    /// above: a missing margin must never become a zero that publishes a free fuel.
+    /// </summary>
+    public decimal? MarginUahPerLiter { get; init; }
 
     public decimal? MarginPercent { get; init; }
 
     /// <summary>Computed customer price/liter = min(cost + profit, pump − minDiscount).
-    /// Server-authoritative; any value sent on write is ignored and recomputed.</summary>
-    public decimal FinalPricePerLiter { get; init; }
+    /// Server-authoritative; any value sent on write is ignored and recomputed. Null when the fuel's cost or
+    /// margin is not stated — there is no honest price to publish then.</summary>
+    public decimal? FinalPricePerLiter { get; init; }
 
     /// <summary>Pump/board price (колонка), UAH/liter - the ceiling. Null until an
     /// operator records it; while null the price is the legacy cost + profit. Manual in MVP.</summary>
