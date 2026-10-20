@@ -30,6 +30,11 @@
 --
 -- If a fuel legitimately has no cost, `allow_below_cost` is the switch that says so - and it
 -- is false on all 23, so today nobody has said so about any of them.
+--
+-- THE ID IS CAST TO TEXT because `fuel_types.id` is a uuid since 2026-10-20
+-- (`20261020084928_FuelTypeIdsBecomeUuid`) and `uuid || text` is not an operator Postgres has:
+-- the file would stop running the day the column changed, and a precondition that cannot run
+-- reports success without having checked anything. The cast runs on both shapes.
 
 BEGIN;
 SET TRANSACTION READ ONLY;
@@ -38,7 +43,7 @@ SELECT to_regclass('public.fuel_types') IS NOT NULL AS t \gset
 \if :t
 SELECT 'fuel_types' AS table_name,
        'no supplier cost - the below-cost guard is skipped for this fuel' AS violation,
-       f.name || ' (brand ' || b.slug || ', id ' || f.id || ')' AS detail
+       f.name || ' (brand ' || b.slug || ', id ' || f.id::text || ')' AS detail
 FROM fuel_types f
 LEFT JOIN brands b ON b.id = f.brand_id
 WHERE NOT f.is_deleted
@@ -47,7 +52,7 @@ WHERE NOT f.is_deleted
 UNION ALL
 SELECT 'fuel_types' AS table_name,
        'no margin - the below-cost guard is skipped for this fuel' AS violation,
-       f.name || ' (brand ' || b.slug || ', id ' || f.id || ')' AS detail
+       f.name || ' (brand ' || b.slug || ', id ' || f.id::text || ')' AS detail
 FROM fuel_types f
 LEFT JOIN brands b ON b.id = f.brand_id
 WHERE NOT f.is_deleted
