@@ -51,7 +51,7 @@ public sealed class RealizedMarginSqlIntegrationTests : IClassFixture<TestDataba
 
         await using var context = CreateContext();
         var report = await new GetRealizedMarginQueryHandler(context)
-            .HandleAsync(new GetRealizedMarginQuery(FromDate: new DateTime(2026, 1, 1), ToDate: new DateTime(2026, 2, 1)), CancellationToken.None);
+            .HandleAsync(new GetRealizedMarginQuery(FromDate: new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), ToDate: new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc)), CancellationToken.None);
 
         report.RevenueUah.Should().Be(2150m, "the revenue is the frozen line total");
         report.CostUah.Should().Be(2500m, "the cost is what the delivered voucher cost us");
@@ -76,7 +76,7 @@ public sealed class RealizedMarginSqlIntegrationTests : IClassFixture<TestDataba
 
         await using var context = CreateContext();
         var report = await new GetRealizedMarginQueryHandler(context)
-            .HandleAsync(new GetRealizedMarginQuery(FromDate: new DateTime(2026, 3, 1), ToDate: new DateTime(2026, 4, 1)), CancellationToken.None);
+            .HandleAsync(new GetRealizedMarginQuery(FromDate: new DateTime(2026, 3, 1, 0, 0, 0, DateTimeKind.Utc), ToDate: new DateTime(2026, 4, 1, 0, 0, 0, DateTimeKind.Utc)), CancellationToken.None);
 
         report.RevenueUah.Should().Be(2500m);
         // A voucher with no cost contributes no cost - and the litres it represents are reported,
@@ -99,7 +99,7 @@ public sealed class RealizedMarginSqlIntegrationTests : IClassFixture<TestDataba
 
         await using var context = CreateContext();
         var report = await new GetRealizedMarginQueryHandler(context)
-            .HandleAsync(new GetRealizedMarginQuery(FromDate: new DateTime(2026, 5, 1), ToDate: new DateTime(2026, 6, 1)), CancellationToken.None);
+            .HandleAsync(new GetRealizedMarginQuery(FromDate: new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Utc), ToDate: new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc)), CancellationToken.None);
 
         report.RevenueUah.Should().Be(0m, "a group with no voucher handed over earns no margin");
         report.Lines.Should().Be(0);
