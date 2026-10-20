@@ -235,6 +235,7 @@ public sealed class BatchCostTimelineIntegrationTests : IClassFixture<TestDataba
         {
             seed.Suppliers.Add(new Supplier
             {
+                EdrIpn = TestEdrIpns.Next(),
                 Id = SupplierId,
                 Name = "Timeline Supplier",
                 IsActive = true,

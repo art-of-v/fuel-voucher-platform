@@ -55,6 +55,7 @@ public sealed class CostEntryAuditIntegrationTests : IClassFixture<TestDatabaseF
         };
         var supplier = new Supplier
         {
+            EdrIpn = TestEdrIpns.Next(),
             Id = Guid.NewGuid(),
             Name = $"Audit supplier {suffix}",
             IsActive = true,

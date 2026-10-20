@@ -118,7 +118,7 @@ public sealed class SuppliersController : ControllerBase
             LegalForm = request.LegalForm?.Trim(),
             Phone = request.Phone?.Trim(),
             Email = request.Email?.Trim(),
-            EdrIpn = request.EdrIpn?.Trim(),
+            EdrIpn = request.EdrIpn!.Trim(),
             Rnkrr = request.Rnkrr?.Trim(),
             Address = request.Address?.Trim(),
             Notes = request.Notes?.Trim(),
@@ -180,7 +180,7 @@ public sealed class SuppliersController : ControllerBase
         supplier.LegalForm = request.LegalForm?.Trim();
         supplier.Phone = request.Phone?.Trim();
         supplier.Email = request.Email?.Trim();
-        supplier.EdrIpn = request.EdrIpn?.Trim();
+        supplier.EdrIpn = request.EdrIpn!.Trim();
         supplier.Rnkrr = request.Rnkrr?.Trim();
         supplier.Address = request.Address?.Trim();
         supplier.Notes = request.Notes?.Trim();
@@ -244,8 +244,15 @@ public sealed class SuppliersController : ControllerBase
         s.Id, s.Name, s.AcquisitionSource, s.LegalForm, s.Phone, s.Email, s.EdrIpn, s.Rnkrr, s.Address, s.Notes, s.IsActive);
 
     /// <summary>
-    /// Only the name is mandatory. Everything else depends on the legal form — an ФОП has an ІПН and an
-    /// LLC has an ЄДРОПУ — so rejecting a blank there would reject half the suppliers we actually deal with.
+    /// The name and the registry code are mandatory. Everything else depends on the legal form —
+    /// an ФОП has an ІПН and an LLC has an ЄДРОПУ — so rejecting a blank there would reject half
+    /// the suppliers we actually deal with.
+    /// <para>
+    /// The registry code became mandatory on 2026-10-20, on the business's instruction: it is what
+    /// a VAT invoice is issued against, so a supplier without one cannot be invoiced and the
+    /// business carries the cost of that. The database enforces it too, so a direct API call
+    /// cannot slip a blank past this form.
+    /// </para>
     /// </summary>
     private static string? Validate(CreateSupplierRequest request)
     {
@@ -255,7 +262,10 @@ public sealed class SuppliersController : ControllerBase
         if (request.LegalForm is { Length: > 0 } form && !LegalForms.Contains(form.Trim()))
             return $"Unknown legal form '{form}'. Expected one of: {string.Join(", ", LegalForms)}.";
 
-        if (!string.IsNullOrWhiteSpace(request.EdrIpn) && !EdrIpnPattern.IsMatch(request.EdrIpn.Trim()))
+        if (string.IsNullOrWhiteSpace(request.EdrIpn))
+            return "ЄДРОПУ/ІПН is required - it is what the invoice is issued against.";
+
+        if (!EdrIpnPattern.IsMatch(request.EdrIpn.Trim()))
             return "ЄДРОПУ/ІПН must be 8-10 digits.";
 
         if (!string.IsNullOrWhiteSpace(request.Rnkrr) && !RnkrrPattern.IsMatch(request.Rnkrr.Trim()))
@@ -348,6 +358,17 @@ public class CreateSupplierRequest
     public string? LegalForm { get; set; }
     public string? Phone { get; set; }
     public string? Email { get; set; }
+
+    /// <summary>
+    /// The supplier's registry code - ЄДРОПУ for a company, ІПН for an individual. Mandatory:
+    /// it is what a VAT invoice is issued against, so a supplier without one cannot be invoiced
+    /// and the business carries the cost of that.
+    /// <para>
+    /// Nullable in the request type only so that a missing field is a clean 400 with a sentence
+    /// rather than a model-binding error; the validation refuses a blank, and the database refuses
+    /// it too.
+    /// </para>
+    /// </summary>
     public string? EdrIpn { get; set; }
     public string? Rnkrr { get; set; }
     public string? Address { get; set; }

@@ -98,11 +98,17 @@ BEGIN;
 -- One supplier for the whole QA pool. Named so it is obvious in the admin screens and in any audit
 -- row which chain a voucher came from - an unattributable test batch is the thing that makes a
 -- production cleanup guesswork later.
-INSERT INTO suppliers (id, name, is_active, notes, created_at_utc, updated_at_utc)
-SELECT gen_random_uuid(), 'QA Supplier (emulated)', true,
-       'Test-only. Created by scripts/seed-qa-full-emulation.sql. Safe to delete with its batches.',
-       now(), now()
-WHERE NOT EXISTS (SELECT 1 FROM suppliers WHERE name = 'QA Supplier (emulated)');
+    -- The registry code is mandatory since 2026-10-20: it is what a VAT invoice is issued
+    -- against. A QA supplier has no real one, so it gets the same kind of obviously-fake
+    -- number the QA phone uses (9999...), which is 10 digits and therefore well-formed -
+    -- a seed that could not satisfy the constraint would leave the QA database unable to
+    -- take the migration.
+    INSERT INTO suppliers (id, name, is_active, notes, edr_ipn, created_at_utc, updated_at_utc)
+    SELECT gen_random_uuid(), 'QA Supplier (emulated)', true,
+            'Test-only. Created by scripts/seed-qa-full-emulation.sql. Safe to delete with its batches.',
+            '9999999999',
+            now(), now()
+    WHERE NOT EXISTS (SELECT 1 FROM suppliers WHERE name = 'QA Supplier (emulated)');
 
 -- The QA account the reviewer signs in as. Held vouchers must belong to somebody, and the fulfilment
 -- claim only serves test stock to a QA account, so this has to be that one. Checked here rather than

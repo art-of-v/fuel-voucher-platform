@@ -38,8 +38,8 @@ public sealed class AdminVoucherListSortTests : IDisposable
         _context = new ApplicationDbContext(options, TestQrCipher.Instance);
 
         _context.Suppliers.AddRange(
-            new Supplier { Id = AlphaId, Name = "Альфа Палив", CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new Supplier { Id = BetaId, Name = "Бета Палив", CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
+            new Supplier { Id = AlphaId, Name = "Альфа Палив", EdrIpn = "9000000017", CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new Supplier { Id = BetaId, Name = "Бета Палив", EdrIpn = "9000000103", CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
 
         _context.FuelTypes.Add(new FuelTypeEntity
         {

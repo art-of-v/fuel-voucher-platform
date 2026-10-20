@@ -35,9 +35,12 @@ describe("supplier EDR/ІПН validation", () => {
     expect(isValidEdrIpn("３８５２８１４７")).toBe(false);
   });
 
-  it("is optional, and trims before measuring", () => {
-    expect(isValidEdrIpn("")).toBe(true);
-    expect(isValidEdrIpn("   ")).toBe(true);
+  it("is required, and trims before measuring", () => {
+    // Mandatory since 2026-10-20: the code is what a VAT invoice is issued against, so a
+    // supplier without one cannot be invoiced. A blank is a different mistake from a
+    // malformed one, and the form says so in a different sentence.
+    expect(isValidEdrIpn("")).toBe(false);
+    expect(isValidEdrIpn("   ")).toBe(false);
     expect(isValidEdrIpn("  38528147  ")).toBe(true);
     // Seven digits plus surrounding whitespace is still seven digits.
     expect(isValidEdrIpn("  3852814  ")).toBe(false);
@@ -64,15 +67,16 @@ describe("supplier РНОКР validation", () => {
 describe("supplier requisites as a pair", () => {
   it("gates on either field being wrong", () => {
     expect(isValidSupplierRequisites({ edrIpn: "38528147", rnkrr: "12345" })).toBe(true);
-    expect(isValidSupplierRequisites({ edrIpn: "", rnkrr: "" })).toBe(true);
+    expect(isValidSupplierRequisites({ edrIpn: "", rnkrr: "" })).toBe(false);
     expect(isValidSupplierRequisites({ edrIpn: "nope", rnkrr: "" })).toBe(false);
-    expect(isValidSupplierRequisites({ edrIpn: "", rnkrr: "nope" })).toBe(false);
+    expect(isValidSupplierRequisites({ edrIpn: "38528147", rnkrr: "nope" })).toBe(false);
   });
 
-  it("does not require an identifier at all - an ФОП and an LLC carry different ones", () => {
-    // The trap this guards: "must be valid" read as "must be present" would have made half the
-    // suppliers unstorable, which is the same mistake a mandatory-field rule makes here.
-    expect(isValidSupplierRequisites({ edrIpn: "", rnkrr: "" })).toBe(true);
-    expect(isValidSupplierRequisites({ edrIpn: "  ", rnkrr: "  " })).toBe(true);
+  it("requires the registry code, and only the registry code", () => {
+    // Mandatory since 2026-10-20. The РНОКР stays optional: it is a registry record
+    // number, not a tax one, and an LLC has no reason to carry one.
+    expect(isValidSupplierRequisites({ edrIpn: "", rnkrr: "" })).toBe(false);
+    expect(isValidSupplierRequisites({ edrIpn: "  ", rnkrr: "" })).toBe(false);
+    expect(isValidSupplierRequisites({ edrIpn: "38528147", rnkrr: "" })).toBe(true);
   });
 });

@@ -30,9 +30,17 @@ function isOptionalDigits(value: string, min: number, max: number): boolean {
   return trimmed === "" || (ASCII_DIGITS.test(trimmed) && trimmed.length >= min && trimmed.length <= max);
 }
 
-/** Mirrors the server's `EdrIpnPattern`: `^\d{8,10}$`, applied to the trimmed value. */
+/**
+ * Mirrors the server's `EdrIpnPattern`: `^\d{8,10}$`, applied to the trimmed value - and the
+ * server's rule that a blank is refused, so this one is not optional.
+ *
+ * The registry code became mandatory on 2026-10-20: it is what a VAT invoice is issued
+ * against, so a supplier without one cannot be invoiced.
+ */
 export function isValidEdrIpn(value: string): boolean {
-  return isOptionalDigits(value, EDR_IPN_MIN_DIGITS, EDR_IPN_MAX_DIGITS);
+  const trimmed = value.trim();
+  return trimmed !== "" && ASCII_DIGITS.test(trimmed)
+    && trimmed.length >= EDR_IPN_MIN_DIGITS && trimmed.length <= EDR_IPN_MAX_DIGITS;
 }
 
 /** Mirrors the server's `RnkrrPattern`: `^\d{5}$`, applied to the trimmed value. */
@@ -46,9 +54,9 @@ export interface SupplierRequisites {
 }
 
 /**
- * Whether the supplier form may be saved. An ФОП has an ІПН and an LLC has an ЄДРОПУ,
- * so neither identifier is mandatory - this answers "is what was typed storable", not
- * "is the supplier complete".
+ * Whether the supplier form may be saved. The registry code (ЄДРОПУ / ІПН) is mandatory - an
+ * ФОП has an ІПН and an LLC has an ЄДРОПУ, and without one the supplier cannot be invoiced.
+ * The РНОКР stays optional: it is a registry record number, not a tax one.
  */
 export function isValidSupplierRequisites(form: SupplierRequisites): boolean {
   return isValidEdrIpn(form.edrIpn) && isValidRnkrr(form.rnkrr);

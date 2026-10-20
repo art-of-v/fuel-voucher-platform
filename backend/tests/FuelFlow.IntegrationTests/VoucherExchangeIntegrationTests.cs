@@ -749,6 +749,7 @@ var actingUserId = Guid.NewGuid();
     private static void SeedSupplier(ApplicationDbContext ctx, Guid supplierId, string name = "Seed Supplier")
         => ctx.Suppliers.Add(new Supplier
         {
+            EdrIpn = TestEdrIpns.Next(),
             Id = supplierId,
             Name = name,
             IsActive = true,

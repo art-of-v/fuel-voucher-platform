@@ -208,8 +208,8 @@ public sealed class SeedScriptsExecuteTests : IClassFixture<TestDatabaseFixture>
             FROM brands b WHERE b.slug = 'okko'
             ON CONFLICT (id) DO NOTHING;
 
-            INSERT INTO suppliers (id, name, is_active, created_at_utc, updated_at_utc)
-            VALUES ('66666666-6666-4666-8666-0000000000aa', 'QA Supplier (emulated)', true, now(), now())
+            INSERT INTO suppliers (id, name, is_active, edr_ipn, created_at_utc, updated_at_utc)
+            VALUES ('66666666-6666-4666-8666-0000000000aa', 'QA Supplier (emulated)', true, '9999999999', now(), now())
             ON CONFLICT (id) DO NOTHING;
 
             INSERT INTO voucher_imports

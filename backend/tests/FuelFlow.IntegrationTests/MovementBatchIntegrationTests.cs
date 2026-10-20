@@ -306,6 +306,7 @@ public sealed class MovementBatchIntegrationTests : IClassFixture<TestDatabaseFi
         var id = Guid.NewGuid();
         ctx.Suppliers.Add(new Supplier
         {
+            EdrIpn = TestEdrIpns.Next(),
             Id = id, Name = $"Seed {id:N}"[..20], IsActive = true,
             CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
         });

@@ -195,7 +195,7 @@ var afterCosts = (await CostsAsync(context, importId)).Single(c => c.FuelTypeId 
 
         if (!await seed.Suppliers.AnyAsync())
         {
-            seed.Suppliers.Add(new Supplier { Id = Guid.NewGuid(), Name = "S", IsActive = true, CreatedAtUtc = DateTime.UtcNow });
+            seed.Suppliers.Add(new Supplier { Id = Guid.NewGuid(), Name = "S", EdrIpn = TestEdrIpns.Next(), IsActive = true, CreatedAtUtc = DateTime.UtcNow });
         }
         if (!await seed.FuelTypes.AnyAsync())
         {

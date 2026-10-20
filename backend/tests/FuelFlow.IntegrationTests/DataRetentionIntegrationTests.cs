@@ -372,6 +372,7 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
             var supplierId = Guid.NewGuid();
             seed.Suppliers.Add(new Supplier
             {
+                EdrIpn = TestEdrIpns.Next(),
                 Id = supplierId,
                 Name = $"Retention Test Supplier {supplierId:N}"[..40],
                 CreatedAtUtc = Old(),

@@ -57,13 +57,18 @@ public sealed class SuppliersControllerTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    private Supplier Seed(string name, bool isActive = true)
+    private static int _edrSeq;
+
+    private Supplier Seed(string name, bool isActive = true, string? edrIpn = null)
     {
         var now = DateTime.UtcNow;
         var supplier = new Supplier
         {
             Id = Guid.NewGuid(),
             Name = name,
+            // The registry code is mandatory since 2026-10-20, and unique - so each seeded
+            // supplier gets its own, or two of them are the same counterparty twice.
+            EdrIpn = edrIpn ?? (9000000000 + Interlocked.Increment(ref _edrSeq)).ToString(),
             IsActive = isActive,
             CreatedAtUtc = now,
             UpdatedAtUtc = now
@@ -86,25 +91,83 @@ public sealed class SuppliersControllerTests : IDisposable
     };
 
     [Fact]
-    public async Task Create_ShouldAcceptSupplierWithOnlyName()
+    public async Task Create_ShouldAcceptSupplierWithOnlyTheMandatoryRequisites()
     {
-var result = await _controller.Create(new CreateSupplierRequest { Name = "ФОП Стретович Микола" });
+        // The name and the registry code. Everything else stays optional - an ФОП has an ІПН
+        // and an LLC has an ЄДРОПУ, and rejecting a blank in the other fields would reject
+        // half the suppliers we actually deal with.
+        var result = await _controller.Create(new CreateSupplierRequest
+        {
+            Name = "Постачальник тільки з обов'язковим",
+            EdrIpn = "1234567890"
+        });
 
         var ok = result.Result.Should().BeOfType<OkObjectResult>().Subject;
         var dto = ok.Value.Should().BeOfType<SupplierDto>().Subject;
-        dto.Name.Should().Be("ФОП Стретович Микола");
+        dto.Name.Should().Be("Постачальник тільки з обов'язковим");
         dto.LegalForm.Should().BeNull();
         dto.IsActive.Should().BeTrue();
+        dto.EdrIpn.Should().Be("1234567890");
 
-        (await _context.Suppliers.SingleAsync()).Name.Should().Be("ФОП Стретович Микола");
+        (await _context.Suppliers.SingleAsync()).Name.Should().Be("Постачальник тільки з обов'язковим");
     }
+
+    /// <summary>
+    /// The registry code became mandatory on 2026-10-20: it is what a VAT invoice is issued
+    /// against, so a supplier without one cannot be invoiced.
+    /// <para>
+    /// The blank has to be refused with a sentence, not with a stack trace from the database -
+    /// which is the whole reason the API validates it, since the column is NOT NULL and the
+    /// database would answer a blank with a 23514 and a stack trace in the Error Logs.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task Create_ShouldRejectASupplierWithNoRegistryCode()
+    {
+        var result = await _controller.Create(new CreateSupplierRequest { Name = "Без коду" });
+
+        ErrorOf(result).Should().Be("ЄДРОПУ/ІПН is required - it is what the invoice is issued against.");
+
+        (await _context.Suppliers.CountAsync()).Should().Be(0, "a refused supplier is not written");
+    }
+
+    [Fact]
+    public async Task Create_ShouldRejectABlankRegistryCode()
+    {
+        var result = await _controller.Create(new CreateSupplierRequest
+        {
+            Name = "З порожнім кодом",
+            EdrIpn = "   "
+        });
+
+        result.Result.Should().BeOfType<BadRequestObjectResult>();
+        (await _context.Suppliers.CountAsync()).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Update_ShouldRejectABlankRegistryCode()
+    {
+        var supplier = Seed("Постачальник з кодом");
+        var id = supplier.Id;
+
+        var result = await _controller.Update(id, new UpdateSupplierRequest
+        {
+            Name = supplier.Name,
+            EdrIpn = "  "
+        });
+
+        result.Result.Should().BeOfType<BadRequestObjectResult>();
+        (await _context.Suppliers.SingleAsync(s => s.Id == id)).EdrIpn.Should().Be(supplier.EdrIpn,
+            "a refused update leaves the stored row untouched");
+    }
+
 
     [Fact]
     public async Task Create_WithNoRoute_StoresDirect()
     {
         // Every supplier in the database today is direct, so the absent case is the common one and
         // must not be an error - a required field here would have made every existing form fail.
-        var result = await _controller.Create(new CreateSupplierRequest { Name = "ФОП Стретович Микола" });
+        var result = await _controller.Create(new CreateSupplierRequest { Name = "ФОП Стретович Микола", EdrIpn = "1234567890" });
 
         var dto = result.Result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeOfType<SupplierDto>().Subject;
         dto.AcquisitionSource.Should().Be(AcquisitionSources.Direct);
@@ -118,6 +181,7 @@ var result = await _controller.Create(new CreateSupplierRequest { Name = "ФОП
         // endpoint cannot state the route, a secondary-route supplier can never exist at all.
         var result = await _controller.Create(new CreateSupplierRequest
         {
+            EdrIpn = "1234567890",
             Name = "ТОВ Постачання Плюс",
             AcquisitionSource = AcquisitionSources.Partner,
         });
@@ -134,6 +198,7 @@ var result = await _controller.Create(new CreateSupplierRequest { Name = "ФОП
         // a 23514 - a 500 and a stack trace. Normalising here is what turns a typo into an answer.
         var result = await _controller.Create(new CreateSupplierRequest
         {
+            EdrIpn = "1234567890",
             Name = "ТОВ Постачання Плюс",
             AcquisitionSource = "  PARTNER  ",
         });
@@ -159,6 +224,7 @@ var result = await _controller.Create(new CreateSupplierRequest { Name = "ФОП
     {
         var result = await _controller.Create(new CreateSupplierRequest
         {
+            EdrIpn = "1234567890",
             Name = "ТОВ Постачання Плюс",
             AcquisitionSource = "grey",
         });
@@ -181,6 +247,7 @@ var result = await _controller.Create(new CreateSupplierRequest { Name = "ФОП
 
         var result = await _controller.Update(supplier.Id, new UpdateSupplierRequest
         {
+            EdrIpn = "1234567890",
             Name = supplier.Name,
             AcquisitionSource = AcquisitionSources.Direct,
         });
@@ -201,6 +268,7 @@ var result = await _controller.Create(new CreateSupplierRequest { Name = "ФОП
 
         var result = await _controller.Update(supplier.Id, new UpdateSupplierRequest
         {
+            EdrIpn = "1234567890",
             Name = supplier.Name,
             Phone = "+380501234567",
             AcquisitionSource = AcquisitionSources.Partner,
@@ -240,7 +308,7 @@ var result = await _controller.Create(new CreateSupplierRequest { Name = "ФОП
     [InlineData("   ")]
     public async Task Create_ShouldRejectMissingName(string? name)
     {
-        var result = await _controller.Create(new CreateSupplierRequest { Name = name });
+        var result = await _controller.Create(new CreateSupplierRequest { Name = name, EdrIpn = "1234567890" });
 
         result.Result.Should().BeOfType<BadRequestObjectResult>();
         (await _context.Suppliers.CountAsync()).Should().Be(0);
@@ -379,7 +447,7 @@ var result = await _controller.Create(new CreateSupplierRequest { Name = "ФОП
         // string would let this through and land the operator back on the 500.
         Seed("Постачальник");
 
-        var result = await _controller.Create(new CreateSupplierRequest { Name = "  Постачальник  " });
+        var result = await _controller.Create(new CreateSupplierRequest { Name = "  Постачальник  ", EdrIpn = "1234567890" });
 
         result.Result.Should().BeOfType<ConflictObjectResult>();
         (await _context.Suppliers.CountAsync()).Should().Be(1);
@@ -413,7 +481,7 @@ var result = await _controller.Create(new CreateSupplierRequest { Name = "ФОП
         var kept = Seed("Перший постачальник");
         var second = Seed("Другий постачальник");
 
-        var result = await _controller.Update(second.Id, new UpdateSupplierRequest { Name = kept.Name });
+        var result = await _controller.Update(second.Id, new UpdateSupplierRequest { Name = kept.Name, EdrIpn = "1234567890" });
 
         result.Result.Should().BeOfType<ConflictObjectResult>();
         var names = await _context.Suppliers.Select(s => s.Name).ToListAsync();
@@ -429,6 +497,7 @@ var result = await _controller.Create(new CreateSupplierRequest { Name = "ФОП
 
         var result = await _controller.Update(seeded.Id, new UpdateSupplierRequest
         {
+            EdrIpn = "1234567890",
             Name = seeded.Name,
             Phone = "+380501234567"
         });
@@ -488,7 +557,7 @@ var result = await _controller.Create(new CreateSupplierRequest { Name = "ФОП
     {
         var seeded = Seed("Постачальник", isActive: false);
 
-        await _controller.Update(seeded.Id, new UpdateSupplierRequest { Name = "Перейменований" });
+        await _controller.Update(seeded.Id, new UpdateSupplierRequest { Name = "Перейменований", EdrIpn = "1234567890" });
 
         (await _context.Suppliers.SingleAsync()).IsActive.Should().BeFalse();
     }
@@ -496,7 +565,7 @@ var result = await _controller.Create(new CreateSupplierRequest { Name = "ФОП
     [Fact]
     public async Task Update_UnknownSupplier_ShouldReturnNotFound()
     {
-        var result = await _controller.Update(Guid.NewGuid(), new UpdateSupplierRequest { Name = "Хтось" });
+        var result = await _controller.Update(Guid.NewGuid(), new UpdateSupplierRequest { Name = "Хтось", EdrIpn = "1234567890" });
 
         result.Result.Should().BeOfType<NotFoundResult>();
     }
@@ -508,6 +577,7 @@ var result = await _controller.Create(new CreateSupplierRequest { Name = "ФОП
 
         var result = await _controller.Update(seeded.Id, new UpdateSupplierRequest
         {
+            EdrIpn = "1234567890",
             Name = "Перейменований",
             Rnkrr = "123"
         });

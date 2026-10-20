@@ -72,6 +72,7 @@ public class VoucherAcquisitionSourceTests : WebApplicationFactory<Program>, ICl
         {
             context.Suppliers.Add(new Supplier
             {
+                EdrIpn = TestEdrIpns.Next(),
                 Id = Guid.NewGuid(),
                 Name = "acquisition-source-test-supplier",
                 IsActive = true,
