@@ -89,14 +89,48 @@ public sealed class RoleHierarchyTests
     [Theory]
     [InlineData(SeedRoles.QaName)]
     [InlineData(SeedRoles.ManagerName)]
-    public void EveryRefusalIsAlsoRefusedForARolelessTarget(string actorRole)
+    [InlineData(SeedRoles.AdminName)]
+    public void EveryRefusalButTheOwners_IsAlsoRefusedForARolelessTarget(string actorRole)
     {
-        // A target with no role is refused to everyone. Documented rather than fixed here: see
-        // planning issue #299 - the guard sits before the ProductOwner short-circuit, so even the
-        // owner cannot manage such an account, and the SPA offers four buttons that all 403.
+        // A target with no role is refused to everyone below the ProductOwner: the hierarchy has
+        // no place to put it, so nobody in a tier can be said to manage it. The ProductOwner is
+        // the exception, and the only way such an account is ever recovered - see planning #299.
         RoleHierarchy.CanActivateDeactivate(actorRole, null).Should().BeFalse();
+        RoleHierarchy.CanAssignRole(actorRole, null, SeedRoles.UserName).Should().BeFalse();
         RoleHierarchy.CanBan(actorRole, null).Should().BeFalse();
         RoleHierarchy.CanDelete(actorRole, null).Should().BeFalse();
+    }
+
+    [Fact]
+    public void The_ProductOwner_Can_Manage_An_Account_That_Has_No_Role()
+    {
+        // The null guard used to sit before the ProductOwner's short-circuit, so the one actor
+        // with absolute rights could not touch an account the hierarchy could not place - and the
+        // account was stuck: nobody could activate, deactivate, re-role, email or ban it.
+        RoleHierarchy.CanActivateDeactivate(SeedRoles.ProductOwnerName, null).Should().BeTrue();
+        RoleHierarchy.CanAssignRole(SeedRoles.ProductOwnerName, null, SeedRoles.UserName).Should().BeTrue();
+        RoleHierarchy.CanAssignRole(SeedRoles.ProductOwnerName, null, SeedRoles.AdminName).Should().BeTrue();
+        RoleHierarchy.CanBan(SeedRoles.ProductOwnerName, null).Should().BeTrue();
+    }
+
+    [Fact]
+    public void The_ProductOwner_Cannot_Mint_A_Second_ProductOwner_Through_A_Roleless_Target_Either()
+    {
+        // The roleless exception does not open the singleton: a ProductOwner is still never
+        // assignable through the app.
+        RoleHierarchy.CanAssignRole(SeedRoles.ProductOwnerName, null, SeedRoles.ProductOwnerName).Should().BeFalse();
+    }
+
+    [Fact]
+    public void The_Refusal_Says_Why()
+    {
+        // The refusal used to be an empty 403, so the reason existed only in the server log.
+        RoleHierarchy.DescribeRefusal(SeedRoles.ManagerName, null)
+            .Should().Contain("no role").And.Contain("ProductOwner");
+        RoleHierarchy.DescribeRefusal(SeedRoles.ManagerName, SeedRoles.AdminName)
+            .Should().Contain("Manager").And.Contain("Admin");
+        RoleHierarchy.DescribeRefusal(null, SeedRoles.UserName)
+            .Should().Contain("staff");
     }
 
     [Theory]

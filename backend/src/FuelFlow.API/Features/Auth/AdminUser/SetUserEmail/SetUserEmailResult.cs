@@ -13,7 +13,7 @@ public sealed class SetUserEmailResult
 
     public static SetUserEmailResult CreatePending() => new() { Success = true, PendingConfirmation = true };
     public static SetUserEmailResult CreateCleared() => new() { Success = true };
-    public static SetUserEmailResult CreateForbidden() => new() { Forbidden = true };
+    public static SetUserEmailResult CreateForbidden(string reason) => new() { Forbidden = true, Error = reason };
     public static SetUserEmailResult CreateNotFound(string error) => new() { NotFound = true, Error = error };
     public static SetUserEmailResult Failure(string error) => new() { Error = error };
 }

@@ -16,13 +16,16 @@ export const STAFF_ROLES: string[] = [ROLE_PRODUCT_OWNER, ROLE_ADMIN, ROLE_MANAG
  *
  * - A ProductOwner target is never changeable by anyone (singleton, untouchable).
  * - ProductOwner actor: User / QA / Manager / Admin — never another ProductOwner (not assignable;
- *   the PO is pinned via the env bootstrap only).
+ *   the PO is pinned via the env bootstrap only). A target with NO role is included here: only
+ *   the ProductOwner may place such an account, and that is the only way out of the state
+ *   (planning #299).
  * - Admin actor: User / Manager, and only for User/Manager targets (Admins are created by the
- *   ProductOwner only).
+ *   ProductOwner only). A target with no role is NOT theirs: the backend refuses it, and a
+ *   dropdown that is guaranteed to 403 is worse than no dropdown.
  * - Manager / QA / User actor: none. QA can flip a User account's active switch but may not mint
  *   roles, so its dropdown is empty and it gets no role control.
  */
-export function assignableRoles(actorRole: string, targetCurrentRole: string): string[] {
+export function assignableRoles(actorRole: string, targetCurrentRole: string | null): string[] {
   if (targetCurrentRole === ROLE_PRODUCT_OWNER) return [];
   if (actorRole === ROLE_PRODUCT_OWNER) return [ROLE_USER, ROLE_QA, ROLE_MANAGER, ROLE_ADMIN];
   if (actorRole === ROLE_ADMIN && (targetCurrentRole === ROLE_USER || targetCurrentRole === ROLE_MANAGER)) {

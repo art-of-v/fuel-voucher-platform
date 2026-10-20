@@ -43,7 +43,7 @@ public sealed class SetUserRoleCommandHandler
 
         // Cannot change your own role.
         if (target.Id == command.ActingUserId)
-            return SetUserRoleResult.CreateForbidden();
+            return SetUserRoleResult.CreateForbidden("You cannot change your own role.");
 
         // Hierarchy check — enforced server-side.
         if (!RoleHierarchy.CanAssignRole(command.ActingRole, target.Role?.Name, command.RoleName))
@@ -51,7 +51,8 @@ public sealed class SetUserRoleCommandHandler
             _logger.LogWarning(
                 "Role change for {TargetId} rejected: actor role {ActingRole} cannot manage target role {TargetRole}",
                 command.UserId, command.ActingRole, command.RoleName);
-            return SetUserRoleResult.CreateForbidden();
+            return SetUserRoleResult.CreateForbidden(
+                RoleHierarchy.DescribeRefusal(command.ActingRole, target.Role?.Name));
         }
 
         // Cannot demote the last active ProductOwner.

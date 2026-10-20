@@ -98,7 +98,7 @@ public sealed class AdminUserController : ControllerBase
         if (result.NotFound)
             return NotFound(new { message = result.Error });
         if (result.Forbidden)
-            return Forbid();
+            return Forbidden(result.Error);
         if (!result.Success)
             return BadRequest(new { message = result.Error });
 
@@ -131,7 +131,7 @@ public sealed class AdminUserController : ControllerBase
         if (result.NotFound)
             return NotFound(new { message = result.Error });
         if (result.Forbidden)
-            return Forbid();
+            return Forbidden(result.Error);
         if (!result.Success)
             return BadRequest(new { message = result.Error });
 
@@ -194,7 +194,7 @@ public sealed class AdminUserController : ControllerBase
         if (result.NotFound)
             return NotFound(new { message = result.Error });
         if (result.Forbidden)
-            return Forbid();
+            return Forbidden(result.Error);
         if (!result.Success)
             return BadRequest(new { message = result.Error });
 
@@ -217,12 +217,20 @@ public sealed class AdminUserController : ControllerBase
         if (result.NotFound)
             return NotFound(new { message = result.Error });
         if (result.Forbidden)
-            return Forbid();
+            return Forbidden(result.Error);
         if (!result.Success)
             return BadRequest(new { message = result.Error });
 
         return NoContent();
     }
+
+    /// <summary>
+    /// A 403 that says why. <see cref="ControllerBase.Forbid()"/> writes an empty body, so the
+    /// operator saw a toast with nothing after the colon and had to guess what had been refused
+    /// (planning #299). The admin SPA reads the <c>message</c> field and shows it unchanged.
+    /// </summary>
+    private IActionResult Forbidden(string? reason) =>
+        StatusCode(StatusCodes.Status403Forbidden, new { message = reason });
 
     private (Guid? ActingUserId, string? ActingRole, string? ActingName) GetActor()
     {

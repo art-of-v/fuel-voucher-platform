@@ -1151,26 +1151,34 @@ if (status === "booting") {
                       <td className="p-4 font-mono text-xs text-muted-foreground">{user.referredBy || '-'}</td>
                       <td className="p-4 font-mono text-xs text-muted-foreground">
                         {(() => {
-                          const currentRole = user.role || 'User';
+                          // The account's REAL role - null when it has none. The SPA used to read
+                          // that as 'User', which hid the state from the operator AND made the
+                          // repair impossible: the dropdown showed 'User' as the current value,
+                          // so picking 'User' was a no-op and the account could not be given the
+                          // one role it most likely needs (planning #299).
+                          const currentRole = user.role;
                           const options = user.isDeleted || user.id === currentUserId
                             ? []
                             : assignableRoles(actorRole, currentRole);
                           if (options.length === 0) {
-                            return <span className="capitalize">{currentRole}</span>;
+                            return <span className="capitalize">{currentRole ?? t('users.noRole')}</span>;
                           }
-                          const choices = options.includes(currentRole) ? options : [currentRole, ...options];
+                          const choices = currentRole && !options.includes(currentRole)
+                            ? [currentRole, ...options]
+                            : options;
                           return (
                             <select
-                              value={currentRole}
+                              value={currentRole ?? ''}
                               disabled={setUserRoleMutation.isPending}
                               onChange={(e) => {
                                 const role = e.target.value;
-                                if (role !== currentRole) {
+                                if (role !== (currentRole ?? '')) {
                                   setUserRoleMutation.mutate({ userId: user.id, role });
                                 }
                               }}
                               className="bg-transparent border border-border rounded px-2 py-1 text-xs text-foreground"
                             >
+                              {currentRole === null && <option value="">{t('users.noRole')}</option>}
                               {choices.map((r) => (
                                 <option key={r} value={r}>{r}</option>
                               ))}

@@ -42,7 +42,7 @@ public sealed class SetUserBannedCommandHandler
         // Banning yourself would revoke your own session and, for a lone ProductOwner,
         // lock the whole system out. Never allowed in either direction.
         if (target.Id == command.ActingUserId)
-            return SetUserBannedResult.CreateForbidden();
+            return SetUserBannedResult.CreateForbidden("You cannot ban your own account.");
 
         // Hierarchy check — enforced server-side, never trust the SPA. Ban authority mirrors
         // delete authority (ProductOwner → anyone, Admin → User/Manager): both are hard
@@ -52,7 +52,8 @@ public sealed class SetUserBannedCommandHandler
             _logger.LogWarning(
                 "User {TargetId} ban/unban rejected: actor role {ActingRole} cannot manage target role {TargetRole}",
                 command.UserId, command.ActingRole, target.Role?.Name);
-            return SetUserBannedResult.CreateForbidden();
+            return SetUserBannedResult.CreateForbidden(
+                RoleHierarchy.DescribeRefusal(command.ActingRole, target.Role?.Name));
         }
 
         // Never ban the last active, non-banned ProductOwner — that would leave the system

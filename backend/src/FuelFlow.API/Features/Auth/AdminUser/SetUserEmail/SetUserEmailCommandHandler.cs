@@ -47,7 +47,8 @@ public sealed class SetUserEmailCommandHandler
             _logger.LogWarning(
                 "Email change for {TargetId} rejected: actor role {ActingRole} cannot manage target role {TargetRole}",
                 command.UserId, command.ActingRole, target.Role?.Name);
-            return SetUserEmailResult.CreateForbidden();
+            return SetUserEmailResult.CreateForbidden(
+                RoleHierarchy.DescribeRefusal(command.ActingRole, target.Role?.Name));
         }
 
         var oldEmail = target.Email;
