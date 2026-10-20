@@ -229,6 +229,172 @@ public sealed class JournalPostingService
         return Convert.ToInt64(result, CultureInfo.InvariantCulture);
     }
 
+    /// <summary>
+    /// Posts a batch of facts in one unit of work.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A nightly sweep that writes off a hundred expired vouchers used to post a hundred entries,
+    /// and every post was five queries of its own: the idempotency check, the accounts, the period,
+    /// the entry number and the two saves. The batch asks the same four questions once for the whole
+    /// set - the accounts are the same because the facts are of one kind, the period is the same
+    /// because they are of one date, the entry numbers come from one sequence upsert, and the two
+    /// saves are two saves and not two per fact.
+    /// </para>
+    /// <para>
+    /// The numbers a batch takes are consecutive, so the ledger's entry numbers stay a gapless
+    /// sequence - which is the property the accountant reads the journal for.
+    /// </para>
+    /// <para>
+    /// A batch is of ONE kind and ONE date, and says so when it is not: the accounts and the period
+    /// are resolved once each, and resolving them per fact would be the same five queries again.
+    /// </para>
+    /// </remarks>
+    public async Task<IReadOnlyList<JournalEntry>> PostManyAsync(
+        IReadOnlyCollection<PostJournalEntryRequest> requests,
+        CancellationToken cancellationToken = default)
+    {
+        if (requests.Count == 0)
+            return [];
+
+        var first = requests.First();
+        foreach (var request in requests)
+        {
+            if (request.AmountUah <= 0)
+                throw new LedgerPostingException(
+                    $"Amount for '{request.SourceEvent}' must be greater than zero; got {request.AmountUah}.");
+            if (string.IsNullOrWhiteSpace(request.Description))
+                throw new LedgerPostingException($"Description for '{request.SourceEvent}' must not be blank.");
+            if (request.SourceEvent != first.SourceEvent || request.SourceType != first.SourceType)
+                throw new LedgerPostingException(
+                    "A batch posts facts of one kind; the accounts are resolved once for it.");
+            if (request.EntryDate != first.EntryDate)
+                throw new LedgerPostingException(
+                    "A batch posts facts of one date; the accounting period is resolved once for it.");
+        }
+
+        // The entries that are already there - the idempotency check, once for the batch.
+        var sourceIds = requests.Select(r => r.SourceId).Distinct().ToArray();
+        var existing = await _db.JournalEntries
+            .Include(e => e.Lines)
+            .Where(e => e.SourceEvent == first.SourceEvent
+                     && e.SourceType == first.SourceType
+                     && e.SourceId != null
+                     && sourceIds.Contains(e.SourceId.Value))
+            .ToListAsync(cancellationToken);
+        var existingBySourceId = existing.ToDictionary(e => e.SourceId);
+
+        var pending = requests.Where(r => !existingBySourceId.ContainsKey(r.SourceId)).ToList();
+        if (pending.Count == 0)
+        {
+            _logger.LogInformation(
+                "Journal entries for {SourceEvent} already exist for {Count} sources; not posting twice.",
+                first.SourceEvent, existing.Count);
+            return existing;
+        }
+
+        var (debit, credit) = await ResolveAccountsAsync(first.SourceEvent, cancellationToken);
+        var period = await ResolvePeriodAsync(first.EntryDate, cancellationToken);
+
+        var firstNo = await NextEntryNosAsync(period.Id, pending.Count, cancellationToken);
+        var now = DateTime.UtcNow;
+
+        var entries = new List<JournalEntry>(pending.Count);
+        for (var index = 0; index < pending.Count; index++)
+        {
+            var request = pending[index];
+            var entry = new JournalEntry
+            {
+                Id = Guid.NewGuid(),
+                // Consecutive, so the ledger's numbers stay a gapless sequence.
+                EntryNo = firstNo + index,
+                EntryDate = request.EntryDate,
+                PeriodId = period.Id,
+                SourceType = request.SourceType,
+                SourceEvent = request.SourceEvent,
+                SourceId = request.SourceId,
+                Description = request.Description,
+                // Draft first, exactly as the single post does it: the entry has to exist and be
+                // composable before it is posted, because the trigger refuses a line added to an
+                // entry that is already posted.
+                Status = JournalEntryStatus.Draft,
+                CreatedAtUtc = now,
+                CreatedByUserId = request.PostedByUserId,
+                Lines =
+                [
+                    NewLine(1, debit, request),
+                    NewLine(2, credit, request),
+                ],
+            };
+
+            _db.JournalEntries.Add(entry);
+            entries.Add(entry);
+        }
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            foreach (var entry in entries)
+            {
+                entry.Status = JournalEntryStatus.Posted;
+                entry.PostedAtUtc = now;
+                entry.PostedByUserId = first.PostedByUserId;
+                entry.TamperHash = ComputeTamperHash(entry);
+            }
+
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            // Do not leave half-written drafts behind: they would be visible, unbalanced postings
+            // that nobody asked for.
+            foreach (var entry in entries)
+            {
+                _db.Entry(entry).State = EntityState.Deleted;
+            }
+
+            await _db.SaveChangesAsync(cancellationToken);
+            throw;
+        }
+
+        _logger.LogInformation(
+            "Posted {Count} journal entries for {SourceEvent} in one unit of work.",
+            entries.Count, first.SourceEvent);
+
+        return entries;
+    }
+
+    /// <summary>
+    /// Hands out <paramref name="count"/> consecutive entry numbers for the period, in one atomic
+    /// upsert. The single post takes one number the same way.
+    /// </summary>
+    private async Task<long> NextEntryNosAsync(Guid periodId, int count, CancellationToken cancellationToken)
+    {
+        var name = $"journal:{periodId}";
+
+        // Not Database.SqlQuery: EF composes a query over anything handed to it, and an
+        // INSERT ... ON CONFLICT ... RETURNING is not composable. Opening the connection through
+        // the context instead means the upsert runs on the caller's connection and inside the
+        // caller's transaction, so a batch that is later rolled back does not burn numbers.
+        await _db.Database.OpenConnectionAsync(cancellationToken);
+
+        await using var command = _db.Database.GetDbConnection().CreateCommand();
+        command.CommandText = """
+            INSERT INTO document_sequences (id, name, last_value)
+            VALUES (gen_random_uuid(), @name, @count)
+            ON CONFLICT (name) DO UPDATE
+                SET last_value = document_sequences.last_value + @count
+            RETURNING last_value;
+            """;
+        command.Parameters.Add(new NpgsqlParameter("name", NpgsqlDbType.Varchar) { Value = name });
+        command.Parameters.Add(new NpgsqlParameter("count", NpgsqlDbType.Integer) { Value = count });
+
+        var result = await command.ExecuteScalarAsync(cancellationToken);
+        var last = Convert.ToInt64(result, CultureInfo.InvariantCulture);
+        return last - count + 1;
+    }
+
     private static JournalLine NewLine(short lineNo, ChartOfAccount account, PostJournalEntryRequest request)
     {
         // Line 1 is the debit leg and line 2 the credit leg because ResolveAccountsAsync returned

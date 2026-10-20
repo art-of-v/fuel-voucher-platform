@@ -177,6 +177,7 @@ public class ExpiredVoucherLossService
             }
 
             var now = DateTime.UtcNow;
+            var writeOffs = new List<PostJournalEntryRequest>();
             foreach (var v in batch)
             {
                 // Read the status BEFORE the flip. The candidate set spans three values (Imported /
@@ -202,7 +203,7 @@ public class ExpiredVoucherLossService
 
                 if (writeOffAmount > 0m)
                 {
-                    await _journal.PostAsync(new PostJournalEntryRequest
+                    writeOffs.Add(new PostJournalEntryRequest
                     {
                         SourceEvent = ExpiredStockWriteOffEvent,
                         SourceType = JournalSourceType.Cost,
@@ -217,7 +218,7 @@ public class ExpiredVoucherLossService
                         PostedByUserId = authorId!.Value,
                         VoucherId = v.Id,
                         QuantityLiters = v.Liters,
-                    }, cancellationToken);
+                    });
                     writtenOff += writeOffAmount;
                 }
 
@@ -248,6 +249,18 @@ public class ExpiredVoucherLossService
                     Reason = $"expired unsold, retired by the nightly loss sweep (grace {graceDays}d)",
                     OccurredAtUtc = now
                 });
+            }
+
+            // The ledger for the whole batch, in one unit of work. A post is five queries of its
+            // own - the idempotency check, the accounts, the period, the entry number and the two
+            // saves - and the batch asks the same four questions once for the whole set.
+            //
+            // The order the comment above insists on is kept: every write-off is posted before any
+            // status is flipped, so a failure here leaves the stock exactly as it was and the next
+            // night's run tries it again.
+            if (writeOffs.Count > 0)
+            {
+                await _journal.PostManyAsync(writeOffs, cancellationToken);
             }
 
             await _context.SaveChangesAsync(cancellationToken);
