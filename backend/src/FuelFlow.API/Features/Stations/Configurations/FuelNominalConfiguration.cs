@@ -21,7 +21,9 @@ internal sealed class FuelNominalConfiguration : IEntityTypeConfiguration<FuelNo
 
         builder.Property(e => e.DataKind)
             .HasColumnName("data_kind")
-            .HasColumnType("text")
+            // varchar(10), like every other data_kind column in the schema. The value is one of
+            // two words, and the CHECK beside it says so.
+            .HasMaxLength(10)
             .IsRequired();
 
         // A named value, not a boolean: a rehearsal row that cannot be called anything else cannot be

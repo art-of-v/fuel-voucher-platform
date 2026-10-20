@@ -22,7 +22,9 @@ internal sealed class FuelTypeProductCodeConfiguration : IEntityTypeConfiguratio
            builder.Property(e => e.FuelTypeId).HasColumnName("fuel_type_id").HasColumnType("uuid")
                .IsRequired();
         builder.Property(e => e.BrandId).HasColumnName("brand_id").HasColumnType("uuid").IsRequired();
-        builder.Property(e => e.ProductCode).HasColumnName("product_code").HasColumnType("text").IsRequired();
+        builder.Property(e => e.ProductCode).HasColumnName("product_code")
+            // varchar(32), the bound ck_fuel_type_product_codes_product_code_length already states.
+            .HasMaxLength(32).IsRequired();
         builder.Property(e => e.LastSeenAtUtc).HasColumnName("last_seen_at_utc").HasColumnType("timestamptz");
 
         // THE guarantee. One code, one grade, per network: the lookup a voucher's QR does is a single
