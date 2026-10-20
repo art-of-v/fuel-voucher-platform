@@ -216,19 +216,39 @@ export interface Company {
   updatedAt?: string;
 }
 
+// A contract is a row in the `contracts` table: this user, this company, this brand, with a
+// term. It carries no document text - the schema has no column for it - so the client must
+// not invent one. `GET /api/legal-entity/contracts`.
 export interface Contract {
   id: string;
-  title: string;
-  content: string;
-  version: string;
-  status: string;
+  legalEntityId: string;
+  legalEntityName?: string | null;
+  brandId: string;
+  brandName?: string | null;
+  createdAt: string;
+  expiresAt: string;
+  expired: boolean;
 }
 
+// What `POST /api/legal-entity/sign` answers: the signature that was recorded.
+export interface ContractSignature {
+  id: string;
+  contractId: string;
+  signedAt: string;
+}
+
+// A signature on a contract. `GET /api/legal-entity/contracts/signed`.
+// The brand travels by id and by name: the id is what a screen matches on, the name is the
+// label it shows.
 export interface UserContract {
   id: string;
+  contractId: string;
+  legalEntityName?: string | null;
+  brandId?: string | null;
+  brandName?: string | null;
   signedAt: string;
-  contract: Contract;
-  station?: Station | null;
+  expiresAt?: string | null;
+  expired: boolean;
 }
 
 export interface User {

@@ -8,24 +8,31 @@ import { Haptics } from '../src/core/utils/haptics';
 /**
  * Contract signing, which had no tests.
  *
- * Signing a contract here is a legal act with a station, and this screen is where a
+ * Signing a contract here is a legal act with a provider, and this screen is where a
  * mistake becomes expensive: the wrong contract signed, or a signature submitted
  * against no contract at all. Three things carry the risk:
  *
  * - a contract is **auto-selected only when exactly one is available**. With two or
  *   more the screen must force a choice, because silently picking the first would
  *   sign a document the user never read
- * - signing needs all three of station, contract and signature; anything missing is
+ * - signing needs all three of provider, contract and signature; anything missing is
  *   refused rather than half-submitted
  * - a failure surfaces the server's own message and keeps the sheet, so the
  *   signature is not lost and the user can retry
  *
  * There is also a safety net at the top: a user with no legal profile is sent to
  * complete it rather than left on a screen that cannot succeed.
+ *
+ * **The fixtures below are the SERVER's shape.** They used to be the client's own types
+ * - a contract with a `title` and a `content`, a signature with a nested `station` -
+ * and the server has never returned any of that: `contracts` is a row of ids and dates,
+ * and a signature carries the brand by id and by name. A fixture built from the client's
+ * types agrees with the client and says nothing about the server, which is how a screen
+ * that could not sign anything passed its own suite.
  */
 
 const mockInvalidate = jest.fn();
-const mockSignContracts = jest.fn();
+const mockSignContract = jest.fn();
 const mockGetLegalProfile = jest.fn();
 const mockNotification = jest.fn();
 const mockImpact = jest.fn();
@@ -62,7 +69,7 @@ jest.mock('@tanstack/react-query', () => ({
 }));
 
 jest.mock('../src/features/contracts/api/signContract', () => ({
-  signContracts: (...a: unknown[]) => mockSignContracts(...a),
+  signContract: (...a: unknown[]) => mockSignContract(...a),
 }));
 
 jest.mock('../src/features/profile/api/updateLegalProfile', () => ({
@@ -163,13 +170,37 @@ jest.mock('lucide-react-native', () => {
   };
 });
 
+/** A brand, as `GET /api/brands` returns it. */
 const station = (id: string, name: string) => ({ id, name, color: '#ff0000', logoText: name });
-const contract = (id: string, title: string) => ({ id, title, content: `text of ${title}` });
-const signed = (id: string, stationId: string, c = contract('c-1', 'Framework')) => ({
+
+/** A contract, as `GET /api/legal-entity/contracts` returns it. */
+const contract = (
+  id: string,
+  brandId: string,
+  brandName: string,
+  expiresAt = '2026-12-31T00:00:00Z',
+  expired = false,
+) => ({
   id,
-  station: { id: stationId, name: 'Shell' },
-  contract: c,
+  legalEntityId: 'le-1',
+  legalEntityName: 'Romashka',
+  brandId,
+  brandName,
+  createdAt: '2026-01-01T00:00:00Z',
+  expiresAt,
+  expired,
+});
+
+/** A signature, as `GET /api/legal-entity/contracts/signed` returns it. */
+const signed = (id: string, brandId: string, brandName: string | null = 'Shell') => ({
+  id,
+  contractId: 'c-1',
+  legalEntityName: 'Romashka',
+  brandId,
+  brandName,
   signedAt: '2026-01-01',
+  expiresAt: '2026-12-31T00:00:00Z',
+  expired: false,
 });
 
 /** Signed contracts as an array, which is what the query returns when there are some. */
@@ -177,17 +208,18 @@ const noSigned = [] as any[];
 
 beforeEach(() => {
   mockStations = [station('st-1', 'Shell'), station('st-2', 'OKKO')];
-  mockContracts = [contract('c-1', 'Framework agreement')];
+  // One contract per brand, so each brand's sheet auto-selects its own contract.
+  mockContracts = [contract('c-1', 'st-1', 'Shell'), contract('c-2', 'st-2', 'OKKO')];
   mockSignedContracts = noSigned;
   mockLoadingKeys = new Set();
   mockIsPending = false;
   mockInvalidate.mockClear();
-  mockSignContracts.mockReset();
+  mockSignContract.mockReset();
   mockGetLegalProfile.mockReset();
   mockNotification.mockClear();
   mockImpact.mockClear();
   mockReplace.mockClear();
-  mockSignContracts.mockResolvedValue({ ok: true });
+  mockSignContract.mockResolvedValue({ ok: true });
   mockGetLegalProfile.mockResolvedValue({ id: 'le-1', name: 'Romashka' });
   alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 });
@@ -263,47 +295,68 @@ describe('Contracts — choosing a brand', () => {
 
 describe('Contracts — which document gets signed', () => {
   it('auto-selects the contract when there is exactly one', () => {
-    mockContracts = [contract('c-1', 'Framework agreement')];
     render(<ContractsScreen />);
     fireEvent.press(screen.getAllByTestId('icon-PenTool')[0]);
 
     // One option is not a choice; the sheet can go straight to it.
-    expect(screen.getAllByText('Framework agreement').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Shell · formatted(2026-12-31T00:00:00Z)').length).toBeGreaterThan(
+      0,
+    );
     expect(screen.getByText('contracts.reviewText')).toBeTruthy();
   });
 
   it('forces a choice when several contracts are available', () => {
-    mockContracts = [contract('c-1', 'Framework agreement'), contract('c-2', 'Service addendum')];
+    mockContracts = [
+      contract('c-1', 'st-1', 'Shell', '2026-12-31T00:00:00Z'),
+      contract('c-3', 'st-1', 'Shell', '2027-06-30T00:00:00Z'),
+    ];
     render(<ContractsScreen />);
     fireEvent.press(screen.getAllByTestId('icon-PenTool')[0]);
 
-    // Both are offered...
-    expect(screen.getByText('Framework agreement')).toBeTruthy();
-    expect(screen.getByText('Service addendum')).toBeTruthy();
+    // Both are offered, and they are told apart by their term...
+    expect(screen.getByText('Shell · formatted(2026-12-31T00:00:00Z)')).toBeTruthy();
+    expect(screen.getByText('Shell · formatted(2027-06-30T00:00:00Z)')).toBeTruthy();
+  });
+
+  it('offers only the contracts of the brand that was pressed', () => {
+    // OKKO's contract is not offered under Shell's card: a contract belongs to a brand.
+    render(<ContractsScreen />);
+    fireEvent.press(screen.getAllByTestId('icon-PenTool')[0]);
+
+    expect(screen.queryByText('OKKO · formatted(2026-12-31T00:00:00Z)')).toBeNull();
   });
 
   it('will not sign anything until a contract is chosen', async () => {
-    mockContracts = [contract('c-1', 'Framework agreement'), contract('c-2', 'Service addendum')];
+    mockContracts = [
+      contract('c-1', 'st-1', 'Shell', '2026-12-31T00:00:00Z'),
+      contract('c-3', 'st-1', 'Shell', '2027-06-30T00:00:00Z'),
+    ];
     render(<ContractsScreen />);
     fireEvent.press(screen.getAllByTestId('icon-PenTool')[0]);
     fireEvent.press(screen.getByTestId('signature-pad'));
 
-    // Signing with no contract chosen would submit the wrong document — or none.
+    // Signing with no contract chosen would submit the wrong document — or none, so
+    // the button stays disabled until one is picked, and nothing is signed.
+    expect(screen.getByTestId('sign-submit').props.accessibilityState.disabled).toBe(true);
+
     fireEvent.press(screen.getByText('contracts.signAndConfirm'));
-    await waitFor(() => expect(alertSpy).toHaveBeenCalled());
-    expect(mockSignContracts).not.toHaveBeenCalled();
+    await waitFor(() => expect(mockSignContract).not.toHaveBeenCalled());
+    expect(alertSpy).not.toHaveBeenCalledWith('contracts.success', 'contracts.signedSuccess');
   });
 
   it('signs the contract the user picked', async () => {
-    mockContracts = [contract('c-1', 'Framework agreement'), contract('c-2', 'Service addendum')];
+    mockContracts = [
+      contract('c-1', 'st-1', 'Shell', '2026-12-31T00:00:00Z'),
+      contract('c-3', 'st-1', 'Shell', '2027-06-30T00:00:00Z'),
+    ];
     render(<ContractsScreen />);
     fireEvent.press(screen.getAllByTestId('icon-PenTool')[0]);
-    fireEvent.press(screen.getByText('Service addendum'));
+    fireEvent.press(screen.getByText('Shell · formatted(2027-06-30T00:00:00Z)'));
     fireEvent.press(screen.getByTestId('signature-pad'));
     fireEvent.press(screen.getByText('contracts.signAndConfirm'));
 
     await waitFor(() =>
-      expect(mockSignContracts).toHaveBeenCalledWith(['c-2'], 'data:image/png;base64,SIG', 'st-1'),
+      expect(mockSignContract).toHaveBeenCalledWith('c-3', 'data:image/png;base64,SIG'),
     );
   });
 
@@ -313,7 +366,11 @@ describe('Contracts — which document gets signed', () => {
 
     fireEvent.press(screen.getByText('contracts.readFull'));
 
-    expect(screen.getByText('text of Framework agreement')).toBeTruthy();
+    // The reader shows what the contract IS: a company, a term, and a brand. It has no
+    // text to show, because the schema has no column for one.
+    expect(screen.getByText('contracts.company')).toBeTruthy();
+    expect(screen.getByText('Romashka')).toBeTruthy();
+    expect(screen.getByText('contracts.expiresAt')).toBeTruthy();
   });
 });
 
@@ -332,16 +389,37 @@ describe('Contracts — signing', () => {
     expect(screen.getByTestId('sign-submit').props.accessibilityState.disabled).toBe(false);
   });
 
-  it('signs with the station, the contract and the signature', async () => {
+  it('signs with the contract and the signature, in the shape the server binds', async () => {
     render(<ContractsScreen />);
     fireEvent.press(screen.getAllByTestId('icon-PenTool')[1]);
     fireEvent.press(screen.getByTestId('signature-pad'));
     fireEvent.press(screen.getByText('contracts.signAndConfirm'));
 
-    // All three parts of the act, on the station that was actually chosen.
+    // `{ contractId, signatureData }` - the body `POST /api/legal-entity/sign` binds.
+    // The client used to post `{ contractIds: [...], stationId }`, which bound nothing.
     await waitFor(() =>
-      expect(mockSignContracts).toHaveBeenCalledWith(['c-1'], 'data:image/png;base64,SIG', 'st-2'),
+      expect(mockSignContract).toHaveBeenCalledWith('c-2', 'data:image/png;base64,SIG'),
     );
+  });
+
+  it('offers nothing to sign when the brand has no contract', () => {
+    mockContracts = [];
+    render(<ContractsScreen />);
+    fireEvent.press(screen.getAllByTestId('icon-PenTool')[0]);
+
+    expect(screen.getByText('contracts.noContractForBrand')).toBeTruthy();
+    expect(screen.getByTestId('sign-submit').props.accessibilityState.disabled).toBe(true);
+  });
+
+  it('does not offer a contract whose term has run out', () => {
+    // The server refuses to sign an expired contract, so offering one would only
+    // produce a rejection after the user had drawn their signature.
+    mockContracts = [contract('c-1', 'st-1', 'Shell', '2020-01-01T00:00:00Z', true)];
+    render(<ContractsScreen />);
+    fireEvent.press(screen.getAllByTestId('icon-PenTool')[0]);
+
+    expect(screen.getByText('contracts.noContractForBrand')).toBeTruthy();
+    expect(screen.getByTestId('sign-submit').props.accessibilityState.disabled).toBe(true);
   });
 
   it('confirms, refreshes and shows the signed list afterwards', async () => {
@@ -359,7 +437,7 @@ describe('Contracts — signing', () => {
   });
 
   it('surfaces the server message and keeps the sheet when signing fails', async () => {
-    mockSignContracts.mockRejectedValue(new Error('Contract already signed'));
+    mockSignContract.mockRejectedValue(new Error('Contract already signed'));
     render(<ContractsScreen />);
     fireEvent.press(screen.getAllByTestId('icon-PenTool')[0]);
     fireEvent.press(screen.getByTestId('signature-pad'));
@@ -373,7 +451,7 @@ describe('Contracts — signing', () => {
   });
 
   it('falls back to a generic message when the failure carries none', async () => {
-    mockSignContracts.mockRejectedValue({});
+    mockSignContract.mockRejectedValue({});
     render(<ContractsScreen />);
     fireEvent.press(screen.getAllByTestId('icon-PenTool')[0]);
     fireEvent.press(screen.getByTestId('signature-pad'));
@@ -384,7 +462,7 @@ describe('Contracts — signing', () => {
     );
   });
 
-  it('shows that signing is under way instead of the button label', async () => {
+  it('shows that signing is under way instead of the button label', () => {
     mockIsPending = true;
     render(<ContractsScreen />);
     fireEvent.press(screen.getAllByTestId('icon-PenTool')[0]);
@@ -402,13 +480,13 @@ describe('Contracts — reading what is already signed', () => {
     expect(screen.getByText('contracts.noSignedContracts')).toBeTruthy();
   });
 
-  it('lists signed contracts with their station and date', () => {
+  it('lists signed contracts with their brand, company and date', () => {
     mockSignedContracts = [signed('sc-1', 'st-1')];
     render(<ContractsScreen />);
     fireEvent.press(screen.getByText('contracts.signed'));
 
-    expect(screen.getByText('Framework')).toBeTruthy();
-    expect(screen.getByText('contracts.brand: Shell')).toBeTruthy();
+    expect(screen.getByText('Shell')).toBeTruthy();
+    expect(screen.getByText('contracts.company: Romashka')).toBeTruthy();
     expect(screen.getByText('contracts.signedAt: formatted(2026-01-01)')).toBeTruthy();
   });
 
@@ -417,23 +495,23 @@ describe('Contracts — reading what is already signed', () => {
     render(<ContractsScreen />);
     fireEvent.press(screen.getByText('contracts.signed'));
 
-    fireEvent.press(screen.getByText('Framework'));
+    fireEvent.press(screen.getByText('Shell'));
 
-    expect(screen.getByText('text of Framework')).toBeTruthy();
+    expect(screen.getByText('contracts.signedAt')).toBeTruthy();
+    expect(screen.getByText('formatted(2026-01-01)')).toBeTruthy();
   });
 
-  it('falls back to the network name when the station is gone', () => {
-    mockSignedContracts = [signed('sc-1', 'st-1')];
-    mockSignedContracts[0].station = null;
+  it('falls back to the network name when the brand is gone', () => {
+    mockSignedContracts = [signed('sc-1', 'st-1', null)];
     render(<ContractsScreen />);
     fireEvent.press(screen.getByText('contracts.signed'));
 
-    // A signed contract whose station no longer resolves must still be attributable.
-    expect(screen.getByText('contracts.brand: FuelFlow Network')).toBeTruthy();
+    // A signed contract whose brand no longer resolves must still be attributable.
+    expect(screen.getByText('FuelFlow Network')).toBeTruthy();
   });
 
   it('does not carry a signature over into the next contract', async () => {
-    mockSignContracts.mockResolvedValue({ ok: true });
+    mockSignContract.mockResolvedValue({ ok: true });
     render(<ContractsScreen />);
     fireEvent.press(screen.getAllByTestId('icon-PenTool')[0]);
     fireEvent.press(screen.getByTestId('signature-pad'));
@@ -455,31 +533,32 @@ describe('Contracts — reading what is already signed', () => {
     mockSignedContracts = [signed('sc-1', 'st-1')];
     render(<ContractsScreen />);
     fireEvent.press(screen.getByText('contracts.signed'));
-    fireEvent.press(screen.getByText('Framework'));
+    fireEvent.press(screen.getByText('Shell'));
 
     fireEvent.press(screen.getByText('contracts.close'));
 
-    expect(screen.queryByText('text of Framework')).toBeNull();
+    expect(screen.queryByText('contracts.signedAt')).toBeNull();
   });
 
   it('closes the reader from its close icon too', () => {
     mockSignedContracts = [signed('sc-1', 'st-1')];
     render(<ContractsScreen />);
     fireEvent.press(screen.getByText('contracts.signed'));
-    fireEvent.press(screen.getByText('Framework'));
+    fireEvent.press(screen.getByText('Shell'));
 
-    // A reader that cannot be dismissed by the X would trap the user over a document
-    // they only wanted to glance at.
     fireEvent.press(screen.getByTestId('close-reader-x'));
 
-    expect(screen.queryByText('text of Framework')).toBeNull();
+    expect(screen.queryByText('contracts.signedAt')).toBeNull();
   });
 
   it('abandons the signing sheet from its close icon, discarding the signature', () => {
-    mockContracts = [contract('c-1', 'Framework agreement'), contract('c-2', 'Service addendum')];
+    mockContracts = [
+      contract('c-1', 'st-1', 'Shell', '2026-12-31T00:00:00Z'),
+      contract('c-3', 'st-1', 'Shell', '2027-06-30T00:00:00Z'),
+    ];
     render(<ContractsScreen />);
     fireEvent.press(screen.getAllByTestId('icon-PenTool')[0]);
-    fireEvent.press(screen.getByText('Service addendum'));
+    fireEvent.press(screen.getByText('Shell · formatted(2027-06-30T00:00:00Z)'));
     fireEvent.press(screen.getByTestId('signature-pad'));
 
     fireEvent.press(screen.getByTestId('close-signing-x'));
@@ -494,7 +573,7 @@ describe('Contracts — reading what is already signed', () => {
     render(<ContractsScreen />);
 
     fireEvent.press(screen.getByText('contracts.signed'));
-    expect(screen.getByText('contracts.brand: Shell')).toBeTruthy();
+    expect(screen.getByText('contracts.company: Romashka')).toBeTruthy();
 
     fireEvent.press(screen.getByText('contracts.available'));
     expect(screen.getByText('contracts.selectBrand')).toBeTruthy();
