@@ -3,7 +3,6 @@ using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using FuelFlow.SharedKernel.Domain;
 
 namespace FuelFlow.Payments.Configurations;
 
@@ -189,9 +188,14 @@ builder.Property(e => e.ProviderAmountKopecks)
 
         // WebhookEventId deliberately carries no FK, and the index above is deliberately not unique.
         // Same rule as the audit tables: this row has to stay writable whatever happened to the
-        // delivery that produced it, and a webhook row pruned by retention must not take the payment
-        // with it. It is still indexed, because "which delivery proved this payment" is a question
-        // an operator asks during a dispute.
+        // delivery that produced it. It is still indexed, because "which delivery proved this
+        // payment" is a question an operator asks during a dispute.
+        //
+        // The comment here used to say the delivery is pruned by retention. It is not - the
+        // retention job prunes provider_event_outbox, and webhook_events is not on its list - so
+        // the sentence described a pruning that never happens. The decision does not change: the
+        // payment is the money and the delivery is the evidence of it, and one of the two must
+        // never be what blocks writing the other. The rule, not the retention window, decides it.
 
         builder.ToTable(t =>
         {
@@ -257,18 +261,5 @@ builder.Property(e => e.ProviderAmountKopecks)
             // The FK does the work that matters: an id, when present, is a real user.
             t.HasCheckConstraint("ck_payments_provider_length", "length(provider) > 0 AND length(provider) <= 20");
         });
-
-        // --- F-14: the foreign key this column was missing -------------------------------------------------
-        // The reference is real and single-parent, so the database enforces it. ON DELETE is stated
-        // explicitly rather than left to the default: a schema that says NO ACTION by accident is a
-        // schema nobody has thought about.
-        builder.HasOne<AuditEventOutbox>()
-            .WithMany()
-            .HasForeignKey(e => e.WebhookEventId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        // Postgres does not index a foreign key column on its own, and the parent's delete check and
-        // every join down this column scan without one.
-        builder.HasIndex(e => e.WebhookEventId);
     }
 }

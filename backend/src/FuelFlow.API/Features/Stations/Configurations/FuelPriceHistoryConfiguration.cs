@@ -86,18 +86,5 @@ internal sealed class FuelPriceHistoryConfiguration : IEntityTypeConfiguration<F
                 "(min_discount_per_liter IS NULL OR min_discount_per_liter >= 0)");
 
             });
-
-        // --- F-14: the foreign key this column was missing -------------------------------------------------
-        // The reference is real and single-parent, so the database enforces it. ON DELETE is stated
-        // explicitly rather than left to the default: a schema that says NO ACTION by accident is a
-        // schema nobody has thought about.
-        builder.HasOne<User>()
-            .WithMany()
-            .HasForeignKey(e => e.ChangedByUserId)
-            .OnDelete(DeleteBehavior.SetNull);
-
-        // Postgres does not index a foreign key column on its own, and the parent's delete check and
-        // every join down this column scan without one.
-        builder.HasIndex(e => e.ChangedByUserId);
     }
 }

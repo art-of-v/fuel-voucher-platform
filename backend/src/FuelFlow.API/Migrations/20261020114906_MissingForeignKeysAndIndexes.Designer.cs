@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FuelFlow.API.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20261020112620_MissingForeignKeysAndIndexes")]
+    [Migration("20261020114906_MissingForeignKeysAndIndexes")]
     partial class MissingForeignKeysAndIndexes
     {
         /// <inheritdoc />
@@ -4764,25 +4764,12 @@ namespace FuelFlow.API.Migrations
                     b.Navigation("SourceVoucher");
                 });
 
-            modelBuilder.Entity("FuelFlow.Features.Settings.SharedModels.AppSetting", b =>
-                {
-                    b.HasOne("FuelFlow.SharedKernel.Domain.User", null)
-                        .WithMany()
-                        .HasForeignKey("UpdatedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict);
-                });
-
             modelBuilder.Entity("FuelFlow.Features.Settlement.SharedModels.SettlementMessage", b =>
                 {
                     b.HasOne("FuelFlow.Payments.SharedModels.Payment", "Payment")
                         .WithMany("SettlementMessages")
                         .HasForeignKey("PaymentId")
                         .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("FuelFlow.SharedKernel.Domain.User", null)
-                        .WithMany()
-                        .HasForeignKey("ResolvedUserId")
-                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Payment");
                 });
@@ -4912,18 +4899,6 @@ namespace FuelFlow.API.Migrations
 
             modelBuilder.Entity("FuelFlow.Features.Vouchers.Renewal.Operator.OperatorVoucherRenewal", b =>
                 {
-                    b.HasOne("FuelFlow.SharedKernel.Domain.User", null)
-                        .WithMany()
-                        .HasForeignKey("ActingUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("FuelFlow.SharedKernel.Domain.User", null)
-                        .WithMany()
-                        .HasForeignKey("CustomerUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", "ReplacementVoucher")
                         .WithMany()
                         .HasForeignKey("ReplacementVoucherId")
@@ -4971,22 +4946,9 @@ namespace FuelFlow.API.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("FuelFlow.SharedKernel.Domain.AuditEventOutbox", null)
-                        .WithMany()
-                        .HasForeignKey("WebhookEventId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.Navigation("Order");
 
                     b.Navigation("User");
-                });
-
-            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.AuditEventOutbox", b =>
-                {
-                    b.HasOne("FuelFlow.SharedKernel.Domain.User", null)
-                        .WithMany()
-                        .HasForeignKey("ChangedByUserId")
-                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.BrandStation", b =>
@@ -4998,14 +4960,6 @@ namespace FuelFlow.API.Migrations
                         .IsRequired();
 
                     b.Navigation("Brand");
-                });
-
-            modelBuilder.Entity("FuelFlow.SharedKernel.Domain.ErrorLog", b =>
-                {
-                    b.HasOne("FuelFlow.SharedKernel.Domain.User", null)
-                        .WithMany()
-                        .HasForeignKey("ResolvedByUserId")
-                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.FuelNominal", b =>
@@ -5025,11 +4979,6 @@ namespace FuelFlow.API.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("FuelFlow.SharedKernel.Domain.User", null)
-                        .WithMany()
-                        .HasForeignKey("ChangedByUserId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.HasOne("FuelFlow.SharedKernel.Domain.FuelTypeEntity", null)
                         .WithMany()
                         .HasForeignKey("FuelTypeId")
@@ -5044,11 +4993,6 @@ namespace FuelFlow.API.Migrations
                         .HasForeignKey("BrandId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.HasOne("FuelFlow.SharedKernel.Domain.User", null)
-                        .WithMany()
-                        .HasForeignKey("PriceUpdatedByUserId")
-                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.FuelTypeProductCode", b =>

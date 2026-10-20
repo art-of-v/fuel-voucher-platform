@@ -19,6 +19,16 @@ namespace FuelFlow.API.Migrations
                 oldClrType: typeof(Guid),
                 oldType: "uuid");
 
+            // The all-zero guid stood for "no user" in a column that was NOT NULL. The column is
+            // nullable now, so the rows that carried the sentinel say what they mean. The name the
+            // human gave is kept in changed_by_user_name and is not touched here.
+            migrationBuilder.Sql(
+                """
+                UPDATE "provider_event_outbox"
+                SET "changed_by_user_id" = NULL
+                WHERE "changed_by_user_id" = '00000000-0000-0000-0000-000000000000'::uuid;
+                """);
+
             migrationBuilder.CreateIndex(
                 name: "ix_voucher_movements_actor_party_id",
                 table: "voucher_movements",
@@ -100,22 +110,6 @@ namespace FuelFlow.API.Migrations
                 column: "updated_by_user_id");
 
             migrationBuilder.AddForeignKey(
-                name: "FK_app_settings_users_updated_by_user_id",
-                table: "app_settings",
-                column: "updated_by_user_id",
-                principalTable: "users",
-                principalColumn: "id",
-                onDelete: ReferentialAction.Restrict);
-
-            migrationBuilder.AddForeignKey(
-                name: "FK_error_logs_users_resolved_by_user_id",
-                table: "error_logs",
-                column: "resolved_by_user_id",
-                principalTable: "users",
-                principalColumn: "id",
-                onDelete: ReferentialAction.SetNull);
-
-            migrationBuilder.AddForeignKey(
                 name: "FK_feedback_chat_bindings_users_user_id",
                 table: "feedback_chat_bindings",
                 column: "user_id",
@@ -132,38 +126,6 @@ namespace FuelFlow.API.Migrations
                 onDelete: ReferentialAction.SetNull);
 
             migrationBuilder.AddForeignKey(
-                name: "FK_fuel_price_history_users_changed_by_user_id",
-                table: "fuel_price_history",
-                column: "changed_by_user_id",
-                principalTable: "users",
-                principalColumn: "id",
-                onDelete: ReferentialAction.SetNull);
-
-            migrationBuilder.AddForeignKey(
-                name: "FK_fuel_types_users_price_updated_by_user_id",
-                table: "fuel_types",
-                column: "price_updated_by_user_id",
-                principalTable: "users",
-                principalColumn: "id",
-                onDelete: ReferentialAction.SetNull);
-
-            migrationBuilder.AddForeignKey(
-                name: "FK_operator_voucher_renewals_users_acting_user_id",
-                table: "operator_voucher_renewals",
-                column: "acting_user_id",
-                principalTable: "users",
-                principalColumn: "id",
-                onDelete: ReferentialAction.Restrict);
-
-            migrationBuilder.AddForeignKey(
-                name: "FK_operator_voucher_renewals_users_customer_user_id",
-                table: "operator_voucher_renewals",
-                column: "customer_user_id",
-                principalTable: "users",
-                principalColumn: "id",
-                onDelete: ReferentialAction.Restrict);
-
-            migrationBuilder.AddForeignKey(
                 name: "FK_order_line_items_fuel_types_fuel_type_id",
                 table: "order_line_items",
                 column: "fuel_type_id",
@@ -172,36 +134,12 @@ namespace FuelFlow.API.Migrations
                 onDelete: ReferentialAction.Restrict);
 
             migrationBuilder.AddForeignKey(
-                name: "FK_payments_provider_event_outbox_webhook_event_id",
-                table: "payments",
-                column: "webhook_event_id",
-                principalTable: "provider_event_outbox",
-                principalColumn: "id",
-                onDelete: ReferentialAction.Restrict);
-
-            migrationBuilder.AddForeignKey(
-                name: "FK_provider_event_outbox_users_changed_by_user_id",
-                table: "provider_event_outbox",
-                column: "changed_by_user_id",
-                principalTable: "users",
-                principalColumn: "id",
-                onDelete: ReferentialAction.SetNull);
-
-            migrationBuilder.AddForeignKey(
                 name: "FK_purchase_batches_fuel_types_fuel_type_id",
                 table: "purchase_batches",
                 column: "fuel_type_id",
                 principalTable: "fuel_types",
                 principalColumn: "id",
                 onDelete: ReferentialAction.Restrict);
-
-            migrationBuilder.AddForeignKey(
-                name: "FK_settlement_messages_users_resolved_user_id",
-                table: "settlement_messages",
-                column: "resolved_user_id",
-                principalTable: "users",
-                principalColumn: "id",
-                onDelete: ReferentialAction.SetNull);
 
             migrationBuilder.AddForeignKey(
                 name: "FK_users_parties_party_id",
@@ -216,14 +154,6 @@ namespace FuelFlow.API.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropForeignKey(
-                name: "FK_app_settings_users_updated_by_user_id",
-                table: "app_settings");
-
-            migrationBuilder.DropForeignKey(
-                name: "FK_error_logs_users_resolved_by_user_id",
-                table: "error_logs");
-
-            migrationBuilder.DropForeignKey(
                 name: "FK_feedback_chat_bindings_users_user_id",
                 table: "feedback_chat_bindings");
 
@@ -232,40 +162,12 @@ namespace FuelFlow.API.Migrations
                 table: "feedback_messages");
 
             migrationBuilder.DropForeignKey(
-                name: "FK_fuel_price_history_users_changed_by_user_id",
-                table: "fuel_price_history");
-
-            migrationBuilder.DropForeignKey(
-                name: "FK_fuel_types_users_price_updated_by_user_id",
-                table: "fuel_types");
-
-            migrationBuilder.DropForeignKey(
-                name: "FK_operator_voucher_renewals_users_acting_user_id",
-                table: "operator_voucher_renewals");
-
-            migrationBuilder.DropForeignKey(
-                name: "FK_operator_voucher_renewals_users_customer_user_id",
-                table: "operator_voucher_renewals");
-
-            migrationBuilder.DropForeignKey(
                 name: "FK_order_line_items_fuel_types_fuel_type_id",
                 table: "order_line_items");
 
             migrationBuilder.DropForeignKey(
-                name: "FK_payments_provider_event_outbox_webhook_event_id",
-                table: "payments");
-
-            migrationBuilder.DropForeignKey(
-                name: "FK_provider_event_outbox_users_changed_by_user_id",
-                table: "provider_event_outbox");
-
-            migrationBuilder.DropForeignKey(
                 name: "FK_purchase_batches_fuel_types_fuel_type_id",
                 table: "purchase_batches");
-
-            migrationBuilder.DropForeignKey(
-                name: "FK_settlement_messages_users_resolved_user_id",
-                table: "settlement_messages");
 
             migrationBuilder.DropForeignKey(
                 name: "FK_users_parties_party_id",
@@ -334,6 +236,15 @@ namespace FuelFlow.API.Migrations
             migrationBuilder.DropIndex(
                 name: "ix_app_settings_updated_by_user_id",
                 table: "app_settings");
+
+            // The column goes back to NOT NULL, so the rows that now say NULL need the sentinel
+            // back before it does - a down migration that cannot run is not a down migration.
+            migrationBuilder.Sql(
+                """
+                UPDATE "provider_event_outbox"
+                SET "changed_by_user_id" = '00000000-0000-0000-0000-000000000000'::uuid
+                WHERE "changed_by_user_id" IS NULL;
+                """);
 
             migrationBuilder.AlterColumn<Guid>(
                 name: "changed_by_user_id",

@@ -44,19 +44,8 @@ internal sealed class ErrorLogConfiguration : IEntityTypeConfiguration<ErrorLog>
         builder.HasIndex(e => e.TraceId);
         // The journal's default view is the outstanding errors, ordered newest first.
         builder.HasIndex(e => new { e.ResolvedAtUtc, e.LoggedAtUtc });
-        // ResolvedByUserId is indexed by the FK convention above.
-
-        // --- F-14: the foreign key this column was missing -------------------------------------------------
-        // The reference is real and single-parent, so the database enforces it. ON DELETE is stated
-        // explicitly rather than left to the default: a schema that says NO ACTION by accident is a
-        // schema nobody has thought about.
-        builder.HasOne<User>()
-            .WithMany()
-            .HasForeignKey(e => e.ResolvedByUserId)
-            .OnDelete(DeleteBehavior.SetNull);
-
-        // Postgres does not index a foreign key column on its own, and the parent's delete check and
-        // every join down this column scan without one.
+        // The convention above says every actor column is indexed, and this one was not: the index
+        // was written down in a comment and never declared, so nothing in the database used it.
         builder.HasIndex(e => e.ResolvedByUserId);
     }
 }

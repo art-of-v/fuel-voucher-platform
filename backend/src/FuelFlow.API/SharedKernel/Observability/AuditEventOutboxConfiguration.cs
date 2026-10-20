@@ -23,26 +23,16 @@ internal sealed class AuditEventOutboxConfiguration : IEntityTypeConfiguration<A
         builder.Property(e => e.ChangedByUserName).HasColumnName("changed_by_user_name").HasMaxLength(200);
         builder.Property(e => e.Summary).HasColumnName("summary").HasMaxLength(500).IsRequired();
         builder.Property(e => e.ChangedAtUtc).HasColumnName("changed_at_utc").HasColumnType("timestamp with time zone").IsRequired();
+        // changed_by_user_id stays a bare uuid, like every other actor column on an audit row:
+        // the record of who did something must be writable even if the account has since gone.
         builder.HasIndex(e => e.AggregateId);
         builder.HasIndex(e => e.ChangedAtUtc);
         // The admin audit screen filters by event type and orders newest-first; with no index on
         // event_type that query had to choose between a scan and a sort.
         builder.HasIndex(e => new { e.EventType, e.ChangedAtUtc })
             .IsDescending(false, true);
-
-        // --- F-14: the foreign key this column was missing -------------------------------------------------
-        // The column used to be NOT NULL and the price sync wrote the all-zero guid into it, which
-        // is why it had no foreign key: a value that stands for "no user" cannot point at a user.
-        // The system now writes NULL for that, and the foreign key is possible - with SET NULL,
-        // because the record of what a machine did has to survive the account it names, and the
-        // account may go.
-        builder.HasOne<User>()
-            .WithMany()
-            .HasForeignKey(e => e.ChangedByUserId)
-            .OnDelete(DeleteBehavior.SetNull);
-
-        // Postgres does not index a foreign key column on its own, and the parent's delete check and
-        // every join down this column scan without one.
+        // The convention above says every actor column is indexed, and this one was not: the index
+        // was written down in a comment and never declared, so nothing in the database used it.
         builder.HasIndex(e => e.ChangedByUserId);
     }
 }
