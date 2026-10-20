@@ -26,6 +26,10 @@ internal sealed class FeedbackMessageReplyConfiguration : IEntityTypeConfigurati
             .HasForeignKey(e => e.FeedbackMessageId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // staff_user_id is a TELEGRAM id, not users.id: the reply is written from the staff group,
+        // and its author is whoever is in that chat. It is a bigint for that reason, and it can
+        // never carry a foreign key to users - there is no such row to point at. The name is
+        // captured beside it, because a Telegram id is not a readable audit trail.
         builder.Property(e => e.StaffUserId)
             .HasColumnName("staff_user_id")
             .IsRequired();

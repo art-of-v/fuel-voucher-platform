@@ -140,11 +140,21 @@ public sealed class ForeignKeyContractTests : IClassFixture<TestDatabaseFixture>
             "error_logs.resolved_by_user_id",
             "fuel_price_history.changed_by_user_id",
             "fuel_types.price_updated_by_user_id",
+            // The ledger's author columns. TARGET_SCHEMA §G: "an audit row must be writable
+            // whatever the actor id says" - a key on the author of a movement would make the
+            // movement the thing that blocks deleting the account that made it.
+            "movement_batches.opened_by_user_id",
+            "order_events.actor_user_id",
             "operator_voucher_renewals.acting_user_id",
             "operator_voucher_renewals.customer_user_id",
             "payments.webhook_event_id",
             "provider_event_outbox.changed_by_user_id",
-            "settlement_messages.resolved_user_id"
+            // The batch's operator: the same rule as the rows above, and the reason the column
+            // carries the name of the operator beside it.
+            "purchase_batches.entered_by_user_id",
+            "settlement_messages.resolved_user_id",
+            "voucher_events.actor_user_id",
+            "voucher_movements.actor_user_id"
         };
 
         var constrained = (await context.Database

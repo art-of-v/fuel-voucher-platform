@@ -25,6 +25,11 @@ internal sealed class SettlementMessageConfiguration : IEntityTypeConfiguration<
             .HasColumnName("message_id")
             .IsRequired();
 
+        // telegram_user_id is a TELEGRAM id, not users.id: the settlement channel is a chat, and its
+        // sender is whoever is in it. It is a bigint for that reason, and it can never carry a
+        // foreign key to users - there is no such row to point at. The display name is captured
+        // beside it, because a Telegram id is not a readable audit trail. (resolved_user_id below
+        // is a different id space: it IS a users.id, and it stays FK-free by the audit rule.)
         builder.Property(e => e.TelegramUserId)
             .HasColumnName("telegram_user_id")
             .IsRequired();
