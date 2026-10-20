@@ -1691,6 +1691,10 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("brand");
 
+                    b.Property<Guid?>("BrandId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("brand_id");
+
                     b.Property<Guid>("FuelTypeId")
                         .HasColumnType("uuid")
                         .HasColumnName("fuel_type_id");
@@ -2275,6 +2279,10 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("brand");
 
+                    b.Property<Guid?>("BrandId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("brand_id");
+
                     b.Property<decimal?>("CostPerLiterApplied")
                         .HasColumnType("numeric(10,4)")
                         .HasColumnName("cost_per_liter_applied");
@@ -2362,6 +2370,10 @@ namespace FuelFlow.API.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("brand");
+
+                    b.Property<Guid?>("BrandId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("brand_id");
 
                     b.Property<decimal?>("CostPerLiter")
                         .HasColumnType("numeric(10,4)")
@@ -3797,6 +3809,8 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasAlternateKey("Id", "BrandId");
+
                     b.HasIndex("BrandId")
                         .HasDatabaseName("ix_fuel_types_brand_id");
 
@@ -4064,6 +4078,10 @@ namespace FuelFlow.API.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("brand");
+
+                    b.Property<Guid?>("BrandId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("brand_id");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
