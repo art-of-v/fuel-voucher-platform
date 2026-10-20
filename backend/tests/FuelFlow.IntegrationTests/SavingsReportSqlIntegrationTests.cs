@@ -99,6 +99,8 @@ public sealed class SavingsReportSqlIntegrationTests : IClassFixture<TestDatabas
                 VoucherNumber = Guid.NewGuid().ToString("N"),
                 QrPayload = Guid.NewGuid().ToString("N"),
                 Status = VoucherStatus.Assigned,
+                // An assigned voucher is held against an order - the schema refuses one without it.
+                OrderId = order.Id,
                 SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
                 CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
                 CreatedAtUtc = DateTime.UtcNow,
