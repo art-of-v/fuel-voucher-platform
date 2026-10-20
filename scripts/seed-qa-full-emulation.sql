@@ -185,6 +185,7 @@ CREATE TEMP VIEW qa_pkg AS
 SELECT
     nominal.fuel_type_id                            AS fuel_type_id,
     lower(brand.slug)                               AS brand,
+    brand.id                                        AS brand_id,
     nominal.liters                                  AS liters,
     -- The effective price of the package: the fuel's rate x litres, capped by the ceiling. There is
     -- no per-nominal override left to prefer, and no stored total to read, so both numbers below are
@@ -215,12 +216,13 @@ WHERE nominal.data_kind = 'qa'
 -- the brand and not the nominal, so a catalogue that lists 10 L, 20 L and 50 L of the same fuel
 -- shares one batch, and the query has to collapse to it rather than emit one row per package.
 INSERT INTO purchase_batches
-    (id, import_job_id, fuel_type_id, brand, supplier_id, created_at_utc, updated_at_utc)
+    (id, import_job_id, fuel_type_id, brand, brand_id, supplier_id, created_at_utc, updated_at_utc)
 SELECT DISTINCT ON (imp.id, pkg.fuel_type_id)
     gen_random_uuid(),
     imp.id,
     pkg.fuel_type_id,
     pkg.brand,
+    pkg.brand_id,
     sup.id,
     now() - interval '2 days',
     now() - interval '2 days'
@@ -234,12 +236,13 @@ ON CONFLICT (import_job_id, fuel_type_id) DO NOTHING;
 -- would reject the alternative. Inserted as the shortfall against the target depth, so re-running
 -- tops a drained pool back up instead of multiplying it.
 INSERT INTO fuel_vouchers
-(id, brand, fuel_type_id, liters, cost_per_liter, supplier_id, import_job_id,
+(id, brand, brand_id, fuel_type_id, liters, cost_per_liter, supplier_id, import_job_id,
  supplier_expiration_date, customer_expiration_date, voucher_number, qr_payload, qr_payload_sha256,
      status, data_kind, acquisition_source, is_deleted, created_at_utc, updated_at_utc)
 SELECT
     gen_random_uuid(),
     pkg.brand,
+    pkg.brand_id,
     pkg.fuel_type_id,
     pkg.liters,
     pkg.supplier_price_per_liter,
@@ -296,7 +299,7 @@ ON CONFLICT (id) DO NOTHING;
 -- against line items every cycle and releases the excess back to `Available`, so a line that
 -- overstates its count loses vouchers within about a minute - and reads as silent data loss.
 INSERT INTO order_line_items
-    (id, order_id, fuel_type_id, liters, quantity, unit_price, line_total, brand, term_code)
+    (id, order_id, fuel_type_id, liters, quantity, unit_price, line_total, brand, brand_id, term_code)
 SELECT
     md5('qa-line-' || pkg.fuel_type_id || ':' || pkg.liters::text)::uuid,
     md5('qa-order-' || pkg.fuel_type_id || ':' || pkg.liters::text)::uuid,
@@ -306,19 +309,21 @@ SELECT
     pkg.final_price_per_liter,
     pkg.final_price_per_liter * pkg.liters * :'wallet_per_fuel_type'::int,
     pkg.brand,
+    pkg.brand_id,
     NULL
 FROM qa_pkg pkg
 WHERE pkg.final_price_per_liter IS NOT NULL
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO fuel_vouchers
-(id, brand, fuel_type_id, liters, cost_per_liter, supplier_id, import_job_id,
+(id, brand, brand_id, fuel_type_id, liters, cost_per_liter, supplier_id, import_job_id,
  supplier_expiration_date, customer_expiration_date, voucher_number, qr_payload, qr_payload_sha256,
      status, data_kind, acquisition_source, is_deleted, order_id, assigned_to_user_id, issued_at_utc,
      created_at_utc, updated_at_utc)
 SELECT
     md5('qa-held-' || pkg.fuel_type_id || ':' || pkg.liters::text || '-' || lpad(n::text, 2, '0'))::uuid,
     pkg.brand,
+    pkg.brand_id,
     pkg.fuel_type_id,
     pkg.liters,
     pkg.supplier_price_per_liter,

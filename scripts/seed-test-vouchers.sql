@@ -92,6 +92,22 @@ BEGIN;
   \endif
 \endif
 
+-- The brand's key, resolved from the fuel type whichever way the fuel was named. The rows below
+-- carry the brand's id beside its slug, and the id is what the schema's key is checked against -
+-- so it is resolved from the fuel itself and not taken from the caller, which is the same reason
+-- the fuel's own id is not.
+SELECT coalesce(min(b.id::text), '') AS fuel_brand_id
+FROM fuel_types f
+JOIN brands b ON b.id = f.brand_id
+WHERE f.id = :'fuel_type_id'::uuid
+\gset
+
+\if :{?fuel_brand_id}
+\else
+  \echo 'The fuel type does not name a brand - the rows below need the brand beside the name.'
+  \quit
+\endif
+
 -- **The order line's quantity must equal the number of fulfillments below.**
 -- `BackgroundJobs/FulfillmentService.cs` reconciles fulfillments against line items every cycle and
 -- releases any voucher it counts as excess back to `Available` — a seed with quantity 1 and four
@@ -109,9 +125,10 @@ VALUES (
     now() - interval '3 days', now(), now() - interval '3 days', false)
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO order_line_items (id, order_id, brand, fuel_type_id, liters, quantity, unit_price, line_total, term_code)
+INSERT INTO order_line_items (id, order_id, brand, brand_id, fuel_type_id, liters, quantity, unit_price, line_total, term_code)
 VALUES (
     '44444444-4444-4444-8444-000000000001', '11111111-1111-4111-8111-000000000001', 'OKKO',
+    :'fuel_brand_id'::uuid,
     :'fuel_type_id', 10.00, 3, 96.90, 2907.00, '1w')
 ON CONFLICT (id) DO NOTHING;
 
@@ -125,32 +142,32 @@ ON CONFLICT (id) DO NOTHING;
 -- notices is broken, and #200 closed on the two defects that were found by hand while two more sat
 -- behind them.
 INSERT INTO fuel_vouchers
-    (id, brand, fuel_type_id, liters, supplier_expiration_date, customer_expiration_date,
+    (id, brand, brand_id, fuel_type_id, liters, supplier_expiration_date, customer_expiration_date,
      voucher_number, qr_payload, qr_payload_sha256, created_at_utc, updated_at_utc, status, order_id,
      assigned_to_user_id, legal_entity_id, worker_user_id, data_kind, is_deleted)
 VALUES
     -- room to extend: customer +7d, brand +90d
-    ('22222222-2222-4222-8222-000000000001', 'OKKO', :'fuel_type_id', 10.00, current_date + 90, current_date + 7,
+    ('22222222-2222-4222-8222-000000000001', 'OKKO', :'fuel_brand_id'::uuid, :'fuel_type_id', 10.00, current_date + 90, current_date + 7,
      'EMU-VCH-EXT', 'EMU-QR-EXT', sha256(convert_to('EMU-QR-EXT', 'UTF8')), now() - interval '3 days', now(), 'Assigned',
      '11111111-1111-4111-8111-000000000001', :'qa_user_id', NULL, NULL, 'qa', false),
     -- ceiling reached while still valid: must refuse to extend and replace instead
-    ('22222222-2222-4222-8222-000000000002', 'OKKO', :'fuel_type_id', 10.00, current_date + 7, current_date + 7,
+    ('22222222-2222-4222-8222-000000000002', 'OKKO', :'fuel_brand_id'::uuid, :'fuel_type_id', 10.00, current_date + 7, current_date + 7,
      'EMU-VCH-FULL', 'EMU-QR-FULL', sha256(convert_to('EMU-QR-FULL', 'UTF8')), now() - interval '3 days', now(), 'Assigned',
      '11111111-1111-4111-8111-000000000001', :'qa_user_id', NULL, NULL, 'qa', false),
     -- already lapsed: the replace branch on entry
-    ('22222222-2222-4222-8222-000000000003', 'OKKO', :'fuel_type_id', 10.00, current_date + 90, current_date - 2,
+    ('22222222-2222-4222-8222-000000000003', 'OKKO', :'fuel_brand_id'::uuid, :'fuel_type_id', 10.00, current_date + 90, current_date - 2,
      'EMU-VCH-LAPSED', 'EMU-QR-LAPSED', sha256(convert_to('EMU-QR-LAPSED', 'UTF8')), now() - interval '20 days', now(), 'Expired',
      '11111111-1111-4111-8111-000000000001', NULL, NULL, NULL, 'qa', false),
     -- stock for a replacement, long enough for any tier up to 6 months
-    ('33333333-3333-4333-8333-000000000001', 'OKKO', :'fuel_type_id', 10.00, current_date + 180, current_date + 180,
+    ('33333333-3333-4333-8333-000000000001', 'OKKO', :'fuel_brand_id'::uuid, :'fuel_type_id', 10.00, current_date + 180, current_date + 180,
      'EMU-STK-A', 'EMU-QR-STK-A', sha256(convert_to('EMU-QR-STK-A', 'UTF8')), now(), now(), 'Available', NULL, NULL, NULL, NULL, 'qa', false),
-    ('33333333-3333-4333-8333-000000000002', 'OKKO', :'fuel_type_id', 10.00, current_date + 180, current_date + 180,
+    ('33333333-3333-4333-8333-000000000002', 'OKKO', :'fuel_brand_id'::uuid, :'fuel_type_id', 10.00, current_date + 180, current_date + 180,
      'EMU-STK-B', 'EMU-QR-STK-B', sha256(convert_to('EMU-QR-STK-B', 'UTF8')), now(), now(), 'Available', NULL, NULL, NULL, NULL, 'qa', false),
     -- short paper term: buying a longer tier must clamp to this date, never past it
     -- ('qa', not `true`: `data_kind` is the text column the boolean `is_test_data` became, and this
     -- row still carried the old boolean — which Postgres coerces to 'true' and
     -- ck_fuel_vouchers_data_kind then refuses. The third way this file could not run.)
-    ('33333333-3333-4333-8333-000000000003', 'OKKO', :'fuel_type_id', 10.00, current_date + 20, current_date + 20,
+    ('33333333-3333-4333-8333-000000000003', 'OKKO', :'fuel_brand_id'::uuid, :'fuel_type_id', 10.00, current_date + 20, current_date + 20,
      'EMU-STK-SHORT', 'EMU-QR-STK-SHORT', sha256(convert_to('EMU-QR-STK-SHORT', 'UTF8')), now(), now(), 'Available', NULL, NULL, NULL, NULL, 'qa', false)
 ON CONFLICT (id) DO NOTHING;
 

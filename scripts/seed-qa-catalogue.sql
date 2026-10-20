@@ -147,13 +147,14 @@ ON CONFLICT (fuel_type_id, data_kind, liters) DO NOTHING;
 -- `vouchers_per_package` of them, and only the shortfall: the series is bounded by what is already
 -- behind the nominal, so re-running tops the pool back up and stops, instead of multiplying it.
 INSERT INTO fuel_vouchers
-    (id, brand, fuel_type_id, liters, cost_per_liter,
+    (id, brand, brand_id, fuel_type_id, liters, cost_per_liter,
      supplier_expiration_date, customer_expiration_date, voucher_number, qr_payload,
      qr_payload_sha256, status, data_kind, acquisition_source, is_deleted,
      created_at_utc, updated_at_utc)
 SELECT
     gen_random_uuid(),
     lower(brand.slug),
+    brand.id,
     nominal.fuel_type_id,
     nominal.liters,
     fuel.supplier_price_per_liter,
