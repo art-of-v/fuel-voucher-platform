@@ -2800,6 +2800,10 @@ namespace FuelFlow.API.Migrations
                     b.HasIndex("VoucherId")
                         .HasDatabaseName("ix_operator_voucher_renewals_voucher_id");
 
+                    b.HasIndex("VoucherId", "NewExpiration")
+                        .IsUnique()
+                        .HasDatabaseName("ix_operator_voucher_renewals_voucher_id_new_expiration");
+
                     b.ToTable("operator_voucher_renewals", null, t =>
                         {
                             t.HasCheckConstraint("ck_operator_renewal_branch", "branch IN ('extend', 'replace')");
