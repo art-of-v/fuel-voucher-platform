@@ -2,6 +2,7 @@ using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using FuelFlow.SharedKernel.Domain;
 
 namespace FuelFlow.Features.Orders.Configurations;
 
@@ -149,5 +150,18 @@ internal sealed class OrderLineItemConfiguration : IEntityTypeConfiguration<Orde
             t.HasCheckConstraint("ck_order_line_renewal_snapshots_are_paired",
                 "(previous_customer_expiration IS NULL) = (new_customer_expiration IS NULL)");
         });
+
+        // --- F-14: the foreign key this column was missing -------------------------------------------------
+        // The reference is real and single-parent, so the database enforces it. ON DELETE is stated
+        // explicitly rather than left to the default: a schema that says NO ACTION by accident is a
+        // schema nobody has thought about.
+        builder.HasOne<FuelTypeEntity>()
+            .WithMany()
+            .HasForeignKey(e => e.FuelTypeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Postgres does not index a foreign key column on its own, and the parent's delete check and
+        // every join down this column scan without one.
+        builder.HasIndex(e => e.FuelTypeId);
     }
 }

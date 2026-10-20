@@ -71,5 +71,24 @@ internal sealed class PurchaseBatchConfiguration : IEntityTypeConfiguration<Purc
 
         // fuel_type_id is a uuid since planning D-21's second slice, and a uuid has no length to
         // bound - the check that bounded it as text went with the text.
+
+        // --- F-14: the foreign key this column was missing -------------------------------------------------
+        // The reference is real and single-parent, so the database enforces it. ON DELETE is stated
+        // explicitly rather than left to the default: a schema that says NO ACTION by accident is a
+        // schema nobody has thought about.
+        builder.HasOne<FuelTypeEntity>()
+            .WithMany()
+            .HasForeignKey(e => e.FuelTypeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Postgres does not index a foreign key column on its own, and the parent's delete check and
+        // every join down this column scan without one.
+        builder.HasIndex(e => e.FuelTypeId);
+
+        // --- F-23: a reference column without an index ----------------------------------------------
+        // the batch names the operator who entered it. No foreign key here on purpose - this is an audit row, and an audit row must not
+        // be the thing that blocks deleting its own subject - but the reference is still read, and
+        // without an index every read of it is a scan.
+        builder.HasIndex(e => e.EnteredByUserId);
     }
 }

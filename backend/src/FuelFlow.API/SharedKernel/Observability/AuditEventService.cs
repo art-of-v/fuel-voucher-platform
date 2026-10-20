@@ -29,7 +29,7 @@ public sealed class AuditEventService
             EventType = eventType,
             OldValue = oldValue,
             NewValue = newValue,
-            ChangedByUserId = changedByUserId,
+            ChangedByUserId = changedByUserId == Guid.Empty ? null : changedByUserId,
             ChangedByUserName = changedByUserName,
             Summary = summary,
             ChangedAtUtc = DateTime.UtcNow,
