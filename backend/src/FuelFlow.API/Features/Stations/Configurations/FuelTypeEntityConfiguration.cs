@@ -37,7 +37,8 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
 
         builder.Property(e => e.Name)
             .HasColumnName("name")
-            .HasColumnType("text")
+            // varchar(200), the bound ck_fuel_types_name_length already states.
+            .HasMaxLength(200)
             .IsRequired();
 
         builder.Property(e => e.BrandId)
@@ -47,7 +48,8 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
 
         builder.Property(e => e.BrandFuelCode)
             .HasColumnName("brand_fuel_code")
-            .HasColumnType("text");
+            // varchar(50), the bound ck_fuel_types_brand_fuel_code_length already states.
+            .HasMaxLength(50);
         // Snake case like every other column here. Left unmapped, EF would scaffold
         // "MarginUahPerLiter" — a second spelling of one column in the same table, invisible until a
         // hand-written migration or a query names the other one.

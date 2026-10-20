@@ -3596,7 +3596,8 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("fuel_type_id");
 
                     b.Property<string>("DataKind")
-                        .HasColumnType("text")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
                         .HasColumnName("data_kind");
 
                     b.Property<decimal>("Liters")
@@ -3725,7 +3726,8 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("base_price");
 
                     b.Property<string>("BrandFuelCode")
-                        .HasColumnType("text")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
                         .HasColumnName("brand_fuel_code");
 
                     b.Property<Guid>("BrandId")
@@ -3762,7 +3764,8 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
                     b.Property<DateTime?>("PriceUpdatedAt")
@@ -3951,7 +3954,8 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("fuel_type_id");
 
                     b.Property<string>("ProductCode")
-                        .HasColumnType("text")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
                         .HasColumnName("product_code");
 
                     b.Property<Guid>("BrandId")
