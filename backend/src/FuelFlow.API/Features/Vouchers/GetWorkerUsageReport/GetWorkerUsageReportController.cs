@@ -38,12 +38,18 @@ public sealed class GetWorkerUsageReportController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<GetWorkerUsageReportResponse>> Get(
         [FromQuery] Guid legalEntityId,
-        CancellationToken cancellationToken)
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
+        CancellationToken cancellationToken = default)
     {
         if (legalEntityId == Guid.Empty)
         {
             return BadRequest("legalEntityId is required");
         }
+
+        // The page size is clamped by PagedRequest, so a client asking for
+        // "?pageSize=2000000000" gets the maximum and not the whole table.
+        var paging = new PagedRequest(Page: page, PageSize: pageSize);
 
         var userId = GetUserId();
         if (userId == Guid.Empty)
@@ -53,12 +59,39 @@ public sealed class GetWorkerUsageReportController : ControllerBase
 
         // The same predicate the wallet already uses to decide what a worker holds
         // (GetUserVouchersCommandHandler): issued to this worker, for this company.
-        var rows = await _context.FuelVouchers
+        var held = _context.FuelVouchers
             .AsNoTracking()
             .Where(v => v.WorkerUserId == userId && v.LegalEntityId == legalEntityId)
-            .Where(v => !v.IsDeleted && v.Status != VoucherStatus.VerificationFailed)
+            .Where(v => !v.IsDeleted && v.Status != VoucherStatus.VerificationFailed);
+
+        // The count is asked of the same query the page is, so the two cannot disagree.
+        var totalCount = await held.CountAsync(cancellationToken);
+
+        // The totals are computed over EVERY voucher the worker holds, not over the page. They
+        // used to be computed from the rows the endpoint returned, which was the same number only
+        // because the endpoint returned every row. A total that described the page would be a
+        // different number on every page, and the summary is the part the worker reads.
+        var totals = await held
+            .GroupBy(_ => 1)
+            .Select(g => new WorkerUsageTotals(
+                Count: g.Count(),
+                LitersReceived: g.Sum(v => v.Liters),
+                LitersUsed: g.Where(v => v.Status == VoucherStatus.Used).Sum(v => v.Liters),
+                LitersRemaining: g.Where(v => v.Status != VoucherStatus.Used).Sum(v => v.Liters),
+                CountUsed: g.Count(v => v.Status == VoucherStatus.Used),
+                CountRemaining: g.Count(v => v.Status != VoucherStatus.Used)))
+            .FirstOrDefaultAsync(cancellationToken)
+            ?? new WorkerUsageTotals(0, 0, 0, 0, 0, 0);
+
+        var rows = await held
             .OrderByDescending(v => v.IssuedAtUtc)
             .ThenByDescending(v => v.CreatedAtUtc)
+            // The tie-break: two vouchers can share an issue timestamp, and a page boundary
+            // that falls between them would skip one. A skipped row is fuel the worker does
+            // not know they hold.
+            .ThenBy(v => v.Id)
+            .Skip(paging.Skip)
+            .Take(paging.PageSize)
             .Select(v => new WorkerUsageListItem(
                 v.Id,
                 v.Brand,
@@ -72,15 +105,11 @@ public sealed class GetWorkerUsageReportController : ControllerBase
                 v.Status == VoucherStatus.Used))
             .ToListAsync(cancellationToken);
 
-        // Totals are computed from the rows that were just returned, so the summary and the breakdown
-        // cannot disagree - one list, one aggregate.
-        var totals = new WorkerUsageTotals(
-            Count: rows.Count,
-            LitersReceived: rows.Sum(r => r.Liters),
-            LitersUsed: rows.Where(r => r.IsUsed).Sum(r => r.Liters),
-            LitersRemaining: rows.Where(r => !r.IsUsed).Sum(r => r.Liters),
-            CountUsed: rows.Count(r => r.IsUsed),
-            CountRemaining: rows.Count(r => !r.IsUsed));
+        // The body keeps its shape - the app reads an object with a totals block and an items
+        // list - and the count travels in a header, so a client can tell that another page
+        // follows without the shape changing.
+        Response.Headers["X-Total-Count"] = totalCount.ToString();
+        Response.Headers["X-Has-Next-Page"] = totalCount > paging.Skip + rows.Count ? "true" : "false";
 
         return Ok(new GetWorkerUsageReportResponse(legalEntityId, totals, rows));
     }

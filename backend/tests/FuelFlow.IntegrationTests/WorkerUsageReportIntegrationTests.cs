@@ -176,10 +176,79 @@ public sealed class WorkerUsageReportIntegrationTests : IClassFixture<TestDataba
         var controller = new GetWorkerUsageReportController(CreateContext());
         controller.ControllerContext = new ControllerContext { HttpContext = BuildContext(Guid.NewGuid()) };
 
-        var result = await controller.Get(Guid.Empty, CancellationToken.None);
+        var result = await controller.Get(Guid.Empty, cancellationToken: CancellationToken.None);
 
         // ActionResult<T> boxes the BadRequest, so unwrap rather than asserting on the outer type.
         result.Result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    /// <summary>
+    /// The list is a page; the totals are not.
+    /// </summary>
+    /// <remarks>
+    /// The totals used to be computed from the rows the endpoint returned, which was the same number
+    /// only because the endpoint returned every row. A total that described the page would be a
+    /// different number on every page - and the totals are the part the worker actually reads.
+    /// </remarks>
+    [Fact]
+    public async Task Report_Pages_The_List_And_Keeps_The_Totals_Over_Every_Voucher()
+    {
+        var workerId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+
+        await using (var seed = CreateContext())
+        {
+            await ResetAsync(seed);
+            SeedUser(seed, workerId);
+            SeedCompany(seed, companyId, workerId);
+            Issue(seed, companyId, workerId, VoucherStatus.Assigned, 10m);
+            Issue(seed, companyId, workerId, VoucherStatus.Assigned, 20m);
+            Issue(seed, companyId, workerId, VoucherStatus.Used, 5m);
+            await seed.SaveChangesAsync();
+        }
+
+        var controller = new GetWorkerUsageReportController(CreateContext());
+        controller.ControllerContext = new ControllerContext { HttpContext = BuildContext(workerId) };
+
+        var result = await controller.Get(companyId, page: 1, pageSize: 2);
+
+        var ok = result.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var report = (GetWorkerUsageReportResponse)ok.Value!;
+
+        report.Items.Should().HaveCount(2, "the page holds what was asked for");
+        report.Totals.Count.Should().Be(3, "the totals describe every voucher the worker holds, not the page");
+        report.Totals.LitersReceived.Should().Be(35m);
+        report.Totals.LitersUsed.Should().Be(5m);
+
+        controller.HttpContext.Response.Headers["X-Total-Count"].ToString().Should().Be("3");
+        controller.HttpContext.Response.Headers["X-Has-Next-Page"].ToString().Should().Be("true");
+    }
+
+    [Fact]
+    public async Task Report_Clamps_A_Page_Size_That_Asks_For_Everything()
+    {
+        var workerId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+
+        await using (var seed = CreateContext())
+        {
+            await ResetAsync(seed);
+            SeedUser(seed, workerId);
+            SeedCompany(seed, companyId, workerId);
+            Issue(seed, companyId, workerId, VoucherStatus.Assigned, 10m);
+            await seed.SaveChangesAsync();
+        }
+
+        var controller = new GetWorkerUsageReportController(CreateContext());
+        controller.ControllerContext = new ControllerContext { HttpContext = BuildContext(workerId) };
+
+        var result = await controller.Get(companyId, page: 1, pageSize: 100_000);
+
+        var ok = result.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var report = (GetWorkerUsageReportResponse)ok.Value!;
+
+        report.Items.Should().HaveCount(1, "there is only one voucher");
+        report.Totals.Count.Should().Be(1);
     }
 
     private async Task<GetWorkerUsageReportResponse> GetReportAsync(Guid userId, Guid companyId)
@@ -187,7 +256,7 @@ public sealed class WorkerUsageReportIntegrationTests : IClassFixture<TestDataba
         var controller = new GetWorkerUsageReportController(CreateContext());
         controller.ControllerContext = new ControllerContext { HttpContext = BuildContext(userId) };
 
-        var result = await controller.Get(companyId, CancellationToken.None);
+        var result = await controller.Get(companyId, cancellationToken: CancellationToken.None);
 
         var ok = result.Result.Should().BeOfType<OkObjectResult>().Subject;
         return (GetWorkerUsageReportResponse)ok.Value!;
