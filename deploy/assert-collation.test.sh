@@ -106,9 +106,15 @@ else
     -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=fuelflow \
     -e POSTGRES_INITDB_ARGS="--locale-provider=icu --icu-locale=uk-UA --locale=C.UTF-8" \
     postgres:16-alpine > /dev/null 2>&1
+  # NOT `pg_isready`. Measured on 2026-10-20: `pg_isready -U postgres -d fuelflow` answers
+  # YES within three-tenths of a second of `docker run`, because initdb starts a BOOTSTRAP
+  # server on the socket - and that server is not the one that will serve the database. The
+  # assertion then runs against a cluster that is still coming up, reads no row, and exits 2.
+  # `psql -c 'select 1'` is the honest readiness check: it fails until the real server is up
+  # and the database exists.
   ready=0
-  for _ in $(seq 1 60); do
-    if docker exec "$CONTAINER_NAME" pg_isready -U postgres -d fuelflow > /dev/null 2>&1; then ready=1; break; fi
+  for _ in $(seq 1 120); do
+    if docker exec "$CONTAINER_NAME" psql -U postgres -d fuelflow -c 'select 1' > /dev/null 2>&1; then ready=1; break; fi
     sleep 1
   done
   if [[ "$ready" -ne 1 ]]; then
@@ -118,7 +124,7 @@ else
     out="$(bash "$SCRIPT" --container "$CONTAINER_NAME" --user postgres --db fuelflow 2>&1)"; rc=$?
     check "it exits 0 on a cluster with the production locale" "0" "$rc"
     check_contains "it reports the locale" "uk-UA" "$out"
-    check_contains "it reports the provider" "i" "$out"
+    check_contains "it reports the provider" "provider:     i" "$out"
     check_contains "it says the cluster sorts Ukrainian" "sorts by the Ukrainian alphabet" "$out"
   fi
   docker rm -f "$CONTAINER_NAME" > /dev/null 2>&1
