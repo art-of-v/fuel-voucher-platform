@@ -25,8 +25,30 @@ namespace FuelFlow.API.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            // The blanks first, for the same reason as in the migration before: a blank is not a
+            // registry code, and the API stores one as NULL. The rows that carry a blank are the
+            // ones written before that rule.
+            migrationBuilder.Sql("""
+                UPDATE "suppliers" SET "edr_ipn" = NULL
+                WHERE "edr_ipn" IS NOT NULL AND btrim("edr_ipn") = '';
+                """);
+
             migrationBuilder.Sql("""
                 ALTER TABLE "suppliers" ALTER COLUMN "edr_ipn" DROP NOT NULL;
+                """);
+
+            // The constraint is replaced, not left as it is. The one this database carries was
+            // written before the column was allowed to be empty, so it refuses a NULL - and a
+            // supplier without a code is exactly what the business allows. Replaced with the
+            // version that says the same thing as the model: no code is fine, a code has to be
+            // a code.
+            migrationBuilder.Sql("""
+                ALTER TABLE "suppliers" DROP CONSTRAINT IF EXISTS "ck_suppliers_edr_ipn_format";
+                """);
+
+            migrationBuilder.Sql("""
+                ALTER TABLE "suppliers" ADD CONSTRAINT "ck_suppliers_edr_ipn_format"
+                CHECK ("edr_ipn" IS NULL OR "edr_ipn" ~ '^[0-9]{8,10}$');
                 """);
         }
 
