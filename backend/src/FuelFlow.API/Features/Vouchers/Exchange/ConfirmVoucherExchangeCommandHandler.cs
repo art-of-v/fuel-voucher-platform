@@ -8,6 +8,7 @@ using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace FuelFlow.Features.Vouchers.Exchange;
 
@@ -395,8 +396,24 @@ public sealed class ConfirmVoucherExchangeCommandHandler
         // movement_batches.surcharge_uah, and each voucher's own cost is on the voucher. There is no
         // third number here that is not one of those two.
 
-        await _context.SaveChangesAsync(ct);
-        await _context.SaveChangesAsync(ct);
+        try
+        {
+            await _context.SaveChangesAsync(ct);
+            await _context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException
+        {
+            SqlState: PostgresErrorCodes.UniqueViolation,
+            ConstraintName: "ix_voucher_exchanges_old_voucher_id"
+        })
+        {
+            // The database refused a second exchange row for a voucher that is already retired into
+            // one. The check above catches this in every ordinary case - it is the race it cannot
+            // cover, two operators confirming the same selection at the same moment - and the answer
+            // is the same answer the check gives, not a 500. The transaction rolls back on the way
+            // out of this method, so nothing half-exchanged survives.
+            return Fail("One or more selected vouchers were already exchanged.");
+        }
 
         await _eventService.RecordEventAsync(
             "Voucher",

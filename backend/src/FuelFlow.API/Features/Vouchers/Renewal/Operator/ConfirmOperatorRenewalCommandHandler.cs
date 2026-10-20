@@ -7,6 +7,7 @@ using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace FuelFlow.Features.Vouchers.Renewal.Operator;
 
@@ -379,7 +380,25 @@ public sealed class ConfirmOperatorRenewalCommandHandler
             CreatedAtUtc = now
         });
 
-        await _context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException
+        {
+            SqlState: PostgresErrorCodes.UniqueViolation,
+            ConstraintName: "ix_operator_voucher_renewals_voucher_id_new_expiration"
+        })
+        {
+            // The database refused the row, because this voucher already has a renewal to this date.
+            // The advisory lock above means the ordinary double-click never gets here - it is the
+            // backstop for the case where the same renewal is recorded twice by two paths at once.
+            // The answer is the same answer the operator gets for any other refusal: what happened,
+            // in words, and not a 500.
+            throw new VoucherRenewalException(
+                "already_renewed",
+                "This voucher already has a renewal to that date.");
+        }
 
         var summary = branch == VoucherRenewalBranch.Extend
             ? $"Operator extended customer voucher {voucher.VoucherNumber} ({term.Code()}) → {newExpiration:yyyy-MM-dd}, surcharge ₴{command.SurchargeUah}"
