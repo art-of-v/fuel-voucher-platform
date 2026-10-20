@@ -57,24 +57,14 @@ public sealed class ContractValidityIntegrationTests : IClassFixture<TestDatabas
     }
 
     [Fact]
-    public async Task A_Contract_Without_A_Term_Is_Refused_By_The_Database()
+    public async Task A_Contract_Whose_Term_Is_Not_A_Term_Is_Refused_By_The_Database()
     {
         await using var context = CreateContext();
         await context.Database.MigrateAsync();
 
-        context.Contracts.Add(NewContract(null));
-
-        var act = () => context.SaveChangesAsync();
-        await act.Should().ThrowAsync<DbUpdateException>(
-            "a contract without a term is not a contract");
-    }
-
-    [Fact]
-    public async Task A_Term_That_Ends_Before_It_Starts_Is_Refused_By_The_Database()
-    {
-        await using var context = CreateContext();
-        await context.Database.MigrateAsync();
-
+        // The term is not a term: it is before the contract was even created. The column is NOT
+        // NULL as well - checked above - but a model that always sends a value cannot show
+        // that, and this is the refusal a caller can actually cause.
         var contract = NewContract(DateTime.UtcNow.AddDays(-2));
         context.Contracts.Add(contract);
 

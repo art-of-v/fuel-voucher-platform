@@ -675,13 +675,16 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
             UpdatedAtUtc = DateTime.UtcNow
         };
         var contract = new Contract
-        {
-            Id = contractId,
-            UserId = userId,
-            LegalEntityId = entityId,
-            BrandId = BrandIds.Okko,
-            CreatedAtUtc = DateTime.UtcNow
-        };
+            {
+                Id = contractId,
+                UserId = userId,
+                LegalEntityId = entityId,
+                BrandId = BrandIds.Okko,
+                CreatedAtUtc = DateTime.UtcNow,
+                // The validity term is mandatory since 2026-10-20, and it has to be AFTER the
+                // contract was created - ck_contracts_expiry_after_creation refuses the other.
+                ExpiresAtUtc = DateTime.UtcNow.AddYears(1)
+            };
         var signature = new UserContract
         {
             Id = Guid.NewGuid(),
