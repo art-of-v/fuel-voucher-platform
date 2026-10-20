@@ -142,7 +142,7 @@ say "the dump will be: $WORK/before-$STAMP.dump"
 # It also means the dump is taken from a quiescent database, which is the only
 # kind of dump worth restoring over a rebuilt cluster.
 say "1/8  stopping the backend, so no new job can start"
-compose stop dotnet-backend || true
+compose stop fuelflow-backend || true
 echo "the backend is stopped."
 
 say "2/8  checking that no background job is RUNNING"
@@ -247,7 +247,7 @@ docker exec -i "$CONTAINER" psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAX \
   -c "SELECT 'fuel_types=' || (SELECT count(*) FROM fuel_types) || ' brands=' || (SELECT count(*) FROM brands) || ' brand_stations=' || (SELECT count(*) FROM brand_stations) || ' orders=' || (SELECT count(*) FROM orders);"
 
 say "8/8  starting the backend and waiting for health"
-  compose up -d dotnet-backend
+  compose up -d fuelflow-backend
   # The probe goes through caddy, not into the backend container: the backend image has no wget
   # (a distroless-ish .NET image), and caddy's is the path the outside world uses anyway.
   for _ in $(seq 1 60); do
@@ -280,7 +280,7 @@ say "8/8  starting the backend and waiting for health"
   wrong, stop the backend, drop the new volume, copy the old one back and start
   postgres:
 
-    $COMPOSE_HINT stop dotnet-backend postgres
+    $COMPOSE_HINT stop fuelflow-backend postgres
     docker volume rm $VOLUME
     docker volume create $VOLUME
     docker run --rm -v $OLD_VOLUME:/from -v $VOLUME:/to alpine:3 sh -c 'cp -a /from/. /to/'
