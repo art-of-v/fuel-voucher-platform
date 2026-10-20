@@ -7,6 +7,7 @@ using FluentAssertions;
 using FuelFlow.Features.Auth.AdminUser.SetUserActive;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -177,6 +178,8 @@ public sealed class OrderReceiptIntegrationTests : IClassFixture<TestDatabaseFix
             .Select(u => u.Id)
             .SingleAsync();
 
+        await EnsureTheFuelExistsAsync(context);
+
         var order = new Order
         {
             Id = Guid.NewGuid(),
@@ -205,6 +208,46 @@ public sealed class OrderReceiptIntegrationTests : IClassFixture<TestDatabaseFix
         await context.SaveChangesAsync();
 
         return order.Id;
+    }
+
+    /// <summary>
+    /// The line item names a fuel, and order_line_items.fuel_type_id is a foreign key now: the fuel
+    /// has to be a row, not a uuid typed from memory. The seeded database does not carry this one,
+    /// so the fixture makes it.
+    /// </summary>
+    private static async Task EnsureTheFuelExistsAsync(ApplicationDbContext context)
+    {
+        var fuelTypeId = ToUuid("diesel");
+        if (await context.FuelTypes.AnyAsync(f => f.Id == fuelTypeId))
+        {
+            return;
+        }
+
+        var brandId = await context.Brands.Select(b => (Guid?)b.Id).FirstOrDefaultAsync();
+        if (brandId is null)
+        {
+            brandId = Guid.NewGuid();
+            var now = DateTime.UtcNow;
+            context.Brands.Add(new Brand
+            {
+                Id = brandId.Value,
+                Slug = "receipt-fixture-" + Guid.NewGuid().ToString("N")[..8],
+                Name = "Receipt fixture",
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now
+            });
+        }
+
+        var stamp = DateTime.UtcNow;
+        context.FuelTypes.Add(new FuelTypeEntity
+        {
+            Id = fuelTypeId,
+            Name = "Дизель (receipt fixture)",
+            BrandId = brandId.Value,
+            PumpPricePerLiter = 50m,
+            CreatedAtUtc = stamp,
+            UpdatedAtUtc = stamp
+        });
     }
 
     private async Task SeedAsync()
