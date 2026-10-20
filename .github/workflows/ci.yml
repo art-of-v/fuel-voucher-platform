@@ -1336,7 +1336,11 @@ jobs:
           set -euo pipefail
           cd /root/FuelFlow/deploy
           docker compose --env-file .env.staging -f docker-compose.staging.yml pull
-          docker compose --env-file .env.staging -f docker-compose.staging.yml up -d
+          # --remove-orphans: a service that was renamed leaves its container behind, and Docker then
+          # refuses to create the new one because the NAME is already taken. That is not a transient
+          # failure - it blocked the whole deploy on 2026-10-20, staging and production alike,
+          # because the backend's service key was renamed while its container name stayed the same.
+          docker compose --env-file .env.staging -f docker-compose.staging.yml up -d --remove-orphans
           # Records what is actually running, by digest, so a later "which version is
           # prod on?" is answerable from the log even when a component was held on `main`.
           docker compose --env-file .env.staging -f docker-compose.staging.yml images
@@ -1478,7 +1482,9 @@ jobs:
           # failed pull abort BEFORE `up`, so a missing or unauthorized image can never
           # silently fall back to an on-box build.
           docker compose --env-file .env -f docker-compose.prod.yml pull
-          docker compose --env-file .env -f docker-compose.prod.yml up -d
+          # --remove-orphans: see the staging step above. The orphan is the container of the
+          # service the compose file no longer has, and it holds the name the new one wants.
+          docker compose --env-file .env -f docker-compose.prod.yml up -d --remove-orphans
           # What is actually running, by digest - the authoritative answer to "which
           # version is prod on?", and the way to spot a component left on its old build.
           docker compose --env-file .env -f docker-compose.prod.yml images
