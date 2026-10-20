@@ -90,6 +90,7 @@ public sealed class VoucherListSortingIntegrationTests : IClassFixture<TestDatab
         var supplierB = Guid.NewGuid();
         var fuelTypeId = $"sort-{tag}";
         var brand = $"sort{tag}";
+        var brandId = Guid.CreateVersion7();
 
         using var ctx = CreateContext();
         await ctx.Database.MigrateAsync();
@@ -98,11 +99,26 @@ public sealed class VoucherListSortingIntegrationTests : IClassFixture<TestDatab
             new Supplier { Id = supplierA, Name = $"SORT-{tag}-Альфа", EdrIpn = TestEdrIpns.Next(), CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
             new Supplier { Id = supplierB, Name = $"SORT-{tag}-Бета", EdrIpn = TestEdrIpns.Next(), CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
 
+        // A network of its own, so the brand on the vouchers is a brand that EXISTS and is the brand
+        // of the fuel they claim. The database refuses a voucher whose brand is not its fuel's
+        // brand (20261020164744_TheBrandCannotDisagreeWithItsFuel), and the name this test
+        // invented is not a network anybody sells fuel under. Giving the test a real row keeps the
+        // isolation it was after - the query is filtered on the brand - and makes the row true.
+        ctx.Brands.Add(new Brand
+        {
+            Id = brandId,
+            Slug = brand,
+            Name = $"SORT-{tag}",
+            LogoText = "SORT",
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+
         ctx.FuelTypes.Add(new FuelTypeEntity
         {
             Id =   ToUuid(fuelTypeId),
             Name = $"A-95 {tag}",
-            BrandId = BrandIds.Okko,
+            BrandId = brandId,
             BasePrice = 55,
             DiscountPrice = 52,
             CreatedAtUtc = DateTime.UtcNow,
