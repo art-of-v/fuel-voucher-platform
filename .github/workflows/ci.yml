@@ -549,6 +549,18 @@ jobs:
       # trimmed. The archive is what the backup uploads.
       - name: Test the WAL archive prune job
         run: bash deploy/prune-wal-archive.test.sh
+
+      # The check that stops a false claim about the collation from reaching a
+      # document. On 2026-10-20 a review of the live database reported that the
+      # production cluster was "still on the C collation", and recorded it - and it
+      # was false, because pg_database's `datcollate` is the LIBC name, and the
+      # cluster was in fact sorting the Ukrainian alphabet under ICU. `daticulocale`
+      # is the column that means it.
+      #
+      # The test needs a real cluster for the behavioural half, and this job has
+      # Docker, so it runs the whole thing rather than skipping it.
+      - name: Test the collation assertion
+        run: bash deploy/assert-collation.test.sh
   # The repo-root fetchers in scripts/ — the only write path into `station_nodes`. They parse a
   # third-party site nobody here controls (UPG rebuilds its map page periodically, KLO renders its
   # pins through a WordPress plugin), and a silent parse change would import a few hundred rows with
@@ -745,6 +757,23 @@ jobs:
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: fuelflow
+          # The SAME locale production runs. The dry run restores PRODUCTION's schema
+          # into this container, so this container has to sort the way production sorts
+          # - and production sorts by the Ukrainian alphabet (ICU uk-UA), not by code
+          # point.
+          #
+          # Without this, the container takes the Alpine image's default (libc
+          # en_US.utf8, a code-point collation) and the two environments disagree about
+          # every ORDER BY on a Cyrillic column: brand_stations.name_sort_key is a text
+          # generated column, and its index is ordered by whatever the cluster's default
+          # collation is, so the same query returns a DIFFERENT order here than it does
+          # in production. The dry run would be proving a migration against a shape
+          # production does not have.
+          #
+          # `--locale=C.UTF-8` alongside the ICU locale is deliberate and is what
+          # production runs: it keeps the libc categories ICU does not govern at the
+          # libc default. The effective collation is daticulocale, and it is uk-UA.
+          POSTGRES_INITDB_ARGS: "--locale-provider=icu --icu-locale=uk-UA --locale=C.UTF-8"
         ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U postgres"
@@ -831,6 +860,26 @@ jobs:
           done
           db -t -A -c "SELECT count(*) FROM fuel_types WHERE NOT is_deleted" | sed 's/^/live fuels: /'
 
+      # Prove the container sorts the way production sorts, instead of assuming it.
+      #
+      # The dry run restores PRODUCTION's schema into this container, so a difference in
+      # collation is a difference in the shape the migration is proven against: the
+      # generated column brand_stations.name_sort_key is a text column, and its index is
+      # ordered by whatever the cluster's default collation is - so the same ORDER BY
+      # returns a different order here than it does in production.
+      #
+      # The check is behavioural on purpose. It sorts four Ukrainian words and looks at
+      # the order, because a column cannot be trusted to describe itself: `datcollate`
+      # reports the LIBC name, and under the ICU provider it says "C" while the cluster
+      # is sorting the Ukrainian alphabet. `daticulocale` is the column that means it.
+      # A review of this database on 2026-10-20 reported the wrong collation because of
+      # exactly that, and the claim it made was false.
+      - name: Prove the collation matches production
+        run: |
+          set -euo pipefail
+          export PGPASSWORD=postgres
+          bash deploy/assert-collation.sh --psql "postgres://postgres:${PGPASSWORD}@localhost:5432/fuelflow"
+
       # The whole point. On the production dump this is where the offer split failed twice, and on
       # 2026-10-19 where the pricing migration failed once: the copy of the prices off the offers ran
       # after the table was dropped. The step that runs next says so on a failure.
@@ -912,6 +961,23 @@ jobs:
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: fuelflow
+          # The SAME locale production runs. The dry run restores PRODUCTION's schema
+          # into this container, so this container has to sort the way production sorts
+          # - and production sorts by the Ukrainian alphabet (ICU uk-UA), not by code
+          # point.
+          #
+          # Without this, the container takes the Alpine image's default (libc
+          # en_US.utf8, a code-point collation) and the two environments disagree about
+          # every ORDER BY on a Cyrillic column: brand_stations.name_sort_key is a text
+          # generated column, and its index is ordered by whatever the cluster's default
+          # collation is, so the same query returns a DIFFERENT order here than it does
+          # in production. The dry run would be proving a migration against a shape
+          # production does not have.
+          #
+          # `--locale=C.UTF-8` alongside the ICU locale is deliberate and is what
+          # production runs: it keeps the libc categories ICU does not govern at the
+          # libc default. The effective collation is daticulocale, and it is uk-UA.
+          POSTGRES_INITDB_ARGS: "--locale-provider=icu --icu-locale=uk-UA --locale=C.UTF-8"
         ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U postgres"
@@ -963,6 +1029,26 @@ jobs:
           dotnet restore backend/src/FuelFlow.API/FuelFlow.API.csproj
           dotnet ef database update --project backend/src/FuelFlow.API \
             --connection "Host=localhost;Port=5432;Database=fuelflow;Username=postgres;Password=postgres"
+
+      # Prove the container sorts the way production sorts, instead of assuming it.
+      #
+      # The dry run restores PRODUCTION's schema into this container, so a difference in
+      # collation is a difference in the shape the migration is proven against: the
+      # generated column brand_stations.name_sort_key is a text column, and its index is
+      # ordered by whatever the cluster's default collation is - so the same ORDER BY
+      # returns a different order here than it does in production.
+      #
+      # The check is behavioural on purpose. It sorts four Ukrainian words and looks at
+      # the order, because a column cannot be trusted to describe itself: `datcollate`
+      # reports the LIBC name, and under the ICU provider it says "C" while the cluster
+      # is sorting the Ukrainian alphabet. `daticulocale` is the column that means it.
+      # A review of this database on 2026-10-20 reported the wrong collation because of
+      # exactly that, and the claim it made was false.
+      - name: Prove the collation matches production
+        run: |
+          set -euo pipefail
+          export PGPASSWORD=postgres
+          bash deploy/assert-collation.sh --psql "postgres://postgres:${PGPASSWORD}@localhost:5432/fuelflow"
 
       - name: Check the history afterwards
         run: |
