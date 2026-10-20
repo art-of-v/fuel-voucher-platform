@@ -1,0 +1,67 @@
+feat(ledger): expired stock is written off in the books, not only in the P&L
+
+The nightly expiry sweep retired a voucher to `Expired` and recorded the loss in the
+per-batch P&L — and the ledger carried nothing. Account 281 (Товари на складі) still
+held the voucher's cost, so the one book an accountant reads said the stock was there
+while the stock had been written off. Two books, two answers, and the divergence was
+invisible until somebody read both.
+
+**The write-off is Dr 807 (Витрати від утрати товарів) / Cr 281 (Товари на складі).**
+
+807 rather than 808 (Витрати товарів, the cost of goods sold) because 808 is what a
+SALE books, and a voucher nobody bought is not a sale. 807 is the element the
+Ukrainian Plan of Accounts (MinFin Order No. 291) gives for lost goods, and it rolls up
+under 80 with the cost of sales while staying readable on its own — because "how much
+did we lose to expired stock" is a question the account has to be able to answer without
+a report. It is a subaccount of 80, so no new top-level account is invented, and the
+chart's own rule still holds: only the accounts this business uses are seeded.
+
+**Who stands behind a posting made by a machine.** The journal will not take a posted
+entry that names nobody — "a posted entry without both a moment and a person is an
+entry nobody can be asked about" — and a nightly sweep has nobody of its own. The
+operator who turned the sweep on does: the person who decided that lapsed unsold stock
+is written off is the one the entry is about, and the admin screen already records who
+changed a setting. So the write-off is posted under the operator, with no invented user
+and no schema change.
+
+**And when the setting names nobody, nothing is booked at all.** A voucher retired
+without its entry is the exact divergence this change removes, and attributing the entry
+to a made-up user would be a worse lie. So the job refuses, logs an error, and says what
+to do.
+
+**One flag, as before.** `ExpiredVoucherLoss:Enabled` gates the status flip and the
+ledger posting together — two flags for one business fact is how the two books drift
+apart. The dry run still says what it *would* post: the entry count, the accounts, and
+the amount.
+
+**The posting happens BEFORE the status flip**, and that order is the safety. If the
+posting fails, the voucher is not retired, so the next night's run tries again — and
+the posting is idempotent on `(source_event, source_type, source_id)` with the voucher
+as the id, so the retry reuses the entry instead of writing a second one.
+
+**One entry per voucher**, because the idempotency key is the voucher. A group-level
+entry would be fewer rows and would skip a partly-processed group on a re-run, which is
+how a write-off goes half-booked.
+
+## Files
+
+**Changed**
+- `backend/src/FuelFlow.API/BackgroundJobs/ExpiredVoucherLossService.cs` — the write-off
+- `backend/tests/FuelFlow.IntegrationTests/ExpiredVoucherLossIntegrationTests.cs` — four tests
+- `backend/tests/FuelFlow.IntegrationTests/SeededChartOfAccountsTests.cs` — the chart now has 25 accounts
+- `backend/src/FuelFlow.API/Migrations/ApplicationDbContextModelSnapshot.cs` — generated
+
+**Added**
+- `backend/src/FuelFlow.API/Migrations/20261020064748_SeedExpiredStockWriteOff.cs` — 807 and its two mapping rules
+- `backend/src/FuelFlow.API/Migrations/20261020064748_SeedExpiredStockWriteOff.Designer.cs` — generated
+
+## Tests
+
+Four, in `ExpiredVoucherLossIntegrationTests`:
+
+- the write-off lands in the ledger, Dr 807 / Cr 281, 2500 UAH per voucher, and the whole
+  book balances;
+- a second run does not write the same write-off twice — the crash-between-posting-and-flip
+  case, where the status is rolled back and the voucher meets the job again;
+- a dry run writes nothing to the ledger;
+- a setting that names nobody books nothing at all.
