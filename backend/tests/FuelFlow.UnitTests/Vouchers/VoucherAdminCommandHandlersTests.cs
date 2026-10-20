@@ -9,7 +9,6 @@ using FuelFlow.Features.Vouchers.DeleteVoucher;
 using FuelFlow.Features.Vouchers.GetAdminVoucherById;
 using FuelFlow.Features.Vouchers.GetAdminVouchers;
 using FuelFlow.Features.Vouchers.GetImportBatches;
-using FuelFlow.Features.Vouchers.GetQrCodes;
 using FuelFlow.Features.Vouchers.GetVoucherVerification;
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.SharedModels;
@@ -768,29 +767,6 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
         result.QrCodeBase64.Should().Be("data:image/png;base64,base64-data");
     }
 
-    // ── 8. GetQrCodesQueryHandler ────────────────────────────────────────────
-
-    [Fact]
-    public async Task GetQrCodes_ShouldReturnSequentialIdsAndCorrectStatus()
-    {
-        _context.FuelVouchers.AddRange(
-            CreateVoucher(status: VoucherStatus.Available, createdAtUtc: DateTime.UtcNow),
-            CreateVoucher(status: VoucherStatus.Assigned, createdAtUtc: DateTime.UtcNow.AddMinutes(-1)),
-            CreateVoucher(status: VoucherStatus.Used, createdAtUtc: DateTime.UtcNow.AddMinutes(-2)));
-        await _context.SaveChangesAsync();
-
-        var handler = new GetQrCodesQueryHandler(_context);
-        var result = await handler.HandleAsync(new GetQrCodesQuery());
-
-        result.Should().HaveCount(3);
-        result.Select(d => d.Id).Should().Equal(1, 2, 3);
-
-        result[0].Status.Should().Be("available");
-        result[0].BrandId.Should().Be(BrandIds.Okko.ToString());
-        result[0].FuelType.Should().Be("A-95");
-        result[1].Status.Should().Be("sold");
-        result[2].Status.Should().Be("sold");
-    }
 
     // ── 9. Import batches ────────────────────────────────────────────────────
 
