@@ -112,11 +112,11 @@ from f in _context.FuelTypes.AsNoTracking()
 
         // No GroupBy(...).First() any more, and that is the point of the split. The triple used to have
         // several candidate rows and this picked one "most recently priced" - which, across the real and
-        // QA pools, silently read the rehearsal price for a real order. It is now a genuine key:
-        // `UNIQUE (brand_id, fuel_type_id, data_kind)` on fuel_offers times
-        // `UNIQUE (offer_id, liters)` on fuel_offer_volumes, with the pool pinned above. Two rows cannot
-        // collide, so there is nothing left to arbitrate - and a duplicate here would now throw instead
-        // of quietly picking a price.
+        // QA pools, silently read the rehearsal price for a real order. It is now a genuine key: the
+        // size is a row in fuel_nominals, whose key (fuel_type_id, data_kind, litres) is one row per
+        // fuel, pool and size, and the fuel type itself is unique per (brand, name). With the pool
+        // pinned above, two rows cannot collide, so there is nothing left to arbitrate - and a
+        // duplicate here would now throw instead of quietly picking a price.
 
         var period = new ReportPeriod(
             query.FromDate,

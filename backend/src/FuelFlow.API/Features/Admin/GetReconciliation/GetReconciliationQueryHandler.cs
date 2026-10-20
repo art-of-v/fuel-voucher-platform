@@ -27,26 +27,19 @@ public sealed class GetReconciliationQueryHandler
         var paidUnfulfilled = await _context.Orders.CountAsync(o => o.Status == OrderStatus.PendingFulfillment, cancellationToken);
         var partiallyFulfilled = await _context.Orders.CountAsync(o => o.Status == OrderStatus.PartiallyFulfilled, cancellationToken);
 
-        // Margin is a property of the offer, so the lookup is volumes joined to offers, pinned to the
-        // real pool: these are operator counters over real business, and the old lookup had no pool
-        // filter, so a QA rehearsal row could shadow a real one by being newer.
+        // The margin lives on the FUEL TYPE, and the size is a row in fuel_nominals - whose key
+        // (fuel_type_id, data_kind, litres) is one row per fuel, pool and size - so this lookup
+        // cannot match twice and cannot silently pick one of two prices. A duplicate would now throw
+        // rather than resolve to one arbitrary price.
         //
-        // The GroupBy(...).First() this replaces existed only to break ties the schema already
-        // forbids - UNIQUE (brand_id, fuel_type_id, data_kind) on fuel_offers times
-        // UNIQUE (offer_id, liters) on fuel_offer_volumes makes the triple unique inside a pool. A
-        // duplicate now throws rather than silently resolving to one arbitrary price.
-        // Projects the margin, not the offer entity. Handing back a whole tracked-free entity and then
-        // reading one column off it loads every offer column for every volume in the catalogue to
-        // answer one question, and - worse - depends on the provider materialising the navigation,
-        // which the in-memory provider does not and which would make this throw on a null rather than
-        // return a wrong number.
-        // An explicit join rather than `v.Offer.X`: relying on the navigation being materialised is a
-        // silent dependency on provider behaviour, and where it is not materialised this throws on a
-        // null instead of returning a wrong number - which is exactly the kind of failure that looks
-        // like a data problem and gets debugged as one.
+        // Pinned to the real pool: these are operator counters over real business, and the old lookup
+        // had no pool filter, so a QA rehearsal row could shadow a real one by being newer.
         //
-        // Projects the margin alone. Handing back the offer entity would load every offer column for
-        // every volume in the catalogue to answer one question.
+        // An explicit join rather than a navigation: relying on the navigation being materialised is
+        // a silent dependency on provider behaviour, and where it is not materialised the read throws
+        // on a null instead of returning a wrong number - which is exactly the kind of failure that
+        // looks like a data problem and gets debugged as one. It also reads the margin alone instead
+        // of every column of every fuel and every nominal in the catalogue.
         var fpLookup = await (
 from f in _context.FuelTypes.AsNoTracking()
             // Keyed the way the consumer keys it: an order line stores the network as its slug, so the
