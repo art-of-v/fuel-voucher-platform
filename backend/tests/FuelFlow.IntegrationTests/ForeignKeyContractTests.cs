@@ -12,7 +12,7 @@ namespace FuelFlow.IntegrationTests;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Why this is a test about the whole schema and not about the fourteen keys this change
+/// <b>Why this is a test about the whole schema and not about the five keys this change
 /// added.</b> A foreign key that the model declares and the database does not have is invisible:
 /// the model looks right, the database is unguarded, and nothing fails. So does the reverse - a
 /// key in the database that the model does not know about, which EF will not remove and which
@@ -27,10 +27,11 @@ namespace FuelFlow.IntegrationTests;
 /// column one too.
 /// </para>
 /// <para>
-/// The audit actor columns are deliberately WITHOUT foreign keys - an audit row must not be the
-/// thing that blocks deleting its own subject, which is the rule issue #307 writes down. This
-/// test does not require them to have one, and does not forbid it either; it is about the keys
-/// that do exist.
+/// <b>Why there is a second test about the keys that must NOT be there.</b> The audit actor
+/// columns carry no foreign key on purpose: an audit row must not be the thing that blocks
+/// deleting its own subject, which is the rule issue #307 writes down. A rule nobody checks is
+/// a rule one afternoon of adding "just one more key" erases. So the columns are written out
+/// here and the test fails if a key appears on any of them.
 /// </para>
 /// </remarks>
 [Collection("Integration Tests")]
@@ -115,6 +116,54 @@ public sealed class ForeignKeyContractTests : IClassFixture<TestDatabaseFixture>
 
         withoutIndex.Should().BeEmpty(
             "a foreign key without an index makes every delete of the parent a scan of the child table");
+    }
+
+    [Fact]
+    public async Task TheAuditActorColumns_CarryNoForeignKey()
+    {
+        await using var context = CreateContext();
+
+        // The rule is issue #307's: an audit row must not be the thing that blocks deleting its
+        // own subject. A key on any of these columns would either wedge the job that deletes the
+        // account, or force it to delete the history - and the history is the point.
+        //
+        // The list is written out rather than derived from the model. A derived list would follow
+        // the model and prove nothing; this one is the rule, in the form a code change has to
+        // argue with before it can add a key here.
+        //
+        // payments.webhook_event_id is in the list for a neighbouring reason: it names the delivery
+        // that proved the payment, and the payment is the money - one of the two must never be what
+        // blocks writing the other.
+        var unconstrained = new[]
+        {
+            "app_settings.updated_by_user_id",
+            "error_logs.resolved_by_user_id",
+            "fuel_price_history.changed_by_user_id",
+            "fuel_types.price_updated_by_user_id",
+            "operator_voucher_renewals.acting_user_id",
+            "operator_voucher_renewals.customer_user_id",
+            "payments.webhook_event_id",
+            "provider_event_outbox.changed_by_user_id",
+            "settlement_messages.resolved_user_id"
+        };
+
+        var constrained = (await context.Database
+            .SqlQueryRaw<string>(
+                """
+                SELECT tc.table_name || '.' || kcu.column_name
+                FROM information_schema.table_constraints tc
+                JOIN information_schema.key_column_usage kcu
+                  ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
+                WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = 'public'
+                """)
+            .ToListAsync())
+            .ToHashSet(StringComparer.Ordinal);
+
+        var wronglyConstrained = unconstrained.Where(constrained.Contains).ToArray();
+
+        wronglyConstrained.Should().BeEmpty(
+            "an audit row must not be the thing that blocks deleting its own subject - " +
+            "issue #307 writes the rule down, and this test is what keeps it true");
     }
 
     [Fact]

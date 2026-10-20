@@ -105,8 +105,14 @@ public sealed class PartySupertypeTests : IClassFixture<TestDatabaseFixture>
                 DELETE FROM natural_persons np
                 USING users u WHERE u.party_id = np.party_id AND u.id = {0}
                 """, userId);
-            await context.Database.ExecuteSqlRawAsync("DELETE FROM parties WHERE id IN (SELECT party_id FROM users WHERE id = {0})", userId);
+            // The user goes before the party: users.party_id is a foreign key now, and a party a
+            // user still points at cannot be deleted. The party id is read off the user BEFORE the
+            // user is deleted, because afterwards there is nothing left to read it from.
+            var party = await context.Database.SqlQuery<Guid?>($"""
+                SELECT party_id AS "Value" FROM users WHERE id = {userId}
+                """).FirstAsync();
             await context.Database.ExecuteSqlRawAsync("DELETE FROM users WHERE id = {0}", userId);
+            await context.Database.ExecuteSqlRawAsync("DELETE FROM parties WHERE id = {0}", party);
         }
     }
 
@@ -176,8 +182,14 @@ public sealed class PartySupertypeTests : IClassFixture<TestDatabaseFixture>
         finally
         {
             await context.Database.ExecuteSqlRawAsync("DELETE FROM natural_persons WHERE party_id IN (SELECT party_id FROM users WHERE id = {0})", userId);
-            await context.Database.ExecuteSqlRawAsync("DELETE FROM parties WHERE id IN (SELECT party_id FROM users WHERE id = {0})", userId);
+            // The user goes before the party: users.party_id is a foreign key now, and a party a
+            // user still points at cannot be deleted. The party id is read off the user BEFORE the
+            // user is deleted, because afterwards there is nothing left to read it from.
+            var party = await context.Database.SqlQuery<Guid?>($"""
+                SELECT party_id AS "Value" FROM users WHERE id = {userId}
+                """).FirstAsync();
             await context.Database.ExecuteSqlRawAsync("DELETE FROM users WHERE id = {0}", userId);
+            await context.Database.ExecuteSqlRawAsync("DELETE FROM parties WHERE id = {0}", party);
         }
     }
 
