@@ -118,7 +118,9 @@ public sealed class ContractSigningIntegrationTests : IClassFixture<TestDatabase
         var profile = await client.PostAsJsonAsync("/api/legal-entity/profile", new
         {
             Name = "ACME LLC",
-            Edrpou = "38528174"
+            // A code whose control digit passes the format gate (#266) - "38528174" does not,
+            // and the gate would answer 400 before a contract is ever in reach.
+            Edrpou = "12345678"
         });
         profile.EnsureSuccessStatusCode();
         var legalEntityId = (await profile.Content.ReadFromJsonAsync<JsonElement>())
