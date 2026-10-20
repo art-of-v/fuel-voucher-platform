@@ -39,7 +39,19 @@ public sealed class VoucherController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetMyVouchers(
         [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 50,
+        // The default page size is the MAXIMUM, not a smaller number, and that is deliberate.
+        //
+        // The app that is in everybody's hands today asks for no page at all, and it is the
+        // one client that cannot be changed in the same deploy: the mobile app reaches its
+        // users through the store and through an OTA, and the backend reaches them now. A
+        // smaller default would truncate a customer's wallet in the window between the two,
+        // and the missing vouchers would be SILENT - a wallet that shows fewer vouchers
+        // than the customer owns is a worse failure than a slow response, because a slow
+        // response is visible and a missing voucher is not.
+        //
+        // The app that DOES ask for pages asks for 50, and it is the one that pays the
+        // price of a small page: one request, one page, one set of rendered QR images.
+        [FromQuery] int pageSize = PageLimits.MaxPageSize,
         CancellationToken cancellationToken = default)
     {
         var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
