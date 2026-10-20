@@ -46,22 +46,22 @@ public sealed class BrandKeyBackfillTests : IClassFixture<TestDatabaseFixture>
     {
         var userId = Guid.NewGuid();
         var fuelTypeId = Guid.NewGuid();
-        var brandId = Guid.NewGuid();
         var voucherId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
 
+        // The seeded network, used as it is: its slug is unique, so a second brand with the same
+        // slug is refused.
+        Guid brandId;
+        await using (var lookup = CreateContext())
+        {
+            brandId = await lookup.Brands
+                .Where(b => b.Slug == "okko")
+                .Select(b => b.Id)
+                .FirstAsync();
+        }
+
         await using (var seed = CreateContext())
         {
-            seed.Brands.Add(new Brand
-            {
-                Id = brandId,
-                Slug = "okko",
-                Name = "OKKO",
-                LogoText = "OK",
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
-            });
-
             seed.FuelTypes.Add(new FuelTypeEntity
             {
                 Id = fuelTypeId,
