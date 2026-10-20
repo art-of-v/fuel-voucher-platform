@@ -310,10 +310,11 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
 
         var result = await _getAdminOrdersHandler.HandleAsync(new GetAdminOrdersQuery());
 
-        result.Should().HaveCount(2);
-        result.Should().Contain(dto => dto.Id == active.Id && dto.Status == OrderStatus.Fulfilled.ToString());
-        result.Should().Contain(dto => dto.Id == softDeleted.Id && dto.Status == OrderStatus.Cancelled.ToString());
-        result.Should().Contain(dto => dto.Id == active.Id && dto.LineItems.Count == 1);
+        result.TotalCount.Should().Be(2);
+        result.Items.Should().HaveCount(2);
+        result.Items.Should().Contain(dto => dto.Id == active.Id && dto.Status == OrderStatus.Fulfilled.ToString());
+        result.Items.Should().Contain(dto => dto.Id == softDeleted.Id && dto.Status == OrderStatus.Cancelled.ToString());
+        result.Items.Should().Contain(dto => dto.Id == active.Id && dto.LineItems.Count == 1);
     }
 
     [Fact]
@@ -371,9 +372,10 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
 
         var result = await _getAdminPurchasesHandler.HandleAsync(new GetAdminPurchasesQuery());
 
-        result.Should().ContainSingle();
-        result[0].Id.Should().Be(order.Id);
-        result[0].VoucherCount.Should().Be(1);
+        result.TotalCount.Should().Be(1);
+        result.Items.Should().ContainSingle();
+        result.Items[0].Id.Should().Be(order.Id);
+        result.Items[0].VoucherCount.Should().Be(1);
     }
 
     private void SeedDefaultUser()

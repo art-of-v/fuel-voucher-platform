@@ -2,6 +2,7 @@ using FuelFlow.Features.Admin.GetDashboard;
 using FuelFlow.Features.Admin.GetRealizedMargin;
 using FuelFlow.Features.Admin.GetReconciliation;
 using FuelFlow.Features.Orders.GetAdminPurchases;
+using FuelFlow.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -65,10 +66,14 @@ public sealed class AdminController : ControllerBase
     }
 
     [HttpGet("purchases")]
-    [ProducesResponseType(typeof(List<AdminPurchaseDto>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetPurchases(CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(PagedResult<AdminPurchaseDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetPurchases(
+        [FromQuery] int page = 1,
+        [FromQuery] int limit = 50,
+        CancellationToken cancellationToken = default)
     {
-        var result = await _getAdminPurchasesHandler.HandleAsync(new GetAdminPurchasesQuery(), cancellationToken);
+        var result = await _getAdminPurchasesHandler.HandleAsync(
+            new GetAdminPurchasesQuery(page, limit), cancellationToken);
         return Ok(result);
     }
 }

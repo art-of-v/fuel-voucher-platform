@@ -14,20 +14,33 @@ public sealed class GetAdminOrdersQueryHandler
         _context = context;
     }
 
-    public async Task<List<OrderDto>> HandleAsync(
+    public async Task<PagedResult<OrderDto>> HandleAsync(
         GetAdminOrdersQuery query,
         CancellationToken cancellationToken = default)
     {
-        var orders = await _context.Orders
+        // The count is taken from the query WITHOUT the includes: a count that joined the
+        // fulfillments and the line items would count rows, not orders.
+        var baseQuery = _context.Orders
             .IgnoreQueryFilters()
-            .AsNoTracking()
+            .AsNoTracking();
+
+        var total = await baseQuery.CountAsync(cancellationToken);
+
+        // The page is taken from the same query WITH the includes, and the includes are split
+        // because both of them are collections: joined, they would multiply each other.
+        var orders = await baseQuery
             .AsSplitQuery()
             .Include(o => o.Fulfillments)
             .Include(o => o.LineItems)
             .OrderByDescending(o => o.CreatedAtUtc)
+            // A stable order needs a tie-break, or two orders created in the same tick can swap
+            // places between two pages and one of them is shown twice.
+            .ThenBy(o => o.Id)
+            .Skip(PageLimits.SkipFor(PageLimits.ClampPage(query.Page), PageLimits.ClampPageSize(query.Limit)))
+            .Take(PageLimits.ClampPageSize(query.Limit))
             .ToListAsync(cancellationToken);
 
-        return orders.Select(o =>
+        var items = orders.Select(o =>
         {
             var lineItemsList = o.LineItems.ToList();
             var firstLi = lineItemsList.FirstOrDefault();
@@ -60,6 +73,14 @@ public sealed class GetAdminOrdersQueryHandler
                 }).ToList()
             };
         }).ToList();
+
+        return new PagedResult<OrderDto>
+        {
+            Items = items,
+            TotalCount = total,
+            Page = PageLimits.ClampPage(query.Page),
+            PageSize = PageLimits.ClampPageSize(query.Limit)
+        };
     }
 }
 
