@@ -3,6 +3,7 @@ using FuelFlow.Features.Vouchers.GetInventory;
 using FuelFlow.Features.Vouchers.GetUserVouchers;
 using FuelFlow.Features.Vouchers.MarkVoucherAsUsed;
 using FuelFlow.Features.Vouchers.RestoreVoucher;
+using FuelFlow.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -36,7 +37,10 @@ public sealed class VoucherController : ControllerBase
     [Authorize]
     [ProducesResponseType(typeof(GetUserVouchersResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> GetMyVouchers(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetMyVouchers(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
+        CancellationToken cancellationToken = default)
     {
         var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
                      ?? User.FindFirst("sub")?.Value;
@@ -49,8 +53,18 @@ public sealed class VoucherController : ControllerBase
 
         try
         {
-            var command = new GetUserVouchersCommand(Guid.Parse(userId));
+            // The page size is clamped by PagedRequest, so a client asking for
+            // "?pageSize=2000000000" gets the maximum and not the whole table.
+            var command = new GetUserVouchersCommand(
+                Guid.Parse(userId),
+                new PagedRequest(Page: page, PageSize: pageSize));
             var response = await _getUserVouchersHandler.HandleAsync(command, cancellationToken);
+
+            // The body stays a plain array - the mobile client reads an array and has for
+            // as long as this endpoint has existed - and the count travels in a header, so
+            // a client can tell that another page follows without the shape changing.
+            Response.Headers["X-Total-Count"] = response.TotalCount.ToString();
+            Response.Headers["X-Has-Next-Page"] = response.HasNextPage ? "true" : "false";
             return Ok(response.Vouchers);
         }
         catch (Exception ex)

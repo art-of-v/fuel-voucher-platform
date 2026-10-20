@@ -1,14 +1,48 @@
 import { apiFetch } from '../../../core/api/apiClient';
 import type { Voucher, Order } from '../../../core/types/api';
 
+/**
+ * The caller's wallet.
+ *
+ * The server pages this list, and it has to: the list carries the REDEEMABLE QR of every
+ * voucher in it - the bearer material and a rendered PNG per row - so an unbounded list
+ * meant that one customer with a few hundred vouchers made the API render all of their QR
+ * images in a single request.
+ *
+ * The pages are fetched in sequence and concatenated, so the app still sees the whole
+ * wallet. The paging is the server's bound on one request, not a change of what the
+ * screen shows.
+ */
 export async function getMyVouchers(): Promise<Voucher[]> {
-  const response = await apiFetch('/api/vouchers/my');
-  if (!response.ok) {
-    if (response.status === 401) return [];
-    throw new Error('Failed to fetch vouchers');
+  const all: Voucher[] = [];
+  const pageSize = 50;
+
+  for (let page = 1; ; page++) {
+    const response = await apiFetch(`/api/vouchers/my?page=${page}&pageSize=${pageSize}`);
+    if (!response.ok) {
+      // 401 is the signed-out case, and the original behaviour was to yield an empty
+      // list rather than an error - so the pages fetched so far are kept.
+      if (response.status === 401) return all;
+      throw new Error('Failed to fetch vouchers');
+    }
+
+    const data = await response.json();
+    const vouchers = (Array.isArray(data) ? data : []).map(mapVoucher);
+    all.push(...vouchers);
+
+    // The server's count decides, and the short page is only the fallback. The order
+    // matters: the server is the one that knows how many rows it left out, and a page
+    // shorter than the one we asked for does not mean the list ended - it means the
+    // server serves smaller pages than we asked for.
+    const total = Number(response.headers.get('X-Total-Count') ?? '0');
+    if (total > 0) {
+      if (all.length >= total) break;
+    } else if (vouchers.length < pageSize) {
+      break;
+    }
   }
-  const data = await response.json();
-  return (Array.isArray(data) ? data : []).map(mapVoucher);
+
+  return all;
 }
 
 function mapVoucher(v: any): Voucher {

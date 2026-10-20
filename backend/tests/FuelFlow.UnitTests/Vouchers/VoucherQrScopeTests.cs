@@ -97,7 +97,7 @@ public sealed class VoucherQrScopeTests : IDisposable
         var issued = IssuedVoucher(workerId: WorkerId);
         var handler = BuildWalletHandler(out var qrGenerator);
 
-        var response = await handler.HandleAsync(new GetUserVouchersCommand(OwnerId));
+        var response = await handler.HandleAsync(new GetUserVouchersCommand(OwnerId, new PagedRequest(PageSize: PageLimits.MaxPageSize)));
 
         // The row itself stays: the owner's hub reads this same list to show what each order
         // delivered and how much is still undistributed in the company's pool.
@@ -117,7 +117,7 @@ public sealed class VoucherQrScopeTests : IDisposable
         IssuedVoucher(workerId: WorkerId);
         var handler = BuildWalletHandler(out _);
 
-        var response = await handler.HandleAsync(new GetUserVouchersCommand(WorkerId));
+        var response = await handler.HandleAsync(new GetUserVouchersCommand(WorkerId, new PagedRequest(PageSize: PageLimits.MaxPageSize)));
 
         response.Vouchers.Should().ContainSingle();
         var dto = response.Vouchers[0];
@@ -133,7 +133,7 @@ public sealed class VoucherQrScopeTests : IDisposable
         IssuedVoucher(workerId: null);
         var handler = BuildWalletHandler(out _);
 
-        var response = await handler.HandleAsync(new GetUserVouchersCommand(OwnerId));
+        var response = await handler.HandleAsync(new GetUserVouchersCommand(OwnerId, new PagedRequest(PageSize: PageLimits.MaxPageSize)));
 
         response.Vouchers.Should().ContainSingle();
         response.Vouchers[0].QrPayload.Should().Be("9018$1000$redeemable-instrument");

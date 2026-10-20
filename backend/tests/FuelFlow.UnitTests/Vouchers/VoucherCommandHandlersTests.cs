@@ -119,7 +119,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         await _context.SaveChangesAsync();
 
         var handler = BuildGetUserVouchersHandler();
-        var command = new GetUserVouchersCommand(UserId);
+        var command = new GetUserVouchersCommand(UserId, new PagedRequest(PageSize: PageLimits.MaxPageSize));
 
         var response = await handler.HandleAsync(command);
 
@@ -134,11 +134,59 @@ public sealed class VoucherCommandHandlersTests : IDisposable
     public async Task GetUserVouchers_ShouldReturnEmptyList_WhenNoVouchersAssigned()
     {
         var handler = BuildGetUserVouchersHandler();
-        var command = new GetUserVouchersCommand(OtherUserId);
+        var command = new GetUserVouchersCommand(OtherUserId, new PagedRequest(PageSize: PageLimits.MaxPageSize));
 
         var response = await handler.HandleAsync(command);
 
         response.Vouchers.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetUserVouchers_ShouldPage_AndSayHowManyThereAreInTotal()
+    {
+        // Three vouchers that share ONE creation timestamp, so the page boundary falls
+        // between rows the database cannot order on its own.
+        var created = DateTime.UtcNow.AddDays(-1);
+        for (var i = 0; i < 3; i++)
+        {
+            _context.FuelVouchers.Add(new FuelVoucher
+            {
+                Id = Guid.NewGuid(),
+                Brand = "okko",
+                FuelTypeId = ToUuid("okko-95"),
+                Liters = 10,
+                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+                CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+                VoucherNumber = $"OKKO-PAGE-{i}",
+                QrPayload = $"payload-{i}",
+                Status = VoucherStatus.Assigned,
+                AssignedToUserId = UserId,
+                CreatedAtUtc = created,
+                UpdatedAtUtc = created
+            });
+        }
+        await _context.SaveChangesAsync();
+
+        var handler = BuildGetUserVouchersHandler();
+
+        var first = await handler.HandleAsync(
+            new GetUserVouchersCommand(UserId, new PagedRequest(Page: 1, PageSize: 2)));
+        first.Vouchers.Should().HaveCount(2);
+        first.TotalCount.Should().Be(3);
+        first.HasNextPage.Should().BeTrue();
+
+        var second = await handler.HandleAsync(
+            new GetUserVouchersCommand(UserId, new PagedRequest(Page: 2, PageSize: 2)));
+        second.Vouchers.Should().HaveCount(1);
+        second.HasNextPage.Should().BeFalse();
+
+        // The two pages together are the whole wallet, and no voucher is on both of them
+        // or on neither. The three rows share one creation timestamp, so this is the case
+        // the tie-break exists for: without it, a page boundary can skip a row, and a
+        // skipped row is a customer's fuel missing from their wallet.
+        var ids = first.Vouchers.Select(v => v.Id).Concat(second.Vouchers.Select(v => v.Id)).ToList();
+        ids.Should().HaveCount(3);
+        ids.Should().OnlyHaveUniqueItems();
     }
 
     [Fact]
@@ -176,7 +224,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         await _context.SaveChangesAsync();
 
         var handler = BuildGetUserVouchersHandler();
-        var response = await handler.HandleAsync(new GetUserVouchersCommand(UserId));
+        var response = await handler.HandleAsync(new GetUserVouchersCommand(UserId, new PagedRequest(PageSize: PageLimits.MaxPageSize)));
 
         response.Vouchers.Should().ContainSingle();
         response.Vouchers[0].Id.Should().Be(giftedVoucher.Id);

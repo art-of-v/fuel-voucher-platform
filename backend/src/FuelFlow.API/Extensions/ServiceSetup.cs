@@ -559,13 +559,18 @@ services.AddScoped<FuelFlow.Features.Vouchers.Availability.PackageStockAvailabil
 
         services.AddCors(options =>
         {
-            options.AddDefaultPolicy(policy =>
-            {
-                policy.WithOrigins(allowedOrigins)
-                      .AllowAnyHeader()
-                      .AllowAnyMethod()
-                      .AllowCredentials();
-            });
+              options.AddDefaultPolicy(policy =>
+              {
+                  policy.WithOrigins(allowedOrigins)
+                        .AllowAnyHeader()
+                        .AllowAnyMethod()
+                        // The wallet's paging headers. A browser client cannot read a
+                        // response header that is not exposed, and the mobile client falls
+                        // back to "a short page means the end" - but the count is worth
+                        // having for the client that can read it.
+                        .WithExposedHeaders("X-Total-Count", "X-Has-Next-Page")
+                        .AllowCredentials();
+              });
         });
 
         return services;
