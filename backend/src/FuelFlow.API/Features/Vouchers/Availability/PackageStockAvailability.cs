@@ -29,7 +29,7 @@ public readonly record struct StockKey(string Brand, Guid FuelTypeId, decimal Li
 /// counter: a package the shop advertises as available and then refuses to sell is the bug this class exists
 /// to prevent, and a package it hides while fulfilment would happily hand the voucher over wastes a sale.
 ///
-/// The predicate is an offer, not a reservation. Nothing is held here, so two customers can still race for
+/// The predicate is an offer to sell, not a reservation. Nothing is held here, so two customers can still race for
 /// the last voucher — fulfilment remains the authority, and an order that loses the race simply sits
 /// <c>PartiallyFulfilled</c> until the operator restocks. What this removes is the common, avoidable failure:
 /// paying for fuel the shop already said it did not have.
@@ -110,8 +110,9 @@ public sealed class PackageStockAvailability
     /// <para>
     /// Both omissions matter because a triple is not unique. <c>scripts/seed-qa-catalogue.sql</c> gives
     /// every real package a QA mirror on the <em>same</em> Brand, fuel and nominal, so as shipped every
-    /// sellable triple has exactly two live rows — measured on production 2026-10-14: 13 offers producing
-    /// 58 rows, 58 flagged real and 58 flagged QA, with no duplicates inside either pool. An unordered
+    /// sellable triple has exactly two live rows — measured on production 2026-10-14: 13 brand-fuel
+    /// groups producing 58 rows, 58 flagged real and 58 flagged QA, with no duplicates inside either
+    /// pool. An unordered
     /// <c>FirstOrDefaultAsync</c> over two rows returns whichever one Postgres happens to produce first.
     /// </para>
     /// <para>
@@ -170,7 +171,7 @@ var pool = DataKinds.ForPool(isTestAccount);
             return [];
 
         // Narrowed with separate IN-lists on the entity rather than with
-        // `wanted.Contains(StockKey.For(offer.BrandId, offer.FuelTypeId, nominal.Liters))`, which
+        // `wanted.Contains(StockKey.For(fuel.BrandId, fuel.Id, nominal.Liters))`, which
         // cannot be translated - the same wall SellableKeys documents below, hit for the same reason.
         // Separate lists hand back a cross product the cart never asked about, so the resolved
         // dictionary is filtered back down to `wanted` after materialisation.
@@ -278,7 +279,7 @@ var key = StockKey.For(row.BrandSlug, row.Fuel.Id, row.Liters);
         CancellationToken cancellationToken = default)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        // Vouchers still carry the network by text, so this gate - unlike the offer lookups above -
+        // Vouchers still carry the network by text, so this gate - unlike the fuel lookups above -
         // is matched on the slug rather than on a uuid.
         var brand = brandSlug.ToLower();
         var pool = DataKinds.ForPool(isTestAccount);

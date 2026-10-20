@@ -15,8 +15,8 @@ public sealed class GetPublicPackagesQueryHandler
         _stock = stock;
     }
 
-    // Projects PublicPackageResponse (store-front fields only) — never the raw offer/volume entities,
-    // which carry the operator's supplier cost + margin. See PublicPackageResponse (planning #52).
+    // Projects PublicPackageResponse (store-front fields only) — never the raw fuel rows, which
+    // carry the operator's supplier cost + margin. See PublicPackageResponse (planning #52).
     // OriginalPrice (the struck-through "before" price) is recomputed fresh from the pump price via
     // FuelPricing.OriginalPackagePrice (planning #73), so it is the public list/pump price — never the
     // leaked supplier cost — and every legacy row is corrected with no data migration. The SQL still
@@ -45,11 +45,11 @@ var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
         // prices. A QA caller now sees the QA pool and nobody else sees it at all.
         //
 // Query syntax rather than chained `Join` calls: the nominal join keys off the fuel, which is not
-    // in scope before the offer is joined. The joins are explicit because the offer carries no
-    // navigation to FuelType - Brand and fuel are natural keys throughout this schema, so there is
-    // nothing to navigate; the fuel's display name is joined for here and nowhere else.
+    // in scope before the sizes are joined. The joins are explicit because a size carries no
+    // navigation to its fuel - both are uuids since D-21, so there is nothing to navigate; the fuel's
+    // display name is joined for here and nowhere else.
     var rows = await (
-// The fuel and its sizes. There is no offer in this query and there will not be: the price is the
+// The fuel and its sizes. There is no price row in this query and there will not be: the price is the
     // fuel's own, so a second row saying what a litre costs could only ever disagree with the first.
     // The pool lives on the nominal, which is the only thing left that varies.
     from fuel in _context.FuelTypes.AsNoTracking()

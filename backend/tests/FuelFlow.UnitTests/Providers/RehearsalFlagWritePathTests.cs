@@ -274,7 +274,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         var conflict = result.Should().BeOfType<ConflictObjectResult>().Subject;
 
         (await _context.FuelTypes.CountAsync(f => f.BrandId == BrandIds.Okko && f.Name == "А95 ЄВРО(QA)"))
-            .Should().Be(1, "a second row for the same fuel is a second offer the storefront would list twice");
+            .Should().Be(1, "a second row for the same fuel the storefront would list twice");
         (await _context.FuelNominals.CountAsync(n => n.FuelTypeId == ToUuid("qa-a95")))
             .Should().Be(1, "and it must not have created a second size for the same pool");
         conflict.Value.Should().NotBeNull("the operator is told which fuel to reprice instead");

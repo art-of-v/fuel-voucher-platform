@@ -1,18 +1,18 @@
 namespace FuelFlow.SharedKernel.Domain;
 
 /// <summary>
-/// A size joined to the offer that sells it: everything a caller needs to price or sell one line of
-/// fuel, with the per-litre facts read once from <see cref="FuelOffer"/> rather than repeated per size.
+/// A size joined to the fuel that sells it: everything a caller needs to price or sell one line of
+/// fuel, with the per-litre facts read once from the fuel rather than repeated per size.
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Why this type exists.</b> Before <c>fuel_offers</c>, a caller that wanted to price a line read a
-/// <see cref="FuelPackage"/> row and every per-litre column on it. With the split, that data lives on
-/// the offer and only the size is left - so a caller needs both and something has to join them.
+/// <b>Why this type exists.</b> A caller that wants to price a line needs two things: the per-litre
+/// facts, and the size the fuel is sold in. The facts live on the fuel; the size is a row of its own
+/// (a nominal). Neither is the other, so something has to join them - and the join is this type.
 /// </para>
 ///
 /// <para>
-/// The alternative was to pass a <c>FuelOffer</c> plus a number into every pricing call. This is the
+/// The alternative was to pass the fuel plus a number into every pricing call. This is the
 /// same thing with a name, and the property names are deliberately IDENTICAL to
 /// <see cref="FuelPackage"/>'s so that <c>ServerPricing</c> — the money path — changes type rather
 /// than logic. Nothing in that file decides anything about where a price comes from; it recomputes
@@ -20,7 +20,7 @@ namespace FuelFlow.SharedKernel.Domain;
 /// </para>
 ///
 /// <para>
-/// <b>PackagePrice is not the same fact as the offer price times litres</b>, and is not derived from it
+/// <b>PackagePrice is not the same fact as the fuel's price times litres</b>, and is not derived from it
 /// at read time: it is what the customer is charged for this package, recomputed the way
 /// <c>order_line_items.unit_price</c> is. One price per litre per grade, so a nominal cannot be sold
 /// at a number of its own; the relation is asserted in tests and not enforced by a constraint.
@@ -29,7 +29,7 @@ namespace FuelFlow.SharedKernel.Domain;
 public sealed record SellablePackage
 {
     /// <summary>
-    /// The size this package sells in, composed from the offer and the fuel's nominal list. Not a row
+    /// The size this package sells in, composed from the fuel and its nominal list. Not a row
     /// id any more: no column, no foreign key, nothing to keep in step - see <see cref="PackageIds"/>.
     /// </summary>
     public string PackageId { get; init; } = string.Empty;
@@ -62,7 +62,7 @@ public sealed record SellablePackage
     public decimal? MarginPercent { get; init; }
 
     /// <summary>
-    /// The customer price per litre these four knobs produce, or <c>null</c> while the offer has no
+    /// The customer price per litre these four knobs produce, or <c>null</c> while the fuel has no
     /// cost or no margin. Computed, not carried: <c>fuel_offers</c> stopped storing it on 2026-10-17,
     /// and a member that had to be projected from a column nobody selects is a member two projections
     /// can forget in different ways. Derived here instead, once, for both.
@@ -95,8 +95,8 @@ public sealed record SellablePackage
     /// <summary>
     /// Compose the pair. The one place this join is expressed, and the only place identity is set.
     /// <para>
-    /// The fuel is passed in rather than reached through <c>offer.FuelType</c> because this runs after
-    /// materialisation, where the navigation is only populated if the query asked for it - and the
+    /// The fuel is passed in rather than reached through a navigation because this runs after
+    /// materialisation, where a navigation is only populated if the query asked for it - and the
     /// callers here project server-side, so nothing asked. A margin read off a navigation that happens
     /// to be loaded is a margin that is silently zero everywhere else.
     /// </para>
