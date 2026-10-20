@@ -30,6 +30,7 @@ public sealed class PreflightDbFileTests
     [InlineData("014-fuel-type-references-are-all-uuids.sql")]
     [InlineData("015-roles-columns-match-the-model.sql")]
     [InlineData("016-migration-ids-are-well-formed.sql")]
+    [InlineData("017-fuels-without-a-supplier-cost.sql")]
     public void EveryCheck_IsShapedSoItCannotWrite(string fileName)
     {
         var sql = File.ReadAllText(FindRepoFile(Path.Combine("deploy", "preflight-db", fileName)));
