@@ -10,6 +10,17 @@ public class FuelVoucher
 {
     public Guid Id { get; set; }
     public string Brand { get; set; } = null!;
+
+    /// <summary>
+    /// The brand's id - the key the text above is a copy of.
+    /// </summary>
+    /// <remarks>
+    /// The brand is written twice on this row: as the name the application and the importers speak,
+    /// and - from the key - as the id of the brand itself. The name is what a report groups by and
+    /// what a parser reads; the id is what the database can check. A composite foreign key over
+    /// (fuel type, brand) says the two copies are the same fact; a trigger can only ask.
+    /// </remarks>
+    public Guid? BrandId { get; set; }
     public Guid FuelTypeId { get; set; }
     public FuelTypeEntity? FuelType { get; set; }
     public decimal Liters { get; set; }

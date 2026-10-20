@@ -13,6 +13,12 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
 
         builder.HasKey(e => e.Id);
 
+        // The key a row that names both a fuel and a brand is checked against. A foreign key can
+        // name a row by one column or by a set of them, and a set of them can say what a set of
+        // names cannot: that the fuel this row names and the brand this row names are the same
+        // fact. The four tables that carry a brand as a name are checked against this.
+        builder.HasAlternateKey(e => new { e.Id, e.BrandId });
+
         builder.Property(e => e.IsDeleted).HasColumnName("is_deleted").IsRequired();
         builder.Property(e => e.DeletedAtUtc).HasColumnName("deleted_at_utc");
 

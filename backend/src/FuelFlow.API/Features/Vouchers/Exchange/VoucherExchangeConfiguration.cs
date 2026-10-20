@@ -56,6 +56,13 @@ internal sealed class VoucherExchangeConfiguration : IEntityTypeConfiguration<Vo
             .HasMaxLength(50)
             .IsRequired();
 
+        // The key the brand text above is a copy of. Nullable for now: the column arrives with the
+        // backfill, and the rows that are written before the readers move to the id still carry
+        // only the name. The foreign key over (fuel type, brand) comes with the same migration.
+        builder.Property(e => e.BrandId)
+            .HasColumnName("brand_id")
+            .HasColumnType("uuid");
+
         builder.Property(e => e.SurchargeUah)
             .HasColumnName("surcharge_uah")
             .HasColumnType("numeric(10,2)")
