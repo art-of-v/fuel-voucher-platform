@@ -142,7 +142,6 @@ public sealed class GetAdminVouchersQueryHandler
             WorkerFirstName = v.WorkerUser?.FirstName,
             WorkerLastName = v.WorkerUser?.LastName,
             CreatedAtUtc = v.CreatedAtUtc,
-            ImageUrl = v.ImageUrl,
             IsTestData = v.DataKind == DataKinds.Qa,
             AcquisitionSource = v.AcquisitionSource,
             IsDeleted = v.IsDeleted

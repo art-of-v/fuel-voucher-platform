@@ -121,8 +121,6 @@ export interface Voucher {
   workerUserId?: string | null;
   workerFirstName?: string | null;
   workerLastName?: string | null;
-  fuelSubtype?: string | null;
-  redemptionRules?: string | null;
   // The customer's original purchase order for this fuel, resolved across replace swaps
   // (see docs/VOUCHER_RENEWAL.md "Two histories"). The wallet files the live voucher under
   // this order so one tank of fuel stays one asset. Null when no purchase order backs it.

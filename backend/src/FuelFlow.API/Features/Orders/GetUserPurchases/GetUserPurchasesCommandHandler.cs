@@ -271,7 +271,7 @@ Guid? ResolveOriginOrderId(Guid voucherId)
             _logger.LogWarning(
                 "Voucher {VoucherId} ({VoucherNumber}) has no QR payload — cannot generate QR image",
                 voucher.Id, voucher.VoucherNumber);
-            return voucher.ImageUrl;
+            return null;
         }
 
         if (voucher.QrParameters is null)

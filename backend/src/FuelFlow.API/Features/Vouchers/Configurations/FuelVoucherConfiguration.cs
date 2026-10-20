@@ -96,19 +96,6 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
             .HasMaxLength(32)
             .IsRequired();
 
-        builder.Property(e => e.FuelSubtype)
-            .HasColumnName("fuel_subtype")
-            .HasMaxLength(50);
-
-        // Read-only and never written, but projected by live endpoints, so it stays - bounded.
-        builder.Property(e => e.RedemptionRules)
-            .HasColumnName("redemption_rules")
-            .HasMaxLength(1000);
-
-        builder.Property(e => e.ImageUrl)
-            .HasColumnName("image_url")
-            .HasMaxLength(500);
-
         builder.Property(e => e.AssignedToUserId)
             .HasColumnName("assigned_to_user_id");
 
