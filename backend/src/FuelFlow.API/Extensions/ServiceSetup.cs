@@ -11,6 +11,7 @@ using FuelFlow.Features.Pricing.ImportKloPrices;
 using FuelFlow.Features.Pricing.ImportKloPrices;
 using FuelFlow.Features.Admin.GetReconciliation;
 using FuelFlow.Features.Auth.AdminLogin;
+using FuelFlow.Features.Auth.AdminUser.GetAdminUserOptions;
 using FuelFlow.Features.Auth.AdminUser.GetAdminUsers;
 using FuelFlow.Features.Auth.GenerateChallenge;
 using FuelFlow.Features.Auth.Logout;
@@ -440,6 +441,7 @@ services.AddScoped<FuelFlow.Features.Vouchers.Availability.PackageStockAvailabil
     private static void AddAdminServices(IServiceCollection services)
     {
         services.AddScoped<GetAdminUsersQueryHandler>();
+    services.AddScoped<GetAdminUserOptionsQueryHandler>();
         services.AddScoped<GetReconciliationQueryHandler>();
     }
 

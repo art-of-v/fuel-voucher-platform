@@ -345,7 +345,7 @@ public class SettlementCodeTests : WebApplicationFactory<Program>, IClassFixture
         using var context = NewContext();
         var handler = new GetAdminUsersQueryHandler(context);
 
-        var result = await handler.HandleAsync(new GetAdminUsersQuery(), CancellationToken.None);
+        var result = (await handler.HandleAsync(new GetAdminUsersQuery(), CancellationToken.None)).Items;
 
         result.Should().Contain(u => u.Id == userId.ToString() && u.SettlementCode == expected);
     }
@@ -362,8 +362,8 @@ public class SettlementCodeTests : WebApplicationFactory<Program>, IClassFixture
         using var context = NewContext();
         var handler = new GetAdminUsersQueryHandler(context);
 
-        var result = await handler.HandleAsync(
-            new GetAdminUsersQuery(Search: code.ToLowerInvariant()), CancellationToken.None);
+        var result = (await handler.HandleAsync(
+            new GetAdminUsersQuery(Search: code.ToLowerInvariant()), CancellationToken.None)).Items;
 
         result.Should().ContainSingle(u => u.Id == userId.ToString());
     }

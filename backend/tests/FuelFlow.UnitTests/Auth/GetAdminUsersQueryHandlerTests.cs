@@ -77,7 +77,7 @@ public sealed class GetAdminUsersQueryHandlerTests : IDisposable
         _context.Users.AddRange(userWithRole, userWithoutRole);
         await _context.SaveChangesAsync();
 
-        var result = await _handler.HandleAsync(new GetAdminUsersQuery(), CancellationToken.None);
+        var result = (await _handler.HandleAsync(new GetAdminUsersQuery(), CancellationToken.None)).Items;
 
         result.Should().HaveCount(2);
 
@@ -103,7 +103,7 @@ public sealed class GetAdminUsersQueryHandlerTests : IDisposable
     [Fact]
     public async Task GetAdminUsers_ShouldReturnEmpty_WhenNoUsers()
     {
-        var result = await _handler.HandleAsync(new GetAdminUsersQuery(), CancellationToken.None);
+        var result = (await _handler.HandleAsync(new GetAdminUsersQuery(), CancellationToken.None)).Items;
 
         result.Should().BeEmpty();
     }

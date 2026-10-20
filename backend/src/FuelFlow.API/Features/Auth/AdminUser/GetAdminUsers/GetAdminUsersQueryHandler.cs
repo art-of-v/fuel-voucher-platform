@@ -8,7 +8,7 @@ public sealed class GetAdminUsersQueryHandler
     private readonly ApplicationDbContext _context;
     public GetAdminUsersQueryHandler(ApplicationDbContext context) => _context = context;
 
-    public async Task<List<AdminUserDto>> HandleAsync(GetAdminUsersQuery query, CancellationToken ct = default)
+    public async Task<PagedResult<AdminUserDto>> HandleAsync(GetAdminUsersQuery query, CancellationToken ct = default)
     {
         // The filters are the DATABASE's job. This used to load every user into the process and
         // filter the list there, so a search for one customer read the whole table to answer it -
@@ -39,11 +39,19 @@ public sealed class GetAdminUsersQueryHandler
                 (u.SettlementCode != null && u.SettlementCode.ToLower().Contains(search)));
         }
 
-        return await users
+        // The count is taken from the same query the page is: the filters are already the
+        // database's job, and a count that ignored them would answer a different question.
+        var total = await users.CountAsync(ct);
+
+        var limit = PageLimits.ClampPageSize(query.Limit);
+
+        var items = await users
             // The tie-break: many accounts share a registration timestamp, and without a unique
             // second key the sort is unstable - a row can move between pages.
             .OrderByDescending(u => u.CreatedAtUtc)
             .ThenBy(u => u.Id)
+            .Skip(PageLimits.SkipFor(PageLimits.ClampPage(query.Page), limit))
+            .Take(limit)
             .Select(u => new AdminUserDto
             {
                 Id = u.Id.ToString(),
@@ -74,6 +82,14 @@ public sealed class GetAdminUsersQueryHandler
                 CreatedAt = u.CreatedAtUtc.ToString("o")
             })
             .ToListAsync(ct);
+
+        return new PagedResult<AdminUserDto>
+        {
+            Items = items,
+            TotalCount = total,
+            Page = PageLimits.ClampPage(query.Page),
+            PageSize = limit
+        };
     }
 }
 
