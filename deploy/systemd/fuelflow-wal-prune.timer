@@ -1,0 +1,34 @@
+# Fires fuelflow-wal-prune.service every six hours.
+#
+# WHY SIX HOURS AND NOT NIGHTLY
+#
+# The archive grows at a rate the database sets, not the clock: measured on the
+# production box on 2026-10-20, 74 segments and 1.06 GiB in 11 h 15 min - 0.0942
+# GiB/h, about 2.26 GiB/day. The size cap is 8 GiB, so the cap is reached in about
+# three and a half days.
+#
+# A nightly trim would therefore let the archive sit near its cap for most of a
+# day, and a nightly trim that is ALSO the nightly backup is a trim that does not
+# happen when the backup fails. Six hours means the cap is enforced on a schedule
+# that does not depend on anything else on the box, and it puts a 16 GiB disk
+# budget's worth of headroom between "the archive is too big" and "the disk is
+# full" in about a day and a half instead of three and a half.
+#
+# The minute is 17 rather than :00 so this never starts at the same instant as the
+# backup (03:22), the Docker GC (04:20) or the disk check.
+[Unit]
+Description=FuelFlow WAL archive trim (every 6 hours)
+Documentation=https://github.com/art-of-v/fuel-voucher-platform-planning/blob/main/docs/DEPLOYMENT.md
+
+[Timer]
+OnCalendar=*-*-* 00,06,12,18:17:00
+# If the machine was off at 06:17 (a reboot during a deploy, say), run as soon as it
+# is back rather than skipping a whole window.
+Persistent=true
+# Smear the start by up to 3 min so the trim never begins at the exact instant of
+# another job and contends for IO.
+RandomizedDelaySec=180
+Unit=fuelflow-wal-prune.service
+
+[Install]
+WantedBy=timers.target

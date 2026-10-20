@@ -83,6 +83,28 @@ WAL_ARCHIVE_DIR="${WAL_ARCHIVE_DIR:-/root/fuelflow-wal}"
 WAL_RETENTION_DAYS="${WAL_RETENTION_DAYS:-3}"
 WAL_REMOTE_RETENTION_DAYS="${WAL_REMOTE_RETENTION_DAYS:-30}"
 
+# The trim's bounds, defined here so this script and deploy/prune-wal-archive.sh
+# cannot disagree about them - the same values, the same defaults, and the same
+# meaning:
+#
+#   WAL_RETENTION_DAYS         the POLICY: how long the archive stays on the box.
+#   WAL_MAX_BYTES              the GUARD: whatever the rate turns out to be, the
+#                               archive on the box cannot pass this cap. 8 GiB.
+#   STAGING_WAL_ARCHIVE_DIR    staging archives too, and it gets tighter bounds
+#                               (a day, a gibibyte) because it is disposable AND it
+#                               shares the disk with production.
+WAL_MAX_BYTES="${WAL_MAX_BYTES:-8589934592}"                 # 8 GiB
+STAGING_WAL_ARCHIVE_DIR="${STAGING_WAL_ARCHIVE_DIR:-/root/fuelflow-wal-staging}"
+STAGING_WAL_MAX_BYTES="${STAGING_WAL_MAX_BYTES:-1073741824}" # 1 GiB
+
+# Exported, because deploy/prune-wal-archive.sh - the script that actually trims the
+# archive now, and the one the six-hourly timer runs - is a SEPARATE process and
+# would otherwise fall back to its own defaults. These values are the ones this
+# script resolved (from .env, via load_env, below), so the backup and the timer
+# cannot end up trimming to different bounds.
+export WAL_ARCHIVE_DIR WAL_RETENTION_DAYS WAL_MAX_BYTES
+export STAGING_WAL_ARCHIVE_DIR STAGING_WAL_MAX_BYTES
+
 # Load POSTGRES_USER / POSTGRES_DB / BACKUP_AGE_RECIPIENT from the same .env the stack uses.
 # load_env PARSES .env instead of sourcing it, so a secret containing a space (e.g. a
 # Gmail app password) or shell metacharacters can't break or inject into this run.
@@ -147,8 +169,32 @@ echo "[$(date -Is)] Backing up '${POSTGRES_DB}' -> ${OUT}"
 # shellcheck source=pitr-common.sh
 source "$SCRIPT_DIR/pitr-common.sh"
 
-ARCHIVER_OK=0
-check_wal_archive "$CONTAINER" "$WAL_ARCHIVE_DIR" "$POSTGRES_USER" "$POSTGRES_DB" 1800 || ARCHIVER_OK=1
+  ARCHIVER_OK=0
+  check_wal_archive "$CONTAINER" "$WAL_ARCHIVE_DIR" "$POSTGRES_USER" "$POSTGRES_DB" 1800 || ARCHIVER_OK=1
+  
+  # Trim the WAL archive BEFORE anything is written, not after.
+  #
+  # The trim used to live at the end of this script, which meant two things were both
+  # true and neither was good: the disk was only freed after the dump, the base backup
+  # and the off-box upload had all been written (so a tight disk could make the very
+  # steps that would have freed it fail), and because this script runs `set -euo
+  # pipefail`, any failure above the trim skipped the trim entirely.
+  #
+  # The trim now lives in deploy/prune-wal-archive.sh, which is ALSO installed as its
+  # own six-hourly timer (deploy/install-wal-prune-schedule.sh). This call is the
+  # "free the disk before I write to it" half; the timer is the "the bound holds even
+  # when this script fails" half. Both are deliberate.
+  #
+  # The trim's own failure is not fatal here: a failed trim means the archive is
+  # bigger than it should be, and the archive's own health check at the end of this
+  # run is what decides whether the BACKUP is good. Failing the backup over a
+  # trim would turn a disk-hygiene problem into a missing backup.
+  if [[ -x "$SCRIPT_DIR/prune-wal-archive.sh" ]]; then
+    "$SCRIPT_DIR/prune-wal-archive.sh" || echo "WARNING: the WAL archive trim reported a problem - see the output above." >&2
+  else
+    echo "WARNING: $SCRIPT_DIR/prune-wal-archive.sh is missing or not executable - the archive was not trimmed." >&2
+  fi
+  
 
 # -Fc = compressed custom format, which restore.sh expects.
 docker exec "$CONTAINER" pg_dump \
@@ -329,43 +375,20 @@ else
   echo "         server alone, but not if the server is destroyed." >&2
 fi
 
-# Prune the local WAL archive. TWO bounds, because one is not enough.
+# The WAL archive was trimmed near the TOP of this script, before anything was
+# written, by deploy/prune-wal-archive.sh - the same script the six-hourly
+# fuelflow-wal-prune.timer runs. It used to be trimmed here, at the end, and that
+# was a mistake worth recording: under `set -euo pipefail` a failure anywhere
+# above this point skipped the trim entirely, so the night the backup broke was
+# the night the archive stopped being trimmed. The bounds it applies are the ones
+# documented above, and they are unchanged:
 #
-# The age bound is the policy: how long the archive stays on the box. It is short on
-# purpose. The off-box copy is a complete snapshot of the archive, taken nightly, so the
-# history is preserved there - the on-box copy only has to bridge the gap between two
-# nightly snapshots.
-#
-# The size bound is the guard. An idle database produces a 16 MiB segment every
-# archive_timeout, and almost all of it is zeros, so the archive grows at a rate set by
-# the TIMEOUT and not by the traffic. Measured on the production box on 2026-10-19: 288
-# segments a day, 4.6 GiB a day. At that rate a 14-day window is 63 GiB, and the disk
-# holds 21 GiB - so the age bound alone would have filled the disk in four days, and a
-# full disk is how the database stops accepting writes.
-#
-# The size bound is what makes that impossible. Whatever the rate turns out to be, the
-# archive on the box cannot pass the cap.
-WAL_MAX_BYTES="${WAL_MAX_BYTES:-8589934592}"   # 8 GiB
-if [[ -d "$WAL_ARCHIVE_DIR" ]]; then
-  prune_wal_archive "$WAL_ARCHIVE_DIR" "$WAL_RETENTION_DAYS" "$WAL_MAX_BYTES"
-fi
-
-# The staging archive, pruned here for the same reason the production one is, and for
-# one more: THEY SHARE THE DISK.
-#
-# Staging is a scratch database, so its archive is disposable - nothing is shipped off
-# the box for it, and nothing else prunes it, because this script is the only thing that
-# runs nightly and the staging stack has no backup of its own. Left alone it would grow
-# at the same rate as production's, on the same 22 GiB, until the disk filled - and a
-# full disk takes production down with it.
-#
-# So the bounds are much tighter: a day, and a gibibyte. Enough to rehearse a restore
-# against staging, which is the reason staging archives at all.
-STAGING_WAL_ARCHIVE_DIR="${STAGING_WAL_ARCHIVE_DIR:-/root/fuelflow-wal-staging}"
-STAGING_WAL_MAX_BYTES="${STAGING_WAL_MAX_BYTES:-1073741824}"   # 1 GiB
-if [[ -d "$STAGING_WAL_ARCHIVE_DIR" ]]; then
-  prune_wal_archive "$STAGING_WAL_ARCHIVE_DIR" 1 "$STAGING_WAL_MAX_BYTES"
-fi
+#   - the age bound is the policy (WAL_RETENTION_DAYS, default 3) - the on-box
+#     copy only has to bridge the gap between two nightly off-box snapshots;
+#   - the size bound is the guard (WAL_MAX_BYTES, default 8 GiB) - whatever rate
+#     the archive turns out to grow at, it cannot pass the cap;
+#   - staging gets a day and a gibibyte, because it is disposable and because it
+#     shares the disk with production.
 
 # Prune old dumps. Both extensions: .dump.age is current, .dump catches any plaintext
 # file left over from before this script encrypted anything.
