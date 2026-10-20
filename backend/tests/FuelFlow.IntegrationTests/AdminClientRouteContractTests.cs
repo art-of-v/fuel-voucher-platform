@@ -123,7 +123,7 @@ public class AdminClientRouteContractTests : IClassFixture<TestDatabaseFixture>
             .ToArray();
 
         blocked.Should().BeEmpty(
-            "the admin SPA can only reach these paths; anything missing from admin/nginx.conf and " +
+            "the admin SPA can only reach these paths; anything missing from admin/nginx.conf.template and " +
             "deploy/Caddyfile answers 404 at the edge while passing locally");
     }
 

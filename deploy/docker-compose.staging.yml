@@ -33,9 +33,9 @@
 # Prod commits ~1792M; these limits add ~944M, so both stacks fit a 4 GB box + 2 GB swap
 # with headroom left for the host. Staging is sized smaller than prod on purpose — it is
 # for verification, not load. If a legitimate staging import gets OOM-killed, raise
-# dotnet-backend first. Limits are caps, not reservations; real idle usage is far lower.
+# fuelflow-staging-backend first. Limits are caps, not reservations; real idle usage is far lower.
 #
-#   dotnet-backend 512M | postgres 256M | redis 96M | admin 48M | website 32M  = ~944M
+#   fuelflow-staging-backend 512M | postgres 256M | redis 96M | admin 48M | website 32M  = ~944M
 
 name: fuelflow-staging
 
@@ -46,7 +46,7 @@ x-logging: &default-logging
     max-file: "3"
 
 services:
-  dotnet-backend:
+  fuelflow-staging-backend:
     image: ghcr.io/art-of-v/fuelflow-backend:${BACKEND_IMAGE_TAG:-${IMAGE_TAG:-main}}
     container_name: fuelflow-staging-backend
     restart: unless-stopped
@@ -111,9 +111,9 @@ services:
       SupportMail__Password: ${SUPPORT_MAIL_PASSWORD:-}
       SupportMail__ToEmail: ${SUPPORT_MAIL_TO_EMAIL:-}
 
-      # Staging domains. `dotnet-backend` is the in-network name the staging admin nginx and
+      # Staging domains. `fuelflow-staging-backend` is the in-network name the staging admin nginx and
       # (via the shared network) Caddy use; keep it in AllowedHosts or host filtering 400s.
-      AllowedHosts: "${ROOT_DOMAIN};${API_DOMAIN};${MARKETING_DOMAIN};dotnet-backend"
+      AllowedHosts: "${ROOT_DOMAIN};${API_DOMAIN};${MARKETING_DOMAIN};fuelflow-staging-backend"
       Cors__AllowedOrigins__0: "https://${ROOT_DOMAIN}"
       Cors__AllowedOrigins__1: "https://${MARKETING_DOMAIN}"
 
@@ -154,7 +154,13 @@ services:
     logging: *default-logging
     security_opt:
       - no-new-privileges:true
-    # Same image as prod: its nginx proxies a relative /api to `dotnet-backend:8080`, which
+    # The backend's in-network name, substituted into the nginx template at container
+    # start. The filter matters: without it envsubst would also replace nginx's own
+    # $variables in the template, and the config would not parse.
+    environment:
+      BACKEND_HOST: fuelflow-staging-backend
+      NGINX_ENVSUBST_FILTER: "^BACKEND_HOST$"
+    # Same image as prod: its nginx proxies a relative /api to `fuelflow-staging-backend:8080`, which
     # resolves to the staging backend on the staging default network. Reachable by Caddy on
     # the shared network as `staging-admin`.
     ports:
@@ -165,7 +171,7 @@ services:
         aliases:
           - staging-admin
     depends_on:
-      - dotnet-backend
+      - fuelflow-staging-backend
 
   website-frontend:
     image: ghcr.io/art-of-v/fuelflow-website:${WEBSITE_IMAGE_TAG:-${IMAGE_TAG:-main}}

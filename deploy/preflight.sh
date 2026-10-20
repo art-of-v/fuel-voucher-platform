@@ -30,15 +30,15 @@ fail() { echo "ERROR: $*" >&2; exit 1; }
 warn() { echo "WARNING: $*" >&2; warnings+=("$*"); }
 
 # The compose service names and the container names are not derivable from each
-# other - `dotnet-backend` runs as `fuelflow-backend`, and `admin-frontend` as
-# `fuelflow-admin`. The first version of this script guessed with a substitution,
-# looked up `fuelflow-dotnet-backend`, found nothing, and reported "(not running)"
+# other - `admin-frontend` runs as `fuelflow-admin` and `website-frontend` as
+# `fuelflow-website`. The first version of this script guessed with a substitution,
+# looked up `fuelflow-fuelflow-backend`, found nothing, and reported "(not running)"
 # for all three while passing cleanly - which is the worst possible failure for a
 # check whose whole job is to notice that the running image is not what a tagless
 # `up -d` would pick. Spelled out, and exercised against the real box.
 service_container() {
   case "$1" in
-    dotnet-backend)  echo "fuelflow-backend" ;;
+    fuelflow-backend)  echo "fuelflow-backend" ;;
     admin-frontend)  echo "fuelflow-admin" ;;
     website-frontend) echo "fuelflow-website" ;;
     *) echo "fuelflow-$1" ;;
@@ -397,7 +397,7 @@ echo "  Caddyfile: valid"
 #
 # Production and staging run on this box and caddy is attached to both
 # fuelflow_default and fuelflow_shared. Staging joins the shared network under the
-# same service-name aliases, so before app#977 the name `dotnet-backend` resolved
+# same service-name aliases, so before app#977 the name `fuelflow-backend` resolved
 # to the STAGING backend from caddy's point of view. Production then answered
 #
 #     400 Invalid Hostname
@@ -453,7 +453,7 @@ fi
 # ------------------------------------------------------------------------------
 echo "== images =="
 stale=0
-for svc in dotnet-backend admin-frontend website-frontend; do
+for svc in fuelflow-backend admin-frontend website-frontend; do
   ctr="$(service_container "$svc")"
   running=$(docker inspect "$ctr" --format '{{.Config.Image}}' 2>/dev/null || true)
   if [[ -z "$running" ]]; then

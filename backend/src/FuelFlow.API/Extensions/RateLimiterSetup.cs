@@ -55,7 +55,7 @@ internal static class RateLimiterSetup
     /// Second, and more consequential: <c>ForwardLimit</c> defaults to 1, so only the rightmost
     /// X-Forwarded-For entry is consumed. Requests arriving on the admin domain traverse TWO
     /// proxies - Caddy appends the client IP, then the admin container's nginx appends Caddy's
-    /// address (<c>$proxy_add_x_forwarded_for</c> in admin/nginx.conf). Taking one hop back from
+    /// address (<c>$proxy_add_x_forwarded_for</c> in admin/nginx.conf.template). Taking one hop back from
     /// that chain yields Caddy's container address for every caller, so all admin-origin traffic
     /// collapsed into a single rate-limit partition: one client could exhaust the shared bucket
     /// for everyone, and the per-IP OTP ceiling degraded to one global bucket. ForwardLimit is

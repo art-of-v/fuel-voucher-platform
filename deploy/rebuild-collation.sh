@@ -79,15 +79,15 @@ if [[ "$TARGET" == "staging" ]]; then
   BACKEND="${BACKEND:-fuelflow-staging-backend}"
   # Staging has no caddy of its own - it is fronted by the PRODUCTION caddy, which
   # serves the staging domains. The probe still goes through that caddy, and it asks
-  # for the backend by its COMPOSE SERVICE NAME (`dotnet-backend`), not by its
+  # for the backend by its CONTAINER name (`fuelflow-staging-backend`) - which is
   # container name (`fuelflow-staging-backend`).
   #
   # The distinction is not cosmetic: the backend's AllowedHosts list contains
-  # `dotnet-backend` and NOT the container name, so a probe to the container name is
+  # `fuelflow-staging-backend` and NOT any other name, so a probe to a name it does
   # answered with 400 Bad Request - a probe that looks like a broken backend and is
   # not. Measured on 2026-10-20.
   CADDY="${CADDY:-fuelflow-caddy}"
-  HEALTH_URL="${HEALTH_URL:-http://dotnet-backend:8080/health}"
+  HEALTH_URL="${HEALTH_URL:-http://fuelflow-backend:8080/health}"
   WORK="${WORK:-/root/collation-rebuild-staging}"
 else
   ENV_FILE="${ENV_FILE:-.env}"
@@ -95,7 +95,7 @@ else
   CONTAINER="${CONTAINER:-fuelflow-postgres}"
   BACKEND="${BACKEND:-fuelflow-backend}"
   CADDY="${CADDY:-fuelflow-caddy}"
-  HEALTH_URL="${HEALTH_URL:-http://dotnet-backend:8080/health}"
+  HEALTH_URL="${HEALTH_URL:-http://fuelflow-backend:8080/health}"
   WORK="${WORK:-/root/collation-rebuild}"
 fi
 
