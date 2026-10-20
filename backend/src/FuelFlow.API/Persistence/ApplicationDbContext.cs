@@ -223,6 +223,22 @@ var cipher = _qrCipher;
         // stops being comparable afterwards.
         var transitions = CaptureOrderTransitions();
 
+        // The status change and the order_events row that records it are ONE unit of work. EF
+        // opens a separate implicit transaction per SaveChanges, so without this the change could
+        // land and the event could fail - an order that moved with no record of why, and no way to
+        // tell afterwards whether the event was lost or never written.
+        //
+        // A caller that already opened a transaction (the fulfilment service does) gets the one it
+        // has: a second transaction would throw, and the unit of work is already atomic there.
+        //
+        // Not on the in-memory provider: it has no transactions at all, and the unit tests are
+        // about the logic, not about the atomicity - the integration test is.
+        await using var transaction = transitions.Count > 0
+            && Database.CurrentTransaction is null
+            && Database.IsRelational()
+                ? await Database.BeginTransactionAsync(cancellationToken)
+                : null;
+
         try
         {
             var affected = await base.SaveChangesAsync(cancellationToken);
@@ -230,6 +246,11 @@ var cipher = _qrCipher;
             if (transitions.Count > 0)
             {
                 await RecordOrderEventsAsync(transitions, cancellationToken);
+            }
+
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
             }
 
             return affected;
