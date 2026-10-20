@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
 
 import { getTokens } from '../core/design/tokens';
 import { Haptics } from '../core/utils/haptics';
@@ -200,6 +200,31 @@ beforeEach(() => {
   mockContextKind = 'personal';
   mockFeedbackAvailable = true;
   jest.spyOn(Haptics, 'impactAsync').mockResolvedValue(undefined as any);
+  // The file's whole subject is the press feedback, and the press feedback is driven by
+  // `Pressability`, which holds `onPressOut` back by `minPressDuration` (130 ms). Fake
+  // timers are what make that delay controllable - see the afterEach below.
+  jest.useFakeTimers();
+});
+
+/**
+ * Pressability holds `onPressOut` back by `minPressDuration` (130 ms) so a quick tap still
+ * registers as a press — which means **every press in this file leaves a timer behind**. It
+ * fires in whatever test runs next, outside `act(...)`, and React's warning about a state
+ * update that was not wrapped in `act` is a hard failure in this repository
+ * (`jest.setup.js` turns it into a thrown error) — in a test that has nothing to do with the
+ * press. That is a flake: it depends on how long the next test happens to take, and it
+ * failed a pull request that changed nothing on this screen.
+ *
+ * The timers are therefore run at the end of every test, inside `act`, where the update they
+ * cause belongs — and the fake timers make that instant and deterministic: the real delay
+ * never has to elapse, and the test that failed on somebody else's press is the test that
+ * owns it.
+ */
+afterEach(() => {
+  act(() => {
+    jest.runOnlyPendingTimers();
+  });
+  jest.useRealTimers();
 });
 
 describe('BottomTabs — press feedback', () => {
