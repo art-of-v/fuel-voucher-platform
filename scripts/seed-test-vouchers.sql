@@ -68,7 +68,7 @@ BEGIN;
   SELECT
     count(*) <> 1                       AS fuel_not_resolved,
     count(*) > 1                        AS fuel_ambiguous,
-    coalesce(min(f.id), '')             AS fuel_type_id
+       coalesce(min(f.id::text), '')      AS fuel_type_id
   FROM fuel_types f
   JOIN brands b ON b.id = f.brand_id
   WHERE lower(b.slug) = lower(:'fuel_brand') AND NOT f.is_deleted

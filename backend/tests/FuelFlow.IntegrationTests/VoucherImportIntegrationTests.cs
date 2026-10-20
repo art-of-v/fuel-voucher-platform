@@ -15,6 +15,7 @@ using UglyToad.PdfPig.Content;
 using UglyToad.PdfPig.Core;
 using UglyToad.PdfPig.Fonts.Standard14Fonts;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -341,7 +342,7 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
         var voucher = await db.FuelVouchers.FirstOrDefaultAsync(v => v.VoucherNumber == voucherNum);
         voucher.Should().NotBeNull();
         voucher!.Brand.Should().Be("WOG");
-        voucher.FuelTypeId.Should().Be("wog-95-euro");
+        voucher.FuelTypeId.Should().Be(ToUuid("wog-95-euro"));
         voucher.Liters.Should().Be(20m);
         voucher.SupplierExpirationDate.Should().Be(new DateOnly(2026, 2, 9));
     }
