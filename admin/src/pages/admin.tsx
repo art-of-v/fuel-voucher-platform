@@ -1585,7 +1585,6 @@ export default function AdminScreen() {
                               disabled={setUserRoleMutation.isPending}
                               onChange={(e) => {
                                 const role = e.target.value;
-<<<<<<< HEAD
                                 if (role !== (currentRole ?? '')) {
                                   setUserRoleMutation.mutate({ userId: user.id, role });
                                 }
