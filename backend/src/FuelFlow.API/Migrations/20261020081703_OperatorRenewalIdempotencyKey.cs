@@ -36,8 +36,7 @@ namespace FuelFlow.API.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.Sql("""
-                CREATE UNIQUE INDEX "ix_operator_voucher_renewals_voucher_id_new_expiration"
-                ON "operator_voucher_renewals" ("voucher_id", "new_expiration");
+                DROP INDEX IF EXISTS "ix_operator_voucher_renewals_voucher_id_new_expiration";
                 """);
         }
     }
