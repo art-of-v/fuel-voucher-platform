@@ -59,7 +59,7 @@ internal static class PipelineSetup
             {
                 // The probe asks "is the database reachable?", and it used to ask it the expensive
                 // way: GetPendingMigrationsAsync() reads the WHOLE __EFMigrationsHistory table
-                // (166 rows today) and diffs it against the model snapshot - and then the result
+                // (183 rows when this was written) and diffs it against the model snapshot - and then the result
                 // was thrown away, so a pending migration never made the probe unhealthy anyway.
                 // SELECT 1 is the same question with one cheap round trip.
                 await db.Database.ExecuteSqlRawAsync("SELECT 1", ct);
