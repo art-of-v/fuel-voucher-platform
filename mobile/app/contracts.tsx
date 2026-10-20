@@ -9,10 +9,10 @@ import {
   getAvailableContracts,
   getSignedContracts,
 } from '../src/features/contracts/api/getContracts';
-import { signContracts } from '../src/features/contracts/api/signContract';
+import { signContract } from '../src/features/contracts/api/signContract';
 import { getLegalProfile } from '../src/features/profile/api/updateLegalProfile';
 import { getStations } from '../src/features/stations/api/getStations';
-import type { Station, Contract } from '../src/core/types/api';
+import type { Station, Contract, UserContract } from '../src/core/types/api';
 import { GridPageLayout, LoadingState, ScreenHeader } from '../src/core/ui';
 import { useDesignTokens } from '../src/core/hooks/useTheme';
 import { useI18n } from '../src/core/i18n';
@@ -20,6 +20,21 @@ import { Haptics } from '../src/core/utils/haptics';
 import { SignaturePad } from '../src/components/SignaturePad';
 
 type Tab = 'AVAILABLE' | 'SIGNED';
+
+/**
+ * What the reader shows about a contract.
+ *
+ * The schema has no document text - a contract is a row of ids and dates - so "the contract"
+ * on this screen is its facts: which brand, which company, and the term it runs for. The
+ * reader is where the user looks before they sign, so what it shows has to be true.
+ */
+type ContractCard = {
+  title: string;
+  facts: { label: string; value: string }[];
+};
+
+/** The name the network is shown under when a contract's brand does not resolve. */
+const NETWORK_NAME = 'FuelFlow Network';
 
 export default function ContractsScreen() {
   const router = useRouter();
@@ -188,6 +203,21 @@ export default function ContractsScreen() {
           fontFamily: 'Rajdhani-SemiBold',
           fontSize: tokens.type.numericSmall.fontSize,
         },
+        factRow: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          gap: tokens.spacing.md,
+        },
+        factLabel: {
+          fontFamily: 'Rajdhani-SemiBold',
+          fontSize: tokens.type.caption.fontSize,
+        },
+        factValue: {
+          fontFamily: 'Rajdhani-SemiBold',
+          fontSize: tokens.type.numericSmall.fontSize,
+          flexShrink: 1,
+          textAlign: 'right',
+        },
       }),
     [tokens],
   );
@@ -195,7 +225,7 @@ export default function ContractsScreen() {
   const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState<Tab>('AVAILABLE');
-  const [readingContract, setReadingContract] = useState<Contract | null>(null);
+  const [readingCard, setReadingCard] = useState<ContractCard | null>(null);
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
   const [signingContract, setSigningContract] = useState<Contract | null>(null);
@@ -232,15 +262,10 @@ export default function ContractsScreen() {
 
   // Mutations
   const signMutation = useMutation({
-    mutationFn: ({
-      contractIds,
-      sig,
-      stationId,
-    }: {
-      contractIds: string[];
-      sig: string;
-      stationId?: string;
-    }) => signContracts(contractIds, sig, stationId),
+    // One contract per call, and the body the server binds: `{ contractId, signatureData }`.
+    // The client used to post an array of ids and a station, which bound nothing.
+    mutationFn: ({ contractId, sig }: { contractId: string; sig: string }) =>
+      signContract(contractId, sig),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['signedContracts'] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -256,9 +281,46 @@ export default function ContractsScreen() {
   });
 
   // Helpers
-  const isProviderSigned = (stationId: string) => {
-    return signedContracts?.some((sc) => sc.station?.id === stationId);
-  };
+  // The brand travels by id, so that is what a screen matches on: two brands may share a name.
+  const isProviderSigned = (brandId: string) =>
+    signedContracts?.some((sc) => sc.brandId === brandId) ?? false;
+
+  // The contracts of the brand whose card was pressed. A contract belongs to a brand, so the
+  // sheet offers THAT brand's contracts - not every contract the user happens to hold, which
+  // is how a signature could end up on a document for a different provider. An expired
+  // contract is not offered either: the server refuses to sign one, so offering it would
+  // only produce a rejection after the user had drawn their signature.
+  const brandContracts = useMemo(
+    () =>
+      selectedStation
+        ? (contracts || []).filter((c) => c.brandId === selectedStation.id && !c.expired)
+        : ([] as Contract[]),
+    [contracts, selectedStation],
+  );
+
+  // Two contracts of one brand are told apart by their term, so the option carries it.
+  const contractLabel = (c: Contract) =>
+    `${c.brandName ?? NETWORK_NAME} · ${formatExpirationDate(c.expiresAt)}`;
+
+  const cardOfContract = (c: Contract): ContractCard => ({
+    title: c.brandName ?? NETWORK_NAME,
+    facts: [
+      { label: t('contracts.company'), value: c.legalEntityName ?? '-' },
+      { label: t('contracts.createdAt'), value: formatExpirationDate(c.createdAt) },
+      { label: t('contracts.expiresAt'), value: formatExpirationDate(c.expiresAt) },
+    ],
+  });
+
+  const cardOfSignature = (sc: UserContract): ContractCard => ({
+    title: sc.brandName ?? NETWORK_NAME,
+    facts: [
+      { label: t('contracts.signedAt'), value: formatExpirationDate(sc.signedAt) },
+      {
+        label: t('contracts.expiresAt'),
+        value: sc.expiresAt ? formatExpirationDate(sc.expiresAt) : '-',
+      },
+    ],
+  });
 
   const handleSign = () => {
     if (!selectedStation || !signingContract || !signature) {
@@ -266,11 +328,7 @@ export default function ContractsScreen() {
       return;
     }
 
-    signMutation.mutate({
-      contractIds: [signingContract.id],
-      sig: signature,
-      stationId: selectedStation.id,
-    });
+    signMutation.mutate({ contractId: signingContract.id, sig: signature });
   };
 
   const Header = <ScreenHeader title={t('contracts.title')} />;
@@ -382,8 +440,12 @@ export default function ContractsScreen() {
                         onPress={() => {
                           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                           setSelectedStation(station);
-                          const available = contracts || [];
-                          setSigningContract(available.length === 1 ? available[0] : null);
+                          // Only this brand's contracts: a contract belongs to a brand, and
+                          // the card the user pressed is the brand they are signing with.
+                          const forBrand = (contracts || []).filter(
+                            (c) => c.brandId === station.id && !c.expired,
+                          );
+                          setSigningContract(forBrand.length === 1 ? forBrand[0] : null);
                         }}
                         style={[styles.actionBtn, { backgroundColor: tokens.colors.primary }]}
                       >
@@ -414,7 +476,7 @@ export default function ContractsScreen() {
               signedContracts?.map((sc) => (
                 <Pressable
                   key={sc.id}
-                  onPress={() => setReadingContract(sc.contract)}
+                  onPress={() => setReadingCard(cardOfSignature(sc))}
                   style={[
                     styles.providerCard,
                     { backgroundColor: tokens.colors.card, borderColor: tokens.colors.borderLight },
@@ -430,7 +492,7 @@ export default function ContractsScreen() {
                           fontSize: tokens.type.numericSmall.fontSize,
                         }}
                       >
-                        {sc.contract.title}
+                        {sc.brandName ?? NETWORK_NAME}
                       </Text>
                       <Text
                         style={{
@@ -438,7 +500,7 @@ export default function ContractsScreen() {
                           fontSize: tokens.type.caption.fontSize,
                         }}
                       >
-                        {t('contracts.brand')}: {sc.station?.name || 'FuelFlow Network'}
+                        {t('contracts.company')}: {sc.legalEntityName ?? '-'}
                       </Text>
                       <Text
                         style={{
@@ -459,31 +521,35 @@ export default function ContractsScreen() {
       </ScrollView>
 
       {/* Contract Reader Modal */}
-      <Modal visible={!!readingContract} animationType="fade" transparent testID="reader-modal">
+      <Modal visible={!!readingCard} animationType="fade" transparent testID="reader-modal">
         <View style={[styles.modalOverlay, { backgroundColor: tokens.colors.overlay }]}>
           <View style={[styles.modalContent, { backgroundColor: tokens.colors.card }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: tokens.colors.primary }]}>
-                {readingContract?.title}
+                {readingCard?.title}
               </Text>
-              <Pressable testID="close-reader-x" onPress={() => setReadingContract(null)}>
+              <Pressable testID="close-reader-x" onPress={() => setReadingCard(null)}>
                 <X size={24} color={tokens.colors.text.dim} />
               </Pressable>
             </View>
             <ScrollView style={styles.contractTextScroll}>
-              <Text
-                style={{
-                  color: tokens.colors.text.primary,
-                  lineHeight: 22,
-                  fontSize: tokens.type.numericSmall.fontSize,
-                }}
-              >
-                {readingContract?.content}
-              </Text>
+              {readingCard?.facts.map((fact) => (
+                <View
+                  key={fact.label}
+                  style={[styles.factRow, { marginBottom: tokens.spacing.sm }]}
+                >
+                  <Text style={[styles.factLabel, { color: tokens.colors.text.dim }]}>
+                    {fact.label}
+                  </Text>
+                  <Text style={[styles.factValue, { color: tokens.colors.text.primary }]}>
+                    {fact.value}
+                  </Text>
+                </View>
+              ))}
             </ScrollView>
             <Pressable
               testID="close-reader-button"
-              onPress={() => setReadingContract(null)}
+              onPress={() => setReadingCard(null)}
               style={[styles.modalCloseBtn, { backgroundColor: tokens.colors.primary }]}
             >
               <Text style={{ color: tokens.colors.text.onPrimary, fontFamily: 'Inter-Black' }}>
@@ -504,7 +570,7 @@ export default function ContractsScreen() {
                   style={[styles.sheetTitle, { color: tokens.colors.primary }]}
                   numberOfLines={1}
                 >
-                  {signingContract ? signingContract.title : t('contracts.signingTitle')}
+                  {signingContract ? contractLabel(signingContract) : t('contracts.signingTitle')}
                 </Text>
                 <Text
                   style={{ color: tokens.colors.text.dim, marginTop: tokens.spacing.xxs }}
@@ -529,9 +595,9 @@ export default function ContractsScreen() {
               style={styles.sheetScroll}
               contentContainerStyle={styles.sheetScrollContent}
             >
-              {contracts && contracts.length > 1 && (
+              {brandContracts.length > 1 && (
                 <View style={{ marginBottom: tokens.spacing.lg, gap: tokens.spacing.sm }}>
-                  {contracts.map((c) => {
+                  {brandContracts.map((c) => {
                     const selected = signingContract?.id === c.id;
                     return (
                       <Pressable
@@ -559,7 +625,7 @@ export default function ContractsScreen() {
                           ]}
                           numberOfLines={2}
                         >
-                          {c.title}
+                          {contractLabel(c)}
                         </Text>
                       </Pressable>
                     );
@@ -578,12 +644,18 @@ export default function ContractsScreen() {
                     style={[styles.summaryTitle, { color: tokens.colors.text.primary }]}
                     numberOfLines={2}
                   >
-                    {signingContract.title}
+                    {contractLabel(signingContract)}
                   </Text>
                   <Text style={[styles.summaryProvider, { color: tokens.colors.text.dim }]}>
                     {t('contracts.brand')}: {selectedStation?.name}
                   </Text>
                 </View>
+              )}
+
+              {brandContracts.length === 0 && (
+                <Text style={{ color: tokens.colors.text.dim, marginTop: tokens.spacing.lg }}>
+                  {t('contracts.noContractForBrand')}
+                </Text>
               )}
 
               <Text
@@ -595,7 +667,8 @@ export default function ContractsScreen() {
                 {t('contracts.reviewText')}
               </Text>
               <Pressable
-                onPress={() => setReadingContract(signingContract)}
+                onPress={() => signingContract && setReadingCard(cardOfContract(signingContract))}
+                disabled={!signingContract}
                 style={[styles.readFullBtn, { borderColor: tokens.colors.primary }]}
               >
                 <Eye size={16} color={tokens.colors.primary} />
@@ -614,11 +687,11 @@ export default function ContractsScreen() {
               <Pressable
                 testID="sign-submit"
                 onPress={handleSign}
-                disabled={signMutation.isPending || !signature}
+                disabled={signMutation.isPending || !signature || !signingContract}
                 style={[
                   styles.signSubmitBtn,
                   { backgroundColor: tokens.colors.primary },
-                  (signMutation.isPending || !signature) && { opacity: 0.5 },
+                  (signMutation.isPending || !signature || !signingContract) && { opacity: 0.5 },
                 ]}
               >
                 <Text

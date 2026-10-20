@@ -272,8 +272,8 @@ public sealed class LegalEntityController : ControllerBase
             id = c.Id,
             legalEntityId = c.LegalEntityId,
             legalEntityName = c.Entity?.Name,
-            BrandId = c.BrandId,
-            BrandName = c.Brand?.Name,
+            brandId = c.BrandId,
+            brandName = c.Brand?.Name,
             createdAt = c.CreatedAtUtc,
             // The validity term, and whether it has run out. A contract list that does not
             // say when a contract ends cannot answer "which of these is about to expire".
@@ -284,6 +284,17 @@ public sealed class LegalEntityController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>
+    /// Sign ONE contract. The body is <c>{ contractId, signatureData }</c> - the shape the mobile
+    /// client posts, and the only one this endpoint binds.
+    /// <para>
+    /// One contract per call, deliberately: the screen signs one document at a time (the user
+    /// picks a contract and signs it), so a batch body would be a shape no caller has. A client
+    /// that posted <c>{ contractIds: [...], stationId }</c> bound nothing - <c>ContractId</c>
+    /// stayed <c>Guid.Empty</c> and every call was a 400, which is what the mobile client did
+    /// for as long as it existed.
+    /// </para>
+    /// </summary>
     [HttpPost("sign")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -355,7 +366,11 @@ public sealed class LegalEntityController : ControllerBase
             id = uc.Id,
             contractId = uc.ContractId,
             legalEntityName = uc.Contract?.Entity?.Name,
-            BrandName = uc.Contract?.Brand?.Name,
+            // The brand is carried by id, not only by name: a client that has to decide
+            // "is this brand already signed?" needs something it can compare, and two
+            // brands may share a name. The name is the label; the id is the fact.
+            brandId = uc.Contract?.BrandId,
+            brandName = uc.Contract?.Brand?.Name,
             signedAt = uc.SignedAtUtc,
             // A signature outlives the contract it is a signature of, so the term travels
             // with it - otherwise a signed-contract list cannot say which of them has run out.
