@@ -51,8 +51,8 @@ public sealed class ImportKloPricesCommandHandlerTests : IDisposable
         {
             Id = BrandIds.Klo,
             Slug = "klo",
-            Name = "KLO",
-            LogoText = "KLO",
+            Name = "klo",
+            LogoText = "klo",
             Color = "#000",
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow

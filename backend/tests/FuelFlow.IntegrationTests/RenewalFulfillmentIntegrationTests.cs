@@ -63,9 +63,9 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
 
             SeedUser(seed, userId);
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
-            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", 50m, sourceExpiry));
+            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "okko", "okko-95", 50m, sourceExpiry));
             seed.Orders.Add(RenewalOrder(orderId, userId, price: 500, monobankInvoiceId: null,
-                ("OKKO", "okko-95", 50m, 500)));
+                ("okko", "okko-95", 50m, 500)));
             MarkAsRenewalLine(seed, orderId, sourceId, termCode: "1m");
 
             await seed.SaveChangesAsync();
@@ -148,9 +148,9 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
 
             SeedUser(seed, userId);
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
-            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", 50m, sourceExpiry));
+            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "okko", "okko-95", 50m, sourceExpiry));
             seed.Orders.Add(RenewalOrder(orderId, userId, price: 500, monobankInvoiceId: null,
-                ("OKKO", "okko-95", 50m, 500)));
+                ("okko", "okko-95", 50m, 500)));
             MarkAsRenewalLine(seed, orderId, sourceId, termCode: "1m");
 
             await seed.SaveChangesAsync();
@@ -211,11 +211,11 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
 
             SeedUser(seed, userId);
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
-            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", 50m,
+            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "okko", "okko-95", 50m,
                 sourceExpiry, providerExpiry: sourceExpiry));
-            seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 50m, today.AddDays(10)));
+            seed.FuelVouchers.Add(StockVoucher(stockId, "okko", "okko-95", 50m, today.AddDays(10)));
             seed.Orders.Add(RenewalOrder(orderId, userId, price: 500, monobankInvoiceId: null,
-                ("OKKO", "okko-95", 50m, 500)));
+                ("okko", "okko-95", 50m, 500)));
             MarkAsRenewalLine(seed, orderId, sourceId, termCode: "1w");
 
             await seed.SaveChangesAsync();
@@ -331,10 +331,10 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             // under test.
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
 
-            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", 50m, sourceExpiry, providerExpiry));
-            seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 50m, today.AddMonths(6)));
+            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "okko", "okko-95", 50m, sourceExpiry, providerExpiry));
+            seed.FuelVouchers.Add(StockVoucher(stockId, "okko", "okko-95", 50m, today.AddMonths(6)));
             seed.Orders.Add(RenewalOrder(orderId, userId, price: 500, monobankInvoiceId: null,
-                ("OKKO", "okko-95", 50m, 500)));
+                ("okko", "okko-95", 50m, 500)));
             MarkAsRenewalLine(seed, orderId, sourceId, termCode: "1m");
 
             await seed.SaveChangesAsync();
@@ -430,9 +430,9 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
 
             SeedUser(seed, userId);
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
-            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", 50m, sourceExpiry, providerExpiry));
+            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "okko", "okko-95", 50m, sourceExpiry, providerExpiry));
             seed.Orders.Add(RenewalOrder(orderId, userId, price: 500, monobankInvoiceId: null,
-                ("OKKO", "okko-95", 50m, 500)));
+                ("okko", "okko-95", 50m, 500)));
             MarkAsRenewalLine(seed, orderId, sourceId, termCode: "1m");
 
             await seed.SaveChangesAsync();
@@ -485,9 +485,9 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
 
             SeedUser(seed, userId);
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
-            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", 50m, sourceExpiry, providerExpiry));
+            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "okko", "okko-95", 50m, sourceExpiry, providerExpiry));
             seed.Orders.Add(RenewalOrder(orderId, userId, price: 500, monobankInvoiceId: null,
-                ("OKKO", "okko-95", 50m, 500)));
+                ("okko", "okko-95", 50m, 500)));
             MarkAsRenewalLine(seed, orderId, sourceId, termCode: "1m");
 
             await seed.SaveChangesAsync();
@@ -528,11 +528,11 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
             originPurchaseId = purchaseOrderId;
             // Source lapsed → Replace branch. Seeded Assigned so we can prove it goes back to stock.
-            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", 40m, today.AddDays(-3)));
+            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "okko", "okko-95", 40m, today.AddDays(-3)));
             // Matching stock, valid well beyond today + 1 month.
-            seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 40m, today.AddMonths(6)));
+            seed.FuelVouchers.Add(StockVoucher(stockId, "okko", "okko-95", 40m, today.AddMonths(6)));
             seed.Orders.Add(RenewalOrder(orderId, userId, price: 480, monobankInvoiceId: null,
-                ("OKKO", "okko-95", 40m, 480)));
+                ("okko", "okko-95", 40m, 480)));
             MarkAsRenewalLine(seed, orderId, sourceId, termCode: "1m");
 
             await seed.SaveChangesAsync();
@@ -599,11 +599,11 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             // to be written off — which is exactly the case the operator's exchange list exists to surface.
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
 
-            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", 40m,
+            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "okko", "okko-95", 40m,
                 today.AddDays(-3), providerExpiry: today.AddDays(-3)));
-            seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 40m, today.AddMonths(6)));
+            seed.FuelVouchers.Add(StockVoucher(stockId, "okko", "okko-95", 40m, today.AddMonths(6)));
             seed.Orders.Add(RenewalOrder(orderId, userId, price: 480, monobankInvoiceId: null,
-                ("OKKO", "okko-95", 40m, 480)));
+                ("okko", "okko-95", 40m, 480)));
             MarkAsRenewalLine(seed, orderId, sourceId, termCode: "1m");
 
             await seed.SaveChangesAsync();
@@ -669,13 +669,13 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             SeedUser(seed, userId);
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
 
-            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", 50m,
+            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "okko", "okko-95", 50m,
                 sourceExpiry, providerExpiry: sourceExpiry));
-            seed.FuelVouchers.Add(StockVoucher(eightDayId, "OKKO", "okko-95", 50m, today.AddDays(8)));
-            seed.FuelVouchers.Add(StockVoucher(nineDayId, "OKKO", "okko-95", 50m, today.AddDays(9)));
-            seed.FuelVouchers.Add(StockVoucher(fourteenDayId, "OKKO", "okko-95", 50m, today.AddDays(14)));
+            seed.FuelVouchers.Add(StockVoucher(eightDayId, "okko", "okko-95", 50m, today.AddDays(8)));
+            seed.FuelVouchers.Add(StockVoucher(nineDayId, "okko", "okko-95", 50m, today.AddDays(9)));
+            seed.FuelVouchers.Add(StockVoucher(fourteenDayId, "okko", "okko-95", 50m, today.AddDays(14)));
             seed.Orders.Add(RenewalOrder(orderId, userId, price: 500, monobankInvoiceId: null,
-                ("OKKO", "okko-95", 50m, 500)));
+                ("okko", "okko-95", 50m, 500)));
             MarkAsRenewalLine(seed, orderId, sourceId, termCode: "1w");
 
             await seed.SaveChangesAsync();
@@ -731,12 +731,12 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             SeedUser(seed, userId);
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
 
-            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", 50m,
+            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "okko", "okko-95", 50m,
                 boughtFor, providerExpiry: providerTerm));
             seed.Orders.Add(RenewalOrder(firstOrderId, userId, price: 500, monobankInvoiceId: null,
-                ("OKKO", "okko-95", 50m, 500)));
+                ("okko", "okko-95", 50m, 500)));
             seed.Orders.Add(RenewalOrder(secondOrderId, userId, price: 500, monobankInvoiceId: null,
-                ("OKKO", "okko-95", 50m, 500)));
+                ("okko", "okko-95", 50m, 500)));
             MarkAsRenewalLine(seed, firstOrderId, sourceId, termCode: "1w");
             MarkAsRenewalLine(seed, secondOrderId, sourceId, termCode: "2m");
 
@@ -820,13 +820,13 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
 
             // Customer term == brand term: no room to grow, so the branch is Replace.
-            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", 50m,
+            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "okko", "okko-95", 50m,
                 sourceExpiry, providerExpiry: sourceExpiry));
-            seed.FuelVouchers.Add(StockVoucher(twoMonthsId, "OKKO", "okko-95", 50m, today.AddMonths(2)));
-            seed.FuelVouchers.Add(StockVoucher(threeMonthsId, "OKKO", "okko-95", 50m, today.AddMonths(3)));
-            seed.FuelVouchers.Add(StockVoucher(sixMonthsId, "OKKO", "okko-95", 50m, today.AddMonths(6)));
+            seed.FuelVouchers.Add(StockVoucher(twoMonthsId, "okko", "okko-95", 50m, today.AddMonths(2)));
+            seed.FuelVouchers.Add(StockVoucher(threeMonthsId, "okko", "okko-95", 50m, today.AddMonths(3)));
+            seed.FuelVouchers.Add(StockVoucher(sixMonthsId, "okko", "okko-95", 50m, today.AddMonths(6)));
             seed.Orders.Add(RenewalOrder(orderId, userId, price: 500, monobankInvoiceId: null,
-                ("OKKO", "okko-95", 50m, 500)));
+                ("okko", "okko-95", 50m, 500)));
             MarkAsRenewalLine(seed, orderId, sourceId, termCode: "2m");
 
             await seed.SaveChangesAsync();
@@ -884,13 +884,13 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             SeedUser(seed, userId);
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
 
-            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", 50m,
+            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "okko", "okko-95", 50m,
                 sourceExpiry, providerExpiry: sourceExpiry));
             // Both shorter than the promise (sourceExpiry + 2 months); the longer one still fits today + term.
-            seed.FuelVouchers.Add(StockVoucher(Guid.NewGuid(), "OKKO", "okko-95", 50m, today.AddMonths(1)));
-            seed.FuelVouchers.Add(StockVoucher(Guid.NewGuid(), "OKKO", "okko-95", 50m, today.AddMonths(2)));
+            seed.FuelVouchers.Add(StockVoucher(Guid.NewGuid(), "okko", "okko-95", 50m, today.AddMonths(1)));
+            seed.FuelVouchers.Add(StockVoucher(Guid.NewGuid(), "okko", "okko-95", 50m, today.AddMonths(2)));
             seed.Orders.Add(RenewalOrder(orderId, userId, price: 500, monobankInvoiceId: null,
-                ("OKKO", "okko-95", 50m, 500)));
+                ("okko", "okko-95", 50m, 500)));
             MarkAsRenewalLine(seed, orderId, sourceId, termCode: "2m");
 
             await seed.SaveChangesAsync();
@@ -945,11 +945,11 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             SeedUser(seed, firstUserId);
             var purchaseOrderId = SeedPurchaseOrder(seed, firstUserId);
 
-            seed.FuelVouchers.Add(SourceVoucher(sourceId, firstUserId, purchaseOrderId, "OKKO", "okko-95", 50m,
+            seed.FuelVouchers.Add(SourceVoucher(sourceId, firstUserId, purchaseOrderId, "okko", "okko-95", 50m,
                 sourceExpiry, providerExpiry: sourceExpiry));
-            seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 50m, today.AddMonths(6)));
+            seed.FuelVouchers.Add(StockVoucher(stockId, "okko", "okko-95", 50m, today.AddMonths(6)));
             seed.Orders.Add(RenewalOrder(firstOrderId, firstUserId, price: 500, monobankInvoiceId: null,
-                ("OKKO", "okko-95", 50m, 500)));
+                ("okko", "okko-95", 50m, 500)));
             MarkAsRenewalLine(seed, firstOrderId, sourceId, termCode: "2m");
 
             await seed.SaveChangesAsync();
@@ -986,7 +986,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
                     {
                         Id = Guid.NewGuid(),
                         OrderId = secondOrderId,
-                        Brand = "OKKO",
+                        Brand = "okko",
                         FuelTypeId = ToUuid("okko-95"),
                         Liters = 50m,
                         Quantity = 1,
@@ -1045,7 +1045,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             SeedUser(seed, userId);
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
 
-            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", 50m,
+            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "okko", "okko-95", 50m,
                 sourceExpiry, providerExpiry: sourceExpiry));
             // The purchase really did deliver this voucher, so the wallet can reach it. That row is what
             // puts the source into the customer's voucher chain — without it the origin walk has no root to
@@ -1056,9 +1056,9 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
                 VoucherId = sourceId,
                 FulfilledAtUtc = DateTime.UtcNow.AddDays(-10)
             });
-            seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 50m, today.AddMonths(6)));
+            seed.FuelVouchers.Add(StockVoucher(stockId, "okko", "okko-95", 50m, today.AddMonths(6)));
             seed.Orders.Add(RenewalOrder(orderId, userId, price: 500, monobankInvoiceId: null,
-                ("OKKO", "okko-95", 50m, 500)));
+                ("okko", "okko-95", 50m, 500)));
             MarkAsRenewalLine(seed, orderId, sourceId, termCode: "2m");
 
             await seed.SaveChangesAsync();
@@ -1108,7 +1108,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             await seed.Database.MigrateAsync();
             await ResetDataAsync(seed);
 
-            seed.FuelVouchers.Add(StockVoucher(lapsedStockId, "OKKO", "okko-95", 40m, today.AddDays(-10)));
+            seed.FuelVouchers.Add(StockVoucher(lapsedStockId, "okko", "okko-95", 40m, today.AddDays(-10)));
 
             await seed.SaveChangesAsync();
         }
@@ -1153,8 +1153,8 @@ var exchangedId = Guid.NewGuid();
             });
 
             // Two lapsed stock vouchers the operator would normally have to renew with the supplier.
-            seed.FuelVouchers.Add(StockVoucher(exchangedId, "OKKO", "okko-95", 40m, today.AddDays(-10)));
-            seed.FuelVouchers.Add(StockVoucher(stillOwedId, "OKKO", "okko-95", 40m, today.AddDays(-10)));
+            seed.FuelVouchers.Add(StockVoucher(exchangedId, "okko", "okko-95", 40m, today.AddDays(-10)));
+            seed.FuelVouchers.Add(StockVoucher(stillOwedId, "okko", "okko-95", 40m, today.AddDays(-10)));
 
             // One of them has already been exchanged with the supplier - the confirm handler wrote this row,
             // and it wrote the settlement the row belongs to as well (#319).
@@ -1166,7 +1166,7 @@ var exchangedId = Guid.NewGuid();
                 ExchangeBatchId = exchangeBatchId,
                 OldVoucherId = exchangedId,
                 FuelTypeId = ToUuid("okko-95"),
-                Brand = "OKKO",
+                Brand = "okko",
                 SupplierId = supplierId,
                 SurchargeUah = 0m,
                 ActingUserId = Guid.NewGuid(),
@@ -1218,13 +1218,13 @@ var exchangedId = Guid.NewGuid();
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
 
             // Line A: still-valid source → Extend, will succeed.
-            seed.FuelVouchers.Add(SourceVoucher(extendSourceId, userId, purchaseOrderId, "OKKO", "okko-95", 50m, today.AddDays(5)));
+            seed.FuelVouchers.Add(SourceVoucher(extendSourceId, userId, purchaseOrderId, "okko", "okko-95", 50m, today.AddDays(5)));
             // Line B: lapsed source → Replace, but NO matching stock is seeded → stays unfulfilled.
-            seed.FuelVouchers.Add(SourceVoucher(replaceSourceId, userId, purchaseOrderId, "WOG", "wog-95", 40m, today.AddDays(-3)));
+            seed.FuelVouchers.Add(SourceVoucher(replaceSourceId, userId, purchaseOrderId, "wog", "wog-95", 40m, today.AddDays(-3)));
 
             seed.Orders.Add(RenewalOrder(orderId, userId, price: 980, monobankInvoiceId: $"test-invoice-{orderId:N}",
-                ("OKKO", "okko-95", 50m, 500),
-                ("WOG", "wog-95", 40m, 480)));
+                ("okko", "okko-95", 50m, 500),
+                ("wog", "wog-95", 40m, 480)));
 
             MarkAsRenewalLine(seed, orderId, extendSourceId, termCode: "1m");
             MarkAsRenewalLine(seed, orderId, replaceSourceId, termCode: "1m");
@@ -1337,11 +1337,11 @@ var exchangedId = Guid.NewGuid();
 
             SeedUser(seed, userId);
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
-            var source = SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", liters, sourceExpiry);
+            var source = SourceVoucher(sourceId, userId, purchaseOrderId, "okko", "okko-95", liters, sourceExpiry);
             source.CostPerLiter = originalCost;
             seed.FuelVouchers.Add(source);
             seed.Orders.Add(RenewalOrder(orderId, userId, price: amountPaid, monobankInvoiceId: null,
-                ("OKKO", "okko-95", liters, amountPaid)));
+                ("okko", "okko-95", liters, amountPaid)));
             MarkAsRenewalLine(seed, orderId, sourceId, termCode: "1m");
 
             await seed.SaveChangesAsync();
@@ -1387,11 +1387,11 @@ var exchangedId = Guid.NewGuid();
 
             SeedUser(seed, userId);
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
-            var source = SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", liters, today.AddDays(-3));
+            var source = SourceVoucher(sourceId, userId, purchaseOrderId, "okko", "okko-95", liters, today.AddDays(-3));
             source.CostPerLiter = sourceCost;
             seed.FuelVouchers.Add(source);
 
-            var stock = SourceVoucher(stockId, userId, Guid.NewGuid(), "OKKO", "okko-95", liters, today.AddMonths(6));
+            var stock = SourceVoucher(stockId, userId, Guid.NewGuid(), "okko", "okko-95", liters, today.AddMonths(6));
             stock.CostPerLiter = stockCost;
             stock.Status = VoucherStatus.Available;
             stock.AssignedToUserId = null;
@@ -1399,7 +1399,7 @@ var exchangedId = Guid.NewGuid();
             seed.FuelVouchers.Add(stock);
 
             seed.Orders.Add(RenewalOrder(orderId, userId, price: amountPaid, monobankInvoiceId: null,
-                ("OKKO", "okko-95", liters, amountPaid)));
+                ("okko", "okko-95", liters, amountPaid)));
             MarkAsRenewalLine(seed, orderId, sourceId, termCode: "1m");
 
             await seed.SaveChangesAsync();
@@ -1571,10 +1571,10 @@ var exchangedId = Guid.NewGuid();
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
 
             // The voucher as the FIRST renewal left it: still the customer's, expiry already pushed.
-            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "OKKO", "okko-95", 50m, onceRenewed));
+            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, purchaseOrderId, "okko", "okko-95", 50m, onceRenewed));
 
             seed.Orders.Add(RenewalOrder(orderId, userId, price: 500, monobankInvoiceId: null,
-                ("OKKO", "okko-95", 50m, 500)));
+                ("okko", "okko-95", 50m, 500)));
             var line = MarkAsRenewalLine(seed, orderId, sourceId, termCode: "1m");
             line.PreviousCustomerExpiration = originalExpiry;
             line.NewCustomerExpiration = onceRenewed;

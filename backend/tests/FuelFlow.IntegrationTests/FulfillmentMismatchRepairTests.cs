@@ -63,7 +63,7 @@ public sealed class FulfillmentMismatchRepairTests : IClassFixture<TestDatabaseF
     {
         var userId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
-        const string brand = "OKKO";
+        const string brand = "okko";
         const string fuelTypeId = "okko-95";
         const decimal liters = 50m;
 
@@ -249,7 +249,7 @@ public sealed class FulfillmentMismatchRepairTests : IClassFixture<TestDatabaseF
             {
                 Id = Guid.NewGuid(),
                 OrderId = id,
-                Brand = "OKKO",
+                Brand = "okko",
                 FuelTypeId = ToUuid("okko-95"),
                 Liters = 50m,
                 Quantity = quantity,

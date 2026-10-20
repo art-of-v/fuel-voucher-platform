@@ -53,7 +53,7 @@ public sealed class MovementBatchIntegrationTests : IClassFixture<TestDatabaseFi
             ExchangeBatchId = Guid.NewGuid(),
             OldVoucherId = oldVoucherId,
             FuelTypeId = ToUuid("okko-95"),
-            Brand = "OKKO",
+            Brand = "okko",
             SupplierId = supplierId,
             SurchargeUah = 10m,
             ActingUserId = Guid.NewGuid(),
@@ -152,7 +152,7 @@ public sealed class MovementBatchIntegrationTests : IClassFixture<TestDatabaseFi
                 ExchangeBatchId = batchId,
                 OldVoucherId = voucherId,
                 FuelTypeId = ToUuid("okko-95"),
-                Brand = "OKKO",
+                Brand = "okko",
                 SupplierId = supplierId,
                 // Shares that add up to 30, deliberately NOT the settlement's 777.77.
                 SurchargeUah = 15m,
@@ -198,7 +198,7 @@ public sealed class MovementBatchIntegrationTests : IClassFixture<TestDatabaseFi
             ExchangeBatchId = batchId,
             OldVoucherId = oldVoucherId,
             FuelTypeId = ToUuid("okko-95"),
-            Brand = "OKKO",
+            Brand = "okko",
             SupplierId = supplierId,
             SurchargeUah = 50m,
             ActingUserId = Guid.NewGuid(),
@@ -343,7 +343,7 @@ public sealed class MovementBatchIntegrationTests : IClassFixture<TestDatabaseFi
         ctx.FuelVouchers.Add(new FuelVoucher
         {
             Id = id,
-            Brand = "OKKO",
+            Brand = "okko",
             FuelTypeId =   ToUuid(fuelTypeId),
             Liters = liters,
             SupplierExpirationDate = when,

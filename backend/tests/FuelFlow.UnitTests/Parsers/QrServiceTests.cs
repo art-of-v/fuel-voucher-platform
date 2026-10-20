@@ -259,7 +259,7 @@ public class KloVoucherParserTests : IDisposable
         var parser = new KloVoucherParser(_context, new BrandSlugResolver(_context), NullLogger<KloVoucherParser>.Instance);
         var context = new ProviderDetectionContext
         {
-            Words = new List<Word> { WordTestHelper.CreateWord("КЛО", 0, 0), WordTestHelper.CreateWord("KLO", 10, 0) }
+            Words = new List<Word> { WordTestHelper.CreateWord("КЛО", 0, 0), WordTestHelper.CreateWord("klo", 10, 0) }
         };
 
         var result = parser.CanParse(context);
@@ -273,7 +273,7 @@ public class KloVoucherParserTests : IDisposable
         var parser = new KloVoucherParser(_context, new BrandSlugResolver(_context), NullLogger<KloVoucherParser>.Instance);
         var context = new ProviderDetectionContext
         {
-            Words = new List<Word> { WordTestHelper.CreateWord("OKKO", 0, 0), WordTestHelper.CreateWord("WOG", 10, 0) }
+            Words = new List<Word> { WordTestHelper.CreateWord("okko", 0, 0), WordTestHelper.CreateWord("wog", 10, 0) }
         };
 
         var result = parser.CanParse(context);
@@ -290,7 +290,7 @@ public class KloVoucherParserTests : IDisposable
 
         var words = new List<Word>
         {
-            WordTestHelper.CreateWord("KLO", 50, 100),
+            WordTestHelper.CreateWord("klo", 50, 100),
             WordTestHelper.CreateWord("ДП", 60, 80),
             WordTestHelper.CreateWord("20", 70, 60),
             WordTestHelper.CreateWord("л", 85, 60),
@@ -324,7 +324,7 @@ public class KloVoucherParserTests : IDisposable
 
         result.Should().HaveCount(1);
         var parsed = result.First();
-        parsed.Brand.Should().Be("KLO");
+        parsed.Brand.Should().Be("klo");
         parsed.Liters.Should().Be(20m);
         parsed.ExpirationDate.Should().Be(new DateOnly(2026, 6, 17));
         parsed.VoucherNumber.Should().Be("99999600000020368126");
@@ -352,7 +352,7 @@ public class KloVoucherParserTests : IDisposable
 
         var words = new List<Word>
         {
-            WordTestHelper.CreateWord("KLO", 50, 100),
+            WordTestHelper.CreateWord("klo", 50, 100),
             // No fuel in the fixture is called this, which is the whole point.
             WordTestHelper.CreateWord("ГАЗ", 60, 80),
             WordTestHelper.CreateWord("20", 70, 60),

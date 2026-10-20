@@ -94,7 +94,7 @@ public sealed class VoucherExchangePairingTests
     [Fact]
     public void Pair_ProviderBucketingIsCaseInsensitive()
     {
-        var old = Old("O-1", brand: "OKKO");
+        var old = Old("O-1", brand: "okko");
         var fresh = New("N-1", brand: "okko");
 
         var result = VoucherExchangePairing.Pair(new[] { old }, new[] { fresh });

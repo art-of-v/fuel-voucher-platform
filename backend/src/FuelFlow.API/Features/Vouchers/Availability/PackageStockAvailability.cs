@@ -287,7 +287,7 @@ var key = StockKey.For(row.BrandSlug, row.Fuel.Id, row.Liters);
             .AsNoTracking()
             .AnyAsync(
                 v => v.Status == VoucherStatus.Available
-                  && v.Brand.ToLower() == brand
+                  && v.Brand == brand
                   && v.FuelTypeId == fuelTypeId
                   && v.Liters == liters
                   && v.DataKind == pool
@@ -334,13 +334,19 @@ var key = StockKey.For(row.BrandSlug, row.Fuel.Id, row.Liters);
 
         if (brands is not null)
         {
-            query = query.Where(v => brands.Contains(v.Brand.ToLower())
+            query = query.Where(v => brands.Contains(v.Brand)
                                   && fuelTypeIds!.Contains(v.FuelTypeId)
                                   && literSizes!.Contains(v.Liters));
         }
 
+        // The brand is projected RAW, not case-folded in SQL. `lower(brand)` in a projection is
+        // computed per row, so the index that covers (brand, fuel_type_id, liters, status) cannot
+        // serve it as an index-only scan - it has to fetch the heap to fold the string. The
+        // canonical form is the slug, and StockKey's contract is the lower-cased slug, so the fold
+        // happens on the rows that come back.
         return query
-            .Select(v => new StockKey(v.Brand.ToLower(), v.FuelTypeId, v.Liters))
-            .Distinct();
+            .Select(v => new { v.Brand, v.FuelTypeId, v.Liters })
+            .Distinct()
+            .Select(v => new StockKey(v.Brand.ToLowerInvariant(), v.FuelTypeId, v.Liters));
     }
 }

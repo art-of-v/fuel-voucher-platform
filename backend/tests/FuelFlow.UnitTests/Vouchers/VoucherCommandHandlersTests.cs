@@ -70,7 +70,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         var assignedVoucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Brand = "OKKO",
+            Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
@@ -86,7 +86,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         var usedVoucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Brand = "OKKO",
+            Brand = "okko",
             FuelTypeId = ToUuid("okko-dp"),
             Liters = 50,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(2)),
@@ -102,7 +102,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         var availableVoucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Brand = "OKKO",
+            Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
@@ -157,7 +157,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         var giftedVoucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Brand = "OKKO",
+            Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 20,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
@@ -191,11 +191,11 @@ public sealed class VoucherCommandHandlersTests : IDisposable
     {
         var vouchers = new[]
         {
-            CreateVoucher("OKKO", "okko-95", 50, VoucherStatus.Available),
-            CreateVoucher("OKKO", "okko-95", 50, VoucherStatus.Assigned),
-            CreateVoucher("OKKO", "okko-95", 50, VoucherStatus.Used),
-            CreateVoucher("OKKO", "okko-dp", 50, VoucherStatus.Available),
-            CreateVoucher("WOG", "wog-95", 50, VoucherStatus.Available)
+            CreateVoucher("okko", "okko-95", 50, VoucherStatus.Available),
+            CreateVoucher("okko", "okko-95", 50, VoucherStatus.Assigned),
+            CreateVoucher("okko", "okko-95", 50, VoucherStatus.Used),
+            CreateVoucher("okko", "okko-dp", 50, VoucherStatus.Available),
+            CreateVoucher("wog", "wog-95", 50, VoucherStatus.Available)
         };
 
         _context.FuelVouchers.AddRange(vouchers);
@@ -208,17 +208,17 @@ public sealed class VoucherCommandHandlersTests : IDisposable
 
         response.Inventory.Should().HaveCount(3);
 
-        var okkoA95 = response.Inventory.First(i => i.Brand == "OKKO" && i.FuelTypeId == ToUuid("okko-95"));
+        var okkoA95 = response.Inventory.First(i => i.Brand == "okko" && i.FuelTypeId == ToUuid("okko-95"));
         okkoA95.Available.Should().Be(1);
         okkoA95.Assigned.Should().Be(1);
         okkoA95.Used.Should().Be(1);
         okkoA95.Total.Should().Be(3);
 
-        var okkoDiesel = response.Inventory.First(i => i.Brand == "OKKO" && i.FuelTypeId == ToUuid("okko-dp"));
+        var okkoDiesel = response.Inventory.First(i => i.Brand == "okko" && i.FuelTypeId == ToUuid("okko-dp"));
         okkoDiesel.Available.Should().Be(1);
         okkoDiesel.Total.Should().Be(1);
 
-        var wogA95 = response.Inventory.First(i => i.Brand == "WOG" && i.FuelTypeId == ToUuid("wog-95"));
+        var wogA95 = response.Inventory.First(i => i.Brand == "wog" && i.FuelTypeId == ToUuid("wog-95"));
         wogA95.Available.Should().Be(1);
         wogA95.Total.Should().Be(1);
     }
@@ -237,7 +237,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         var voucher = new FuelVoucher
         {
             Id = voucherId,
-            Brand = "OKKO",
+            Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
@@ -270,7 +270,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         var voucher = new FuelVoucher
         {
             Id = voucherId,
-            Brand = "OKKO",
+            Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
@@ -304,7 +304,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         var voucher = new FuelVoucher
         {
             Id = voucherId,
-            Brand = "OKKO",
+            Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
@@ -345,7 +345,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         var voucher = new FuelVoucher
         {
             Id = voucherId,
-            Brand = "OKKO",
+            Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
@@ -381,7 +381,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         var voucher = new FuelVoucher
         {
             Id = voucherId,
-            Brand = "OKKO",
+            Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
@@ -414,7 +414,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         var voucher = new FuelVoucher
         {
             Id = voucherId,
-            Brand = "OKKO",
+            Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),

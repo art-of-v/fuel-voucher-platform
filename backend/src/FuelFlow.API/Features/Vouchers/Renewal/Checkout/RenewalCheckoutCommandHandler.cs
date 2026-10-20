@@ -157,7 +157,7 @@ public sealed class RenewalCheckoutCommandHandler
             var candidate = await _context.FuelVouchers
                 .AsNoTracking()
                 .Where(v => v.Status == VoucherStatus.Available
-                         && v.Brand.ToLower() == line.Source.Brand.ToLower()
+                         && v.Brand == line.Source.Brand
                          && v.FuelTypeId == line.Source.FuelTypeId
                          && v.Liters == line.Source.Liters
                          && v.SupplierExpirationDate >= promisedExpiration
@@ -199,7 +199,7 @@ public sealed class RenewalCheckoutCommandHandler
                 var pool = (await _context.FuelVouchers
                         .AsNoTracking()
                         .Where(v => v.Status == VoucherStatus.Available
-                                 && v.Brand.ToLower() == line.Source.Brand.ToLower()
+                                 && v.Brand == line.Source.Brand
                                  && v.FuelTypeId == line.Source.FuelTypeId
                                  && v.Liters == line.Source.Liters
                                  && v.CostPerLiter != null)

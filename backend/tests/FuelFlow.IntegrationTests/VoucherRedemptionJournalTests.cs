@@ -79,7 +79,7 @@ public sealed class VoucherRedemptionJournalTests : IClassFixture<TestDatabaseFi
             OrderId = orderId,
             SourceVoucherId = null,
             RenewalBranch = null,
-            Brand = "OKKO",
+            Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
             Quantity = 1,
@@ -90,7 +90,7 @@ public sealed class VoucherRedemptionJournalTests : IClassFixture<TestDatabaseFi
         context.FuelVouchers.Add(new FuelVoucher
         {
             Id = voucherId,
-            Brand = "OKKO",
+            Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
             CostPerLiter = costPerLiter,
@@ -262,7 +262,7 @@ public sealed class VoucherRedemptionJournalTests : IClassFixture<TestDatabaseFi
         setup.FuelVouchers.Add(new FuelVoucher
         {
             Id = voucherId,
-            Brand = "OKKO",
+            Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 10m,
             CostPerLiter = 45m,

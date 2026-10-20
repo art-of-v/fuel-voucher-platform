@@ -121,7 +121,7 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
         _context.FuelVouchers.Add(new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Brand = "OKKO",
+            Brand = "okko",
             FuelTypeId = ToUuid(fuelTypeId),
             Liters = liters,
             SupplierExpirationDate = expiry,
@@ -169,7 +169,7 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
         Quantity = 1,
         Price = price,
         BrandId = brandId ?? BrandIds.Okko,
-        BrandName = "OKKO"
+        BrandName = "okko"
     };
 
     [Fact]

@@ -147,7 +147,7 @@ public class OkkoFuelClassifierTests
     public void ResolveFuelType_DieselViaQrCode_Resolves()
     {
         var result = OkkoFuelClassifier.ResolveFuelType(
-            rawText: "OKKO",
+            rawText: "okko",
             qrPayload: "9018$2000$;99999600000020368126=4507101299?",
             ProductionOkkoFuelTypes);
 
@@ -159,7 +159,7 @@ public class OkkoFuelClassifierTests
     public void ResolveFuelType_GasViaQrCode_Resolves()
     {
         var result = OkkoFuelClassifier.ResolveFuelType(
-            rawText: "OKKO",
+            rawText: "okko",
             qrPayload: "9019$2000$;123=456?",
             SeedOkkoFuelTypes);
 
@@ -171,7 +171,7 @@ public class OkkoFuelClassifierTests
     public void ResolveFuelType_PullsCodeStaysDistinctFromBaseDiesel()
     {
         var result = OkkoFuelClassifier.ResolveFuelType(
-            rawText: "OKKO",
+            rawText: "okko",
             qrPayload: "45290$2000$;123=456?",
             SeedOkkoFuelTypes);
 
@@ -209,7 +209,7 @@ public class OkkoFuelClassifierTests
     {
         // Gas QR code but the production catalog has no gas row -> unresolved, not mis-assigned.
         var result = OkkoFuelClassifier.ResolveFuelType(
-            rawText: "OKKO",
+            rawText: "okko",
             qrPayload: "9019$2000$;123=456?",
             ProductionOkkoFuelTypes);
 

@@ -95,7 +95,7 @@ private FuelNominal NewPackage(string fuelTypeId, decimal liters)
         return id;
     }
 
-    private void SeedVoucher(Guid importId, string fuelTypeId, decimal liters, VoucherStatus status = VoucherStatus.Imported, string brand = "OKKO", decimal? costPerLiter = null, Guid? supplierId = null)
+    private void SeedVoucher(Guid importId, string fuelTypeId, decimal liters, VoucherStatus status = VoucherStatus.Imported, string brand = "okko", decimal? costPerLiter = null, Guid? supplierId = null)
     {
         _context.FuelVouchers.Add(new FuelVoucher
         {
@@ -122,7 +122,7 @@ private FuelNominal NewPackage(string fuelTypeId, decimal liters)
         _context.FuelVouchers.Add(new FuelVoucher
         {
             Id = id,
-            Brand = "OKKO",
+            Brand = "okko",
             FuelTypeId = ToUuid(fuelTypeId),
             Liters = liters,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
@@ -168,7 +168,7 @@ private FuelNominal NewPackage(string fuelTypeId, decimal liters)
         var batch = await _context.PurchaseBatches.SingleAsync();
         batch.ImportJobId.Should().Be(import);
         batch.FuelTypeId.Should().Be(ToUuid("okko-dp"));
-        batch.Brand.Should().Be("OKKO");
+        batch.Brand.Should().Be("okko");
         batch.SupplierId.Should().Be(SupplierId);   // one PDF = one supplier's delivery
         batch.EnteredByUserId.Should().Be(AdminId);
 
@@ -459,7 +459,7 @@ private FuelNominal NewPackage(string fuelTypeId, decimal liters)
         var row = rows.Should().ContainSingle().Subject;
         row.FuelTypeId.Should().Be(ToUuid("okko-dp"));
         row.FuelTypeName.Should().Be("ДП ЄВРО");
-        row.Brand.Should().Be("OKKO");
+        row.Brand.Should().Be("okko");
         row.VoucherCount.Should().Be(2);
         row.TotalLiters.Should().Be(150m);
         row.CostPerLiter.Should().Be(25m);

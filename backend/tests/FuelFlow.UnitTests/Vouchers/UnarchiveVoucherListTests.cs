@@ -58,7 +58,7 @@ public sealed class UnarchiveVoucherListTests : IDisposable
         _context.FuelVouchers.Add(new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Brand = "OKKO",
+            Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),

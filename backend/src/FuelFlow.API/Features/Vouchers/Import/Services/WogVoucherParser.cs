@@ -156,7 +156,7 @@ public sealed class WogVoucherParser : IVoucherProviderParser
 
             parsedVouchers.Add(new ParsedVoucher
             {
-                Brand = "WOG",
+                Brand = BrandSlug,
                 FuelTypeId = fuelTypeId,
                 Liters = liters,
                 ExpirationDate = expirationDate,

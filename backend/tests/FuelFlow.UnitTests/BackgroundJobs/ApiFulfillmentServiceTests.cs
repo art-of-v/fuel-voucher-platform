@@ -124,7 +124,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             {
                 new OrderLineItem
                 {
-                    Brand = "OKKO",
+                    Brand = "okko",
                     FuelTypeId = ToUuid("okko-95"),
                     Liters = 50,
                     Quantity = 1,
@@ -137,7 +137,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
         var voucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Brand = "OKKO",
+            Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
@@ -213,7 +213,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             {
                 new OrderLineItem
                 {
-                    Brand = "OKKO",
+                    Brand = "okko",
                     FuelTypeId = ToUuid("okko-95"),
                     Liters = 50,
                     Quantity = 3,
@@ -226,7 +226,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
         var voucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Brand = "OKKO",
+            Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
@@ -288,7 +288,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             {
                 new OrderLineItem
                 {
-                    Brand = "OKKO",
+                    Brand = "okko",
                     FuelTypeId = ToUuid("okko-95"),
                     Liters = 50,
                     Quantity = 1,
@@ -301,7 +301,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
         var voucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Brand = "OKKO",
+            Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
@@ -402,7 +402,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             {
                 new OrderLineItem
                 {
-                    Brand = "OKKO",
+                    Brand = "okko",
                     FuelTypeId = ToUuid("okko-95"),
                     Liters = 50,
                     Quantity = 3,
@@ -417,7 +417,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             _context.FuelVouchers.Add(new FuelVoucher
             {
                 Id = Guid.NewGuid(),
-                Brand = "OKKO",
+                Brand = "okko",
                 FuelTypeId = ToUuid("okko-95"),
                 Liters = 50,
                 SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),

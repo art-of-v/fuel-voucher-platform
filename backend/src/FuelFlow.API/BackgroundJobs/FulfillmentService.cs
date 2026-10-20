@@ -991,7 +991,7 @@ if (!fullyAttributed && fulfillments.Count > 0)
         return await _context.FuelVouchers
             .AsNoTracking()
             .Where(v => v.Status == VoucherStatus.Available
-                     && v.Brand.ToLower() == lineItem.Brand.ToLower()
+                     && v.Brand == lineItem.Brand
                      && v.FuelTypeId == lineItem.FuelTypeId
                      && v.Liters == lineItem.Liters
                      && v.DataKind == pool
@@ -1661,7 +1661,7 @@ var lastFailedAtUtc = await _context.Payments
         return await _context.FuelVouchers
             .AsNoTracking()
             .Where(v => v.Status == VoucherStatus.Available
-                     && v.Brand.ToLower() == source.Brand.ToLower()
+                     && v.Brand == source.Brand
                      && v.FuelTypeId == source.FuelTypeId
                      && v.Liters == source.Liters
                      && v.DataKind == pool

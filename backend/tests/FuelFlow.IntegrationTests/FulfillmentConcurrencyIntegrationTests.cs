@@ -36,7 +36,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
     {
         var userId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
-        const string brand = "OKKO";
+        const string brand = "okko";
         const string fuelTypeId = "okko-95";
         const decimal liters = 50m;
         const int quantity = 3;
@@ -196,7 +196,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 seed.FuelVouchers.Add(new FuelVoucher
                 {
                     Id = Guid.NewGuid(),
-                    Brand = "OKKO",
+                    Brand = "okko",
                     FuelTypeId =   ToUuid(fuelTypeId),
                     Liters = liters,
                     SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
@@ -299,7 +299,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 {
                     Id = Guid.NewGuid(),
                     OrderId = orderId,
-                    Brand = "OKKO",
+                    Brand = "okko",
                     FuelTypeId =   ToUuid(fuelTypeId),
                     Liters = liters,
                     Quantity = quantity,
@@ -314,7 +314,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
             seed.FuelVouchers.Add(new FuelVoucher
             {
                 Id = Guid.NewGuid(),
-                Brand = "OKKO",
+                Brand = "okko",
                 FuelTypeId =   ToUuid(fuelTypeId),
                 Liters = liters,
                 SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
@@ -366,7 +366,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                     {
                         Id = Guid.NewGuid(),
                         OrderId = orderId,
-                        Brand = "OKKO",
+                        Brand = "okko",
                         FuelTypeId = ToUuid("okko-dp"),
                         Liters = 10m,
                         Quantity = 3,
@@ -380,7 +380,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
             seed.FuelVouchers.Add(new FuelVoucher
             {
                 Id = usedVoucherId,
-                Brand = "OKKO",
+                Brand = "okko",
                 FuelTypeId = ToUuid("okko-dp"),
                 Liters = 10m,
                 SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
@@ -406,7 +406,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 seed.FuelVouchers.Add(new FuelVoucher
                 {
                     Id = Guid.NewGuid(),
-                    Brand = "OKKO",
+                    Brand = "okko",
                     FuelTypeId = ToUuid("okko-dp"),
                     Liters = 10m,
                     SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
@@ -495,7 +495,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                     {
                         Id = Guid.NewGuid(),
                         OrderId = partialOrderId,
-                        Brand = "OKKO",
+                        Brand = "okko",
                         FuelTypeId = ToUuid("okko-dp"),
                         Liters = 10m,
                         Quantity = 3,
@@ -510,7 +510,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 seed.FuelVouchers.Add(new FuelVoucher
                 {
                     Id = Guid.NewGuid(),
-                    Brand = "OKKO",
+                    Brand = "okko",
                     FuelTypeId = ToUuid("okko-dp"),
                     Liters = 10m,
                     SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
@@ -539,7 +539,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                     {
                         Id = Guid.NewGuid(),
                         OrderId = fullOrderId,
-                        Brand = "OKKO",
+                        Brand = "okko",
                         FuelTypeId = ToUuid("okko-95"),
                         Liters = 50m,
                         Quantity = 2,
@@ -554,7 +554,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 seed.FuelVouchers.Add(new FuelVoucher
                 {
                     Id = Guid.NewGuid(),
-                    Brand = "OKKO",
+                    Brand = "okko",
                     FuelTypeId = ToUuid("okko-95"),
                     Liters = 50m,
                     SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),

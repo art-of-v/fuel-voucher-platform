@@ -458,7 +458,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
             OrderId = order.Id,
             VoucherId = Guid.NewGuid(),
             FulfilledAtUtc = DateTime.UtcNow,
-            Voucher = BuildVoucher("OKKO", "okko-95", 50)
+            Voucher = BuildVoucher("okko", "okko-95", 50)
         });
         _context.Orders.Add(order);
         await _context.SaveChangesAsync();

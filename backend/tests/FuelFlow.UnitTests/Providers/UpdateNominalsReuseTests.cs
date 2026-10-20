@@ -105,7 +105,7 @@ public sealed class UpdateNominalsReuseTests : IDisposable
         {
             Id = BrandIds.Okko,
             Slug = "okko",
-            Name = "OKKO",
+            Name = "okko",
             Color = "#00ff80",
             LogoText = "OK",
             SortOrder = 1,

@@ -54,7 +54,7 @@ public sealed class PurchaseBatchPnlHandlerTests : IDisposable
         return id;
     }
 
-    private Guid SeedVoucher(Guid importId, decimal liters, VoucherStatus status, string fuelTypeId = "okko-dp", string brand = "OKKO")
+    private Guid SeedVoucher(Guid importId, decimal liters, VoucherStatus status, string fuelTypeId = "okko-dp", string brand = "okko")
     {
         var id = Guid.NewGuid();
         _context.FuelVouchers.Add(new FuelVoucher
@@ -97,7 +97,7 @@ public sealed class PurchaseBatchPnlHandlerTests : IDisposable
             Id = Guid.NewGuid(),
             ImportJobId = importId,
             FuelTypeId = ToUuid(fuelTypeId),
-            Brand = "OKKO",
+            Brand = "okko",
             SupplierId = supplierId,
             CreatedAtUtc = now,
             UpdatedAtUtc = now

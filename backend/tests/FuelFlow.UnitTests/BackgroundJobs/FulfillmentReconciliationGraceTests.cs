@@ -73,7 +73,7 @@ public sealed class FulfillmentReconciliationGraceTests : IDisposable
                 new OrderLineItem
                 {
                     Id = Guid.NewGuid(),
-                    Brand = "OKKO",
+                    Brand = "okko",
                     FuelTypeId = ToUuid("okko-95"),
                     Liters = 10m,
                     Quantity = 1,
@@ -90,7 +90,7 @@ public sealed class FulfillmentReconciliationGraceTests : IDisposable
             var voucher = new FuelVoucher
             {
                 Id = Guid.NewGuid(),
-                Brand = "OKKO",
+                Brand = "okko",
                 FuelTypeId = ToUuid("okko-95"),
                 Liters = 10m,
                 VoucherNumber = $"V-GRACE-{i}",

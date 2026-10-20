@@ -43,7 +43,7 @@ public static class TermStockCoverage
         return await context.FuelVouchers
             .AsNoTracking()
             .Where(v => v.Status == VoucherStatus.Available
-                     && v.Brand.ToLower() == brand
+                     && v.Brand == brand
                      && v.FuelTypeId == fuelTypeId
                      && v.Liters == liters)
             .OrderByDescending(v => v.SupplierExpirationDate)

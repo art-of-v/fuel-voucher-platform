@@ -419,7 +419,7 @@ public sealed class RenewalCheckoutCommandHandlerTests : IDisposable
         var voucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Brand = "OKKO",
+            Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = liters,
             SupplierExpirationDate = providerExpiry ?? expiry.AddYears(1),

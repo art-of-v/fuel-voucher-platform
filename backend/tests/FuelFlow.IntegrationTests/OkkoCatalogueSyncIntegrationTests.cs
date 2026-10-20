@@ -112,7 +112,7 @@ public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDataba
         {
             context.Brands.Add(new Brand
             {
-                Id = OkkoBrandId, Name = "OKKO", Color = "#000", LogoText = "OKKO"
+                Id = OkkoBrandId, Name = "okko", Color = "#000", LogoText = "okko"
             });
         }
 

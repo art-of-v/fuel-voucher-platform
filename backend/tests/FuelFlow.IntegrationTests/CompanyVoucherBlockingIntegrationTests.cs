@@ -293,7 +293,7 @@ public sealed class CompanyVoucherBlockingIntegrationTests : IClassFixture<TestD
         => new()
         {
             Id = id,
-            Brand = "OKKO",
+            Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),

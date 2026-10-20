@@ -117,7 +117,7 @@ public OrderCommandHandlersTests()
         _context.FuelVouchers.Add(new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Brand = "OKKO",
+            Brand = "okko",
             FuelTypeId = ToUuid(fuelTypeId),
             Liters = liters,
             SupplierExpirationDate = expiry,
@@ -146,7 +146,7 @@ public OrderCommandHandlersTests()
         
         FuelTypeId = ToUuid("okko-95"),
         BrandId = BrandIds.Okko,
-        BrandName = "OKKO",
+        BrandName = "okko",
         Liters = 50,
         Quantity = 1,
         Price = 2500
@@ -162,7 +162,7 @@ public OrderCommandHandlersTests()
                 
                 FuelTypeId = ToUuid("okko-95"),
                 BrandId = BrandIds.Okko,
-                BrandName = "OKKO",
+                BrandName = "okko",
                 Liters = 50,
                 Quantity = 1,
                 Price = 2500
@@ -196,7 +196,7 @@ public OrderCommandHandlersTests()
     private CreateCheckoutCommand BelowCostCommand() => new()
     {
         UserId = _context.Users.First().Id,
-        FuelTypeId = ToUuid("okko-loss"), BrandId = BrandIds.Okko, BrandName = "OKKO",
+        FuelTypeId = ToUuid("okko-loss"), BrandId = BrandIds.Okko, BrandName = "okko",
         Liters = 50, Quantity = 1, Price = 2425
     };
 
@@ -207,7 +207,7 @@ public OrderCommandHandlersTests()
         {
             new CheckoutItem
             {
-                FuelTypeId = ToUuid("okko-loss"), BrandId = BrandIds.Okko, BrandName = "OKKO",
+                FuelTypeId = ToUuid("okko-loss"), BrandId = BrandIds.Okko, BrandName = "okko",
                 Liters = 50, Quantity = 1, Price = 2425
             }
         }
@@ -388,7 +388,7 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
         var command = new CreateCheckoutCommand
         {
             UserId = _context.Users.First().Id,
-            FuelTypeId = ToUuid("okko-frac"), BrandId = BrandIds.Okko, BrandName = "OKKO",
+            FuelTypeId = ToUuid("okko-frac"), BrandId = BrandIds.Okko, BrandName = "okko",
             Liters = 10, Quantity = 1, Price = 4567   // client price is ignored; server recomputes 456.70
         };
 

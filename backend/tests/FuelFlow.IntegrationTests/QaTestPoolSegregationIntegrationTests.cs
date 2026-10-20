@@ -31,7 +31,7 @@ namespace FuelFlow.IntegrationTests;
 [Collection("Integration Tests")]
 public sealed class QaTestPoolSegregationIntegrationTests : IClassFixture<TestDatabaseFixture>
 {
-    private const string Brand = "OKKO";
+    private const string Brand = "okko";
     private const string FuelTypeId = "okko-95";
     private const decimal Liters = 10m;
 

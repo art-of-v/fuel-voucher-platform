@@ -72,17 +72,17 @@ public sealed class FulfillmentMismatchNotificationTests
 
         await Create(channelEnabled: true, flag: true, notifier)
             .FulfillmentMismatchAsync(
-                "11111111-2222-3333-4444-555555555555", "11111111", "OKKO", 2, 3, 5, corrected: true, default);
+                "11111111-2222-3333-4444-555555555555", "11111111", "okko", 2, 3, 5, corrected: true, default);
 
         sent.Title.Should().NotBeNullOrWhiteSpace();
         sent.Message.Should().NotBeNullOrWhiteSpace();
 
         // The operator's first move is to open that order - if the id is missing, the alert is noise.
         sent.Message.Should().Contain("11111111");
-        sent.Message.Should().Contain("OKKO");
+        sent.Message.Should().Contain("okko");
 
         sent.Context.Should().NotBeNull();
-        sent.Context!["Мережа"].Should().Be("OKKO");
+        sent.Context!["Мережа"].Should().Be("okko");
         sent.Context["Повернуто"].Should().Be("2");
         sent.Context["Очікувалося"].Should().Be("3");
         sent.Context["Знайдено"].Should().Be("5");
@@ -96,7 +96,7 @@ public sealed class FulfillmentMismatchNotificationTests
 
         await Create(channelEnabled: true, flag: true, notifier)
             .FulfillmentMismatchAsync(
-                "66666666-0000-0000-0000-000000000000", "66666666", "OKKO", 0, 3, 5,
+                "66666666-0000-0000-0000-000000000000", "66666666", "okko", 0, 3, 5,
                 corrected: false, default);
 
         sent.Context!["Дія"].Should().Be("залишено людині");
@@ -114,7 +114,7 @@ public sealed class FulfillmentMismatchNotificationTests
         var (notifier, _) = Capturing();
 
         await Create(channelEnabled: true, flag: false, notifier)
-            .FulfillmentMismatchAsync("22222222-0000-0000-0000-000000000000", "22222222", "OKKO", 2, 3, 5, corrected: true, default);
+            .FulfillmentMismatchAsync("22222222-0000-0000-0000-000000000000", "22222222", "okko", 2, 3, 5, corrected: true, default);
 
         notifier.Verify(n => n.SendAsync(
             It.IsAny<AlertSeverity>(), It.IsAny<string>(), It.IsAny<string>(),
@@ -128,8 +128,8 @@ public sealed class FulfillmentMismatchNotificationTests
         var (notifier, _) = Capturing();
         var dispatcher = Create(channelEnabled: true, flag: true, notifier);
 
-        await dispatcher.FulfillmentMismatchAsync("33333333-0000-0000-0000-000000000000", "33333333", "OKKO", 2, 3, 5, corrected: true, default);
-        await dispatcher.FulfillmentMismatchAsync("33333333-0000-0000-0000-000000000000", "33333333", "OKKO", 2, 3, 5, corrected: true, default);
+        await dispatcher.FulfillmentMismatchAsync("33333333-0000-0000-0000-000000000000", "33333333", "okko", 2, 3, 5, corrected: true, default);
+        await dispatcher.FulfillmentMismatchAsync("33333333-0000-0000-0000-000000000000", "33333333", "okko", 2, 3, 5, corrected: true, default);
 
         // The throttle is keyed per order, not globally: one bad order must not be able to silence
         // the alert about a different one, while a job that keeps re-running over the same order
@@ -146,8 +146,8 @@ public sealed class FulfillmentMismatchNotificationTests
         var (notifier, _) = Capturing();
         var dispatcher = Create(channelEnabled: true, flag: true, notifier);
 
-        await dispatcher.FulfillmentMismatchAsync("44444444-0000-0000-0000-000000000000", "44444444", "OKKO", 2, 3, 5, corrected: true, default);
-        await dispatcher.FulfillmentMismatchAsync("55555555-0000-0000-0000-000000000000", "55555555", "OKKO", 1, 4, 5, corrected: true, default);
+        await dispatcher.FulfillmentMismatchAsync("44444444-0000-0000-0000-000000000000", "44444444", "okko", 2, 3, 5, corrected: true, default);
+        await dispatcher.FulfillmentMismatchAsync("55555555-0000-0000-0000-000000000000", "55555555", "okko", 1, 4, 5, corrected: true, default);
 
         notifier.Verify(n => n.SendAsync(
             It.IsAny<AlertSeverity>(), It.IsAny<string>(), It.IsAny<string>(),

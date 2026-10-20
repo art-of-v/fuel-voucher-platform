@@ -129,7 +129,7 @@ public sealed class OkkoVoucherParser : IVoucherProviderParser
 
             parsedVouchers.Add(new ParsedVoucher
             {
-                Brand = "OKKO",
+                Brand = BrandSlug,
                 FuelTypeId = fuelTypeId,
                 Liters = liters,
                 ExpirationDate = expirationDate,

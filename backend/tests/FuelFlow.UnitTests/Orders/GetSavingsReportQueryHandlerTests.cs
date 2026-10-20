@@ -71,7 +71,7 @@ public sealed class GetSavingsReportQueryHandlerTests : IDisposable
         _context.FuelVouchers.Add(new FuelVoucher
         {
             Id = voucherId,
-            Brand = "OKKO",
+            Brand = "okko",
             FuelTypeId = ToUuid("okko-dp"),
             Liters = liters,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),

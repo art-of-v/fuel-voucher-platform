@@ -65,10 +65,10 @@ internal static class SeededBrands
 
     private static string NameOf(Guid id) => id switch
     {
-        _ when id == BrandIds.Okko => "OKKO",
-        _ when id == BrandIds.Wog => "WOG",
+        _ when id == BrandIds.Okko => "okko",
+        _ when id == BrandIds.Wog => "wog",
         _ when id == BrandIds.Upg => "UPG",
-        _ when id == BrandIds.Klo => "KLO",
+        _ when id == BrandIds.Klo => "klo",
         _ => throw new ArgumentOutOfRangeException(nameof(id), id, "Not one of the four seeded networks.")
     };
 }

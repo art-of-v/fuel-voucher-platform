@@ -55,8 +55,8 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
             await ResetDataAsync(seed);
 
             SeedUser(seed, userId);
-            seed.FuelVouchers.Add(StockVoucher(Guid.NewGuid(), "OKKO", "okko-95", 50m));
-            seed.Orders.Add(PurchaseOrder(orderId, userId, ("OKKO", "okko-95", 50m, 2500)));
+            seed.FuelVouchers.Add(StockVoucher(Guid.NewGuid(), "okko", "okko-95", 50m));
+            seed.Orders.Add(PurchaseOrder(orderId, userId, ("okko", "okko-95", 50m, 2500)));
 
             await seed.SaveChangesAsync();
         }
@@ -98,8 +98,8 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
             await ResetDataAsync(seed);
 
             SeedUser(seed, userId);
-            seed.FuelVouchers.Add(StockVoucher(Guid.NewGuid(), "OKKO", "okko-95", 50m));
-            seed.Orders.Add(PurchaseOrder(orderId, userId, ("OKKO", "okko-95", 50m, 2500)));
+            seed.FuelVouchers.Add(StockVoucher(Guid.NewGuid(), "okko", "okko-95", 50m));
+            seed.Orders.Add(PurchaseOrder(orderId, userId, ("okko", "okko-95", 50m, 2500)));
 
             await seed.SaveChangesAsync();
         }
@@ -154,14 +154,14 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
 
             SeedUser(seed, userId);
             // Two vouchers ordered, three in stock: the third one is the spare.
-            seed.FuelVouchers.Add(StockVoucher(Guid.NewGuid(), "OKKO", "okko-95", 50m));
-            seed.FuelVouchers.Add(StockVoucher(Guid.NewGuid(), "OKKO", "okko-95", 50m));
-            seed.FuelVouchers.Add(StockVoucher(Guid.NewGuid(), "OKKO", "okko-95", 50m));
+            seed.FuelVouchers.Add(StockVoucher(Guid.NewGuid(), "okko", "okko-95", 50m));
+            seed.FuelVouchers.Add(StockVoucher(Guid.NewGuid(), "okko", "okko-95", 50m));
+            seed.FuelVouchers.Add(StockVoucher(Guid.NewGuid(), "okko", "okko-95", 50m));
             seed.Orders.Add(PurchaseOrder(
                 orderId,
                 userId,
-                ("OKKO", "okko-95", 50m, 2500),
-                ("OKKO", "okko-95", 50m, 2500)));
+                ("okko", "okko-95", 50m, 2500),
+                ("okko", "okko-95", 50m, 2500)));
 
             await seed.SaveChangesAsync();
         }
@@ -220,9 +220,9 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
             SeedUser(seed, userId);
 
             // The lapsed voucher the customer is holding, bought under an earlier purchase.
-            seed.Orders.Add(PurchaseOrder(purchaseId, userId, ("WOG", "wog-95", 40m, 2400)));
-            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, "WOG", "wog-95", 40m, today.AddDays(-3), purchaseId));
-            seed.FuelVouchers.Add(StockVoucher(Guid.NewGuid(), "WOG", "wog-95", 40m, today.AddMonths(1)));
+            seed.Orders.Add(PurchaseOrder(purchaseId, userId, ("wog", "wog-95", 40m, 2400)));
+            seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, "wog", "wog-95", 40m, today.AddDays(-3), purchaseId));
+            seed.FuelVouchers.Add(StockVoucher(Guid.NewGuid(), "wog", "wog-95", 40m, today.AddMonths(1)));
 
             seed.Orders.Add(RenewalOrder(renewalId, userId, 480, sourceId));
 
@@ -270,8 +270,8 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
             await ResetDataAsync(seed);
 
             SeedUser(seed, userId);
-            seed.Orders.Add(PurchaseOrder(orderId, userId, ("OKKO", "okko-95", 50m, 2500)));
-            seed.FuelVouchers.Add(StockVoucher(voucherId, "OKKO", "okko-95", 50m));
+            seed.Orders.Add(PurchaseOrder(orderId, userId, ("okko", "okko-95", 50m, 2500)));
+            seed.FuelVouchers.Add(StockVoucher(voucherId, "okko", "okko-95", 50m));
             await seed.SaveChangesAsync();
 
             await seed.Database.ExecuteSqlInterpolatedAsync(
@@ -313,7 +313,7 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
             await ResetDataAsync(seed);
 
             SeedUser(seed, userId);
-            seed.Orders.Add(PurchaseOrder(orderId, userId, ("OKKO", "okko-95", 50m, 2500)));
+            seed.Orders.Add(PurchaseOrder(orderId, userId, ("okko", "okko-95", 50m, 2500)));
             await seed.SaveChangesAsync();
         }
 
@@ -344,7 +344,7 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
             await ResetDataAsync(seed);
 
             SeedUser(seed, userId);
-            seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 50m));
+            seed.FuelVouchers.Add(StockVoucher(stockId, "okko", "okko-95", 50m));
             await seed.SaveChangesAsync();
         }
 
@@ -373,7 +373,7 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
             await seed.Database.MigrateAsync();
             await ResetDataAsync(seed);
 
-            seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 50m));
+            seed.FuelVouchers.Add(StockVoucher(stockId, "okko", "okko-95", 50m));
             await seed.SaveChangesAsync();
         }
 
@@ -411,10 +411,10 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
 
             SeedUser(seed, userId);
 
-            seed.Orders.Add(PurchaseOrder(purchaseId, userId, ("OKKO", "okko-95", 50m, 2500)));
+            seed.Orders.Add(PurchaseOrder(purchaseId, userId, ("okko", "okko-95", 50m, 2500)));
             // The customer's voucher has lapsed, so the operator takes a fresh one out of the warehouse.
-            seed.FuelVouchers.Add(SourceVoucher(customerVoucherId, userId, "OKKO", "okko-95", 50m, today.AddDays(-2), purchaseId));
-            seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 50m));
+            seed.FuelVouchers.Add(SourceVoucher(customerVoucherId, userId, "okko", "okko-95", 50m, today.AddDays(-2), purchaseId));
+            seed.FuelVouchers.Add(StockVoucher(stockId, "okko", "okko-95", 50m));
 
             await seed.SaveChangesAsync();
         }
@@ -571,7 +571,7 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
                 {
                     Id = Guid.NewGuid(),
                     OrderId = orderId,
-                    Brand = "WOG",
+                    Brand = "wog",
                     FuelTypeId = ToUuid("wog-95"),
                     Liters = 40m,
                     Quantity = 1,

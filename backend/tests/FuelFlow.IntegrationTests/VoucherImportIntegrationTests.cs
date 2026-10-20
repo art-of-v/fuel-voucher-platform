@@ -170,7 +170,7 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
         var client = CreateClient();
         await AuthenticateAdminAsync(client);
         await SeedSupplierAsync();
-        var pdfBytes = GenerateVoucherPdf("OKKO", "DP", 20, "17.06.2025", "99999600000020368126");
+        var pdfBytes = GenerateVoucherPdf("okko", "DP", 20, "17.06.2025", "99999600000020368126");
 
         using var content = new MultipartFormDataContent();
         var fileContent = new ByteArrayContent(pdfBytes);
@@ -197,7 +197,7 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
 
         var voucher = await db.FuelVouchers.FirstOrDefaultAsync(v => v.VoucherNumber == "99999600000020368126");
         voucher.Should().NotBeNull();
-        voucher!.Brand.Should().Be("OKKO");
+        voucher!.Brand.Should().Be("okko");
         voucher.Liters.Should().Be(20m);
         voucher.SupplierExpirationDate.Should().Be(new DateOnly(2025, 6, 17));
         voucher.QrPayload.Should().Be("9018$2000$;99999600000020368126=4507101299?");
@@ -217,7 +217,7 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
         await SeedSupplierAsync();
         // Use a unique voucher number to avoid collision with previous test runs
         var voucherNum = "88888600000020368126";
-        var pdfBytes = GenerateVoucherPdf("OKKO", "A95", 10, "20.12.2025", voucherNum);
+        var pdfBytes = GenerateVoucherPdf("okko", "A95", 10, "20.12.2025", voucherNum);
 
         _qrDecoderMock.Setup(x => x.Decode(It.IsAny<SixLabors.ImageSharp.Image>()))
             .Returns(new QrDecodeResult { Text = $"9018$2000$;{voucherNum}=4507101299?", EccLevel = "L" });
@@ -265,7 +265,7 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
         await AuthenticateAdminAsync(client);
         await SeedSupplierAsync();
         // Generate an invalid voucher missing the voucher number (or non-matching number regex)
-        var pdfBytes = GenerateVoucherPdf("OKKO", "LPG", 50, "15.08.2025", "INVALID_NUM");
+        var pdfBytes = GenerateVoucherPdf("okko", "LPG", 50, "15.08.2025", "INVALID_NUM");
 
         using var content = new MultipartFormDataContent();
         var fileContent = new ByteArrayContent(pdfBytes);
@@ -318,7 +318,7 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
         _qrDecoderMock.Setup(x => x.Decode(It.IsAny<SixLabors.ImageSharp.Image>()))
             .Returns(new QrDecodeResult { Text = voucherNum, EccLevel = "L" });
 
-        var pdfBytes = GenerateVoucherPdf("WOG", "A-95", 20, "09.02.2026", voucherNum);
+        var pdfBytes = GenerateVoucherPdf("wog", "A-95", 20, "09.02.2026", voucherNum);
 
         using var content = new MultipartFormDataContent();
         var fileContent = new ByteArrayContent(pdfBytes);
@@ -342,7 +342,7 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
 
         var voucher = await db.FuelVouchers.FirstOrDefaultAsync(v => v.VoucherNumber == voucherNum);
         voucher.Should().NotBeNull();
-        voucher!.Brand.Should().Be("WOG");
+        voucher!.Brand.Should().Be("wog");
         voucher.FuelTypeId.Should().Be(ToUuid("wog-95-euro"));
         voucher.Liters.Should().Be(20m);
         voucher.SupplierExpirationDate.Should().Be(new DateOnly(2026, 2, 9));
@@ -364,7 +364,7 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
         _qrDecoderMock.Setup(x => x.Decode(It.IsAny<SixLabors.ImageSharp.Image>()))
             .Returns(new QrDecodeResult { Text = voucherNum, EccLevel = "L" });
 
-        var pdfBytes = GenerateVoucherPdf("WOG", "ZZZ", 20, "09.02.2026", voucherNum);
+        var pdfBytes = GenerateVoucherPdf("wog", "ZZZ", 20, "09.02.2026", voucherNum);
 
         using var content = new MultipartFormDataContent();
         var fileContent = new ByteArrayContent(pdfBytes);

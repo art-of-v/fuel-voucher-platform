@@ -101,7 +101,7 @@ public sealed class FulfillmentOrderForeignKeyIntegrationTests : IClassFixture<T
         => new()
         {
             Id = id,
-            Brand = "OKKO",
+            Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 10m,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),

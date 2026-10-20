@@ -127,7 +127,7 @@ public sealed class ApiFulfillmentServicePartialBackfillTests : IDisposable
             {
                 new OrderLineItem
                 {
-                    Brand = "OKKO",
+                    Brand = "okko",
                     FuelTypeId = ToUuid("okko-95"),
                     Liters = 20,
                     Quantity = 2,
@@ -140,7 +140,7 @@ public sealed class ApiFulfillmentServicePartialBackfillTests : IDisposable
         var existingAssignedVoucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Brand = "OKKO",
+            Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 20,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
@@ -163,7 +163,7 @@ public sealed class ApiFulfillmentServicePartialBackfillTests : IDisposable
         var newAvailableVoucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Brand = "OKKO",
+            Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 20,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(2),
