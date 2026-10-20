@@ -832,6 +832,43 @@ jobs:
             -f deploy/schema-fingerprint.sql > fromzero.fingerprint
           echo "fromzero.fingerprint $(wc -l < fromzero.fingerprint) objects"
 
+      # The fingerprint compares what a constraint MEANS, and this proves it. PostgreSQL
+      # stores the same rule in two different shapes depending on how it was written, and it
+      # re-shapes it on the way out of a dump - so a fingerprint that compared the shape
+      # would report a difference where there is none. The canonicalisation in
+      # deploy/schema-fingerprint.sql exists for that, and this is the check that it works:
+      # two tables, the same rule, the two shapes, and one fingerprint.
+      #
+      # The tables are dropped afterwards, so the fingerprint this job uploads is the
+      # schema's and not the scratch tables'.
+      - name: Prove the fingerprint compares the rule and not its shape
+        run: |
+          set -euo pipefail
+          export PGPASSWORD=postgres
+          db() { psql "postgres://postgres:$PGPASSWORD@localhost:5432/fuelflow" -X -q -v ON_ERROR_STOP=1 "$@"; }
+
+          db -c "CREATE TABLE canon_a (status varchar(50), CONSTRAINT ck_canon CHECK (status IN ('Active','Revoked')))"
+          db -c "CREATE TABLE canon_b (status varchar(50), CONSTRAINT ck_canon CHECK (((status)::text = ANY ((ARRAY['Active'::character varying, 'Revoked'::character varying])::text[]))))"
+
+          psql "postgres://postgres:$PGPASSWORD@localhost:5432/fuelflow" -X -q \
+            -f deploy/schema-fingerprint.sql > canon.fingerprint
+
+          db -c "DROP TABLE canon_a, canon_b"
+
+          a="$(grep 'ck_canon' canon.fingerprint | grep 'canon_a' | sed 's/.*ck_canon //')"
+          b="$(grep 'ck_canon' canon.fingerprint | grep 'canon_b' | sed 's/.*ck_canon //')"
+          if [ -z "$a" ] || [ -z "$b" ]; then
+            echo "::error::the canonicalisation probe produced no lines to compare"
+            exit 1
+          fi
+          if [ "$a" != "$b" ]; then
+            echo "::error::the same rule in two shapes produced two fingerprints"
+            echo "  shape one: $a"
+            echo "  shape two: $b"
+            exit 1
+          fi
+          echo "the same rule in two shapes produced one fingerprint"
+
       - name: Upload the fingerprint
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
