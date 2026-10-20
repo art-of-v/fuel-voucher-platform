@@ -100,16 +100,20 @@ public class AdminClientRouteContractTests : IClassFixture<TestDatabaseFixture>
     /// <summary>
     /// The admin origin only forwards an allow-listed subset of <c>/api</c> to the backend, so an
     /// endpoint the SPA calls but the edge does not permit fails closed as a 404 in production
-    /// while working fine in dev. nginx.conf carries its own copy of the list as defence in depth,
-    /// and the two are documented as needing to move together - which is exactly the kind of
-    /// coupling a test can hold instead of a comment.
+    /// while working fine in dev. nginx.conf.template carries its own copy of the list as
+    /// defence in depth, and the two are documented as needing to move together - which is
+    /// exactly the kind of coupling a test can hold instead of a comment.
     /// </summary>
     [Fact]
     public void EveryAdminPath_IsPermittedByTheEdgeAllowList()
     {
         var repoRoot = RepositoryRoot();
 
-        var allowed = new[] { Path.Combine(repoRoot, "admin", "nginx.conf"), Path.Combine(repoRoot, "deploy", "Caddyfile") }
+        // The nginx config is a TEMPLATE - the backend's name is substituted into it at
+        // container start, because the same admin image serves production and staging and
+        // they have different backend names. The allow-list is in the template, so that is
+        // the file that has to be read.
+        var allowed = new[] { Path.Combine(repoRoot, "admin", "nginx.conf.template"), Path.Combine(repoRoot, "deploy", "Caddyfile") }
             .SelectMany(AllowListEntries)
             .ToList();
 
