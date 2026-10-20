@@ -1,4 +1,5 @@
 using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.Availability;
 using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
@@ -49,6 +50,54 @@ public static class TermStockCoverage
             .OrderByDescending(v => v.SupplierExpirationDate)
             .Select(v => (DateOnly?)v.SupplierExpirationDate)
             .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// The same answer for a whole cart, in one query: the latest paper expiry per
+    /// (brand, fuel type, litres).
+    /// </summary>
+    /// <remarks>
+    /// The single-line path asks the database once per cart line, so a bulk checkout with twenty
+    /// lines asked it twenty times for the same question - and every one of those questions was
+    /// the same GROUP BY the database can do for all of them at once.
+    ///
+    /// The narrowing is three IN-lists rather than one list of the keys, because a composite
+    /// `Contains` cannot be translated - the same wall `PackageStockAvailability` documents. The
+    /// groups that come back are the triples the vouchers really have, so a triple with no stock
+    /// is simply absent, and absent means "no stock" - the same answer the single-line query gave.
+    /// </remarks>
+    public static async Task<Dictionary<StockKey, DateOnly?>> BestStockExpirationsAsync(
+        ApplicationDbContext context,
+        IReadOnlyCollection<StockKey> wanted,
+        CancellationToken cancellationToken = default)
+    {
+        if (wanted.Count == 0)
+            return [];
+
+        var brands = wanted.Select(k => k.Brand).Distinct().ToArray();
+        var fuelTypeIds = wanted.Select(k => k.FuelTypeId).Distinct().ToArray();
+        var literSizes = wanted.Select(k => k.Liters).Distinct().ToArray();
+
+        var rows = await context.FuelVouchers
+            .AsNoTracking()
+            .Where(v => v.Status == VoucherStatus.Available
+                     && brands.Contains(v.Brand)
+                     && fuelTypeIds.Contains(v.FuelTypeId)
+                     && literSizes.Contains(v.Liters))
+            // The grouping is what makes this one row per triple instead of one row per voucher.
+            .GroupBy(v => new { v.Brand, v.FuelTypeId, v.Liters })
+            .Select(g => new
+            {
+                g.Key.Brand,
+                g.Key.FuelTypeId,
+                g.Key.Liters,
+                Best = g.Max(v => v.SupplierExpirationDate)
+            })
+            .ToListAsync(cancellationToken);
+
+        return rows.ToDictionary(
+            r => StockKey.For(r.Brand, r.FuelTypeId, r.Liters),
+            r => (DateOnly?)r.Best);
     }
 
     /// <summary>

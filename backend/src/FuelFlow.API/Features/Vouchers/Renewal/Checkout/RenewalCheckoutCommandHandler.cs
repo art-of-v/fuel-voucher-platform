@@ -145,6 +145,41 @@ public sealed class RenewalCheckoutCommandHandler
             resolved.Add(new ResolvedLine(source, term, branch, lineAmount));
         }
 
+        // One lookup for the whole batch: the fuel types behind the lines. The below-cost guard
+        // below asked the database for each one of them in turn.
+        var fuelTypesById = await _context.FuelTypes
+            .AsNoTracking()
+            .Where(f => resolved.Select(r => r.Source.FuelTypeId).Contains(f.Id))
+            .ToDictionaryAsync(f => f.Id, f => f, cancellationToken);
+
+        // And one grouped query for the pool blend: the weighted average cost of the priced
+        // vouchers of every fuel the batch touches. It was one query per line before.
+        var blendBrands = resolved.Select(r => r.Source.Brand).Distinct().ToArray();
+        var blendFuelTypeIds = resolved.Select(r => r.Source.FuelTypeId).Distinct().ToArray();
+        var blendLiterSizes = resolved.Select(r => r.Source.Liters).Distinct().ToArray();
+
+        var poolBlends = (await (
+                from v in _context.FuelVouchers.AsNoTracking()
+                where v.Status == VoucherStatus.Available
+                      && v.CostPerLiter != null
+                      && v.CostPerLiter > 0m
+                      && blendBrands.Contains(v.Brand)
+                      && blendFuelTypeIds.Contains(v.FuelTypeId)
+                      && blendLiterSizes.Contains(v.Liters)
+                group v by new { v.Brand, v.FuelTypeId, v.Liters } into g
+                select new
+                {
+                    g.Key.Brand,
+                    g.Key.FuelTypeId,
+                    g.Key.Liters,
+                    PoolLiters = g.Sum(v => v.Liters),
+                    Cost = g.Sum(v => v.CostPerLiter * v.Liters)
+                })
+                .ToListAsync(cancellationToken))
+            .ToDictionary(
+                b => (b.Brand, b.FuelTypeId, b.Liters),
+                b => (b.PoolLiters, b.Cost));
+
         // Replace lines each need a DISTINCT in-stock voucher at offer time — a can-this-batch-be-
         // filled gate, not a hold (no payment has happened). The atomic claim runs post-payment in
         // FulfillmentService; if stock depletes in between, that path auto-refunds the missing line.
@@ -154,6 +189,19 @@ public sealed class RenewalCheckoutCommandHandler
         {
             var promisedExpiration = VoucherRenewalEligibility.PromisedExpirationForReplace(
                 today, line.Source.CustomerExpirationDate, line.Term);
+
+            // This one query stays per line, and it is worth saying why. Every line takes a
+            // DIFFERENT voucher out of the same pool, and the promise each line has to meet is its
+            // own (it depends on the term and on the voucher the customer brings back). So the
+            // candidates of one line are not the candidates of the next: a batch would have to
+            // fetch the whole pool of the fuel to filter it in memory, and a line that finds
+            // nothing here would have found something in the pool the batch threw away.
+            //
+            // The lines that share a fuel AND a promise could share one query, but the order in
+            // which the lines consume the pool is the order of the basket, and a group that
+            // fetched its candidates up front would take them in a different order than the
+            // basket does. That is a different voucher for a customer, so it is not a trade worth
+            // making.
             var candidate = await _context.FuelVouchers
                 .AsNoTracking()
                 .Where(v => v.Status == VoucherStatus.Available
@@ -196,22 +244,15 @@ public sealed class RenewalCheckoutCommandHandler
 
             if (replacementCost is not { } priced || priced <= 0m)
             {
-                var pool = (await _context.FuelVouchers
-                        .AsNoTracking()
-                        .Where(v => v.Status == VoucherStatus.Available
-                                 && v.Brand == line.Source.Brand
-                                 && v.FuelTypeId == line.Source.FuelTypeId
-                                 && v.Liters == line.Source.Liters
-                                 && v.CostPerLiter != null)
-                        .Select(v => new { v.CostPerLiter, v.Liters })
-                        .ToListAsync(cancellationToken))
-                    .Where(p => p.CostPerLiter is { } c && c > 0m)
-                    .ToList();
+                // The blend of the priced pool of this fuel, for the whole batch: one grouped
+                // query instead of one per line.
+                var pool = poolBlends.GetValueOrDefault(
+                    (line.Source.Brand, line.Source.FuelTypeId, line.Source.Liters));
 
-                var poolLiters = pool.Sum(p => p.Liters);
+                var poolLiters = pool.PoolLiters;
                 if (poolLiters <= 0m) continue;   // nothing priced: nothing to judge against
 
-                replacementCost = pool.Sum(p => p.CostPerLiter!.Value * p.Liters) / poolLiters;
+                replacementCost = pool.Cost / poolLiters;
             }
 
             // line.Source is the customer's own voucher, coming back to us, at what we paid for it.
@@ -219,9 +260,7 @@ public sealed class RenewalCheckoutCommandHandler
                     line.LineAmount, line.Source.Liters, replacementCost, line.Source.CostPerLiter)
                 == RenewalMarginVerdict.BelowCost)
             {
-                var fuelType = await _context.FuelTypes
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync(f => f.Id == line.Source.FuelTypeId, cancellationToken);
+                var fuelType = fuelTypesById.GetValueOrDefault(line.Source.FuelTypeId);
 
                 if (fuelType?.AllowBelowCost != true)
                 {

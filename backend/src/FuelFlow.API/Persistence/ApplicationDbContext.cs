@@ -326,6 +326,14 @@ var cipher = _qrCipher;
     private async Task RecordOrderEventsAsync(
         IReadOnlyList<OrderTransition> transitions, CancellationToken cancellationToken)
     {
+        // One lookup for the whole batch. Reading the invoice id per transition meant one query
+        // per order status change, inside the save that records it.
+        var orderIds = transitions.Select(t => t.OrderId).Distinct().ToArray();
+        var invoiceIds = await Orders
+            .Where(o => orderIds.Contains(o.Id))
+            .Select(o => new { o.Id, o.MonobankInvoiceId })
+            .ToDictionaryAsync(o => o.Id, o => o.MonobankInvoiceId, cancellationToken);
+
         foreach (var transition in transitions)
         {
             OrderEvents.Add(new OrderEvent
@@ -337,23 +345,12 @@ var cipher = _qrCipher;
                 ToStatus = transition.ToStatus.ToString(),
                 // The invoice id the order carries is the external reference a webhook delivering
                 // twice would repeat, so it is what makes a duplicate findable later.
-                ExternalRef = await CurrentInvoiceIdAsync(transition.OrderId, cancellationToken),
+                ExternalRef = invoiceIds.GetValueOrDefault(transition.OrderId),
                 OccurredAtUtc = DateTime.UtcNow
             });
         }
 
         await base.SaveChangesAsync(cancellationToken);
-    }
-
-    private async Task<string?> CurrentInvoiceIdAsync(Guid orderId, CancellationToken cancellationToken)
-    {
-        // Read from the database rather than the change tracker: the order may have been saved in an
-        // earlier SaveChanges within the same request, and an entry the tracker already released has
-        // no value left to give.
-        return await Orders
-            .Where(o => o.Id == orderId)
-            .Select(o => o.MonobankInvoiceId)
-            .FirstOrDefaultAsync(cancellationToken);
     }
 
     private readonly record struct OrderTransition(

@@ -97,12 +97,32 @@ return refunds
 
         if (staleRefunds.Count > 0)
         {
+            // The orders and their delivered counts, in two lookups for the whole batch rather
+            // than two per stale refund.
+            var staleOrderIds = staleRefunds
+                .Where(r => r.OrderId.HasValue)
+                .Select(r => r.OrderId!.Value)
+                .Distinct()
+                .ToArray();
+
+            var staleOrders = await _context.Orders
+                .Where(o => staleOrderIds.Contains(o.Id))
+                .ToDictionaryAsync(o => o.Id, o => o, cancellationToken);
+
+            var staleDeliveredCounts = await _context.Fulfillments
+                .Where(f => staleOrderIds.Contains(f.OrderId))
+                .GroupBy(f => f.OrderId)
+                .Select(g => new { OrderId = g.Key, Delivered = g.Count() })
+                .ToDictionaryAsync(x => x.OrderId, x => x.Delivered, cancellationToken);
+
             foreach (var staleRefund in staleRefunds)
             {
                 PaymentFactory.ApplyStatus(
                     staleRefund, PaymentStatus.Failed, observedAtUtc: null, DateTime.UtcNow);
                 staleRefund.ErrorMessage = "Timed out waiting for Monobank confirmation (refund abandoned)";
-                await RevertPrematureRefundedOrderStatusAsync(staleRefund, cancellationToken);
+                var staleOrder = staleRefund.OrderId.HasValue ? staleOrders.GetValueOrDefault(staleRefund.OrderId.Value) : null;
+                var staleDelivered = staleRefund.OrderId.HasValue ? staleDeliveredCounts.GetValueOrDefault(staleRefund.OrderId.Value) : 0;
+                RevertPrematureRefundedOrderStatus(staleRefund, staleOrder, staleDelivered);
                 _logger.LogWarning(
                     "Failed refund {RefundId} (invoice {InvoiceId}) timed out after 24h; status reset to Failed",
                     staleRefund.Id, staleRefund.ProviderInvoiceId);
@@ -130,25 +150,43 @@ return refunds
 
         _logger.LogInformation("Syncing status for {Count} pending refunds", pendingRefunds.Count);
 
+        // One lookup for the whole batch, and one grouped count beside it. Both used to be asked
+        // per refund: the order, and how much of it had been delivered. A hundred pending refunds
+        // meant two hundred round trips before the first HTTP call was even made.
+        var orderIds = pendingRefunds
+            .Where(r => r.OrderId.HasValue)
+            .Select(r => r.OrderId!.Value)
+            .Distinct()
+            .ToArray();
+
+        var orders = await _context.Orders
+            .Where(o => orderIds.Contains(o.Id))
+            .ToDictionaryAsync(o => o.Id, o => o, cancellationToken);
+
+        var deliveredCounts = await _context.Fulfillments
+            .Where(f => orderIds.Contains(f.OrderId))
+            .GroupBy(f => f.OrderId)
+            .Select(g => new { OrderId = g.Key, Delivered = g.Count() })
+            .ToDictionaryAsync(x => x.OrderId, x => x.Delivered, cancellationToken);
+
         // Enforce the status invariant: while a refund is still in flight the order must
         // not sit in a refunded state (legacy rows written by the old premature-transition
         // code). Reconcile such orders back to their fulfillment-derived status.
         foreach (var refund in pendingRefunds)
         {
-            await RevertPrematureRefundedOrderStatusAsync(refund, cancellationToken);
+            var order = refund.OrderId.HasValue ? orders.GetValueOrDefault(refund.OrderId.Value) : null;
+            var delivered = refund.OrderId.HasValue ? deliveredCounts.GetValueOrDefault(refund.OrderId.Value) : 0;
+            RevertPrematureRefundedOrderStatus(refund, order, delivered);
         }
 
         foreach (var refund in pendingRefunds)
         {
                 try
                 {
-                    var order = await _context.Orders
-                        .AsNoTracking()
-                        .FirstOrDefaultAsync(o => o.Id == refund.OrderId, cancellationToken);
-
-                    // Poll the merchant that issued this invoice, recorded at checkout. An order
-                    // without one predates the two-merchant change, so it is a live invoice.
-                    var merchant = order?.MonobankMerchant ?? MonobankMerchant.Live;
+                    // The order was loaded for the whole batch above.
+                    var merchant = (refund.OrderId.HasValue && orders.TryGetValue(refund.OrderId.Value, out var order)
+                        ? order.MonobankMerchant
+                        : null) ?? MonobankMerchant.Live;
                     var monobankClient = _monobankClientFactory.ForMerchant(merchant);
 
                     var status = await monobankClient.GetInvoiceStatusAsync(
@@ -285,7 +323,15 @@ return refunds
                 refund, PaymentStatus.Failed, observedAtUtc: null, DateTime.UtcNow);
             refund.ErrorMessage = "Monobank reported refund failure";
 
-            await RevertPrematureRefundedOrderStatusAsync(refund, cancellationToken);
+            // One refund, so one lookup is one lookup - the batch paths above do the same work
+            // for a whole batch at a time.
+            var order = refund.OrderId.HasValue
+                ? await _context.Orders.FirstOrDefaultAsync(o => o.Id == refund.OrderId.Value, cancellationToken)
+                : null;
+            var delivered = order is null
+                ? 0
+                : await _context.Fulfillments.CountAsync(f => f.OrderId == order.Id, cancellationToken);
+            RevertPrematureRefundedOrderStatus(refund, order, delivered);
         }
         else
         {
@@ -321,12 +367,12 @@ return refunds
             refund.Id, refund.OrderId, refund.AmountKopecks, newStatus);
     }
 
-    private async Task RevertPrematureRefundedOrderStatusAsync(Payment refund, CancellationToken cancellationToken)
+    private void RevertPrematureRefundedOrderStatus(
+        Payment refund,
+        Order? order,
+        int deliveredCount)
     {
-        var order = await _context.Orders
-            .FirstOrDefaultAsync(o => o.Id == refund.OrderId, cancellationToken);
-
-        if (order == null)
+        if (order is null)
         {
             return;
         }
@@ -340,9 +386,6 @@ return refunds
         {
             return;
         }
-
-        var deliveredCount = await _context.Fulfillments
-            .CountAsync(f => f.OrderId == order.Id, cancellationToken);
 
         var revertStatus = deliveredCount > 0
             ? OrderStatus.PartiallyFulfilled
