@@ -1,6 +1,36 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Trash2, Loader2, FileUp, Filter, CheckSquare, ChevronUp, ChevronDown, ArrowUpDown, ChevronLeft, ChevronRight, FileSignature, Package, X, ArrowLeft, CheckCircle, XCircle, QrCode, BarChart, Building, ScrollText, Bug, Ban, ShieldCheck, MapPin, Replace, RefreshCw, Handshake, MessageSquare, History } from "lucide-react";
+import {
+  Trash2,
+  Loader2,
+  FileUp,
+  Filter,
+  CheckSquare,
+  ChevronUp,
+  ChevronDown,
+  ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
+  FileSignature,
+  Package,
+  X,
+  ArrowLeft,
+  CheckCircle,
+  XCircle,
+  QrCode,
+  BarChart,
+  Building,
+  ScrollText,
+  Bug,
+  Ban,
+  ShieldCheck,
+  MapPin,
+  Replace,
+  RefreshCw,
+  Handshake,
+  MessageSquare,
+  History,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -20,7 +50,11 @@ import { useTheme } from "@/lib/theme-store";
 import { themes } from "@/lib/themes";
 import { useI18n } from "@/lib/i18n";
 import { sendCode } from "@/lib/session";
-import { bootSession, signInWithCode, signOut as endSession } from "@/lib/session";
+import {
+  bootSession,
+  signInWithCode,
+  signOut as endSession,
+} from "@/lib/session";
 import { hasSessionMarker, useSession } from "@/lib/session-store";
 import { type CurrentUser } from "@/lib/admin-auth";
 import { STAFF_ROLES, assignableRoles } from "@/lib/roles";
@@ -42,7 +76,8 @@ import { formatDate, formatDateTime } from "@/lib/utils";
 
 function orderStatusKey(status: string): string {
   const camel = status.charAt(0).toLowerCase() + status.slice(1);
-  if (camel === 'pendingpayment' || camel === 'pendingfulfillment') return 'pending';
+  if (camel === "pendingpayment" || camel === "pendingfulfillment")
+    return "pending";
   return camel;
 }
 
@@ -135,14 +170,32 @@ export default function AdminScreen() {
 
   const [activeTab, setActiveTab] = useState(() => {
     // Guard against stale stored tabs (e.g. the removed 'stations' view).
-    const validTabs = ['brands', 'purchases', 'users', 'vouchers', 'imports', 'voucherExchange', 'suppliers', 'stationNodes', 'customerRenewal', 'contracts', 'reconciliation', 'heldPayments', 'auditlog', 'errorlogs', 'feedback', 'reports', 'settings'];
-    const stored = localStorage.getItem('admin_active_tab');
-    return stored && validTabs.includes(stored) ? stored : 'brands';
+    const validTabs = [
+      "brands",
+      "purchases",
+      "users",
+      "vouchers",
+      "imports",
+      "voucherExchange",
+      "suppliers",
+      "stationNodes",
+      "customerRenewal",
+      "contracts",
+      "reconciliation",
+      "heldPayments",
+      "auditlog",
+      "errorlogs",
+      "feedback",
+      "reports",
+      "settings",
+    ];
+    const stored = localStorage.getItem("admin_active_tab");
+    return stored && validTabs.includes(stored) ? stored : "brands";
   });
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
-    localStorage.setItem('admin_active_tab', tab);
+    localStorage.setItem("admin_active_tab", tab);
   };
   // Report state
   const [reportUserId, setReportUserId] = useState("");
@@ -151,43 +204,49 @@ export default function AdminScreen() {
   const [reportTrigger, setReportTrigger] = useState(0);
   const [showReconciliationAct, setShowReconciliationAct] = useState(false);
 
-    // How much money is sitting unplaced. Not just a tab label: the whole point of the tab is that
-    // nobody thinks to open it, so the count has to meet them in the sidebar. Enabled on every tab,
-    // because the number is the alarm.
-    const { data: heldPaymentsTotal } = useQuery({
-        queryKey: ["admin", "heldPayments", "count"],
-        queryFn: () => apiRequest<any, { total: number }>("GET", "/api/admin/payments/unallocated?limit=1"),
-        refetchInterval: 60_000,
-    });
-    const heldPaymentCount = heldPaymentsTotal?.total ?? 0;
+  // How much money is sitting unplaced. Not just a tab label: the whole point of the tab is that
+  // nobody thinks to open it, so the count has to meet them in the sidebar. Enabled on every tab,
+  // because the number is the alarm.
+  const { data: heldPaymentsTotal } = useQuery({
+    queryKey: ["admin", "heldPayments", "count"],
+    queryFn: () =>
+      apiRequest<any, { total: number }>(
+        "GET",
+        "/api/admin/payments/unallocated?limit=1",
+      ),
+    refetchInterval: 60_000,
+  });
+  const heldPaymentCount = heldPaymentsTotal?.total ?? 0;
 
   const toDateInput = (d: Date) => {
     const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
     return `${y}-${m}-${day}`;
   };
 
   const formatDisplayDate = (iso: string) => {
-    if (!iso) return '';
-    const parts = iso.split('-');
+    if (!iso) return "";
+    const parts = iso.split("-");
     if (parts.length !== 3) return iso;
     return `${parts[2]}.${parts[1]}.${parts[0]}`;
   };
 
-  const setReportQuickDate = (preset: 'yesterday' | 'week' | 'month' | '30days') => {
+  const setReportQuickDate = (
+    preset: "yesterday" | "week" | "month" | "30days",
+  ) => {
     const now = new Date();
-    if (preset === 'yesterday') {
+    if (preset === "yesterday") {
       now.setDate(now.getDate() - 1);
       const s = toDateInput(now);
       setReportFromDate(s);
       setReportToDate(s);
-    } else if (preset === 'week') {
+    } else if (preset === "week") {
       const monday = new Date(now);
       monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
       setReportFromDate(toDateInput(monday));
       setReportToDate(toDateInput(now));
-    } else if (preset === '30days') {
+    } else if (preset === "30days") {
       const past = new Date(now);
       past.setDate(now.getDate() - 30);
       setReportFromDate(toDateInput(past));
@@ -199,8 +258,6 @@ export default function AdminScreen() {
     }
   };
 
-
-
   // Import state
   const [importFiles, setImportFiles] = useState<File[]>([]);
   // A PDF is one supplier's delivery, and the vouchers it creates have to be settled with that supplier -
@@ -208,28 +265,50 @@ export default function AdminScreen() {
   // not guessed per voucher.
   const [importSupplierId, setImportSupplierId] = useState<string>("");
   const { data: suppliers } = useQuery({
-    queryKey: ['suppliers'],
-    queryFn: () => apiRequest<any, { id: string; name: string; isActive: boolean }[]>("GET", "/api/admin/suppliers"),
+    queryKey: ["suppliers"],
+    queryFn: () =>
+      apiRequest<any, { id: string; name: string; isActive: boolean }[]>(
+        "GET",
+        "/api/admin/suppliers",
+      ),
   });
   const [isImporting, setIsImporting] = useState(false);
-  const [importStatus, setImportStatus] = useState<'idle' | 'processing' | 'completed' | 'error'>('idle');
-  const [importResult, setImportResult] = useState({ success: 0, errors: 0, existing: 0, modelUsed: '' });
-  const [importErrorLines, setImportErrorLines] = useState<{ pageNumber: number; voucherNumber: string | null; reason: string }[]>([]);
-  const [importProgress, setImportProgress] = useState({ processed: 0, total: 0 });
-  const [importErrorMsg, setImportErrorMsg] = useState('');
+  const [importStatus, setImportStatus] = useState<
+    "idle" | "processing" | "completed" | "error"
+  >("idle");
+  const [importResult, setImportResult] = useState({
+    success: 0,
+    errors: 0,
+    existing: 0,
+    modelUsed: "",
+  });
+  const [importErrorLines, setImportErrorLines] = useState<
+    { pageNumber: number; voucherNumber: string | null; reason: string }[]
+  >([]);
+  const [importProgress, setImportProgress] = useState({
+    processed: 0,
+    total: 0,
+  });
+  const [importErrorMsg, setImportErrorMsg] = useState("");
   const [selectedQrId, setSelectedQrId] = useState<string | null>(null);
   // The D-13 record read for one voucher (VOUCHER_LIFECYCLE.md slice 2). Null id means closed.
-  const [lifecycleVoucher, setLifecycleVoucher] = useState<{ id: string; number: string } | null>(null);
+  const [lifecycleVoucher, setLifecycleVoucher] = useState<{
+    id: string;
+    number: string;
+  } | null>(null);
 
   // Fetch single voucher details when modal is open to get decrypted QR
   const { data: fullVoucherData, isLoading: isVoucherLoading } = useQuery({
     queryKey: ["/api/admin/vouchers", selectedQrId],
     queryFn: async () => {
       if (!selectedQrId) return null;
-      const res = await apiRequest<any, any>("GET", `/api/admin/vouchers/${selectedQrId}`);
+      const res = await apiRequest<any, any>(
+        "GET",
+        `/api/admin/vouchers/${selectedQrId}`,
+      );
       return res;
     },
-    enabled: !!user && !!selectedQrId
+    enabled: !!user && !!selectedQrId,
   });
 
   // Derived state to keep logic working (if something relied on selectedQrData string, we can mock it or remove usage)
@@ -245,16 +324,25 @@ export default function AdminScreen() {
   const [filterProvider, setFilterProvider] = useState("");
   const [filterAmount, setFilterAmount] = useState("");
   const [filterExpirationDate, setFilterExpirationDate] = useState("");
-  const [selectedVoucherIds, setSelectedVoucherIds] = useState<Set<string>>(new Set());
+  const [selectedVoucherIds, setSelectedVoucherIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [page, setPage] = useState(1);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
   const [refundTarget, setRefundTarget] = useState<PurchaseType | null>(null);
-  const [selectedSignature, setSelectedSignature] = useState<string | null>(null);
-  const [userConfirm, setUserConfirm] = useState<{ id: string; action: "ban" | "delete" } | null>(null);
+  const [selectedSignature, setSelectedSignature] = useState<string | null>(
+    null,
+  );
+  const [userConfirm, setUserConfirm] = useState<{
+    id: string;
+    action: "ban" | "delete";
+  } | null>(null);
   const [selectedImportId, setSelectedImportId] = useState<string | null>(null);
   // Per-fuel cost/L drafts on the import-detail batch-costs panel (fuelTypeId → raw input text).
-  const [batchCostInputs, setBatchCostInputs] = useState<Record<string, string>>({});
+  const [batchCostInputs, setBatchCostInputs] = useState<
+    Record<string, string>
+  >({});
   const limit = 50;
 
   interface VoucherType {
@@ -264,21 +352,21 @@ export default function AdminScreen() {
     liters: number;
     fuelType: { name: string } | null;
     fuelTypeId: string;
-brand: string;
-      /** The company we bought the voucher from. Not the brand above - that is `brand`. */
-      supplierId: string | null;
-      supplierName: string | null;
-      /** UAH per liter, stamped by the import batch. Null = cost never entered, not zero. */
-      costPerLiter: number | null;
-      /** Real term printed on the supplier's document - the ceiling. Staff-only. */
-      providerExpirationDate: string;
+    brand: string;
+    /** The company we bought the voucher from. Not the brand above - that is `brand`. */
+    supplierId: string | null;
+    supplierName: string | null;
+    /** UAH per liter, stamped by the import batch. Null = cost never entered, not zero. */
+    costPerLiter: number | null;
+    /** Real term printed on the supplier's document - the ceiling. Staff-only. */
+    providerExpirationDate: string;
     /** What the customer was sold. Diverges from the brand term once short terms ship. */
     customerExpirationDate: string;
-voucherNumber: string;
-  createdAtUtc: string;
-  /** Archived by the soft delete (#217): hidden from customers, restorable from this list. */
-  isDeleted: boolean;
-}
+    voucherNumber: string;
+    createdAtUtc: string;
+    /** Archived by the soft delete (#217): hidden from customers, restorable from this list. */
+    isDeleted: boolean;
+  }
 
   /** A page of rows and the count behind it, the shape the paged admin endpoints answer with. */
   interface PagedResult<T> {
@@ -399,7 +487,7 @@ voucherNumber: string;
         "GET",
         `/api/admin/users?page=${usersPage}&limit=${USERS_PAGE_SIZE}`,
       );
-    }
+    },
   });
 
   const usersList = usersPageData?.items ?? [];
@@ -413,18 +501,26 @@ voucherNumber: string;
     queryKey: ["/api/admin/users/options"],
     enabled: !!user,
     queryFn: async () => {
-      return await apiRequest<any, AdminUserOption[]>("GET", "/api/admin/users/options");
-    }
+      return await apiRequest<any, AdminUserOption[]>(
+        "GET",
+        "/api/admin/users/options",
+      );
+    },
   });
 
   // Loaded so the purchases table can show the fuel name instead of the raw fuel-type UUID.
-  const { data: fuelTypesList = [] } = useQuery<{ id: string; name: string }[]>({
-    queryKey: ["/api/admin/fuel-types"],
-    enabled: !!user,
-    queryFn: async () => {
-      return await apiRequest<any, { id: string; name: string }[]>("GET", "/api/admin/fuel-types");
-    }
-  });
+  const { data: fuelTypesList = [] } = useQuery<{ id: string; name: string }[]>(
+    {
+      queryKey: ["/api/admin/fuel-types"],
+      enabled: !!user,
+      queryFn: async () => {
+        return await apiRequest<any, { id: string; name: string }[]>(
+          "GET",
+          "/api/admin/fuel-types",
+        );
+      },
+    },
+  );
 
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
@@ -432,56 +528,86 @@ voucherNumber: string;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast.success(t('users.deleteSuccess'));
+      toast.success(t("users.deleteSuccess"));
     },
     onError: (err: Error) => {
-      toast.error(`${t('users.deleteFailed')}: ${err.message}`);
+      toast.error(`${t("users.deleteFailed")}: ${err.message}`);
     },
   });
 
   const setUserActiveMutation = useMutation({
-    mutationFn: async ({ userId, isActive }: { userId: string; isActive: boolean }) => {
-      const endpoint = isActive ? `/api/admin/users/${userId}/activate` : `/api/admin/users/${userId}/deactivate`;
+    mutationFn: async ({
+      userId,
+      isActive,
+    }: {
+      userId: string;
+      isActive: boolean;
+    }) => {
+      const endpoint = isActive
+        ? `/api/admin/users/${userId}/activate`
+        : `/api/admin/users/${userId}/deactivate`;
       await apiRequest<any, unknown>("POST", endpoint);
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast.success(variables.isActive ? t('users.activated') : t('users.deactivated'));
+      toast.success(
+        variables.isActive ? t("users.activated") : t("users.deactivated"),
+      );
     },
     onError: (err: Error) => {
-      toast.error(`${t('users.toggleFailed')}: ${err.message}`);
+      toast.error(`${t("users.toggleFailed")}: ${err.message}`);
     },
   });
 
   const setUserBannedMutation = useMutation({
-    mutationFn: async ({ userId, isBanned }: { userId: string; isBanned: boolean }) => {
-      const endpoint = isBanned ? `/api/admin/users/${userId}/ban` : `/api/admin/users/${userId}/unban`;
+    mutationFn: async ({
+      userId,
+      isBanned,
+    }: {
+      userId: string;
+      isBanned: boolean;
+    }) => {
+      const endpoint = isBanned
+        ? `/api/admin/users/${userId}/ban`
+        : `/api/admin/users/${userId}/unban`;
       await apiRequest<any, unknown>("POST", endpoint);
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast.success(variables.isBanned ? t('users.banned') : t('users.unbanned'));
+      toast.success(
+        variables.isBanned ? t("users.banned") : t("users.unbanned"),
+      );
     },
     onError: (err: Error) => {
-      toast.error(`${t('users.banFailed')}: ${err.message}`);
+      toast.error(`${t("users.banFailed")}: ${err.message}`);
     },
   });
 
   const setUserRoleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
-      await apiRequest<any, unknown>("POST", `/api/admin/users/${userId}/role`, { role });
+      await apiRequest<any, unknown>(
+        "POST",
+        `/api/admin/users/${userId}/role`,
+        { role },
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast.success(t('users.roleChanged'));
+      toast.success(t("users.roleChanged"));
     },
     onError: (err: Error) => {
-      toast.error(`${t('users.roleChangeFailed')}: ${err.message}`);
+      toast.error(`${t("users.roleChangeFailed")}: ${err.message}`);
     },
   });
 
   const setUserEmailMutation = useMutation({
-    mutationFn: async ({ userId, email }: { userId: string; email: string | null }) => {
+    mutationFn: async ({
+      userId,
+      email,
+    }: {
+      userId: string;
+      email: string | null;
+    }) => {
       return await apiRequest<any, { pendingConfirmation: boolean }>(
         "POST",
         `/api/admin/users/${userId}/email`,
@@ -490,18 +616,22 @@ voucherNumber: string;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast.success(data?.pendingConfirmation ? t('users.emailChangeSent') : t('users.emailCleared'));
+      toast.success(
+        data?.pendingConfirmation
+          ? t("users.emailChangeSent")
+          : t("users.emailCleared"),
+      );
     },
     onError: (err: Error) => {
-      toast.error(`${t('users.emailChangeFailed')}: ${err.message}`);
+      toast.error(`${t("users.emailChangeFailed")}: ${err.message}`);
     },
   });
 
   // Current signed-in admin's role/id. Captured here because the users table below shadows
   // `user` with its row variable, so the actor is not reachable inside the map. The id lets us
   // hide the role control on the actor's own row (the backend also rejects self-role-change).
-  const actorRole = user?.role ?? '';
-  const currentUserId = user?.id ?? '';
+  const actorRole = user?.role ?? "";
+  const currentUserId = user?.id ?? "";
 
   // The purchases list is a PAGE, not the whole table. The endpoint used to answer with every
   // order the shop had ever taken, and the table grew with it: the screen got slower as the
@@ -513,7 +643,10 @@ voucherNumber: string;
   const { data: purchasesPageData } = useQuery<PagedResult<PurchaseType>>({
     queryKey: ["/api/admin/purchases", purchasesPage],
     queryFn: () =>
-      apiRequest("GET", `/api/admin/purchases?page=${purchasesPage}&limit=${PURCHASES_PAGE_SIZE}`),
+      apiRequest(
+        "GET",
+        `/api/admin/purchases?page=${purchasesPage}&limit=${PURCHASES_PAGE_SIZE}`,
+      ),
     enabled: !!user,
     // The orders table has to converge on its own because the changes that matter arrive
     // out-of-band, not from an action taken in this tab:
@@ -528,7 +661,8 @@ voucherNumber: string;
     // order status hasn't caught up) for quick convergence, falling back to the same 15s baseline
     // otherwise. refetchOnWindowFocus is kept explicit for clarity.
     refetchInterval: (query) => {
-      const rows = (query.state.data as PagedResult<PurchaseType> | undefined)?.items;
+      const rows = (query.state.data as PagedResult<PurchaseType> | undefined)
+        ?.items;
       const settling = rows?.some(
         (p) =>
           p.refundStatus === "Processing" ||
@@ -546,35 +680,45 @@ voucherNumber: string;
 
   // The purchases table shows human-readable values instead of raw IDs: resolve the fuel-type
   // UUID to its name and the buyer's userId to their phone (both datasets loaded above).
-  const fuelNameById = new Map(fuelTypesList.map((f) => [f.id, f.name] as const));
+  const fuelNameById = new Map(
+    fuelTypesList.map((f) => [f.id, f.name] as const),
+  );
   // The names come from the OPTIONS list, not from the paged customers table: the purchases table
   // shows orders of customers who are not on the page the admin happens to be looking at.
   const usersById = new Map(userOptions.map((u) => [u.id, u] as const));
   const clientLabel = (userId: string) => {
     const u = usersById.get(userId);
-    return u?.phone || [u?.firstName, u?.lastName].filter(Boolean).join(" ").trim() || userId.slice(0, 8);
+    return (
+      u?.phone ||
+      [u?.firstName, u?.lastName].filter(Boolean).join(" ").trim() ||
+      userId.slice(0, 8)
+    );
   };
 
   const refundPurchaseMutation = useMutation({
     mutationFn: async (orderId: string) => {
-      return await apiRequest<any, { success: boolean; refundId: string; amountKopecks: number; status: string }>(
-        "POST",
-        `/api/admin/orders/${orderId}/refund`,
-        {}
-      );
+      return await apiRequest<
+        any,
+        {
+          success: boolean;
+          refundId: string;
+          amountKopecks: number;
+          status: string;
+        }
+      >("POST", `/api/admin/orders/${orderId}/refund`, {});
     },
     onSuccess: (data) => {
       setRefundTarget(null);
       queryClient.invalidateQueries({ queryKey: ["/api/admin/purchases"] });
       toast.success(
         data.success
-          ? t('purchases.refundSuccess', (data.amountKopecks / 100).toFixed(2))
-          : t('purchases.refundFailed')
+          ? t("purchases.refundSuccess", (data.amountKopecks / 100).toFixed(2))
+          : t("purchases.refundFailed"),
       );
     },
     onError: (err: Error) => {
       setRefundTarget(null);
-      toast.error(`${t('purchases.refundFailed')}: ${err.message}`);
+      toast.error(`${t("purchases.refundFailed")}: ${err.message}`);
     },
   });
 
@@ -584,14 +728,16 @@ voucherNumber: string;
   // The in-flight id is tracked per row rather than relying on mutation.isPending: a useMutation
   // is one instance, so isPending would grey out the button on every row the moment any one of
   // them was clicked.
-  const [receiptInFlightId, setReceiptInFlightId] = useState<string | null>(null);
+  const [receiptInFlightId, setReceiptInFlightId] = useState<string | null>(
+    null,
+  );
 
   const receiptMutation = useMutation({
     mutationFn: async (orderId: string) => {
       const { blob, fileName } = await apiBlob(
         "GET",
         `/api/admin/orders/${orderId}/receipt`,
-        `receipt-${orderId}.pdf`
+        `receipt-${orderId}.pdf`,
       );
       return { blob, fileName };
     },
@@ -606,7 +752,7 @@ voucherNumber: string;
       setTimeout(() => URL.revokeObjectURL(url), 0);
     },
     onError: (err: Error) => {
-      toast.error(`${t('purchases.receiptFailed')}: ${err.message}`);
+      toast.error(`${t("purchases.receiptFailed")}: ${err.message}`);
     },
     onSettled: () => {
       setReceiptInFlightId(null);
@@ -623,7 +769,17 @@ voucherNumber: string;
     statuses: string[];
     amounts: number[];
   }>({
-    queryKey: ["/api/admin/vouchers", page, sortBy, sortOrder, filterFuelType, filterStatus, filterProvider, filterAmount, filterExpirationDate],
+    queryKey: [
+      "/api/admin/vouchers",
+      page,
+      sortBy,
+      sortOrder,
+      filterFuelType,
+      filterStatus,
+      filterProvider,
+      filterAmount,
+      filterExpirationDate,
+    ],
     enabled: !!user,
     staleTime: 30_000,
     queryFn: async () => {
@@ -636,11 +792,16 @@ voucherNumber: string;
         ...(filterStatus ? { status: filterStatus } : {}),
         ...(filterProvider ? { brand: filterProvider } : {}),
         ...(filterAmount ? { amount: filterAmount } : {}),
-        ...(filterExpirationDate ? { expirationDate: filterExpirationDate } : {})
+        ...(filterExpirationDate
+          ? { expirationDate: filterExpirationDate }
+          : {}),
       });
-      const res = await apiRequest<any, any>("GET", `/api/admin/vouchers?${params.toString()}`);
+      const res = await apiRequest<any, any>(
+        "GET",
+        `/api/admin/vouchers?${params.toString()}`,
+      );
       return res;
-    }
+    },
   });
 
   const vouchers = vouchersResponse?.data || [];
@@ -658,56 +819,86 @@ voucherNumber: string;
 
   const { data: contractsList = [] } = useQuery<ContractType[]>({
     queryKey: ["/api/admin/legal-entity/contracts"],
-    enabled: !!user && activeTab === 'contracts'
+    enabled: !!user && activeTab === "contracts",
   });
 
   const { data: signedContractsList = [] } = useQuery<UserContractType[]>({
     queryKey: ["/api/admin/legal-entity/contracts/signed-contracts"],
-    enabled: !!user && activeTab === 'contracts'
+    enabled: !!user && activeTab === "contracts",
   });
 
   const { data: importsList = [] } = useQuery<any[]>({
     queryKey: ["/api/admin/voucher-imports"],
-    enabled: !!user && activeTab === 'imports',
+    enabled: !!user && activeTab === "imports",
     staleTime: 30_000,
   });
 
-  const { data: importVouchers = [] } = useQuery<any[]>({
-    queryKey: ["/api/admin/voucher-imports", selectedImportId, "vouchers"],
+  // The batch's vouchers, a page at a time. The endpoint answers with the page and the size of
+  // the whole batch, because the two buttons below act on the whole batch and have to be able
+  // to say what they are about to do.
+  const [importVouchersPage, setImportVouchersPage] = useState(1);
+  const { data: importVouchersPageData } = useQuery<any>({
+    queryKey: [
+      "/api/admin/voucher-imports",
+      selectedImportId,
+      "vouchers",
+      importVouchersPage,
+    ],
     staleTime: 30_000,
     queryFn: async () => {
-      if (!selectedImportId) return [];
-      const res = await apiRequest<any, any>("GET", `/api/admin/voucher-imports/${selectedImportId}/vouchers`);
+      if (!selectedImportId)
+        return {
+          items: [],
+          totalCount: 0,
+          page: 1,
+          pageSize: 50,
+          totalPages: 0,
+        };
+      const res = await apiRequest<any, any>(
+        "GET",
+        `/api/admin/voucher-imports/${selectedImportId}/vouchers?page=${importVouchersPage}&pageSize=50`,
+      );
       return res;
     },
-    enabled: !!user && activeTab === 'imports' && !!selectedImportId
+    enabled: !!user && activeTab === "imports" && !!selectedImportId,
   });
+  const importVouchers: any[] = importVouchersPageData?.items ?? [];
+  const importVouchersTotal = importVouchersPageData?.totalCount ?? 0;
+  const importVouchersTotalPages = importVouchersPageData?.totalPages ?? 0;
 
   const { data: batchCosts = [] } = useQuery<any[]>({
     queryKey: ["/api/admin/voucher-imports", selectedImportId, "batch-costs"],
     queryFn: async () => {
       if (!selectedImportId) return [];
-      const res = await apiRequest<any, any>("GET", `/api/admin/voucher-imports/${selectedImportId}/batch-costs`);
+      const res = await apiRequest<any, any>(
+        "GET",
+        `/api/admin/voucher-imports/${selectedImportId}/batch-costs`,
+      );
       return res ?? [];
     },
-    enabled: !!user && activeTab === 'imports' && !!selectedImportId
+    enabled: !!user && activeTab === "imports" && !!selectedImportId,
   });
 
   const { data: batchPnl = [] } = useQuery<any[]>({
     queryKey: ["/api/admin/voucher-imports", selectedImportId, "batch-pnl"],
     queryFn: async () => {
       if (!selectedImportId) return [];
-      const res = await apiRequest<any, any>("GET", `/api/admin/voucher-imports/${selectedImportId}/batch-pnl`);
+      const res = await apiRequest<any, any>(
+        "GET",
+        `/api/admin/voucher-imports/${selectedImportId}/batch-pnl`,
+      );
       return res ?? [];
     },
-    enabled: !!user && activeTab === 'imports' && !!selectedImportId
+    enabled: !!user && activeTab === "imports" && !!selectedImportId,
   });
 
-  const { data: reconciliationData, isLoading: isReconLoading } = useQuery<any>({
-    queryKey: ["/api/admin/reconciliation"],
-    enabled: !!user && activeTab === 'reconciliation',
-    staleTime: 30_000,
-  });
+  const { data: reconciliationData, isLoading: isReconLoading } = useQuery<any>(
+    {
+      queryKey: ["/api/admin/reconciliation"],
+      enabled: !!user && activeTab === "reconciliation",
+      staleTime: 30_000,
+    },
+  );
 
   // Stock vouchers lapsing/expired → nav badge count on "Заміна талонів" (#104). Polled while
   // logged in so the operator notices without opening the tab; cheap COUNT-only endpoint.
@@ -716,35 +907,51 @@ voucherNumber: string;
     enabled: !!user,
     refetchInterval: 60_000,
     queryFn: async () => {
-      const res = await apiRequest<unknown, { count: number }>("GET", "/api/admin/voucher-exchange/attention/count");
+      const res = await apiRequest<unknown, { count: number }>(
+        "GET",
+        "/api/admin/voucher-exchange/attention/count",
+      );
       return res.count ?? 0;
     },
   });
 
-  const {
-    data: reportData,
-    isLoading: isReportLoading
-  } = useQuery<any>({
-    queryKey: ["/api/admin/report", reportUserId, reportFromDate, reportToDate, reportTrigger],
-    enabled: !!user && activeTab === 'reports' && reportTrigger > 0,
+  const { data: reportData, isLoading: isReportLoading } = useQuery<any>({
+    queryKey: [
+      "/api/admin/report",
+      reportUserId,
+      reportFromDate,
+      reportToDate,
+      reportTrigger,
+    ],
+    enabled: !!user && activeTab === "reports" && reportTrigger > 0,
     // On-demand report (runs only after an explicit "generate" trigger); opt out of the global
     // background poll so it is not silently re-run every 15s.
     refetchInterval: false,
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (reportUserId) params.set('userId', reportUserId);
-      if (reportFromDate) params.set('fromDate', new Date(reportFromDate).toISOString());
-      if (reportToDate) params.set('toDate', new Date(reportToDate + 'T23:59:59').toISOString());
+      if (reportUserId) params.set("userId", reportUserId);
+      if (reportFromDate)
+        params.set("fromDate", new Date(reportFromDate).toISOString());
+      if (reportToDate)
+        params.set(
+          "toDate",
+          new Date(reportToDate + "T23:59:59").toISOString(),
+        );
       const qs = params.toString();
-      const res = await apiRequest<any, any>("GET", `/api/admin/report${qs ? '?' + qs : ''}`);
+      const res = await apiRequest<any, any>(
+        "GET",
+        `/api/admin/report${qs ? "?" + qs : ""}`,
+      );
       return res;
-    }
+    },
   });
-
 
   const bulkDeleteMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("POST", "/api/admin/vouchers/bulk-action", { action: "delete_all", ids: [] });
+      await apiRequest("POST", "/api/admin/vouchers/bulk-action", {
+        action: "delete_all",
+        ids: [],
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/vouchers"] });
@@ -754,7 +961,10 @@ voucherNumber: string;
 
   const deleteSelectedMutation = useMutation({
     mutationFn: async (ids: string[]) => {
-      await apiRequest("POST", "/api/admin/vouchers/bulk-action", { action: "delete", ids });
+      await apiRequest("POST", "/api/admin/vouchers/bulk-action", {
+        action: "delete",
+        ids,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/vouchers"] });
@@ -771,51 +981,157 @@ voucherNumber: string;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/vouchers"] });
-      toast.success(t('vouchers.unarchive') + " ✓");
+      toast.success(t("vouchers.unarchive") + " ✓");
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const activateVoucherMutation = useMutation({
+  // One voucher's own buttons, on a row: the id-based action, which acts on what it is given.
+  const activateOneVoucherMutation = useMutation({
     mutationFn: async (ids: string[]) => {
-      await apiRequest("POST", "/api/admin/vouchers/bulk-action", { action: "activate", ids });
+      await apiRequest("POST", "/api/admin/vouchers/bulk-action", {
+        action: "activate",
+        ids,
+      });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/voucher-imports"] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/admin/voucher-imports"],
+      });
       if (selectedImportId) {
-        queryClient.invalidateQueries({ queryKey: ["/api/admin/voucher-imports", selectedImportId, "vouchers"] });
+        queryClient.invalidateQueries({
+          queryKey: [
+            "/api/admin/voucher-imports",
+            selectedImportId,
+            "vouchers",
+          ],
+        });
+      }
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const deactivateOneVoucherMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      await apiRequest("POST", "/api/admin/vouchers/bulk-action", {
+        action: "deactivate",
+        ids,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["/api/admin/voucher-imports"],
+      });
+      if (selectedImportId) {
+        queryClient.invalidateQueries({
+          queryKey: [
+            "/api/admin/voucher-imports",
+            selectedImportId,
+            "vouchers",
+          ],
+        });
+      }
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  // The whole batch, in one action, decided by the server: the tab holds a page of the batch now,
+  // so the ids in the browser would be a page of it.
+  const activateVoucherMutation = useMutation({
+    mutationFn: async ({ action }: { action: string }) => {
+      await apiRequest(
+        "POST",
+        `/api/admin/voucher-imports/${selectedImportId}/bulk-action`,
+        { action },
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["/api/admin/voucher-imports"],
+      });
+      if (selectedImportId) {
+        queryClient.invalidateQueries({
+          queryKey: [
+            "/api/admin/voucher-imports",
+            selectedImportId,
+            "vouchers",
+          ],
+        });
       }
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const deactivateVoucherMutation = useMutation({
-    mutationFn: async (ids: string[]) => {
-      await apiRequest("POST", "/api/admin/vouchers/bulk-action", { action: "deactivate", ids });
+    mutationFn: async ({ action }: { action: string }) => {
+      await apiRequest(
+        "POST",
+        `/api/admin/voucher-imports/${selectedImportId}/bulk-action`,
+        { action },
+      );
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/voucher-imports"] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/admin/voucher-imports"],
+      });
       if (selectedImportId) {
-        queryClient.invalidateQueries({ queryKey: ["/api/admin/voucher-imports", selectedImportId, "vouchers"] });
+        queryClient.invalidateQueries({
+          queryKey: [
+            "/api/admin/voucher-imports",
+            selectedImportId,
+            "vouchers",
+          ],
+        });
       }
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const setBatchCostMutation = useMutation({
-    mutationFn: async ({ fuelTypeId, costPerLiter }: { fuelTypeId: string; costPerLiter: number }) => {
-      await apiRequest("PUT", `/api/admin/voucher-imports/${selectedImportId}/batch-costs/${encodeURIComponent(fuelTypeId)}`, { costPerLiter });
+    mutationFn: async ({
+      fuelTypeId,
+      costPerLiter,
+    }: {
+      fuelTypeId: string;
+      costPerLiter: number;
+    }) => {
+      await apiRequest(
+        "PUT",
+        `/api/admin/voucher-imports/${selectedImportId}/batch-costs/${encodeURIComponent(fuelTypeId)}`,
+        { costPerLiter },
+      );
     },
     onSuccess: () => {
       if (selectedImportId) {
-        queryClient.invalidateQueries({ queryKey: ["/api/admin/voucher-imports", selectedImportId, "batch-costs"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/admin/voucher-imports", selectedImportId, "batch-pnl"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/admin/voucher-imports", selectedImportId, "vouchers"] });
+        queryClient.invalidateQueries({
+          queryKey: [
+            "/api/admin/voucher-imports",
+            selectedImportId,
+            "batch-costs",
+          ],
+        });
+        queryClient.invalidateQueries({
+          queryKey: [
+            "/api/admin/voucher-imports",
+            selectedImportId,
+            "batch-pnl",
+          ],
+        });
+        queryClient.invalidateQueries({
+          queryKey: [
+            "/api/admin/voucher-imports",
+            selectedImportId,
+            "vouchers",
+          ],
+        });
       }
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/voucher-imports"] });
-      toast.success(t('imports.costSaved'));
+      queryClient.invalidateQueries({
+        queryKey: ["/api/admin/voucher-imports"],
+      });
+      toast.success(t("imports.costSaved"));
     },
-    onError: (e: Error) => toast.error(`${t('imports.costSaveFailed')}: ${e.message}`),
+    onError: (e: Error) =>
+      toast.error(`${t("imports.costSaveFailed")}: ${e.message}`),
   });
 
   // RQ-3: upload a supplier invoice (.xlsx) and pre-fill the per-fuel cost drafts from it.
@@ -841,15 +1157,26 @@ voucherNumber: string;
   const parseInvoiceMutation = useMutation({
     mutationFn: async (file: File) => {
       const fd = new FormData();
-      fd.append('file', file);
+      fd.append("file", file);
       return await apiRequest<FormData, ParseInvoiceResponse>(
-        "POST", `/api/admin/voucher-imports/${selectedImportId}/parse-invoice`, fd, undefined, 120_000, 0);
+        "POST",
+        `/api/admin/voucher-imports/${selectedImportId}/parse-invoice`,
+        fd,
+        undefined,
+        120_000,
+        0,
+      );
     },
     onSuccess: (result) => {
       const prefill: Record<string, string> = {};
       let matched = 0;
       for (const line of result.lines) {
-        if (line.matched && line.fuelTypeId && line.costPerLiter != null && line.costPerLiter > 0) {
+        if (
+          line.matched &&
+          line.fuelTypeId &&
+          line.costPerLiter != null &&
+          line.costPerLiter > 0
+        ) {
           prefill[line.fuelTypeId] = String(line.costPerLiter);
           matched++;
         }
@@ -859,16 +1186,31 @@ voucherNumber: string;
       const issues: string[] = [];
       const unmatchedLines = result.lines.filter((l) => !l.matched).length;
       const warnings = result.lines.filter((l) => l.warning).length;
-      if (unmatchedLines > 0) issues.push(t('imports.invoiceUnmatchedLines', String(unmatchedLines)));
-      if (result.unmatchedImportFuels.length > 0) issues.push(t('imports.invoiceUncoveredFuels', result.unmatchedImportFuels.join(', ')));
-      if (warnings > 0) issues.push(t('imports.invoiceWarnings', String(warnings)));
-      if (result.errors.length > 0) issues.push(t('imports.invoiceRowErrors', String(result.errors.length)));
-      const suffix = issues.length ? ` · ${issues.join(' · ')}` : '';
+      if (unmatchedLines > 0)
+        issues.push(t("imports.invoiceUnmatchedLines", String(unmatchedLines)));
+      if (result.unmatchedImportFuels.length > 0)
+        issues.push(
+          t(
+            "imports.invoiceUncoveredFuels",
+            result.unmatchedImportFuels.join(", "),
+          ),
+        );
+      if (warnings > 0)
+        issues.push(t("imports.invoiceWarnings", String(warnings)));
+      if (result.errors.length > 0)
+        issues.push(
+          t("imports.invoiceRowErrors", String(result.errors.length)),
+        );
+      const suffix = issues.length ? ` · ${issues.join(" · ")}` : "";
 
-      if (matched > 0) toast.success(`${t('imports.invoiceParsed', String(matched))}${suffix}`);
-      else toast.error(`${t('imports.invoiceNoMatch')}${suffix}`);
+      if (matched > 0)
+        toast.success(
+          `${t("imports.invoiceParsed", String(matched))}${suffix}`,
+        );
+      else toast.error(`${t("imports.invoiceNoMatch")}${suffix}`);
     },
-    onError: (e: Error) => toast.error(`${t('imports.invoiceParseFailed')}: ${e.message}`),
+    onError: (e: Error) =>
+      toast.error(`${t("imports.invoiceParseFailed")}: ${e.message}`),
   });
 
   const toggleSort = (column: string) => {
@@ -879,9 +1221,6 @@ voucherNumber: string;
       setSortOrder("desc");
     }
   };
-
-
-
 
   const toggleSelectAll = () => {
     if (selectedVoucherIds.size === vouchers.length && vouchers.length > 0) {
@@ -900,7 +1239,7 @@ voucherNumber: string;
     setSelectedVoucherIds(newSet);
   };
 
-if (status === "booting") {
+  if (status === "booting") {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4 relative">
         <div className="aurora-bg" aria-hidden="true">
@@ -928,19 +1267,25 @@ if (status === "booting") {
         <div className="glass-panel p-8 w-full max-sm relative z-10 text-center">
           <h1 className="text-2xl font-bold mb-4">
             <span className="glass-text-gradient">
-              {blocker.reason === "rate_limited" ? "Too many attempts" : "Server unavailable"}
+              {blocker.reason === "rate_limited"
+                ? "Too many attempts"
+                : "Server unavailable"}
             </span>
           </h1>
           <p className="text-sm mb-6 text-muted-foreground">
             {blocker.reason === "rate_limited" ? (
               <>
-                You have tried to restore this session several times in a row. Wait{" "}
-                <span className="text-primary font-semibold">{remaining}s</span> and it will
-                clear on its own - nothing is wrong with your account.
+                You have tried to restore this session several times in a row.
+                Wait{" "}
+                <span className="text-primary font-semibold">{remaining}s</span>{" "}
+                and it will clear on its own - nothing is wrong with your
+                account.
               </>
             ) : (
-              <>Can't reach the server right now. This usually clears up in a few seconds after a
-              deploy.</>
+              <>
+                Can't reach the server right now. This usually clears up in a
+                few seconds after a deploy.
+              </>
             )}
           </p>
           <Button
@@ -974,16 +1319,25 @@ if (status === "booting") {
               <LionMark size={76} />
             </div>
           )}
-          <h1 className="text-2xl font-bold mb-6 text-center"><span className="glass-text-gradient">Admin Login</span></h1>
+          <h1 className="text-2xl font-bold mb-6 text-center">
+            <span className="glass-text-gradient">Admin Login</span>
+          </h1>
 
           {unauthorized ? (
             <>
               <p className="text-center text-sm mb-6 text-muted-foreground">
-                This account is not authorized to use the admin dashboard. Sign in with
-                an administrator account, or use the mobile app for purchases and vouchers.
+                This account is not authorized to use the admin dashboard. Sign
+                in with an administrator account, or use the mobile app for
+                purchases and vouchers.
               </p>
               <Button
-                onClick={() => { setUnauthorized(false); setLoginError(""); setLoginStep("phone"); setLoginPhone(UA_DIAL_PREFIX); setLoginCode(""); }}
+                onClick={() => {
+                  setUnauthorized(false);
+                  setLoginError("");
+                  setLoginStep("phone");
+                  setLoginPhone(UA_DIAL_PREFIX);
+                  setLoginCode("");
+                }}
                 className="w-full"
               >
                 Use a different account
@@ -1001,10 +1355,17 @@ if (status === "booting") {
                   />
                   <Button
                     onClick={handleSendCode}
-                    disabled={loginLoading || loginPhone.trim().length <= UA_DIAL_PREFIX.length}
+                    disabled={
+                      loginLoading ||
+                      loginPhone.trim().length <= UA_DIAL_PREFIX.length
+                    }
                     className="w-full"
                   >
-                    {loginLoading ? <Loader2 className="animate-spin" /> : "Send Code"}
+                    {loginLoading ? (
+                      <Loader2 className="animate-spin" />
+                    ) : (
+                      "Send Code"
+                    )}
                   </Button>
                 </>
               ) : (
@@ -1023,13 +1384,19 @@ if (status === "booting") {
                     disabled={loginLoading || !loginCode}
                     className="w-full"
                   >
-                    {loginLoading ? <Loader2 className="animate-spin" /> : "Verify Code"}
+                    {loginLoading ? (
+                      <Loader2 className="animate-spin" />
+                    ) : (
+                      "Verify Code"
+                    )}
                   </Button>
                 </>
               )}
 
               {loginError && (
-                <p className="text-destructive text-sm mt-4 text-center">{loginError}</p>
+                <p className="text-destructive text-sm mt-4 text-center">
+                  {loginError}
+                </p>
               )}
             </>
           )}
@@ -1039,100 +1406,128 @@ if (status === "booting") {
   }
 
   return (
-    <Layout activeTab={activeTab} onTabChange={handleTabChange} onLogout={async () => { await endSession(); }} user={user} badges={{ voucherExchange: exchangeAttentionCount, heldPayments: heldPaymentCount }}>
+    <Layout
+      activeTab={activeTab}
+      onTabChange={handleTabChange}
+      onLogout={async () => {
+        await endSession();
+      }}
+      user={user}
+      badges={{
+        voucherExchange: exchangeAttentionCount,
+        heldPayments: heldPaymentCount,
+      }}
+    >
       <div className="space-y-6">
         {/* Brands Tab (new consolidated view) */}
-        {activeTab === 'brands' && (
+        {activeTab === "brands" && (
           <div className="animate-in fade-in duration-300">
             <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
               <Building className="w-6 h-6 text-primary" />
-              {t('nav.brands')}
+              {t("nav.brands")}
             </h2>
-            <BrandsTab onNavigateToImports={() => handleTabChange('imports')} />
+            <BrandsTab onNavigateToImports={() => handleTabChange("imports")} />
           </div>
         )}
 
         {/* Station Nodes Tab (Точки АЗК — map price-radar data source) */}
-        {activeTab === 'stationNodes' && (
+        {activeTab === "stationNodes" && (
           <div className="animate-in fade-in duration-300">
             <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
               <MapPin className="w-6 h-6 text-primary" />
-              {t('nav.stationNodes')}
+              {t("nav.stationNodes")}
             </h2>
             <StationNodesTab />
           </div>
         )}
 
         {/* Suppliers Tab (Постачальники — external voucher issuers) */}
-        {activeTab === 'suppliers' && (
+        {activeTab === "suppliers" && (
           <div className="animate-in fade-in duration-300">
             <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
               <Handshake className="w-6 h-6 text-primary" />
-              {t('suppliers.title')}
+              {t("suppliers.title")}
             </h2>
             <SuppliersTab />
           </div>
         )}
 
         {/* Voucher Exchange Tab (Заміна талонів — operator→brand stock renewal, #104) */}
-        {activeTab === 'voucherExchange' && (
+        {activeTab === "voucherExchange" && (
           <div className="animate-in fade-in duration-300">
             <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
               <Replace className="w-6 h-6 text-primary" />
-              {t('voucherExchange.title')}
+              {t("voucherExchange.title")}
             </h2>
             <VoucherExchangeTab />
           </div>
         )}
 
         {/* Customer Renewal Tab (Операторська заміна талона клієнта) */}
-        {activeTab === 'customerRenewal' && (
+        {activeTab === "customerRenewal" && (
           <div className="animate-in fade-in duration-300">
             <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
               <RefreshCw className="w-6 h-6 text-primary" />
-              {t('nav.customerRenewal')}
+              {t("nav.customerRenewal")}
             </h2>
             <CustomerRenewalTab />
           </div>
         )}
 
         {/* Users Tab */}
-        {activeTab === 'users' && (
+        {activeTab === "users" && (
           <div className="space-y-6 animate-in fade-in duration-300">
             <div className="glass-panel overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-muted">
                   <tr>
-                    <th className="text-left p-4">{t('table.id')}</th>
-                    <th className="text-left p-4">{t('table.name')}</th>
-                    <th className="text-left p-4">{t('table.phone')}</th>
-                    <th className="text-left p-4">{t('table.settlementCode')}</th>
-                    <th className="text-left p-4">{t('table.email')}</th>
-                    <th className="text-left p-4">{t('table.birthdate')}</th>
-                    <th className="text-left p-4">{t('table.bonusBalance')}</th>
-                    <th className="text-left p-4">{t('table.referredBy')}</th>
-                    <th className="text-left p-4">{t('table.role')}</th>
-                    <th className="text-left p-4">{t('table.status')}</th>
-                    <th className="text-left p-4">{t('users.createdAt')}</th>
+                    <th className="text-left p-4">{t("table.id")}</th>
+                    <th className="text-left p-4">{t("table.name")}</th>
+                    <th className="text-left p-4">{t("table.phone")}</th>
+                    <th className="text-left p-4">
+                      {t("table.settlementCode")}
+                    </th>
+                    <th className="text-left p-4">{t("table.email")}</th>
+                    <th className="text-left p-4">{t("table.birthdate")}</th>
+                    <th className="text-left p-4">{t("table.bonusBalance")}</th>
+                    <th className="text-left p-4">{t("table.referredBy")}</th>
+                    <th className="text-left p-4">{t("table.role")}</th>
+                    <th className="text-left p-4">{t("table.status")}</th>
+                    <th className="text-left p-4">{t("users.createdAt")}</th>
                     <th className="text-right p-4"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {usersList.map((user) => (
-                    <tr key={user.id} className="border-border hover:bg-foreground/5 transition-colors">
-                      <td className="p-4 font-mono text-xs text-muted-foreground">{user.id}</td>
+                    <tr
+                      key={user.id}
+                      className="border-border hover:bg-foreground/5 transition-colors"
+                    >
+                      <td className="p-4 font-mono text-xs text-muted-foreground">
+                        {user.id}
+                      </td>
                       <td className="p-4 font-bold text-foreground">
-                        {user.firstName || user.lastName ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : <span className="text-muted-foreground italic">No Name</span>}
+                        {user.firstName || user.lastName ? (
+                          `${user.firstName || ""} ${user.lastName || ""}`.trim()
+                        ) : (
+                          <span className="text-muted-foreground italic">
+                            No Name
+                          </span>
+                        )}
                       </td>
                       <td className="p-4">
                         <span className="inline-flex items-center gap-1.5">
-                          {user.phone || <span className="text-muted-foreground italic">N/A</span>}
+                          {user.phone || (
+                            <span className="text-muted-foreground italic">
+                              N/A
+                            </span>
+                          )}
                           {user.isQaAccount && (
                             <span
-                              title={t('users.qaBadgeTitle')}
+                              title={t("users.qaBadgeTitle")}
                               className="inline-flex items-center px-1.5 py-0.5 rounded bg-primary/10 text-primary text-xs font-semibold"
                             >
-                              {t('users.qaBadge')}
+                              {t("users.qaBadge")}
                             </span>
                           )}
                         </span>
@@ -1140,15 +1535,33 @@ if (status === "booting") {
                       <td className="p-4">
                         <span
                           className="inline-flex items-center px-1.5 py-0.5 rounded bg-muted font-mono text-xs font-semibold tracking-wider text-foreground"
-                          title={t('users.settlementCodeTitle')}
+                          title={t("users.settlementCodeTitle")}
                         >
                           {user.settlementCode}
                         </span>
                       </td>
-                      <td className="p-4">{user.email || <span className="text-muted-foreground italic">N/A</span>}</td>
-                      <td className="p-4">{user.birthdate ? formatDate(user.birthdate) : <span className="text-muted-foreground italic">N/A</span>}</td>
-                      <td className="p-4 text-primary font-bold">{user.bonusBalance || 0} UAH</td>
-                      <td className="p-4 font-mono text-xs text-muted-foreground">{user.referredBy || '-'}</td>
+                      <td className="p-4">
+                        {user.email || (
+                          <span className="text-muted-foreground italic">
+                            N/A
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-4">
+                        {user.birthdate ? (
+                          formatDate(user.birthdate)
+                        ) : (
+                          <span className="text-muted-foreground italic">
+                            N/A
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-4 text-primary font-bold">
+                        {user.bonusBalance || 0} UAH
+                      </td>
+                      <td className="p-4 font-mono text-xs text-muted-foreground">
+                        {user.referredBy || "-"}
+                      </td>
                       <td className="p-4 font-mono text-xs text-muted-foreground">
                         {(() => {
                           // The account's REAL role - null when it has none. The SPA used to read
@@ -1172,6 +1585,7 @@ if (status === "booting") {
                               disabled={setUserRoleMutation.isPending}
                               onChange={(e) => {
                                 const role = e.target.value;
+<<<<<<< HEAD
                                 if (role !== (currentRole ?? '')) {
                                   setUserRoleMutation.mutate({ userId: user.id, role });
                                 }
@@ -1180,7 +1594,9 @@ if (status === "booting") {
                             >
                               {currentRole === null && <option value="">{t('users.noRole')}</option>}
                               {choices.map((r) => (
-                                <option key={r} value={r}>{r}</option>
+                                <option key={r} value={r}>
+                                  {r}
+                                </option>
                               ))}
                             </select>
                           );
@@ -1189,19 +1605,19 @@ if (status === "booting") {
                       <td className="p-4">
                         {user.isDeleted ? (
                           <span className="inline-flex items-center px-2 py-1 rounded bg-destructive/10 text-destructive text-xs font-semibold">
-                            {t('users.deleted')}
+                            {t("users.deleted")}
                           </span>
                         ) : user.isBanned ? (
                           <span className="inline-flex items-center px-2 py-1 rounded bg-destructive/10 text-destructive text-xs font-semibold">
-                            {t('users.banned_status')}
+                            {t("users.banned_status")}
                           </span>
                         ) : user.isActive ? (
                           <span className="inline-flex items-center px-2 py-1 rounded bg-success/10 text-success text-xs font-semibold">
-                            {t('users.active')}
+                            {t("users.active")}
                           </span>
                         ) : (
                           <span className="inline-flex items-center px-2 py-1 rounded bg-warning/10 text-warning text-xs font-semibold">
-                            {t('users.inactive')}
+                            {t("users.inactive")}
                           </span>
                         )}
                       </td>
@@ -1214,17 +1630,30 @@ if (status === "booting") {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => setUserActiveMutation.mutate({ userId: user.id, isActive: !user.isActive })}
+                              onClick={() =>
+                                setUserActiveMutation.mutate({
+                                  userId: user.id,
+                                  isActive: !user.isActive,
+                                })
+                              }
                               disabled={setUserActiveMutation.isPending}
-                              className={user.isActive ? "text-warning hover:bg-warning/10" : "text-success hover:bg-success/10"}
+                              className={
+                                user.isActive
+                                  ? "text-warning hover:bg-warning/10"
+                                  : "text-success hover:bg-success/10"
+                              }
                             >
                               {user.isActive ? (
                                 <>
-                                  <span className="ml-1 text-xs">{t('users.deactivate')}</span>
+                                  <span className="ml-1 text-xs">
+                                    {t("users.deactivate")}
+                                  </span>
                                 </>
                               ) : (
                                 <>
-                                  <span className="ml-1 text-xs">{t('users.activate')}</span>
+                                  <span className="ml-1 text-xs">
+                                    {t("users.activate")}
+                                  </span>
                                 </>
                               )}
                             </Button>
@@ -1232,39 +1661,61 @@ if (status === "booting") {
                               variant="ghost"
                               size="sm"
                               onClick={() => {
-                                const next = window.prompt(t('users.emailPrompt'), user.email || '');
+                                const next = window.prompt(
+                                  t("users.emailPrompt"),
+                                  user.email || "",
+                                );
                                 if (next !== null) {
                                   const trimmed = next.trim();
-                                  setUserEmailMutation.mutate({ userId: user.id, email: trimmed === '' ? null : trimmed });
+                                  setUserEmailMutation.mutate({
+                                    userId: user.id,
+                                    email: trimmed === "" ? null : trimmed,
+                                  });
                                 }
                               }}
                               disabled={setUserEmailMutation.isPending}
                               className="text-info hover:bg-info/10"
                             >
-                              <span className="ml-1 text-xs">{t('users.editEmail')}</span>
+                              <span className="ml-1 text-xs">
+                                {t("users.editEmail")}
+                              </span>
                             </Button>
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => {
                                 if (user.isBanned) {
-                                  setUserBannedMutation.mutate({ userId: user.id, isBanned: false });
+                                  setUserBannedMutation.mutate({
+                                    userId: user.id,
+                                    isBanned: false,
+                                  });
                                 } else {
-                                  setUserConfirm({ id: user.id, action: "ban" });
+                                  setUserConfirm({
+                                    id: user.id,
+                                    action: "ban",
+                                  });
                                 }
                               }}
                               disabled={setUserBannedMutation.isPending}
-                              className={user.isBanned ? "text-success hover:bg-success/10" : "text-destructive hover:bg-destructive/10"}
+                              className={
+                                user.isBanned
+                                  ? "text-success hover:bg-success/10"
+                                  : "text-destructive hover:bg-destructive/10"
+                              }
                             >
                               {user.isBanned ? (
                                 <>
                                   <ShieldCheck className="w-4 h-4" />
-                                  <span className="ml-1 text-xs">{t('users.unban')}</span>
+                                  <span className="ml-1 text-xs">
+                                    {t("users.unban")}
+                                  </span>
                                 </>
                               ) : (
                                 <>
                                   <Ban className="w-4 h-4" />
-                                  <span className="ml-1 text-xs">{t('users.ban')}</span>
+                                  <span className="ml-1 text-xs">
+                                    {t("users.ban")}
+                                  </span>
                                 </>
                               )}
                             </Button>
@@ -1272,13 +1723,18 @@ if (status === "booting") {
                               variant="ghost"
                               size="sm"
                               onClick={() => {
-                                setUserConfirm({ id: user.id, action: "delete" });
+                                setUserConfirm({
+                                  id: user.id,
+                                  action: "delete",
+                                });
                               }}
                               disabled={deleteUserMutation.isPending}
                               className="text-destructive hover:bg-destructive/10"
                             >
                               <Trash2 className="w-4 h-4" />
-                              <span className="ml-1 text-xs">{t('users.delete')}</span>
+                              <span className="ml-1 text-xs">
+                                {t("users.delete")}
+                              </span>
                             </Button>
                           </>
                         )}
@@ -1287,7 +1743,10 @@ if (status === "booting") {
                   ))}
                   {usersList.length === 0 && (
                     <tr>
-                      <td colSpan={10} className="p-8 text-center text-muted-foreground">
+                      <td
+                        colSpan={10}
+                        className="p-8 text-center text-muted-foreground"
+                      >
                         No users found
                       </td>
                     </tr>
@@ -1299,7 +1758,7 @@ if (status === "booting") {
             {usersTotalPages > 1 && (
               <div className="flex items-center justify-between text-sm text-muted-foreground">
                 <span>
-                  {t('users.total')}: {usersPageData?.totalCount ?? 0}
+                  {t("users.total")}: {usersPageData?.totalCount ?? 0}
                 </span>
                 <div className="flex items-center gap-2">
                   <Button
@@ -1330,76 +1789,114 @@ if (status === "booting") {
         )}
 
         {/* Purchases Tab */}
-        {activeTab === 'purchases' && (
+        {activeTab === "purchases" && (
           <div className="space-y-6 animate-in fade-in duration-300">
             <div className="glass-panel overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-muted">
                   <tr>
-                    <th className="text-left p-4">{t('table.number')}</th>
-                    <th className="text-left p-4">{t('table.client')}</th>
-                    <th className="text-left p-4">{t('table.station')}</th>
-                    <th className="text-left p-4">{t('table.fuel')}</th>
-                    <th className="text-left p-4">{t('table.liters')}</th>
-                    <th className="text-left p-4">{t('table.price')}</th>
-                    <th className="text-left p-4">{t('common.status')}</th>
-                    <th className="text-left p-4">{t('common.date')}</th>
-                    <th className="text-left p-4">{t('table.vouchers')}</th>
-                    <th className="text-left p-4">{t('purchases.acquirer')}</th>
-                    <th className="text-left p-4">{t('common.actions')}</th>
+                    <th className="text-left p-4">{t("table.number")}</th>
+                    <th className="text-left p-4">{t("table.client")}</th>
+                    <th className="text-left p-4">{t("table.station")}</th>
+                    <th className="text-left p-4">{t("table.fuel")}</th>
+                    <th className="text-left p-4">{t("table.liters")}</th>
+                    <th className="text-left p-4">{t("table.price")}</th>
+                    <th className="text-left p-4">{t("common.status")}</th>
+                    <th className="text-left p-4">{t("common.date")}</th>
+                    <th className="text-left p-4">{t("table.vouchers")}</th>
+                    <th className="text-left p-4">{t("purchases.acquirer")}</th>
+                    <th className="text-left p-4">{t("common.actions")}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {purchases.map((purchase, index) => (
                     <tr key={purchase.id} className="border-border">
-                      <td className="p-4 font-mono text-xs" title={purchase.id}>{index + 1}</td>
+                      <td className="p-4 font-mono text-xs" title={purchase.id}>
+                        {index + 1}
+                      </td>
                       <td className="p-4">{clientLabel(purchase.userId)}</td>
                       <td className="p-4">{purchase.brand}</td>
-                      <td className="p-4">{fuelNameById.get(purchase.fuelTypeId) || purchase.fuelTypeId}</td>
-                      <td className="p-4">{purchase.liters}L</td>
-                      <td className="p-4 text-primary font-bold">{purchase.price} UAH</td>
                       <td className="p-4">
-                        <span className={`px-2 py-1 rounded text-xs ${purchase.status === "Fulfilled" ? "bg-success/20 text-success" :
-                          purchase.status === "PartiallyFulfilled" ? "bg-warning/20 text-warning" :
-                            purchase.status === "PartiallyRefunded" ? "bg-info/20 text-info" :
-                              purchase.status === "Refunded" ? "bg-info/20 text-info" :
-                                purchase.status === "PendingPayment" || purchase.status === "PendingFulfillment" ? "bg-warning/20 text-warning" :
-                                  "bg-destructive/20 text-destructive"
-                          }`}>
-                          {t('order.status.' + orderStatusKey(purchase.status))}
+                        {fuelNameById.get(purchase.fuelTypeId) ||
+                          purchase.fuelTypeId}
+                      </td>
+                      <td className="p-4">{purchase.liters}L</td>
+                      <td className="p-4 text-primary font-bold">
+                        {purchase.price} UAH
+                      </td>
+                      <td className="p-4">
+                        <span
+                          className={`px-2 py-1 rounded text-xs ${
+                            purchase.status === "Fulfilled"
+                              ? "bg-success/20 text-success"
+                              : purchase.status === "PartiallyFulfilled"
+                                ? "bg-warning/20 text-warning"
+                                : purchase.status === "PartiallyRefunded"
+                                  ? "bg-info/20 text-info"
+                                  : purchase.status === "Refunded"
+                                    ? "bg-info/20 text-info"
+                                    : purchase.status === "PendingPayment" ||
+                                        purchase.status === "PendingFulfillment"
+                                      ? "bg-warning/20 text-warning"
+                                      : "bg-destructive/20 text-destructive"
+                          }`}
+                        >
+                          {t("order.status." + orderStatusKey(purchase.status))}
                         </span>
                         {purchase.refundStatus && (
-                          <span className={`block mt-1 px-2 py-1 rounded text-xs ${
-                            purchase.refundStatus === "Completed" ? "bg-success/20 text-success" :
-                              purchase.refundStatus === "Failed" ? "bg-destructive/20 text-destructive" :
-                                "bg-muted text-muted-foreground"
-                          }`}>
-                            {t('purchases.refundStatus.' + purchase.refundStatus)}
+                          <span
+                            className={`block mt-1 px-2 py-1 rounded text-xs ${
+                              purchase.refundStatus === "Completed"
+                                ? "bg-success/20 text-success"
+                                : purchase.refundStatus === "Failed"
+                                  ? "bg-destructive/20 text-destructive"
+                                  : "bg-muted text-muted-foreground"
+                            }`}
+                          >
+                            {t(
+                              "purchases.refundStatus." + purchase.refundStatus,
+                            )}
                           </span>
                         )}
                       </td>
                       <td className="p-4 text-muted-foreground text-sm">
                         {formatDateTime(purchase.createdAtUtc)}
                       </td>
-                      <td className="p-4">{purchase.voucherCount} / {purchase.quantity}</td>
+                      <td className="p-4">
+                        {purchase.voucherCount} / {purchase.quantity}
+                      </td>
                       <td className="p-4">
                         {/* The acquirer's own record of the payment, next to our receipt.
                             monobankInvoiceId and monobankStatus were on the type from the start and
                             rendered nowhere, so the invoice was in the wire and in nobody's eye. */}
                         {purchase.monobankInvoiceId ? (
                           <div className="space-y-1">
-                            <div className="font-mono text-xs break-all" title={purchase.monobankInvoiceId}>
+                            <div
+                              className="font-mono text-xs break-all"
+                              title={purchase.monobankInvoiceId}
+                            >
                               {purchase.monobankInvoiceId}
                             </div>
                             {purchase.monobankStatus && (
-                              <span className={`inline-block px-1.5 py-0.5 rounded text-xs ${
-                                purchase.monobankStatus === 'Success' ? 'bg-success/20 text-success' : 'bg-muted text-muted-foreground'}`}>
-                                {t('monobank.status.' + purchase.monobankStatus.toLowerCase())}
+                              <span
+                                className={`inline-block px-1.5 py-0.5 rounded text-xs ${
+                                  purchase.monobankStatus === "Success"
+                                    ? "bg-success/20 text-success"
+                                    : "bg-muted text-muted-foreground"
+                                }`}
+                              >
+                                {t(
+                                  "monobank.status." +
+                                    purchase.monobankStatus.toLowerCase(),
+                                )}
                               </span>
                             )}
                             {purchase.refundMonobankStatus && (
                               <span className="block text-xs text-muted-foreground">
-                                {t('purchases.refundStatus.' + purchase.refundMonobankStatus)}
+                                {t(
+                                  "purchases.refundStatus." +
+                                    purchase.refundMonobankStatus,
+                                )}
                               </span>
                             )}
                           </div>
@@ -1423,7 +1920,9 @@ if (status === "booting") {
                           ) : (
                             <ScrollText className="w-4 h-4" />
                           )}
-                          <span className="ml-1 text-xs">{t('purchases.downloadReceipt')}</span>
+                          <span className="ml-1 text-xs">
+                            {t("purchases.downloadReceipt")}
+                          </span>
                         </Button>
                         <Button
                           variant="ghost"
@@ -1433,14 +1932,19 @@ if (status === "booting") {
                           className="text-warning hover:bg-warning/10"
                         >
                           <XCircle className="w-4 h-4" />
-                          <span className="ml-1 text-xs">{t('purchases.refund')}</span>
+                          <span className="ml-1 text-xs">
+                            {t("purchases.refund")}
+                          </span>
                         </Button>
                       </td>
                     </tr>
                   ))}
                   {purchases.length === 0 && (
                     <tr>
-                      <td colSpan={11} className="p-8 text-center text-muted-foreground">
+                      <td
+                        colSpan={11}
+                        className="p-8 text-center text-muted-foreground"
+                      >
                         No purchases found
                       </td>
                     </tr>
@@ -1452,7 +1956,7 @@ if (status === "booting") {
             {purchasesTotalPages > 1 && (
               <div className="flex items-center justify-between text-sm text-muted-foreground">
                 <span>
-                  {t('purchases.total')}: {purchasesPageData?.totalCount ?? 0}
+                  {t("purchases.total")}: {purchasesPageData?.totalCount ?? 0}
                 </span>
                 <div className="flex items-center gap-2">
                   <Button
@@ -1482,14 +1986,16 @@ if (status === "booting") {
           </div>
         )}
 
-
         {/* Import Tab */}
-        {activeTab === 'vouchers' && (
+        {activeTab === "vouchers" && (
           <div className="space-y-6 animate-in fade-in duration-300">
             <div className="glass-panel p-8 mb-8">
               <div
-                className={`flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-12 transition-colors ${isDragging ? 'border-primary bg-primary/10' : 'border-border hover:bg-foreground/5'}`}
-                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                className={`flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-12 transition-colors ${isDragging ? "border-primary bg-primary/10" : "border-border hover:bg-foreground/5"}`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDragging(true);
+                }}
                 onDragLeave={() => setIsDragging(false)}
                 onDrop={(e) => {
                   e.preventDefault();
@@ -1500,30 +2006,48 @@ if (status === "booting") {
                 }}
               >
                 <FileUp className="w-12 h-12 text-muted-foreground mb-4" />
-                <h3 className="text-xl font-bold mb-2">{t('import.title')}</h3>
-                <p className="text-muted-foreground mb-6 text-center max-w-md">{t('import.description')}</p>
+                <h3 className="text-xl font-bold mb-2">{t("import.title")}</h3>
+                <p className="text-muted-foreground mb-6 text-center max-w-md">
+                  {t("import.description")}
+                </p>
                 {importFiles.length > 0 && (
                   <div className="mb-4 text-center">
-                    <p className="text-sm text-muted-foreground">{t('import.filesSelected', importFiles.length.toString())}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {t("import.filesSelected", importFiles.length.toString())}
+                    </p>
                     <ul className="text-sm font-mono text-primary mt-1">
-                      {importFiles.map((f, i) => <li key={i}>{f.name} ({Math.round(f.size / 1024)}KB)</li>)}
+                      {importFiles.map((f, i) => (
+                        <li key={i}>
+                          {f.name} ({Math.round(f.size / 1024)}KB)
+                        </li>
+                      ))}
                     </ul>
                   </div>
                 )}
                 <div className="flex gap-4 items-end">
                   <div className="flex-1 min-w-0">
-                    <Select value={importSupplierId} onValueChange={setImportSupplierId}>
+                    <Select
+                      value={importSupplierId}
+                      onValueChange={setImportSupplierId}
+                    >
                       <SelectTrigger>
-                        <SelectValue placeholder={t('import.supplier')} />
+                        <SelectValue placeholder={t("import.supplier")} />
                       </SelectTrigger>
                       <SelectContent>
-                        {(suppliers ?? []).filter((s) => s.isActive).map((s) => (
-                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                        ))}
+                        {(suppliers ?? [])
+                          .filter((s) => s.isActive)
+                          .map((s) => (
+                            <SelectItem key={s.id} value={s.id}>
+                              {s.name}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
-                    {(suppliers ?? []).filter((s) => s.isActive).length === 0 && (
-                      <p className="text-xs text-muted-foreground mt-1">{t('import.noSuppliers')}</p>
+                    {(suppliers ?? []).filter((s) => s.isActive).length ===
+                      0 && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {t("import.noSuppliers")}
+                      </p>
                     )}
                   </div>
                   <Input
@@ -1538,126 +2062,230 @@ if (status === "booting") {
                       }
                     }}
                   />
-                  <Button variant="outline" onClick={() => document.getElementById('file-upload')?.click()}>{t('import.clickSelect')}</Button>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      document.getElementById("file-upload")?.click()
+                    }
+                  >
+                    {t("import.clickSelect")}
+                  </Button>
                   <Button
                     onClick={async () => {
                       if (importFiles.length === 0) return;
                       // Refuse before the upload rather than letting the backend reject the whole file
                       // after a 300s parse: the supplier decides who the stock is settled with.
                       if (!importSupplierId) {
-                        setImportStatus('error');
-                        setImportErrorMsg(t('import.supplierRequired'));
+                        setImportStatus("error");
+                        setImportErrorMsg(t("import.supplierRequired"));
                         return;
                       }
                       setIsImporting(true);
-                      setImportStatus('processing');
-                      setImportErrorMsg('');
-                      setImportResult({ success: 0, errors: 0, existing: 0, modelUsed: '' }); // Reset stats
+                      setImportStatus("processing");
+                      setImportErrorMsg("");
+                      setImportResult({
+                        success: 0,
+                        errors: 0,
+                        existing: 0,
+                        modelUsed: "",
+                      }); // Reset stats
                       setImportErrorLines([]);
                       const formData = new FormData();
-                      importFiles.forEach(file => formData.append('file', file));
-                      formData.append('supplierId', importSupplierId);
+                      importFiles.forEach((file) =>
+                        formData.append("file", file),
+                      );
+                      formData.append("supplierId", importSupplierId);
                       try {
-                        const result = await apiRequest<any, { imported: number; failed: number; duplicates: number; errors?: { pageNumber: number; voucherNumber: string | null; reason: string }[] }>("POST", "/api/voucher-catalog/import", formData, undefined, 300_000, 0);
+                        const result = await apiRequest<
+                          any,
+                          {
+                            imported: number;
+                            failed: number;
+                            duplicates: number;
+                            errors?: {
+                              pageNumber: number;
+                              voucherNumber: string | null;
+                              reason: string;
+                            }[];
+                          }
+                        >(
+                          "POST",
+                          "/api/voucher-catalog/import",
+                          formData,
+                          undefined,
+                          300_000,
+                          0,
+                        );
 
                         setImportProgress({ processed: 1, total: 1 });
-                        setImportStatus(result.failed > 0 ? 'error' : 'completed');
+                        setImportStatus(
+                          result.failed > 0 ? "error" : "completed",
+                        );
                         setImportResult({
                           success: result.imported || 0,
                           errors: result.failed || 0,
                           existing: result.duplicates || 0,
-                          modelUsed: ''
+                          modelUsed: "",
                         });
                         setImportErrorLines(result.errors || []);
-
                       } catch (e) {
-                        console.error('Import failed:', e, {
-                          url: '/api/voucher-catalog/import',
-                          method: 'POST',
+                        console.error("Import failed:", e, {
+                          url: "/api/voucher-catalog/import",
+                          method: "POST",
                           timeoutMs: 300_000,
                           retries: 0,
-                          files: importFiles.map(f => ({ name: f.name, size: f.size, type: f.type })),
+                          files: importFiles.map((f) => ({
+                            name: f.name,
+                            size: f.size,
+                            type: f.type,
+                          })),
                         });
-                        setImportStatus('error');
-                        setImportErrorMsg(e instanceof Error ? e.message : String(e));
+                        setImportStatus("error");
+                        setImportErrorMsg(
+                          e instanceof Error ? e.message : String(e),
+                        );
                         // Don't overwrite if we already set partial results above
-                        setImportResult(prev => {
-                          if (prev.success > 0 || prev.existing > 0) return prev;
-                          return { success: 0, errors: importFiles.length, existing: 0, modelUsed: '' };
+                        setImportResult((prev) => {
+                          if (prev.success > 0 || prev.existing > 0)
+                            return prev;
+                          return {
+                            success: 0,
+                            errors: importFiles.length,
+                            existing: 0,
+                            modelUsed: "",
+                          };
                         });
                       }
                       setIsImporting(false);
-                      queryClient.invalidateQueries({ queryKey: ["/api/admin/vouchers"] });
+                      queryClient.invalidateQueries({
+                        queryKey: ["/api/admin/vouchers"],
+                      });
                       setImportFiles([]);
                     }}
                     disabled={isImporting || importFiles.length === 0}
                   >
-                    {isImporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileUp className="w-4 h-4 mr-2" />}
-                    {t('import.start')}
+                    {isImporting ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <FileUp className="w-4 h-4 mr-2" />
+                    )}
+                    {t("import.start")}
                   </Button>
                 </div>
-                {importFiles.length > 0 && <div className="mt-4 text-success">{t('import.filesSelected', importFiles.length.toString())}</div>}
+                {importFiles.length > 0 && (
+                  <div className="mt-4 text-success">
+                    {t("import.filesSelected", importFiles.length.toString())}
+                  </div>
+                )}
               </div>
             </div>
 
-            {importStatus !== 'idle' && (
-              <div className={`border rounded-xl p-4 mb-6 ${importStatus === 'error' ? 'bg-destructive/10 border-destructive/30' : 'bg-muted border-border'}`}>
+            {importStatus !== "idle" && (
+              <div
+                className={`border rounded-xl p-4 mb-6 ${importStatus === "error" ? "bg-destructive/10 border-destructive/30" : "bg-muted border-border"}`}
+              >
                 <div className="flex justify-between text-sm mb-2">
-                  <span className="text-muted-foreground font-bold">{t('common.status')}:
-                    <span className={
-                      importStatus === 'completed' ? "text-success uppercase ml-2" :
-                        importStatus === 'error' ? "text-destructive uppercase ml-2" :
-                          "text-info animate-pulse uppercase ml-2"
-                    }>
-                      {importStatus === 'completed' ? t('import.completed').toUpperCase() : importStatus === 'error' ? t('import.failed').toUpperCase() : t('import.processing').replace('...', '').toUpperCase()}
+                  <span className="text-muted-foreground font-bold">
+                    {t("common.status")}:
+                    <span
+                      className={
+                        importStatus === "completed"
+                          ? "text-success uppercase ml-2"
+                          : importStatus === "error"
+                            ? "text-destructive uppercase ml-2"
+                            : "text-info animate-pulse uppercase ml-2"
+                      }
+                    >
+                      {importStatus === "completed"
+                        ? t("import.completed").toUpperCase()
+                        : importStatus === "error"
+                          ? t("import.failed").toUpperCase()
+                          : t("import.processing")
+                              .replace("...", "")
+                              .toUpperCase()}
                     </span>
                   </span>
                   <span className="text-muted-foreground">
-                    {importStatus === 'error' ? t('import.errorOccurred') : `${importProgress.processed} / ${importProgress.total} ${t('import.processed').toLowerCase()}`}
+                    {importStatus === "error"
+                      ? t("import.errorOccurred")
+                      : `${importProgress.processed} / ${importProgress.total} ${t("import.processed").toLowerCase()}`}
                   </span>
-                  {(importStatus === 'completed' || importStatus === 'error') && (
-                    <button onClick={() => setImportStatus('idle')} className="text-xs text-muted-foreground hover:text-foreground underline ml-2">{t('import.close')}</button>
+                  {(importStatus === "completed" ||
+                    importStatus === "error") && (
+                    <button
+                      onClick={() => setImportStatus("idle")}
+                      className="text-xs text-muted-foreground hover:text-foreground underline ml-2"
+                    >
+                      {t("import.close")}
+                    </button>
                   )}
                 </div>
                 {importResult.modelUsed && (
                   <div className="text-xs text-muted-foreground mb-2">
-                    {t('import.model')}: <span className="text-info font-mono">{importResult.modelUsed}</span>
+                    {t("import.model")}:{" "}
+                    <span className="text-info font-mono">
+                      {importResult.modelUsed}
+                    </span>
                   </div>
                 )}
                 <div className="w-full bg-muted rounded-full h-2.5 mb-2 overflow-hidden">
                   <div
-                    className={`h-2.5 rounded-full transition-all duration-500 ${importStatus === 'completed' ? 'bg-success' :
-                      importStatus === 'error' ? 'bg-destructive' :
-                        'bg-info animate-pulse'
-                      }`}
-                    style={{ width: `${importProgress.total > 0 ? (importProgress.processed / importProgress.total) * 100 : 0}%` }}
+                    className={`h-2.5 rounded-full transition-all duration-500 ${
+                      importStatus === "completed"
+                        ? "bg-success"
+                        : importStatus === "error"
+                          ? "bg-destructive"
+                          : "bg-info animate-pulse"
+                    }`}
+                    style={{
+                      width: `${importProgress.total > 0 ? (importProgress.processed / importProgress.total) * 100 : 0}%`,
+                    }}
                   ></div>
                 </div>
                 <div className="flex flex-col gap-2">
-                  {importStatus === 'error' && (
+                  {importStatus === "error" && (
                     <div className="flex flex-col gap-1">
-                      <div className="text-xs text-destructive">{t('import.errorOccurred')}</div>
-                      {importErrorMsg && <div className="text-xs text-destructive font-mono break-all">{importErrorMsg}</div>}
+                      <div className="text-xs text-destructive">
+                        {t("import.errorOccurred")}
+                      </div>
+                      {importErrorMsg && (
+                        <div className="text-xs text-destructive font-mono break-all">
+                          {importErrorMsg}
+                        </div>
+                      )}
                     </div>
                   )}
-                  {importStatus === 'processing' && (
-                    <div className="text-xs text-muted-foreground">{t('import.largeFileNote')}</div>
+                  {importStatus === "processing" && (
+                    <div className="text-xs text-muted-foreground">
+                      {t("import.largeFileNote")}
+                    </div>
                   )}
                   <div className="flex justify-between text-xs text-muted-foreground pt-1 border-t border-border">
-                    <span className="text-success">{t('import.successful')}: {importResult.success}</span>
-                    <span className="text-destructive">{t('import.failedCount')}: {importResult.errors}</span>
-                    <span className="text-warning">{t('import.duplicates')}: {importResult.existing}</span>
+                    <span className="text-success">
+                      {t("import.successful")}: {importResult.success}
+                    </span>
+                    <span className="text-destructive">
+                      {t("import.failedCount")}: {importResult.errors}
+                    </span>
+                    <span className="text-warning">
+                      {t("import.duplicates")}: {importResult.existing}
+                    </span>
                   </div>
                   {importErrorLines.length > 0 && (
                     <div className="flex flex-col gap-1 mt-1 max-h-48 overflow-y-auto pt-2 border-t border-border">
-                      <div className="text-xs text-destructive font-semibold">{t('import.failedRows')}:</div>
+                      <div className="text-xs text-destructive font-semibold">
+                        {t("import.failedRows")}:
+                      </div>
                       {importErrorLines.map((er, i) => (
                         <div key={i} className="text-xs flex gap-2 items-start">
                           <span className="text-muted-foreground font-mono shrink-0">
-                            #{er.pageNumber}{er.voucherNumber ? ` · ${er.voucherNumber}` : ''}
+                            #{er.pageNumber}
+                            {er.voucherNumber ? ` · ${er.voucherNumber}` : ""}
                           </span>
                           <span className="text-destructive break-words">
-                            {er.reason && er.reason.trim() ? er.reason : t('import.unknownReason')}
+                            {er.reason && er.reason.trim()
+                              ? er.reason
+                              : t("import.unknownReason")}
                           </span>
                         </div>
                       ))}
@@ -1672,93 +2300,156 @@ if (status === "booting") {
               <div className="flex flex-wrap justify-between items-center glass-panel p-4 gap-4">
                 <div className="flex gap-6 items-center flex-wrap">
                   <div>
-                    <div className="text-xs text-muted-foreground uppercase tracking-wider">{t('vouchers.total')}</div>
-                    <div className="text-2xl font-bold text-foreground">{globalTotal}</div>
+                    <div className="text-xs text-muted-foreground uppercase tracking-wider">
+                      {t("vouchers.total")}
+                    </div>
+                    <div className="text-2xl font-bold text-foreground">
+                      {globalTotal}
+                    </div>
                   </div>
                   {filterFuelType && (
                     <div className="animate-in fade-in">
-                      <div className="text-xs text-muted-foreground uppercase tracking-wider">{t('vouchers.filtered')} ({fuelNameById.get(filterFuelType) || filterFuelType})</div>
-                      <div className="text-2xl font-bold text-primary">{totalVouchers}</div>
+                      <div className="text-xs text-muted-foreground uppercase tracking-wider">
+                        {t("vouchers.filtered")} (
+                        {fuelNameById.get(filterFuelType) || filterFuelType})
+                      </div>
+                      <div className="text-2xl font-bold text-primary">
+                        {totalVouchers}
+                      </div>
                     </div>
                   )}
                   {selectedVoucherIds.size > 0 && (
                     <div className="animate-in fade-in">
-                      <div className="text-xs text-muted-foreground uppercase tracking-wider">{t('vouchers.selected')}</div>
-                      <div className="text-2xl font-bold text-info">{selectedVoucherIds.size}</div>
+                      <div className="text-xs text-muted-foreground uppercase tracking-wider">
+                        {t("vouchers.selected")}
+                      </div>
+                      <div className="text-2xl font-bold text-info">
+                        {selectedVoucherIds.size}
+                      </div>
                     </div>
                   )}
                 </div>
 
                 <div className="flex gap-2 items-center">
                   <div className="flex items-center gap-2">
-                    <Select value={filterFuelType || "all"} onValueChange={(val) => { setFilterFuelType(val === "all" ? "" : val); setPage(1); }}>
+                    <Select
+                      value={filterFuelType || "all"}
+                      onValueChange={(val) => {
+                        setFilterFuelType(val === "all" ? "" : val);
+                        setPage(1);
+                      }}
+                    >
                       <SelectTrigger className="w-[180px] bg-muted border-border text-foreground rounded-lg h-9">
                         <div className="flex items-center gap-2">
                           <Filter className="w-3.5 h-3.5 text-muted-foreground" />
-                          <SelectValue placeholder={t('vouchers.fuelType')} />
+                          <SelectValue placeholder={t("vouchers.fuelType")} />
                         </div>
                       </SelectTrigger>
                       <SelectContent className="text-foreground shadow-2xl">
-                        <SelectItem value="all">{t('vouchers.allFuelTypes')}</SelectItem>
+                        <SelectItem value="all">
+                          {t("vouchers.allFuelTypes")}
+                        </SelectItem>
                         {[...dropdownFuelTypes]
                           .sort((a, b) => a.name.localeCompare(b.name))
                           .map((ft) => (
-                            <SelectItem key={ft.id} value={ft.id}>{ft.name}</SelectItem>
+                            <SelectItem key={ft.id} value={ft.id}>
+                              {ft.name}
+                            </SelectItem>
                           ))}
                       </SelectContent>
                     </Select>
 
-                    <Select value={filterStatus || "all"} onValueChange={(val) => { setFilterStatus(val === "all" ? "" : val); setPage(1); }}>
+                    <Select
+                      value={filterStatus || "all"}
+                      onValueChange={(val) => {
+                        setFilterStatus(val === "all" ? "" : val);
+                        setPage(1);
+                      }}
+                    >
                       <SelectTrigger className="w-[140px] bg-muted border-border text-foreground rounded-lg h-9">
-                        <SelectValue placeholder={t('vouchers.status')} />
+                        <SelectValue placeholder={t("vouchers.status")} />
                       </SelectTrigger>
                       <SelectContent className="text-foreground shadow-2xl">
-                        <SelectItem value="all">{t('vouchers.allStatuses')}</SelectItem>
+                        <SelectItem value="all">
+                          {t("vouchers.allStatuses")}
+                        </SelectItem>
                         {dropdownStatuses.map((s: string) => (
-                          <SelectItem key={s} value={s}>{t('status.' + voucherStatusKey(s))}</SelectItem>
+                          <SelectItem key={s} value={s}>
+                            {t("status." + voucherStatusKey(s))}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
 
-                    <Select value={filterProvider || "all"} onValueChange={(val) => {
-                      setFilterProvider(val === "all" ? "" : val);
-                      // The fuel filter is scoped to the brand, so a fuel chosen under the old
-                      // brand may not exist under the new one. Drop it rather than leave a filter
-                      // that silently returns nothing.
-                      if (val !== "all" && filterFuelType && !(fuelTypesByBrand[val] || []).some((f) => f.id === filterFuelType))
-                        setFilterFuelType("");
-                      setPage(1);
-                    }}>
+                    <Select
+                      value={filterProvider || "all"}
+                      onValueChange={(val) => {
+                        setFilterProvider(val === "all" ? "" : val);
+                        // The fuel filter is scoped to the brand, so a fuel chosen under the old
+                        // brand may not exist under the new one. Drop it rather than leave a filter
+                        // that silently returns nothing.
+                        if (
+                          val !== "all" &&
+                          filterFuelType &&
+                          !(fuelTypesByBrand[val] || []).some(
+                            (f) => f.id === filterFuelType,
+                          )
+                        )
+                          setFilterFuelType("");
+                        setPage(1);
+                      }}
+                    >
                       <SelectTrigger className="w-[140px] bg-muted border-border text-foreground rounded-lg h-9">
-                        <SelectValue placeholder={t('vouchers.brand')} />
+                        <SelectValue placeholder={t("vouchers.brand")} />
                       </SelectTrigger>
                       <SelectContent className="text-foreground shadow-2xl">
-                        <SelectItem value="all">{t('vouchers.allBrands')}</SelectItem>
+                        <SelectItem value="all">
+                          {t("vouchers.allBrands")}
+                        </SelectItem>
                         {dropdownProviders.map((p: string) => (
-                          <SelectItem key={p} value={p}>{p}</SelectItem>
+                          <SelectItem key={p} value={p}>
+                            {p}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
 
-                    <Select value={filterAmount || "all"} onValueChange={(val) => { setFilterAmount(val === "all" ? "" : val); setPage(1); }}>
+                    <Select
+                      value={filterAmount || "all"}
+                      onValueChange={(val) => {
+                        setFilterAmount(val === "all" ? "" : val);
+                        setPage(1);
+                      }}
+                    >
                       <SelectTrigger className="w-[100px] bg-muted border-border text-foreground rounded-lg h-9">
-                        <SelectValue placeholder={t('vouchers.volume')} />
+                        <SelectValue placeholder={t("vouchers.volume")} />
                       </SelectTrigger>
                       <SelectContent className="text-foreground shadow-2xl">
-                        <SelectItem value="all">{t('vouchers.all')}</SelectItem>
-                        {dropdownAmounts.sort((a: number, b: number) => a - b).map((a: number) => (
-                          <SelectItem key={a} value={a.toString()}>{a} L</SelectItem>
-                        ))}
+                        <SelectItem value="all">{t("vouchers.all")}</SelectItem>
+                        {dropdownAmounts
+                          .sort((a: number, b: number) => a - b)
+                          .map((a: number) => (
+                            <SelectItem key={a} value={a.toString()}>
+                              {a} L
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
 
                     <DateInput
                       value={filterExpirationDate}
-                      onChange={(v) => { setFilterExpirationDate(v); setPage(1); }}
+                      onChange={(v) => {
+                        setFilterExpirationDate(v);
+                        setPage(1);
+                      }}
                       className="w-[140px] bg-muted border-border text-foreground rounded-lg h-9 text-xs"
                     />
 
-                    {(filterFuelType || filterStatus || filterProvider || filterAmount || filterExpirationDate) && (
+                    {(filterFuelType ||
+                      filterStatus ||
+                      filterProvider ||
+                      filterAmount ||
+                      filterExpirationDate) && (
                       <Button
                         variant="ghost"
                         size="icon"
@@ -1770,7 +2461,7 @@ if (status === "booting") {
                           setFilterExpirationDate("");
                           setPage(1);
                         }}
-                        title={t('vouchers.clearFilters')}
+                        title={t("vouchers.clearFilters")}
                         className="h-9 w-9 text-muted-foreground hover:bg-foreground/5 rounded-lg"
                       >
                         <X className="w-4 h-4" />
@@ -1779,14 +2470,23 @@ if (status === "booting") {
                   </div>
 
                   {selectedVoucherIds.size > 0 ? (
-                    <Button variant="destructive" size="sm" onClick={() => setShowDeleteConfirm(true)}>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setShowDeleteConfirm(true)}
+                    >
                       <Trash2 className="w-4 h-4 mr-2" />
-                      {t('vouchers.delete')} ({selectedVoucherIds.size})
+                      {t("vouchers.delete")} ({selectedVoucherIds.size})
                     </Button>
                   ) : (
                     vouchers.length > 0 && (
-                      <Button variant="ghost" size="sm" onClick={() => setShowDeleteAllConfirm(true)} className="text-destructive hover:bg-destructive/10">
-                        {t('common.deleteAll')} ({globalTotal})
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowDeleteAllConfirm(true)}
+                        className="text-destructive hover:bg-destructive/10"
+                      >
+                        {t("common.deleteAll")} ({globalTotal})
                       </Button>
                     )
                   )}
@@ -1801,77 +2501,143 @@ if (status === "booting") {
                     <tr>
                       <th className="p-4 w-10 sticky left-0 bg-muted z-10">
                         <div
-                          className={`w-4 h-4 border rounded cursor-pointer flex items-center justify-center transition-colors ${selectedVoucherIds.size === vouchers.length && vouchers.length > 0 ? 'bg-primary border-primary' : 'border-border hover:border-foreground/40'}`}
+                          className={`w-4 h-4 border rounded cursor-pointer flex items-center justify-center transition-colors ${selectedVoucherIds.size === vouchers.length && vouchers.length > 0 ? "bg-primary border-primary" : "border-border hover:border-foreground/40"}`}
                           onClick={toggleSelectAll}
                         >
-                          {selectedVoucherIds.size === vouchers.length && vouchers.length > 0 && <CheckSquare className="w-3 h-3 text-primary-foreground" />}
+                          {selectedVoucherIds.size === vouchers.length &&
+                            vouchers.length > 0 && (
+                              <CheckSquare className="w-3 h-3 text-primary-foreground" />
+                            )}
                         </div>
                       </th>
                       {[
-                        { id: 'qrCodeData', label: t('vouchers.image'), sortable: false },
-                        { id: 'amount', label: t('vouchers.volume'), sortable: true },
-                        { id: 'fuelType', label: t('vouchers.fuelType'), sortable: true },
-                        { id: 'brand', label: t('vouchers.brand'), sortable: true },
-                        { id: 'supplier', label: t('vouchers.supplier'), sortable: true },
-                        { id: 'costPerLiter', label: t('vouchers.costPerLiter'), sortable: true },
-                        { id: 'expirationDate', label: t('vouchers.expires'), sortable: true },
-                        { id: 'externalId', label: t('vouchers.externalId'), sortable: true },
-                        { id: 'status', label: t('vouchers.status'), sortable: true },
-                        { id: 'createdAt', label: t('common.date'), sortable: true },
+                        {
+                          id: "qrCodeData",
+                          label: t("vouchers.image"),
+                          sortable: false,
+                        },
+                        {
+                          id: "amount",
+                          label: t("vouchers.volume"),
+                          sortable: true,
+                        },
+                        {
+                          id: "fuelType",
+                          label: t("vouchers.fuelType"),
+                          sortable: true,
+                        },
+                        {
+                          id: "brand",
+                          label: t("vouchers.brand"),
+                          sortable: true,
+                        },
+                        {
+                          id: "supplier",
+                          label: t("vouchers.supplier"),
+                          sortable: true,
+                        },
+                        {
+                          id: "costPerLiter",
+                          label: t("vouchers.costPerLiter"),
+                          sortable: true,
+                        },
+                        {
+                          id: "expirationDate",
+                          label: t("vouchers.expires"),
+                          sortable: true,
+                        },
+                        {
+                          id: "externalId",
+                          label: t("vouchers.externalId"),
+                          sortable: true,
+                        },
+                        {
+                          id: "status",
+                          label: t("vouchers.status"),
+                          sortable: true,
+                        },
+                        {
+                          id: "createdAt",
+                          label: t("common.date"),
+                          sortable: true,
+                        },
                         // Not sortable: it is an action, not a fact about the voucher. Declared with the
                         // other columns so the header and the cells stay in step - the alternative is a
                         // header outside the map and a cell inside it, which drifts the moment one of them
                         // gains an entry.
-                        { id: 'lifecycle', label: t('voucherLifecycle.open'), sortable: false },
+                        {
+                          id: "lifecycle",
+                          label: t("voucherLifecycle.open"),
+                          sortable: false,
+                        },
                       ].map((col) => (
                         <th
                           key={col.id}
-                          className={`text-left p-4 transition-colors ${col.sortable ? 'cursor-pointer hover:text-foreground hover:bg-foreground/5' : ''}`}
+                          className={`text-left p-4 transition-colors ${col.sortable ? "cursor-pointer hover:text-foreground hover:bg-foreground/5" : ""}`}
                           onClick={() => col.sortable && toggleSort(col.id)}
                         >
                           <div className="flex items-center gap-1.5">
                             {col.label}
-                            {col.sortable && (
-                              sortBy === col.id ? (
-                                sortOrder === 'asc' ? <ChevronUp className="w-3.5 h-3.5 text-primary" /> : <ChevronDown className="w-3.5 h-3.5 text-primary" />
+                            {col.sortable &&
+                              (sortBy === col.id ? (
+                                sortOrder === "asc" ? (
+                                  <ChevronUp className="w-3.5 h-3.5 text-primary" />
+                                ) : (
+                                  <ChevronDown className="w-3.5 h-3.5 text-primary" />
+                                )
                               ) : (
                                 <ArrowUpDown className="w-3 h-3 opacity-20" />
-                              )
-                            )}
+                              ))}
                           </div>
                         </th>
                       ))}
-
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     {vouchers.map((v: VoucherType) => {
-                      const statusKey = typeof v.status === 'string' ? voucherStatusKey(v.status) : 'imported';
+                      const statusKey =
+                        typeof v.status === "string"
+                          ? voucherStatusKey(v.status)
+                          : "imported";
                       const isSelected = selectedVoucherIds.has(v.id);
                       return (
-                        <tr key={v.id} className={`transition-colors ${isSelected ? 'bg-primary/5 hover:bg-primary/10' : 'hover:bg-foreground/5'}`}>
+                        <tr
+                          key={v.id}
+                          className={`transition-colors ${isSelected ? "bg-primary/5 hover:bg-primary/10" : "hover:bg-foreground/5"}`}
+                        >
                           <td className="p-4 sticky left-0 z-10">
                             <div
-                              className={`w-4 h-4 border rounded cursor-pointer flex items-center justify-center transition-colors ${isSelected ? 'bg-primary border-primary' : 'border-border hover:border-foreground/40'}`}
+                              className={`w-4 h-4 border rounded cursor-pointer flex items-center justify-center transition-colors ${isSelected ? "bg-primary border-primary" : "border-border hover:border-foreground/40"}`}
                               onClick={() => toggleSelectRow(v.id)}
                             >
-                              {isSelected && <CheckSquare className="w-3 h-3 text-primary-foreground" />}
+                              {isSelected && (
+                                <CheckSquare className="w-3 h-3 text-primary-foreground" />
+                              )}
                             </div>
                           </td>
-                          <td className="p-4" onClick={() => setSelectedQrId(v.id)}>
+                          <td
+                            className="p-4"
+                            onClick={() => setSelectedQrId(v.id)}
+                          >
                             <div className="cursor-pointer hover:scale-105 transition-transform bg-muted p-1 rounded-md w-fit border border-border">
                               <QrCode className="w-6 h-6 text-muted-foreground" />
                             </div>
                           </td>
-                          <td className="p-4 font-bold text-foreground">{v.liters} L</td>
+                          <td className="p-4 font-bold text-foreground">
+                            {v.liters} L
+                          </td>
                           <td className="p-4">
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-foreground/80 border border-border">
                               {v.fuelType?.name || v.fuelTypeId}
                             </span>
                           </td>
-                          <td className="p-4 font-medium text-foreground/80 uppercase">{v.brand || "Unknown"}</td>
+                          <td className="p-4 font-medium text-foreground/80 uppercase">
+                            {v.brand || "Unknown"}
+                          </td>
                           <td className="p-4 text-muted-foreground">
-                            {v.supplierName || <span className="opacity-50">-</span>}
+                            {v.supplierName || (
+                              <span className="opacity-50">-</span>
+                            )}
                           </td>
                           <td className="p-4 font-mono text-xs text-muted-foreground">
                             {/* formatMoney already renders the symbol and already renders "-" for a
@@ -1880,24 +2646,37 @@ if (status === "booting") {
                             {formatMoney(v.costPerLiter)}
                           </td>
                           <td className="p-4 text-muted-foreground font-mono text-xs">
-                            {v.providerExpirationDate ? formatDate(v.providerExpirationDate) : '-'}
+                            {v.providerExpirationDate
+                              ? formatDate(v.providerExpirationDate)
+                              : "-"}
                             {/* Only worth a second line once we sell shorter terms than we bought -
                                 today the two are always identical. */}
-                            {v.customerExpirationDate !== v.providerExpirationDate && (
+                            {v.customerExpirationDate !==
+                              v.providerExpirationDate && (
                               <div className="text-[10px] text-muted-foreground/70">
-                                {t('vouchers.customerExpires')}: {formatDate(v.customerExpirationDate)}
+                                {t("vouchers.customerExpires")}:{" "}
+                                {formatDate(v.customerExpirationDate)}
                               </div>
-)}
-                      </td>
-                          <td className="p-4 font-mono text-xs text-muted-foreground">{v.voucherNumber}</td>
+                            )}
+                          </td>
+                          <td className="p-4 font-mono text-xs text-muted-foreground">
+                            {v.voucherNumber}
+                          </td>
                           <td className="p-4">
                             <div className="flex items-center gap-2">
-                              <span className={`px-2 py-1 rounded-md text-xs font-bold uppercase border backdrop-blur-md ${statusKey === 'available' ? 'bg-success/10 text-success border-success/20' :
-                                statusKey === 'assigned' ? 'bg-info/10 text-info border-info/20' :
-                                  statusKey === 'used' ? 'bg-muted text-muted-foreground border-border' :
-                                    statusKey === 'sold' ? 'bg-warning/10 text-warning border-warning/20' :
-                                      'bg-warning/10 text-warning border-warning/20'
-                                }`}>
+                              <span
+                                className={`px-2 py-1 rounded-md text-xs font-bold uppercase border backdrop-blur-md ${
+                                  statusKey === "available"
+                                    ? "bg-success/10 text-success border-success/20"
+                                    : statusKey === "assigned"
+                                      ? "bg-info/10 text-info border-info/20"
+                                      : statusKey === "used"
+                                        ? "bg-muted text-muted-foreground border-border"
+                                        : statusKey === "sold"
+                                          ? "bg-warning/10 text-warning border-warning/20"
+                                          : "bg-warning/10 text-warning border-warning/20"
+                                }`}
+                              >
                                 {t(`status.${statusKey}`)}
                               </span>
                               {/* An archived voucher still holds its status - Available on an
@@ -1906,16 +2685,20 @@ if (status === "booting") {
                               {v.isDeleted && (
                                 <>
                                   <span className="px-2 py-1 rounded-md text-xs font-bold uppercase border border-destructive/30 bg-destructive/10 text-destructive">
-                                    {t('vouchers.archived')}
+                                    {t("vouchers.archived")}
                                   </span>
                                   <Button
                                     variant="outline"
                                     size="sm"
                                     className="h-7 text-xs"
-                                    disabled={unarchiveVoucherMutation.isPending}
-                                    onClick={() => unarchiveVoucherMutation.mutate(v.id)}
+                                    disabled={
+                                      unarchiveVoucherMutation.isPending
+                                    }
+                                    onClick={() =>
+                                      unarchiveVoucherMutation.mutate(v.id)
+                                    }
                                   >
-                                    {t('vouchers.unarchive')}
+                                    {t("vouchers.unarchive")}
                                   </Button>
                                 </>
                               )}
@@ -1929,28 +2712,42 @@ if (status === "booting") {
                               variant="outline"
                               size="sm"
                               className="h-7 text-xs"
-                              aria-label={`${t('voucherLifecycle.open')}: ${v.voucherNumber}`}
-                              onClick={() => setLifecycleVoucher({ id: v.id, number: v.voucherNumber })}
+                              aria-label={`${t("voucherLifecycle.open")}: ${v.voucherNumber}`}
+                              onClick={() =>
+                                setLifecycleVoucher({
+                                  id: v.id,
+                                  number: v.voucherNumber,
+                                })
+                              }
                             >
                               <History className="w-3 h-3 mr-1" />
-                              {t('voucherLifecycle.open')}
+                              {t("voucherLifecycle.open")}
                             </Button>
                           </td>
-
                         </tr>
                       );
                     })}
                     {isVouchersLoading && (
-                      <tr><td colSpan={12} className="p-16 text-center text-muted-foreground">
-                        <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
-                        Loading...
-                      </td></tr>
+                      <tr>
+                        <td
+                          colSpan={12}
+                          className="p-16 text-center text-muted-foreground"
+                        >
+                          <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+                          Loading...
+                        </td>
+                      </tr>
                     )}
                     {!isVouchersLoading && vouchers.length === 0 && (
-                      <tr><td colSpan={12} className="p-16 text-center text-muted-foreground flex flex-col items-center justify-center gap-2">
-                        <Package className="w-8 h-8 opacity-20" />
-                        {t('import.noVouchers')}
-                      </td></tr>
+                      <tr>
+                        <td
+                          colSpan={12}
+                          className="p-16 text-center text-muted-foreground flex flex-col items-center justify-center gap-2"
+                        >
+                          <Package className="w-8 h-8 opacity-20" />
+                          {t("import.noVouchers")}
+                        </td>
+                      </tr>
                     )}
                   </tbody>
                 </table>
@@ -1961,10 +2758,22 @@ if (status === "booting") {
                   Showing {vouchers.length} items (Page {page})
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))} className="h-8">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page === 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    className="h-8"
+                  >
                     <ChevronLeft className="w-4 h-4 mr-1" /> Prev
                   </Button>
-                  <Button variant="outline" size="sm" disabled={vouchers.length < limit} onClick={() => setPage(p => p + 1)} className="h-8">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={vouchers.length < limit}
+                    onClick={() => setPage((p) => p + 1)}
+                    className="h-8"
+                  >
                     Next <ChevronRight className="w-4 h-4 ml-1" />
                   </Button>
                 </div>
@@ -1974,14 +2783,18 @@ if (status === "booting") {
         )}
 
         {/* Imports Tab */}
-        {activeTab === 'imports' && (
+        {activeTab === "imports" && (
           <div className="space-y-6 animate-in fade-in duration-300">
             {selectedImportId ? (
               <>
                 {/* Detail View */}
                 <div className="flex items-center justify-between">
-                  <Button variant="ghost" onClick={() => setSelectedImportId(null)} className="text-muted-foreground hover:text-foreground">
-                    <ArrowLeft className="w-4 h-4 mr-2" /> {t('imports.back')}
+                  <Button
+                    variant="ghost"
+                    onClick={() => setSelectedImportId(null)}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-2" /> {t("imports.back")}
                   </Button>
                   <div className="flex gap-2">
                     <Button
@@ -1989,26 +2802,27 @@ if (status === "booting") {
                       size="sm"
                       disabled={activateVoucherMutation.isPending}
                       onClick={() => {
-                        const ids = importVouchers
-                          .filter((v: any) => v.status === 'Imported' || v.status === 'VerifiedWithWarnings' || v.status === 'Expired' || v.status === 'Deactivated')
-                          .map((v: any) => v.id);
-                        if (ids.length > 0) activateVoucherMutation.mutate(ids);
+                        // The whole batch, decided by the server. The tab holds a page of it now, so
+                        // the ids in the browser would be a page - and a button that says "activate
+                        // all" and activates a page is a button that lies.
+                        activateVoucherMutation.mutate({ action: "activate" });
                       }}
                     >
-                      <CheckCircle className="w-4 h-4 mr-1" /> {t('imports.activateAll')}
+                      <CheckCircle className="w-4 h-4 mr-1" />{" "}
+                      {t("imports.activateAll")}
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       disabled={deactivateVoucherMutation.isPending}
                       onClick={() => {
-                        const ids = importVouchers
-                          .filter((v: any) => v.status === 'Imported' || v.status === 'Available' || v.status === 'VerifiedWithWarnings')
-                          .map((v: any) => v.id);
-                        if (ids.length > 0) deactivateVoucherMutation.mutate(ids);
+                        deactivateVoucherMutation.mutate({
+                          action: "deactivate",
+                        });
                       }}
                     >
-                      <XCircle className="w-4 h-4 mr-1" /> {t('imports.deactivateAll')}
+                      <XCircle className="w-4 h-4 mr-1" />{" "}
+                      {t("imports.deactivateAll")}
                     </Button>
                   </div>
                 </div>
@@ -2018,7 +2832,9 @@ if (status === "booting") {
                     <div className="flex items-center justify-between gap-2 mb-1">
                       <div className="flex items-center gap-2">
                         <Package className="w-5 h-5 text-primary" />
-                        <h3 className="text-lg font-bold">{t('imports.batchCostsTitle')}</h3>
+                        <h3 className="text-lg font-bold">
+                          {t("imports.batchCostsTitle")}
+                        </h3>
                       </div>
                       <input
                         id="invoice-upload"
@@ -2035,211 +2851,411 @@ if (status === "booting") {
                         variant="outline"
                         size="sm"
                         disabled={parseInvoiceMutation.isPending}
-                        onClick={() => document.getElementById('invoice-upload')?.click()}
+                        onClick={() =>
+                          document.getElementById("invoice-upload")?.click()
+                        }
                       >
+                        {parseInvoiceMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <FileUp className="w-4 h-4 mr-2" />
+                        )}
                         {parseInvoiceMutation.isPending
-                          ? <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          : <FileUp className="w-4 h-4 mr-2" />}
-                        {parseInvoiceMutation.isPending ? t('imports.invoiceParsing') : t('imports.parseInvoice')}
+                          ? t("imports.invoiceParsing")
+                          : t("imports.parseInvoice")}
                       </Button>
                     </div>
-                    <p className="text-sm text-muted-foreground mb-4">{t('imports.batchCostsHint')}</p>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      {t("imports.batchCostsHint")}
+                    </p>
                     <div className="space-y-3">
                       {batchCosts.map((b: any) => {
-                        const draft = batchCostInputs[b.fuelTypeId] ?? (b.costPerLiter != null ? String(b.costPerLiter) : '');
+                        const draft =
+                          batchCostInputs[b.fuelTypeId] ??
+                          (b.costPerLiter != null
+                            ? String(b.costPerLiter)
+                            : "");
                         const parsed = parseFloat(draft);
-                        const canSave = !isNaN(parsed) && parsed > 0 && parsed !== b.costPerLiter;
+                        const canSave =
+                          !isNaN(parsed) &&
+                          parsed > 0 &&
+                          parsed !== b.costPerLiter;
                         return (
-                          <div key={b.fuelTypeId} className="flex flex-wrap items-end gap-4 rounded-lg border border-border p-4">
+                          <div
+                            key={b.fuelTypeId}
+                            className="flex flex-wrap items-end gap-4 rounded-lg border border-border p-4"
+                          >
                             <div className="min-w-[180px] flex-1">
-                              <div className="font-semibold">{b.fuelTypeName || b.fuelTypeId}</div>
-                              <div className="text-xs uppercase text-muted-foreground">{b.brand}</div>
-                              <div className="text-xs text-muted-foreground mt-1">{t('imports.batchStock', b.voucherCount, b.totalLiters)}</div>
+                              <div className="font-semibold">
+                                {b.fuelTypeName || b.fuelTypeId}
+                              </div>
+                              <div className="text-xs uppercase text-muted-foreground">
+                                {b.brand}
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-1">
+                                {t(
+                                  "imports.batchStock",
+                                  b.voucherCount,
+                                  b.totalLiters,
+                                )}
+                              </div>
                             </div>
                             <div className="w-40">
-                              <label className="text-xs text-muted-foreground">{t('imports.costPerLiter')}</label>
+                              <label className="text-xs text-muted-foreground">
+                                {t("imports.costPerLiter")}
+                              </label>
                               <Input
                                 type="number"
                                 step="0.01"
                                 min="0"
                                 value={draft}
-                                onChange={(e) => setBatchCostInputs((prev) => ({ ...prev, [b.fuelTypeId]: e.target.value }))}
+                                onChange={(e) =>
+                                  setBatchCostInputs((prev) => ({
+                                    ...prev,
+                                    [b.fuelTypeId]: e.target.value,
+                                  }))
+                                }
                               />
                             </div>
                             <div className="min-w-[120px]">
-                              <div className="text-xs text-muted-foreground">{t('imports.blendedCost')}</div>
-                              <div className="font-mono text-sm">{b.blendedCostPerLiter != null ? `${b.blendedCostPerLiter} ₴` : '—'}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {t("imports.blendedCost")}
+                              </div>
+                              <div className="font-mono text-sm">
+                                {b.blendedCostPerLiter != null
+                                  ? `${b.blendedCostPerLiter} ₴`
+                                  : "—"}
+                              </div>
                             </div>
-<Button
-            size="sm"
-            disabled={!canSave || setBatchCostMutation.isPending}
-            onClick={() => setBatchCostMutation.mutate({ fuelTypeId: b.fuelTypeId, costPerLiter: parsed })}
-          >
-            {t('imports.saveCost')}
-          </Button>
-            {/* Why this cost is what it is (#178). The panel above edits a number; this shows where
+                            <Button
+                              size="sm"
+                              disabled={
+                                !canSave || setBatchCostMutation.isPending
+                              }
+                              onClick={() =>
+                                setBatchCostMutation.mutate({
+                                  fuelTypeId: b.fuelTypeId,
+                                  costPerLiter: parsed,
+                                })
+                              }
+                            >
+                              {t("imports.saveCost")}
+                            </Button>
+                            {/* Why this cost is what it is (#178). The panel above edits a number; this shows where
                 the number came from, so an operator can defend it rather than restate it. */}
-            <BatchCostTimeline importId={selectedImportId} enabled={!!user && activeTab === 'imports'} />
-          </div>
-        );
+                            <BatchCostTimeline
+                              importId={selectedImportId}
+                              enabled={!!user && activeTab === "imports"}
+                            />
+                          </div>
+                        );
                       })}
                     </div>
                   </div>
                 )}
 
-                {batchPnl.length > 0 && (() => {
-                  const money = (v: any) => formatMoney(v == null ? null : Number(v));
-                  const perL = (v: any) => (v != null ? `${Number(v)} ₴` : '—');
-                  const loss = (v: any) => (v != null && Number(v) > 0 ? `−${money(v)}` : money(v));
-                  const totalRevenue = batchPnl.reduce((s: number, b: any) => s + (b.realizedRevenue ?? 0), 0);
-                  const totalRealized = batchPnl.reduce((s: number, b: any) => s + (b.realizedMargin ?? 0), 0);
-                  const totalExpiredLoss = batchPnl.reduce((s: number, b: any) => s + (b.expiredLoss ?? 0), 0);
-                  const totalNet = batchPnl.reduce((s: number, b: any) => s + (b.netRealizedResult ?? 0), 0);
-                  const totalUnrealized = batchPnl.reduce((s: number, b: any) => s + (b.unrealizedMargin ?? 0), 0);
-                  return (
-                    <div className="glass-panel p-6">
-                      <div className="flex items-center gap-2 mb-1">
-                        <BarChart className="w-5 h-5 text-primary" />
-                        <h3 className="text-lg font-bold">{t('imports.pnlTitle')}</h3>
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-4">{t('imports.pnlHint')}</p>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead className="text-xs uppercase text-muted-foreground">
-                            <tr className="border-b border-border">
-                              <th className="text-left p-2">{t('imports.pnlFuel')}</th>
-                              <th className="text-right p-2">{t('imports.pnlSold')}</th>
-                              <th className="text-right p-2">{t('imports.pnlRemaining')}</th>
-                              <th className="text-right p-2">{t('imports.pnlCostL')}</th>
-                              <th className="text-right p-2">{t('imports.pnlAvgSaleL')}</th>
-                              <th className="text-right p-2">{t('imports.pnlRealizedRevenue')}</th>
-                              <th className="text-right p-2">{t('imports.pnlRealizedMargin')}</th>
-                              <th className="text-right p-2">{t('imports.pnlExpiredLoss')}</th>
-                              <th className="text-right p-2">{t('imports.pnlNetResult')}</th>
-                              <th className="text-right p-2">{t('imports.pnlUnrealizedMargin')}</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {batchPnl.map((b: any) => (
-                              <tr key={`${b.fuelTypeId}-${b.brand}`} className="border-b border-border/50">
-                                <td className="p-2">
-                                  <div className="font-semibold">{b.fuelTypeName || b.fuelTypeId}</div>
-                                  <div className="text-xs uppercase text-muted-foreground">{b.brand}</div>
-                                </td>
-                                <td className="p-2 text-right font-mono">{b.vouchersSold} · {b.litersSold} L</td>
-                                <td className="p-2 text-right font-mono">{b.vouchersRemaining} · {b.litersRemaining} L</td>
-                                <td className="p-2 text-right font-mono">
-                                  {b.costPerLiter != null ? perL(b.costPerLiter) : <span className="text-warning">{t('imports.pnlUncosted')}</span>}
-                                </td>
-                                <td className="p-2 text-right font-mono">{perL(b.avgSalePricePerLiter)}</td>
-                                <td className="p-2 text-right font-mono">{money(b.realizedRevenue)}</td>
-                                <td className={`p-2 text-right font-mono ${b.realizedMargin != null && b.realizedMargin < 0 ? 'text-destructive' : b.realizedMargin != null ? 'text-success' : ''}`}>{money(b.realizedMargin)}</td>
-                                <td className="p-2 text-right font-mono">
-                                  {b.vouchersExpired > 0 ? (
-                                    <>
-                                      <div className="text-destructive">{loss(b.expiredLoss)}</div>
-                                      <div className="text-xs text-muted-foreground">{b.vouchersExpired} · {b.litersExpired} L</div>
-                                    </>
-                                  ) : '—'}
-                                </td>
-                                <td className={`p-2 text-right font-mono ${b.netRealizedResult != null && b.netRealizedResult < 0 ? 'text-destructive' : b.netRealizedResult != null ? 'text-success' : ''}`}>{money(b.netRealizedResult)}</td>
-                                <td className="p-2 text-right font-mono">{money(b.unrealizedMargin)}</td>
+                {batchPnl.length > 0 &&
+                  (() => {
+                    const money = (v: any) =>
+                      formatMoney(v == null ? null : Number(v));
+                    const perL = (v: any) =>
+                      v != null ? `${Number(v)} ₴` : "—";
+                    const loss = (v: any) =>
+                      v != null && Number(v) > 0 ? `−${money(v)}` : money(v);
+                    const totalRevenue = batchPnl.reduce(
+                      (s: number, b: any) => s + (b.realizedRevenue ?? 0),
+                      0,
+                    );
+                    const totalRealized = batchPnl.reduce(
+                      (s: number, b: any) => s + (b.realizedMargin ?? 0),
+                      0,
+                    );
+                    const totalExpiredLoss = batchPnl.reduce(
+                      (s: number, b: any) => s + (b.expiredLoss ?? 0),
+                      0,
+                    );
+                    const totalNet = batchPnl.reduce(
+                      (s: number, b: any) => s + (b.netRealizedResult ?? 0),
+                      0,
+                    );
+                    const totalUnrealized = batchPnl.reduce(
+                      (s: number, b: any) => s + (b.unrealizedMargin ?? 0),
+                      0,
+                    );
+                    return (
+                      <div className="glass-panel p-6">
+                        <div className="flex items-center gap-2 mb-1">
+                          <BarChart className="w-5 h-5 text-primary" />
+                          <h3 className="text-lg font-bold">
+                            {t("imports.pnlTitle")}
+                          </h3>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          {t("imports.pnlHint")}
+                        </p>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead className="text-xs uppercase text-muted-foreground">
+                              <tr className="border-b border-border">
+                                <th className="text-left p-2">
+                                  {t("imports.pnlFuel")}
+                                </th>
+                                <th className="text-right p-2">
+                                  {t("imports.pnlSold")}
+                                </th>
+                                <th className="text-right p-2">
+                                  {t("imports.pnlRemaining")}
+                                </th>
+                                <th className="text-right p-2">
+                                  {t("imports.pnlCostL")}
+                                </th>
+                                <th className="text-right p-2">
+                                  {t("imports.pnlAvgSaleL")}
+                                </th>
+                                <th className="text-right p-2">
+                                  {t("imports.pnlRealizedRevenue")}
+                                </th>
+                                <th className="text-right p-2">
+                                  {t("imports.pnlRealizedMargin")}
+                                </th>
+                                <th className="text-right p-2">
+                                  {t("imports.pnlExpiredLoss")}
+                                </th>
+                                <th className="text-right p-2">
+                                  {t("imports.pnlNetResult")}
+                                </th>
+                                <th className="text-right p-2">
+                                  {t("imports.pnlUnrealizedMargin")}
+                                </th>
                               </tr>
-                            ))}
-                          </tbody>
-                          <tfoot>
-                            <tr className="border-t-2 border-border font-bold">
-                              <td className="p-2" colSpan={5}>{t('imports.pnlTotal')}</td>
-                              <td className="p-2 text-right font-mono">{money(totalRevenue)}</td>
-                              <td className={`p-2 text-right font-mono ${totalRealized < 0 ? 'text-destructive' : 'text-success'}`}>{money(totalRealized)}</td>
-                              <td className="p-2 text-right font-mono text-destructive">{loss(totalExpiredLoss)}</td>
-                              <td className={`p-2 text-right font-mono ${totalNet < 0 ? 'text-destructive' : 'text-success'}`}>{money(totalNet)}</td>
-                              <td className="p-2 text-right font-mono">{money(totalUnrealized)}</td>
-                            </tr>
-                          </tfoot>
-                        </table>
+                            </thead>
+                            <tbody>
+                              {batchPnl.map((b: any) => (
+                                <tr
+                                  key={`${b.fuelTypeId}-${b.brand}`}
+                                  className="border-b border-border/50"
+                                >
+                                  <td className="p-2">
+                                    <div className="font-semibold">
+                                      {b.fuelTypeName || b.fuelTypeId}
+                                    </div>
+                                    <div className="text-xs uppercase text-muted-foreground">
+                                      {b.brand}
+                                    </div>
+                                  </td>
+                                  <td className="p-2 text-right font-mono">
+                                    {b.vouchersSold} · {b.litersSold} L
+                                  </td>
+                                  <td className="p-2 text-right font-mono">
+                                    {b.vouchersRemaining} · {b.litersRemaining}{" "}
+                                    L
+                                  </td>
+                                  <td className="p-2 text-right font-mono">
+                                    {b.costPerLiter != null ? (
+                                      perL(b.costPerLiter)
+                                    ) : (
+                                      <span className="text-warning">
+                                        {t("imports.pnlUncosted")}
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="p-2 text-right font-mono">
+                                    {perL(b.avgSalePricePerLiter)}
+                                  </td>
+                                  <td className="p-2 text-right font-mono">
+                                    {money(b.realizedRevenue)}
+                                  </td>
+                                  <td
+                                    className={`p-2 text-right font-mono ${b.realizedMargin != null && b.realizedMargin < 0 ? "text-destructive" : b.realizedMargin != null ? "text-success" : ""}`}
+                                  >
+                                    {money(b.realizedMargin)}
+                                  </td>
+                                  <td className="p-2 text-right font-mono">
+                                    {b.vouchersExpired > 0 ? (
+                                      <>
+                                        <div className="text-destructive">
+                                          {loss(b.expiredLoss)}
+                                        </div>
+                                        <div className="text-xs text-muted-foreground">
+                                          {b.vouchersExpired} ·{" "}
+                                          {b.litersExpired} L
+                                        </div>
+                                      </>
+                                    ) : (
+                                      "—"
+                                    )}
+                                  </td>
+                                  <td
+                                    className={`p-2 text-right font-mono ${b.netRealizedResult != null && b.netRealizedResult < 0 ? "text-destructive" : b.netRealizedResult != null ? "text-success" : ""}`}
+                                  >
+                                    {money(b.netRealizedResult)}
+                                  </td>
+                                  <td className="p-2 text-right font-mono">
+                                    {money(b.unrealizedMargin)}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                            <tfoot>
+                              <tr className="border-t-2 border-border font-bold">
+                                <td className="p-2" colSpan={5}>
+                                  {t("imports.pnlTotal")}
+                                </td>
+                                <td className="p-2 text-right font-mono">
+                                  {money(totalRevenue)}
+                                </td>
+                                <td
+                                  className={`p-2 text-right font-mono ${totalRealized < 0 ? "text-destructive" : "text-success"}`}
+                                >
+                                  {money(totalRealized)}
+                                </td>
+                                <td className="p-2 text-right font-mono text-destructive">
+                                  {loss(totalExpiredLoss)}
+                                </td>
+                                <td
+                                  className={`p-2 text-right font-mono ${totalNet < 0 ? "text-destructive" : "text-success"}`}
+                                >
+                                  {money(totalNet)}
+                                </td>
+                                <td className="p-2 text-right font-mono">
+                                  {money(totalUnrealized)}
+                                </td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })()}
+                    );
+                  })()}
 
                 <div className="glass-panel overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-muted">
                       <tr>
-                        <th className="text-left p-4">{t('vouchers.brand')}</th>
-                        <th className="text-left p-4">{t('vouchers.fuelType')}</th>
-                        <th className="text-left p-4">{t('vouchers.volume')}</th>
-                        <th className="text-left p-4">{t('imports.number')}</th>
-                        <th className="text-left p-4">{t('vouchers.expires')}</th>
-                        <th className="text-left p-4">{t('common.status')}</th>
-                        <th className="text-left p-4">{t('imports.verification')}</th>
-                        <th className="text-left p-4">{t('common.actions')}</th>
+                        <th className="text-left p-4">{t("vouchers.brand")}</th>
+                        <th className="text-left p-4">
+                          {t("vouchers.fuelType")}
+                        </th>
+                        <th className="text-left p-4">
+                          {t("vouchers.volume")}
+                        </th>
+                        <th className="text-left p-4">{t("imports.number")}</th>
+                        <th className="text-left p-4">
+                          {t("vouchers.expires")}
+                        </th>
+                        <th className="text-left p-4">{t("common.status")}</th>
+                        <th className="text-left p-4">
+                          {t("imports.verification")}
+                        </th>
+                        <th className="text-left p-4">{t("common.actions")}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {importVouchers.map((v: any) => {
                         const statusColors: Record<string, string> = {
-                          Imported: 'bg-warning/10 text-warning border-warning/20',
-                          Available: 'bg-success/10 text-success border-success/20',
-                          VerifiedWithWarnings: 'bg-warning/10 text-warning border-warning/20',
-                          VerificationFailed: 'bg-destructive/10 text-destructive border-destructive/20',
-                          Assigned: 'bg-info/10 text-info border-info/20',
-                          Used: 'bg-muted text-muted-foreground border-border',
-                          Expired: 'bg-destructive/10 text-destructive border-destructive/20',
-                          Deactivated: 'bg-muted text-muted-foreground border-border',
+                          Imported:
+                            "bg-warning/10 text-warning border-warning/20",
+                          Available:
+                            "bg-success/10 text-success border-success/20",
+                          VerifiedWithWarnings:
+                            "bg-warning/10 text-warning border-warning/20",
+                          VerificationFailed:
+                            "bg-destructive/10 text-destructive border-destructive/20",
+                          Assigned: "bg-info/10 text-info border-info/20",
+                          Used: "bg-muted text-muted-foreground border-border",
+                          Expired:
+                            "bg-destructive/10 text-destructive border-destructive/20",
+                          Deactivated:
+                            "bg-muted text-muted-foreground border-border",
                         };
                         return (
-                          <tr key={v.id} className="border-border hover:bg-foreground/5">
+                          <tr
+                            key={v.id}
+                            className="border-border hover:bg-foreground/5"
+                          >
                             <td className="p-4 uppercase">{v.brand}</td>
-                            <td className="p-4">{v.fuelTypeName || v.fuelTypeId}</td>
+                            <td className="p-4">
+                              {v.fuelTypeName || v.fuelTypeId}
+                            </td>
                             <td className="p-4">{v.liters}L</td>
-                            <td className="p-4 font-mono text-xs">{v.voucherNumber}</td>
+                            <td className="p-4 font-mono text-xs">
+                              {v.voucherNumber}
+                            </td>
                             <td className="p-4 text-sm">
                               {v.providerExpirationDate}
-                              {v.customerExpirationDate !== v.providerExpirationDate && (
+                              {v.customerExpirationDate !==
+                                v.providerExpirationDate && (
                                 <div className="text-[10px] text-muted-foreground">
-                                  {t('vouchers.customerExpires')}: {v.customerExpirationDate}
+                                  {t("vouchers.customerExpires")}:{" "}
+                                  {v.customerExpirationDate}
                                 </div>
                               )}
                             </td>
                             <td className="p-4">
-                              <span className={`px-2 py-1 rounded text-xs font-bold uppercase border ${statusColors[v.status] || 'bg-muted text-muted-foreground'}`}>
-                                {t('status.' + v.status.charAt(0).toLowerCase() + v.status.slice(1))}
+                              <span
+                                className={`px-2 py-1 rounded text-xs font-bold uppercase border ${statusColors[v.status] || "bg-muted text-muted-foreground"}`}
+                              >
+                                {t(
+                                  "status." +
+                                    v.status.charAt(0).toLowerCase() +
+                                    v.status.slice(1),
+                                )}
                               </span>
                             </td>
                             <td className="p-4">
                               {v.verificationMismatchPercent != null ? (
-                                <span className={`text-xs font-mono ${
-                                  v.verificationMismatchPercent === 0 ? 'text-success' :
-                                  v.verificationMismatchPercent < 5 ? 'text-warning' : 'text-destructive'
-                                }`}>
-                                  {v.verificationMismatchPercent.toFixed(2)}% ({v.verificationMismatchedModules}/{v.verificationTotalModules})
+                                <span
+                                  className={`text-xs font-mono ${
+                                    v.verificationMismatchPercent === 0
+                                      ? "text-success"
+                                      : v.verificationMismatchPercent < 5
+                                        ? "text-warning"
+                                        : "text-destructive"
+                                  }`}
+                                >
+                                  {v.verificationMismatchPercent.toFixed(2)}% (
+                                  {v.verificationMismatchedModules}/
+                                  {v.verificationTotalModules})
                                 </span>
                               ) : (
-                                <span className="text-xs text-muted-foreground">—</span>
+                                <span className="text-xs text-muted-foreground">
+                                  —
+                                </span>
                               )}
                             </td>
                             <td className="p-4">
                               <div className="flex gap-1">
-                                {(v.status === 'Imported' || v.status === 'VerifiedWithWarnings' || v.status === 'Expired' || v.status === 'Deactivated') && (
+                                {(v.status === "Imported" ||
+                                  v.status === "VerifiedWithWarnings" ||
+                                  v.status === "Expired" ||
+                                  v.status === "Deactivated") && (
                                   <Button
                                     variant="ghost"
                                     size="sm"
                                     className="text-success hover:brightness-125"
                                     disabled={activateVoucherMutation.isPending}
-                                    onClick={() => activateVoucherMutation.mutate([v.id])}
+                                    onClick={() =>
+                                      activateOneVoucherMutation.mutate([v.id])
+                                    }
                                   >
                                     <CheckCircle className="w-3.5 h-3.5" />
                                   </Button>
                                 )}
-                                {(v.status === 'Available' || v.status === 'Imported' || v.status === 'VerifiedWithWarnings') && (
+                                {(v.status === "Available" ||
+                                  v.status === "Imported" ||
+                                  v.status === "VerifiedWithWarnings") && (
                                   <Button
                                     variant="ghost"
                                     size="sm"
                                     className="text-destructive hover:brightness-125"
-                                    disabled={deactivateVoucherMutation.isPending}
-                                    onClick={() => deactivateVoucherMutation.mutate([v.id])}
+                                    disabled={
+                                      deactivateVoucherMutation.isPending
+                                    }
+                                    onClick={() =>
+                                      deactivateOneVoucherMutation.mutate([
+                                        v.id,
+                                      ])
+                                    }
                                   >
                                     <XCircle className="w-3.5 h-3.5" />
                                   </Button>
@@ -2250,102 +3266,208 @@ if (status === "booting") {
                         );
                       })}
                       {importVouchers.length === 0 && (
-                        <tr><td colSpan={8} className="p-16 text-center text-muted-foreground">{t('imports.noVouchers')}</td></tr>
+                        <tr>
+                          <td
+                            colSpan={8}
+                            className="p-16 text-center text-muted-foreground"
+                          >
+                            {t("imports.noVouchers")}
+                          </td>
+                        </tr>
                       )}
                     </tbody>
                   </table>
+                  {importVouchersTotalPages > 1 && (
+                    <div className="flex items-center justify-between gap-2 mt-3">
+                      <span className="text-xs text-muted-foreground">
+                        {importVouchersTotal} {t("imports.vouchers")}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={importVouchersPage <= 1}
+                          onClick={() =>
+                            setImportVouchersPage((p) => Math.max(1, p - 1))
+                          }
+                        >
+                          {t("imports.page")}
+                        </Button>
+                        <span className="text-xs text-muted-foreground">
+                          {t(
+                            "imports.pageOf",
+                            String(importVouchersPage),
+                            String(importVouchersTotalPages),
+                          )}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={
+                            importVouchersPage >= importVouchersTotalPages
+                          }
+                          onClick={() => setImportVouchersPage((p) => p + 1)}
+                        >
+                          {t("imports.page")}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </>
             ) : (
               <>
                 {/* List View */}
                 <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-bold">{t('imports.title')}</h2>
+                  <h2 className="text-xl font-bold">{t("imports.title")}</h2>
                 </div>
                 <div className="glass-panel overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-muted">
                       <tr>
-                        <th className="text-left p-4">{t('imports.file')}</th>
-                        <th className="text-left p-4">{t('common.status')}</th>
-                        <th className="text-left p-4">{t('imports.pages')}</th>
-                        <th className="text-left p-4">{t('imports.vouchers')}</th>
-                        <th className="text-left p-4">{t('imports.imported')}</th>
-                        <th className="text-left p-4">{t('imports.duplicates')}</th>
-                        <th className="text-left p-4">{t('imports.errors')}</th>
-                        <th className="text-left p-4">{t('imports.warnings')}</th>
-                        <th className="text-left p-4">{t('imports.created')}</th>
+                        <th className="text-left p-4">{t("imports.file")}</th>
+                        <th className="text-left p-4">{t("common.status")}</th>
+                        <th className="text-left p-4">{t("imports.pages")}</th>
+                        <th className="text-left p-4">
+                          {t("imports.vouchers")}
+                        </th>
+                        <th className="text-left p-4">
+                          {t("imports.imported")}
+                        </th>
+                        <th className="text-left p-4">
+                          {t("imports.duplicates")}
+                        </th>
+                        <th className="text-left p-4">{t("imports.errors")}</th>
+                        <th className="text-left p-4">
+                          {t("imports.warnings")}
+                        </th>
+                        <th className="text-left p-4">
+                          {t("imports.created")}
+                        </th>
                         <th className="text-left p-4"></th>
                       </tr>
                     </thead>
                     <tbody>
                       {importsList.map((imp: any) => (
-                        <tr key={imp.id} className="border-border hover:bg-foreground/5 cursor-pointer" onClick={() => setSelectedImportId(imp.id)}>
+                        <tr
+                          key={imp.id}
+                          className="border-border hover:bg-foreground/5 cursor-pointer"
+                          onClick={() => setSelectedImportId(imp.id)}
+                        >
                           <td className="p-4 font-medium">{imp.fileName}</td>
                           <td className="p-4">
-                            <span className={`px-2 py-1 rounded text-xs font-bold uppercase border ${
-                              imp.status === 'Completed' ? 'bg-success/10 text-success border-success/20' :
-                              imp.status === 'Failed' ? 'bg-destructive/10 text-destructive border-destructive/20' :
-                              'bg-warning/10 text-warning border-warning/20'
-                            }`}>
-                              {t('status.' + imp.status.toLowerCase())}
+                            <span
+                              className={`px-2 py-1 rounded text-xs font-bold uppercase border ${
+                                imp.status === "Completed"
+                                  ? "bg-success/10 text-success border-success/20"
+                                  : imp.status === "Failed"
+                                    ? "bg-destructive/10 text-destructive border-destructive/20"
+                                    : "bg-warning/10 text-warning border-warning/20"
+                              }`}
+                            >
+                              {t("status." + imp.status.toLowerCase())}
                             </span>
                           </td>
                           <td className="p-4">{imp.pageCount}</td>
                           <td className="p-4">{imp.voucherCount}</td>
-                          <td className="p-4 text-success">{imp.importedCount}</td>
-                          <td className="p-4 text-warning">{imp.duplicateCount}</td>
-                          <td className="p-4 text-destructive">{imp.failedCount + imp.verificationFailedCount}</td>
-                          <td className="p-4 text-warning">{imp.verifiedWithWarningsCount}</td>
-                          <td className="p-4 text-sm text-muted-foreground">{formatDateTime(imp.startedAtUtc)}</td>
+                          <td className="p-4 text-success">
+                            {imp.importedCount}
+                          </td>
+                          <td className="p-4 text-warning">
+                            {imp.duplicateCount}
+                          </td>
+                          <td className="p-4 text-destructive">
+                            {imp.failedCount + imp.verificationFailedCount}
+                          </td>
+                          <td className="p-4 text-warning">
+                            {imp.verifiedWithWarningsCount}
+                          </td>
+                          <td className="p-4 text-sm text-muted-foreground">
+                            {formatDateTime(imp.startedAtUtc)}
+                          </td>
                           <td className="p-4">
                             <ChevronRight className="w-4 h-4 text-muted-foreground" />
                           </td>
                         </tr>
                       ))}
                       {importsList.length === 0 && (
-                        <tr><td colSpan={10} className="p-16 text-center text-muted-foreground">{t('imports.none')}</td></tr>
+                        <tr>
+                          <td
+                            colSpan={10}
+                            className="p-16 text-center text-muted-foreground"
+                          >
+                            {t("imports.none")}
+                          </td>
+                        </tr>
                       )}
                     </tbody>
                   </table>
                 </div>
               </>
             )}
-
           </div>
         )}
 
         {/* Reconciliation Tab */}
-        {activeTab === 'reconciliation' && (
+        {activeTab === "reconciliation" && (
           <div className="space-y-6 animate-in fade-in duration-300">
             <h2 className="text-2xl font-bold flex items-center gap-2">
               <BarChart className="w-6 h-6 text-primary" />
-              {t('reconciliation.title')}
+              {t("reconciliation.title")}
             </h2>
 
             {isReconLoading ? (
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Loader2 className="w-5 h-5 animate-spin" />
-                {t('common.loading')}
+                {t("common.loading")}
               </div>
             ) : reconciliationData ? (
               <>
                 {/* Money Ledger — received / delivered / refunded */}
                 <div className="glass-panel p-4">
-                  <p className="text-sm text-muted-foreground mb-3">{t('reconciliation.moneyLedger')}</p>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    {t("reconciliation.moneyLedger")}
+                  </p>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="bg-success/10 border border-success/30 rounded-lg p-3">
-                      <p className="text-xs text-muted-foreground">{t('reconciliation.received')}</p>
-                      <p className="text-xl font-bold text-success">{((reconciliationData.summary.totalReceivedKopecks ?? 0) / 100).toLocaleString()} ₴</p>
+                      <p className="text-xs text-muted-foreground">
+                        {t("reconciliation.received")}
+                      </p>
+                      <p className="text-xl font-bold text-success">
+                        {(
+                          (reconciliationData.summary.totalReceivedKopecks ??
+                            0) / 100
+                        ).toLocaleString()}{" "}
+                        ₴
+                      </p>
                     </div>
                     <div className="bg-info/10 border border-info/30 rounded-lg p-3">
-                      <p className="text-xs text-muted-foreground">{t('reconciliation.deliveredValue')}</p>
-                      <p className="text-xl font-bold text-info">{((reconciliationData.summary.totalFulfilledValueKopecks ?? 0) / 100).toLocaleString()} ₴</p>
+                      <p className="text-xs text-muted-foreground">
+                        {t("reconciliation.deliveredValue")}
+                      </p>
+                      <p className="text-xl font-bold text-info">
+                        {(
+                          (reconciliationData.summary
+                            .totalFulfilledValueKopecks ?? 0) / 100
+                        ).toLocaleString()}{" "}
+                        ₴
+                      </p>
                     </div>
                     <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
-                      <p className="text-xs text-muted-foreground">{t('reconciliation.refundedLabel')}</p>
-                      <p className="text-xl font-bold text-destructive">{((reconciliationData.summary.totalRefundedKopecks ?? 0) / 100).toLocaleString()} ₴</p>
-                      <p className="text-xs text-muted-foreground">{reconciliationData.summary.refundedOrders ?? 0} {t('reconciliation.refundedOrders')}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {t("reconciliation.refundedLabel")}
+                      </p>
+                      <p className="text-xl font-bold text-destructive">
+                        {(
+                          (reconciliationData.summary.totalRefundedKopecks ??
+                            0) / 100
+                        ).toLocaleString()}{" "}
+                        ₴
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {reconciliationData.summary.refundedOrders ?? 0}{" "}
+                        {t("reconciliation.refundedOrders")}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -2353,26 +3475,64 @@ if (status === "booting") {
                 {/* Summary Cards — Key Reconciliation Metrics */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="glass-panel p-4">
-                    <p className="text-sm text-muted-foreground">{t('report.totalSpent')}</p>
-                    <p className="text-2xl font-bold text-success">{reconciliationData.summary.totalRevenueKopecks.toLocaleString()} ₴</p>
-                    <p className="text-xs text-muted-foreground">{reconciliationData.summary.fulfilled} {t('report.fulfilledOrders')}</p>
-                  </div>
-                  <div className={`border rounded-xl p-4 ${reconciliationData.summary.paidUnfulfilled > 0 ? 'bg-destructive/20 border-destructive/50' : 'bg-muted border-border'}`}>
-                    <p className="text-sm text-muted-foreground">{t('reconciliation.needAttention')}</p>
-                    <p className={`text-2xl font-bold ${reconciliationData.summary.paidUnfulfilled > 0 ? 'text-destructive' : 'text-success'}`}>
-                      {reconciliationData.summary.paidUnfulfilled + reconciliationData.summary.partiallyFulfilled}
+                    <p className="text-sm text-muted-foreground">
+                      {t("report.totalSpent")}
                     </p>
-                    <p className="text-xs text-muted-foreground">{reconciliationData.summary.paidUnfulfilled} {t('reconciliation.unfulfilled')} · {reconciliationData.summary.partiallyFulfilled} {t('reconciliation.partial')}</p>
+                    <p className="text-2xl font-bold text-success">
+                      {reconciliationData.summary.totalRevenueKopecks.toLocaleString()}{" "}
+                      ₴
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {reconciliationData.summary.fulfilled}{" "}
+                      {t("report.fulfilledOrders")}
+                    </p>
                   </div>
-                  <div className={`border rounded-xl p-4 ${reconciliationData.summary.orphanVouchers > 0 || reconciliationData.summary.unprocessedEvents > 10 ? 'bg-warning/20 border-warning/50' : 'bg-muted border-border'}`}>
-                    <p className="text-sm text-muted-foreground">{t('reconciliation.dataIntegrity')}</p>
-                    <p className="text-2xl font-bold text-warning">{reconciliationData.summary.orphanVouchers} / {reconciliationData.summary.unprocessedEvents}</p>
-                    <p className="text-xs text-muted-foreground">{t('reconciliation.orphanVouchers')}</p>
+                  <div
+                    className={`border rounded-xl p-4 ${reconciliationData.summary.paidUnfulfilled > 0 ? "bg-destructive/20 border-destructive/50" : "bg-muted border-border"}`}
+                  >
+                    <p className="text-sm text-muted-foreground">
+                      {t("reconciliation.needAttention")}
+                    </p>
+                    <p
+                      className={`text-2xl font-bold ${reconciliationData.summary.paidUnfulfilled > 0 ? "text-destructive" : "text-success"}`}
+                    >
+                      {reconciliationData.summary.paidUnfulfilled +
+                        reconciliationData.summary.partiallyFulfilled}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {reconciliationData.summary.paidUnfulfilled}{" "}
+                      {t("reconciliation.unfulfilled")} ·{" "}
+                      {reconciliationData.summary.partiallyFulfilled}{" "}
+                      {t("reconciliation.partial")}
+                    </p>
+                  </div>
+                  <div
+                    className={`border rounded-xl p-4 ${reconciliationData.summary.orphanVouchers > 0 || reconciliationData.summary.unprocessedEvents > 10 ? "bg-warning/20 border-warning/50" : "bg-muted border-border"}`}
+                  >
+                    <p className="text-sm text-muted-foreground">
+                      {t("reconciliation.dataIntegrity")}
+                    </p>
+                    <p className="text-2xl font-bold text-warning">
+                      {reconciliationData.summary.orphanVouchers} /{" "}
+                      {reconciliationData.summary.unprocessedEvents}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {t("reconciliation.orphanVouchers")}
+                    </p>
                   </div>
                   <div className="glass-panel p-4">
-                    <p className="text-sm text-muted-foreground">{t('reconciliation.providersDeficit')}</p>
-                    <p className={`text-2xl font-bold ${reconciliationData.summary.lowInventoryProviders > 0 ? 'text-warning' : 'text-success'}`}>{reconciliationData.summary.lowInventoryProviders}</p>
-                    <p className="text-xs text-muted-foreground">{reconciliationData.summary.importErrors7d} {t('reconciliation.importErrors7d')}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {t("reconciliation.providersDeficit")}
+                    </p>
+                    <p
+                      className={`text-2xl font-bold ${reconciliationData.summary.lowInventoryProviders > 0 ? "text-warning" : "text-success"}`}
+                    >
+                      {reconciliationData.summary.lowInventoryProviders}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {reconciliationData.summary.importErrors7d}{" "}
+                      {t("reconciliation.importErrors7d")}
+                    </p>
                   </div>
                 </div>
 
@@ -2381,96 +3541,198 @@ if (status === "booting") {
                   <div className="glass-panel p-6">
                     <div className="flex items-center gap-2 mb-4">
                       <div className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
-                      <h3 className="text-lg font-bold">{t('reconciliation.issuesFound', reconciliationData.exceptions.length.toString())}</h3>
+                      <h3 className="text-lg font-bold">
+                        {t(
+                          "reconciliation.issuesFound",
+                          reconciliationData.exceptions.length.toString(),
+                        )}
+                      </h3>
                     </div>
                     <div className="space-y-2">
-                      {reconciliationData.exceptions.map((ex: any, i: number) => (
-                        <div key={i} className={`flex items-start gap-3 p-3 rounded-lg ${ex.severity === 'critical' ? 'bg-destructive/10 border border-destructive/30' : 'bg-warning/10 border border-warning/30'}`}>
-                          <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${ex.severity === 'critical' ? 'bg-destructive' : 'bg-warning'}`} />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-foreground">{ex.description}</p>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {ex.type} · {formatDate(ex.createdAtUtc)}
-                              {ex.id && ex.id !== '00000000-0000-0000-0000-000000000000' && (
-                                <span className="ml-2 font-mono">ID: {ex.id.slice(0, 8)}</span>
-                              )}
-                            </p>
+                      {reconciliationData.exceptions.map(
+                        (ex: any, i: number) => (
+                          <div
+                            key={i}
+                            className={`flex items-start gap-3 p-3 rounded-lg ${ex.severity === "critical" ? "bg-destructive/10 border border-destructive/30" : "bg-warning/10 border border-warning/30"}`}
+                          >
+                            <div
+                              className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${ex.severity === "critical" ? "bg-destructive" : "bg-warning"}`}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-foreground">
+                                {ex.description}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {ex.type} · {formatDate(ex.createdAtUtc)}
+                                {ex.id &&
+                                  ex.id !==
+                                    "00000000-0000-0000-0000-000000000000" && (
+                                    <span className="ml-2 font-mono">
+                                      ID: {ex.id.slice(0, 8)}
+                                    </span>
+                                  )}
+                              </p>
+                            </div>
+                            <span
+                              className={`text-xs px-2 py-0.5 rounded font-medium ${ex.severity === "critical" ? "bg-destructive/20 text-destructive" : "bg-warning/20 text-warning"}`}
+                            >
+                              {ex.severity === "critical"
+                                ? t("reconciliation.critical")
+                                : t("reconciliation.warning")}
+                            </span>
                           </div>
-                          <span className={`text-xs px-2 py-0.5 rounded font-medium ${ex.severity === 'critical' ? 'bg-destructive/20 text-destructive' : 'bg-warning/20 text-warning'}`}>
-                            {ex.severity === 'critical' ? t('reconciliation.critical') : t('reconciliation.warning')}
-                          </span>
-                        </div>
-                      ))}
+                        ),
+                      )}
                     </div>
                   </div>
                 )}
 
                 {/* Three-Way Match Table: Order ↔ Payment ↔ Fulfillment */}
                 <div className="glass-panel p-6">
-                  <h3 className="text-lg font-bold mb-4">{t('reconciliation.threeWayMatch')}</h3>
+                  <h3 className="text-lg font-bold mb-4">
+                    {t("reconciliation.threeWayMatch")}
+                  </h3>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead className="bg-muted">
                         <tr>
-                          <th className="text-left p-3">{t('reconciliation.threeOrder')}</th>
-                          <th className="text-left p-3">{t('report.brand')}</th>
-                          <th className="text-left p-3">{t('report.fuel')}</th>
-                          <th className="text-right p-3">{t('report.amountHeader')}</th>
-                          <th className="text-left p-3">{t('reconciliation.threePayment')}</th>
-                          <th className="text-left p-3">{t('reconciliation.threeFulfillment')}</th>
-                          <th className="text-right p-3">{t('reconciliation.threeVouchExp')}</th>
-                          <th className="text-right p-3">{t('reconciliation.threeVouchDel')}</th>
-                          <th className="text-left p-3">{t('reconciliation.threeMatch')}</th>
-                          <th className="text-left p-3">{t('reconciliation.threeRefund')}</th>
-                          <th className="text-left p-3">{t('reconciliation.threeAge')}</th>
+                          <th className="text-left p-3">
+                            {t("reconciliation.threeOrder")}
+                          </th>
+                          <th className="text-left p-3">{t("report.brand")}</th>
+                          <th className="text-left p-3">{t("report.fuel")}</th>
+                          <th className="text-right p-3">
+                            {t("report.amountHeader")}
+                          </th>
+                          <th className="text-left p-3">
+                            {t("reconciliation.threePayment")}
+                          </th>
+                          <th className="text-left p-3">
+                            {t("reconciliation.threeFulfillment")}
+                          </th>
+                          <th className="text-right p-3">
+                            {t("reconciliation.threeVouchExp")}
+                          </th>
+                          <th className="text-right p-3">
+                            {t("reconciliation.threeVouchDel")}
+                          </th>
+                          <th className="text-left p-3">
+                            {t("reconciliation.threeMatch")}
+                          </th>
+                          <th className="text-left p-3">
+                            {t("reconciliation.threeRefund")}
+                          </th>
+                          <th className="text-left p-3">
+                            {t("reconciliation.threeAge")}
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
                         {reconciliationData.threeWayMatch?.map((row: any) => {
-                          const matchColor = row.matchStatus === 'OK' ? 'text-success bg-success/10' :
-                            row.matchStatus === 'PARTIAL' ? 'text-warning bg-warning/10' :
-                            row.matchStatus === 'UNFULFILLED' ? 'text-destructive bg-destructive/10' :
-                            row.matchStatus === 'CANCELLED' ? 'text-muted-foreground bg-muted' :
-                            row.matchStatus === 'REFUNDED' ? 'text-destructive bg-destructive/10' :
-                            row.matchStatus === 'PARTIAL_REFUNDED' ? 'text-info bg-info/10' :
-                            'text-info bg-info/10';
+                          const matchColor =
+                            row.matchStatus === "OK"
+                              ? "text-success bg-success/10"
+                              : row.matchStatus === "PARTIAL"
+                                ? "text-warning bg-warning/10"
+                                : row.matchStatus === "UNFULFILLED"
+                                  ? "text-destructive bg-destructive/10"
+                                  : row.matchStatus === "CANCELLED"
+                                    ? "text-muted-foreground bg-muted"
+                                    : row.matchStatus === "REFUNDED"
+                                      ? "text-destructive bg-destructive/10"
+                                      : row.matchStatus === "PARTIAL_REFUNDED"
+                                        ? "text-info bg-info/10"
+                                        : "text-info bg-info/10";
                           return (
                             <tr key={row.orderId} className="border-border">
-                              <td className="p-3 font-mono text-xs">{row.orderId.slice(0, 8)}</td>
+                              <td className="p-3 font-mono text-xs">
+                                {row.orderId.slice(0, 8)}
+                              </td>
                               <td className="p-3 uppercase">{row.brand}</td>
                               <td className="p-3">{row.fuelType}</td>
-                              <td className="p-3 text-right">{formatMoney(row.totalPrice)}</td>
+                              <td className="p-3 text-right">
+                                {formatMoney(row.totalPrice)}
+                              </td>
                               <td className="p-3">
-                                <span className={`px-1.5 py-0.5 rounded text-xs ${row.monobankStatus === 'Success' ? 'bg-success/20 text-success' : row.monobankStatus === 'Pending' ? 'bg-warning/20 text-warning' : 'bg-muted text-muted-foreground'}`}>
-                                  {row.monobankStatus ? t('monobank.status.' + row.monobankStatus.toLowerCase()) : '—'}
+                                <span
+                                  className={`px-1.5 py-0.5 rounded text-xs ${row.monobankStatus === "Success" ? "bg-success/20 text-success" : row.monobankStatus === "Pending" ? "bg-warning/20 text-warning" : "bg-muted text-muted-foreground"}`}
+                                >
+                                  {row.monobankStatus
+                                    ? t(
+                                        "monobank.status." +
+                                          row.monobankStatus.toLowerCase(),
+                                      )
+                                    : "—"}
                                 </span>
                               </td>
-                              <td className="p-3 text-xs">{row.orderStatus ? t('order.status.' + row.orderStatus.charAt(0).toLowerCase() + row.orderStatus.slice(1)) : '—'}</td>
-                              <td className="p-3 text-right font-mono">{row.vouchersExpected}</td>
-                              <td className="p-3 text-right font-mono">{row.vouchersDelivered}</td>
+                              <td className="p-3 text-xs">
+                                {row.orderStatus
+                                  ? t(
+                                      "order.status." +
+                                        row.orderStatus
+                                          .charAt(0)
+                                          .toLowerCase() +
+                                        row.orderStatus.slice(1),
+                                    )
+                                  : "—"}
+                              </td>
+                              <td className="p-3 text-right font-mono">
+                                {row.vouchersExpected}
+                              </td>
+                              <td className="p-3 text-right font-mono">
+                                {row.vouchersDelivered}
+                              </td>
                               <td className="p-3">
-                                <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${matchColor}`}>
-                                  {t('reconciliation.match' + row.matchStatus.charAt(0) + row.matchStatus.slice(1).toLowerCase())}
+                                <span
+                                  className={`px-1.5 py-0.5 rounded text-xs font-medium ${matchColor}`}
+                                >
+                                  {t(
+                                    "reconciliation.match" +
+                                      row.matchStatus.charAt(0) +
+                                      row.matchStatus.slice(1).toLowerCase(),
+                                  )}
                                 </span>
                               </td>
                               <td className="p-3">
                                 {row.refundStatus ? (
                                   <div className="flex flex-col gap-0.5">
-                                    <span className={`px-1.5 py-0.5 rounded text-xs w-fit ${row.refundStatus === 'Completed' ? 'bg-success/20 text-success' : row.refundStatus === 'Failed' ? 'bg-destructive/20 text-destructive' : 'bg-warning/20 text-warning'}`}>
-                                      {t('purchases.refundStatus.' + row.refundStatus)}
+                                    <span
+                                      className={`px-1.5 py-0.5 rounded text-xs w-fit ${row.refundStatus === "Completed" ? "bg-success/20 text-success" : row.refundStatus === "Failed" ? "bg-destructive/20 text-destructive" : "bg-warning/20 text-warning"}`}
+                                    >
+                                      {t(
+                                        "purchases.refundStatus." +
+                                          row.refundStatus,
+                                      )}
                                     </span>
                                     {row.refundedKopecks > 0 && (
-                                      <span className="text-xs font-mono text-muted-foreground">{(row.refundedKopecks / 100).toLocaleString()} ₴</span>
+                                      <span className="text-xs font-mono text-muted-foreground">
+                                        {(
+                                          row.refundedKopecks / 100
+                                        ).toLocaleString()}{" "}
+                                        ₴
+                                      </span>
                                     )}
                                   </div>
-                                ) : '—'}
+                                ) : (
+                                  "—"
+                                )}
                               </td>
-                              <td className="p-3 text-xs text-muted-foreground">{row.daysSinceCreated}d</td>
+                              <td className="p-3 text-xs text-muted-foreground">
+                                {row.daysSinceCreated}d
+                              </td>
                             </tr>
                           );
                         })}
-                        {(!reconciliationData.threeWayMatch || reconciliationData.threeWayMatch.length === 0) && (
-                          <tr><td colSpan={11} className="p-8 text-center text-muted-foreground">{t('reconciliation.noOrderData')}</td></tr>
+                        {(!reconciliationData.threeWayMatch ||
+                          reconciliationData.threeWayMatch.length === 0) && (
+                          <tr>
+                            <td
+                              colSpan={11}
+                              className="p-8 text-center text-muted-foreground"
+                            >
+                              {t("reconciliation.noOrderData")}
+                            </td>
+                          </tr>
                         )}
                       </tbody>
                     </table>
@@ -2479,23 +3741,41 @@ if (status === "booting") {
 
                 {/* Voucher Funnel */}
                 <div className="glass-panel p-6">
-                  <h3 className="text-lg font-bold mb-4">{t('reconciliation.voucherFunnel')}</h3>
+                  <h3 className="text-lg font-bold mb-4">
+                    {t("reconciliation.voucherFunnel")}
+                  </h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {reconciliationData.voucherFunnel?.map((item: any) => {
                       const colors: Record<string, string> = {
-                        Imported: 'bg-info/10 border-info/30 text-info',
-                        Available: 'bg-success/10 border-success/30 text-success',
-                        Assigned: 'bg-warning/10 border-warning/30 text-warning',
-                        Used: 'bg-info/10 border-info/30 text-info',
-                        Expired: 'bg-muted border-border text-muted-foreground',
-                        VerificationFailed: 'bg-destructive/10 border-destructive/30 text-destructive',
+                        Imported: "bg-info/10 border-info/30 text-info",
+                        Available:
+                          "bg-success/10 border-success/30 text-success",
+                        Assigned:
+                          "bg-warning/10 border-warning/30 text-warning",
+                        Used: "bg-info/10 border-info/30 text-info",
+                        Expired: "bg-muted border-border text-muted-foreground",
+                        VerificationFailed:
+                          "bg-destructive/10 border-destructive/30 text-destructive",
                       };
-                      const c = colors[item.status] || 'bg-muted border-border text-muted-foreground';
+                      const c =
+                        colors[item.status] ||
+                        "bg-muted border-border text-muted-foreground";
                       return (
-                        <div key={item.status} className={`border rounded-lg p-4 text-center ${c}`}>
+                        <div
+                          key={item.status}
+                          className={`border rounded-lg p-4 text-center ${c}`}
+                        >
                           <p className="text-2xl font-bold">{item.count}</p>
-                          <p className="text-xs mt-1">{t('status.' + item.status.charAt(0).toLowerCase() + item.status.slice(1))}</p>
-                          <p className="text-xs opacity-60">{item.totalLiters}L</p>
+                          <p className="text-xs mt-1">
+                            {t(
+                              "status." +
+                                item.status.charAt(0).toLowerCase() +
+                                item.status.slice(1),
+                            )}
+                          </p>
+                          <p className="text-xs opacity-60">
+                            {item.totalLiters}L
+                          </p>
                         </div>
                       );
                     })}
@@ -2505,26 +3785,48 @@ if (status === "booting") {
                 {/* Profit Summary */}
                 {reconciliationData.revenueSummary?.length > 0 && (
                   <div className="glass-panel p-6">
-                    <h3 className="text-lg font-bold mb-4">{t('report.profitSummary')}</h3>
+                    <h3 className="text-lg font-bold mb-4">
+                      {t("report.profitSummary")}
+                    </h3>
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead className="bg-muted">
                           <tr>
-                            <th className="text-left p-3">{t('report.period')}</th>
-                            <th className="text-right p-3">{t('report.orders_short')}</th>
-                            <th className="text-right p-3">{t('report.profit')}</th>
-                            <th className="text-right p-3">{t('report.avgOrder')}</th>
+                            <th className="text-left p-3">
+                              {t("report.period")}
+                            </th>
+                            <th className="text-right p-3">
+                              {t("report.orders_short")}
+                            </th>
+                            <th className="text-right p-3">
+                              {t("report.profit")}
+                            </th>
+                            <th className="text-right p-3">
+                              {t("report.avgOrder")}
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
-                          {reconciliationData.revenueSummary.map((m: any, i: number) => (
-                            <tr key={i} className="border-border">
-                              <td className="p-3">{m.year}-{String(m.month).padStart(2, '0')}</td>
-                              <td className="p-3 text-right font-mono">{m.orderCount}</td>
-                              <td className="p-3 text-right font-mono text-success">{m.revenueKopecks.toLocaleString()} ₴</td>
-                              <td className="p-3 text-right font-mono text-muted-foreground">{m.orderCount > 0 ? `${(m.revenueKopecks / m.orderCount).toLocaleString()} ₴` : '—'}</td>
-                            </tr>
-                          ))}
+                          {reconciliationData.revenueSummary.map(
+                            (m: any, i: number) => (
+                              <tr key={i} className="border-border">
+                                <td className="p-3">
+                                  {m.year}-{String(m.month).padStart(2, "0")}
+                                </td>
+                                <td className="p-3 text-right font-mono">
+                                  {m.orderCount}
+                                </td>
+                                <td className="p-3 text-right font-mono text-success">
+                                  {m.revenueKopecks.toLocaleString()} ₴
+                                </td>
+                                <td className="p-3 text-right font-mono text-muted-foreground">
+                                  {m.orderCount > 0
+                                    ? `${(m.revenueKopecks / m.orderCount).toLocaleString()} ₴`
+                                    : "—"}
+                                </td>
+                              </tr>
+                            ),
+                          )}
                         </tbody>
                       </table>
                     </div>
@@ -2532,78 +3834,81 @@ if (status === "booting") {
                 )}
               </>
             ) : (
-              <div className="text-center text-muted-foreground py-12">{t('reconciliation.loadFailed')}</div>
+              <div className="text-center text-muted-foreground py-12">
+                {t("reconciliation.loadFailed")}
+              </div>
             )}
           </div>
         )}
 
         {/* Audit Log Tab */}
-        {activeTab === 'heldPayments' && (
-            <HeldPaymentsTab />
-          )}
+        {activeTab === "heldPayments" && <HeldPaymentsTab />}
 
-          {activeTab === 'auditlog' && (
+        {activeTab === "auditlog" && (
           <div className="space-y-6 animate-in fade-in duration-300">
             <h2 className="text-2xl font-bold flex items-center gap-2">
               <ScrollText className="w-6 h-6 text-primary" />
-              {t('auditlog.title')}
+              {t("auditlog.title")}
             </h2>
             <AuditTab />
           </div>
         )}
 
         {/* Error Logs Tab */}
-        {activeTab === 'errorlogs' && (
+        {activeTab === "errorlogs" && (
           <div className="space-y-6 animate-in fade-in duration-300">
             <h2 className="text-2xl font-bold flex items-center gap-2">
               <Bug className="w-6 h-6 text-destructive" />
-              {t('errorlogs.title')}
+              {t("errorlogs.title")}
             </h2>
             <ErrorLogsTab />
           </div>
         )}
 
         {/* Feedback Tab */}
-        {activeTab === 'feedback' && (
+        {activeTab === "feedback" && (
           <div className="space-y-6 animate-in fade-in duration-300">
             <h2 className="text-2xl font-bold flex items-center gap-2">
               <MessageSquare className="w-6 h-6 text-primary" />
-              {t('feedback.title')}
+              {t("feedback.title")}
             </h2>
             <FeedbackTab />
           </div>
         )}
 
         {/* Settings Tab */}
-        {activeTab === 'settings' && (
+        {activeTab === "settings" && (
           <div className="space-y-6 animate-in fade-in duration-300">
             <SettingsTab />
           </div>
         )}
 
         {/* Reports Tab */}
-        {activeTab === 'reports' && (
+        {activeTab === "reports" && (
           <div className="space-y-6 animate-in fade-in duration-300">
             <h2 className="text-2xl font-bold flex items-center gap-2">
               <BarChart className="w-6 h-6 text-primary" />
-              {t('report.title')}
+              {t("report.title")}
             </h2>
 
             {/* Filters */}
             <div className="glass-panel p-4 flex flex-wrap gap-4 items-end">
               <div>
-                <label className="text-xs text-muted-foreground block mb-1">{t('report.allUsers')}</label>
+                <label className="text-xs text-muted-foreground block mb-1">
+                  {t("report.allUsers")}
+                </label>
                 <div className="flex items-center gap-2">
                   <select
                     value={reportUserId}
                     onChange={(e) => setReportUserId(e.target.value)}
                     className="glass-input rounded-lg px-3 py-2 text-sm text-foreground w-64"
                   >
-                    <option value="">{t('report.allUsers')}</option>
+                    <option value="">{t("report.allUsers")}</option>
                     {userOptions.map((u: AdminUserOption) => {
-                      const label = u.firstName || u.lastName
-                        ? `${u.firstName || ''} ${u.lastName || ''}`.trim()
-                        : u.phone || u.id?.slice(0, 8) || u.id;
+                      const label =
+                        u.firstName || u.lastName
+                          ? `${u.firstName || ""} ${u.lastName || ""}`.trim()
+                          : u.phone || u.id?.slice(0, 8) || u.id;
                       return (
                         <option key={u.id} value={u.id}>
                           {label}
@@ -2611,52 +3916,104 @@ if (status === "booting") {
                       );
                     })}
                   </select>
-                  <span className="text-xs text-muted-foreground">({userOptions.length} users loaded)</span>
+                  <span className="text-xs text-muted-foreground">
+                    ({userOptions.length} users loaded)
+                  </span>
                 </div>
               </div>
               <div>
-                <label className="text-xs text-muted-foreground block mb-1">{t('report.from')}</label>
+                <label className="text-xs text-muted-foreground block mb-1">
+                  {t("report.from")}
+                </label>
                 <input
                   type="text"
                   placeholder="dd.mm.yyyy"
-                  value={reportFromDate ? formatDisplayDate(reportFromDate) : ''}
+                  value={
+                    reportFromDate ? formatDisplayDate(reportFromDate) : ""
+                  }
                   onChange={(e) => {
-                    const v = e.target.value.replace(/[^\d]/g, '');
-                    if (v.length === 8) setReportFromDate(`${v.slice(4,8)}-${v.slice(2,4)}-${v.slice(0,2)}`);
-                    else if (v.length < 8) setReportFromDate('');
+                    const v = e.target.value.replace(/[^\d]/g, "");
+                    if (v.length === 8)
+                      setReportFromDate(
+                        `${v.slice(4, 8)}-${v.slice(2, 4)}-${v.slice(0, 2)}`,
+                      );
+                    else if (v.length < 8) setReportFromDate("");
                   }}
                   className="glass-input rounded-lg px-3 py-2 text-sm text-foreground"
                 />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground block mb-1">{t('report.to')}</label>
+                <label className="text-xs text-muted-foreground block mb-1">
+                  {t("report.to")}
+                </label>
                 <input
                   type="text"
                   placeholder="dd.mm.yyyy"
-                  value={reportToDate ? formatDisplayDate(reportToDate) : ''}
+                  value={reportToDate ? formatDisplayDate(reportToDate) : ""}
                   onChange={(e) => {
-                    const v = e.target.value.replace(/[^\d]/g, '');
-                    if (v.length === 8) setReportToDate(`${v.slice(4,8)}-${v.slice(2,4)}-${v.slice(0,2)}`);
-                    else if (v.length < 8) setReportToDate('');
+                    const v = e.target.value.replace(/[^\d]/g, "");
+                    if (v.length === 8)
+                      setReportToDate(
+                        `${v.slice(4, 8)}-${v.slice(2, 4)}-${v.slice(0, 2)}`,
+                      );
+                    else if (v.length < 8) setReportToDate("");
                   }}
                   className="glass-input rounded-lg px-3 py-2 text-sm text-foreground"
                 />
               </div>
               <div className="flex gap-1 items-end">
-                <Button onClick={() => setReportQuickDate('yesterday')} variant="outline" size="sm" className="h-9 text-xs">{t('report.yesterday')}</Button>
-                <Button onClick={() => setReportQuickDate('week')} variant="outline" size="sm" className="h-9 text-xs">{t('report.week')}</Button>
-                <Button onClick={() => setReportQuickDate('30days')} variant="outline" size="sm" className="h-9 text-xs">{t('report.30days')}</Button>
-                <Button onClick={() => setReportQuickDate('month')} variant="outline" size="sm" className="h-9 text-xs">{t('report.month')}</Button>
+                <Button
+                  onClick={() => setReportQuickDate("yesterday")}
+                  variant="outline"
+                  size="sm"
+                  className="h-9 text-xs"
+                >
+                  {t("report.yesterday")}
+                </Button>
+                <Button
+                  onClick={() => setReportQuickDate("week")}
+                  variant="outline"
+                  size="sm"
+                  className="h-9 text-xs"
+                >
+                  {t("report.week")}
+                </Button>
+                <Button
+                  onClick={() => setReportQuickDate("30days")}
+                  variant="outline"
+                  size="sm"
+                  className="h-9 text-xs"
+                >
+                  {t("report.30days")}
+                </Button>
+                <Button
+                  onClick={() => setReportQuickDate("month")}
+                  variant="outline"
+                  size="sm"
+                  className="h-9 text-xs"
+                >
+                  {t("report.month")}
+                </Button>
               </div>
               <div className="flex gap-2 items-end">
-                <Button onClick={() => setReportTrigger(t => t + 1)} variant="default" size="sm" className="gap-2">
+                <Button
+                  onClick={() => setReportTrigger((t) => t + 1)}
+                  variant="default"
+                  size="sm"
+                  className="gap-2"
+                >
                   <BarChart className="w-4 h-4" />
-                  {t('report.generate')}
+                  {t("report.generate")}
                 </Button>
                 {reportData && (
-                  <Button onClick={() => setShowReconciliationAct(true)} variant="outline" size="sm" className="gap-2">
+                  <Button
+                    onClick={() => setShowReconciliationAct(true)}
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                  >
                     <FileSignature className="w-4 h-4" />
-                    {t('report.reconciliationAct')}
+                    {t("report.reconciliationAct")}
                   </Button>
                 )}
               </div>
@@ -2665,55 +4022,98 @@ if (status === "booting") {
             {isReportLoading ? (
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Loader2 className="w-5 h-5 animate-spin" />
-                {t('report.loading')}
+                {t("report.loading")}
               </div>
             ) : reportData ? (
               <>
                 {/* Summary Cards */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="glass-panel p-4">
-                    <p className="text-sm text-muted-foreground">{t('report.totalSpent')}</p>
-                    <p className="text-2xl font-bold text-success">{formatMoney(reportData.summary.totalSpent)}</p>
-                    <p className="text-xs text-muted-foreground">{reportData.summary.totalOrders} {t('report.orders')}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {t("report.totalSpent")}
+                    </p>
+                    <p className="text-2xl font-bold text-success">
+                      {formatMoney(reportData.summary.totalSpent)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {reportData.summary.totalOrders} {t("report.orders")}
+                    </p>
                   </div>
                   <div className="glass-panel p-4">
-                    <p className="text-sm text-muted-foreground">{t('report.purchased')}</p>
-                    <p className="text-2xl font-bold text-warning">{reportData.summary.vouchersPurchased}</p>
-                    <p className="text-xs text-muted-foreground">{t('report.litersPurchased', reportData.summary.totalLitersPurchased.toFixed(0))}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {t("report.purchased")}
+                    </p>
+                    <p className="text-2xl font-bold text-warning">
+                      {reportData.summary.vouchersPurchased}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {t(
+                        "report.litersPurchased",
+                        reportData.summary.totalLitersPurchased.toFixed(0),
+                      )}
+                    </p>
                   </div>
                   <div className="glass-panel p-4">
-                    <p className="text-sm text-muted-foreground">{t('report.used')}</p>
-                    <p className="text-2xl font-bold text-destructive">{reportData.summary.vouchersUsed}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {t("report.used")}
+                    </p>
+                    <p className="text-2xl font-bold text-destructive">
+                      {reportData.summary.vouchersUsed}
+                    </p>
                   </div>
                   <div className="glass-panel p-4">
-                    <p className="text-sm text-muted-foreground">{t('report.litersUsed')}</p>
-                    <p className="text-2xl font-bold text-info">{reportData.summary.totalLitersUsed.toFixed(0)} L</p>
+                    <p className="text-sm text-muted-foreground">
+                      {t("report.litersUsed")}
+                    </p>
+                    <p className="text-2xl font-bold text-info">
+                      {reportData.summary.totalLitersUsed.toFixed(0)} L
+                    </p>
                   </div>
                 </div>
 
                 {/* Monthly Breakdown */}
                 {reportData.monthlyBreakdown?.length > 0 && (
                   <div className="glass-panel p-6">
-                    <h3 className="text-lg font-bold mb-4">{t('report.monthlyBreakdown')}</h3>
+                    <h3 className="text-lg font-bold mb-4">
+                      {t("report.monthlyBreakdown")}
+                    </h3>
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead className="bg-muted">
                           <tr>
-                            <th className="text-left p-3">{t('report.month')}</th>
-                            <th className="text-right p-3">{t('report.amount')}</th>
-                            <th className="text-right p-3">{t('report.purchased')}</th>
-                            <th className="text-right p-3">{t('report.used')}</th>
-                            <th className="text-right p-3">{t('report.litersUsed')}</th>
+                            <th className="text-left p-3">
+                              {t("report.month")}
+                            </th>
+                            <th className="text-right p-3">
+                              {t("report.amount")}
+                            </th>
+                            <th className="text-right p-3">
+                              {t("report.purchased")}
+                            </th>
+                            <th className="text-right p-3">
+                              {t("report.used")}
+                            </th>
+                            <th className="text-right p-3">
+                              {t("report.litersUsed")}
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
                           {reportData.monthlyBreakdown.map((mb: any) => (
                             <tr key={mb.month} className="border-border">
                               <td className="p-3 font-medium">{mb.month}</td>
-                              <td className="p-3 text-right text-success">{formatMoney(mb.totalSpent)}</td>
-                              <td className="p-3 text-right text-warning">{mb.vouchersPurchased}</td>
-                              <td className="p-3 text-right text-destructive">{mb.vouchersUsed}</td>
-                              <td className="p-3 text-right text-info">{mb.totalLitersUsed.toFixed(0)}L</td>
+                              <td className="p-3 text-right text-success">
+                                {formatMoney(mb.totalSpent)}
+                              </td>
+                              <td className="p-3 text-right text-warning">
+                                {mb.vouchersPurchased}
+                              </td>
+                              <td className="p-3 text-right text-destructive">
+                                {mb.vouchersUsed}
+                              </td>
+                              <td className="p-3 text-right text-info">
+                                {mb.totalLitersUsed.toFixed(0)}L
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -2724,61 +4124,122 @@ if (status === "booting") {
 
                 {/* Payments Table */}
                 <div className="glass-panel p-6">
-                  <h3 className="text-lg font-bold mb-4">{t('report.payments', reportData.payments.length)}</h3>
+                  <h3 className="text-lg font-bold mb-4">
+                    {t("report.payments", reportData.payments.length)}
+                  </h3>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead className="bg-muted">
                         <tr>
-                          <th className="text-left p-3">{t('report.paymentId')}</th>
-                          <th className="text-left p-3">{t('report.brand')}</th>
-                          <th className="text-left p-3">{t('report.fuel')}</th>
-                          <th className="text-right p-3">{t('report.amountHeader')}</th>
-                          <th className="text-right p-3">{t('report.liters')}</th>
-                          <th className="text-right p-3">{t('report.quantity')}</th>
-                          <th className="text-left p-3">{t('report.bank')}</th>
-                          <th className="text-left p-3">{t('report.status')}</th>
-                          <th className="text-left p-3">{t('report.date')}</th>
+                          <th className="text-left p-3">
+                            {t("report.paymentId")}
+                          </th>
+                          <th className="text-left p-3">{t("report.brand")}</th>
+                          <th className="text-left p-3">{t("report.fuel")}</th>
+                          <th className="text-right p-3">
+                            {t("report.amountHeader")}
+                          </th>
+                          <th className="text-right p-3">
+                            {t("report.liters")}
+                          </th>
+                          <th className="text-right p-3">
+                            {t("report.quantity")}
+                          </th>
+                          <th className="text-left p-3">{t("report.bank")}</th>
+                          <th className="text-left p-3">
+                            {t("report.status")}
+                          </th>
+                          <th className="text-left p-3">{t("report.date")}</th>
                         </tr>
                       </thead>
                       <tbody>
                         {reportData.payments.map((p: any) => (
                           <tr key={p.orderId} className="border-border">
-                            <td className="p-3 font-mono text-xs text-muted-foreground">{p.orderId.slice(0, 8)}</td>
-                            <td className="p-3 uppercase text-xs">{p.brand || '—'}</td>
-                            <td className="p-3">{p.fuelName || p.fuelType || '—'}</td>
-                            <td className="p-3 text-right font-mono">{formatMoney(p.amount)}</td>
-                            <td className="p-3 text-right">{(p.liters / p.quantity)}L</td>
+                            <td className="p-3 font-mono text-xs text-muted-foreground">
+                              {p.orderId.slice(0, 8)}
+                            </td>
+                            <td className="p-3 uppercase text-xs">
+                              {p.brand || "—"}
+                            </td>
+                            <td className="p-3">
+                              {p.fuelName || p.fuelType || "—"}
+                            </td>
+                            <td className="p-3 text-right font-mono">
+                              {formatMoney(p.amount)}
+                            </td>
+                            <td className="p-3 text-right">
+                              {p.liters / p.quantity}L
+                            </td>
                             <td className="p-3 text-right">{p.quantity}</td>
                             <td className="p-3">
                               {p.monobankStatus ? (
-                                <span className={`px-1.5 py-0.5 rounded text-xs ${
-                                  p.monobankStatus === 'Success' ? 'bg-success/20 text-success' :
-                                  'bg-muted text-muted-foreground'
-                                }`}>{t('monobank.status.' + p.monobankStatus.toLowerCase())}</span>
+                                <span
+                                  className={`px-1.5 py-0.5 rounded text-xs ${
+                                    p.monobankStatus === "Success"
+                                      ? "bg-success/20 text-success"
+                                      : "bg-muted text-muted-foreground"
+                                  }`}
+                                >
+                                  {t(
+                                    "monobank.status." +
+                                      p.monobankStatus.toLowerCase(),
+                                  )}
+                                </span>
                               ) : (
-                                <span className="text-xs text-muted-foreground">—</span>
+                                <span className="text-xs text-muted-foreground">
+                                  —
+                                </span>
                               )}
                             </td>
                             <td className="p-3">
-                              <span className={`px-1.5 py-0.5 rounded text-xs ${
-                                p.status === 'Fulfilled' ? 'bg-success/20 text-success' :
-                                p.status === 'Cancelled' || p.status === 'Refunded' ? 'bg-destructive/20 text-destructive' :
-                                'bg-warning/20 text-warning'
-                              }`}>{t('order.status.' + p.status.charAt(0).toLowerCase() + p.status.slice(1))}</span>
+                              <span
+                                className={`px-1.5 py-0.5 rounded text-xs ${
+                                  p.status === "Fulfilled"
+                                    ? "bg-success/20 text-success"
+                                    : p.status === "Cancelled" ||
+                                        p.status === "Refunded"
+                                      ? "bg-destructive/20 text-destructive"
+                                      : "bg-warning/20 text-warning"
+                                }`}
+                              >
+                                {t(
+                                  "order.status." +
+                                    p.status.charAt(0).toLowerCase() +
+                                    p.status.slice(1),
+                                )}
+                              </span>
                             </td>
-                            <td className="p-3 text-xs text-muted-foreground">{formatDate(p.createdAtUtc)}</td>
+                            <td className="p-3 text-xs text-muted-foreground">
+                              {formatDate(p.createdAtUtc)}
+                            </td>
                           </tr>
                         ))}
                         {reportData.payments.length === 0 && (
-                          <tr><td colSpan={9} className="p-8 text-center text-muted-foreground">{t('report.noPayments')}</td></tr>
+                          <tr>
+                            <td
+                              colSpan={9}
+                              className="p-8 text-center text-muted-foreground"
+                            >
+                              {t("report.noPayments")}
+                            </td>
+                          </tr>
                         )}
                       </tbody>
                     </table>
                   </div>
                   {reportData.payments.length > 0 && (
                     <div className="mt-4 text-xs text-muted-foreground">
-                      {reportData.payments.map((p: any) => p.monobankInvoiceId).filter(Boolean).length > 0 && (
-                        <span>{t('report.monobankInvoices', reportData.payments.filter((p: any) => p.monobankInvoiceId).length)}</span>
+                      {reportData.payments
+                        .map((p: any) => p.monobankInvoiceId)
+                        .filter(Boolean).length > 0 && (
+                        <span>
+                          {t(
+                            "report.monobankInvoices",
+                            reportData.payments.filter(
+                              (p: any) => p.monobankInvoiceId,
+                            ).length,
+                          )}
+                        </span>
                       )}
                     </div>
                   )}
@@ -2786,30 +4247,53 @@ if (status === "booting") {
 
                 {/* Redemptions Table */}
                 <div className="glass-panel p-6">
-                  <h3 className="text-lg font-bold mb-4">{t('report.redemptions', reportData.redemptions.length)}</h3>
+                  <h3 className="text-lg font-bold mb-4">
+                    {t("report.redemptions", reportData.redemptions.length)}
+                  </h3>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead className="bg-muted">
                         <tr>
-                          <th className="text-left p-3">{t('report.redemptionId')}</th>
-                          <th className="text-left p-3">{t('report.brand')}</th>
-                          <th className="text-left p-3">{t('report.fuelName')}</th>
-                          <th className="text-right p-3">{t('report.liters')}</th>
-                          <th className="text-left p-3">{t('report.redeemedAt')}</th>
+                          <th className="text-left p-3">
+                            {t("report.redemptionId")}
+                          </th>
+                          <th className="text-left p-3">{t("report.brand")}</th>
+                          <th className="text-left p-3">
+                            {t("report.fuelName")}
+                          </th>
+                          <th className="text-right p-3">
+                            {t("report.liters")}
+                          </th>
+                          <th className="text-left p-3">
+                            {t("report.redeemedAt")}
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
                         {reportData.redemptions.map((r: any) => (
                           <tr key={r.voucherId} className="border-border">
-                            <td className="p-3 font-mono text-xs text-muted-foreground">{r.voucherId.slice(0, 8)}</td>
-                            <td className="p-3 uppercase">{r.brand || '—'}</td>
-                            <td className="p-3">{r.fuelName || r.fuelType || '—'}</td>
+                            <td className="p-3 font-mono text-xs text-muted-foreground">
+                              {r.voucherId.slice(0, 8)}
+                            </td>
+                            <td className="p-3 uppercase">{r.brand || "—"}</td>
+                            <td className="p-3">
+                              {r.fuelName || r.fuelType || "—"}
+                            </td>
                             <td className="p-3 text-right">{r.liters}L</td>
-                            <td className="p-3 text-xs text-muted-foreground">{formatDate(r.redeemedAt)}</td>
+                            <td className="p-3 text-xs text-muted-foreground">
+                              {formatDate(r.redeemedAt)}
+                            </td>
                           </tr>
                         ))}
                         {reportData.redemptions.length === 0 && (
-                          <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">{t('report.noRedemptions')}</td></tr>
+                          <tr>
+                            <td
+                              colSpan={5}
+                              className="p-8 text-center text-muted-foreground"
+                            >
+                              {t("report.noRedemptions")}
+                            </td>
+                          </tr>
                         )}
                       </tbody>
                     </table>
@@ -2817,7 +4301,9 @@ if (status === "booting") {
                 </div>
               </>
             ) : (
-              <div className="text-center text-muted-foreground py-12">{t('report.noData')}</div>
+              <div className="text-center text-muted-foreground py-12">
+                {t("report.noData")}
+              </div>
             )}
           </div>
         )}
@@ -2826,21 +4312,27 @@ if (status === "booting") {
             system that compares us against an independent source, and it has existed as an API
             since #118 landed with no way to reach it. Sits above the generated report so it does
             not depend on that form having been filled in. */}
-        {activeTab === 'reports' && <StatementReconciliationPanel />}
+        {activeTab === "reports" && <StatementReconciliationPanel />}
 
         {/* Contracts Tab */}
-        {activeTab === 'contracts' && (
+        {activeTab === "contracts" && (
           <div className="space-y-6 animate-in fade-in duration-300">
             <div className="glass-panel p-6">
-              <h2 className="text-xl font-bold mb-4">{t('contracts.availableTitle')}</h2>
+              <h2 className="text-xl font-bold mb-4">
+                {t("contracts.availableTitle")}
+              </h2>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-muted">
                     <tr>
-                      <th className="text-left p-4">{t('contracts.name')}</th>
-                      <th className="text-left p-4">{t('contracts.version')}</th>
-                      <th className="text-left p-4">{t('common.status')}</th>
-                      <th className="text-left p-4">{t('contracts.createdAt')}</th>
+                      <th className="text-left p-4">{t("contracts.name")}</th>
+                      <th className="text-left p-4">
+                        {t("contracts.version")}
+                      </th>
+                      <th className="text-left p-4">{t("common.status")}</th>
+                      <th className="text-left p-4">
+                        {t("contracts.createdAt")}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2849,8 +4341,10 @@ if (status === "booting") {
                         <td className="p-4 font-bold">{contract.title}</td>
                         <td className="p-4 font-mono">{contract.version}</td>
                         <td className="p-4">
-                          <span className={`px-2 py-1 rounded text-xs ${contract.status === "ACTIVE" ? "bg-success/20 text-success" : "bg-muted text-muted-foreground"}`}>
-                            {t('status.' + contract.status.toLowerCase())}
+                          <span
+                            className={`px-2 py-1 rounded text-xs ${contract.status === "ACTIVE" ? "bg-success/20 text-success" : "bg-muted text-muted-foreground"}`}
+                          >
+                            {t("status." + contract.status.toLowerCase())}
                           </span>
                         </td>
                         <td className="p-4 text-muted-foreground">
@@ -2859,7 +4353,14 @@ if (status === "booting") {
                       </tr>
                     ))}
                     {contractsList.length === 0 && (
-                      <tr><td colSpan={4} className="p-8 text-center text-muted-foreground">{t('contracts.noneAvailable')}</td></tr>
+                      <tr>
+                        <td
+                          colSpan={4}
+                          className="p-8 text-center text-muted-foreground"
+                        >
+                          {t("contracts.noneAvailable")}
+                        </td>
+                      </tr>
                     )}
                   </tbody>
                 </table>
@@ -2867,16 +4368,26 @@ if (status === "booting") {
             </div>
 
             <div className="glass-panel p-6">
-              <h2 className="text-xl font-bold mb-4">{t('contracts.signedTitle')}</h2>
+              <h2 className="text-xl font-bold mb-4">
+                {t("contracts.signedTitle")}
+              </h2>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-muted">
                     <tr>
-                      <th className="text-left p-4">{t('contracts.user')}</th>
-                      <th className="text-left p-4">{t('contracts.company')}</th>
-                      <th className="text-left p-4">{t('contracts.contract')}</th>
-                      <th className="text-left p-4">{t('contracts.signedAt')}</th>
-                      <th className="text-left p-4">{t('contracts.signature')}</th>
+                      <th className="text-left p-4">{t("contracts.user")}</th>
+                      <th className="text-left p-4">
+                        {t("contracts.company")}
+                      </th>
+                      <th className="text-left p-4">
+                        {t("contracts.contract")}
+                      </th>
+                      <th className="text-left p-4">
+                        {t("contracts.signedAt")}
+                      </th>
+                      <th className="text-left p-4">
+                        {t("contracts.signature")}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2889,19 +4400,28 @@ if (status === "booting") {
                           {formatDateTime(sc.signedAt)}
                         </td>
                         <td className="p-4">
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             size="sm"
-                            onClick={() => setSelectedSignature(sc.signatureData)}
+                            onClick={() =>
+                              setSelectedSignature(sc.signatureData)
+                            }
                           >
                             <FileSignature className="w-4 h-4 mr-2" />
-                            {t('contracts.view')}
+                            {t("contracts.view")}
                           </Button>
                         </td>
                       </tr>
                     ))}
                     {signedContractsList.length === 0 && (
-                      <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">{t('contracts.noneSigned')}</td></tr>
+                      <tr>
+                        <td
+                          colSpan={5}
+                          className="p-8 text-center text-muted-foreground"
+                        >
+                          {t("contracts.noneSigned")}
+                        </td>
+                      </tr>
                     )}
                   </tbody>
                 </table>
@@ -2912,9 +4432,17 @@ if (status === "booting") {
       </div>
 
       {selectedQrData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4" onClick={() => setSelectedQrId(null)}>
-          <div className="bg-white p-6 rounded-lg max-w-sm w-full animate-in zoom-in-50 duration-200" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-            <h3 className="text-xl font-bold text-black mb-4">{t('import.scanTitle')}</h3>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4"
+          onClick={() => setSelectedQrId(null)}
+        >
+          <div
+            className="bg-white p-6 rounded-lg max-w-sm w-full animate-in zoom-in-50 duration-200"
+            onClick={(e: React.MouseEvent) => e.stopPropagation()}
+          >
+            <h3 className="text-xl font-bold text-black mb-4">
+              {t("import.scanTitle")}
+            </h3>
 
             {isVoucherLoading ? (
               <div className="w-full h-64 flex items-center justify-center">
@@ -2923,45 +4451,88 @@ if (status === "booting") {
             ) : (
               <>
                 <div className="w-full h-64 bg-white flex items-center justify-center mb-4 rounded-lg border-2 border-dashed border-gray-200">
-                  <img src={fullVoucherData?.qrImage} alt="QR" style={{ width: 200, height: 200, imageRendering: 'pixelated' }} />
+                  <img
+                    src={fullVoucherData?.qrImage}
+                    alt="QR"
+                    style={{
+                      width: 200,
+                      height: 200,
+                      imageRendering: "pixelated",
+                    }}
+                  />
                 </div>
-                <p className="font-mono text-xs break-all text-muted-foreground mb-4 bg-gray-100 p-2 rounded">{fullVoucherData?.qrPayload}</p>
+                <p className="font-mono text-xs break-all text-muted-foreground mb-4 bg-gray-100 p-2 rounded">
+                  {fullVoucherData?.qrPayload}
+                </p>
               </>
             )}
 
-            <Button className="w-full font-bold" onClick={() => setSelectedQrId(null)}>{t('common.close')}</Button>
+            <Button
+              className="w-full font-bold"
+              onClick={() => setSelectedQrId(null)}
+            >
+              {t("common.close")}
+            </Button>
           </div>
         </div>
       )}
 
       {selectedSignature && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4" onClick={() => setSelectedSignature(null)}>
-          <div className="glass-panel p-6 max-w-lg w-full animate-in zoom-in-50 duration-200" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4"
+          onClick={() => setSelectedSignature(null)}
+        >
+          <div
+            className="glass-panel p-6 max-w-lg w-full animate-in zoom-in-50 duration-200"
+            onClick={(e: React.MouseEvent) => e.stopPropagation()}
+          >
             <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-foreground">╨ƒ╨ò╨á╨ò╨ô╨¢╨»╨ö ╨ƒ╨å╨ö╨ƒ╨ÿ╨í╨ú</h3>
-                <Button variant="ghost" size="sm" onClick={() => setSelectedSignature(null)}>
-                    <X className="w-5 h-5" />
-                </Button>
-            </div>
-            
-            <div className="bg-white rounded-lg p-4 mb-6">
-                <SignatureViewer data={selectedSignature} />
+              <h3 className="text-xl font-bold text-foreground">
+                ╨ƒ╨ò╨á╨ò╨ô╨¢╨»╨ö ╨ƒ╨å╨ö╨ƒ╨ÿ╨í╨ú
+              </h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedSignature(null)}
+              >
+                <X className="w-5 h-5" />
+              </Button>
             </div>
 
-            <Button className="w-full font-bold" onClick={() => setSelectedSignature(null)}>╨ù╨É╨Ü╨á╨ÿ╨ó╨ÿ</Button>
+            <div className="bg-white rounded-lg p-4 mb-6">
+              <SignatureViewer data={selectedSignature} />
+            </div>
+
+            <Button
+              className="w-full font-bold"
+              onClick={() => setSelectedSignature(null)}
+            >
+              ╨ù╨É╨Ü╨á╨ÿ╨ó╨ÿ
+            </Button>
           </div>
         </div>
       )}
 
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
-          <div className="glass-panel p-6 max-w-sm w-full animate-in zoom-in-50 duration-200" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-            <h3 className="text-xl font-bold text-foreground mb-2">{t('vouchers.deleteConfirmTitle')}</h3>
+          <div
+            className="glass-panel p-6 max-w-sm w-full animate-in zoom-in-50 duration-200"
+            onClick={(e: React.MouseEvent) => e.stopPropagation()}
+          >
+            <h3 className="text-xl font-bold text-foreground mb-2">
+              {t("vouchers.deleteConfirmTitle")}
+            </h3>
             <p className="text-muted-foreground mb-6">
-              {t('vouchers.deleteConfirm', selectedVoucherIds.size.toString())}
+              {t("vouchers.deleteConfirm", selectedVoucherIds.size.toString())}
             </p>
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setShowDeleteConfirm(false)}>{t('vouchers.cancel')}</Button>
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setShowDeleteConfirm(false)}
+              >
+                {t("vouchers.cancel")}
+              </Button>
               <Button
                 variant="destructive"
                 className="flex-1"
@@ -2970,7 +4541,7 @@ if (status === "booting") {
                   setShowDeleteConfirm(false);
                 }}
               >
-                {t('vouchers.delete')}
+                {t("vouchers.delete")}
               </Button>
             </div>
           </div>
@@ -2979,13 +4550,24 @@ if (status === "booting") {
 
       {showDeleteAllConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
-          <div className="glass-panel p-6 max-w-sm w-full animate-in zoom-in-50 duration-200" onClick={(e: any) => e.stopPropagation()}>
-            <h3 className="text-xl font-bold text-foreground mb-2">{t('vouchers.deleteAllTitle')}</h3>
+          <div
+            className="glass-panel p-6 max-w-sm w-full animate-in zoom-in-50 duration-200"
+            onClick={(e: any) => e.stopPropagation()}
+          >
+            <h3 className="text-xl font-bold text-foreground mb-2">
+              {t("vouchers.deleteAllTitle")}
+            </h3>
             <p className="text-muted-foreground mb-6">
-              {t('vouchers.deleteAllConfirm', globalTotal.toString())}
+              {t("vouchers.deleteAllConfirm", globalTotal.toString())}
             </p>
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setShowDeleteAllConfirm(false)}>{t('vouchers.cancel')}</Button>
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setShowDeleteAllConfirm(false)}
+              >
+                {t("vouchers.cancel")}
+              </Button>
               <Button
                 variant="destructive"
                 className="flex-1"
@@ -2994,7 +4576,7 @@ if (status === "booting") {
                   setShowDeleteAllConfirm(false);
                 }}
               >
-                {t('vouchers.deleteAllAction')}
+                {t("vouchers.deleteAllAction")}
               </Button>
             </div>
           </div>
@@ -3003,16 +4585,29 @@ if (status === "booting") {
 
       <ConfirmDialog
         open={userConfirm !== null}
-        onOpenChange={(open) => { if (!open) setUserConfirm(null); }}
+        onOpenChange={(open) => {
+          if (!open) setUserConfirm(null);
+        }}
         destructive
-        title={userConfirm?.action === "ban" ? t("users.ban") : t("users.delete")}
-        description={userConfirm?.action === "ban" ? t("users.banConfirm") : t("users.deleteConfirm")}
-        confirmLabel={userConfirm?.action === "ban" ? t("users.ban") : t("users.delete")}
+        title={
+          userConfirm?.action === "ban" ? t("users.ban") : t("users.delete")
+        }
+        description={
+          userConfirm?.action === "ban"
+            ? t("users.banConfirm")
+            : t("users.deleteConfirm")
+        }
+        confirmLabel={
+          userConfirm?.action === "ban" ? t("users.ban") : t("users.delete")
+        }
         cancelLabel={t("common.cancel")}
         onConfirm={() => {
           if (!userConfirm) return;
           if (userConfirm.action === "ban") {
-            setUserBannedMutation.mutate({ userId: userConfirm.id, isBanned: true });
+            setUserBannedMutation.mutate({
+              userId: userConfirm.id,
+              isBanned: true,
+            });
           } else {
             deleteUserMutation.mutate(userConfirm.id);
           }
@@ -3021,23 +4616,42 @@ if (status === "booting") {
 
       {refundTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
-          <div className="glass-panel p-6 max-w-sm w-full animate-in zoom-in-50 duration-200" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-            <h3 className="text-xl font-bold text-foreground mb-2">{t('purchases.refundTitle')}</h3>
+          <div
+            className="glass-panel p-6 max-w-sm w-full animate-in zoom-in-50 duration-200"
+            onClick={(e: React.MouseEvent) => e.stopPropagation()}
+          >
+            <h3 className="text-xl font-bold text-foreground mb-2">
+              {t("purchases.refundTitle")}
+            </h3>
             <p className="text-muted-foreground mb-2">
-              {t('purchases.refundConfirm', (refundTarget.refundableAmountKopecks / 100).toFixed(2))}
+              {t(
+                "purchases.refundConfirm",
+                (refundTarget.refundableAmountKopecks / 100).toFixed(2),
+              )}
             </p>
             {refundTarget.refundableAmountKopecks <= 0 && (
-              <p className="text-warning text-sm mb-6">{t('purchases.refundNothingToRefund')}</p>
+              <p className="text-warning text-sm mb-6">
+                {t("purchases.refundNothingToRefund")}
+              </p>
             )}
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setRefundTarget(null)}>{t('vouchers.cancel')}</Button>
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setRefundTarget(null)}
+              >
+                {t("vouchers.cancel")}
+              </Button>
               <Button
                 variant="destructive"
                 className="flex-1"
                 onClick={() => refundPurchaseMutation.mutate(refundTarget.id)}
-                disabled={refundPurchaseMutation.isPending || refundTarget.refundableAmountKopecks <= 0}
+                disabled={
+                  refundPurchaseMutation.isPending ||
+                  refundTarget.refundableAmountKopecks <= 0
+                }
               >
-                {t('purchases.refund')}
+                {t("purchases.refund")}
               </Button>
             </div>
           </div>
@@ -3046,31 +4660,59 @@ if (status === "booting") {
 
       {showReconciliationAct && reportData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 overflow-auto">
-          <div className="bg-white text-black rounded-xl p-8 max-w-4xl w-full animate-in zoom-in-50 duration-200 max-h-[95vh] overflow-y-auto print:shadow-none print:rounded-none print:p-4 print:max-h-none" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+          <div
+            className="bg-white text-black rounded-xl p-8 max-w-4xl w-full animate-in zoom-in-50 duration-200 max-h-[95vh] overflow-y-auto print:shadow-none print:rounded-none print:p-4 print:max-h-none"
+            onClick={(e: React.MouseEvent) => e.stopPropagation()}
+          >
             <style>{`@media print { .no-print { display: none !important; } body { background: white; } th, tr { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }`}</style>
             <div className="flex justify-between items-center mb-6 no-print">
-              <h2 className="text-xl font-bold">{t('reconciliation.modalTitle')}</h2>
+              <h2 className="text-xl font-bold">
+                {t("reconciliation.modalTitle")}
+              </h2>
               <div className="flex gap-2">
-                <Button onClick={() => window.print()} variant="default" size="sm" className="bg-blue-600 text-white hover:bg-blue-700">
-                  {t('common.print')}
+                <Button
+                  onClick={() => window.print()}
+                  variant="default"
+                  size="sm"
+                  className="bg-blue-600 text-white hover:bg-blue-700"
+                >
+                  {t("common.print")}
                 </Button>
-                <Button onClick={() => setShowReconciliationAct(false)} variant="outline" size="sm">{t('common.close')}</Button>
+                <Button
+                  onClick={() => setShowReconciliationAct(false)}
+                  variant="outline"
+                  size="sm"
+                >
+                  {t("common.close")}
+                </Button>
               </div>
             </div>
 
             <div className="text-center mb-8">
-              <h1 className="text-2xl font-bold uppercase">{t('reconciliation.documentTitle')}</h1>
+              <h1 className="text-2xl font-bold uppercase">
+                {t("reconciliation.documentTitle")}
+              </h1>
               <p className="text-muted-foreground mt-1">
-                {t('reconciliation.periodLabel')} {reportData.period.from ? formatDate(reportData.period.from) : t('reconciliation.periodFrom')}
-                {' — '}
-                {reportData.period.to ? formatDate(reportData.period.to) : t('reconciliation.periodTo')}
+                {t("reconciliation.periodLabel")}{" "}
+                {reportData.period.from
+                  ? formatDate(reportData.period.from)
+                  : t("reconciliation.periodFrom")}
+                {" — "}
+                {reportData.period.to
+                  ? formatDate(reportData.period.to)
+                  : t("reconciliation.periodTo")}
               </p>
               {(() => {
-                const u = reportUserId ? userOptions.find((x: AdminUserOption) => x.id === reportUserId) : null;
+                const u = reportUserId
+                  ? userOptions.find(
+                      (x: AdminUserOption) => x.id === reportUserId,
+                    )
+                  : null;
                 if (!u) return null;
                 return (
                   <p className="text-gray-700 mt-2 font-medium">
-                    {t('reconciliation.userLabel')} {u.firstName || ''} {u.lastName || ''} ({u.phone || ''})
+                    {t("reconciliation.userLabel")} {u.firstName || ""}{" "}
+                    {u.lastName || ""} ({u.phone || ""})
                   </p>
                 );
               })()}
@@ -3079,57 +4721,138 @@ if (status === "booting") {
             <table className="w-full border-collapse mb-6">
               <thead>
                 <tr className="bg-gray-100">
-                  <th className="border border-gray-300 p-2 text-left text-sm">{t('table.number')}</th>
-                  <th className="border border-gray-300 p-2 text-left text-sm">{t('table.date')}</th>
-                  <th className="border border-gray-300 p-2 text-left text-sm">{t('table.description')}</th>
-                  <th className="border border-gray-300 p-2 text-right text-sm">{t('table.debit')}</th>
-                  <th className="border border-gray-300 p-2 text-right text-sm">{t('table.credit')}</th>
+                  <th className="border border-gray-300 p-2 text-left text-sm">
+                    {t("table.number")}
+                  </th>
+                  <th className="border border-gray-300 p-2 text-left text-sm">
+                    {t("table.date")}
+                  </th>
+                  <th className="border border-gray-300 p-2 text-left text-sm">
+                    {t("table.description")}
+                  </th>
+                  <th className="border border-gray-300 p-2 text-right text-sm">
+                    {t("table.debit")}
+                  </th>
+                  <th className="border border-gray-300 p-2 text-right text-sm">
+                    {t("table.credit")}
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {reportData.payments.length === 0 && reportData.redemptions.length === 0 ? (
-                  <tr><td colSpan={5} className="border border-gray-300 p-4 text-center text-muted-foreground">{t('reconciliation.noOperations')}</td></tr>
+                {reportData.payments.length === 0 &&
+                reportData.redemptions.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="border border-gray-300 p-4 text-center text-muted-foreground"
+                    >
+                      {t("reconciliation.noOperations")}
+                    </td>
+                  </tr>
                 ) : (
                   <>
                     {(() => {
-                      const totalPaid = reportData.payments.reduce((s: number, p: any) => s + p.amount, 0);
-                      const totalLiters = reportData.payments.reduce((s: number, p: any) => s + p.liters, 0);
-                      const avgPrice = totalLiters > 0 ? totalPaid / totalLiters : 0;
-                      const rows: { type: string; date: string; desc: string; debit: number | null; credit: number | null; id: string }[] = [];
+                      const totalPaid = reportData.payments.reduce(
+                        (s: number, p: any) => s + p.amount,
+                        0,
+                      );
+                      const totalLiters = reportData.payments.reduce(
+                        (s: number, p: any) => s + p.liters,
+                        0,
+                      );
+                      const avgPrice =
+                        totalLiters > 0 ? totalPaid / totalLiters : 0;
+                      const rows: {
+                        type: string;
+                        date: string;
+                        desc: string;
+                        debit: number | null;
+                        credit: number | null;
+                        id: string;
+                      }[] = [];
                       reportData.payments.forEach((p: any) => {
                         rows.push({
-                          type: 'payment', id: p.orderId, date: p.createdAtUtc,
-                          desc: t('reconciliation.paymentDesc', p.fuelName || p.fuelType || t('reconciliation.fuel'), (p.liters / p.quantity).toString(), p.quantity.toString()),
-                          debit: p.amount, credit: null,
+                          type: "payment",
+                          id: p.orderId,
+                          date: p.createdAtUtc,
+                          desc: t(
+                            "reconciliation.paymentDesc",
+                            p.fuelName ||
+                              p.fuelType ||
+                              t("reconciliation.fuel"),
+                            (p.liters / p.quantity).toString(),
+                            p.quantity.toString(),
+                          ),
+                          debit: p.amount,
+                          credit: null,
                         });
                         // Confirmed refund = money returned for undelivered vouchers.
-                        if (p.refundStatus === 'Completed' && p.refundedKopecks > 0) {
+                        if (
+                          p.refundStatus === "Completed" &&
+                          p.refundedKopecks > 0
+                        ) {
                           rows.push({
-                            type: 'refund', id: p.orderId + '-refund', date: p.createdAtUtc,
-                            desc: t('reconciliation.refundDesc', p.fuelName || p.fuelType || t('reconciliation.fuel')),
-                            debit: null, credit: p.refundedKopecks / 100,
+                            type: "refund",
+                            id: p.orderId + "-refund",
+                            date: p.createdAtUtc,
+                            desc: t(
+                              "reconciliation.refundDesc",
+                              p.fuelName ||
+                                p.fuelType ||
+                                t("reconciliation.fuel"),
+                            ),
+                            debit: null,
+                            credit: p.refundedKopecks / 100,
                           });
                         }
                       });
                       reportData.redemptions.forEach((r: any) => {
                         rows.push({
-                          type: 'redemption', id: r.voucherId, date: r.redeemedAt,
-                          desc: t('reconciliation.redemptionDesc', r.fuelName || r.fuelType || t('reconciliation.fuel'), r.liters.toString()),
-                          debit: null, credit: r.liters * avgPrice,
+                          type: "redemption",
+                          id: r.voucherId,
+                          date: r.redeemedAt,
+                          desc: t(
+                            "reconciliation.redemptionDesc",
+                            r.fuelName ||
+                              r.fuelType ||
+                              t("reconciliation.fuel"),
+                            r.liters.toString(),
+                          ),
+                          debit: null,
+                          credit: r.liters * avgPrice,
                         });
                       });
-                      rows.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-                      let totalDebit = 0, totalCredit = 0;
+                      rows.sort(
+                        (a, b) =>
+                          new Date(a.date).getTime() -
+                          new Date(b.date).getTime(),
+                      );
+                      let totalDebit = 0,
+                        totalCredit = 0;
                       return rows.map((row, i) => {
                         if (row.debit !== null) totalDebit += row.debit;
                         if (row.credit !== null) totalCredit += row.credit;
                         return (
                           <tr key={row.id}>
-                            <td className="border border-gray-300 p-2 text-sm font-mono">{i + 1}</td>
-                            <td className="border border-gray-300 p-2 text-sm">{formatDate(row.date)}</td>
-                            <td className="border border-gray-300 p-2 text-sm">{row.desc}</td>
-                            <td className="border border-gray-300 p-2 text-sm text-right font-mono">{row.debit !== null ? row.debit.toLocaleString() : '—'}</td>
-                            <td className="border border-gray-300 p-2 text-sm text-right font-mono">{row.credit !== null ? row.credit.toLocaleString() : '—'}</td>
+                            <td className="border border-gray-300 p-2 text-sm font-mono">
+                              {i + 1}
+                            </td>
+                            <td className="border border-gray-300 p-2 text-sm">
+                              {formatDate(row.date)}
+                            </td>
+                            <td className="border border-gray-300 p-2 text-sm">
+                              {row.desc}
+                            </td>
+                            <td className="border border-gray-300 p-2 text-sm text-right font-mono">
+                              {row.debit !== null
+                                ? row.debit.toLocaleString()
+                                : "—"}
+                            </td>
+                            <td className="border border-gray-300 p-2 text-sm text-right font-mono">
+                              {row.credit !== null
+                                ? row.credit.toLocaleString()
+                                : "—"}
+                            </td>
                           </tr>
                         );
                       });
@@ -3137,42 +4860,104 @@ if (status === "booting") {
                   </>
                 )}
               </tbody>
-              {reportData.payments.length > 0 || reportData.redemptions.length > 0 ? (
+              {reportData.payments.length > 0 ||
+              reportData.redemptions.length > 0 ? (
                 <tfoot>
                   {(() => {
-                    const totalPaid = reportData.payments.reduce((s: number, p: any) => s + p.amount, 0);
-                    const totalLiters = reportData.payments.reduce((s: number, p: any) => s + p.liters, 0);
-                    const avgPrice = totalLiters > 0 ? totalPaid / totalLiters : 0;
-                    let totalDebit = reportData.payments.reduce((s: number, p: any) => s + p.amount, 0);
-                    let totalCredit = reportData.redemptions.reduce((s: number, r: any) => s + r.liters * avgPrice, 0);
-                    const totalRefunded = reportData.payments.reduce((s: number, p: any) =>
-                      s + (p.refundStatus === 'Completed' ? (p.refundedKopecks ?? 0) / 100 : 0), 0);
-                    const totalDelivered = reportData.payments.reduce((s: number, p: any) =>
-                      s + ((p.fulfilledValueKopecks ?? 0) / 100), 0);
+                    const totalPaid = reportData.payments.reduce(
+                      (s: number, p: any) => s + p.amount,
+                      0,
+                    );
+                    const totalLiters = reportData.payments.reduce(
+                      (s: number, p: any) => s + p.liters,
+                      0,
+                    );
+                    const avgPrice =
+                      totalLiters > 0 ? totalPaid / totalLiters : 0;
+                    let totalDebit = reportData.payments.reduce(
+                      (s: number, p: any) => s + p.amount,
+                      0,
+                    );
+                    let totalCredit = reportData.redemptions.reduce(
+                      (s: number, r: any) => s + r.liters * avgPrice,
+                      0,
+                    );
+                    const totalRefunded = reportData.payments.reduce(
+                      (s: number, p: any) =>
+                        s +
+                        (p.refundStatus === "Completed"
+                          ? (p.refundedKopecks ?? 0) / 100
+                          : 0),
+                      0,
+                    );
+                    const totalDelivered = reportData.payments.reduce(
+                      (s: number, p: any) =>
+                        s + (p.fulfilledValueKopecks ?? 0) / 100,
+                      0,
+                    );
                     totalCredit += totalRefunded;
                     const balance = totalDebit - totalCredit;
                     return (
                       <>
                         <tr className="font-bold bg-gray-50">
-                          <td colSpan={3} className="border border-gray-300 p-2 text-sm text-right">{t('reconciliation.total')}</td>
-                          <td className="border border-gray-300 p-2 text-sm text-right font-mono">{totalDebit.toLocaleString()}</td>
-                          <td className="border border-gray-300 p-2 text-sm text-right font-mono">{totalCredit.toLocaleString()}</td>
+                          <td
+                            colSpan={3}
+                            className="border border-gray-300 p-2 text-sm text-right"
+                          >
+                            {t("reconciliation.total")}
+                          </td>
+                          <td className="border border-gray-300 p-2 text-sm text-right font-mono">
+                            {totalDebit.toLocaleString()}
+                          </td>
+                          <td className="border border-gray-300 p-2 text-sm text-right font-mono">
+                            {totalCredit.toLocaleString()}
+                          </td>
                         </tr>
                         <tr className="text-muted-foreground">
-                          <td colSpan={4} className="border border-gray-300 p-2 text-sm text-right">{t('reconciliation.received')}</td>
-                          <td className="border border-gray-300 p-2 text-sm text-right font-mono">{totalDebit.toLocaleString()} {t('table.uah')}</td>
+                          <td
+                            colSpan={4}
+                            className="border border-gray-300 p-2 text-sm text-right"
+                          >
+                            {t("reconciliation.received")}
+                          </td>
+                          <td className="border border-gray-300 p-2 text-sm text-right font-mono">
+                            {totalDebit.toLocaleString()} {t("table.uah")}
+                          </td>
                         </tr>
                         <tr className="text-muted-foreground">
-                          <td colSpan={4} className="border border-gray-300 p-2 text-sm text-right">{t('reconciliation.deliveredValue')}</td>
-                          <td className="border border-gray-300 p-2 text-sm text-right font-mono">{totalDelivered.toLocaleString()} {t('table.uah')}</td>
+                          <td
+                            colSpan={4}
+                            className="border border-gray-300 p-2 text-sm text-right"
+                          >
+                            {t("reconciliation.deliveredValue")}
+                          </td>
+                          <td className="border border-gray-300 p-2 text-sm text-right font-mono">
+                            {totalDelivered.toLocaleString()} {t("table.uah")}
+                          </td>
                         </tr>
                         <tr className="text-muted-foreground">
-                          <td colSpan={4} className="border border-gray-300 p-2 text-sm text-right">{t('reconciliation.refundedLabel')}</td>
-                          <td className="border border-gray-300 p-2 text-sm text-right font-mono">{totalRefunded.toLocaleString()} {t('table.uah')}</td>
+                          <td
+                            colSpan={4}
+                            className="border border-gray-300 p-2 text-sm text-right"
+                          >
+                            {t("reconciliation.refundedLabel")}
+                          </td>
+                          <td className="border border-gray-300 p-2 text-sm text-right font-mono">
+                            {totalRefunded.toLocaleString()} {t("table.uah")}
+                          </td>
                         </tr>
                         <tr className="font-bold bg-blue-50">
-                          <td colSpan={4} className="border border-gray-300 p-2 text-sm text-right">{t('reconciliation.balance')}</td>
-                          <td className={`border border-gray-300 p-2 text-sm text-right font-mono ${balance >= 0 ? 'text-green-700' : 'text-red-700'}`}>{balance.toLocaleString()} {t('table.uah')}</td>
+                          <td
+                            colSpan={4}
+                            className="border border-gray-300 p-2 text-sm text-right"
+                          >
+                            {t("reconciliation.balance")}
+                          </td>
+                          <td
+                            className={`border border-gray-300 p-2 text-sm text-right font-mono ${balance >= 0 ? "text-green-700" : "text-red-700"}`}
+                          >
+                            {balance.toLocaleString()} {t("table.uah")}
+                          </td>
                         </tr>
                       </>
                     );
@@ -3183,11 +4968,15 @@ if (status === "booting") {
 
             <div className="grid grid-cols-2 gap-8 mt-10 text-sm">
               <div>
-                <p className="font-medium mb-8">{t('reconciliation.adminSignature')}</p>
+                <p className="font-medium mb-8">
+                  {t("reconciliation.adminSignature")}
+                </p>
                 <div className="border-b border-gray-400 mt-10" />
               </div>
               <div>
-                <p className="font-medium mb-8">{t('reconciliation.userSignature')}</p>
+                <p className="font-medium mb-8">
+                  {t("reconciliation.userSignature")}
+                </p>
                 <div className="border-b border-gray-400 mt-10" />
               </div>
             </div>
@@ -3195,37 +4984,47 @@ if (status === "booting") {
         </div>
       )}
 
-
       <VoucherLifecycleDrawer
         voucherId={lifecycleVoucher?.id ?? null}
         voucherNumber={lifecycleVoucher?.number ?? null}
-        onOpenChange={(open) => { if (!open) setLifecycleVoucher(null); }}
+        onOpenChange={(open) => {
+          if (!open) setLifecycleVoucher(null);
+        }}
       />
     </Layout>
   );
 }
 
 const SignatureViewer = ({ data }: { data: string }) => {
-    try {
-      const paths = JSON.parse(data);
-      if (!Array.isArray(paths)) return <div className="text-red-500">Invalid signature data</div>;
-      
-      return (
-        <svg viewBox="0 0 400 200" className="w-full h-auto" style={{ maxHeight: '300px' }}>
-          {paths.map((d: string, i: number) => (
-            <path 
-                key={i} 
-                d={d} 
-                fill="none" 
-                stroke="#22c55e" 
-                strokeWidth="4" 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-            />
-          ))}
-        </svg>
-      );
-    } catch (e) {
-      return <div className="p-4 text-red-500 text-center">╨ƒ╨╛╨╝╨╕╨╗╨║╨░ ╨╖╨░╨▓╨░╨╜╤é╨░╨╢╨╡╨╜╨╜╤Å ╨┐╤û╨┤╨┐╨╕╤ü╤â</div>;
-    }
+  try {
+    const paths = JSON.parse(data);
+    if (!Array.isArray(paths))
+      return <div className="text-red-500">Invalid signature data</div>;
+
+    return (
+      <svg
+        viewBox="0 0 400 200"
+        className="w-full h-auto"
+        style={{ maxHeight: "300px" }}
+      >
+        {paths.map((d: string, i: number) => (
+          <path
+            key={i}
+            d={d}
+            fill="none"
+            stroke="#22c55e"
+            strokeWidth="4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        ))}
+      </svg>
+    );
+  } catch (e) {
+    return (
+      <div className="p-4 text-red-500 text-center">
+        ╨ƒ╨╛╨╝╨╕╨╗╨║╨░ ╨╖╨░╨▓╨░╨╜╤é╨░╨╢╨╡╨╜╨╜╤Å ╨┐╤û╨┤╨┐╨╕╤ü╤â
+      </div>
+    );
+  }
 };

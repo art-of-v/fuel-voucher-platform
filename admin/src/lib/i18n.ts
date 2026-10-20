@@ -31,11 +31,13 @@ export const translations: Record<Language, Record<string, string>> = {
     "nav.auditlog": "Audit Log",
     "nav.heldPayments": "Held money",
     "heldPayments.title": "Money we hold",
-    "heldPayments.explainer": "Payments received outside an order. Each one is money that belongs to somebody — name its owner, then place it on an order. Nothing here is guessed: the server refuses to attach money to another customer's order, or to a customer a payment already names.",
+    "heldPayments.explainer":
+      "Payments received outside an order. Each one is money that belongs to somebody — name its owner, then place it on an order. Nothing here is guessed: the server refuses to attach money to another customer's order, or to a customer a payment already names.",
     "heldPayments.codeLookup": "Which customer does this code belong to?",
     "heldPayments.find": "Look up",
     "heldPayments.codeFound": "That code belongs to a customer.",
-    "heldPayments.codeNotFound": "No customer has that code. It was mistyped, or it belongs to someone who has not registered.",
+    "heldPayments.codeNotFound":
+      "No customer has that code. It was mistyped, or it belongs to someone who has not registered.",
     "heldPayments.codeBelongsTo": "The code belongs to",
     "heldPayments.noName": "(no name)",
     "heldPayments.amount": "Amount",
@@ -53,7 +55,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "heldPayments.pickOrder": "Pick an order…",
     "heldPayments.attach": "Attach",
     "heldPayments.amountDiffers": "different amount",
-    "heldPayments.empty": "Nothing is being held. Every payment is against an order.",
+    "heldPayments.empty":
+      "Nothing is being held. Every payment is against an order.",
     "nav.errorlogs": "Error Logs",
     "nav.feedback": "Feedback",
     "nav.reports": "Reports",
@@ -215,9 +218,11 @@ export const translations: Record<Language, Record<string, string>> = {
     "stationNodes.phone": "Phone",
     "stationNodes.stationType": "Type",
     "stationNodes.externalId": "External ID",
-    "stationNodes.externalIdHint": "Importer key (leave blank to derive from the brand + coordinates)",
+    "stationNodes.externalIdHint":
+      "Importer key (leave blank to derive from the brand + coordinates)",
     "stationNodes.autoId": "Auto ID",
-    "stationNodes.autoIdHint": "Derive the external id from the brand's slug + coordinates",
+    "stationNodes.autoIdHint":
+      "Derive the external id from the brand's slug + coordinates",
     "stationNodes.invalidCoords": "Coordinates out of range",
     "stationNodes.coordinates": "Coordinates",
     "stationNodes.noNodes": "No AZK points yet. Add one or import a file.",
@@ -412,6 +417,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "imports.file": "File",
     "imports.pages": "Pages",
     "imports.vouchers": "Vouchers",
+    "imports.page": "Page",
+    "imports.pageOf": "Page {0} of {1}",
     "imports.imported": "Imported",
     "imports.duplicates": "Duplicates",
     "imports.errors": "Errors",
@@ -480,7 +487,8 @@ export const translations: Record<Language, Record<string, string>> = {
       "This fuel's packages do not all carry the same cost or customer price. Saving this row rewrites every package to what is shown here.",
     "priceHistory.atTitle": "Price on a date",
     "priceHistory.atResult": "That day it was",
-    "priceHistory.atNone": "No price was in effect on that date - the fuel was not priced yet.",
+    "priceHistory.atNone":
+      "No price was in effect on that date - the fuel was not priced yet.",
     "priceHistory.stoodFrom": "in effect from {0}",
     "priceHistory.stoodUntil": "until {0}",
     "priceHistory.stoodUntilNow": "still in effect",
@@ -500,7 +508,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "priceHistory.reasonExchangeRelease": "Exchange release",
     "priceHistory.reasonBackfill": "Backfill",
     "priceHistory.reasonUnknown": "Unknown reason",
-    "priceHistory.openHint": "Price history",    "price.spreadCost": "cost across packages: {0} – {1}",
+    "priceHistory.openHint": "Price history",
+    "price.spreadCost": "cost across packages: {0} – {1}",
     "price.allowBelowCost": "Allow below cost",
     "price.isTestData": "QA / rehearsal",
     "price.live": "Live",
@@ -520,14 +529,16 @@ export const translations: Record<Language, Record<string, string>> = {
     "fuel.code": "Code",
     "fuel.codePlaceholder": "e.g. A-95",
     "fuel.codeNone": "no code",
-    "fuel.codeHint": "The code the network publishes for this grade. A fuel without one cannot be matched by the catalogue sync, so it is not repriced automatically.",
+    "fuel.codeHint":
+      "The code the network publishes for this grade. A fuel without one cannot be matched by the catalogue sync, so it is not repriced automatically.",
     "brands.addBrand": "Add Brand",
     "brands.syncCatalogue": "Update from the networks",
     "brands.syncCatalogueHint":
       "Reads each network's price list and adds the grades we do not carry yet. It runs on its own every week; this starts it now. It takes a minute - the vendors' pages are fetched one at a time.",
     "brands.syncCatalogueStarted":
       "The catalogue check is running for OKKO, UPG, WOG and KLO. What it found is in the backend log, and what it changed is on this screen.",
-    "brands.syncCatalogueFailed": "The catalogue check could not be started. See the backend log.",
+    "brands.syncCatalogueFailed":
+      "The catalogue check could not be started. See the backend log.",
     "brands.addProvider": "Add Brand",
     "brands.namePlaceholder": "Brand Name (e.g. OKKO)",
     "brands.logoText": "Logo Text",
@@ -664,7 +675,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "users.noRole": "No role",
     "users.qaBadge": "QA",
     "users.qaBadgeTitle": "QA test account — see QA_TEST_ACCESS.md",
-    "users.settlementCodeTitle": "Issued once at registration. Quote this to the finance channel to attribute a payment. It never changes, and it is not the referral code.",
+    "users.settlementCodeTitle":
+      "Issued once at registration. Quote this to the finance channel to attribute a payment. It never changes, and it is not the referral code.",
     "users.createdAt": "Created Date",
     "users.total": "Total",
     "users.activate": "Activate",
@@ -732,7 +744,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "suppliers.name": "Name",
     "suppliers.legalForm": "Legal form",
     "suppliers.acquisitionSource": "Supply route",
-    "suppliers.acquisitionSourceFixedHint": "Fixed when the supplier was created — every voucher imported from them carries a copy.",
+    "suppliers.acquisitionSourceFixedHint":
+      "Fixed when the supplier was created — every voucher imported from them carries a copy.",
     "suppliers.legalFormPlaceholder": "Select a form",
     "suppliers.phone": "Phone",
     "suppliers.email": "Email",
@@ -837,7 +850,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "voucherLifecycle.loadFailed": "Could not load the lifecycle",
     "voucherLifecycle.timeline": "Timeline",
     "voucherLifecycle.empty": "Nothing has been recorded for this voucher yet",
-    "voucherLifecycle.archivedNote": "This voucher is archived. Its history is kept and stays readable.",
+    "voucherLifecycle.archivedNote":
+      "This voucher is archived. Its history is kept and stays readable.",
     "voucherLifecycle.unknown": "Unknown",
     "voucherLifecycle.notRecorded": "Not recorded",
     "voucherLifecycle.importedFrom": "Imported from",
@@ -1000,13 +1014,16 @@ export const translations: Record<Language, Record<string, string>> = {
     "feedback.verdictJunk": "Dropped",
     "feedback.verdictUnclassified": "Unclassified",
     "feedback.verdictAll": "Everything",
-    "feedback.verdictHint": "The list opens on messages the triage step kept, not on everything that arrived.",
+    "feedback.verdictHint":
+      "The list opens on messages the triage step kept, not on everything that arrived.",
     "feedback.unsure": "Unsure drops",
-    "feedback.unsureHint": "Junk the classifier was not confident about - the early warning that it may be discarding real complaints.",
+    "feedback.unsureHint":
+      "Junk the classifier was not confident about - the early warning that it may be discarding real complaints.",
     "feedback.markHandled": "Mark handled",
     "feedback.markRejected": "Reject",
     "feedback.clearJunk": "Clear dropped",
-    "feedback.clearJunkConfirm": "Delete every message the triage step dropped? This cannot be undone.",
+    "feedback.clearJunkConfirm":
+      "Delete every message the triage step dropped? This cannot be undone.",
     "feedback.junkCleared": "Dropped messages deleted",
     "feedback.stateChanged": "Feedback updated",
     "feedback.empty": "Nothing here yet.",
@@ -1018,9 +1035,11 @@ export const translations: Record<Language, Record<string, string>> = {
     "feedback.anonymous": "not linked",
     "feedback.telegramChat": "Telegram chat",
     "feedback.replies": "Answers sent",
-    "feedback.noReplies": "Nobody has answered yet - reply in the staff Telegram group by quoting the bot's post.",
+    "feedback.noReplies":
+      "Nobody has answered yet - reply in the staff Telegram group by quoting the bot's post.",
     "feedback.showing": "{0}-{1} of {2}",
-    "feedback.summary": "{0} received · {1} useful · {2} dropped · {3} unclassified · {4} answered",
+    "feedback.summary":
+      "{0} received · {1} useful · {2} dropped · {3} unclassified · {4} answered",
     "auditlog.event.ProviderUpdated": "Brand Updated",
     "auditlog.event.ProviderDeleted": "Brand Deleted",
     "auditlog.event.FuelAdded": "Fuel Added",
@@ -1028,7 +1047,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "auditlog.event.PriceChanged": "Price Changed",
     "auditlog.event.NominalSetChanged": "Nominal Set Changed",
     "auditlog.event.AdminLoggedIn": "Admin Logged In",
-"auditlog.event.AdminLoginFailed": "Admin Login Failed",
+    "auditlog.event.AdminLoginFailed": "Admin Login Failed",
     "auditlog.event.UserDeleted": "User Deleted",
 
     // The #281 parity block below was originally pasted here as well, re-declaring four keys this
@@ -1041,7 +1060,8 @@ export const translations: Record<Language, Record<string, string>> = {
     // Acquirer statement act (#118). The endpoints, CSV and PDF have existed since
     // 11 October with nothing calling them; this is the surface they were built for.
     "statementAct.title": "Acquirer statement act",
-    "statementAct.hint": "The acquirer's own record for a period against ours - the only reconciliation that can find us being wrong. Built for the previous calendar month by default: the current one is still accruing rows.",
+    "statementAct.hint":
+      "The acquirer's own record for a period against ours - the only reconciliation that can find us being wrong. Built for the previous calendar month by default: the current one is still accruing rows.",
     "statementAct.merchant": "Merchant",
     "statementAct.merchant.live": "Live",
     "statementAct.merchant.sandbox": "Sandbox",
@@ -1101,11 +1121,13 @@ export const translations: Record<Language, Record<string, string>> = {
     "nav.auditlog": "Журнал змін",
     "nav.heldPayments": "Утримані гроші",
     "heldPayments.title": "Гроші, які ми тримаємо",
-    "heldPayments.explainer": "Платежі, отримані поза замовленням. Кожен — це чиїсь гроші: спершу вкажіть власника, потім прикріпіть до замовлення. Тут нічого не вгадується: сервер відмовиться прикріплювати гроші до замовлення іншого клієнта або до клієнта, якому платіж уже належить.",
+    "heldPayments.explainer":
+      "Платежі, отримані поза замовленням. Кожен — це чиїсь гроші: спершу вкажіть власника, потім прикріпіть до замовлення. Тут нічого не вгадується: сервер відмовиться прикріплювати гроші до замовлення іншого клієнта або до клієнта, якому платіж уже належить.",
     "heldPayments.codeLookup": "Кому належить цей код?",
     "heldPayments.find": "Знайти",
     "heldPayments.codeFound": "Цей код належить клієнтові.",
-    "heldPayments.codeNotFound": "Жоден клієнт не має такого коду. Або в ньому помилка, або він належить тому, хто ще не зареєструвався.",
+    "heldPayments.codeNotFound":
+      "Жоден клієнт не має такого коду. Або в ньому помилка, або він належить тому, хто ще не зареєструвався.",
     "heldPayments.codeBelongsTo": "Код належить",
     "heldPayments.noName": "(без імені)",
     "heldPayments.amount": "Сума",
@@ -1123,7 +1145,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "heldPayments.pickOrder": "Оберіть замовлення…",
     "heldPayments.attach": "Прикріпити",
     "heldPayments.amountDiffers": "інша сума",
-    "heldPayments.empty": "Нічого не утримується. Кожен платіж привʼязаний до замовлення.",
+    "heldPayments.empty":
+      "Нічого не утримується. Кожен платіж привʼязаний до замовлення.",
     "nav.errorlogs": "Журнал помилок",
     "nav.feedback": "Зворотний зв'язок",
     "nav.reports": "Звіти",
@@ -1288,9 +1311,11 @@ export const translations: Record<Language, Record<string, string>> = {
     "stationNodes.phone": "Телефон",
     "stationNodes.stationType": "Тип",
     "stationNodes.externalId": "Зовнішній ID",
-    "stationNodes.externalIdHint": "Ключ для імпорту (лишіть порожнім — виведеться з бренду + координат)",
+    "stationNodes.externalIdHint":
+      "Ключ для імпорту (лишіть порожнім — виведеться з бренду + координат)",
     "stationNodes.autoId": "Авто ID",
-    "stationNodes.autoIdHint": "Вивести зовнішній id зі slug бренду + координат",
+    "stationNodes.autoIdHint":
+      "Вивести зовнішній id зі slug бренду + координат",
     "stationNodes.invalidCoords": "Координати поза діапазоном",
     "stationNodes.coordinates": "Координати",
     "stationNodes.noNodes":
@@ -1487,6 +1512,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "imports.file": "Файл",
     "imports.pages": "Сторінок",
     "imports.vouchers": "Ваучерів",
+    "imports.page": "Сторінка",
+    "imports.pageOf": "Сторінка {0} з {1}",
     "imports.imported": "Імпортовано",
     "imports.duplicates": "Дублікатів",
     "imports.errors": "Помилок",
@@ -1555,7 +1582,8 @@ export const translations: Record<Language, Record<string, string>> = {
       "Пакети цього пального мають різну собівартість або ціну для клієнта. Збереження цього рядка перезапише всі пакети тими значеннями, що показані тут.",
     "priceHistory.atTitle": "Price on a date",
     "priceHistory.atResult": "That day it was",
-    "priceHistory.atNone": "No price was in effect on that date - the fuel was not priced yet.",
+    "priceHistory.atNone":
+      "No price was in effect on that date - the fuel was not priced yet.",
     "priceHistory.stoodFrom": "in effect from {0}",
     "priceHistory.stoodUntil": "until {0}",
     "priceHistory.stoodUntilNow": "still in effect",
@@ -1575,7 +1603,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "priceHistory.reasonExchangeRelease": "Exchange release",
     "priceHistory.reasonBackfill": "Backfill",
     "priceHistory.reasonUnknown": "Unknown reason",
-    "priceHistory.openHint": "Price history",    "price.spreadCost": "собівартість по пакетах: {0} – {1}",
+    "priceHistory.openHint": "Price history",
+    "price.spreadCost": "собівартість по пакетах: {0} – {1}",
     "price.allowBelowCost": "Дозволити нижче собівартості",
     "price.isTestData": "QA / репетиція",
     "price.live": "Бойове",
@@ -1595,14 +1624,16 @@ export const translations: Record<Language, Record<string, string>> = {
     "fuel.code": "Код",
     "fuel.codePlaceholder": "напр. A-95",
     "fuel.codeNone": "без коду",
-    "fuel.codeHint": "Код, який мережа публікує для цієї марки. Паливо без коду не зіставляється каталогом, тому ціна для нього не оновлюватиметься автоматично.",
+    "fuel.codeHint":
+      "Код, який мережа публікує для цієї марки. Паливо без коду не зіставляється каталогом, тому ціна для нього не оновлюватиметься автоматично.",
     "brands.addBrand": "Додати бренд",
     "brands.syncCatalogue": "Оновити з мереж",
     "brands.syncCatalogueHint":
       "Читає ціновий список кожної мережі і додає ті марки, яких у нас ще немає. Самостійно це робиться раз на тиждень; ця кнопка запускає перевірку зараз. Це займає хвилину - сторінки постачальників завантажуються по одній.",
     "brands.syncCatalogueStarted":
       "Перевірка каталогу йде для OKKO, UPG, WOG і KLO. Що вона знайшла - у логі бекенда, а що змінила - на цьому екрані.",
-    "brands.syncCatalogueFailed": "Перевірку каталогу не вдалося запустити. Дивись лог бекенда.",
+    "brands.syncCatalogueFailed":
+      "Перевірку каталогу не вдалося запустити. Дивись лог бекенда.",
     "brands.addProvider": "Додати Постачальника",
     "brands.namePlaceholder": "Назва (напр. OKKO)",
     "brands.logoText": "Текст Логотипу",
@@ -1739,7 +1770,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "users.noRole": "Без ролі",
     "users.qaBadge": "QA",
     "users.qaBadgeTitle": "QA-тестовий акаунт — див. QA_TEST_ACCESS.md",
-    "users.settlementCodeTitle": "Видається один раз при реєстрації. Саме цей код оператор передає у фінансовий канал, щоб прив'язати платіж. Незмінний і не є реферальним кодом.",
+    "users.settlementCodeTitle":
+      "Видається один раз при реєстрації. Саме цей код оператор передає у фінансовий канал, щоб прив'язати платіж. Незмінний і не є реферальним кодом.",
     "users.createdAt": "Дата створення",
     "users.total": "Всього",
     "users.activate": "Активувати",
@@ -1809,7 +1841,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "suppliers.name": "Назва",
     "suppliers.legalForm": "Форма власності",
     "suppliers.acquisitionSource": "Канал постачання",
-    "suppliers.acquisitionSourceFixedHint": "Фіксується при створенні постачальника — кожен талон, імпортований від нього, несе копію.",
+    "suppliers.acquisitionSourceFixedHint":
+      "Фіксується при створенні постачальника — кожен талон, імпортований від нього, несе копію.",
     "suppliers.legalFormPlaceholder": "Оберіть форму",
     "suppliers.phone": "Телефон",
     "suppliers.email": "Пошта",
@@ -1893,7 +1926,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "voucherLifecycle.loadFailed": "Не вдалося завантажити історію",
     "voucherLifecycle.timeline": "Хронологія",
     "voucherLifecycle.empty": "Для цього талона ще нічого не записано",
-    "voucherLifecycle.archivedNote": "Талон в архіві. Його історія зберігається і лишається доступною.",
+    "voucherLifecycle.archivedNote":
+      "Талон в архіві. Його історія зберігається і лишається доступною.",
     "voucherLifecycle.unknown": "Невідомо",
     "voucherLifecycle.notRecorded": "Не записано",
     "voucherLifecycle.importedFrom": "Завезено з",
@@ -2074,13 +2108,16 @@ export const translations: Record<Language, Record<string, string>> = {
     "feedback.verdictJunk": "Відкинуті",
     "feedback.verdictUnclassified": "Не класифіковано",
     "feedback.verdictAll": "Усі",
-    "feedback.verdictHint": "Список відкривається на повідомленнях, які triage визнав корисними, а не на всьому, що надійшло.",
+    "feedback.verdictHint":
+      "Список відкривається на повідомленнях, які triage визнав корисними, а не на всьому, що надійшло.",
     "feedback.unsure": "Сумніві відкидання",
-    "feedback.unsureHint": "Відкинуте, у чому класифікатор не був упевнений - ранній сигнал, що він може викидати справжні скарги.",
+    "feedback.unsureHint":
+      "Відкинуте, у чому класифікатор не був упевнений - ранній сигнал, що він може викидати справжні скарги.",
     "feedback.markHandled": "Опрацьовано",
     "feedback.markRejected": "Відхилити",
     "feedback.clearJunk": "Очистити сміття",
-    "feedback.clearJunkConfirm": "Видалити всі повідомлення, відкинуті triage? Це не можна скасувати.",
+    "feedback.clearJunkConfirm":
+      "Видалити всі повідомлення, відкинуті triage? Це не можна скасувати.",
     "feedback.junkCleared": "Відкинуті повідомлення видалено",
     "feedback.stateChanged": "Зворотний зв'язок оновлено",
     "feedback.empty": "Тут поки порожньо.",
@@ -2092,9 +2129,11 @@ export const translations: Record<Language, Record<string, string>> = {
     "feedback.anonymous": "не прив'язаний",
     "feedback.telegramChat": "Чат Telegram",
     "feedback.replies": "Надіслані відповіді",
-    "feedback.noReplies": "Ще ніхто не відповів - відповідайте в робочій групі Telegram, цитуючи допис бота.",
+    "feedback.noReplies":
+      "Ще ніхто не відповів - відповідайте в робочій групі Telegram, цитуючи допис бота.",
     "feedback.showing": "{0}-{1} з {2}",
-    "feedback.summary": "{0} отримано · {1} корисних · {2} відкинуто · {3} не класифіковано · {4} з відповіддю",
+    "feedback.summary":
+      "{0} отримано · {1} корисних · {2} відкинуто · {3} не класифіковано · {4} з відповіддю",
     "auditlog.event.ProviderCreated": "Постачальника створено",
     "auditlog.event.ProviderUpdated": "Постачальника оновлено",
     "auditlog.event.ProviderDeleted": "Постачальника видалено",
@@ -2109,7 +2148,8 @@ export const translations: Record<Language, Record<string, string>> = {
     // Acquirer statement act (#118). The endpoints, CSV and PDF have existed since
     // 11 October with nothing calling them; this is the surface they were built for.
     "statementAct.title": "Акт звірки з еквайром",
-    "statementAct.hint": "Реєстр операцій еквайрера за період поруч із нашим - єдина звірка, яка може показати, що помились ми. За замовчуванням будується за попередній календарний місяць: поточний ще набирає операцій.",
+    "statementAct.hint":
+      "Реєстр операцій еквайрера за період поруч із нашим - єдина звірка, яка може показати, що помились ми. За замовчуванням будується за попередній календарний місяць: поточний ще набирає операцій.",
     "statementAct.merchant": "Мерчант",
     "statementAct.merchant.live": "Бойовий",
     "statementAct.merchant.sandbox": "Пісочниця",
@@ -2169,11 +2209,13 @@ export const translations: Record<Language, Record<string, string>> = {
     "nav.auditlog": "Audit-Log",
     "nav.heldPayments": "Gehaltenes Geld",
     "heldPayments.title": "Geld, das wir halten",
-    "heldPayments.explainer": "Zahlungen ohne Bestellung. Jede gehört jemandem — erst den Empfänger benennen, dann einer Bestellung zuordnen. Hier wird nichts geraten: Der Server lehnt es ab, Geld einer Bestellung eines anderen Kunden oder einem bereits benannten Kunden zuzuordnen.",
+    "heldPayments.explainer":
+      "Zahlungen ohne Bestellung. Jede gehört jemandem — erst den Empfänger benennen, dann einer Bestellung zuordnen. Hier wird nichts geraten: Der Server lehnt es ab, Geld einer Bestellung eines anderen Kunden oder einem bereits benannten Kunden zuzuordnen.",
     "heldPayments.codeLookup": "Zu welchem Kunden gehört dieser Code?",
     "heldPayments.find": "Suchen",
     "heldPayments.codeFound": "Dieser Code gehört einem Kunden.",
-    "heldPayments.codeNotFound": "Kein Kunde hat diesen Code. Er ist falsch abgetippt, oder er gehört jemandem, der sich noch nicht registriert hat.",
+    "heldPayments.codeNotFound":
+      "Kein Kunde hat diesen Code. Er ist falsch abgetippt, oder er gehört jemandem, der sich noch nicht registriert hat.",
     "heldPayments.codeBelongsTo": "Der Code gehört",
     "heldPayments.noName": "(kein Name)",
     "heldPayments.amount": "Betrag",
@@ -2191,7 +2233,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "heldPayments.pickOrder": "Bestellung wählen…",
     "heldPayments.attach": "Zuordnen",
     "heldPayments.amountDiffers": "anderer Betrag",
-    "heldPayments.empty": "Es wird nichts gehalten. Jede Zahlung ist einer Bestellung zugeordnet.",
+    "heldPayments.empty":
+      "Es wird nichts gehalten. Jede Zahlung ist einer Bestellung zugeordnet.",
     "nav.errorlogs": "Fehlerprotokoll",
     "nav.feedback": "Feedback",
     "nav.reports": "Berichte",
@@ -2357,9 +2400,11 @@ export const translations: Record<Language, Record<string, string>> = {
     "stationNodes.phone": "Telefon",
     "stationNodes.stationType": "Typ",
     "stationNodes.externalId": "Externe ID",
-    "stationNodes.externalIdHint": "Importschlüssel (leer lassen, um ihn aus Marke + Koordinaten abzuleiten)",
+    "stationNodes.externalIdHint":
+      "Importschlüssel (leer lassen, um ihn aus Marke + Koordinaten abzuleiten)",
     "stationNodes.autoId": "Auto-ID",
-    "stationNodes.autoIdHint": "Externe ID aus Marken-Slug + Koordinaten ableiten",
+    "stationNodes.autoIdHint":
+      "Externe ID aus Marken-Slug + Koordinaten ableiten",
     "stationNodes.invalidCoords": "Koordinaten außerhalb des Bereichs",
     "stationNodes.coordinates": "Koordinaten",
     "stationNodes.noNodes":
@@ -2554,7 +2599,8 @@ export const translations: Record<Language, Record<string, string>> = {
       "Die Pakete dieses Kraftstoffs haben nicht alle dieselben Kosten oder Verkaufspreise. Das Speichern dieser Zeile schreibt alle Pakete auf die hier angezeigten Werte um.",
     "priceHistory.atTitle": "Price on a date",
     "priceHistory.atResult": "That day it was",
-    "priceHistory.atNone": "No price was in effect on that date - the fuel was not priced yet.",
+    "priceHistory.atNone":
+      "No price was in effect on that date - the fuel was not priced yet.",
     "priceHistory.stoodFrom": "in effect from {0}",
     "priceHistory.stoodUntil": "until {0}",
     "priceHistory.stoodUntilNow": "still in effect",
@@ -2574,7 +2620,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "priceHistory.reasonExchangeRelease": "Exchange release",
     "priceHistory.reasonBackfill": "Backfill",
     "priceHistory.reasonUnknown": "Unknown reason",
-    "priceHistory.openHint": "Price history",    "price.spreadCost": "Kosten über Pakete: {0} – {1}",
+    "priceHistory.openHint": "Price history",
+    "price.spreadCost": "Kosten über Pakete: {0} – {1}",
     "price.allowBelowCost": "Unter EK erlauben",
     "price.isTestData": "QA / Probelauf",
     "price.live": "Live",
@@ -2594,7 +2641,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "fuel.code": "Code",
     "fuel.codePlaceholder": "z.B. A-95",
     "fuel.codeNone": "kein Code",
-    "fuel.codeHint": "Der Code, den das Netzwerk für diese Sorte veröffentlicht. Ein Kraftstoff ohne Code lässt sich vom Katalogabgleich nicht zuordnen und wird daher nicht automatisch bepreist.",
+    "fuel.codeHint":
+      "Der Code, den das Netzwerk für diese Sorte veröffentlicht. Ein Kraftstoff ohne Code lässt sich vom Katalogabgleich nicht zuordnen und wird daher nicht automatisch bepreist.",
     "price.marginPlaceholder": "z.B. 2.00",
     "price.finalPlaceholder": "Ende (auto)",
     "price.nominalsAuto": "auto",
@@ -2604,7 +2652,8 @@ export const translations: Record<Language, Record<string, string>> = {
       "Liest die Preisliste jedes Netzes und legt die Sorten an, die wir noch nicht führen. Das geschieht sonst jede Woche von selbst; diese Schaltfläche startet es jetzt. Es dauert eine Minute - die Seiten der Anbieter werden nacheinander geladen.",
     "brands.syncCatalogueStarted":
       "Die Katalogprüfung läuft für OKKO, UPG, WOG und KLO. Was sie gefunden hat, steht im Backend-Protokoll, was sie geändert hat, auf diesem Bildschirm.",
-    "brands.syncCatalogueFailed": "Die Katalogprüfung konnte nicht gestartet werden. Sieh im Backend-Protokoll nach.",
+    "brands.syncCatalogueFailed":
+      "Die Katalogprüfung konnte nicht gestartet werden. Sieh im Backend-Protokoll nach.",
     "brands.addProvider": "Marke Hinzufügen",
     "brands.namePlaceholder": "Name (z.B. OKKO)",
     "brands.logoText": "Logo-Text",
@@ -2739,7 +2788,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "users.noRole": "Keine Rolle",
     "users.qaBadge": "QA",
     "users.qaBadgeTitle": "QA-Testkonto — siehe QA_TEST_ACCESS.md",
-    "users.settlementCodeTitle": "Wird bei der Registrierung einmal vergeben. Dieser Code wird an den Finanzkanal übermittelt, um eine Zahlung zuzuordnen. Er ändert sich nie und ist nicht der Empfehlungscode.",
+    "users.settlementCodeTitle":
+      "Wird bei der Registrierung einmal vergeben. Dieser Code wird an den Finanzkanal übermittelt, um eine Zahlung zuzuordnen. Er ändert sich nie und ist nicht der Empfehlungscode.",
     "users.createdAt": "Erstellt am",
     "users.total": "Gesamt",
     "users.activate": "Aktivieren",
@@ -2807,7 +2857,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "suppliers.name": "Name",
     "suppliers.legalForm": "Rechtsform",
     "suppliers.acquisitionSource": "Lieferweg",
-    "suppliers.acquisitionSourceFixedHint": "Beim Anlegen des Lieferanten festgelegt — jeder von ihm importierte Gutschein trägt eine Kopie.",
+    "suppliers.acquisitionSourceFixedHint":
+      "Beim Anlegen des Lieferanten festgelegt — jeder von ihm importierte Gutschein trägt eine Kopie.",
     "suppliers.legalFormPlaceholder": "Rechtsform wählen",
     "suppliers.phone": "Telefon",
     "suppliers.email": "E-Mail",
@@ -2885,8 +2936,10 @@ export const translations: Record<Language, Record<string, string>> = {
     "voucherLifecycle.loading": "Lebenszyklus wird geladen...",
     "voucherLifecycle.loadFailed": "Lebenszyklus konnte nicht geladen werden",
     "voucherLifecycle.timeline": "Zeitleiste",
-    "voucherLifecycle.empty": "Für diesen Gutschein ist noch nichts aufgezeichnet",
-    "voucherLifecycle.archivedNote": "Dieser Gutschein ist archiviert. Seine Historie bleibt erhalten und lesbar.",
+    "voucherLifecycle.empty":
+      "Für diesen Gutschein ist noch nichts aufgezeichnet",
+    "voucherLifecycle.archivedNote":
+      "Dieser Gutschein ist archiviert. Seine Historie bleibt erhalten und lesbar.",
     "voucherLifecycle.unknown": "Unbekannt",
     "voucherLifecycle.notRecorded": "Nicht erfasst",
     "voucherLifecycle.importedFrom": "Importiert aus",
@@ -3056,13 +3109,16 @@ export const translations: Record<Language, Record<string, string>> = {
     "feedback.verdictJunk": "Verworfen",
     "feedback.verdictUnclassified": "Nicht klassifiziert",
     "feedback.verdictAll": "Alle",
-    "feedback.verdictHint": "Die Liste öffnet mit den als nützlich erkannten Nachrichten, nicht mit allem Eingegangenen.",
+    "feedback.verdictHint":
+      "Die Liste öffnet mit den als nützlich erkannten Nachrichten, nicht mit allem Eingegangenen.",
     "feedback.unsure": "Unsichere Verwerfungen",
-    "feedback.unsureHint": "Verworfene Nachrichten, bei denen der Klassifikator unsicher war - das Frühwarnsignal, dass er echte Beschwerden verwirft.",
+    "feedback.unsureHint":
+      "Verworfene Nachrichten, bei denen der Klassifikator unsicher war - das Frühwarnsignal, dass er echte Beschwerden verwirft.",
     "feedback.markHandled": "Als erledigt markieren",
     "feedback.markRejected": "Ablehnen",
     "feedback.clearJunk": "Verworfene löschen",
-    "feedback.clearJunkConfirm": "Alle vom Triage verworfenen Nachrichten löschen? Das kann nicht rückgängig gemacht werden.",
+    "feedback.clearJunkConfirm":
+      "Alle vom Triage verworfenen Nachrichten löschen? Das kann nicht rückgängig gemacht werden.",
     "feedback.junkCleared": "Verworfene Nachrichten gelöscht",
     "feedback.stateChanged": "Feedback aktualisiert",
     "feedback.empty": "Noch nichts vorhanden.",
@@ -3074,9 +3130,11 @@ export const translations: Record<Language, Record<string, string>> = {
     "feedback.anonymous": "nicht verknüpft",
     "feedback.telegramChat": "Telegram-Chat",
     "feedback.replies": "Gesendete Antworten",
-    "feedback.noReplies": "Noch hat niemand geantwortet - in der Telegram-Teamgruppe antworten, indem du den Beitrag des Bots zitierst.",
+    "feedback.noReplies":
+      "Noch hat niemand geantwortet - in der Telegram-Teamgruppe antworten, indem du den Beitrag des Bots zitierst.",
     "feedback.showing": "{0}-{1} von {2}",
-    "feedback.summary": "{0} erhalten · {1} nützlich · {2} verworfen · {3} nicht klassifiziert · {4} beantwortet",
+    "feedback.summary":
+      "{0} erhalten · {1} nützlich · {2} verworfen · {3} nicht klassifiziert · {4} beantwortet",
     "auditlog.event.ProviderCreated": "Anbieter erstellt",
     "auditlog.event.ProviderUpdated": "Anbieter aktualisiert",
     "auditlog.event.ProviderDeleted": "Anbieter gelöscht",
@@ -3142,6 +3200,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "imports.file": "Datei",
     "imports.pages": "Seiten",
     "imports.vouchers": "Gutscheine",
+    "imports.page": "Seite",
+    "imports.pageOf": "Seite {0} von {1}",
     "imports.imported": "Importiert",
     "imports.duplicates": "Duplikate",
     "imports.errors": "Fehler",
@@ -3185,7 +3245,8 @@ export const translations: Record<Language, Record<string, string>> = {
     // Acquirer statement act (#118). The endpoints, CSV and PDF have existed since
     // 11 October with nothing calling them; this is the surface they were built for.
     "statementAct.title": "Abgleich mit dem Acquirer",
-    "statementAct.hint": "Das eigene Verzeichnis des Acquiring-Partners für einen Zeitraum gegen unseres - der einzige Abgleich, der uns einen Fehler nachweisen kann. Voreingestellt ist der vorherige Kalendermonat: der laufende Monat nimmt noch Einträge auf.",
+    "statementAct.hint":
+      "Das eigene Verzeichnis des Acquiring-Partners für einen Zeitraum gegen unseres - der einzige Abgleich, der uns einen Fehler nachweisen kann. Voreingestellt ist der vorherige Kalendermonat: der laufende Monat nimmt noch Einträge auf.",
     "statementAct.merchant": "Händler",
     "statementAct.merchant.live": "Live",
     "statementAct.merchant.sandbox": "Sandbox",
@@ -3194,8 +3255,10 @@ export const translations: Record<Language, Record<string, string>> = {
     "statementAct.build": "Akt erstellen",
     "statementAct.exportCsv": "CSV",
     "statementAct.exportPdf": "PDF",
-    "statementAct.loadFailed": "Der Akt für diesen Zeitraum konnte nicht erstellt werden.",
-    "statementAct.downloadFailed": "Der Akt konnte nicht heruntergeladen werden",
+    "statementAct.loadFailed":
+      "Der Akt für diesen Zeitraum konnte nicht erstellt werden.",
+    "statementAct.downloadFailed":
+      "Der Akt konnte nicht heruntergeladen werden",
     "statementAct.totalRows": "Verzeichniszeilen",
     "statementAct.matched": "Abgeglichen",
     "statementAct.mismatches": "Betragsabweichungen",
@@ -3207,8 +3270,10 @@ export const translations: Record<Language, Record<string, string>> = {
     "statementAct.acquirerAmount": "Acquirer sagt",
     "statementAct.ourAmount": "Wir sagen",
     "statementAct.note": "Hinweis",
-    "statementAct.noRows": "Der Acquirer hat für diesen Zeitraum keine Zeilen geliefert.",
-    "statementAct.missingTitle": "Unsere Bestellungen, die der Acquirer nicht nennt",
+    "statementAct.noRows":
+      "Der Acquirer hat für diesen Zeitraum keine Zeilen geliefert.",
+    "statementAct.missingTitle":
+      "Unsere Bestellungen, die der Acquirer nicht nennt",
     "statementAct.status.matched": "Abgeglichen",
     "statementAct.status.amountMismatch": "Betragsabweichung",
     "statementAct.status.unmatched": "Ohne Zuordnung",
@@ -3245,11 +3310,13 @@ export const translations: Record<Language, Record<string, string>> = {
     "nav.auditlog": "Registro de Auditoría",
     "nav.heldPayments": "Dinero retenido",
     "heldPayments.title": "Dinero que retenemos",
-    "heldPayments.explainer": "Pagos recibidos fuera de un pedido. Cada uno es dinero de alguien: primero indica el titular, luego asígnalo a un pedido. Aquí no se adivina: el servidor se niega a asignar dinero al pedido de otro cliente o a un cliente que el pago ya nombra.",
+    "heldPayments.explainer":
+      "Pagos recibidos fuera de un pedido. Cada uno es dinero de alguien: primero indica el titular, luego asígnalo a un pedido. Aquí no se adivina: el servidor se niega a asignar dinero al pedido de otro cliente o a un cliente que el pago ya nombra.",
     "heldPayments.codeLookup": "¿A qué cliente pertenece este código?",
     "heldPayments.find": "Buscar",
     "heldPayments.codeFound": "Ese código pertenece a un cliente.",
-    "heldPayments.codeNotFound": "Ningún cliente tiene ese código. Puede estar mal escrito, o pertenecer a alguien que aún no se ha registrado.",
+    "heldPayments.codeNotFound":
+      "Ningún cliente tiene ese código. Puede estar mal escrito, o pertenecer a alguien que aún no se ha registrado.",
     "heldPayments.codeBelongsTo": "El código pertenece a",
     "heldPayments.noName": "(sin nombre)",
     "heldPayments.amount": "Importe",
@@ -3267,7 +3334,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "heldPayments.pickOrder": "Elige un pedido…",
     "heldPayments.attach": "Asignar",
     "heldPayments.amountDiffers": "importe distinto",
-    "heldPayments.empty": "No se retiene nada. Cada pago está asignado a un pedido.",
+    "heldPayments.empty":
+      "No se retiene nada. Cada pago está asignado a un pedido.",
     "nav.errorlogs": "Registro de Errores",
     "nav.feedback": "Comentarios",
     "nav.reports": "Informes",
@@ -3432,9 +3500,11 @@ export const translations: Record<Language, Record<string, string>> = {
     "stationNodes.phone": "Teléfono",
     "stationNodes.stationType": "Tipo",
     "stationNodes.externalId": "ID externo",
-    "stationNodes.externalIdHint": "Clave de importación (déjalo vacío para derivarla de marca + coordenadas)",
+    "stationNodes.externalIdHint":
+      "Clave de importación (déjalo vacío para derivarla de marca + coordenadas)",
     "stationNodes.autoId": "ID auto",
-    "stationNodes.autoIdHint": "Derivar el id externo del slug de la marca + coordenadas",
+    "stationNodes.autoIdHint":
+      "Derivar el id externo del slug de la marca + coordenadas",
     "stationNodes.invalidCoords": "Coordenadas fuera de rango",
     "stationNodes.coordinates": "Coordenadas",
     "stationNodes.noNodes":
@@ -3628,7 +3698,8 @@ export const translations: Record<Language, Record<string, string>> = {
       "Los paquetes de este combustible no tienen todos el mismo costo ni el mismo precio de venta. Guardar esta fila reescribe todos los paquetes con los valores mostrados aquí.",
     "priceHistory.atTitle": "Price on a date",
     "priceHistory.atResult": "That day it was",
-    "priceHistory.atNone": "No price was in effect on that date - the fuel was not priced yet.",
+    "priceHistory.atNone":
+      "No price was in effect on that date - the fuel was not priced yet.",
     "priceHistory.stoodFrom": "in effect from {0}",
     "priceHistory.stoodUntil": "until {0}",
     "priceHistory.stoodUntilNow": "still in effect",
@@ -3648,7 +3719,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "priceHistory.reasonExchangeRelease": "Exchange release",
     "priceHistory.reasonBackfill": "Backfill",
     "priceHistory.reasonUnknown": "Unknown reason",
-    "priceHistory.openHint": "Price history",    "price.spreadCost": "costo entre paquetes: {0} – {1}",
+    "priceHistory.openHint": "Price history",
+    "price.spreadCost": "costo entre paquetes: {0} – {1}",
     "price.allowBelowCost": "Permitir bajo costo",
     "price.isTestData": "QA / ensayo",
     "price.live": "Real",
@@ -3669,7 +3741,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "fuel.code": "Código",
     "fuel.codePlaceholder": "p. ej. A-95",
     "fuel.codeNone": "sin código",
-    "fuel.codeHint": "El código que la red publica para este tipo de combustible. Sin él no se puede asociar con el catálogo, por lo que su precio no se actualiza automáticamente.",
+    "fuel.codeHint":
+      "El código que la red publica para este tipo de combustible. Sin él no se puede asociar con el catálogo, por lo que su precio no se actualiza automáticamente.",
     "price.finalPlaceholder": "Final (auto)",
     "price.nominalsAuto": "auto",
     "brands.addBrand": "Agregar Marca",
@@ -3678,7 +3751,8 @@ export const translations: Record<Language, Record<string, string>> = {
       "Lee la lista de precios de cada red y agrega los grados que aún no tenemos. Por sí sola se hace cada semana; este botón la inicia ahora. Tarda un minuto: las páginas de los proveedores se cargan una por una.",
     "brands.syncCatalogueStarted":
       "La revisión del catálogo está en marcha para OKKO, UPG, WOG y KLO. Lo que encontró está en el registro del backend, y lo que cambió, en esta pantalla.",
-    "brands.syncCatalogueFailed": "No se pudo iniciar la revisión del catálogo. Mira el registro del backend.",
+    "brands.syncCatalogueFailed":
+      "No se pudo iniciar la revisión del catálogo. Mira el registro del backend.",
     "brands.addProvider": "Agregar Marca",
     "brands.namePlaceholder": "Nombre (ej. OKKO)",
     "brands.logoText": "Texto del Logo",
@@ -3812,7 +3886,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "users.noRole": "Sin rol",
     "users.qaBadge": "QA",
     "users.qaBadgeTitle": "Cuenta de prueba QA — ver QA_TEST_ACCESS.md",
-    "users.settlementCodeTitle": "Se emite una vez al registrarse. Este es el código que el operador comunica al canal financiero para imputar un pago. Nunca cambia y no es el código de referido.",
+    "users.settlementCodeTitle":
+      "Se emite una vez al registrarse. Este es el código que el operador comunica al canal financiero para imputar un pago. Nunca cambia y no es el código de referido.",
     "users.createdAt": "Fecha de Creación",
     "users.total": "Total",
     "users.activate": "Activar",
@@ -3881,7 +3956,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "suppliers.name": "Nombre",
     "suppliers.legalForm": "Forma jurídica",
     "suppliers.acquisitionSource": "Vía de suministro",
-    "suppliers.acquisitionSourceFixedHint": "Se fija al crear el proveedor: cada vale importado de él lleva una copia.",
+    "suppliers.acquisitionSourceFixedHint":
+      "Se fija al crear el proveedor: cada vale importado de él lleva una copia.",
     "suppliers.legalFormPlaceholder": "Elige una forma",
     "suppliers.phone": "Teléfono",
     "suppliers.email": "Correo",
@@ -3962,7 +4038,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "voucherLifecycle.loadFailed": "No se pudo cargar el historial",
     "voucherLifecycle.timeline": "Cronología",
     "voucherLifecycle.empty": "Aún no se ha registrado nada para este vale",
-    "voucherLifecycle.archivedNote": "Este vale está archivado. Su historial se conserva y sigue legible.",
+    "voucherLifecycle.archivedNote":
+      "Este vale está archivado. Su historial se conserva y sigue legible.",
     "voucherLifecycle.unknown": "Desconocido",
     "voucherLifecycle.notRecorded": "No registrado",
     "voucherLifecycle.importedFrom": "Importado de",
@@ -4128,13 +4205,16 @@ export const translations: Record<Language, Record<string, string>> = {
     "feedback.verdictJunk": "Descartados",
     "feedback.verdictUnclassified": "Sin clasificar",
     "feedback.verdictAll": "Todos",
-    "feedback.verdictHint": "La lista se abre con los mensajes que el triaje consideró útiles, no con todo lo recibido.",
+    "feedback.verdictHint":
+      "La lista se abre con los mensajes que el triaje consideró útiles, no con todo lo recibido.",
     "feedback.unsure": "Descartes dudosos",
-    "feedback.unsureHint": "Mensajes descartados en los que el clasificador no estaba seguro: la alerta temprana de que puede estar tirando quejas reales.",
+    "feedback.unsureHint":
+      "Mensajes descartados en los que el clasificador no estaba seguro: la alerta temprana de que puede estar tirando quejas reales.",
     "feedback.markHandled": "Marcar gestionado",
     "feedback.markRejected": "Rechazar",
     "feedback.clearJunk": "Limpiar descartados",
-    "feedback.clearJunkConfirm": "¿Eliminar todos los mensajes descartados por el triaje? Esta acción no se puede deshacer.",
+    "feedback.clearJunkConfirm":
+      "¿Eliminar todos los mensajes descartados por el triaje? Esta acción no se puede deshacer.",
     "feedback.junkCleared": "Mensajes descartados eliminados",
     "feedback.stateChanged": "Comentarios actualizados",
     "feedback.empty": "Todavía no hay nada aquí.",
@@ -4146,9 +4226,11 @@ export const translations: Record<Language, Record<string, string>> = {
     "feedback.anonymous": "sin vincular",
     "feedback.telegramChat": "Chat de Telegram",
     "feedback.replies": "Respuestas enviadas",
-    "feedback.noReplies": "Todavía nadie ha respondido: responde en el grupo de Telegram citando la publicación del bot.",
+    "feedback.noReplies":
+      "Todavía nadie ha respondido: responde en el grupo de Telegram citando la publicación del bot.",
     "feedback.showing": "{0}-{1} de {2}",
-    "feedback.summary": "{0} recibidos · {1} útiles · {2} descartados · {3} sin clasificar · {4} respondidos",
+    "feedback.summary":
+      "{0} recibidos · {1} útiles · {2} descartados · {3} sin clasificar · {4} respondidos",
     "auditlog.event.ProviderCreated": "Proveedor creado",
     "auditlog.event.ProviderUpdated": "Proveedor actualizado",
     "auditlog.event.ProviderDeleted": "Proveedor eliminado",
@@ -4215,6 +4297,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "imports.file": "Archivo",
     "imports.pages": "Páginas",
     "imports.vouchers": "Vales",
+    "imports.page": "Página",
+    "imports.pageOf": "Página {0} de {1}",
     "imports.imported": "Importados",
     "imports.duplicates": "Duplicados",
     "imports.errors": "Errores",
@@ -4261,7 +4345,8 @@ export const translations: Record<Language, Record<string, string>> = {
     // Acquirer statement act (#118). The endpoints, CSV and PDF have existed since
     // 11 October with nothing calling them; this is the surface they were built for.
     "statementAct.title": "Acta de conciliación con la acquiring",
-    "statementAct.hint": "El registro propio de la acquiring para un periodo frente al nuestro: la única conciliación que puede demostrar que nos equivocamos. Por defecto es el mes natural anterior: el actual todavía está acumulando operaciones.",
+    "statementAct.hint":
+      "El registro propio de la acquiring para un periodo frente al nuestro: la única conciliación que puede demostrar que nos equivocamos. Por defecto es el mes natural anterior: el actual todavía está acumulando operaciones.",
     "statementAct.merchant": "Comercio",
     "statementAct.merchant.live": "En vivo",
     "statementAct.merchant.sandbox": "Sandbox",
@@ -4284,7 +4369,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "statementAct.ourAmount": "Decimos nosotros",
     "statementAct.note": "Nota",
     "statementAct.noRows": "La acquiring no devolvió filas para este periodo.",
-    "statementAct.missingTitle": "Nuestros pedidos que la acquiring no menciona",
+    "statementAct.missingTitle":
+      "Nuestros pedidos que la acquiring no menciona",
     "statementAct.status.matched": "Conciliada",
     "statementAct.status.amountMismatch": "Discrepancia de importe",
     "statementAct.status.unmatched": "Sin correspondencia",
