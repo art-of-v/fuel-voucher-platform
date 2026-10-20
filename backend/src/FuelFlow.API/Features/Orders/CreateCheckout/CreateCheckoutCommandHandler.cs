@@ -221,6 +221,9 @@ public sealed class CreateCheckoutCommandHandler
             Id = Guid.CreateVersion7(),
             OrderId = order.Id,
             Brand = package.BrandSlug,
+            // The brand's key beside its name. The composite foreign key over (fuel, brand) is
+            // what checks the two against each other; until the readers move, both are written.
+            BrandId = package.BrandId,
             FuelTypeId = command.FuelTypeId,
             Liters = command.Liters,
             Quantity = command.Quantity,
