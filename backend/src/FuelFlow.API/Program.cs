@@ -181,7 +181,11 @@ try
     {
         var recurringJobManager = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
 
-        recurringJobManager.AddOrUpdate<FulfillmentService>(
+        // The schedule owns the registry: it registers each job AND records its id, so the set of
+        // ids this build knows about and the set the reconciliation compares against cannot drift.
+        var schedule = new RecurringJobSchedule(recurringJobManager);
+
+        schedule.Add<FulfillmentService>(
             "process-fulfillments",
             service => service.ProcessPendingOrdersAsync(CancellationToken.None),
             // Every 5 minutes, and it is a SAFETY NET rather than the path. An ORDER_CREATED
@@ -201,7 +205,7 @@ try
             // same cadence.
             "*/5 * * * *");
 
-        recurringJobManager.AddOrUpdate<NotificationService>(
+        schedule.Add<NotificationService>(
       "process-notifications",
       service => service.ProcessOrderFulfilledEventsAsync(CancellationToken.None),
       // Every 5 minutes, and a safety net - see process-fulfillments. The event itself is
@@ -211,13 +215,13 @@ try
       // #150 W3. A separate job rather than a second call inside the one above: AddOrUpdate takes
       // an expression tree, which cannot hold an async lambda, and one job per event type is what
       // the rest of this schedule does. Same service, same cadence.
-      recurringJobManager.AddOrUpdate<NotificationService>(
+      schedule.Add<NotificationService>(
       "process-worker-notifications",
       service => service.ProcessVoucherIssuedEventsAsync(CancellationToken.None),
       // Every 5 minutes, and a safety net - see process-fulfillments.
       "*/5 * * * *");
 
-        recurringJobManager.AddOrUpdate<RefundStatusSyncService>(
+        schedule.Add<RefundStatusSyncService>(
             "sync-refund-status",
             service => service.SyncPendingRefundsAsync(CancellationToken.None),
             // Every 5 minutes rather than every minute. Two reasons, and neither is "it is faster
@@ -233,7 +237,7 @@ try
         // Safety net for lost/late Monobank payment webhooks. No-ops unless Monobank:Enabled and
         // ReconciliationEnabled, so it never polls the in-process mock. Every 2 minutes: the outbound
         // Monobank status calls are the cost, and the 3-minute grace window makes sub-minute polling moot.
-        recurringJobManager.AddOrUpdate<MonobankReconciliationService>(
+        schedule.Add<MonobankReconciliationService>(
             "reconcile-monobank-payments",
             service => service.ReconcilePendingPaymentsAsync(CancellationToken.None),
             "*/2 * * * *");
@@ -243,7 +247,7 @@ try
         // an extra run mostly re-reads rows it already has, and an acquirer does not settle a
         // transaction fast enough for that to buy anything. No-ops unless Monobank:Enabled and
         // StatementImportEnabled.
-        recurringJobManager.AddOrUpdate<MonobankStatementImportService>(
+        schedule.Add<MonobankStatementImportService>(
             "import-monobank-statements",
             service => service.ImportRecentStatementsAsync(CancellationToken.None),
             "17 * * * *");
@@ -252,7 +256,7 @@ try
         // react to a depleting pool while keeping the grouped count query cheap; the monitor
         // no-ops unless Telegram voucher alerts are enabled, and repeat suppression lives in
         // NotificationDispatcher.
-        recurringJobManager.AddOrUpdate<VoucherStockMonitor>(
+        schedule.Add<VoucherStockMonitor>(
             "check-voucher-stock",
             service => service.CheckLowStockAsync(CancellationToken.None),
             "*/5 * * * *");
@@ -261,7 +265,7 @@ try
         // retention window). No-ops unless an admin has turned DeletedUnpaidOrderCleanup:Enabled on, because the
         // delete is irreversible. Daily at 03:17 UTC — off-peak, and once a day is ample for a
         // backlog that only grows with abandoned checkouts.
-        recurringJobManager.AddOrUpdate<DeletedUnpaidOrderCleanupService>(
+        schedule.Add<DeletedUnpaidOrderCleanupService>(
             "cleanup-abandoned-orders",
             service => service.CleanupAbandonedOrdersAsync(CancellationToken.None),
             "17 3 * * *");
@@ -270,7 +274,7 @@ try
         // tokens, processed outbox events, read notifications, aged error logs, stale push tokens).
         // Runs read-only (counts only) unless DataRetention:Enabled is on. Daily at 03:40 UTC —
         // off-peak and staggered after order cleanup (03:17) so the two GC jobs never overlap.
-        recurringJobManager.AddOrUpdate<DataRetentionService>(
+        schedule.Add<DataRetentionService>(
             "data-retention-cleanup",
             service => service.CleanupAsync(CancellationToken.None),
             "40 3 * * *");
@@ -280,7 +284,7 @@ try
         // of phantom future margin. Runs read-only (logs the loss it would book) unless
         // ExpiredVoucherLoss:Enabled is on. Daily at 03:50 UTC — off-peak and staggered after the two GC
         // jobs (03:17, 03:40) so the nightly sweeps never overlap.
-        recurringJobManager.AddOrUpdate<ExpiredVoucherLossService>(
+        schedule.Add<ExpiredVoucherLossService>(
             "book-expired-voucher-loss",
             service => service.BookExpiredLossAsync(CancellationToken.None),
             "50 3 * * *");
@@ -294,7 +298,7 @@ try
         // Daily at 04:10 UTC — after the other three nightly sweeps (03:17, 03:40, 03:50) and
         // before the nightly Docker prune on the box (04:20), so the database is not being
         // rewritten in the same minute the images are.
-        recurringJobManager.AddOrUpdate<HangfireHistoryCleanupService>(
+        schedule.Add<HangfireHistoryCleanupService>(
             "cleanup-hangfire-history",
             service => service.CleanupAsync(CancellationToken.None),
             "10 4 * * *");
@@ -314,7 +318,7 @@ try
         // this often safe - an OKKO outage leaves the catalogue untouched rather than blank.
         // Still staggered off the nightly sweeps at 03:17/03:40/03:50.
         // No-ops unless OkkoPrice:Enabled.
-        recurringJobManager.AddOrUpdate<OkkoPriceSyncService>(
+        schedule.Add<OkkoPriceSyncService>(
             "sync-okko-pump-prices",
             service => service.SyncPricesAsync(CancellationToken.None),
             "*/15 * * * *");
@@ -324,7 +328,7 @@ try
         // news that arrives a few times a year. Creating one puts a row in the catalogue and a size
         // on the shelf, so it is the weekly job's business - and the weekly job also prices what it
         // created, so a new grade is priced the day it arrives rather than the next quarter.
-        recurringJobManager.AddOrUpdate<OkkoPriceSyncService>(
+        schedule.Add<OkkoPriceSyncService>(
             "sync-okko-catalogue",
             service => service.SyncCatalogueAndPricesAsync(CancellationToken.None),
             "5 3 * * 1");
@@ -333,29 +337,62 @@ try
         // creates a grade it has not seen before - with its sizes - and records the price, so a fuel
         // we did not carry appears on the shelf at the vendor's price, marked unavailable until an
         // operator costs it. A failed fetch writes nothing: the last known prices stand.
-        recurringJobManager.AddOrUpdate<UpgWogPriceSyncService>(
+        schedule.Add<UpgWogPriceSyncService>(
             "sync-upgwog-pump-prices",
             service => service.SyncPricesAsync(CancellationToken.None),
             "*/15 * * * *");
 
         // The same split for the two vendors that publish a page: prices every fifteen minutes, the
         // question "do they sell something we do not" once a week.
-        recurringJobManager.AddOrUpdate<UpgWogPriceSyncService>(
+        schedule.Add<UpgWogPriceSyncService>(
             "sync-upgwog-catalogue",
             service => service.SyncCatalogueAndPricesAsync(CancellationToken.None),
             "11 3 * * 1");
 
         // KLO publishes no prices of its own, so Minfin's table is the source: what the network
         // charges, every fifteen minutes, and the grades we do not carry, once a week.
-        recurringJobManager.AddOrUpdate<KloPriceSyncService>(
+        schedule.Add<KloPriceSyncService>(
             "sync-klo-prices",
             service => service.SyncPricesAsync(CancellationToken.None),
             "*/15 * * * *");
 
-        recurringJobManager.AddOrUpdate<KloPriceSyncService>(
+        schedule.Add<KloPriceSyncService>(
             "sync-klo-catalogue",
             service => service.SyncCatalogueAndPricesAsync(CancellationToken.None),
             "23 3 * * 1");
+
+        // RECONCILIATION. AddOrUpdate upserts the ids this build knows about; it does not remove an
+        // id the code has forgotten. A job that was renamed or deleted therefore leaves its
+        // registration behind in hangfire.set['recurring-jobs'] forever, and Hangfire tries to load
+        // that job's type on every start - and when the type is gone, it disables the job and says
+        // so in a line of error_logs that nobody reads.
+        //
+        // It happened twice on 2026-10-20: 'sync-upgwog-pump-prices' and 'sync-klo-prices' both
+        // failed to load their type. The next deploy re-registered both ids and the errors stopped.
+        // The mechanism did not, and the next rename does it again.
+        //
+        // The stored ids are read from the raw set rather than from job descriptors, on purpose: a
+        // descriptor resolves the job's type, and a stale registration's type is exactly the thing
+        // that no longer exists.
+        //
+        // The API owns this registry. The JobsWorker registers three of the same ids - a SUBSET of
+        // this list - so this reconciliation is safe where the two share a storage, and the reverse
+        // would not be. The worker therefore does not reconcile, and it must not until its schedule
+        // is the same set rather than a subset of this one.
+        var storedJobIds = scope.ServiceProvider
+            .GetRequiredService<JobStorage>()
+            .GetConnection()
+            .GetAllItemsFromSet("recurring-jobs");
+
+        var staleJobIds = schedule.RemoveStaleRegistrations(storedJobIds);
+        foreach (var staleJobId in staleJobIds)
+        {
+            Log.Warning(
+                "Removed the recurring job {JobId}: this build no longer registers it. It was left " +
+                "behind by a rename or a delete, and Hangfire cannot load its type, so the job " +
+                "was being disabled on every start.",
+                staleJobId);
+        }
     }
 
     // Production deploys only the API (Hangfire runs in-process, no JobsWorker), and

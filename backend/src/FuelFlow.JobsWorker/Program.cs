@@ -170,6 +170,12 @@ try
     using (var scope = host.Services.CreateScope())
     {
         var recurringJobManager = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
+
+        // The API owns the recurring-job registry: it reconciles it on boot, removing any id this
+        // code no longer registers. The three ids below are a SUBSET of the API's list, so the API's
+        // reconciliation leaves them alone - and the reverse would not hold, so the worker does NOT
+        // reconcile. It must not, until its schedule is the same set as the API's rather than a
+        // subset of it.
         recurringJobManager.AddOrUpdate<FulfillmentService>(
             "process-fulfillments",
             service => service.ProcessPendingOrdersAsync(CancellationToken.None),
