@@ -21,8 +21,13 @@
 # originally deployed on a 2 GB server, docs/DEPLOYMENT.md (private docs repo)) with 2 GB of swap as
 # the safety net:
 #
-#   fuelflow-backend  896M   | postgres 512M | redis 192M | caddy 96M | admin 64M | website 32M
-#   total          1792M   leaving ~2.2 GB for the host
+#   fuelflow-backend  896M   | postgres 1G | redis 192M | caddy 96M | admin 64M | website 32M
+#   total          2304M   leaving ~1.8 GB for the host
+#
+# Postgres is the one that was measured rather than chosen: 723 bytes of storage per voucher
+# row puts the first year (700 000 vouchers) at 642 MB of files, and the 256 MB of
+# shared_buffers that goes with it has to fit in the same container. At 512 MB the container
+# was full before the data arrived. See the postgres service below for the full arithmetic.
 #
 # Without these limits a single memory spike (a large voucher PDF import) hands the
 # choice of what to kill to the kernel OOM killer, and the kernel picks the largest
@@ -399,7 +404,23 @@ services:
     image: postgres:16-alpine
     container_name: fuelflow-postgres
     restart: unless-stopped
-    mem_limit: 512m
+    # The container is sized for the FIRST YEAR of data, and the number is measured, not
+    # guessed. 723 bytes of storage per voucher row (heap and indexes together) puts the
+    # database at 642 MB of files at 700 000 vouchers - 7 to 14 million litres of fuel, a
+    # small network's first year. The file cache above that is elastic, but the parts that
+    # are NOT elastic are: 256 MB of shared_buffers and the backends' own working memory.
+    # On the old 512 MB limit those two alone filled the container, which is how the OOM
+    # killer took Postgres while the API kept serving.
+    #
+    # 1 GB is also what the rest of this file already assumed: shared_buffers is a quarter of
+    # it, and effective_cache_size is 1 GB. On 512 MB both statements were half as true as
+    # they read, and the planner was told the host could cache four times what the container
+    # could hold.
+    #
+    # The host has room: 2304 MB of limits on a 4 GB server leaves ~1.8 GB for the OS, Docker
+    # and SSH. The next step after this year is not a bigger container - it is partitioning
+    # fuel_vouchers by month, which is cheaper than memory and does not shrink.
+    mem_limit: 1g
     logging: *default-logging
     security_opt:
       - no-new-privileges:true
@@ -429,7 +450,8 @@ services:
     #   effective_cache_size  was 4 GB on a 512 MB container (and a 4 GB host). The planner reads
     #                          this as "assume the whole box is cache", which is how a seq scan on a
     #                          30 MB database starts costing index scans it cannot afford. 1 GB is
-    #                          what this host can actually hold for Postgres.
+    #                          what this host can actually hold for Postgres, and it is now the
+    #                          container's own limit too - the setting and the cgroup agree.
     #   shared_preload_libraries  empty, so there was no query-level visibility at all: Prometheus
     #                          and Grafana watched the container and nothing inside it. This is the
     #                          cheapest possible way to see which statements the storefront runs.
@@ -476,8 +498,9 @@ services:
     #
     # AND THE TWO THAT NEED A RESTART, which is why they are here rather than in the file
     # the settings above came from: shared_buffers 256M (128M was the PostgreSQL default, not a
-    # choice, and a quarter of a 512M container belongs to the buffer cache) and
-    # max_connections 50 (100 on a 512M container is generous; EVERY pool the application opens
+    # choice, and a quarter of the container's memory belongs to the buffer cache - the
+    # container is 1 GB, so a quarter of it is 256M) and
+    # max_connections 50 (100 on a 1 GB container is generous; EVERY pool the application opens
     # is capped at 5 - the data source, the Hangfire storage and the health check - so this is
     # insurance against a connection storm).
     #
@@ -491,7 +514,8 @@ services:
     #   effective_cache_size  was 4 GB on a 512 MB container (and a 4 GB host). The planner reads
     #                          this as "assume the whole box is cache", which is how a seq scan on a
     #                          30 MB database starts costing index scans it cannot afford. 1 GB is
-    #                          what this host can actually hold for Postgres.
+    #                          what this host can actually hold for Postgres, and it is now the
+    #                          container's own limit too - the setting and the cgroup agree.
     #   shared_preload_libraries  empty, so there was no query-level visibility at all: Prometheus
     #                          and Grafana watched the container and nothing inside it. This is the
     #                          cheapest possible way to see which statements the storefront runs.

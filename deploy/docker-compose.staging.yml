@@ -30,12 +30,19 @@
 #   docker network create fuelflow_shared 2>/dev/null || true
 #
 # --- Memory: the always-on tradeoff ------------------------------------------------
-# Prod commits ~1792M; these limits add ~944M, so both stacks fit a 4 GB box + 2 GB swap
+# Prod commits ~2304M; these limits add ~944M, so both stacks fit a 4 GB box + 2 GB swap
 # with headroom left for the host. Staging is sized smaller than prod on purpose — it is
 # for verification, not load. If a legitimate staging import gets OOM-killed, raise
 # fuelflow-staging-backend first. Limits are caps, not reservations; real idle usage is far lower.
 #
 #   fuelflow-staging-backend 512M | postgres 256M | redis 96M | admin 48M | website 32M  = ~944M
+#
+# Prod's database grew to 1 GB (see docker-compose.prod.yml: 723 bytes of storage per voucher
+# row puts the first year at 642 MB of files, and the 256 MB of shared_buffers has to fit in
+# the same container). Staging's did not, and that asymmetry is deliberate: staging holds
+# production's data as it is today, and the bulk-import rehearsal is a prod-box job. Run the
+# rehearsal with the staging stack stopped, or the rehearsal teaches you that the box ran out
+# of memory instead of what you came to learn.
 
 name: fuelflow-staging
 
