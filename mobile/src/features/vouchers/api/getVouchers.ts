@@ -73,8 +73,6 @@ function mapVoucher(v: any): Voucher {
     workerUserId: v.workerUserId ?? null,
     workerFirstName: v.workerFirstName ?? null,
     workerLastName: v.workerLastName ?? null,
-    fuelSubtype: v.fuelSubtype ?? null,
-    redemptionRules: v.redemptionRules ?? null,
     originOrderId: v.originOrderId ?? null,
     history: Array.isArray(v.history)
       ? v.history.map((h: any) => ({

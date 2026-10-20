@@ -90,9 +90,6 @@ public class FuelVoucher
     public DateTime? UsedAtUtc { get; set; }
 
     public VoucherStatus Status { get; set; }
-    public string? FuelSubtype { get; set; }
-    public string? RedemptionRules { get; set; }
-    public string? ImageUrl { get; set; }
     public Guid? AssignedToUserId { get; set; }
     public Guid? LegalEntityId { get; set; }
     public Guid? WorkerUserId { get; set; }

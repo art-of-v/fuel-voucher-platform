@@ -36,7 +36,6 @@ public sealed class AdminVoucherListItemDto
     public string? WorkerFirstName { get; set; }
     public string? WorkerLastName { get; set; }
     public DateTime CreatedAtUtc { get; set; }
-    public string? ImageUrl { get; set; }
     /// <summary>
     /// Emulated test data rather than fuel the operator paid a supplier for. The code does not exist
     /// at the Brand, so this row must never reach a paying customer.

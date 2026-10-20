@@ -61,7 +61,6 @@ public sealed class GetAdminVoucherByIdQueryHandler
             VoucherNumber = item.VoucherNumber,
             Status = item.Status.ToString(),
             CreatedAtUtc = item.CreatedAtUtc,
-            ImageUrl = item.ImageUrl,
             QrImage = qrImage,
             // Was declared on the DTO and never assigned, so every detail response reported
             // isTestData: false. An emulated voucher then looked like paid-for stock on the one

@@ -19,8 +19,6 @@ public sealed record VoucherDto(
     Guid? WorkerUserId,
     string? WorkerFirstName,
     string? WorkerLastName,
-    string? FuelSubtype,
-    string? RedemptionRules,
     string? ImageUrl,
     DateTime CreatedAtUtc,
     DateTime UpdatedAtUtc,
