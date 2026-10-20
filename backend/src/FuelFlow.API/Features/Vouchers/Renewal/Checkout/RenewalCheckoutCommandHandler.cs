@@ -388,6 +388,9 @@ public sealed class RenewalCheckoutCommandHandler
                 Id = Guid.CreateVersion7(),
                 OrderId = order.Id,
                 Brand = line.Source.Brand,
+                // The brand's key beside its name - the source voucher's own key, because the line
+                // is about the same fuel the customer brings back.
+                BrandId = line.Source.BrandId,
                 FuelTypeId = line.Source.FuelTypeId,
                 Liters = line.Source.Liters,
                 Quantity = 1,

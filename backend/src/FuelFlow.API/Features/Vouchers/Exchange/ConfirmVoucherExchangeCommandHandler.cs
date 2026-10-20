@@ -330,6 +330,9 @@ public sealed class ConfirmVoucherExchangeCommandHandler
                 NewVoucherId = newId,
                 FuelTypeId = old.FuelTypeId,
                 Brand = old.Brand,
+                // The brand's key beside its name - the retired voucher's own key, because the
+                // exchange is about the same fuel.
+                BrandId = old.BrandId,
                 SurchargeUah = pairSurcharge,
                 CostPerLiterApplied = newId.HasValue
                     ? newCostById.GetValueOrDefault(newId.Value)

@@ -181,6 +181,13 @@ public sealed class ImportVouchersCommandHandler
                 f => f.Id,
                 f => slugByBrandId.TryGetValue(f.BrandId, out var slug) ? slug : null);
 
+        // The brand's ID, by fuel - the key the voucher carries beside the brand's name. The same
+        // catalogue read as the slug above, kept as ids so the two cannot disagree about which
+        // network a fuel belongs to.
+        var brandIdByFuelType = catalogBrandByFuelType
+            .Where(f => f.BrandId != Guid.Empty)
+            .ToDictionary(f => f.Id, f => f.BrandId);
+
         var import = new VoucherImport
         {
             Id = Guid.CreateVersion7(),
@@ -440,6 +447,9 @@ public sealed class ImportVouchersCommandHandler
                         {
                             Id = Guid.CreateVersion7(),
                             Brand = parsed.Brand,
+                            // The brand's key beside its name. The pairing is checked below against
+                            // the fuel's own brand, so the two copies name the same network.
+                            BrandId = brandIdByFuelType.GetValueOrDefault(parsed.FuelTypeId.GetValueOrDefault()),
                             FuelTypeId = parsed.FuelTypeId.GetValueOrDefault(),
                             Liters = parsed.Liters,
                             // The date printed on the supplier's document is the real term. It is
