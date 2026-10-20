@@ -1570,28 +1570,39 @@ export default function AdminScreen() {
                           // so picking 'User' was a no-op and the account could not be given the
                           // one role it most likely needs (planning #299).
                           const currentRole = user.role;
-                          const options = user.isDeleted || user.id === currentUserId
-                            ? []
-                            : assignableRoles(actorRole, currentRole);
+                          const options =
+                            user.isDeleted || user.id === currentUserId
+                              ? []
+                              : assignableRoles(actorRole, currentRole);
                           if (options.length === 0) {
-                            return <span className="capitalize">{currentRole ?? t('users.noRole')}</span>;
+                            return (
+                              <span className="capitalize">
+                                {currentRole ?? t("users.noRole")}
+                              </span>
+                            );
                           }
-                          const choices = currentRole && !options.includes(currentRole)
-                            ? [currentRole, ...options]
-                            : options;
+                          const choices =
+                            currentRole && !options.includes(currentRole)
+                              ? [currentRole, ...options]
+                              : options;
                           return (
                             <select
-                              value={currentRole ?? ''}
+                              value={currentRole ?? ""}
                               disabled={setUserRoleMutation.isPending}
                               onChange={(e) => {
                                 const role = e.target.value;
-                                if (role !== (currentRole ?? '')) {
-                                  setUserRoleMutation.mutate({ userId: user.id, role });
+                                if (role !== (currentRole ?? "")) {
+                                  setUserRoleMutation.mutate({
+                                    userId: user.id,
+                                    role,
+                                  });
                                 }
                               }}
                               className="bg-transparent border border-border rounded px-2 py-1 text-xs text-foreground"
                             >
-                              {currentRole === null && <option value="">{t('users.noRole')}</option>}
+                              {currentRole === null && (
+                                <option value="">{t("users.noRole")}</option>
+                              )}
                               {choices.map((r) => (
                                 <option key={r} value={r}>
                                   {r}
