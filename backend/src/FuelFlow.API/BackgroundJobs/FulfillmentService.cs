@@ -568,38 +568,6 @@ if (!fullyAttributed && fulfillments.Count > 0)
         }
     }
 
-    public async Task ProcessVoucherImportsAsync(CancellationToken cancellationToken = default)
-    {
-        var unprocessedEvents = await _context.OutboxEvents
-            .Where(e => !e.Processed && e.EventType == OutboxEventType.VoucherExpired)
-            .OrderBy(e => e.CreatedAtUtc)
-            .Take(50)
-            .ToListAsync(cancellationToken);
-
-        if (!unprocessedEvents.Any())
-        {
-            return;
-        }
-
-        _logger.LogInformation("Processing {Count} VOUCHER_EXPIRED events", unprocessedEvents.Count);
-
-        foreach (var outboxEvent in unprocessedEvents)
-        {
-            try
-            {
-                outboxEvent.Processed = true;
-                outboxEvent.ProcessedAtUtc = DateTime.UtcNow;
-                _context.OutboxEvents.Update(outboxEvent);
-                await _context.SaveChangesAsync(cancellationToken);
-
-                _logger.LogInformation("Processed VOUCHER_EXPIRED event {EventId}", outboxEvent.Id);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to process VOUCHER_EXPIRED event {EventId}", outboxEvent.Id);
-            }
-        }
-    }
 
     public async Task ProcessOrderCreatedEventAsync(OutboxEvent outboxEvent, CancellationToken cancellationToken)
     {
