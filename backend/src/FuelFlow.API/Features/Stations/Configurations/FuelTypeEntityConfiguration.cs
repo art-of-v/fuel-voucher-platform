@@ -110,9 +110,20 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 
+        // The default used to be '-infinity', and it was not chosen: it is what Npgsql writes for
+        // DateTime.MinValue, which is what EF's convention put into the migrations that created this
+        // column. -infinity sorts before every real timestamp and serialises badly, and it is a value
+        // no application means.
+        //
+        // now() is the honest fallback for a raw INSERT that does not state the timestamp, and
+        // ValueGeneratedNever keeps the application in charge: it still sends its own value on every
+        // insert, exactly as it did before, so nothing about the application's behaviour changes. The
+        // default is a safety net for SQL that does not come from EF.
         builder.Property(e => e.UpdatedAtUtc)
             .HasColumnName("updated_at_utc")
             .HasColumnType("timestamp with time zone")
+            .HasDefaultValueSql("now()")
+            .ValueGeneratedNever()
             .IsRequired();
 
         builder.HasIndex(e => e.Name);

@@ -478,7 +478,8 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
+                        .HasColumnName("created_at_utc")
+                        .HasDefaultValueSql("now()");
 
                     b.Property<string>("DirectorName")
                         .HasMaxLength(200)
@@ -509,7 +510,8 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
+                        .HasColumnName("updated_at_utc")
+                        .HasDefaultValueSql("now()");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid")
@@ -1404,7 +1406,8 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
+                        .HasColumnName("updated_at_utc")
+                        .HasDefaultValueSql("now()");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid")
@@ -1624,7 +1627,8 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
+                        .HasColumnName("updated_at_utc")
+                        .HasDefaultValueSql("now()");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid")
@@ -3337,7 +3341,8 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
+                        .HasColumnName("updated_at_utc")
+                        .HasDefaultValueSql("now()");
 
                     b.HasKey("Id");
 
@@ -3477,7 +3482,8 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
+                        .HasColumnName("updated_at_utc")
+                        .HasDefaultValueSql("now()");
 
                     b.HasKey("Id");
 
@@ -3786,7 +3792,8 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
+                        .HasColumnName("updated_at_utc")
+                        .HasDefaultValueSql("now()");
 
                     b.HasKey("Id");
 
