@@ -7,6 +7,11 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace FuelFlow.Features.Vouchers;
 
+/// <summary>What the admin asked the batch to do.</summary>
+public sealed record ImportBatchBulkActionRequest(
+    string Action,
+    string? ActingAdminName = null);
+
 [ApiController]
 [Route("api/admin/voucher-imports")]
 [Authorize(Policy = "Staff")]
@@ -20,6 +25,7 @@ public sealed class AdminVoucherImportController : ControllerBase
     private readonly GetImportBatchCostTimelineQueryHandler _getCostTimelineHandler;
     private readonly SetBatchCostCommandHandler _setBatchCostHandler;
     private readonly ParseInvoiceCommandHandler _parseInvoiceHandler;
+    private readonly ImportBatchBulkActionQueryHandler _bulkActionHandler;
 
     public AdminVoucherImportController(
         GetImportBatchesQueryHandler getAllHandler,
@@ -29,7 +35,8 @@ public sealed class AdminVoucherImportController : ControllerBase
         GetImportBatchPnlQueryHandler getBatchPnlHandler,
         GetImportBatchCostTimelineQueryHandler getCostTimelineHandler,
         SetBatchCostCommandHandler setBatchCostHandler,
-        ParseInvoiceCommandHandler parseInvoiceHandler)
+        ParseInvoiceCommandHandler parseInvoiceHandler,
+        ImportBatchBulkActionQueryHandler bulkActionHandler)
     {
         _getAllHandler = getAllHandler;
         _getByIdHandler = getByIdHandler;
@@ -39,6 +46,7 @@ public sealed class AdminVoucherImportController : ControllerBase
         _getCostTimelineHandler = getCostTimelineHandler;
         _setBatchCostHandler = setBatchCostHandler;
         _parseInvoiceHandler = parseInvoiceHandler;
+        _bulkActionHandler = bulkActionHandler;
     }
 
     [HttpGet]
@@ -56,10 +64,49 @@ public sealed class AdminVoucherImportController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>
+    /// The batch's vouchers, a page at a time, with the count of the whole batch.
+    /// </summary>
     [HttpGet("{id:guid}/vouchers")]
-    public async Task<IActionResult> GetVouchers(Guid id, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetVouchers(
+        Guid id,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
+        CancellationToken cancellationToken = default)
     {
-        var result = await _getVouchersHandler.HandleAsync(new GetImportBatchVouchersQuery(id), cancellationToken);
+        var result = await _getVouchersHandler.HandleAsync(
+            new GetImportBatchVouchersQuery(id, page, pageSize),
+            cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// The whole batch, activated or deactivated at once.
+    /// </summary>
+    /// <remarks>
+    /// The two buttons in the admin used to act on the ids the tab had loaded, which was the whole
+    /// batch only because the list was unbounded. Now that the list is a page, the action is the
+    /// server's: it names the import, and the database decides which rows that is.
+    /// </remarks>
+    [HttpPost("{id:guid}/bulk-action")]
+    public async Task<IActionResult> BulkAction(
+        Guid id,
+        [FromBody] ImportBatchBulkActionRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _bulkActionHandler.HandleAsync(
+            new ImportBatchBulkActionQuery(
+                id,
+                request.Action,
+                GetUserId(),
+                request.ActingAdminName),
+            cancellationToken);
+
+        if (!result.Success)
+        {
+            return BadRequest(new { error = result.Error });
+        }
+
         return Ok(result);
     }
 
