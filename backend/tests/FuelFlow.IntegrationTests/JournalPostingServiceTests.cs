@@ -194,6 +194,88 @@ public sealed class JournalPostingServiceTests : IClassFixture<TestDatabaseFixtu
     }
 
     [Fact]
+    public async Task A_Batch_Posts_One_Entry_Per_Fact_With_Consecutive_Numbers()
+    {
+        // The batch is what a nightly sweep needs: many facts of one kind, one unit of work.
+        var sourceEvent = NewEvent("batch");
+        await MapAsync(sourceEvent,
+            await SeedAccountAsync("Asset", "Debit"),
+            await SeedAccountAsync("Revenue", "Credit"));
+
+        var date = NewDate();
+        var requests = Enumerable.Range(0, 5)
+            .Select(i => Req(sourceEvent, Guid.NewGuid(), date, 100m + i))
+            .ToList();
+
+        await using var context = CreateContext();
+        var entries = await CreateService(context).PostManyAsync(requests);
+
+        entries.Should().HaveCount(5);
+        entries.Should().OnlyContain(e => e.Status == JournalEntryStatus.Posted);
+        entries.Should().OnlyContain(e => e.Lines.Count == 2);
+        entries.Select(e => e.Lines.Sum(l => l.DebitUah))
+            .Should().BeEquivalentTo(requests.Select(r => r.AmountUah));
+        entries.Select(e => e.Lines.Sum(l => l.CreditUah))
+            .Should().BeEquivalentTo(requests.Select(r => r.AmountUah));
+
+        // Consecutive, so the ledger's numbers stay a gapless sequence.
+        var numbers = entries.Select(e => e.EntryNo).OrderBy(n => n).ToList();
+        numbers.Should().BeEquivalentTo(Enumerable.Range((int)numbers[0], numbers.Count).Select(i => (long)i));
+    }
+
+    [Fact]
+    public async Task A_Batch_Posted_Twice_Does_Not_Post_Twice()
+    {
+        var sourceEvent = NewEvent("batch-idempotent");
+        await MapAsync(sourceEvent,
+            await SeedAccountAsync("Asset", "Debit"),
+            await SeedAccountAsync("Revenue", "Credit"));
+
+        var date = NewDate();
+        var requests = Enumerable.Range(0, 3)
+            .Select(i => Req(sourceEvent, Guid.NewGuid(), date, 50m))
+            .ToList();
+
+        await using var context = CreateContext();
+        var service = CreateService(context);
+
+        var first = await service.PostManyAsync(requests);
+        var second = await service.PostManyAsync(requests);
+
+        second.Should().HaveCount(3);
+        second.Select(e => e.Id).Should().BeEquivalentTo(first.Select(e => e.Id),
+            "a replayed batch must reuse the entries it wrote the first time");
+    }
+
+    [Fact]
+    public async Task A_Batch_Of_Two_Kinds_Is_Refused()
+    {
+        // The accounts and the period are resolved once for a batch, so a batch of two kinds would
+        // have to resolve them twice - which is the five queries per fact the batch exists to avoid.
+        var first = NewEvent("batch-kind-a");
+        var second = NewEvent("batch-kind-b");
+        await MapAsync(first,
+            await SeedAccountAsync("Asset", "Debit"),
+            await SeedAccountAsync("Revenue", "Credit"));
+        await MapAsync(second,
+            await SeedAccountAsync("Asset", "Debit"),
+            await SeedAccountAsync("Revenue", "Credit"));
+
+        var date = NewDate();
+        var requests = new List<PostJournalEntryRequest>
+        {
+            Req(first, Guid.NewGuid(), date),
+            Req(second, Guid.NewGuid(), date)
+        };
+
+        await using var context = CreateContext();
+
+        var act = async () => await CreateService(context).PostManyAsync(requests);
+
+        await act.Should().ThrowAsync<LedgerPostingException>();
+    }
+
+    [Fact]
     public async Task An_Unmapped_Event_Is_Refused()
     {
         await using var context = CreateContext();
