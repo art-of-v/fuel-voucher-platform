@@ -44,8 +44,7 @@ internal sealed class ErrorLogConfiguration : IEntityTypeConfiguration<ErrorLog>
         builder.HasIndex(e => e.TraceId);
         // The journal's default view is the outstanding errors, ordered newest first.
         builder.HasIndex(e => new { e.ResolvedAtUtc, e.LoggedAtUtc });
-        // The convention above says every actor column is indexed, and this one was not: the index
-        // was written down in a comment and never declared, so nothing in the database used it.
-        builder.HasIndex(e => e.ResolvedByUserId);
+        // resolved_by_user_id is written and never read: the journal does not filter incidents by
+        // who resolved them. An index there would be the exact defect F-11 removed.
     }
 }

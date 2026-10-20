@@ -64,9 +64,6 @@ internal sealed class SettlementMessageConfiguration : IEntityTypeConfiguration<
         builder.Property(e => e.ResolvedUserId)
             .HasColumnName("resolved_user_id");
 
-        // The actor column is read, so it is indexed: Postgres does not index a column on its own.
-        builder.HasIndex(e => e.ResolvedUserId);
-
         builder.Property(e => e.PaymentId)
             .HasColumnName("payment_id");
 

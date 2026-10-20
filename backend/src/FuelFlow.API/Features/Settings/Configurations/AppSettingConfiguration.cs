@@ -28,9 +28,6 @@ internal sealed class AppSettingConfiguration : IEntityTypeConfiguration<AppSett
 
         builder.Property(e => e.UpdatedByUserId)
             .HasColumnName("updated_by_user_id");
-
-        // The actor column is read, so it is indexed: Postgres does not index a column on its own.
-        builder.HasIndex(e => e.UpdatedByUserId);
         builder.Property(e => e.UpdatedByUserName)
             .HasColumnName("updated_by_user_name")
             .HasMaxLength(200);

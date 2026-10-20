@@ -111,7 +111,8 @@ internal sealed class VoucherExchangeConfiguration : IEntityTypeConfiguration<Vo
         builder.HasIndex(e => e.NewVoucherId);
         // Supplier reconciliation reads one supplier's exchanged vouchers.
         builder.HasIndex(e => e.SupplierId);
-        // ActingUserId is indexed by the FK convention above.
+        // acting_user_id is written and never read: an exchange is not filtered by who recorded it.
+        // An index there would be the exact defect F-11 removed.
 
         // A voucher retired into an exchange can never be retired again, so old_voucher_id is
         // unique - this is the database half of the idempotency the handler already checks, and

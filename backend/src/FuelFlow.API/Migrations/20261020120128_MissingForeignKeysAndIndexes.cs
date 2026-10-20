@@ -30,84 +30,14 @@ namespace FuelFlow.API.Migrations
                 """);
 
             migrationBuilder.CreateIndex(
-                name: "ix_voucher_movements_actor_party_id",
-                table: "voucher_movements",
-                column: "actor_party_id");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_voucher_movements_actor_user_id",
-                table: "voucher_movements",
-                column: "actor_user_id");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_voucher_events_actor_party_id",
-                table: "voucher_events",
-                column: "actor_party_id");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_voucher_events_actor_user_id",
-                table: "voucher_events",
-                column: "actor_user_id");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_settlement_messages_resolved_user_id",
-                table: "settlement_messages",
-                column: "resolved_user_id");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_purchase_batches_entered_by_user_id",
-                table: "purchase_batches",
-                column: "entered_by_user_id");
-
-            migrationBuilder.CreateIndex(
                 name: "ix_purchase_batches_fuel_type_id",
                 table: "purchase_batches",
                 column: "fuel_type_id");
 
             migrationBuilder.CreateIndex(
-                name: "ix_provider_event_outbox_changed_by_user_id",
-                table: "provider_event_outbox",
-                column: "changed_by_user_id");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_order_events_actor_user_id",
-                table: "order_events",
-                column: "actor_user_id");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_operator_voucher_renewals_acting_user_id",
-                table: "operator_voucher_renewals",
-                column: "acting_user_id");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_movement_batches_opened_by_user_id",
-                table: "movement_batches",
-                column: "opened_by_user_id");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_journal_entries_source_id",
-                table: "journal_entries",
-                column: "source_id");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_fuel_types_price_updated_by_user_id",
-                table: "fuel_types",
-                column: "price_updated_by_user_id");
-
-            migrationBuilder.CreateIndex(
                 name: "ix_feedback_messages_user_id",
                 table: "feedback_messages",
                 column: "user_id");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_error_logs_resolved_by_user_id",
-                table: "error_logs",
-                column: "resolved_by_user_id");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_app_settings_updated_by_user_id",
-                table: "app_settings",
-                column: "updated_by_user_id");
 
             migrationBuilder.AddForeignKey(
                 name: "FK_feedback_chat_bindings_users_user_id",
@@ -174,68 +104,12 @@ namespace FuelFlow.API.Migrations
                 table: "users");
 
             migrationBuilder.DropIndex(
-                name: "ix_voucher_movements_actor_party_id",
-                table: "voucher_movements");
-
-            migrationBuilder.DropIndex(
-                name: "ix_voucher_movements_actor_user_id",
-                table: "voucher_movements");
-
-            migrationBuilder.DropIndex(
-                name: "ix_voucher_events_actor_party_id",
-                table: "voucher_events");
-
-            migrationBuilder.DropIndex(
-                name: "ix_voucher_events_actor_user_id",
-                table: "voucher_events");
-
-            migrationBuilder.DropIndex(
-                name: "ix_settlement_messages_resolved_user_id",
-                table: "settlement_messages");
-
-            migrationBuilder.DropIndex(
-                name: "ix_purchase_batches_entered_by_user_id",
-                table: "purchase_batches");
-
-            migrationBuilder.DropIndex(
                 name: "ix_purchase_batches_fuel_type_id",
                 table: "purchase_batches");
 
             migrationBuilder.DropIndex(
-                name: "ix_provider_event_outbox_changed_by_user_id",
-                table: "provider_event_outbox");
-
-            migrationBuilder.DropIndex(
-                name: "ix_order_events_actor_user_id",
-                table: "order_events");
-
-            migrationBuilder.DropIndex(
-                name: "ix_operator_voucher_renewals_acting_user_id",
-                table: "operator_voucher_renewals");
-
-            migrationBuilder.DropIndex(
-                name: "ix_movement_batches_opened_by_user_id",
-                table: "movement_batches");
-
-            migrationBuilder.DropIndex(
-                name: "ix_journal_entries_source_id",
-                table: "journal_entries");
-
-            migrationBuilder.DropIndex(
-                name: "ix_fuel_types_price_updated_by_user_id",
-                table: "fuel_types");
-
-            migrationBuilder.DropIndex(
                 name: "ix_feedback_messages_user_id",
                 table: "feedback_messages");
-
-            migrationBuilder.DropIndex(
-                name: "ix_error_logs_resolved_by_user_id",
-                table: "error_logs");
-
-            migrationBuilder.DropIndex(
-                name: "ix_app_settings_updated_by_user_id",
-                table: "app_settings");
 
             // The column goes back to NOT NULL, so the rows that now say NULL need the sentinel
             // back before it does - a down migration that cannot run is not a down migration.

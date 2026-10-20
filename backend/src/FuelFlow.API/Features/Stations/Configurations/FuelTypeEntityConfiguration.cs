@@ -88,9 +88,6 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
             .HasColumnName("price_updated_by_user_id")
             .HasColumnType("uuid");
 
-        // The actor column is read, so it is indexed: Postgres does not index a column on its own.
-        builder.HasIndex(e => e.PriceUpdatedByUserId);
-
         builder.Property(e => e.BasePrice)
             .HasColumnName("base_price")
             .HasColumnType("numeric(12,2)")

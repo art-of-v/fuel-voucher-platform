@@ -65,8 +65,7 @@ internal sealed class PurchaseBatchConfiguration : IEntityTypeConfiguration<Purc
         builder.HasIndex(e => new { e.ImportJobId, e.FuelTypeId })
             .IsUnique();
 
-        // Supplier reconciliation lists a supplier's batches. EnteredByUserId is indexed by the
-        // FK convention above.
+        // Supplier reconciliation lists a supplier's batches.
         builder.HasIndex(e => e.SupplierId);
 
         // fuel_type_id is a uuid since planning D-21's second slice, and a uuid has no length to
@@ -85,10 +84,10 @@ internal sealed class PurchaseBatchConfiguration : IEntityTypeConfiguration<Purc
         // every join down this column scan without one.
         builder.HasIndex(e => e.FuelTypeId);
 
-        // --- F-23: a reference column without an index ----------------------------------------------
-        // the batch names the operator who entered it. No foreign key here on purpose - this is an audit row, and an audit row must not
-        // be the thing that blocks deleting its own subject - but the reference is still read, and
-        // without an index every read of it is a scan.
-        builder.HasIndex(e => e.EnteredByUserId);
+        // entered_by_user_id carries no foreign key - this is an audit row, and an audit row must
+        // not be the thing that blocks deleting its own subject - and no index either. It is
+        // written and never read: no query filters a batch by the operator who entered it, and an
+        // index there would be the exact defect F-11 removed - a write cost on every insert that
+        // serves no query.
     }
 }
