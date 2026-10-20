@@ -48,6 +48,122 @@
 \pset pager off
 \pset format unaligned
 \pset tuples_only on
+-- THE CANONICAL FORM OF A CONSTRAINT, and why the fingerprint needs one.
+--
+-- A check constraint's stored form depends on HOW it was created, not only on what it says.
+-- Two databases with the same rule can hold it in two different shapes, and PostgreSQL
+-- re-shapes it on the way out of a dump:
+--
+--   CREATE TABLE t (status varchar(50) CHECK (status IN ('Active', 'Revoked')));
+--   -- stored and reported as:  (ARRAY['Active'::character varying, 'Revoked'::character varying])::text[]
+--
+--   CREATE TABLE t (status varchar(50) CHECK (((status)::text = ANY (ARRAY[('Active'::character varying)::text, ...]))));
+--   -- stored and reported as:  ARRAY[('Active'::character varying)::text, ...]
+--
+-- Both enforce the same rule, and BOTH become the second shape when the first one is written
+-- out and parsed again. So the shape is an artefact of the parser's history, not a property
+-- of the schema - and a fingerprint that compares it reports a difference where there is none.
+--
+-- That is not a hypothetical: on 2026-10-20 this comparison found 46 check constraints and one
+-- partial index that "differed" between a from-zero build and production, and every one of
+-- them was the same rule in the same two shapes.
+--
+-- The canonical form is therefore "what PostgreSQL makes of this definition when it parses
+-- it again", and it is computed the only honest way: by CREATING the constraint on a
+-- throwaway table and reading back what the catalog says. Both shapes land on the same
+-- canonical text, and a real difference - another value, another column, another operator -
+-- still lands on a different one.
+
+-- The notices are silenced because the probe table is dropped after every constraint, and
+-- "table does not exist, skipping" is the expected answer to dropping a table that the
+-- exception handler has already rolled back.
+SET client_min_messages = warning;
+
+DO $canonicalise$
+DECLARE
+    r record;
+    canonical text;
+BEGIN
+    CREATE TEMP TABLE IF NOT EXISTS canonical_objects (
+        kind text NOT NULL,
+        table_name text NOT NULL,
+        object_name text NOT NULL,
+        definition text NOT NULL
+    );
+
+    -- The check constraints.
+    FOR r IN
+        SELECT c2.relname AS table_name,
+               con.conname AS constraint_name,
+               -- pg_get_expr, NOT pg_get_constraintdef: the latter wraps the expression in
+               -- "CHECK (...)", and re-adding that wrapper would be "CHECK (CHECK (...))".
+               pg_catalog.pg_get_expr(con.conbin, con.conrelid) AS definition
+        FROM pg_catalog.pg_constraint con
+        JOIN pg_catalog.pg_class c2 ON c2.oid = con.conrelid
+        JOIN pg_catalog.pg_namespace n ON n.oid = c2.relnamespace
+        WHERE con.contype = 'c'
+          AND n.nspname = 'public'
+          AND c2.relkind IN ('r', 'p')
+    LOOP
+        canonical := NULL;
+        BEGIN
+            EXECUTE format('CREATE TEMP TABLE canonical_probe (LIKE public.%I)', r.table_name);
+            EXECUTE format('ALTER TABLE canonical_probe ADD CONSTRAINT canonical_probe_ck CHECK (%s)', r.definition);
+            SELECT pg_catalog.pg_get_constraintdef(con.oid) INTO canonical
+            FROM pg_catalog.pg_constraint con
+            WHERE con.conrelid = 'canonical_probe'::regclass
+              AND con.conname = 'canonical_probe_ck';
+        EXCEPTION WHEN OTHERS THEN
+            -- A definition that will not parse on its own table is reported as it stands.
+            -- It is still compared, and it is still compared by its text.
+            canonical := NULL;
+        END;
+        EXECUTE 'DROP TABLE IF EXISTS canonical_probe';
+        INSERT INTO canonical_objects
+        SELECT 'constraint', r.table_name, r.constraint_name, COALESCE(canonical, r.definition);
+    END LOOP;
+
+    -- The indexes, for the same reason: a PARTIAL index carries a predicate, and the
+    -- predicate is stored in the same two shapes as a check constraint's expression.
+    FOR r IN
+        SELECT c2.relname AS table_name,
+               i2.relname AS index_name,
+               pg_catalog.pg_get_indexdef(i.indexrelid) AS definition
+        FROM pg_catalog.pg_index i
+        JOIN pg_catalog.pg_class c2 ON c2.oid = i.indrelid
+        JOIN pg_catalog.pg_class i2 ON i2.oid = i.indexrelid
+        JOIN pg_catalog.pg_namespace n ON n.oid = c2.relnamespace
+        WHERE n.nspname = 'public'
+          AND i.indpred IS NOT NULL
+          AND c2.relkind IN ('r', 'p')
+    LOOP
+        canonical := NULL;
+        BEGIN
+            EXECUTE format('CREATE TEMP TABLE canonical_probe (LIKE public.%I)', r.table_name);
+            -- The index's own definition, with the table it belongs to swapped for the
+            -- throwaway one, and with the index renamed so it cannot collide.
+            EXECUTE replace(
+                replace(r.definition, 'public.' || r.table_name, 'canonical_probe'),
+                r.index_name, 'canonical_probe_ix');
+            SELECT pg_catalog.pg_get_indexdef(i.indexrelid) INTO canonical
+            FROM pg_catalog.pg_index i
+            WHERE i.indexrelid = 'canonical_probe_ix'::regclass;
+            -- The probe's own names are put back, so the canonical definition is the real
+            -- index's definition: the name is part of the shape, and a comparison that
+            -- compared two probe names would not compare it.
+            IF canonical IS NOT NULL THEN
+                canonical := replace(replace(canonical, 'canonical_probe_ix', r.index_name),
+                                    'pg_temp.canonical_probe', 'public.' || r.table_name);
+            END IF;
+        EXCEPTION WHEN OTHERS THEN
+            canonical := NULL;
+        END;
+        EXECUTE 'DROP TABLE IF EXISTS canonical_probe';
+        INSERT INTO canonical_objects
+        SELECT 'index', r.table_name, r.index_name, COALESCE(canonical, r.definition);
+    END LOOP;
+END
+$canonicalise$;
 
 WITH objects AS (
 
@@ -85,6 +201,7 @@ WITH objects AS (
     JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
     WHERE c.relkind IN ('r', 'p')
       AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'hangfire')
+      AND n.nspname NOT LIKE 'pg_temp%'
       AND n.nspname NOT LIKE 'pg_toast%'
 
     UNION ALL
@@ -114,6 +231,7 @@ WITH objects AS (
       AND NOT a.attisdropped
       AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
       AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'hangfire')
+      AND n.nspname NOT LIKE 'pg_temp%'
       AND n.nspname NOT LIKE 'pg_toast%'
 
     UNION ALL
@@ -121,12 +239,23 @@ WITH objects AS (
     -- Constraints: primary keys, unique, foreign keys, checks, exclusions. The
     -- definition comes from the catalog, so it is the constraint's meaning and not the
     -- SQL that created it - which is what makes two databases comparable at all.
+    --
+    -- A CHECK constraint's definition is the CANONICAL one (see the block above): the same
+    -- rule written in two shapes is one rule, and comparing the shapes would report a
+    -- difference that is not there.
     SELECT 'constraint ' || n.nspname || '.' || c.relname || '.' || con.conname
-           || ' ' || pg_catalog.pg_get_constraintdef(con.oid)
+           || ' ' || COALESCE(
+                  (SELECT co.definition
+                   FROM canonical_objects co
+                   WHERE co.kind = 'constraint'
+                     AND co.table_name = c.relname
+                     AND co.object_name = con.conname),
+                  pg_catalog.pg_get_constraintdef(con.oid))
     FROM pg_catalog.pg_constraint con
     JOIN pg_catalog.pg_class c ON c.oid = con.conrelid
     JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
     WHERE n.nspname NOT IN ('pg_catalog', 'information_schema', 'hangfire')
+    AND n.nspname NOT LIKE 'pg_temp%'
 
     UNION ALL
 
@@ -140,11 +269,19 @@ WITH objects AS (
     -- have the same schema - the OIDs are assigned in creation order, and the two databases
     -- were not created in the same order. They are PostgreSQL's own storage for large
     -- values, they are never named by a migration, and no application reads them.
-    SELECT 'index ' || n.nspname || '.' || c.relname || ' ' || pg_catalog.pg_get_indexdef(i.indexrelid)
+    SELECT 'index ' || n.nspname || '.' || c.relname || ' ' || COALESCE(
+                  (SELECT co.definition
+                   FROM canonical_objects co
+                   WHERE co.kind = 'index'
+                     AND co.table_name = c.relname
+                     AND co.object_name = i2.relname),
+                  pg_catalog.pg_get_indexdef(i.indexrelid))
     FROM pg_catalog.pg_index i
     JOIN pg_catalog.pg_class c ON c.oid = i.indrelid
+    JOIN pg_catalog.pg_class i2 ON i2.oid = i.indexrelid
     JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
     WHERE n.nspname NOT IN ('pg_catalog', 'information_schema', 'hangfire')
+    AND n.nspname NOT LIKE 'pg_temp%'
       AND n.nspname NOT LIKE 'pg_toast%'
 
     UNION ALL
@@ -157,6 +294,7 @@ WITH objects AS (
     JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
     WHERE c.relkind = 'v'
       AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'hangfire')
+      AND n.nspname NOT LIKE 'pg_temp%'
 
     UNION ALL
 
@@ -170,6 +308,7 @@ WITH objects AS (
     JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
     WHERE NOT tg.tgisinternal
       AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'hangfire')
+      AND n.nspname NOT LIKE 'pg_temp%'
 
     UNION ALL
 
@@ -182,6 +321,7 @@ WITH objects AS (
     FROM pg_catalog.pg_proc p
     JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
     WHERE n.nspname NOT IN ('pg_catalog', 'information_schema', 'hangfire')
+    AND n.nspname NOT LIKE 'pg_temp%'
 
     UNION ALL
 
@@ -197,6 +337,7 @@ WITH objects AS (
     JOIN pg_catalog.pg_class c ON c.oid = s.seqrelid
     JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
     WHERE n.nspname NOT IN ('pg_catalog', 'information_schema', 'hangfire')
+    AND n.nspname NOT LIKE 'pg_temp%'
 
     UNION ALL
 
@@ -209,6 +350,7 @@ WITH objects AS (
     WHERE c.relkind IN ('r', 'p')
       AND pg_catalog.obj_description(c.oid, 'pg_class') IS NOT NULL
       AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'hangfire')
+      AND n.nspname NOT LIKE 'pg_temp%'
       AND n.nspname NOT LIKE 'pg_toast%'
 
     UNION ALL
@@ -223,6 +365,7 @@ WITH objects AS (
       AND NOT a.attisdropped
       AND pg_catalog.col_description(a.attrelid, a.attnum) IS NOT NULL
       AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'hangfire')
+      AND n.nspname NOT LIKE 'pg_temp%'
       AND n.nspname NOT LIKE 'pg_toast%'
 
 )
