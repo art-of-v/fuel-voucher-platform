@@ -44,66 +44,90 @@ public sealed class GetRealizedMarginQueryHandler
         GetRealizedMarginQuery query,
         CancellationToken cancellationToken = default)
     {
-        var from = query.FromDate ?? DateTime.MinValue;
-        var to = query.ToDate ?? DateTime.MaxValue;
+        var fromUtc = query.FromDate ?? DateTime.MinValue;
+        var toUtc = query.ToDate ?? DateTime.MaxValue;
 
-        var orders = await _context.Orders
-            .AsNoTracking()
-            // Two collections in one query (LineItems x Fulfillments) - without the split query the
-            // JOIN is their cross product and every order comes back multiplied.
-            .AsSplitQuery()
-            .Include(o => o.LineItems)
-            .Include(o => o.Fulfillments)
-                .ThenInclude(f => f.Voucher)
-            .Where(o => MoneyStatuses.Contains(o.Status)
-                        && o.Kind != OrderKind.ReceivedFromCompany
-                        && o.CreatedAtUtc >= from
-                        && o.CreatedAtUtc <= to)
+        // Two grouped queries, and the report is put together from their answers.
+        //
+        // The revenue of each (order, brand, fuel) group: the frozen line total, which is the
+        // amount actually invoiced and never a recomputation.
+        var lineGroups = await (
+            from o in _context.Orders.AsNoTracking()
+            join li in _context.OrderLineItems.AsNoTracking() on o.Id equals li.OrderId
+            where MoneyStatuses.Contains(o.Status)
+                  && o.Kind != OrderKind.ReceivedFromCompany
+                  && o.CreatedAtUtc >= fromUtc
+                  && o.CreatedAtUtc <= toUtc
+            group li by new { o.Id, o.CreatedAtUtc, li.Brand, li.FuelTypeId } into g
+            select new
+            {
+                g.Key.Id,
+                g.Key.CreatedAtUtc,
+                g.Key.Brand,
+                g.Key.FuelTypeId,
+                Revenue = g.Sum(li => li.LineTotal),
+                LitersSold = g.Sum(li => li.Liters * li.Quantity)
+            })
             .ToListAsync(cancellationToken);
 
-        // Revenue is the frozen line total — the amount actually invoiced, never a recomputation.
-        // Cost is the voucher that was actually handed over, at the cost that voucher carries.
+        // And the vouchers that actually went out, per (order, brand, fuel) group: the cost is
+        // the voucher's own recorded cost, and the vouchers that carry no cost are counted
+        // separately rather than folded in.
+        var deliveredGroups = await (
+            from o in _context.Orders.AsNoTracking()
+            join f in _context.Fulfillments.AsNoTracking() on o.Id equals f.OrderId
+            join v in _context.FuelVouchers.AsNoTracking() on f.VoucherId equals v.Id
+            where MoneyStatuses.Contains(o.Status)
+                  && o.Kind != OrderKind.ReceivedFromCompany
+                  && o.CreatedAtUtc >= fromUtc
+                  && o.CreatedAtUtc <= toUtc
+            group v by new { o.Id, v.Brand, v.FuelTypeId } into g
+            select new
+            {
+                g.Key.Id,
+                g.Key.Brand,
+                g.Key.FuelTypeId,
+                Delivered = g.Count(),
+                // A voucher with no cost, or a cost of zero, carries no cost into the figure.
+                Cost = g.Where(v => v.CostPerLiter > 0m).Sum(v => v.CostPerLiter * v.Liters),
+                UncostedLiters = g.Where(v => v.CostPerLiter == null || v.CostPerLiter <= 0m).Sum(v => v.Liters),
+                // Liters-weighted, like the pricing pool: a 10 L voucher's cost and a 50 L
+                // voucher's cost must not carry equal weight.
+                WeightedLiters = g.Where(v => v.CostPerLiter > 0m).Sum(v => v.Liters)
+            })
+            .ToListAsync(cancellationToken);
+
+        // The two sets are joined on the order and the fuel, and on the brand - case-insensitively,
+        // because a line names the network the way it was written and a voucher the way it was
+        // imported.
+        var deliveredByGroup = deliveredGroups.ToDictionary(
+            g => (g.Id, Brand: g.Brand.ToLowerInvariant(), g.FuelTypeId));
+
         var lines = new List<RealizedMarginLine>();
 
-        foreach (var order in orders)
+        foreach (var group in lineGroups)
         {
-            foreach (var group in order.LineItems.GroupBy(li => (li.Brand, li.FuelTypeId)))
+            // A group with no voucher handed over earns no margin: it is not a sale yet.
+            if (!deliveredByGroup.TryGetValue((group.Id, group.Brand.ToLowerInvariant(), group.FuelTypeId), out var delivered))
             {
-                var revenue = group.Sum(li => li.LineTotal);
-
-                var delivered = order.Fulfillments
-                    .Where(f => f.Voucher is not null
-                                && string.Equals(f.Voucher.Brand, group.Key.Brand, StringComparison.OrdinalIgnoreCase)
-                                && f.Voucher.FuelTypeId == group.Key.FuelTypeId)
-                    .Select(f => f.Voucher!)
-                    .ToList();
-
-                if (delivered.Count == 0) continue;
-
-                var costed = delivered.Where(v => v.CostPerLiter is { } c && c > 0m).ToList();
-                var cost = costed.Sum(v => v.CostPerLiter!.Value * v.Liters);
-                var uncostedLiters = delivered.Where(v => v.CostPerLiter is not { } c || c <= 0m).Sum(v => v.Liters);
-
-                // Uncosted vouchers make the figure a partial truth, and a partial truth that looks
-                // like profit is the dangerous direction — so it is reported, never silently folded in.
-                // Liters-weighted, like the pricing pool: a 10 L voucher's cost and a 50 L voucher's cost
-                // must not carry equal weight. Costless vouchers contribute no cost, so they are left
-                // out of both sums rather than dragging the average toward zero.
-                var weightedLiters = costed.Sum(v => v.Liters);
-                lines.Add(new RealizedMarginLine
-                {
-                    OrderId = order.Id,
-                    CreatedAtUtc = order.CreatedAtUtc,
-                    Brand = group.Key.Brand,
-                    FuelTypeId = group.Key.FuelTypeId,
-                    LitersSold = group.Sum(li => li.Liters * li.Quantity),
-                    VouchersDelivered = delivered.Count,
-                    RevenueUah = revenue,
-                    CostUah = cost,
-                    UncostedLiters = uncostedLiters,
-                    SupplierCostPerLiter = weightedLiters > 0m ? cost / weightedLiters : null,
-                });
+                continue;
             }
+
+            var weightedLiters = delivered.WeightedLiters;
+
+            lines.Add(new RealizedMarginLine
+            {
+                OrderId = group.Id,
+                CreatedAtUtc = group.CreatedAtUtc,
+                Brand = group.Brand,
+                FuelTypeId = group.FuelTypeId,
+                LitersSold = group.LitersSold,
+                VouchersDelivered = delivered.Delivered,
+                RevenueUah = group.Revenue,
+                CostUah = delivered.Cost ?? 0m,
+                UncostedLiters = delivered.UncostedLiters,
+                SupplierCostPerLiter = weightedLiters > 0m ? (delivered.Cost ?? 0m) / weightedLiters : null,
+            });
         }
 
         var report = new RealizedMarginReport
