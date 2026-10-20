@@ -4,7 +4,7 @@
 #
 #     cd ~/FuelFlow/deploy && ./restart.sh                 # restart what is already running
 #     cd ~/FuelFlow/deploy && ./restart.sh --tag <sha>    # move to a specific build first
-#     cd ~/FuelFlow/deploy && ./restart.sh --services dotnet-backend caddy
+#     cd ~/FuelFlow/deploy && ./restart.sh --services fuelflow-backend caddy
 #
 # WHY THIS EXISTS
 #
@@ -38,7 +38,7 @@ cd "$SCRIPT_DIR"
 # "(not running)" while raising nothing.
 service_container() {
   case "$1" in
-    dotnet-backend)  echo "fuelflow-backend" ;;
+    fuelflow-backend)  echo "fuelflow-backend" ;;
     admin-frontend)  echo "fuelflow-admin" ;;
     website-frontend) echo "fuelflow-website" ;;
     *) echo "fuelflow-$1" ;;
@@ -70,7 +70,7 @@ echo "== preflight =="
 if [[ -z "$TAG" ]]; then
   echo
   echo "== pinning the currently running images =="
-  for svc in dotnet-backend admin-frontend website-frontend; do
+  for svc in fuelflow-backend admin-frontend website-frontend; do
     ctr="$(service_container "$svc")"
     img=$(docker inspect "$ctr" --format '{{.Config.Image}}' 2>/dev/null || true)
     if [[ -z "$img" ]]; then
@@ -79,7 +79,7 @@ if [[ -z "$TAG" ]]; then
     fi
     t="${img##*:}"
     case "$svc" in
-      dotnet-backend) BACKEND_IMAGE_TAG="$t" ;;
+      fuelflow-backend) BACKEND_IMAGE_TAG="$t" ;;
       admin-frontend) ADMIN_IMAGE_TAG="$t" ;;
       website-frontend) WEBSITE_IMAGE_TAG="$t" ;;
     esac

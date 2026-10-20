@@ -51,7 +51,11 @@ server {
             return 404;
         }
 
-        proxy_pass http://dotnet-backend:8080;
+        # The backend host is substituted at container start: the SAME admin image serves
+# production and staging, and they have different backend names. The filter on the
+# nginx image is set to BACKEND_HOST alone, so nginx's own $variables below are
+# left alone - envsubst with no filter would eat them.
+proxy_pass http://${BACKEND_HOST}:8080;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
