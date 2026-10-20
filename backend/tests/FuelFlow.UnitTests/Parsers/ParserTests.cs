@@ -64,7 +64,7 @@ public class ParserTests : IDisposable
         {
             CreateWord("Welcome", 0, 0),
             CreateWord("to", 10, 0),
-            CreateWord("OKKO", 20, 0),
+            CreateWord("okko", 20, 0),
             CreateWord("Brand", 30, 0)
         };
         var context = new ProviderDetectionContext { Words = words };
@@ -85,7 +85,7 @@ public class ParserTests : IDisposable
         {
             CreateWord("Welcome", 0, 0),
             CreateWord("to", 10, 0),
-            CreateWord("WOG", 20, 0)
+            CreateWord("wog", 20, 0)
         };
         var context = new ProviderDetectionContext { Words = words };
 
@@ -111,7 +111,7 @@ public class ParserTests : IDisposable
         // Voucher Number: "99999600000020368126"
         var words = new List<Word>
         {
-            CreateWord("OKKO", 50, 100),
+            CreateWord("okko", 50, 100),
             CreateWord("ДП", 60, 80),
             CreateWord("ЄВРО", 80, 80),
             CreateWord("20", 70, 60),
@@ -152,7 +152,7 @@ public class ParserTests : IDisposable
         // Assert
         result.Should().HaveCount(1);
         var parsed = result.First();
-        parsed.Brand.Should().Be("OKKO");
+        parsed.Brand.Should().Be("okko");
         parsed.FuelTypeId.Should().Be(ToUuid("okko-dp"));
         parsed.Liters.Should().Be(20m);
         parsed.ExpirationDate.Should().Be(new DateOnly(2025, 6, 17));
@@ -171,7 +171,7 @@ public class ParserTests : IDisposable
 
         var words = new List<Word>
         {
-            CreateWord("OKKO", 10, 100),
+            CreateWord("okko", 10, 100),
             CreateWord("VOUCHER", 10, 80),
             CreateWord("50 л", 10, 60),
             CreateWord("99999600000020368126", 10, 40)
@@ -223,7 +223,7 @@ public class ParserTests : IDisposable
         {
             CreateWord("10л", 0, 0),
             CreateWord("A-95", 10, 0),
-            CreateWord("WOG", 20, 0)
+            CreateWord("wog", 20, 0)
         };
         var context = new ProviderDetectionContext { Words = words };
 
@@ -238,7 +238,7 @@ public class ParserTests : IDisposable
         var parser = new WogVoucherParser(_context, new BrandSlugResolver(_context), NullLogger<WogVoucherParser>.Instance);
         var words = new List<Word>
         {
-            CreateWord("OKKO", 0, 0),
+            CreateWord("okko", 0, 0),
             CreateWord("A-95", 10, 0)
         };
         var context = new ProviderDetectionContext { Words = words };
@@ -264,7 +264,7 @@ public class ParserTests : IDisposable
             CreateWord("Дійсний", 10, 40),
             CreateWord("до", 50, 40),
             CreateWord("13.05.2026", 70, 40),
-            CreateWord("WOG", 40, 20)
+            CreateWord("wog", 40, 20)
         };
 
         using var dummyImage = new Image<Rgba32>(100, 100);
@@ -295,7 +295,7 @@ public class ParserTests : IDisposable
 
         result.Should().HaveCount(1);
         var parsed = result.First();
-        parsed.Brand.Should().Be("WOG");
+        parsed.Brand.Should().Be("wog");
         parsed.FuelTypeId.Should().Be(ToUuid("wog-95-euro"));
         parsed.Liters.Should().Be(10m);
         parsed.ExpirationDate.Should().Be(new DateOnly(2026, 5, 13));
@@ -312,7 +312,7 @@ public class ParserTests : IDisposable
 
         var words = new List<Word>
         {
-            CreateWord("WOG", 0, 100),
+            CreateWord("wog", 0, 100),
             CreateWord("20", 70, 80),
             CreateWord("л", 85, 80),
             CreateWord("99999600000020368126", 20, 60)
@@ -350,7 +350,7 @@ public class ParserTests : IDisposable
         // production catalog, tripped the fuel_type_id foreign key and 500'd the whole import.
         result.Should().HaveCount(1);
         var parsed = result.First();
-        parsed.Brand.Should().Be("WOG");
+        parsed.Brand.Should().Be("wog");
         parsed.FuelTypeId.Should().BeNull();
         parsed.Liters.Should().Be(20m);
         parsed.VoucherNumber.Should().Be("99999600000020368126");
@@ -376,7 +376,7 @@ public class ParserTests : IDisposable
 
         var words = new List<Word>
         {
-            CreateWord("WOG", 40, 100),
+            CreateWord("wog", 40, 100),
             CreateWord("A-95", 50, 80),
             CreateWord("20", 70, 60),
             CreateWord("л", 85, 60),
@@ -409,7 +409,7 @@ public class ParserTests : IDisposable
 
         result.Should().HaveCount(1);
         var parsed = result.First();
-        parsed.Brand.Should().Be("WOG");
+        parsed.Brand.Should().Be("wog");
         parsed.FuelTypeId.Should().Be(ToUuid("wog-95-euro"));
         parsed.Liters.Should().Be(20m);
         parsed.ExpirationDate.Should().Be(new DateOnly(2026, 2, 9));
@@ -433,7 +433,7 @@ public class ParserTests : IDisposable
 
         var words = new List<Word>
         {
-            CreateWord("OKKO", 50, 100),
+            CreateWord("okko", 50, 100),
             CreateWord("20", 70, 60),
             CreateWord("л", 85, 60),
             CreateWord("17.06.2025", 70, 40),

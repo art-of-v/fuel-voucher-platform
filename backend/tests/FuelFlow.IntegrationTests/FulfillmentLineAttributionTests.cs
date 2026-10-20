@@ -203,8 +203,8 @@ public sealed class FulfillmentLineAttributionTests : IClassFixture<TestDatabase
         UpdatedAtUtc = DateTime.UtcNow,
         LineItems = new List<OrderLineItem>
         {
-            Line(okkoLine, orderId, "OKKO", "okko-95", 10m, quantity: 2, unitPrice: 2500m),
-            Line(wogLine, orderId, "WOG", "wog-95", 10m, quantity: 1, unitPrice: 2500m)
+            Line(okkoLine, orderId, "okko", "okko-95", 10m, quantity: 2, unitPrice: 2500m),
+            Line(wogLine, orderId, "wog", "wog-95", 10m, quantity: 1, unitPrice: 2500m)
         }
     };
 
@@ -218,7 +218,7 @@ public sealed class FulfillmentLineAttributionTests : IClassFixture<TestDatabase
         UpdatedAtUtc = DateTime.UtcNow,
         LineItems = new List<OrderLineItem>
         {
-            Line(lineId, orderId, "OKKO", "okko-95", 10m, quantity, 2500m)
+            Line(lineId, orderId, "okko", "okko-95", 10m, quantity, 2500m)
         }
     };
 
@@ -274,7 +274,7 @@ public sealed class FulfillmentLineAttributionTests : IClassFixture<TestDatabase
         return new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Brand = fuelTypeId.StartsWith("wog", StringComparison.Ordinal) ? "WOG" : "OKKO",
+            Brand = fuelTypeId.StartsWith("wog", StringComparison.Ordinal) ? "wog" : "okko",
             FuelTypeId =   ToUuid(fuelTypeId),
             Liters = liters,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),

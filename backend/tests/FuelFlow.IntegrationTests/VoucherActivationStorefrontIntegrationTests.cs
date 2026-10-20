@@ -193,8 +193,8 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
         {
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             context.FuelVouchers.AddRange(
-                ImportedVoucher("OKKO", "act-95", 10m, costPerLiter: 45m),
-                ImportedVoucher("OKKO", "act-95", 20m, costPerLiter: 45m));
+                ImportedVoucher("okko", "act-95", 10m, costPerLiter: 45m),
+                ImportedVoucher("okko", "act-95", 20m, costPerLiter: 45m));
             await context.SaveChangesAsync();
         }
 
@@ -240,7 +240,7 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
         using (var scope = _fixture.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            context.FuelVouchers.Add(ImportedVoucher("OKKO", "act-uncosted", 5m, costPerLiter: null));
+            context.FuelVouchers.Add(ImportedVoucher("okko", "act-uncosted", 5m, costPerLiter: null));
             await context.SaveChangesAsync();
         }
 
@@ -274,7 +274,7 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
         using (var scope = _fixture.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            context.FuelVouchers.Add(ImportedVoucher("OKKO", "act-toggle", 10m, costPerLiter: 45m));
+            context.FuelVouchers.Add(ImportedVoucher("okko", "act-toggle", 10m, costPerLiter: 45m));
             await context.SaveChangesAsync();
         }
 

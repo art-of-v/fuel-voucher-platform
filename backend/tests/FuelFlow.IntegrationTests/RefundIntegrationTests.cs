@@ -339,7 +339,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
             var voucher = new FuelVoucher
             {
                 Id = Guid.NewGuid(),
-                Brand = "OKKO",
+                Brand = "okko",
                 FuelTypeId = ToUuid("okko-dp"),
                 Liters = 10m,
                 SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
@@ -406,7 +406,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
             var voucher = new FuelVoucher
             {
                 Id = Guid.NewGuid(),
-                Brand = "OKKO",
+                Brand = "okko",
                 FuelTypeId = ToUuid("okko-dp"),
                 Liters = 10m,
                 SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
@@ -549,7 +549,7 @@ var order = CreateOrder(orderId, userId, $"test-invoice-{orderId:N}", OrderStatu
             var voucher = new FuelVoucher
             {
                 Id = Guid.NewGuid(),
-                Brand = "OKKO",
+                Brand = "okko",
                 FuelTypeId = ToUuid("okko-dp"),
                 Liters = 10m,
                 SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
@@ -665,7 +665,7 @@ private static Order AddPaidOrder(
             {
                 Id = Guid.NewGuid(),
                 OrderId = orderId,
-                Brand = "OKKO",
+                Brand = "okko",
                 FuelTypeId = ToUuid("okko-dp"),
                 Liters = 10m,
                 Quantity = quantity,

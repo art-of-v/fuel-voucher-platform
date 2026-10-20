@@ -181,7 +181,7 @@ public sealed class ConfirmOperatorRenewalCommandHandler
         {
             var promisedExpiration = VoucherRenewalEligibility.PromisedExpirationForReplace(
                 today, voucher.CustomerExpirationDate, term);
-            var providerLower = voucher.Brand.ToLower();
+            var providerSlug = voucher.Brand;
 
             // Shortest qualifying voucher first, mirroring FulfillmentService.FindReplacementVoucherAsync:
             // the floor is what we owe the customer, and handing out a shorter voucher that still covers
@@ -189,7 +189,7 @@ public sealed class ConfirmOperatorRenewalCommandHandler
             var stock = await _context.FuelVouchers
                 .AsTracking()
                 .Where(v => v.Status == VoucherStatus.Available
-                         && v.Brand.ToLower() == providerLower
+                         && v.Brand == providerSlug
                          && v.FuelTypeId == voucher.FuelTypeId
                          && v.Liters == voucher.Liters
                          && v.SupplierExpirationDate >= promisedExpiration)

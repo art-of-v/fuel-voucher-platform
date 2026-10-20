@@ -42,8 +42,8 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
         {
             Id = TestOkko,
             Slug = "test-okko",
-            Name = "OKKO",
-            LogoText = "OKKO",
+            Name = "okko",
+            LogoText = "okko",
             Color = "#fff",
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
@@ -78,8 +78,8 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
         {
             Id = TestOkko,
             Slug = "test-okko",
-            Name = "OKKO",
-            LogoText = "OKKO",
+            Name = "okko",
+            LogoText = "okko",
             Color = "#fff",
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
@@ -124,8 +124,8 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
         {
             Id = TestOkko,
             Slug = "test-okko",
-            Name = "OKKO",
-            LogoText = "OKKO",
+            Name = "okko",
+            LogoText = "okko",
             Color = "#fff",
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
@@ -155,8 +155,8 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
         {
             Id = TestOkko,
             Slug = "test-okko",
-            Name = "OKKO",
-            LogoText = "OKKO",
+            Name = "okko",
+            LogoText = "okko",
             Color = "#fff",
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
@@ -215,8 +215,8 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
         {
             Id = TestOkko,
             Slug = "test-okko",
-            Name = "OKKO",
-            LogoText = "OKKO",
+            Name = "okko",
+            LogoText = "okko",
             Color = "#fff",
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
@@ -260,8 +260,8 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
         {
             Id = TestOkko,
             Slug = "test-okko",
-            Name = "OKKO",
-            LogoText = "OKKO",
+            Name = "okko",
+            LogoText = "okko",
             Color = "#fff",
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
@@ -330,8 +330,8 @@ private FuelNominal Package(
         {
             Id = TestKlo,
             Slug = "test-klo",
-            Name = "KLO",
-            LogoText = "KLO",
+            Name = "klo",
+            LogoText = "klo",
             Color = "#fff",
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow

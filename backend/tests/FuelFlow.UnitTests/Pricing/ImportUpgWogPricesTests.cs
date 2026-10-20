@@ -33,7 +33,7 @@ public sealed class ImportUpgWogPricesTests : IDisposable
         _context = new ApplicationDbContext(options, TestQrCipher.Instance);
         _context.Brands.AddRange(
             new Brand { Id = BrandIds.Upg, Slug = "upg", Name = "UPG", Color = "#06b6d4", LogoText = "UPG" },
-            new Brand { Id = BrandIds.Wog, Slug = "wog", Name = "WOG", Color = "#000000", LogoText = "WOG" });
+            new Brand { Id = BrandIds.Wog, Slug = "wog", Name = "wog", Color = "#000000", LogoText = "wog" });
     }
 
     public void Dispose()

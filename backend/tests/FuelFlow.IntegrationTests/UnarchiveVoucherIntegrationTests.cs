@@ -148,7 +148,7 @@ public sealed class UnarchiveVoucherIntegrationTests : IClassFixture<TestDatabas
         seed.FuelVouchers.Add(new FuelVoucher
         {
             Id = voucherId,
-            Brand = "OKKO",
+            Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),

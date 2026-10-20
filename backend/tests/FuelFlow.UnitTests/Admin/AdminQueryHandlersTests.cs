@@ -124,13 +124,13 @@ public sealed class AdminQueryHandlersTests : IDisposable
         _context.SaveChanges();
 
         _context.FuelVouchers.AddRange(
-            CreateVoucher("OKKO", "okko-95", VoucherStatus.Available),
-            CreateVoucher("OKKO", "okko-95", VoucherStatus.Imported),
-            CreateVoucher("OKKO", "okko-95", VoucherStatus.Assigned),
-            CreateVoucher("OKKO", "okko-95", VoucherStatus.Used),
-            CreateVoucher("OKKO", "okko-95", VoucherStatus.VerificationFailed),
-            CreateVoucher("OKKO", "okko-95", VoucherStatus.VerifiedWithWarnings),
-            CreateVoucher("OKKO", "okko-95", VoucherStatus.Expired));
+            CreateVoucher("okko", "okko-95", VoucherStatus.Available),
+            CreateVoucher("okko", "okko-95", VoucherStatus.Imported),
+            CreateVoucher("okko", "okko-95", VoucherStatus.Assigned),
+            CreateVoucher("okko", "okko-95", VoucherStatus.Used),
+            CreateVoucher("okko", "okko-95", VoucherStatus.VerificationFailed),
+            CreateVoucher("okko", "okko-95", VoucherStatus.VerifiedWithWarnings),
+            CreateVoucher("okko", "okko-95", VoucherStatus.Expired));
         _context.SaveChanges();
 
         var fulfilledOrder = CreateOrder(Guid.NewGuid(), UserId, OrderStatus.Fulfilled, MonobankStatus.Success, DateTime.UtcNow.AddDays(-3));
@@ -157,7 +157,7 @@ public sealed class AdminQueryHandlersTests : IDisposable
         response.Vouchers.Used.Should().Be(1);
         response.Vouchers.VerificationFailed.Should().Be(1);
         response.Vouchers.VerifiedWithWarnings.Should().Be(1);
-        response.Vouchers.ByProvider.Should().ContainSingle(v => v.Brand == "OKKO" && v.Count == 7);
+        response.Vouchers.ByProvider.Should().ContainSingle(v => v.Brand == "okko" && v.Count == 7);
 
         response.Orders.Total.Should().Be(3);
         response.Orders.Pending.Should().Be(2);
@@ -190,8 +190,8 @@ public sealed class AdminQueryHandlersTests : IDisposable
     [Fact]
     public async Task GetReconciliation_ShouldReturnMatchingSummary_WhenSeeded()
     {
-        var voucher = CreateVoucher("OKKO", "okko-95", VoucherStatus.Assigned);
-        var availableVoucher = CreateVoucher("OKKO", "okko-95", VoucherStatus.Available);
+        var voucher = CreateVoucher("okko", "okko-95", VoucherStatus.Assigned);
+        var availableVoucher = CreateVoucher("okko", "okko-95", VoucherStatus.Available);
         _context.FuelVouchers.AddRange(voucher, availableVoucher);
 
         var fulfilledOrder = CreateOrder(Guid.NewGuid(), UserId, OrderStatus.Fulfilled, MonobankStatus.Success, DateTime.UtcNow.AddDays(-2));
@@ -252,7 +252,7 @@ public sealed class AdminQueryHandlersTests : IDisposable
     [Fact]
     public async Task GetReconciliation_ShouldComputeLedgerFields_WhenOrdersAreRefunded()
     {
-        var voucher = CreateVoucher("OKKO", "okko-95", VoucherStatus.Assigned);
+        var voucher = CreateVoucher("okko", "okko-95", VoucherStatus.Assigned);
         _context.FuelVouchers.Add(voucher);
 
         // Fixed calendar month for BOTH orders, not "a few days ago": RevenueSummary groups by
@@ -316,8 +316,8 @@ public sealed class AdminQueryHandlersTests : IDisposable
         // so one closed order per month produces one row each. Pinned here explicitly so a change
         // that flattens or re-buckets the grouping fails on a fixed date instead of surfacing as a
         // date-dependent failure in some other assertion.
-        var marchVoucher = CreateVoucher("OKKO", "okko-95", VoucherStatus.Assigned);
-        var aprilVoucher = CreateVoucher("OKKO", "okko-95", VoucherStatus.Assigned);
+        var marchVoucher = CreateVoucher("okko", "okko-95", VoucherStatus.Assigned);
+        var aprilVoucher = CreateVoucher("okko", "okko-95", VoucherStatus.Assigned);
         _context.FuelVouchers.AddRange(marchVoucher, aprilVoucher);
 
         var march = new DateTime(2026, 3, 10, 12, 0, 0, DateTimeKind.Utc);

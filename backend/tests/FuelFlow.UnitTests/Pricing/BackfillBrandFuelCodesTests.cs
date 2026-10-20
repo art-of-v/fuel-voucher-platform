@@ -63,7 +63,7 @@ public sealed class BackfillBrandFuelCodesTests : IDisposable
 
     private async Task SeedAsync(params FuelTypeEntity[] fuels)
     {
-        _context.Brands.Add(new Brand { Id = BrandIds.Okko, Slug = "okko", Name = "OKKO", Color = "#000", LogoText = "OKKO" });
+        _context.Brands.Add(new Brand { Id = BrandIds.Okko, Slug = "okko", Name = "okko", Color = "#000", LogoText = "okko" });
         foreach (var fuel in fuels)
         {
             fuel.BrandId = BrandIds.Okko;

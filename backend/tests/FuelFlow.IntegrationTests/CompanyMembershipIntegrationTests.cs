@@ -315,7 +315,7 @@ public sealed class CompanyMembershipIntegrationTests : IClassFixture<TestDataba
         => new()
         {
             Id = id,
-            Brand = "OKKO",
+            Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
@@ -366,7 +366,7 @@ public sealed class CompanyMembershipIntegrationTests : IClassFixture<TestDataba
             {
                 Id = Guid.NewGuid(),
                 OrderId = purchaseOrderId,
-                Brand = "OKKO",
+                Brand = "okko",
                 FuelTypeId = ToUuid("okko-95"),
                 Liters = 50m,
                 Quantity = 2,

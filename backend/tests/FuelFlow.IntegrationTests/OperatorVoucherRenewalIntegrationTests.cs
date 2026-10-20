@@ -47,7 +47,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
             await ResetDataAsync(seed);
             SeedUser(seed, userId);
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
-            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "OKKO", "okko-95", 50m, oldExpiry, supplierExpiry: today.AddMonths(12)));
+            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "okko", "okko-95", 50m, oldExpiry, supplierExpiry: today.AddMonths(12)));
             await seed.SaveChangesAsync();
         }
 
@@ -140,7 +140,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
             await ResetDataAsync(seed);
             SeedUser(seed, userId);
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
-            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "OKKO", "okko-95", 50m, customerExpiry));
+            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "okko", "okko-95", 50m, customerExpiry));
             await seed.SaveChangesAsync();
         }
 
@@ -188,9 +188,9 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
             SeedUser(seed, userId);
             originPurchaseId = SeedPurchaseOrder(seed, userId);
             // Lapsed source → Replace branch; seeded Assigned so we can prove it goes back to stock.
-            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, originPurchaseId, "OKKO", "okko-95", 40m, today.AddDays(-3)));
+            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, originPurchaseId, "okko", "okko-95", 40m, today.AddDays(-3)));
             // Matching stock, valid well beyond today + 1 month.
-            seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 40m, today.AddMonths(6)));
+            seed.FuelVouchers.Add(StockVoucher(stockId, "okko", "okko-95", 40m, today.AddMonths(6)));
             await seed.SaveChangesAsync();
         }
 
@@ -283,7 +283,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
             await ResetDataAsync(seed);
             SeedUser(seed, userId);
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
-            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "WOG", "wog-95", 40m, today.AddDays(-3)));
+            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "wog", "wog-95", 40m, today.AddDays(-3)));
             await seed.SaveChangesAsync();
         }
 
@@ -325,9 +325,9 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
             await ResetDataAsync(seed);
             SeedUser(seed, userId);
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
-            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "OKKO", "okko-95", 40m, today.AddDays(-3)));
+            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "okko", "okko-95", 40m, today.AddDays(-3)));
             // Stock that cost us 50/litre: 40 L is 2000 UAH, so a 300 surcharge is far under it.
-            seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 40m, today.AddMonths(6), costPerLiter: 50m));
+            seed.FuelVouchers.Add(StockVoucher(stockId, "okko", "okko-95", 40m, today.AddMonths(6), costPerLiter: 50m));
             // Set explicitly: fuel_types is not truncated between tests, so the opt-in test that runs
             // before or after this one must not decide the outcome here.
             await seed.FuelTypes
@@ -376,8 +376,8 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
             await ResetDataAsync(seed);
             SeedUser(seed, userId);
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
-            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "OKKO", "okko-95", 40m, today.AddDays(-3)));
-            seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 40m, today.AddMonths(6), costPerLiter: 50m));
+            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "okko", "okko-95", 40m, today.AddDays(-3)));
+            seed.FuelVouchers.Add(StockVoucher(stockId, "okko", "okko-95", 40m, today.AddMonths(6), costPerLiter: 50m));
             await seed.SaveChangesAsync();
         }
 
@@ -410,8 +410,8 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
             await ResetDataAsync(seed);
             SeedUser(seed, userId);
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
-            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "OKKO", "okko-95", 40m, today.AddDays(-3)));
-            seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 40m, today.AddMonths(6), costPerLiter: 50m));
+            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "okko", "okko-95", 40m, today.AddDays(-3)));
+            seed.FuelVouchers.Add(StockVoucher(stockId, "okko", "okko-95", 40m, today.AddMonths(6), costPerLiter: 50m));
             await seed.FuelTypes
                 .Where(f => f.Id == ToUuid("okko-95"))
                 .ExecuteUpdateAsync(s => s.SetProperty(f => f.AllowBelowCost, true));
@@ -447,7 +447,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
             await ResetDataAsync(seed);
             SeedUser(seed, userId);
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
-            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "OKKO", "okko-95", 20m, today.AddDays(10), supplierExpiry: today.AddMonths(12)));
+            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "okko", "okko-95", 20m, today.AddDays(10), supplierExpiry: today.AddMonths(12)));
             await seed.SaveChangesAsync();
         }
 
@@ -477,7 +477,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
         {
             await seed.Database.MigrateAsync();
             await ResetDataAsync(seed);
-            seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 50m, today.AddMonths(3)));
+            seed.FuelVouchers.Add(StockVoucher(stockId, "okko", "okko-95", 50m, today.AddMonths(3)));
             await seed.SaveChangesAsync();
         }
 
@@ -506,7 +506,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
             await ResetDataAsync(seed);
             SeedUser(seed, userId);
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
-            var v = CustomerVoucher(voucherId, userId, purchaseOrderId, "OKKO", "okko-95", 50m, today.AddDays(5));
+            var v = CustomerVoucher(voucherId, userId, purchaseOrderId, "okko", "okko-95", 50m, today.AddDays(5));
             v.Status = VoucherStatus.Used;
             seed.FuelVouchers.Add(v);
             await seed.SaveChangesAsync();
@@ -537,7 +537,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
             await ResetDataAsync(seed);
             SeedUser(seed, userId);
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
-            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "OKKO", "okko-95", 50m, today.AddDays(5), supplierExpiry: today.AddMonths(12)));
+            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "okko", "okko-95", 50m, today.AddDays(5), supplierExpiry: today.AddMonths(12)));
             await seed.SaveChangesAsync();
         }
 
@@ -597,7 +597,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
             await ResetDataAsync(seed);
             SeedUser(seed, userId);
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
-            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "OKKO", "okko-95", 50m, today.AddDays(5), supplierExpiry: today.AddMonths(12)));
+            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "okko", "okko-95", 50m, today.AddDays(5), supplierExpiry: today.AddMonths(12)));
             await seed.SaveChangesAsync();
         }
 
@@ -668,7 +668,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
             await ResetDataAsync(seed);
             SeedUser(seed, userId);
             var purchaseOrderId = SeedPurchaseOrder(seed, userId);
-            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "OKKO", "okko-95", 50m, oldExpiry, supplierExpiry: today.AddMonths(12)));
+            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "okko", "okko-95", 50m, oldExpiry, supplierExpiry: today.AddMonths(12)));
             await seed.SaveChangesAsync();
         }
 

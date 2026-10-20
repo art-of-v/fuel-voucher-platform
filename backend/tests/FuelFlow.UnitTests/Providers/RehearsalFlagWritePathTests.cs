@@ -75,7 +75,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
 
         _context.Brands.Add(new Brand
         {
-            Id = BrandIds.Okko, Slug = "okko", Name = "OKKO", Color = "#22c55e", LogoText = "OKKO",
+            Id = BrandIds.Okko, Slug = "okko", Name = "okko", Color = "#22c55e", LogoText = "okko",
             CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
         });
         _context.SaveChanges();
@@ -289,7 +289,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
 
         _context.Brands.Add(new Brand
         {
-            Id = BrandIds.Wog, Slug = "wog", Name = "WOG", Color = "#10b981", LogoText = "WOG",
+            Id = BrandIds.Wog, Slug = "wog", Name = "wog", Color = "#10b981", LogoText = "wog",
             CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
         });
         await _context.SaveChangesAsync();

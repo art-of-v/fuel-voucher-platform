@@ -141,7 +141,7 @@ public sealed class DeletedUnpaidOrderCleanupIntegrationTests : IClassFixture<Te
             seed.FuelVouchers.Add(new FuelVoucher
             {
                 Id = voucherId,
-                Brand = "OKKO",
+                Brand = "okko",
                 FuelTypeId = ToUuid("okko-dp"),
                 Liters = 10m,
                 SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
@@ -223,7 +223,7 @@ public sealed class DeletedUnpaidOrderCleanupIntegrationTests : IClassFixture<Te
                 {
                     Id = Guid.NewGuid(),
                     OrderId = orderId,
-                    Brand = "OKKO",
+                    Brand = "okko",
                     FuelTypeId = ToUuid("okko-dp"),
                     Liters = 10m,
                     Quantity = 2,

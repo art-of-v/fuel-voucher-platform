@@ -136,7 +136,7 @@ public sealed class VoucherTermSaleTests : IDisposable
                 
                 FuelTypeId = ToUuid("okko-95"),
                 BrandId = BrandIds.Okko,
-                BrandName = "OKKO",
+                BrandName = "okko",
                 Liters = 10,
                 Quantity = 1,
                 Price = 600,
@@ -162,7 +162,7 @@ public sealed class VoucherTermSaleTests : IDisposable
     /// Puts one <c>Available</c> voucher in stock with the given paper term. The term ladder is gated on
     /// stock now, so any quote that should offer a term needs this behind it.
     /// </summary>
-    private void SeedStock(int daysUntilPaperExpiry, string brand = "OKKO", string fuelTypeId = "okko-95", decimal liters = 10m)
+    private void SeedStock(int daysUntilPaperExpiry, string brand = "okko", string fuelTypeId = "okko-95", decimal liters = 10m)
     {
         _context.FuelVouchers.Add(new FuelVoucher
         {
@@ -608,7 +608,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         _context.FuelVouchers.Add(new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Brand = "OKKO",
+            Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 10m,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(6),
@@ -629,10 +629,10 @@ public sealed class VoucherTermSaleTests : IDisposable
     [Fact]
     public async Task Quote_MatchesStockCaseInsensitively()
     {
-        // The catalog and order lines carry "okko"; imported stock carries "OKKO". A case-sensitive match
+        // The catalog and order lines carry "okko"; imported stock carries "okko". A case-sensitive match
         // would hide every term from the customer despite the shelf being full.
         EnableTermSale(("1w", 20m));
-        SeedStock(daysUntilPaperExpiry: 8, brand: "OKKO");
+        SeedStock(daysUntilPaperExpiry: 8, brand: "okko");
 
         var quote = await QuoteHandler().HandleAsync(isTestAccount: false, BrandIds.Okko, ToUuid("okko-95"), 10m);
 

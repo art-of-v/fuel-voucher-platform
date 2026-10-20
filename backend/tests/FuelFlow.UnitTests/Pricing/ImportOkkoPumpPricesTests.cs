@@ -39,8 +39,8 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
     private async Task SeedCatalogAsync()
     {
         _context.Brands.AddRange(
-            new Brand { Id = BrandIds.Okko, Slug = "okko", Name = "OKKO", Color = "#000000", LogoText = "OKKO" },
-            new Brand { Id = BrandIds.Wog, Slug = "wog", Name = "WOG", Color = "#000000", LogoText = "WOG" });
+            new Brand { Id = BrandIds.Okko, Slug = "okko", Name = "okko", Color = "#000000", LogoText = "okko" },
+            new Brand { Id = BrandIds.Wog, Slug = "wog", Name = "wog", Color = "#000000", LogoText = "wog" });
         _context.FuelTypes.AddRange(
             new FuelTypeEntity { Id = ToUuid("okko-95"), Name = "A-95", BrandId = BrandIds.Okko, BasePrice = 54, DiscountPrice = 51 },
             new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52 },

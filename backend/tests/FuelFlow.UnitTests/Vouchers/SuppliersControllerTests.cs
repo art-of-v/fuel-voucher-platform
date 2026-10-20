@@ -38,7 +38,7 @@ public sealed class SuppliersControllerTests : IDisposable
         {
             new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
             new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Name, "+380677757766"),
-            new System.Security.Claims.Claim("first_name", "QA")
+            new System.Security.Claims.Claim("first_name", "qa")
         };
         _controller = new SuppliersController(_context, new AuditEventService(_context))
         {

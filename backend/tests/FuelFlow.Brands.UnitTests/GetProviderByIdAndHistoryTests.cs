@@ -46,8 +46,8 @@ public sealed class GetProviderByIdAndHistoryTests : IDisposable
         {
             Id = TestOkko,
             Slug = "test-okko",
-            Name = "OKKO",
-            LogoText = "OKKO",
+            Name = "okko",
+            LogoText = "okko",
             Color = "#22c55e",
             CreatedAtUtc = now,
             UpdatedAtUtc = now
@@ -71,8 +71,8 @@ public sealed class GetProviderByIdAndHistoryTests : IDisposable
 
         brand.Should().NotBeNull();
         brand!.Id.Should().Be(TestOkko);
-        brand.Name.Should().Be("OKKO");
-        brand.LogoText.Should().Be("OKKO");
+        brand.Name.Should().Be("okko");
+        brand.LogoText.Should().Be("okko");
         brand.Color.Should().Be("#22c55e");
         brand.Nominals.Should().Equal(10, 20, 50);
         brand.Fuels.Should().HaveCount(2);

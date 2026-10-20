@@ -186,14 +186,14 @@ public sealed class RenewalQuoteCommandHandler
         FuelVoucher source,
         CancellationToken cancellationToken)
     {
-        var key = (source.Brand.ToLower(), source.FuelTypeId, source.Liters);
+        var key = (source.Brand, source.FuelTypeId, source.Liters);
         if (cache.TryGetValue(key, out var cached))
             return cached;
 
         var best = await _context.FuelVouchers
             .AsNoTracking()
             .Where(v => v.Status == VoucherStatus.Available
-                     && v.Brand.ToLower() == key.Item1
+                     && v.Brand == key.Item1
                      && v.FuelTypeId == source.FuelTypeId
                      && v.Liters == source.Liters)
             .OrderByDescending(v => v.SupplierExpirationDate)

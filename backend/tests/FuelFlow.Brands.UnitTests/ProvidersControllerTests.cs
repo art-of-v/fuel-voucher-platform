@@ -204,7 +204,7 @@ public sealed class BrandFuelControllerTests : IDisposable
     [Fact]
     public async Task AddFuel_ProviderWithoutAnyNominals_CreatesDefaultPackages()
     {
-        await AddBrandAsync(TestKlo, "KLO");
+        await AddBrandAsync(TestKlo, "klo");
 
         var result = await _controller.AddFuel(
             TestKlo,
@@ -228,7 +228,7 @@ public sealed class BrandFuelControllerTests : IDisposable
     [Fact]
     public async Task AddFuel_ProviderWithExistingNominals_UsesThoseNominals()
     {
-        await AddBrandAsync(TestOkko, "OKKO");
+        await AddBrandAsync(TestOkko, "okko");
         await AddFuelAsync("test-fuel-a", TestOkko, "A-95");
         await AddPackageAsync("test-fuel-a", TestOkko, 10m, 51m, 49m, 2m);
         await AddPackageAsync("test-fuel-a", TestOkko, 20m, 51m, 49m, 2m);
@@ -266,7 +266,7 @@ public sealed class BrandFuelControllerTests : IDisposable
     [Fact]
     public async Task AddFuel_FractionalPerLiterPrice_PreservesKopecksOnHeadlineAndPackage()
     {
-        await AddBrandAsync(TestOkko, "OKKO");
+        await AddBrandAsync(TestOkko, "okko");
 
         var result = await _controller.AddFuel(
             TestOkko,
@@ -285,7 +285,7 @@ public sealed class BrandFuelControllerTests : IDisposable
     [Fact]
     public async Task UpdateFuel_FuelWithoutPackages_SeedsDefaultPackagesAndSavesPrice()
     {
-        await AddBrandAsync(TestKlo, "KLO");
+        await AddBrandAsync(TestKlo, "klo");
         await AddFuelAsync("test-fuel-ttt", TestKlo, "ttt");
 
         var result = await _controller.UpdateFuel(
@@ -309,7 +309,7 @@ public sealed class BrandFuelControllerTests : IDisposable
     [Fact]
     public async Task UpdateFuel_AppendsTheNewPrice_ToThePriceHistory_WithTheOperatorAsActor()
     {
-        await AddBrandAsync(TestOkko, "OKKO");
+        await AddBrandAsync(TestOkko, "okko");
         await AddFuelAsync("test-fuel-h", TestOkko, "A-95");
         await AddPackageAsync("test-fuel-h", TestOkko, 10m, 51m, 49m, 2m);
 
@@ -347,7 +347,7 @@ public sealed class BrandFuelControllerTests : IDisposable
     [Fact]
     public async Task UpdateFuel_WithExistingPackages_UpdatesAllPrices()
     {
-        await AddBrandAsync(TestOkko, "OKKO");
+        await AddBrandAsync(TestOkko, "okko");
         await AddFuelAsync("test-fuel-a", TestOkko, "A-95");
         await AddPackageAsync("test-fuel-a", TestOkko, 10m, 51m, 49m, 2m);
         await AddPackageAsync("test-fuel-a", TestOkko, 20m, 51m, 49m, 2m);
@@ -377,7 +377,7 @@ public sealed class BrandFuelControllerTests : IDisposable
     [Fact]
     public async Task UpdateFuel_RecordsOldToNewValuesInAuditSummary()
     {
-        await AddBrandAsync(TestOkko, "OKKO");
+        await AddBrandAsync(TestOkko, "okko");
         await AddFuelAsync("test-fuel-a", TestOkko, "A-95");
         await AddPackageAsync("test-fuel-a", TestOkko, 10m, 51m, 49m, 2m);
 
@@ -413,7 +413,7 @@ public sealed class BrandFuelControllerTests : IDisposable
     [Fact]
     public async Task UpdateNominals_ReplacesPackagesForAllFuels()
     {
-        await AddBrandAsync(TestOkko, "OKKO");
+        await AddBrandAsync(TestOkko, "okko");
         await AddFuelAsync("test-fuel-a", TestOkko, "A-95");
         await AddFuelAsync("test-fuel-b", TestOkko, "B");
         await AddPackageAsync("test-fuel-a", TestOkko, 10m, 51m, 49m, 2m);
@@ -442,7 +442,7 @@ public sealed class BrandFuelControllerTests : IDisposable
     [Fact]
     public async Task UpdateNominals_LeavesTheOffersPricingAlone()
     {
-        await AddBrandAsync(TestOkko, "OKKO");
+        await AddBrandAsync(TestOkko, "okko");
         await AddFuelAsync("test-fuel-a", TestOkko, "A-95");
         await AddPackageAsync("test-fuel-a", TestOkko, 10m, 51m, 49m, 2m);
 
@@ -484,7 +484,7 @@ public sealed class BrandFuelControllerTests : IDisposable
     [Fact]
     public async Task AddFuel_BelowCostNotOptedIn_Returns400_AndPersistsNothing()
     {
-        await AddBrandAsync(TestOkko, "OKKO");
+        await AddBrandAsync(TestOkko, "okko");
 
         var result = await _controller.AddFuel(
             TestOkko,
@@ -504,7 +504,7 @@ public sealed class BrandFuelControllerTests : IDisposable
     [Fact]
     public async Task AddFuel_BelowCostOptedIn_SavesPrice_AndFiresDeliberateWarningAlert()
     {
-        await AddBrandAsync(TestOkko, "OKKO");
+        await AddBrandAsync(TestOkko, "okko");
         var alerts = new Mock<IAlertNotifier>();
         var controller = BuildController(DispatcherWith(alerts));
 
@@ -528,7 +528,7 @@ public sealed class BrandFuelControllerTests : IDisposable
     [Fact]
     public async Task UpdateFuel_BelowCostNotOptedIn_Returns400_AndLeavesPriceUnchanged()
     {
-        await AddBrandAsync(TestOkko, "OKKO");
+        await AddBrandAsync(TestOkko, "okko");
         await AddFuelAsync("test-fuel-a", TestOkko, "A-95");
         await AddPackageAsync("test-fuel-a", TestOkko, 10m, 51m, 49m, 2m);
 
@@ -548,7 +548,7 @@ public sealed class BrandFuelControllerTests : IDisposable
     [Fact]
     public async Task UpdateFuel_BelowCostOptedIn_SavesPrice_AndFiresDeliberateWarningAlert()
     {
-        await AddBrandAsync(TestOkko, "OKKO");
+        await AddBrandAsync(TestOkko, "okko");
         await AddFuelAsync("test-fuel-a", TestOkko, "A-95");
         await AddPackageAsync("test-fuel-a", TestOkko, 10m, 51m, 49m, 2m);
         var alerts = new Mock<IAlertNotifier>();

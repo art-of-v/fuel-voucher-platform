@@ -276,7 +276,7 @@ public sealed class WorkerUsageReportIntegrationTests : IClassFixture<TestDataba
         => new()
         {
             Id = Guid.NewGuid(),
-            Brand = "OKKO",
+            Brand = "okko",
             FuelTypeId = ToUuid("okko-dp"),
             Liters = liters,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6)),

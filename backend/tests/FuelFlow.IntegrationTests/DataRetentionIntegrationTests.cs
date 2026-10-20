@@ -233,7 +233,7 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
             seed.FuelVouchers.Add(new FuelVoucher
             {
                 Id = voucherId,
-                Brand = "OKKO",
+                Brand = "okko",
                 FuelTypeId = ToUuid("okko-dp"),
                 Liters = 10m,
                 VoucherNumber = $"V-{voucherId:N}"[..20],

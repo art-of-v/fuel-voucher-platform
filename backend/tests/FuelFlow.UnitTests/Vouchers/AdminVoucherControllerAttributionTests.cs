@@ -95,7 +95,7 @@ public sealed class AdminVoucherControllerAttributionTests : IDisposable
         _context.FuelVouchers.Add(new FuelVoucher
         {
             Id = id,
-            Brand = "OKKO",
+            Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
             VoucherNumber = $"V-{id:N}"[..20],

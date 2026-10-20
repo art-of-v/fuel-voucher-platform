@@ -277,7 +277,7 @@ public sealed class VoucherLifecycleIntegrationTests : IClassFixture<TestDatabas
     private static FuelVoucher Stock(Guid id, decimal liters) => new()
     {
         Id = id,
-        Brand = "OKKO",
+        Brand = "okko",
         FuelTypeId = ToUuid("okko-95"),
         Liters = liters,
         SupplierExpirationDate = new DateOnly(2027, 1, 1),
@@ -334,7 +334,7 @@ public sealed class VoucherLifecycleIntegrationTests : IClassFixture<TestDatabas
         {
             Id = lineId,
             OrderId = orderId,
-            Brand = "OKKO",
+            Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
             Quantity = 1,

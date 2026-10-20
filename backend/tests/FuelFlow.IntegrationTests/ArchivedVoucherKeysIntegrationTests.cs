@@ -105,7 +105,7 @@ public sealed class ArchivedVoucherKeysIntegrationTests : IClassFixture<TestData
     private static FuelVoucher Voucher(string number, string qr) => new()
     {
         Id = Guid.NewGuid(),
-        Brand = "OKKO",
+        Brand = "okko",
         FuelTypeId = ToUuid("okko-95"),
         Liters = 10m,
         SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),

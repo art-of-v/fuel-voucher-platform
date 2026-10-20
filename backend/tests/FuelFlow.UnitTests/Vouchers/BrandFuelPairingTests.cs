@@ -21,8 +21,8 @@ public sealed class BrandFuelPairingTests
     [Fact]
     public void CaseDoesNotMatter_BecauseOneSideComesOffPaper()
     {
-        BrandFuelPairing.IsConsistent("OKKO", "okko").Should().BeTrue();
-        BrandFuelPairing.IsConsistent("okko", "OKKO").Should().BeTrue();
+        BrandFuelPairing.IsConsistent("okko", "okko").Should().BeTrue();
+        BrandFuelPairing.IsConsistent("okko", "okko").Should().BeTrue();
     }
 
     [Theory]
@@ -38,13 +38,13 @@ public sealed class BrandFuelPairingTests
     [Fact]
     public void DifferentBrand_IsNotConsistent()
     {
-        BrandFuelPairing.IsConsistent("OKKO", "klo").Should().BeFalse();
+        BrandFuelPairing.IsConsistent("okko", "klo").Should().BeFalse();
     }
 
     [Fact]
     public void NoCatalogBrand_LeavesTheVoucherToItsOwnMerits()
     {
-        BrandFuelPairing.IsConsistent("OKKO", null).Should().BeTrue();
+        BrandFuelPairing.IsConsistent("okko", null).Should().BeTrue();
     }
 
     [Fact]

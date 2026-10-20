@@ -236,7 +236,7 @@ public sealed class MyCompanyMembershipsIntegrationTests : IClassFixture<TestDat
         seed.FuelVouchers.Add(new FuelVoucher
         {
             Id = id,
-            Brand = "OKKO",
+            Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),

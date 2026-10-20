@@ -49,7 +49,7 @@ public sealed class ParseInvoiceHandlerTests : IDisposable
         return id;
     }
 
-    private void SeedVoucher(Guid importId, string fuelTypeId, decimal liters, string brand = "OKKO")
+    private void SeedVoucher(Guid importId, string fuelTypeId, decimal liters, string brand = "okko")
     {
         _context.FuelVouchers.Add(new FuelVoucher
         {
@@ -96,7 +96,7 @@ public sealed class ParseInvoiceHandlerTests : IDisposable
         line.Matched.Should().BeTrue();
         line.FuelTypeId.Should().Be(ToUuid("okko-dp"));
         line.FuelTypeName.Should().Be("Дизельне паливо ОККО");
-        line.Brand.Should().Be("OKKO");
+        line.Brand.Should().Be("okko");
         line.CostPerLiter.Should().Be(48.5m);
         line.ImportLiters.Should().Be(5000m);
         line.Warning.Should().BeNull();

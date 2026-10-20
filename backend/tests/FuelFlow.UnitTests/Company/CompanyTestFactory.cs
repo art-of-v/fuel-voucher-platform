@@ -94,7 +94,7 @@ internal static class CompanyTestFactory
         Guid? legalEntityId = null,
         Guid? assignedToUserId = null,
         Guid? workerUserId = null,
-        string brand = "OKKO",
+        string brand = "okko",
         string fuelTypeId = "okko-95",
         decimal liters = 50)
         => new()

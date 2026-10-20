@@ -44,7 +44,7 @@ public class AdminPaymentsControllerTests : IClassFixture<TestDatabaseFixture>
                 HttpContext = new DefaultHttpContext { User = new System.Security.Claims.ClaimsPrincipal(
                     new System.Security.Claims.ClaimsIdentity(
                         [new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
-                         new System.Security.Claims.Claim("first_name", "QA")], "TestAuth")) },
+                         new System.Security.Claims.Claim("first_name", "qa")], "TestAuth")) },
             },
         };
 

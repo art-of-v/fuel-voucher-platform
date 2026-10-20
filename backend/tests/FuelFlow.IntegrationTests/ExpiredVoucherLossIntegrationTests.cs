@@ -461,7 +461,7 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
             Id = Guid.NewGuid(),
             ImportJobId = ImportId,
             FuelTypeId = ToUuid("okko-dp"),
-            Brand = "OKKO",
+            Brand = "okko",
             SupplierId = supplierId,
             CreatedAtUtc = now,
             UpdatedAtUtc = now
@@ -549,7 +549,7 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
         Guid? orderId = null) => new()
     {
         Id = Guid.NewGuid(),
-        Brand = "OKKO",
+        Brand = "okko",
         FuelTypeId = ToUuid("okko-dp"),
         Liters = 100m,
         SupplierExpirationDate = expirationDate,

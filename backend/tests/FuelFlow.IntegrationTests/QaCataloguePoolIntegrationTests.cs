@@ -91,7 +91,7 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
                 Id = Brand,
                 Slug = BrandSlug,
                 Name = "QA pool",
-                LogoText = "QA",
+                LogoText = "qa",
                 Color = "#00ff80",
                 SortOrder = 999,
                 CreatedAtUtc = now,
