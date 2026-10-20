@@ -140,14 +140,9 @@ export default function SuppliersTab() {
     // Checked live, from the first keystroke, and gating the button: the alternative is what this
     // screen did for its whole life - validate nothing here, let the server 400, and show the raw
     // English error string in a toast. `CustomerRenewalTab` sets a field's validity the same way.
-    // Two messages, because "must be 8-10 digits" is the wrong sentence for an empty field -
-    // the field is required, and that is a different thing to be told. The server refuses a
-    // blank too (a supplier without a registry code cannot be invoiced), so the form and the
-    // API say the same thing.
-    const edrIpnBlank = form.edrIpn.trim() === "";
-    const edrIpnError = isValidEdrIpn(form.edrIpn)
-        ? null
-        : t(edrIpnBlank ? "suppliers.error.edrIpnRequired" : "suppliers.error.edrIpn");
+    // The registry code is optional; if it is typed, it has to be a code. The server says the
+    // same thing, and a blank is stored as null rather than as an empty string.
+    const edrIpnError = isValidEdrIpn(form.edrIpn) ? null : t("suppliers.error.edrIpn");
     const rnkrrError = isValidRnkrr(form.rnkrr) ? null : t("suppliers.error.rnkrr");
     const requisitesValid = edrIpnError === null && rnkrrError === null;
 

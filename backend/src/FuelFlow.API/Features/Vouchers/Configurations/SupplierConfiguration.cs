@@ -36,14 +36,20 @@ internal sealed class SupplierConfiguration : IEntityTypeConfiguration<Supplier>
         // caller reading a supplier needs one field regardless of form.
         builder.Property(e => e.EdrIpn)
             .HasColumnName("edr_ipn")
-            .HasMaxLength(20)
-            .IsRequired();
+            .HasMaxLength(20);
 
         // One supplier, one registry code. Two rows with the same code are the same counterparty
-        // recorded twice, and a business that pays "two" suppliers who are one person pays twice
-        // and reconciles the difference by hand.
+        // recorded twice, and a business that pays "two" suppliers who is one person pays twice
+        // and reconciles the difference by hand. A supplier with no code cannot collide, so the
+        // uniqueness costs nothing for one who has not been identified yet.
         builder.HasIndex(e => e.EdrIpn)
             .IsUnique();
+
+        // A code that is there has to be a code. A blank is not a registry code, and the API
+        // stores a blank as NULL rather than as "" - so this only ever sees a real value.
+        builder.ToTable(t =>
+            t.HasCheckConstraint("ck_suppliers_edr_ipn_format",
+                "\"edr_ipn\" IS NULL OR \"edr_ipn\" ~ '^[0-9]{8,10}$'"));
 
         builder.Property(e => e.Rnkrr)
             .HasColumnName("rnkrr")

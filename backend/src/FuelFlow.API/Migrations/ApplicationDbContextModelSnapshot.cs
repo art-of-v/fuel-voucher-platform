@@ -4136,7 +4136,6 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("created_at_utc");
 
                     b.Property<string>("EdrIpn")
-                        .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("edr_ipn");
@@ -4196,6 +4195,8 @@ namespace FuelFlow.API.Migrations
                     b.ToTable("suppliers", null, t =>
                         {
                             t.HasCheckConstraint("ck_suppliers_acquisition_source", "acquisition_source IN ('direct', 'partner')");
+
+                            t.HasCheckConstraint("ck_suppliers_edr_ipn_format", "\"edr_ipn\" IS NULL OR \"edr_ipn\" ~ '^[0-9]{8,10}$'");
                         });
                 });
 
