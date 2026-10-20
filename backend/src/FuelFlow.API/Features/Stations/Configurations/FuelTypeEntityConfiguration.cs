@@ -92,6 +92,10 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
             .HasColumnName("price_updated_at")
             .HasColumnType("timestamp with time zone");
 
+        // price_updated_by_user_id stays a bare uuid, like every other actor column on a row that
+        // records who did something: the record has to survive the account. A key here would
+        // either wedge the job that deletes a user or force it to delete the price history -
+        // and the price history is the point (planning #307, TARGET_SCHEMA §G).
         builder.Property(e => e.PriceUpdatedByUserId)
             .HasColumnName("price_updated_by_user_id")
             .HasColumnType("uuid");

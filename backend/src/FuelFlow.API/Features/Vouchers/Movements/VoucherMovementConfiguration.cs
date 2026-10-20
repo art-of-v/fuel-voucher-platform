@@ -97,6 +97,9 @@ internal sealed class VoucherMovementConfiguration : IEntityTypeConfiguration<Vo
             .HasDefaultValue(VoucherActorKinds.System)
             .IsRequired();
 
+        // Bare uuid, no FK: a movement has to be writable whatever happened to the actor row, and the
+        // movement must not be the thing that blocks deleting that account (planning #307,
+        // TARGET_SCHEMA §G). The pairing constraint below is what says a 'user' actor is named.
         builder.Property(e => e.ActorUserId)
             .HasColumnName("actor_user_id");
 
