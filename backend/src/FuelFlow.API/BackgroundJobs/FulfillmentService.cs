@@ -30,6 +30,18 @@ public class FulfillmentService
     /// </summary>
     private const int ReconciliationGraceMinutes = 15;
 
+    /// <summary>
+    /// A staff alert about an order that could not be filled from stock, waiting for the transaction
+    /// to close before it is sent.
+    /// </summary>
+    /// <remarks>
+    /// The alert is a Telegram HTTP call. A fulfilment holds a transaction open across a long stretch
+    /// of work, so sending the alert from inside it means holding the transaction - and every row
+    /// lock it holds - across a network round trip. It also means the alert can describe work the
+    /// transaction then rolls back. Collecting the alert and sending it after the commit avoids both.
+    /// </remarks>
+    private sealed record PendingStockAlert(Guid OrderId, string FuelLabel, int Assigned, int Needed);
+
     private readonly ApplicationDbContext _context;
     private readonly ILogger<FulfillmentService> _logger;
     private readonly RefundOrderCommandHandler _refundHandler;
@@ -124,7 +136,6 @@ public class FulfillmentService
             foreach (var order in fulfilledOrders)
             {
                 var currentOrder = order;
-                IDbContextTransaction? transaction = null;
 
                 // #246: this runs on the same scoped context as AssignVouchersToOrderAsync, which
                 // claims vouchers with raw compare-and-swap UPDATEs. Those rows are then loaded here
@@ -139,14 +150,26 @@ public class FulfillmentService
                 // instances already tracked, and `Update()` would throw on the duplicate key.
                 _context.ChangeTracker.Clear();
 
+                // The transaction is DISPOSED at the end of this iteration, so every exit path closes
+                // it: a commit where the work was done, a rollback everywhere else.
+                //
+                // It used to be opened and closed by hand, and one path — the one that leaves an old
+                // mismatch alone for a human — jumped over the commit. There was no `finally` either,
+                // and the `catch` only runs on an exception, so that path left the transaction open on
+                // the connection. The next order's BeginTransactionAsync then threw "The connection is
+                // already in a transaction and cannot participate in another transaction", which
+                // killed the whole batch rather than the one order — and the abandoned transaction
+                // held its row locks until the connection closed, which blocked the writers behind it.
+                await using var transaction = _context.Database.IsRelational()
+                    ? await _context.Database.BeginTransactionAsync(cancellationToken)
+                    : (IDbContextTransaction?)null;
+
                 try
                 {
-                    if (_context.Database.IsRelational())
+                    if (transaction != null)
                     {
                         // Serialize trimming per order so it can never race with a concurrent
                         // fulfillment that is assigning vouchers to the same order.
-                        transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
-
                         await _context.Database.ExecuteSqlInterpolatedAsync(
                             $"SELECT pg_advisory_xact_lock(hashtext('fulfillment-order'), hashtext({currentOrder.Id.ToString()}))",
                             cancellationToken);
@@ -234,6 +257,17 @@ if (!fullyAttributed && fulfillments.Count > 0)
                         // #217 step 3: this is the case that most needs a human - nothing was
                         // corrected, so the mismatch just stays until someone opens the order. A log
                         // line nobody reads is not a warning.
+                        //
+                        // The transaction is closed BEFORE the alert. The alert is a Telegram HTTP
+                        // call, and holding a transaction open across one is the thing the comment
+                        // further down this method warns about. Nothing was written on this path,
+                        // so it is closed without a commit — which releases the advisory lock and
+                        // the row locks with it.
+                        if (transaction != null)
+                        {
+                            await transaction.RollbackAsync(cancellationToken);
+                        }
+
                         await _notifications.FulfillmentMismatchAsync(
                             currentOrder.Id.ToString(),
                             currentOrder.Id.ToString()[..8],
@@ -625,6 +659,13 @@ if (!fullyAttributed && fulfillments.Count > 0)
         var shouldAutoRefund = false;
         IDbContextTransaction? transaction = null;
 
+        // Staff alerts about stock that ran out are collected here and sent AFTER the transaction is
+        // closed. They are Telegram HTTP calls, and this method holds a transaction across a long
+        // stretch of work - holding one open across a network call is what the comment on the
+        // repair pass warns about, and it is also why the alert used to be able to describe a
+        // fulfilment that the transaction later rolled back.
+        var pendingStockAlerts = new List<PendingStockAlert>();
+
         try
         {
             if (_context.Database.IsRelational())
@@ -777,8 +818,8 @@ if (!fullyAttributed && fulfillments.Count > 0)
                             ? lineItem.FuelTypeId.ToString().ToString()
                             : $"{fuelTypeName} ({lineItem.Brand.ToUpperInvariant()}, {lineItem.Liters:0.##} L)";
 
-                        await _notifications.OrderUnfulfillableAsync(
-                            order.Id, fuelLabel, i, lineItem.Quantity, cancellationToken);
+                        // Collected, not sent: the alert goes out after the transaction is closed.
+                        pendingStockAlerts.Add(new PendingStockAlert(order.Id, fuelLabel, i, lineItem.Quantity));
                         break;
                     }
 
@@ -954,6 +995,14 @@ if (!fullyAttributed && fulfillments.Count > 0)
                 await transaction.RollbackAsync(cancellationToken);
             }
             throw;
+        }
+
+        // The transaction is closed. The alerts go out now - a staff alert that says "this order
+        // could not be filled" is worth sending, and worth sending about work that really happened.
+        foreach (var alert in pendingStockAlerts)
+        {
+            await _notifications.OrderUnfulfillableAsync(
+                alert.OrderId, alert.FuelLabel, alert.Assigned, alert.Needed, cancellationToken);
         }
 
         if (shouldAutoRefund)
@@ -1159,6 +1208,10 @@ var lastFailedAtUtc = await _context.Payments
 
         var shouldAutoRefund = false;
         IDbContextTransaction? transaction = null;
+
+        // Collected here and sent after the transaction is closed - see the same list in
+        // AssignVouchersToOrderAsync for why the alert cannot be sent inside the transaction.
+        var pendingStockAlerts = new List<PendingStockAlert>();
 
         try
         {
@@ -1385,7 +1438,8 @@ var lastFailedAtUtc = await _context.Payments
                             "Renewal order {OrderId}: no replacement stock for {FuelLabel} valid until {PromisedExpiration}",
                             orderId, fuelLabel, promisedExpiration);
 
-                        await _notifications.OrderUnfulfillableAsync(orderId, fuelLabel, 0, 1, cancellationToken);
+                        // Collected, not sent: the alert goes out after the transaction is closed.
+                        pendingStockAlerts.Add(new PendingStockAlert(orderId, fuelLabel, 0, 1));
                         continue;
                     }
 
@@ -1587,7 +1641,14 @@ var lastFailedAtUtc = await _context.Payments
             throw;
         }
 
-        // Same path as buy-fuel partials: refunds only the unfulfilled lines, gated by the
+        // The transaction is closed. The alerts go out now.
+        foreach (var alert in pendingStockAlerts)
+        {
+            await _notifications.OrderUnfulfillableAsync(
+                alert.OrderId, alert.FuelLabel, alert.Assigned, alert.Needed, cancellationToken);
+        }
+
+        // Same path as buy-fuel partials: refunds only the unfulfilled lines, gated on the
         // AutoRefund runtime setting and its grace window (this realises the "auto-refund that row"
         // decision for a post-payment no-stock replace).
         if (shouldAutoRefund)
