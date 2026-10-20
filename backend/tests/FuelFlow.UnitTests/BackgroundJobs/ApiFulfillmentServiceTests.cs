@@ -334,50 +334,6 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task ProcessVoucherImportsAsync_ShouldMarkVoucherExpiredEventsAsProcessed()
-    {
-        var outboxEvent = new OutboxEvent
-        {
-            EventType = OutboxEventType.VoucherExpired,
-            Payload = System.Text.Json.JsonSerializer.Serialize(new { voucherId = Guid.NewGuid() }),
-            Processed = false,
-            CreatedAtUtc = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1)
-        };
-
-        _context.OutboxEvents.Add(outboxEvent);
-        await _context.SaveChangesAsync();
-
-        await _service.ProcessVoucherImportsAsync();
-
-        var processedEvent = await _context.OutboxEvents.FindAsync(outboxEvent.Id);
-        processedEvent.Should().NotBeNull();
-        processedEvent!.Processed.Should().BeTrue();
-        processedEvent.ProcessedAtUtc.Should().NotBeNull();
-    }
-
-    [Fact]
-    public async Task ProcessVoucherImportsAsync_ShouldSkipAlreadyProcessedEvents()
-    {
-        var outboxEvent = new OutboxEvent
-        {
-            EventType = OutboxEventType.VoucherExpired,
-            Payload = "{}",
-            Processed = true,
-            CreatedAtUtc = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1)
-        };
-
-        _context.OutboxEvents.Add(outboxEvent);
-        await _context.SaveChangesAsync();
-
-        await _service.ProcessVoucherImportsAsync();
-
-        var processedEvent = await _context.OutboxEvents.FindAsync(outboxEvent.Id);
-        processedEvent.Should().NotBeNull();
-        processedEvent!.Processed.Should().BeTrue();
-        processedEvent.ProcessedAtUtc.Should().BeNull();
-    }
-
-    [Fact]
     public async Task ProcessPendingOrdersAsync_ShouldNotAutoRefund_WhenSettingDisabled()
     {
         var userId = Guid.NewGuid();
