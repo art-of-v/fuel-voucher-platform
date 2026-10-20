@@ -787,7 +787,13 @@ jobs:
           POSTGRES_INITDB_ARGS: "--locale-provider=icu --icu-locale=uk-UA --locale=C.UTF-8"
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U postgres"
+          # NOT `pg_isready -U postgres`. initdb starts a BOOTSTRAP server on the socket
+          # while the cluster is still being created, and `pg_isready` answers YES against
+          # it - so the job can start before the real server is up. Measured on 2026-10-20:
+          # `pg_isready` says YES three-tenths of a second after `docker run`; `psql` does
+          # not, and it does not until the database exists. The step below restores a
+          # production dump into this container, so the container has to be real.
+          --health-cmd "psql -U postgres -d fuelflow -c 'SELECT 1'"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
@@ -991,7 +997,13 @@ jobs:
           POSTGRES_INITDB_ARGS: "--locale-provider=icu --icu-locale=uk-UA --locale=C.UTF-8"
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U postgres"
+          # NOT `pg_isready -U postgres`. initdb starts a BOOTSTRAP server on the socket
+          # while the cluster is still being created, and `pg_isready` answers YES against
+          # it - so the job can start before the real server is up. Measured on 2026-10-20:
+          # `pg_isready` says YES three-tenths of a second after `docker run`; `psql` does
+          # not, and it does not until the database exists. The step below restores a
+          # production dump into this container, so the container has to be real.
+          --health-cmd "psql -U postgres -d fuelflow -c 'SELECT 1'"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
