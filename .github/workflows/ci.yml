@@ -536,6 +536,19 @@ jobs:
       # files, so the test is a directory of files.
       - name: Test the WAL archive pruning
         run: bash deploy/pitr-common.test.sh
+
+      # The JOB that runs that pruning, on its own six-hourly timer. The function is
+      # covered by the step above; this covers the part that is new - that the job
+      # exists, that it applies the bounds, and that a disk still above the threshold
+      # afterwards is a non-zero exit rather than a quiet success.
+      #
+      # It is a separate step because the thing it protects against is a night when
+      # the BACKUP fails: the trim used to live inside backup.sh, under `set -e`, at
+      # the end of a long script - so a failure anywhere above it skipped the trim,
+      # and the night the backup broke was the night the archive stopped being
+      # trimmed. The archive is what the backup uploads.
+      - name: Test the WAL archive prune job
+        run: bash deploy/prune-wal-archive.test.sh
   # The repo-root fetchers in scripts/ — the only write path into `station_nodes`. They parse a
   # third-party site nobody here controls (UPG rebuilds its map page periodically, KLO renders its
   # pins through a WordPress plugin), and a silent parse change would import a few hundred rows with

@@ -1,0 +1,50 @@
+# Runs the WAL archive trim (deploy/prune-wal-archive.sh) on its own schedule, as a
+# systemd oneshot. Mirrors fuelflow-prune.service.
+#
+# WHY THIS IS NOT PART OF THE NIGHTLY BACKUP
+#
+# backup.sh has always trimmed the archive, and it does it well. But it does it at
+# line 350 of a script that runs `set -euo pipefail` - after the dump, after the
+# base backup, after the off-box upload. Anything that fails above that line ends
+# the script, and the trim never happens that night. The night the backup breaks is
+# the night the archive stops being trimmed, because the archive is what the backup
+# uploads. The 8 GiB cap that makes a runaway archive impossible is enforced by
+# that same function, so the cap was only as reliable as the job around it.
+#
+# This unit is the cap, on its own timer, with no database, no network and no age
+# key - so it works on the night the backup does not.
+#
+# Type=oneshot: the unit is "active" only while prune-wal-archive.sh runs, and the
+# timer that triggers it treats a non-zero exit as a failed unit - which is what
+# fires the OnFailure alert. The script exits non-zero on a prune error OR when the
+# filesystem the archive lives on is still above the threshold afterwards (disk
+# filling from something the trim cannot reclaim).
+[Unit]
+Description=FuelFlow WAL archive trim
+Documentation=https://github.com/art-of-v/fuel-voucher-platform-planning/blob/main/docs/DEPLOYMENT.md
+# Nothing to require: this is filesystem work. It deliberately does NOT depend on
+# the backup having run, or on postgres being up.
+After=local-fs.target
+
+# On failure, start the alert unit. %n is this unit's name, passed as the instance so
+# the alert message can name what failed.
+OnFailure=fuelflow-prune-alert@%n.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/FuelFlow/deploy
+ExecStart=/root/FuelFlow/deploy/prune-wal-archive.sh
+# Lower priority than the live app: a trim must never be why a customer request is
+# slow. It is also a directory of file deletions, which is cheap but not free.
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=6
+# Deleting a few hundred files is fast, but never let a wedged mount hang the timer
+# forever - a stuck unit blocks the next run.
+TimeoutStartSec=900
+# Log lines land in the journal tagged with this identifier:
+# `journalctl -t fuelflow-wal-prune`.
+SyslogIdentifier=fuelflow-wal-prune
+
+# No [Install] section on purpose: this service is started BY the timer, never
+# enabled on its own. The timer is the thing that gets enabled.
