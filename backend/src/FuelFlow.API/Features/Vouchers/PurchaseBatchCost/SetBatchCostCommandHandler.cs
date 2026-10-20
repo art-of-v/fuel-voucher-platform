@@ -85,6 +85,13 @@ public sealed class SetBatchCostCommandHandler
             .Where(v => v.ImportJobId == command.ImportJobId && v.FuelTypeId == command.FuelTypeId && !v.IsDeleted)
             .Select(v => v.Brand)
             .FirstOrDefaultAsync(cancellationToken);
+        // The brand's key beside its name. The batch is about the fuel the vouchers name, so the
+        // key is the fuel's own brand - the same fact the name carries.
+        var brandId = await _context.FuelVouchers
+            .IgnoreQueryFilters()
+            .Where(v => v.ImportJobId == command.ImportJobId && v.FuelTypeId == command.FuelTypeId && !v.IsDeleted)
+            .Select(v => v.BrandId)
+            .FirstOrDefaultAsync(cancellationToken);
         if (brand is null)
             return new SetBatchCostResult(false, true, "No vouchers for this fuel in the import", null, 0);
 
@@ -151,6 +158,7 @@ public sealed class SetBatchCostCommandHandler
                     ImportJobId = command.ImportJobId,
                     FuelTypeId = command.FuelTypeId,
                     Brand = brand,
+                    BrandId = brandId,
                     SupplierId = sid,
                     EnteredByUserId = actingUser,
                     CreatedAtUtc = now,
@@ -162,6 +170,7 @@ public sealed class SetBatchCostCommandHandler
         else
         {
             batch.Brand = brand;
+            batch.BrandId = brandId;
             batch.EnteredByUserId = actingUser;
             batch.UpdatedAtUtc = now;
             _context.PurchaseBatches.Update(batch);

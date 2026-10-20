@@ -135,6 +135,9 @@ public sealed class GiftVouchersCommandHandler
                     Id = Guid.CreateVersion7(),
                     OrderId = issuanceOrderId,
                     Brand = voucher.Brand,
+                    // The brand's key beside its name - the voucher's own key, because the line
+                    // is about the same fuel the company hands over.
+                    BrandId = voucher.BrandId,
                     FuelTypeId = voucher.FuelTypeId,
                     Liters = voucher.Liters,
                     Quantity = 1,
