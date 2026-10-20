@@ -137,6 +137,32 @@ public sealed class TermPricingOverlapTests : IClassFixture<TestDatabaseFixture>
             .Where(r => r.Scheme == scheme)
             .ExecuteDeleteAsync();
 
+    [Fact]
+    public async Task A_Closed_Window_That_Reaches_Into_The_Open_One_Is_Refused()
+    {
+        // The case the old constraints allowed: a closed window and an open window for the same
+        // tier, overlapping. The lookup would then have two candidates for the same date - which
+        // is exactly what the exclusion constraint exists to prevent.
+        var boundary = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+        var scheme = VoucherTermPricingSchemes.RenewalRate;
+
+        await using var context = CreateContext();
+
+        await ClearSchemeAsync(context, scheme);
+
+        context.VoucherTermPricings.Add(Window(
+            scheme,
+            "1w",
+            new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            boundary.AddDays(1)));
+        context.VoucherTermPricings.Add(Window(scheme, "1w", boundary, null));
+
+        var act = async () => await context.SaveChangesAsync();
+
+        await act.Should().ThrowAsync<DbUpdateException>(
+            "the closed window reaches past the moment the open one starts, so the two overlap");
+    }
+
     private static VoucherTermPricing Window(string scheme, string termCode, DateTime from, DateTime? to) => new()
     {
         Id = Guid.NewGuid(),
