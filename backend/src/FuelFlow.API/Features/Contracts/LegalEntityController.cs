@@ -274,7 +274,11 @@ public sealed class LegalEntityController : ControllerBase
             legalEntityName = c.Entity?.Name,
             BrandId = c.BrandId,
             BrandName = c.Brand?.Name,
-            createdAt = c.CreatedAtUtc
+            createdAt = c.CreatedAtUtc,
+            // The validity term, and whether it has run out. A contract list that does not
+            // say when a contract ends cannot answer "which of these is about to expire".
+            expiresAt = c.ExpiresAtUtc,
+            expired = c.ExpiresAtUtc <= DateTime.UtcNow
         });
 
         return Ok(result);
@@ -296,6 +300,12 @@ public sealed class LegalEntityController : ControllerBase
 
         if (contract is null)
             return NotFound("Contract not found");
+
+        // A contract that has already expired is not signed. The term is the whole point of
+        // having one: without this check the expiry would be a field nobody reads, and the
+        // signature would outlive the agreement it is a signature of.
+        if (!ContractValidity.CanBeSigned(contract.ExpiresAtUtc, DateTime.UtcNow))
+            return BadRequest($"This contract expired on {contract.ExpiresAtUtc:yyyy-MM-dd} and cannot be signed.");
 
         var alreadySigned = await _dbContext.UserContracts
             .AnyAsync(uc => uc.ContractId == request.ContractId && uc.UserId == userId.Value, cancellationToken);
@@ -346,7 +356,11 @@ public sealed class LegalEntityController : ControllerBase
             contractId = uc.ContractId,
             legalEntityName = uc.Contract?.Entity?.Name,
             BrandName = uc.Contract?.Brand?.Name,
-            signedAt = uc.SignedAtUtc
+            signedAt = uc.SignedAtUtc,
+            // A signature outlives the contract it is a signature of, so the term travels
+            // with it - otherwise a signed-contract list cannot say which of them has run out.
+            expiresAt = uc.Contract?.ExpiresAtUtc,
+            expired = uc.Contract?.ExpiresAtUtc <= DateTime.UtcNow
         });
 
         return Ok(result);

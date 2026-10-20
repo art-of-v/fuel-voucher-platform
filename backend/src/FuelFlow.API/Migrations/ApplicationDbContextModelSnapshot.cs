@@ -432,6 +432,10 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
 
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at_utc");
+
                     b.Property<Guid>("LegalEntityId")
                         .HasColumnType("uuid")
                         .HasColumnName("legal_entity_id");
@@ -445,13 +449,19 @@ namespace FuelFlow.API.Migrations
                     b.HasIndex("BrandId")
                         .HasDatabaseName("ix_contracts_brand_id");
 
+                    b.HasIndex("ExpiresAtUtc")
+                        .HasDatabaseName("ix_contracts_expires_at_utc");
+
                     b.HasIndex("LegalEntityId")
                         .HasDatabaseName("ix_contracts_legal_entity_id");
 
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_contracts_user_id");
 
-                    b.ToTable("contracts", (string)null);
+                    b.ToTable("contracts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_contracts_expiry_after_creation", "expires_at_utc > created_at_utc");
+                        });
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Contracts.SharedModels.LegalEntity", b =>
