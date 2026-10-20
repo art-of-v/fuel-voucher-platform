@@ -9,7 +9,7 @@ namespace FuelFlow.SharedKernel.Domain;
 public static class FuelPricing
 {
     /// <summary>
-    /// The per-litre customer price, or <c>null</c> when the offer has no cost or no margin recorded.
+    /// The per-litre customer price, or <c>null</c> when the fuel has no cost or no margin recorded.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -17,9 +17,10 @@ public static class FuelPricing
     /// with a shape the callers can act on. <see cref="FinalPerLiter"/> takes four non-null decimals
     /// because the write paths have already decided a fuel is priced; a read path holding four nullable
     /// columns has to decide what "not priced yet" means, and every place that decided it for itself was
-    /// a place the decision could differ. Measured on production 2026-10-17: 25 live offers, 122 live
-    /// volumes, <b>0</b> of them without both knobs — so this returns null for a fuel the catalogue
-    /// import created and nobody has priced yet, and for nothing else.
+    /// a place the decision could differ. Measured on production 2026-10-17, when the price still
+    /// lived on <c>fuel_offers</c> and its volumes: 25 live offers, 122 live volumes, <b>0</b> of them
+    /// without both knobs — so this returns null for a fuel the catalogue import created and nobody
+    /// has priced yet, and for nothing else.
     /// </para>
     /// <para>
     /// Cost or margin missing ⇒ null rather than a number built from what is there. Treating a missing
@@ -104,7 +105,7 @@ public static class FuelPricing
     }
 
     /// <summary>
-    /// What a nominal costs, from the offer's rate and the volume's optional override.
+    /// What a nominal costs: the fuel's per-litre price times the size.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -114,19 +115,19 @@ public static class FuelPricing
     /// there is one expression and every caller uses it.
     /// </para>
     /// <para>
-    /// <b>An override is an exception, and this is where it is honoured.</b> Null means "price it like
-    /// the rest of the fuel" — the ordinary case, and the one every write path produces. A number means an
-    /// operator set this nominal deliberately (a round marketing price for a 50 L canister, say), and it
-    /// survives a repricing of the offer rather than being overwritten, which is what the old
-    /// <c>package_price</c> column could not do.
+    /// <b>The rate is the fuel's, and the size only multiplies it.</b> The four knobs - supplier cost,
+    /// margin, pump ceiling and the guaranteed gap under it - live on the fuel, and every size of that
+    /// fuel is priced by the same rate. There is no per-nominal override any more: the one-off prices
+    /// went with the offers on 2026-10-18 (<c>20261018190514_NoOneOffPrices</c>), and with them the
+    /// question of what a deliberate price for one size would survive a repricing.
     /// </para>
     /// <para>
     /// Rounded to the kopeck half away from zero, matching per-line rounding at checkout. Money is
     /// decimal UAH throughout (spec §12).
     /// </para>
     /// </remarks>
-    /// <param name="costPerLiter">The offer's supplier cost, or null when the fuel is not priced yet.</param>
-    /// <param name="profitPerLiter">The offer's margin, or null when the fuel is not priced yet.</param>
+    /// <param name="costPerLiter">The fuel's supplier cost, or null when the fuel is not priced yet.</param>
+    /// <param name="profitPerLiter">The fuel's margin, or null when the fuel is not priced yet.</param>
     /// <param name="pumpPricePerLiter">The pump ceiling (колонка), or null when none is recorded.</param>
     /// <param name="minDiscountPerLiter">The guaranteed gap under the ceiling, or null for zero.</param>
 /// <param name="liters">The nominal being priced.</param>
@@ -172,9 +173,11 @@ public static class FuelPricing
     /// asked about the price that will actually be charged rather than about the rate the formula yields.
     /// </summary>
     /// <remarks>
-    /// This is what makes an override subject to the same guard as everything else. Without it, a
-    /// per-nominal override would be the one way to sell under cost without the block firing, because the
-    /// guard would judge the rate while the customer was charged the override.
+    /// This asks about the price that will actually be charged rather than about the rate the formula
+    /// yields, so a caller that has a price in hand does not have to reconstruct the rate to ask the
+    /// question. No caller in the application has one today: the guard is asked of the rate
+    /// (<see cref="IsBelowCost(decimal,decimal,decimal?,decimal)"/>), which is the same question
+    /// asked earlier.
     /// </remarks>
     public static bool IsBelowCost(decimal? costPerLiter, decimal liters, decimal packagePrice)
         => costPerLiter is { } cost

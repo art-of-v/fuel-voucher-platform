@@ -121,7 +121,7 @@ public sealed class BrandFuelController : ControllerBase
         // One fuel type per name per Brand, refused rather than accepted as a second row. This fuel
         // id is generated here, so nothing about the write collides on a duplicate the way it did when
         // the id was the brand-encoded 'okko-95' - and a twin is not a cosmetic duplicate: it becomes a
-        // second offer, the storefront lists one fuel at two prices, and the voucher importer resolves
+        // second row in the catalogue, the storefront lists one fuel at two prices, and the voucher importer resolves
         // the fuel by name with FirstOrDefault (OkkoFuelClassifier/WogFuelClassifier), so the twin
         // without the imported pump price is the one a real voucher can land on. The database refuses
         // the same thing with ux_fuel_types_Brand_name; this says which fuel already owns the name.
@@ -136,7 +136,7 @@ public sealed class BrandFuelController : ControllerBase
             {
                 message = $"'{request.Name}' already exists at {Brand.Name}. Price it with PUT "
                           + $"fuels/{duplicate} instead of adding it twice: a second row for the same "
-                          + "fuel is a second offer, and a voucher can then be priced against whichever "
+                          + "fuel is a second row in the catalogue, and a voucher can then be priced against whichever "
                           + "of the two the importer happens to pick.",
                 fuelTypeId = duplicate,
                 field = nameof(request.Name)
@@ -226,9 +226,10 @@ public sealed class BrandFuelController : ControllerBase
             // round to 2dp, never store kopecks-as-integer (that once made the app show 8492.00).
             BasePrice = Math.Round(baseUahPerLiter, 2, MidpointRounding.AwayFromZero),
             DiscountPrice = Math.Round(discountUahPerLiter, 2, MidpointRounding.AwayFromZero),
-            // The margin is born on the fuel. It used to be written only to the offer below, because the
-            // offer was where every reader found it; now the fuel is where every reader looks, and a fuel
-            // created without one prices at cost - silently, and correctly by the formula.
+            // The margin is born on the fuel. It used to be written only to the offer row, because that
+            // row was where every reader found it; the offers are gone (2026-10-19) and the fuel is where
+            // every reader looks, and a fuel created without a margin prices at cost - silently, and
+            // correctly by the formula.
             MarginUahPerLiter = request.MarginUahPerLiter,
             AllowBelowCost = request.AllowBelowCost,
             CreatedAtUtc = DateTime.UtcNow,
@@ -258,7 +259,7 @@ public sealed class BrandFuelController : ControllerBase
 
 // Every per-litre knob the request carries is a property of WHAT IS BEING SOLD, not of how much of
     // it: a 5 L bottle and a 50 L canister of the same fuel have one price per litre. They used to
-    // be written on an offer, because an offer per pool could hold two prices for one grade; with
+    // be written on a per-pool offer row, because that row could hold two prices for one grade; with
     // the pool on the size list they are written on the fuel and there is no second place to keep
     // them in step.
     var pool = DataKinds.ForPool(request.IsTestData.Value);
@@ -329,10 +330,10 @@ public sealed class BrandFuelController : ControllerBase
         var fuel = await _context.FuelTypes.FirstOrDefaultAsync(f => f.Id == fuelId, ct);
         if (fuel is null) return NotFound();
 
-        // Offer existence - not package existence - is what decides whether this edit seeds defaults,
-        // and the pool is read off the incoming request because that is the pool the fuel is moving
-        // INTO. A fuel with a rehearsal offer and no live one is being created live here, and must be
-        // seeded like one.
+        // Whether the fuel has any SIZES is what decides whether this edit seeds defaults - not
+        // whether it has packages. The pool is read off the incoming request because that is the pool
+        // the fuel is moving INTO, and a fuel with no sizes in it must be seeded like one. (The seed
+        // below does not carry that pool - planning#460.)
         var pool = DataKinds.ForPool(request.IsTestData.Value);
 
 // A fuel whose name reads as rehearsal cannot be flipped to live by an edit. The flag is the
@@ -378,8 +379,9 @@ public sealed class BrandFuelController : ControllerBase
                                   ? known + request.MinDiscountPerLiter
                                   : request.MinDiscountPerLiter);
 
-        // There is no offer to find, create or flip. Flipping `isTestData` moves the SIZES to the
-        // other pool, below; the price is the fuel's and there is nothing pool-shaped left to move.
+        // There is no offer to find, create or flip: the price is the fuel's, and the SIZES are the
+        // fuel's too - the size list is what the two pools differ in. (This edit does not carry the
+        // pool it was handed over to the sizes - planning#460.)
 var seededNominals = await _context.FuelNominals
     .AnyAsync(n => n.FuelTypeId == fuel.Id, ct);
     if (!seededNominals)
@@ -397,7 +399,7 @@ var seededNominals = await _context.FuelNominals
         var BrandName = Brand?.Name ?? "?";
 
         // Snapshot BEFORE anything is written below. The "before" is the fuel's own figures, which
-        // is where every price figure lives now; there is no offer to fall back to for the old one.
+        // is where every price figure lives now; there is no second copy to fall back to for the old one.
         var oldSupplierPrice = fuel.SupplierPricePerLiter;
         var oldMarginPrice = fuel.MarginUahPerLiter;
         // audit payload records what the customer paid per litre, and that number is still a fact even
@@ -428,16 +430,16 @@ var seededNominals = await _context.FuelNominals
         fuel.MinDiscountPerLiter = request.MinDiscountPerLiter;
         fuel.UpdatedAtUtc = DateTime.UtcNow;
         // The loop that restated every volume's total after a reprice is gone, and its absence is the
-        // improvement rather than a gap: a volume's price is now the offer's rate x its litres unless
-        // somebody set an override, so there is nothing to restate - and an override is no longer erased
-        // by the next pump import, which is what made this endpoint dangerous to touch.
+        // improvement rather than a gap: a volume's price is now the fuel's rate x its litres, so there
+        // is nothing to restate - and there is no per-size override left for the next pump import to
+        // erase, which is what made this endpoint dangerous to touch.
 
-        // The history row, before the save that persists the offer - and it also stamps
+        // The history row, before the save that persists the fuel - and it also stamps
         // price_updated_at / price_updated_by_user_id, which this endpoint previously left at their
         // creation-time values, so the audit trail could not say when an operator repriced a fuel.
         await _priceRecorder.RecordAsync(fuel, PriceHistoryReasons.Operator, GetUserId(), ct: ct);
 
-        // The other pool has nothing to archive: an offer existed to hold a price, and the
+        // The other pool has nothing to archive: the price used to live on a row of its own, and the
         // price is the fuel's. What separates the pools now is the size list, handled above.
         fuel.Name = request.Name;
         // base = pump/reference (колонка) when known, else legacy final + min discount;
@@ -571,7 +573,7 @@ var seededNominals = await _context.FuelNominals
         // Archive rather than remove - same reasoning as the brand branch above: the cascade from
         // fuel_types reaches fuel_vouchers (#217). The sizes are not archived either: they belong to
         // the fuel, and this row is the one that says no. It used to be a second row doing that job,
-        // and a live offer put the fuel back on the shelf the moment a nominals edit touched it.
+        // and a live price row put the fuel back on the shelf the moment a nominals edit touched it.
         var archivedAt = DateTime.UtcNow;
 
         fuel.IsDeleted = true;
@@ -614,8 +616,8 @@ var seededNominals = await _context.FuelNominals
 var BrandFuels = await _context.FuelTypes.Where(f => f.BrandId == id).ToListAsync(ct);
     var fuelIds = BrandFuels.Select(f => f.Id).ToList();
 
-    // The sizes a fuel is sold in are the operator's answer, written once per fuel rather than once
-    // per offer. Read AsTracking: the rows below are updated in place, and the context defaults to
+    // The sizes a fuel is sold in are the operator's answer, written once per fuel and pool rather than
+    // once per offer. Read AsTracking: the rows below are updated in place, and the context defaults to
     // NoTracking - without it the edit would persist nothing (NoTrackingMutationGuardTests).
     var existingNominals = await _context.FuelNominals
         .AsTracking()
@@ -633,13 +635,13 @@ var BrandFuels = await _context.FuelTypes.Where(f => f.BrandId == id).ToListAsyn
         // package an order referenced was never the package in the catalog. Reusing a package that
         // stays keeps its id, so historical rows keep resolving to the thing they bought.
         //
-        // Pricing is unchanged: the cost and the pump are the offer's, the margin is the fuel's, and only the
-        // derived package total is rewritten on each volume.
+        // Pricing is unchanged: the cost, the pump ceiling and the margin are all the fuel's, and only
+        // the derived package total is rewritten on each volume.
         var wanted = nominals.Distinct().ToHashSet();
         var now = DateTime.UtcNow;
 
 // The sizes a fuel is sold in are the operator's answer, written once per fuel and pool. The
-        // volume loops that used to follow are gone: `fuel_offer_volumes` was a second copy of this
+        // per-volume loops that used to follow are gone: `fuel_offer_volumes` was a second copy of this
         // same answer, and keeping both in step was the whole cost of having it.
         foreach (var fuel in BrandFuels)
         {

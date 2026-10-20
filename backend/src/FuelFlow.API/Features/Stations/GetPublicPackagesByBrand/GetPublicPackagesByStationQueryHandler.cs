@@ -33,12 +33,12 @@ public sealed class GetPublicPackagesByBrandQueryHandler
         // purchasable through the other. Pool-aware there and here, because a filter that hid the QA
         // catalogue from everyone also hid it from QA.
         //
-        // `data_kind` is on the offer, so the filter is on the offer; the fuel's display name is
-        // joined from fuel_types for the same reason as there - the offer knows which fuel, not what
+        // `data_kind` is on the size, so the filter is on the size; the fuel's display name is
+        // joined from fuel_types for the same reason as there - the size knows which fuel, not what
         // it is called.
 var rows = await (
         // The fuel and its sizes; see GetPublicPackagesQueryHandler, which is the same query narrowed
-        // to one Brand. No offer: the price is the fuel's own.
+        // to one Brand. No price row: the price is the fuel's own.
         from fuel in _context.FuelTypes.AsNoTracking()
         where !fuel.IsDeleted && fuel.BrandId == query.BrandId
         // The network's own code travels with the row: the stock keys below are matched on it, and

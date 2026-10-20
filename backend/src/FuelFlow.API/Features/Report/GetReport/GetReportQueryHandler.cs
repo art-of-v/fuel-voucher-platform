@@ -82,21 +82,20 @@ public sealed class GetReportQueryHandler
             .Where(ft => allFuelTypeIds.Contains(ft.Id))
             .ToDictionaryAsync(ft => ft.Id, ft => ft.Name, cancellationToken);
 
-        // Margin comes from the offer, so this reads volumes joined to their offer. The real pool is chosen
-        // deliberately: this is an operator report over real business, and the old lookup had no pool
-        // filter at all, so a QA rehearsal row could shadow a real one purely by being newer.
-        // Projects the margin, not the offer entity. Handing back a whole tracked-free entity and then
-        // reading one column off it loads every offer column for every volume in the catalogue to
-        // answer one question, and - worse - depends on the provider materialising the navigation,
-        // which the in-memory provider does not and which would make this throw on a null rather than
-        // return a wrong number.
-        // An explicit join rather than `v.Offer.X`: relying on the navigation being materialised is a
-        // silent dependency on provider behaviour, and where it is not materialised this throws on a
-        // null instead of returning a wrong number - which is exactly the kind of failure that looks
+        // The margin lives on the fuel, so this reads the fuel joined to its sizes and projects the
+        // margin alone - not the entity. Handing back a whole tracked-free entity and then reading
+        // one column off it loads every column of every fuel in the catalogue to answer one
+        // question, and - worse - depends on the provider materialising the navigation, which the
+        // in-memory provider does not and which would make this throw on a null rather than return a
+        // wrong number.
+        // An explicit join rather than a navigation: relying on the navigation being materialised is
+        // a silent dependency on provider behaviour, and where it is not materialised this throws on
+        // a null instead of returning a wrong number - which is exactly the kind of failure that looks
         // like a data problem and gets debugged as one.
         //
-        // Projects the margin alone. Handing back the offer entity would load every offer column for
-        // every volume in the catalogue to answer one question.
+        // The real pool is chosen deliberately: this is an operator report over real business, and
+        // the old lookup had no pool filter at all, so a QA rehearsal row could shadow a real one
+        // purely by being newer.
         var fpLookup = await (
 from f in _context.FuelTypes.AsNoTracking()
             // Keyed the way the consumer keys it: an order line stores the network as its slug, so the

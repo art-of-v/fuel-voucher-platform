@@ -5,6 +5,15 @@ namespace FuelFlow.SharedKernel.Domain;
 /// </summary>
 /// <remarks>
 /// <para>
+/// <b>This class exists only so the migration history compiles.</b> <c>fuel_offers</c> was dropped on
+/// 2026-10-19; the key it built is history, and the rule below is the rule the backfill applied -
+/// <c>DropTheBrandPrefixFromOfferKeys</c> re-keys the rows the historical
+/// <c>SplitFuelPackagesIntoOffers</c> backfill wrote under the old rule, and
+/// <c>OfferBackfillIntegrationTests</c> asserts that a fully migrated database holds the ids this
+/// method computes. Nothing in the application calls it: there is no <c>DbSet</c>, no entity
+/// configuration, and no navigation pointing at it.
+/// </para>
+/// <para>
 /// The offer's identity is <c>(brand_id, fuel_type_id, data_kind)</c>, not any one of the three.
 /// Dropping the pool would merge the QA mirror of a live offer into the live offer, which is the one
 /// thing the storefront filter must never be able to do; dropping the Brand would make a fuel that

@@ -56,7 +56,7 @@ public sealed record OkkoCatalogueApplyResult(
 /// </para>
 /// <para>
 /// <b>What it writes, and what it refuses to.</b> A missing grade becomes a row: the brand's code, a name
-/// derived from the grade, and an offer carrying nothing but the published pump price. Everything an
+/// derived from the grade, and the published pump price - and nothing else. Everything an
 /// operator owns is left alone — our price, the margin, the minimum discount, the below-cost opt-in,
 /// the name itself — and an existing fuel is not touched at all, because the pump sync already owns its
 /// price. The asymmetry is the point: this is a way of learning that a grade exists, not a way of
@@ -79,8 +79,8 @@ public sealed record OkkoCatalogueApplyResult(
 /// an import turns a supplier's new product into a sellable row nobody priced.
 /// </para>
 /// <para>
-/// <b>A created fuel is not sellable.</b> It gets an offer with a pump price and <em>no volumes</em>,
-/// and the storefront lists volumes: so the fuel is invisible until an operator adds nominals, at which
+/// <b>A created fuel is not sellable.</b> It gets the published pump price and <em>no sizes</em>,
+/// and the storefront lists sizes: so the fuel is invisible until an operator adds nominals, at which
 /// point it appears at the pump price with no acquisition cost behind it. An import that guessed a
 /// margin would be publishing a price nobody approved, which is the incident the whole offer split came
 /// from (F-33: 1,00 грн/л on the live site).
