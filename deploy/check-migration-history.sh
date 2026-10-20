@@ -18,6 +18,14 @@
 # IF NOT EXISTS. A from-zero build and a restored copy of production come out the same shape. The
 # next deletion might not be so lucky, and nothing in the build would have said so.
 #
+# WHAT DOES NOW SAY SO: the schema comparison (deploy/diff-schema.sh, wired into ci.yml as the
+# fromzero-schema job) builds the schema from zero and compares it with production's shape.
+# This script checks the IDS; that one checks what the ids produce. Both are needed - an id can
+# be present and produce something different, and that is exactly what happened with the check
+# constraints: the compensating migration creates them with raw SQL and EF's own migrations
+# create them through the model, so the same rule is stored in two different forms, and only
+# the schema comparison could see it.
+#
 # WHAT IT COMPARES
 #
 # Two lists of migration ids, one per line:
