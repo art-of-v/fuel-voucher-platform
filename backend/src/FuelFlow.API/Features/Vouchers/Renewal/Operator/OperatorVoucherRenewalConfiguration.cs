@@ -12,6 +12,26 @@ internal sealed class OperatorVoucherRenewalConfiguration : IEntityTypeConfigura
 
         builder.HasKey(e => e.Id);
 
+        // The idempotency key, and the answer to a business question the review asked.
+        //
+        // A customer MAY renew the same voucher any number of times - that is the rule the
+        // business gave on 2026-10-20 - so there must NOT be a unique on the voucher alone.
+        //
+        // What there must be is a unique on (voucher, the expiry it was moved to), because a
+        // repeated request produces the SAME new expiry. That is what makes a double-clicked
+        // "confirm renewal" impossible rather than merely unlikely: the application checks
+        // first, and the check and the write are not in the same atomic step, so it is a race,
+        // not a guarantee. The database is the only place that can settle a race.
+        //
+        // A genuine second renewal is to a LATER expiry, so it is a different key and is
+        // allowed - which is exactly what the business rule requires.
+        //
+        // Together with ck_operator_renewal_expiration_moves_forward this covers both halves of
+        // the race: the one where the voucher's expiry was already moved (the check catches
+        // new == old), and the one where it was not (this unique catches the same target).
+        builder.HasIndex(e => new { e.VoucherId, e.NewExpiration })
+            .IsUnique();
+
         // #246 detector: xmin token. No DDL - xmin is a system column. Raw SQL must never write
         // this table, or the token starts failing saves that did not actually race.
         builder.UseXminAsConcurrencyToken();

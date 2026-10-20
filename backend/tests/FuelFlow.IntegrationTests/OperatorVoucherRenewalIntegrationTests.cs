@@ -635,6 +635,89 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
             .CustomerExpirationDate.Should().Be(today.AddDays(5).AddMonths(1));
     }
 
+    /// <summary>
+    /// The idempotency key, and the answer to a business question the review asked.
+    /// <para>
+    /// A customer MAY renew the same voucher any number of times - the business said so on
+    /// 2026-10-20 - so a unique on the voucher alone would be wrong. The key is (voucher, the
+    /// expiry it was moved to), because a repeated request produces the SAME new expiry.
+    /// </para>
+    /// <para>
+    /// <b>Why this test writes to the table directly instead of going through the handler.</b>
+    /// The handler checks the voucher's current expiry first, so a second confirmation of the
+    /// same request is already refused by the application - which would make this test pass
+    /// with or without the index. The index is the backstop for the other half of the race:
+    /// the one where the voucher's expiry has NOT been moved yet, because the process died
+    /// between the check and the write. Only the database can settle that, so only the
+    /// database is asked.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task TheSameRenewalToTheSameExpiry_CannotBeRecordedTwice()
+    {
+        var userId = Guid.NewGuid();
+        var voucherId = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var oldExpiry = today.AddDays(5);
+        var newExpiry = oldExpiry.AddMonths(1);
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+            SeedUser(seed, userId);
+            var purchaseOrderId = SeedPurchaseOrder(seed, userId);
+            seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "OKKO", "okko-95", 50m, oldExpiry, supplierExpiry: today.AddMonths(12)));
+            await seed.SaveChangesAsync();
+        }
+
+        // The first renewal, recorded.
+        using (var ctx = CreateContext())
+        {
+            ctx.OperatorVoucherRenewals.Add(Renewal(voucherId, userId, oldExpiry, newExpiry));
+            await ctx.SaveChangesAsync();
+        }
+
+        // The same renewal again - a double-clicked "confirm renewal" - must be refused.
+        using (var ctx = CreateContext())
+        {
+            ctx.OperatorVoucherRenewals.Add(Renewal(voucherId, userId, oldExpiry, newExpiry));
+            var act = () => ctx.SaveChangesAsync();
+
+            await act.Should().ThrowAsync<DbUpdateException>(
+                "the same voucher cannot be moved to the same expiry twice - that is the double-click");
+        }
+
+        // And a genuine second renewal, to a LATER expiry, is allowed - the business rule is
+        // that a customer may renew as often as they like.
+        using (var ctx = CreateContext())
+        {
+            ctx.OperatorVoucherRenewals.Add(Renewal(voucherId, userId, newExpiry, newExpiry.AddMonths(1)));
+            var act = () => ctx.SaveChangesAsync();
+
+            await act.Should().NotThrowAsync(
+                "a customer may renew the same voucher any number of times, as long as it moves forward");
+        }
+
+        using var verify = CreateContext();
+        (await verify.OperatorVoucherRenewals.CountAsync(r => r.VoucherId == voucherId)).Should().Be(2);
+    }
+
+    private static OperatorVoucherRenewal Renewal(Guid voucherId, Guid customerUserId, DateOnly oldExpiry, DateOnly newExpiration)
+        => new()
+        {
+            Id = Guid.NewGuid(),
+            VoucherId = voucherId,
+            CustomerUserId = customerUserId,
+            Branch = "extend",
+            TermCode = "1m",
+            OldExpiration = oldExpiry,
+            NewExpiration = newExpiration,
+            SurchargeUah = 10m,
+            ActingUserId = Guid.NewGuid(),
+            CreatedAtUtc = DateTime.UtcNow
+        };
+
     // ---- Helpers -------------------------------------------------------------------------------
 
     private static ConfirmOperatorRenewalCommandHandler Handler(ApplicationDbContext ctx)
