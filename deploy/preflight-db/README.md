@@ -68,11 +68,21 @@ what to write.
 
 ## The files
 
-| File | Asks | Blocks |
+| File | Asks | In strict mode |
 |---|---|---|
-| `011-fuel-type-name-twins.sql` | Does any brand have more than one **live** fuel row under one name | yes |
+| `011-fuel-type-name-twins.sql` | Does any brand have more than one **live** fuel row under one name | blocks the deploy |
+| `013-fuel-type-references-agree-on-type.sql` | Does any column that names a fuel type disagree with `fuel_types.id` about what a fuel type's id IS | blocks the deploy |
+| `014-fuel-type-references-are-all-uuids.sql` | Does any reference to a fuel type still hold a TEXT-shaped id rather than a uuid | blocks the deploy |
+| `015-roles-columns-match-the-model.sql` | Are the columns of `roles` exactly the set the EF model maps | blocks the deploy |
+| `016-migration-ids-are-well-formed.sql` | Is every `MigrationId` `^<14 digits>_<name>$`, and recorded once | blocks the deploy |
+| `017-fuels-without-a-supplier-cost.sql` | Which fuels have no supplier cost, or a cost and no margin | blocks the deploy |
 
-`011` is a precondition its migration refuses on: a failed deploy with the refusal on the box, versus
+**Every file in this directory is the same instrument**: a warning by default, a failed
+deploy when `PREFLIGHT_DB_STRICT` is on. The distinction between the files is what they
+ask, not how hard they push - a violated precondition is a line in the deploy log either
+way, and the mode decides whether the deploy stops.
+
+`011` is the one its own migration refuses on: a failed deploy with the refusal on the box, versus
 thirty seconds and a list of rows to reconcile. One live fuel per name per brand is what makes the name
 identify a fuel, which is what every other key in the schema depends on. It groups by `brand_id`,
 because `20261018191320_CatalogueBrandsBecomeUuid` renamed `fuel_types.station_id` to `brand_id` -
@@ -83,6 +93,16 @@ about. It asked whether `fuel_offers.brand_id` disagreed with `fuel_types.brand_
 that carried no station in it. There is no offer row any more and the key is the fuel type's own id, so
 the question cannot be asked and there is nothing left for an answer to worry about. Its number is not
 reused, the way `010`'s is not.
+
+`013` and `014` were added on 2026-10-20 with planning D-21's second slice, which turned the fuel type's
+id from a text key into a uuid. `013` asks whether the columns that reference a fuel type agree with
+`fuel_types.id` about its TYPE; `014` asks whether any of them still holds a text-shaped id. They are two
+questions about the same change, asked two ways, because a type change and a value change fail differently.
+`015` and `016` came out of the production review of 2026-10-19: production carried two dead columns on
+`roles` and one space-prefixed row in the migration history, and neither the CI gate nor the model could
+see either. `017` names the fuels whose below-cost guard is switched off because the inputs are missing -
+and it is the file that makes the catalogue's missing cost visible on every deploy.
+
 
 ## A check that cannot run is a warning, never a pass
 
