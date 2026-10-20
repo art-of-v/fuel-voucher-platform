@@ -198,10 +198,34 @@ services:
       # The same Ukrainian ICU collation production uses - see docker-compose.prod.yml for why
       # ICU and not a glibc locale, and for the measured before/after. A staging database that
       # sorts differently from production is one that cannot be used to answer a sorting question.
-      POSTGRES_INITDB_ARGS: "--locale-provider=icu --icu-locale=uk-UA --locale=C.UTF-8"
+      POSTGRES_INITDB_ARGS: "--locale-provider=icu --icu-locale=uk-UA --locale=C.UTF-8 --data-checksums"
     # Same postgres configuration as production, scaled to this container's smaller cap. See
     # docker-compose.prod.yml for why each setting is what it is; keep the two in step, because a
     # setting that only exists on prod is one nobody remembers exists.
+    # Postgres tuning. The same reasoning as production, and the same values, because a
+    # setting that only exists on one box is one nobody remembers exists - and the first
+    # time it matters is the day somebody needs to use it. See docker-compose.prod.yml for
+    # the reasoning behind each value; it is the same list.
+    #
+    # THE PLANNER. random_page_cost 4 and effective_io_concurrency 1 are PostgreSQL's
+    # defaults, and those defaults are for a magnetic spindle. The disk is an SSD, where a
+    # random read costs about what a sequential one does, so the planner was told index
+    # scans are four times more expensive than they are.
+    #
+    # THE TIMEOUTS. All three were unbounded. The one that matters is
+    # idle_in_transaction_session_timeout: a connection that opens a transaction and walks
+    # away holds its snapshot, and that is what pins the vacuum horizon and stops VACUUM from
+    # reclaiming dead rows anywhere in the database.
+    #
+    # THE LOGS. Three settings that cost nothing and say what used to be invisible: a query
+    # that spills to disk, a lock wait, and an autovacuum that ran long enough to change the
+    # plan underneath a query.
+    #
+    # WHY THEY ARE HERE AND NOT ONLY ON THE BOX. They were applied to the running server
+    # with ALTER SYSTEM, which writes postgresql.auto.conf - and that file lives in the
+    # container's volume. A box rebuilt from this file, or a disaster recovery on a new
+    # server, would come up with PostgreSQL's defaults and every one of these would silently
+    # be back to what it was.
     command:
       - postgres
       - -c
@@ -212,6 +236,26 @@ services:
       - log_min_duration_statement=1000
       - -c
       - track_io_timing=on
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - effective_io_concurrency=200
+      - -c
+      - statement_timeout=30s
+      - -c
+      - lock_timeout=10s
+      - -c
+      - idle_in_transaction_session_timeout=60s
+      - -c
+      - log_temp_files=10MB
+      - -c
+      - log_lock_waits=on
+      - -c
+      - log_autovacuum_min_duration=1000
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - max_connections=50
       # WAL archiving, same as production. Staging is a scratch database, so its recovery
       # point objective is not the one that matters - but the CONFIGURATION has to be the same,
       # because a setting that only exists on production is one nobody remembers exists, and
