@@ -442,6 +442,29 @@ else
 fi
 
 # ------------------------------------------------------------------------------
+# 3b. The names the alerting chain uses
+#
+# The Caddy upstreams above are the names the TRAFFIC uses. These are the names the
+# ALERTING uses, and on 2026-10-20 they were wrong: the Prometheus scrape target named
+# `dotnet-backend`, which is not a service anybody ran, so Prometheus scraped nothing from
+# the API and every rule that reads a metric the API emits was an `absent()` that could
+# never fire - including the one that says "customers may have paid without receiving
+# vouchers".
+#
+# The fix landed as one string, and nothing checked it. This is the second time a rename
+# has silently broken a name in this repository, so the check lives here: before anything
+# is pulled, recreated or restarted, the names are resolved against the compose services
+# that exist.
+#
+# The check is its own script because it must also run in CI, and it needs no container,
+# no box and no .env - the compose service names are read out of the compose file itself.
+# ------------------------------------------------------------------------------
+echo "== the alerting chain's names =="
+if ! bash "$SCRIPT_DIR/check-alerting-names.sh"; then
+  fail "the alerting chain names something that does not resolve. Nothing has been restarted, and a Prometheus target or a Grafana datasource that points at a name nobody runs is an alerting chain that cannot fire."
+fi
+
+# ------------------------------------------------------------------------------
 # 4. Image tags
 #
 # `docker compose up -d` without *_IMAGE_TAG falls back to the mutable `:main`

@@ -520,6 +520,8 @@ jobs:
         run: bash deploy/check-migration-history.test.sh
       - name: Test the schema comparison
         run: bash deploy/diff-schema.test.sh
+      - name: Test the alerting chain's names
+        run: bash deploy/check-alerting-names.test.sh
 
       # The script that turns WAL archiving on. It was written, syntax-checked, merged
       # and shipped without ever being RUN, and the first run on the production server
