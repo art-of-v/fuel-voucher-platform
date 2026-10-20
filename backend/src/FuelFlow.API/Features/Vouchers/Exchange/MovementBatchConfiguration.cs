@@ -130,5 +130,11 @@ internal sealed class MovementBatchConfiguration : IEntityTypeConfiguration<Move
             t.HasCheckConstraint("ck_movement_batches_supplier_matches_kind",
                 "kind <> 'voucher_exchange' OR supplier_id IS NOT NULL");
         });
+
+        // --- F-23: a reference column without an index ----------------------------------------------
+        // the settlement record names its operator. No foreign key here on purpose - this is an audit row, and an audit row must not
+        // be the thing that blocks deleting its own subject - but the reference is still read, and
+        // without an index every read of it is a scan.
+        builder.HasIndex(e => e.OpenedByUserId);
     }
 }

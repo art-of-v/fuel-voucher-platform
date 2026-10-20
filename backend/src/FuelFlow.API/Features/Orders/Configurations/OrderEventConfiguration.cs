@@ -75,5 +75,11 @@ internal sealed class OrderEventConfiguration : IEntityTypeConfiguration<OrderEv
         // No query filter and no IsDeleted. This table is append-only: nothing here is ever updated
         // or removed except by the cascade above, and a filter that hid deleted rows would defeat
         // the reason the table exists.
+
+        // --- F-23: a reference column without an index ----------------------------------------------
+        // the admin audit screen asks who did this. No foreign key here on purpose - this is an audit row, and an audit row must not
+        // be the thing that blocks deleting its own subject - but the reference is still read, and
+        // without an index every read of it is a scan.
+        builder.HasIndex(e => e.ActorUserId);
     }
 }

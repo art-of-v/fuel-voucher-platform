@@ -92,6 +92,12 @@ internal sealed class JournalEntryConfiguration : IEntityTypeConfiguration<Journ
             // the only moment it is true for, since a draft may legitimately be dated ahead of its
             // period while it is being composed.
         });
+
+        // --- F-23: a reference column without an index ----------------------------------------------
+        // Polymorphic: source_type says what kind of row this is, so the pair is what a lookup uses.
+        // No foreign key here on purpose - an entry must not be the thing that blocks deleting its
+        // subject - but the reference is still read, and without an index every read of it is a scan.
+        builder.HasIndex(e => e.SourceId);
     }
 }
 
@@ -190,5 +196,6 @@ internal sealed class LedgerMappingRuleConfiguration : IEntityTypeConfiguration<
             t.HasCheckConstraint("ck_ledger_mapping_rules_side", "side IN ('Debit','Credit')");
             t.HasCheckConstraint("ck_ledger_mapping_rules_event_not_blank", "btrim(source_event) <> ''");
         });
+
     }
 }

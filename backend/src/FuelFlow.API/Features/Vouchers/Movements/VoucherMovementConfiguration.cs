@@ -180,5 +180,17 @@ internal sealed class VoucherMovementConfiguration : IEntityTypeConfiguration<Vo
             t.HasCheckConstraint("ck_voucher_movements_actor_is_somebody",
                 "actor_user_id IS NULL OR actor_user_id <> '00000000-0000-0000-0000-000000000000'");
         });
+
+        // --- F-23: a reference column without an index ----------------------------------------------
+        // the ledger is read by actor. No foreign key here on purpose - this is an audit row, and an audit row must not
+        // be the thing that blocks deleting its own subject - but the reference is still read, and
+        // without an index every read of it is a scan.
+        builder.HasIndex(e => e.ActorUserId);
+
+        // --- F-23: a reference column without an index ----------------------------------------------
+        // the ledger is read by actor. No foreign key here on purpose - this is an audit row, and an audit row must not
+        // be the thing that blocks deleting its own subject - but the reference is still read, and
+        // without an index every read of it is a scan.
+        builder.HasIndex(e => e.ActorPartyId);
     }
 }
