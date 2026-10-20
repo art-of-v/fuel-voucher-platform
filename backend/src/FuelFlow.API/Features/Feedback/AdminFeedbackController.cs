@@ -90,7 +90,7 @@ public sealed class AdminFeedbackController : ControllerBase
         [FromQuery] string? severity = null,
         [FromQuery] string? status = null,
         [FromQuery] string? search = null,
-        [FromQuery] double? maxConfidence = null,
+        [FromQuery] decimal? maxConfidence = null,
         [FromQuery] DateTime? from = null,
         [FromQuery] DateTime? to = null,
         CancellationToken ct = default)
@@ -343,7 +343,7 @@ public sealed record AdminFeedbackDto
     public FeedbackSeverity? Severity { get; init; }
     public string? Summary { get; init; }
     public FeedbackLanguage? Language { get; init; }
-    public double? Confidence { get; init; }
+    public decimal? Confidence { get; init; }
     public string? ClassifierError { get; init; }
     public DateTime? ClassifiedAtUtc { get; init; }
     public FeedbackStatus Status { get; init; }

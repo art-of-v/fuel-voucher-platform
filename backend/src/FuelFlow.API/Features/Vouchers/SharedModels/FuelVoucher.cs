@@ -192,7 +192,22 @@ public class FuelVoucher
 
     public bool IsDeleted { get; set; }
 
-    public double? VerificationMismatchPercent { get; set; }
+    /// <summary>
+    /// How much of the printed QR matrix did not match, as a percentage.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A decimal, not a double. Binary floating point cannot represent 0.1 exactly, and a percentage
+    /// is compared against a threshold - a value that reads 10.0% and is stored as 0.1 in binary is a
+    /// value that is not the number anyone wrote down.
+    /// </para>
+    /// <para>
+    /// It was the only money-adjacent column in the schema that was a float. Every other one is
+    /// <c>numeric</c> with an explicit scale.
+    /// </para>
+    /// </remarks>
+    public decimal? VerificationMismatchPercent { get; set; }
+
     public int? VerificationMismatchedModules { get; set; }
     public int? VerificationTotalModules { get; set; }
 }

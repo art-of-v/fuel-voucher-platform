@@ -44,7 +44,13 @@ public sealed class FeedbackMessage
 
     /// <summary>Classifier confidence 0..1. Retained even for dropped messages, so a drifting
     /// classifier is visible in the admin filter rather than invisible in the discard bin.</summary>
-    public double? Confidence { get; set; }
+    /// <remarks>
+    /// A decimal, not a double. The classifier's own answer is a double - it comes out of a JSON
+    /// document written by somebody else's model - but the number this system stores and compares
+    /// against a threshold is a decimal, because binary floating point cannot represent 0.1 exactly
+    /// and a confidence of 0.6 is a number people read.
+    /// </remarks>
+    public decimal? Confidence { get; set; }
 
     /// <summary>
     /// Last classifier failure, truncated. A row with this set and no verdict is one the team can

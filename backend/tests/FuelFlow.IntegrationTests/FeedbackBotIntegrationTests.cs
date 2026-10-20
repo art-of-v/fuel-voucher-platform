@@ -367,7 +367,7 @@ public sealed class FeedbackBotIntegrationTests : IClassFixture<TestDatabaseFixt
 
         var row = await ReadOne(messageId);
         row.Verdict.Should().Be(FeedbackVerdict.Junk);
-        row.Confidence.Should().Be(0.3);
+        row.Confidence.Should().Be(0.3m);
         row.Category.Should().Be(FeedbackCategory.Complaint, "the detail survives even when the verdict does not");
     }
 

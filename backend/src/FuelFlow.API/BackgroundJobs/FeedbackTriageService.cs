@@ -109,7 +109,12 @@ public sealed class FeedbackTriageService
         row.Severity = classification.Severity;
         row.Summary = classification.Summary;
         row.Language = classification.Language;
-        row.Confidence = Math.Round(classification.Confidence, 2);
+        // The classifier's answer is a double - it comes out of a JSON document written by somebody
+        // else's model - and this row stores a decimal, because a confidence of 0.6 is a number people
+        // read and read back. The conversion goes through the decimal, not the other way round: a
+        // double rounded to two places and then converted is a different number from a decimal
+        // rounded to two places, and the decimal is the one the column keeps.
+        row.Confidence = Math.Round((decimal)classification.Confidence, 2);
         row.ClassifierError = null;
         row.ClassifiedAtUtc = DateTime.UtcNow;
 
