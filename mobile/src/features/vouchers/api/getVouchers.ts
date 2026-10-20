@@ -17,7 +17,14 @@ export async function getMyVouchers(): Promise<Voucher[]> {
   const all: Voucher[] = [];
   const pageSize = 50;
 
-  for (let page = 1; ; page++) {
+  // The backstop. The loop ends on the server's count, and on a short page when the
+  // server sends no count - but a server that answered every request with a full page
+  // and no count would otherwise be asked the same question for ever. Ten thousand
+  // vouchers is past any customer's wallet; past that, the wallet is what the customer
+  // has and the rest is a server that is not answering.
+  const maxPages = 200;
+
+  for (let page = 1; page <= maxPages; page++) {
     const response = await apiFetch(`/api/vouchers/my?page=${page}&pageSize=${pageSize}`);
     if (!response.ok) {
       // 401 is the signed-out case, and the original behaviour was to yield an empty
