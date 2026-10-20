@@ -174,6 +174,8 @@ public sealed class RealizedMarginSqlIntegrationTests : IClassFixture<TestDataba
                 VoucherNumber = Guid.NewGuid().ToString("N"),
                 QrPayload = Guid.NewGuid().ToString("N"),
                 Status = VoucherStatus.Assigned,
+                // An assigned voucher is held against an order - the schema refuses one without it.
+                OrderId = orderId,
                 SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(90),
                 CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(90),
                 CreatedAtUtc = DateTime.UtcNow,
