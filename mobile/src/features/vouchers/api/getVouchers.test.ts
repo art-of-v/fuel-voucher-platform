@@ -17,7 +17,8 @@ function page(ids: string[], totalCount?: number) {
     status: 200,
     json: async () => ids.map((id) => ({ id, brand: 'okko', fuelType: 'A-95', liters: 10 })),
     headers: {
-      get: (name: string) => (name === 'X-Total-Count' && totalCount !== undefined ? String(totalCount) : null),
+      get: (name: string) =>
+        name === 'X-Total-Count' && totalCount !== undefined ? String(totalCount) : null,
     },
   } as any;
 }
@@ -67,9 +68,7 @@ describe('getMyVouchers', () => {
     // Fifty of them, and the count says fifty: the second page would be empty, and the
     // count is what says so without asking for it.
     const fifty = Array.from({ length: 50 }, (_, i) => `v${i}`);
-    apiFetchMock
-      .mockResolvedValueOnce(page(fifty, 50))
-      .mockResolvedValueOnce(page([], 50));
+    apiFetchMock.mockResolvedValueOnce(page(fifty, 50)).mockResolvedValueOnce(page([], 50));
 
     const vouchers = await getMyVouchers();
 
