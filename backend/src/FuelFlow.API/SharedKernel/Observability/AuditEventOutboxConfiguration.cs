@@ -31,8 +31,6 @@ internal sealed class AuditEventOutboxConfiguration : IEntityTypeConfiguration<A
         // event_type that query had to choose between a scan and a sort.
         builder.HasIndex(e => new { e.EventType, e.ChangedAtUtc })
             .IsDescending(false, true);
-        // The convention above says every actor column is indexed, and this one was not: the index
-        // was written down in a comment and never declared, so nothing in the database used it.
-        builder.HasIndex(e => e.ChangedByUserId);
+        // ChangedByUserId is indexed by the FK convention above.
     }
 }

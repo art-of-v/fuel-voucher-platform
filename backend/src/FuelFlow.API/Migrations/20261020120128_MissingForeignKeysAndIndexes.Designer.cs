@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FuelFlow.API.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20261020114906_MissingForeignKeysAndIndexes")]
+    [Migration("20261020120128_MissingForeignKeysAndIndexes")]
     partial class MissingForeignKeysAndIndexes
     {
         /// <inheritdoc />
@@ -1073,9 +1073,6 @@ namespace FuelFlow.API.Migrations
                     b.HasIndex("ReversedByEntryId")
                         .HasDatabaseName("ix_journal_entries_reversed_by_entry_id");
 
-                    b.HasIndex("SourceId")
-                        .HasDatabaseName("ix_journal_entries_source_id");
-
                     b.HasIndex("PeriodId", "EntryNo")
                         .IsUnique()
                         .HasDatabaseName("ix_journal_entries_period_id_entry_no");
@@ -1939,9 +1936,6 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Key");
 
-                    b.HasIndex("UpdatedByUserId")
-                        .HasDatabaseName("ix_app_settings_updated_by_user_id");
-
                     b.ToTable("app_settings", (string)null);
                 });
 
@@ -2014,9 +2008,6 @@ namespace FuelFlow.API.Migrations
 
                     b.HasIndex("PaymentId")
                         .HasDatabaseName("ix_settlement_messages_payment_id");
-
-                    b.HasIndex("ResolvedUserId")
-                        .HasDatabaseName("ix_settlement_messages_resolved_user_id");
 
                     b.HasIndex("SentAtUtc")
                         .HasDatabaseName("ix_settlement_messages_refusals")
@@ -2157,12 +2148,6 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ActorPartyId")
-                        .HasDatabaseName("ix_voucher_events_actor_party_id");
-
-                    b.HasIndex("ActorUserId")
-                        .HasDatabaseName("ix_voucher_events_actor_user_id");
-
                     b.HasIndex("ExternalRef")
                         .HasDatabaseName("ix_voucher_events_ref")
                         .HasFilter("external_ref IS NOT NULL");
@@ -2247,9 +2232,6 @@ namespace FuelFlow.API.Migrations
 
                     b.HasIndex("OpenedAtUtc")
                         .HasDatabaseName("ix_movement_batches_opened_at_utc");
-
-                    b.HasIndex("OpenedByUserId")
-                        .HasDatabaseName("ix_movement_batches_opened_by_user_id");
 
                     b.HasIndex("SupplierId")
                         .HasDatabaseName("ix_movement_batches_supplier_id");
@@ -2659,12 +2641,6 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ActorPartyId")
-                        .HasDatabaseName("ix_voucher_movements_actor_party_id");
-
-                    b.HasIndex("ActorUserId")
-                        .HasDatabaseName("ix_voucher_movements_actor_user_id");
-
                     b.HasIndex("BatchId")
                         .HasDatabaseName("ix_voucher_movements_batch")
                         .HasFilter("batch_id IS NOT NULL");
@@ -2818,9 +2794,6 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("xmin");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("ActingUserId")
-                        .HasDatabaseName("ix_operator_voucher_renewals_acting_user_id");
 
                     b.HasIndex("CreatedAtUtc")
                         .HasDatabaseName("ix_operator_voucher_renewals_created_at_utc");
@@ -3307,9 +3280,6 @@ namespace FuelFlow.API.Migrations
                     b.HasIndex("ChangedAtUtc")
                         .HasDatabaseName("ix_provider_event_outbox_changed_at_utc");
 
-                    b.HasIndex("ChangedByUserId")
-                        .HasDatabaseName("ix_provider_event_outbox_changed_by_user_id");
-
                     b.HasIndex("EventType", "ChangedAtUtc")
                         .IsDescending(false, true)
                         .HasDatabaseName("ix_provider_event_outbox_event_type_changed_at_utc");
@@ -3610,9 +3580,6 @@ namespace FuelFlow.API.Migrations
                     b.HasIndex("LoggedAtUtc")
                         .HasDatabaseName("ix_error_logs_logged_at_utc");
 
-                    b.HasIndex("ResolvedByUserId")
-                        .HasDatabaseName("ix_error_logs_resolved_by_user_id");
-
                     b.HasIndex("Source")
                         .HasDatabaseName("ix_error_logs_source");
 
@@ -3828,9 +3795,6 @@ namespace FuelFlow.API.Migrations
 
                     b.HasIndex("Name")
                         .HasDatabaseName("ix_fuel_types_name");
-
-                    b.HasIndex("PriceUpdatedByUserId")
-                        .HasDatabaseName("ix_fuel_types_price_updated_by_user_id");
 
                     b.HasIndex("BrandId", "BrandFuelCode")
                         .IsUnique()
@@ -4063,9 +4027,6 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ActorUserId")
-                        .HasDatabaseName("ix_order_events_actor_user_id");
-
                     b.HasIndex("ExternalRef")
                         .HasDatabaseName("ix_order_events_external_ref");
 
@@ -4121,9 +4082,6 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("updated_at_utc");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("EnteredByUserId")
-                        .HasDatabaseName("ix_purchase_batches_entered_by_user_id");
 
                     b.HasIndex("FuelTypeId")
                         .HasDatabaseName("ix_purchase_batches_fuel_type_id");

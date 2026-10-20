@@ -86,9 +86,6 @@ internal sealed class OperatorVoucherRenewalConfiguration : IEntityTypeConfigura
             .HasColumnName("acting_user_id")
             .IsRequired();
 
-        // The actor column is read, so it is indexed: Postgres does not index a column on its own.
-        builder.HasIndex(e => e.ActingUserId);
-
         builder.Property(e => e.ActingUserName)
             .HasColumnName("acting_user_name")
             .HasMaxLength(200);
