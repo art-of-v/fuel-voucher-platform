@@ -17,6 +17,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -233,7 +234,7 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
             {
                 Id = voucherId,
                 Brand = "OKKO",
-                FuelTypeId = "okko-dp",
+                FuelTypeId = ToUuid("okko-dp"),
                 Liters = 10m,
                 VoucherNumber = $"V-{voucherId:N}"[..20],
                 QrPayload = $"qr-{voucherId:N}",
@@ -382,7 +383,7 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
             {
                 Id = Guid.NewGuid(),
                 ImportJobId = costedId,
-                FuelTypeId = "okko-95",
+                FuelTypeId = ToUuid("okko-95"),
                 Brand = "okko",
                 SupplierId = supplierId,
                 CreatedAtUtc = Old(),

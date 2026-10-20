@@ -32,7 +32,7 @@ public sealed class GetAdminVouchersQueryHandler
         if (!string.IsNullOrWhiteSpace(query.Brand))
             q = q.Where(v => v.Brand == query.Brand);
 
-        if (!string.IsNullOrWhiteSpace(query.FuelTypeId))
+        if (query.FuelTypeId.HasValue)
             q = q.Where(v => v.FuelTypeId == query.FuelTypeId);
         else if (!string.IsNullOrWhiteSpace(query.FuelType))
             q = q.Where(v => v.FuelType != null && v.FuelType.Name == query.FuelType);
@@ -129,7 +129,7 @@ public sealed class GetAdminVouchersQueryHandler
             QrPayload = v.QrPayload,
             Liters = v.Liters,
             FuelTypeId = v.FuelTypeId,
-            FuelType = v.FuelType == null ? null : new FuelTypeRefDto { Id = v.FuelType.Id, Name = v.FuelType.Name },
+            FuelType = v.FuelType == null ? null : new FuelTypeRefDto { Id = v.FuelType.Id.ToString(), Name = v.FuelType.Name },
             Brand = v.Brand,
             SupplierId = v.SupplierId,
             SupplierName = v.Supplier?.Name,
@@ -187,7 +187,7 @@ public sealed class GetAdminVouchersQueryHandler
                 .ToDictionary(
                     g => g.Key,
                     g => g
-                        .Select(o => new FuelTypeRefDto { Id = o.Id, Name = o.Name })
+                        .Select(o => new FuelTypeRefDto { Id = o.Id.ToString(), Name = o.Name })
                         .OrderBy(o => o.Name, StringComparer.CurrentCulture)
                         .ToList(),
                     StringComparer.Ordinal),

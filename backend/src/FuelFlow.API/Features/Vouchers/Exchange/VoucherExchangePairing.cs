@@ -12,7 +12,7 @@ namespace FuelFlow.Features.Vouchers.Exchange;
 public static class VoucherExchangePairing
 {
     /// <summary>A voucher reduced to the fields pairing needs.</summary>
-    public sealed record Candidate(Guid Id, string Brand, string FuelTypeId, decimal Liters, string VoucherNumber);
+    public sealed record Candidate(Guid Id, string Brand, Guid FuelTypeId, decimal Liters, string VoucherNumber);
 
     public sealed record Result(
         IReadOnlyList<(Guid OldId, Guid? NewId)> Pairs,
@@ -57,6 +57,6 @@ public static class VoucherExchangePairing
         return new Result(pairs, paired, unpairedOld, unpairedNew);
     }
 
-    private static (string, string, decimal) Key(Candidate c)
+    private static (string, Guid, decimal) Key(Candidate c)
         => (c.Brand.ToLowerInvariant(), c.FuelTypeId, c.Liters);
 }

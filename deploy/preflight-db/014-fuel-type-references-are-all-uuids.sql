@@ -50,6 +50,12 @@
 -- WHY A QUESTION, NOT A GATE, like `011` and `012`. Finding rows here is not a broken database - it
 -- is the one fact D-21's second slice has to be planned around, and the plan belongs to a human. The
 -- migration it informs can still refuse; this only has to make the refusal not surprising.
+--
+-- WHY THE COLUMNS ARE COMPARED AS TEXT. The columns this reads were text until D-21's second slice
+-- converted them to uuid, and `uuid !~* '...'` is not an operator Postgres has: the file would stop
+-- running the day the column changed, and a precondition that cannot run reports success without
+-- having checked anything. The cast runs on both shapes, so the file answers the same question
+-- before and after the conversion - which is the only way it can be a question at all.
 
 BEGIN;
 SET TRANSACTION READ ONLY;
@@ -60,7 +66,7 @@ SELECT to_regclass('public.fuel_types') IS NOT NULL AS t \gset
 \if :t
 SELECT 'fuel_types' AS table_name, id, name AS detail
 FROM fuel_types
-WHERE id !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+WHERE id::text !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
 ORDER BY id;
 \endif
 
@@ -71,7 +77,7 @@ SELECT to_regclass('public.order_line_items') IS NOT NULL AS t \gset
 SELECT 'order_line_items' AS table_name, fuel_type_id AS id, count(*)::text AS rows
 FROM order_line_items
 WHERE fuel_type_id IS NOT NULL
-  AND fuel_type_id !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+  AND fuel_type_id::text !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
 GROUP BY fuel_type_id
 ORDER BY fuel_type_id;
 \endif
@@ -81,7 +87,7 @@ SELECT to_regclass('public.purchase_batches') IS NOT NULL AS t \gset
 SELECT 'purchase_batches' AS table_name, fuel_type_id AS id, count(*)::text AS rows
 FROM purchase_batches
 WHERE fuel_type_id IS NOT NULL
-  AND fuel_type_id !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+  AND fuel_type_id::text !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
 GROUP BY fuel_type_id
 ORDER BY fuel_type_id;
 \endif
@@ -91,7 +97,7 @@ SELECT to_regclass('public.voucher_exchanges') IS NOT NULL AS t \gset
 SELECT 'voucher_exchanges' AS table_name, fuel_type_id AS id, count(*)::text AS rows
 FROM voucher_exchanges
 WHERE fuel_type_id IS NOT NULL
-  AND fuel_type_id !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+  AND fuel_type_id::text !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
 GROUP BY fuel_type_id
 ORDER BY fuel_type_id;
 \endif

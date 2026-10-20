@@ -35,7 +35,7 @@ public sealed class TermQuoteQueryHandler
 
     public async Task<TermQuoteResponse> HandleAsync(
         bool isTestAccount,
-        Guid BrandId, string fuelTypeId, decimal liters, CancellationToken cancellationToken = default)
+        Guid BrandId, Guid fuelTypeId, decimal liters, CancellationToken cancellationToken = default)
     {
         var config = await _settings.GetVoucherTermConfigAsync(cancellationToken);
         var pool = DataKinds.ForPool(isTestAccount);

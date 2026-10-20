@@ -16,7 +16,7 @@ public sealed class TermStockUnavailableException : Exception
 {
     public const string Code = "term_stock_unavailable";
 
-    public TermStockUnavailableException(string fuelTypeId)
+    public TermStockUnavailableException(Guid fuelTypeId)
         : base($"The selected term for fuel {fuelTypeId} is not backed by stock and cannot be sold.")
     {
     }

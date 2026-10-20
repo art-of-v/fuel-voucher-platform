@@ -11,6 +11,7 @@ using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.UnitTests.BackgroundJobs;
 
@@ -99,7 +100,7 @@ public sealed class ExpiredVoucherLossServiceTests : IDisposable
         {
             Id = Guid.NewGuid(),
             Brand = "OKKO",
-            FuelTypeId = "okko-dp",
+            FuelTypeId = ToUuid("okko-dp"),
             Liters = 10m,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-expiredDaysAgo)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-expiredDaysAgo)),

@@ -5,6 +5,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.Providers.UnitTests;
 
@@ -38,7 +39,7 @@ public sealed class GetFuelPriceHistoryQueryHandlerTests : IDisposable
         await SeedAsync(fuelTypeId: "fuel-a", at: 20, margin: 3m);
         await SeedAsync(fuelTypeId: "fuel-a", at: 30, margin: 4m);
 
-        var history = await _handler.HandleAsync(new GetFuelPriceHistoryQuery("fuel-a"));
+        var history = await _handler.HandleAsync(new GetFuelPriceHistoryQuery(ToUuid("fuel-a")));
 
         // Oldest first, so the current price is the last element and the sequence can be read in order.
         // The reverse would put today's price at the bottom.
@@ -52,13 +53,13 @@ public sealed class GetFuelPriceHistoryQueryHandlerTests : IDisposable
         await SeedAsync(fuelTypeId: "fuel-b", at: 10, margin: 2m, dataKind: DataKinds.Real);
         await SeedAsync(fuelTypeId: "fuel-b", at: 11, margin: 99m, dataKind: DataKinds.Qa);
 
-        var history = await _handler.HandleAsync(new GetFuelPriceHistoryQuery("fuel-b"));
+        var history = await _handler.HandleAsync(new GetFuelPriceHistoryQuery(ToUuid("fuel-b")));
 
         history.Select(h => h.DataKind).Should().Equal(DataKinds.Real, DataKinds.Qa);
         // Both rows now belong to the same fuel - there is one price per grade - so the pool is the
         // only thing that tells them apart, and it is what the audit trail shows the operator.
         history.Should().HaveCount(2);
-        history.Should().OnlyContain(h => h.FuelTypeId == "fuel-b");
+           history.Should().OnlyContain(h => h.FuelTypeId == ToUuid("fuel-b"));
         history.Single(h => h.DataKind == DataKinds.Qa).MarginUahPerLiter.Should().Be(99m);
     }
 
@@ -68,9 +69,9 @@ public sealed class GetFuelPriceHistoryQueryHandlerTests : IDisposable
         await SeedAsync(fuelTypeId: "fuel-c", at: 10, margin: 2m);
         await SeedAsync(fuelTypeId: "fuel-d", at: 10, margin: 5m);
 
-        var history = await _handler.HandleAsync(new GetFuelPriceHistoryQuery("fuel-c"));
+        var history = await _handler.HandleAsync(new GetFuelPriceHistoryQuery(ToUuid("fuel-c")));
 
-        history.Should().ContainSingle().Which.FuelTypeId.Should().Be("fuel-c");
+        history.Should().ContainSingle().Which.FuelTypeId.Should().Be(ToUuid("fuel-c"));
     }
 
     [Fact]
@@ -81,7 +82,7 @@ public sealed class GetFuelPriceHistoryQueryHandlerTests : IDisposable
             await SeedAsync(fuelTypeId: "fuel-e", at: 10 + i, margin: i);
         }
 
-        var history = await _handler.HandleAsync(new GetFuelPriceHistoryQuery("fuel-e", Limit: 3));
+        var history = await _handler.HandleAsync(new GetFuelPriceHistoryQuery(ToUuid("fuel-e"), Limit: 3));
 
         // A limit that kept the oldest rows would answer "what did it cost at the start", which is the
         // one question a caller who did not ask for it cannot tell they got wrong.
@@ -91,7 +92,7 @@ public sealed class GetFuelPriceHistoryQueryHandlerTests : IDisposable
     [Fact]
     public async Task AFuelWithNoHistory_ComesBackEmptyRatherThanThrowing()
     {
-        var history = await _handler.HandleAsync(new GetFuelPriceHistoryQuery("never-seen"));
+        var history = await _handler.HandleAsync(new GetFuelPriceHistoryQuery(ToUuid("never-seen")));
 
         history.Should().BeEmpty();
     }
@@ -101,7 +102,7 @@ public sealed class GetFuelPriceHistoryQueryHandlerTests : IDisposable
     {
         await SeedAsync(fuelTypeId: "fuel-f", at: 10, margin: 2m);
 
-var entry = (await _handler.HandleAsync(new GetFuelPriceHistoryQuery("fuel-f"))).Single();
+var entry = (await _handler.HandleAsync(new GetFuelPriceHistoryQuery(ToUuid("fuel-f")))).Single();
 
     entry.SupplierPricePerLiter.Should().Be(50m);
     entry.MarginUahPerLiter.Should().Be(2m);
@@ -116,7 +117,7 @@ private async Task SeedAsync(string fuelTypeId, int at, decimal margin, string? 
         _context.FuelPriceHistory.Add(new FuelPriceHistory
         {
             Id = Guid.CreateVersion7(),
-            FuelTypeId = fuelTypeId,
+                FuelTypeId = ToUuid(fuelTypeId),
             BrandId = BrandIds.Okko,
             DataKind = dataKind ?? DataKinds.Real,
             SupplierPricePerLiter = 50m,

@@ -11,6 +11,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -83,7 +84,7 @@ public class VoucherAcquisitionSourceTests : WebApplicationFactory<Program>, ICl
         {
             context.FuelTypes.Add(new FuelTypeEntity
             {
-                Id = "okko-acq",
+                Id = ToUuid("okko-acq"),
                 Name = "Дизель (acq test)",
                 BrandId = BrandIds.Okko,
                 BasePrice = 60m,
@@ -97,7 +98,7 @@ public class VoucherAcquisitionSourceTests : WebApplicationFactory<Program>, ICl
 
         var fuel = await context.FuelTypes.FirstAsync();
         var supplier = await context.Suppliers.FirstAsync();
-        return (importId, fuel.Id, supplier.Id);
+        return (importId, fuel.Id.ToString(), supplier.Id);
     }
 
     /// <summary>
@@ -113,7 +114,7 @@ public class VoucherAcquisitionSourceTests : WebApplicationFactory<Program>, ICl
         {
             Id = Guid.NewGuid(),
             ImportJobId = importId,
-            FuelTypeId = fuelTypeId,
+            FuelTypeId =   ToUuid(fuelTypeId),
             SupplierId = supplierId,
             Brand = "okko",
             VoucherNumber = $"ACQ-{Guid.NewGuid():N}",
@@ -180,7 +181,7 @@ public class VoucherAcquisitionSourceTests : WebApplicationFactory<Program>, ICl
         {
             Id = Guid.NewGuid(),
             ImportJobId = importId,
-            FuelTypeId = fuelTypeId,
+            FuelTypeId =   ToUuid(fuelTypeId),
             SupplierId = supplierId,
             Brand = "okko",
             VoucherNumber = $"ACQ-{Guid.NewGuid():N}",

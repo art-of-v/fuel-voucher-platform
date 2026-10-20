@@ -49,7 +49,7 @@ export interface FuelType {
   name: string;
   /** Brand uuid, matching {@link StationNode.brandId}. */
   brandId: string;
-  /** The network's code. The fuel id is still the natural key `okko-95`, so this is the only thing that says which network a fuel belongs to. */
+  /** The network's code. A fuel's own id is an opaque uuid, so this is what says which network a fuel belongs to. */
   brandSlug: string;
   basePrice: number;
   discountPrice: number;

@@ -159,7 +159,7 @@ public sealed class ImportOkkoPumpPricesCommandHandler
                 .AsTracking()
                 .Where(ft => ft.BrandId == okkoId.Value)
                 .ToListAsync(ct))
-            .OrderBy(ft => ft.Id, StringComparer.Ordinal)
+            .OrderBy(ft => ft.Id)
             .ToList();
 
 // A pump price is a property of WHAT IS SOLD, so it lands on the fuel, which is the row every
@@ -339,7 +339,7 @@ public sealed class ImportOkkoPumpPricesCommandHandler
                 : $"OKKO / {a.FuelName}: pump set to {a.PumpPricePerLiter:F2} UAH/L (imported from site)";
 
             await _events.RecordEventAsync(
-                "Fuel", a.FuelTypeId, "PumpPriceImported",
+                "Fuel", a.FuelTypeId.ToString(), "PumpPriceImported",
                 oldValue, newValue, actorId ?? Guid.Empty, actorName,
                 summary, OkkoSlug, ct);
         }

@@ -6,6 +6,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -42,7 +43,7 @@ public sealed class OrderHistoryIntegrationTests : IClassFixture<TestDatabaseFix
                 Id = Guid.CreateVersion7(),
                 OrderId = order.Id,
                 Brand = "okko",
-                FuelTypeId = "okko-95",
+                FuelTypeId = ToUuid("okko-95"),
                 Liters = 10m,
                 Quantity = 1,
                 UnitPrice = 890.60m,
@@ -277,7 +278,7 @@ public sealed class OrderHistoryIntegrationTests : IClassFixture<TestDatabaseFix
                 Id = Guid.CreateVersion7(),
                 OrderId = order.Id,
                 Brand = "okko",
-                FuelTypeId = "okko-95",
+                FuelTypeId = ToUuid("okko-95"),
                 Liters = 10m,
                 Quantity = 1,
                 UnitPrice = 890.60m,

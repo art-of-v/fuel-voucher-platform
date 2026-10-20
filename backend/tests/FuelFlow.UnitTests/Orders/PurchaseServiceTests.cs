@@ -23,6 +23,7 @@ using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Domain;
 
 using FuelFlow.SharedKernel.Observability;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 namespace FuelFlow.UnitTests.Orders;
 
 public class OrderCommandHandlersTests : IDisposable
@@ -85,11 +86,11 @@ public OrderCommandHandlersTests()
     {
         var fuelTypes = new[]
         {
-            new FuelTypeEntity { Id = "okko-dp", Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "okko-95", Name = "A-95", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "okko-p95", Name = "Pulls 95", BrandId = BrandIds.Okko, BasePrice = 62, DiscountPrice = 58, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "wog-dp", Name = "ДП Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "wog-95", Name = "A-95 Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow }
+            new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("okko-95"), Name = "A-95", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("okko-p95"), Name = "Pulls 95", BrandId = BrandIds.Okko, BasePrice = 62, DiscountPrice = 58, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("wog-dp"), Name = "ДП Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("wog-95"), Name = "A-95 Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow }
         };
         _context.FuelTypes.AddRange(fuelTypes);
         _context.SaveChanges();
@@ -117,7 +118,7 @@ public OrderCommandHandlersTests()
         {
             Id = Guid.NewGuid(),
             Brand = "OKKO",
-            FuelTypeId = fuelTypeId,
+            FuelTypeId = ToUuid(fuelTypeId),
             Liters = liters,
             SupplierExpirationDate = expiry,
             CustomerExpirationDate = expiry,
@@ -143,7 +144,7 @@ public OrderCommandHandlersTests()
     {
         UserId = _context.Users.First().Id,
         
-        FuelTypeId = "okko-95",
+        FuelTypeId = ToUuid("okko-95"),
         BrandId = BrandIds.Okko,
         BrandName = "OKKO",
         Liters = 50,
@@ -159,7 +160,7 @@ public OrderCommandHandlersTests()
             new CheckoutItem
             {
                 
-                FuelTypeId = "okko-95",
+                FuelTypeId = ToUuid("okko-95"),
                 BrandId = BrandIds.Okko,
                 BrandName = "OKKO",
                 Liters = 50,
@@ -178,7 +179,7 @@ public OrderCommandHandlersTests()
     {
         _context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = "okko-loss", Name = "ДП збиток", BrandId = BrandIds.Okko,
+            Id = ToUuid("okko-loss"), Name = "ДП збиток", BrandId = BrandIds.Okko,
             BasePrice = 49, DiscountPrice = 49, AllowBelowCost = allowBelowCost,
             CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
         });
@@ -195,7 +196,7 @@ public OrderCommandHandlersTests()
     private CreateCheckoutCommand BelowCostCommand() => new()
     {
         UserId = _context.Users.First().Id,
-        FuelTypeId = "okko-loss", BrandId = BrandIds.Okko, BrandName = "OKKO",
+        FuelTypeId = ToUuid("okko-loss"), BrandId = BrandIds.Okko, BrandName = "OKKO",
         Liters = 50, Quantity = 1, Price = 2425
     };
 
@@ -206,7 +207,7 @@ public OrderCommandHandlersTests()
         {
             new CheckoutItem
             {
-                FuelTypeId = "okko-loss", BrandId = BrandIds.Okko, BrandName = "OKKO",
+                FuelTypeId = ToUuid("okko-loss"), BrandId = BrandIds.Okko, BrandName = "OKKO",
                 Liters = 50, Quantity = 1, Price = 2425
             }
         }
@@ -226,7 +227,7 @@ public OrderCommandHandlersTests()
             {
                 Id = Guid.NewGuid(),
                 Brand = "okko",
-                FuelTypeId = "okko-95",
+                FuelTypeId = ToUuid("okko-95"),
                 Liters = 50,
                 Quantity = 1,
                 UnitPrice = 2500,
@@ -251,7 +252,7 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
 
         var lineItem = Assert.Single(order.LineItems);
         Assert.Equal("okko", lineItem.Brand);
-        Assert.Equal("okko-95", lineItem.FuelTypeId);
+        Assert.Equal(ToUuid("okko-95"), lineItem.FuelTypeId);
         Assert.Equal(50, lineItem.Liters);
         Assert.Equal(1, lineItem.Quantity);
         Assert.Equal(2500, lineItem.LineTotal);
@@ -364,7 +365,7 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
         // Before #90 this collapsed to a whole 457 UAH and would then mismatch the success webhook.
         _context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = "okko-frac", Name = "ДП дробові", BrandId = BrandIds.Okko,
+            Id = ToUuid("okko-frac"), Name = "ДП дробові", BrandId = BrandIds.Okko,
             BasePrice = 50, DiscountPrice = 48,
             CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
         });
@@ -387,7 +388,7 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
         var command = new CreateCheckoutCommand
         {
             UserId = _context.Users.First().Id,
-            FuelTypeId = "okko-frac", BrandId = BrandIds.Okko, BrandName = "OKKO",
+            FuelTypeId = ToUuid("okko-frac"), BrandId = BrandIds.Okko, BrandName = "OKKO",
             Liters = 10, Quantity = 1, Price = 4567   // client price is ignored; server recomputes 456.70
         };
 
@@ -505,7 +506,7 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
     public async Task CreateCheckout_ShouldThrow_WhenFuelTypeNotInBrand()
     {
         var command = CheckoutCommand();
-        command.FuelTypeId = "unknown-fuel";
+        command.FuelTypeId = ToUuid("unknown-fuel");
 
         var ex = await Assert.ThrowsAsync<ArgumentException>(() => _createCheckoutHandler.HandleAsync(command));
         Assert.Contains("Invalid fuel type", ex.Message);
@@ -526,7 +527,7 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
         // so it must not carry the internal fuel id or our margin reasoning. The id is preserved on
         // the property for logs and telemetry instead.
         Assert.DoesNotContain("okko-loss", ex.Message);
-        Assert.Equal("okko-loss", ex.FuelTypeId);
+        Assert.Equal(ToUuid("okko-loss"), ex.FuelTypeId);
         Assert.False(await _context.Orders.AnyAsync());
     }
 
@@ -550,7 +551,7 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
             () => _bulkCheckoutHandler.HandleAsync(BelowCostBulkCommand()));
 
         Assert.DoesNotContain("okko-loss", ex.Message);
-        Assert.Equal("okko-loss", ex.FuelTypeId);
+        Assert.Equal(ToUuid("okko-loss"), ex.FuelTypeId);
         Assert.False(await _context.Orders.AnyAsync());
     }
 

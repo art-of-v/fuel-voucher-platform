@@ -227,7 +227,7 @@ public sealed class FuelFlowMetrics : IDisposable
             description: "Awaiting-payment orders older than the reconciliation grace window, by merchant.");
     }
 
-    public void VoucherAssigned(string brand, string fuelTypeId, bool isCompany) =>
+    public void VoucherAssigned(string brand, Guid fuelTypeId, bool isCompany) =>
         _vouchersAssigned.Add(1,
             new KeyValuePair<string, object?>("brand", brand),
             new KeyValuePair<string, object?>("fuel_type", fuelTypeId),

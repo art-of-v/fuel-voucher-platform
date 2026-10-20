@@ -13,7 +13,7 @@ public sealed record BatchCostTimelineEntry
 {
     public Guid ExchangeBatchId { get; init; }
     public DateTime AtUtc { get; init; }
-    public string FuelTypeId { get; init; } = string.Empty;
+    public Guid FuelTypeId { get; init; }
     public string Brand { get; init; } = string.Empty;
 
     /// <summary>Vouchers of this import that this exchange retired.</summary>

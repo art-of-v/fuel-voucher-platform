@@ -5,6 +5,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.UnitTests.Orders;
 
@@ -53,7 +54,7 @@ public sealed class GetSavingsReportQueryHandlerTests : IDisposable
             Id = Guid.NewGuid(),
             OrderId = order.Id,
             Brand = "okko",
-            FuelTypeId = "okko-dp",
+            FuelTypeId = ToUuid("okko-dp"),
             Liters = liters,
             Quantity = quantity,
             UnitPrice = lineTotal / quantity,
@@ -71,7 +72,7 @@ public sealed class GetSavingsReportQueryHandlerTests : IDisposable
         {
             Id = voucherId,
             Brand = "OKKO",
-            FuelTypeId = "okko-dp",
+            FuelTypeId = ToUuid("okko-dp"),
             Liters = liters,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),

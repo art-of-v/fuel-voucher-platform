@@ -10,6 +10,7 @@ using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.UnitTests.Sync;
 
@@ -63,7 +64,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
                 {
                     Id = Guid.NewGuid(),
                     Brand = "OKKO",
-                    FuelTypeId = "okko-95",
+                    FuelTypeId = ToUuid("okko-95"),
                     Liters = 50,
                     Quantity = 2,
                     UnitPrice = 2500,
@@ -86,7 +87,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
                 {
                     Id = Guid.NewGuid(),
                     Brand = "OKKO",
-                    FuelTypeId = "okko-dp",
+                    FuelTypeId = ToUuid("okko-dp"),
                     Liters = 50,
                     Quantity = 1,
                     UnitPrice = 2500,
@@ -99,7 +100,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
         {
             Id = Guid.NewGuid(),
             Brand = "OKKO",
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
@@ -115,7 +116,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
         {
             Id = Guid.NewGuid(),
             Brand = "OKKO",
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
@@ -131,7 +132,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
         {
             Id = Guid.NewGuid(),
             Brand = "OKKO",
-            FuelTypeId = "okko-dp",
+            FuelTypeId = ToUuid("okko-dp"),
             Liters = 50,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(2)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(2)),
@@ -224,7 +225,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
                 {
                     Id = Guid.NewGuid(),
                     Brand = "OKKO",
-                    FuelTypeId = "okko-95",
+                    FuelTypeId = ToUuid("okko-95"),
                     Liters = 50,
                     Quantity = 1,
                     UnitPrice = 2500,
@@ -267,7 +268,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
                 {
                     Id = Guid.NewGuid(),
                     Brand = "OKKO",
-                    FuelTypeId = "okko-95",
+                    FuelTypeId = ToUuid("okko-95"),
                     Liters = 50,
                     Quantity = 1,
                     UnitPrice = 2500,
@@ -290,7 +291,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
                 {
                     Id = Guid.NewGuid(),
                     Brand = "OKKO",
-                    FuelTypeId = "okko-dp",
+                    FuelTypeId = ToUuid("okko-dp"),
                     Liters = 50,
                     Quantity = 1,
                     UnitPrice = 2500,
@@ -334,7 +335,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
                 {
                     Id = Guid.NewGuid(),
                     Brand = "OKKO",
-                    FuelTypeId = "okko-95",
+                    FuelTypeId = ToUuid("okko-95"),
                     Liters = 50,
                     Quantity = 1,
                     UnitPrice = 2500,
@@ -357,7 +358,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
                 {
                     Id = Guid.NewGuid(),
                     Brand = "OKKO",
-                    FuelTypeId = "okko-95",
+                    FuelTypeId = ToUuid("okko-95"),
                     Liters = 20,
                     Quantity = 1,
                     UnitPrice = 800,
@@ -374,7 +375,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
             Id = Guid.NewGuid(),
             OrderId = renewalOrderId,
             Brand = "OKKO",
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 20,
             Quantity = 1,
             UnitPrice = 800,

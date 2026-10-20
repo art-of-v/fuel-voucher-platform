@@ -34,7 +34,7 @@ public sealed class FuelTypeProductCode
     /// migration would have to chase across every child table, and the archive-not-delete policy means
     /// the parent outlives the row either way.
     /// </summary>
-    public string FuelTypeId { get; set; } = null!;
+    public Guid FuelTypeId { get; set; }
 
     /// <summary>
     /// The network that publishes the code, mirroring <c>fuel_types.brand_id</c>. Carried here

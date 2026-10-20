@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.UnitTests.BackgroundJobs;
 
@@ -37,7 +38,7 @@ public sealed class VoucherStockMonitorTests : IDisposable
 
         _context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = "test-expiring-dp",
+            Id = ToUuid("test-expiring-dp"),
             Name = "ДП ЄВРО",
             BrandId = BrandIds.Okko,
             BasePrice = 100,
@@ -66,7 +67,7 @@ public sealed class VoucherStockMonitorTests : IDisposable
         {
             Id = Guid.NewGuid(),
             Brand = brand ?? _provider,
-            FuelTypeId = "test-expiring-dp",
+            FuelTypeId = ToUuid("test-expiring-dp"),
             Liters = 10,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(daysUntilExpiry)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(daysUntilExpiry)),

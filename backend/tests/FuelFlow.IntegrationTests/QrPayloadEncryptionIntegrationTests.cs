@@ -5,6 +5,7 @@ using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -33,7 +34,7 @@ public sealed class QrPayloadEncryptionIntegrationTests : IClassFixture<TestData
     {
         Id = Guid.CreateVersion7(),
         Brand = "okko",
-        FuelTypeId = "okko-95",
+        FuelTypeId = ToUuid("okko-95"),
         Liters = 10m,
         SupplierExpirationDate = new DateOnly(2027, 1, 1),
         CustomerExpirationDate = new DateOnly(2027, 1, 1),

@@ -103,7 +103,7 @@ public sealed class GetWorkerUsageReportController : ControllerBase
 public sealed record WorkerUsageListItem(
     Guid Id,
     string Brand,
-    string FuelTypeId,
+    Guid FuelTypeId,
     string VoucherNumber,
     decimal Liters,
     string Status,

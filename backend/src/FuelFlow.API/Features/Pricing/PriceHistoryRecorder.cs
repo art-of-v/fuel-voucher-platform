@@ -101,8 +101,8 @@ public sealed class PriceHistoryRecorder
     /// <see cref="FuelPriceHistory"/> states - the id is a version 7 UUID, so it breaks a tie
     /// chronologically.
     /// </summary>
-    private async Task<Dictionary<string, FuelPriceHistory>> LatestForAsync(
-        List<string> fuelTypeIds,
+    private async Task<Dictionary<Guid, FuelPriceHistory>> LatestForAsync(
+        List<Guid> fuelTypeIds,
         CancellationToken ct)
     {
         var rows = await _context.FuelPriceHistory
@@ -113,7 +113,7 @@ public sealed class PriceHistoryRecorder
             .ToListAsync(ct);
 
         // Ascending order plus overwrite-on-equal keeps the last row written for each fuel.
-        var latest = new Dictionary<string, FuelPriceHistory>(StringComparer.Ordinal);
+        var latest = new Dictionary<Guid, FuelPriceHistory>();
         foreach (var row in rows) latest[row.FuelTypeId] = row;
         return latest;
     }
@@ -127,7 +127,7 @@ public sealed class PriceHistoryRecorder
         string reason,
         Guid? actingUserId,
         DateTime? effectiveFromUtc,
-        Dictionary<string, FuelPriceHistory> latest)
+        Dictionary<Guid, FuelPriceHistory> latest)
     {
         var at = effectiveFromUtc ?? DateTime.UtcNow;
         var margin = fuel.MarginUahPerLiter;

@@ -7,6 +7,7 @@ using FuelFlow.SharedKernel.Domain;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -38,15 +39,15 @@ public sealed class PublicFuelTypesIntegrationTests : IClassFixture<TestDatabase
             .UseNpgsql(_fixture.ConnectionString)
             .Options, TestQrCipher.Instance);
 
-    private async Task<(Guid BrandId, string FuelId, string OtherFuelId)> SeedAsync(
+    private async Task<(Guid BrandId, Guid FuelId, Guid OtherFuelId)> SeedAsync(
         decimal? cost,
         decimal? margin,
         bool withStock)
     {
         var brandId = Guid.NewGuid();
         var slug = $"slug-{Guid.NewGuid():N}"[..20];
-        var fuelId = $"priced-{Guid.NewGuid():N}";
-        var otherFuelId = $"unpriced-{Guid.NewGuid():N}";
+        var fuelId = ToUuid($"priced-{Guid.NewGuid():N}");
+        var otherFuelId = ToUuid($"unpriced-{Guid.NewGuid():N}");
 
         await using var context = CreateContext();
         context.Brands.Add(new Brand
@@ -62,7 +63,7 @@ public sealed class PublicFuelTypesIntegrationTests : IClassFixture<TestDatabase
 
         context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = fuelId,
+            Id =   fuelId,
             BrandId = brandId,
             Name = "А-95",
             SupplierPricePerLiter = cost,
@@ -75,7 +76,7 @@ public sealed class PublicFuelTypesIntegrationTests : IClassFixture<TestDatabase
 
         context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = otherFuelId,
+            Id =   otherFuelId,
             BrandId = brandId,
             Name = "ДП",
             // No cost, no margin: the state an imported fuel is in until an operator prices it.
@@ -90,7 +91,7 @@ public sealed class PublicFuelTypesIntegrationTests : IClassFixture<TestDatabase
             // fuel is not sold in is not stock behind it.
             context.FuelNominals.Add(new FuelNominal
             {
-                FuelTypeId = fuelId,
+                FuelTypeId =   fuelId,
                 Liters = 10m,
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow
@@ -100,7 +101,7 @@ public sealed class PublicFuelTypesIntegrationTests : IClassFixture<TestDatabase
             {
                 Id = Guid.NewGuid(),
                 Brand = slug,
-                FuelTypeId = fuelId,
+                FuelTypeId =   fuelId,
                 Liters = 10m,
                 Status = VoucherStatus.Available,
                 DataKind = DataKinds.Real,
@@ -132,7 +133,7 @@ public sealed class PublicFuelTypesIntegrationTests : IClassFixture<TestDatabase
     {
         var (_, fuelId, _) = await SeedAsync(cost: 40m, margin: 3m, withStock: true);
 
-        var fuel = (await ListAsync()).Single(f => f.Id == fuelId);
+        var fuel = (await ListAsync()).Single(f => f.Id == fuelId.ToString());
 
         // 40 + 3 = 43, and the pump ceiling of 92.90 does not bind, so our price is 43.
         fuel.FinalPricePerLiter.Should().Be(43m);
@@ -145,7 +146,7 @@ public sealed class PublicFuelTypesIntegrationTests : IClassFixture<TestDatabase
     {
         var (_, _, otherFuelId) = await SeedAsync(cost: 40m, margin: 3m, withStock: false);
 
-        var fuel = (await ListAsync()).Single(f => f.Id == otherFuelId);
+        var fuel = (await ListAsync()).Single(f => f.Id == otherFuelId.ToString());
 
         // No cost and no margin, so there is no price of ours - null, not zero.
         fuel.FinalPricePerLiter.Should().BeNull();
@@ -162,7 +163,7 @@ public sealed class PublicFuelTypesIntegrationTests : IClassFixture<TestDatabase
         // back to the column price.
         var (_, fuelId, _) = await SeedAsync(cost: null, margin: null, withStock: true);
 
-        var fuel = (await ListAsync()).Single(f => f.Id == fuelId);
+        var fuel = (await ListAsync()).Single(f => f.Id == fuelId.ToString());
 
         fuel.IsAvailable.Should().BeTrue();
         fuel.FinalPricePerLiter.Should().BeNull();

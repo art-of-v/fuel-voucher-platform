@@ -14,6 +14,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -211,7 +212,7 @@ public sealed class QaTestPoolSegregationIntegrationTests : IClassFixture<TestDa
                 Id = Guid.NewGuid(),
                 OrderId = orderId,
                 Brand = Brand,
-                FuelTypeId = FuelTypeId,
+                FuelTypeId =   ToUuid(FuelTypeId),
                 Liters = Liters,
                 Quantity = 1,
                 UnitPrice = 520,
@@ -224,7 +225,7 @@ public sealed class QaTestPoolSegregationIntegrationTests : IClassFixture<TestDa
     {
         Id = id,
         Brand = Brand,
-        FuelTypeId = FuelTypeId,
+        FuelTypeId =   ToUuid(FuelTypeId),
         Liters = Liters,
         SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(3),
         CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(3),

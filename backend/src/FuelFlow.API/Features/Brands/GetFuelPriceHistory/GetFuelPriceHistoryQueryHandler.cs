@@ -14,7 +14,7 @@ namespace FuelFlow.Features.Brands.GetFuelPriceHistory;
 /// because the last row is the current price and the first is where the window started - reversing it
 /// would put the current price at the bottom of a chart.
 /// </param>
-public sealed record GetFuelPriceHistoryQuery(string FuelTypeId, int Limit = 50);
+public sealed record GetFuelPriceHistoryQuery(Guid FuelTypeId, int Limit = 50);
 
 /// <summary>
 /// One recorded price. Deliberately flat and numeric: the six per-litre facts plus when, who and why.
@@ -29,7 +29,7 @@ public sealed record GetFuelPriceHistoryQuery(string FuelTypeId, int Limit = 50)
 /// </param>
 public sealed record FuelPriceHistoryEntry(
     Guid Id,
-    string FuelTypeId,
+    Guid FuelTypeId,
     string DataKind,
     decimal? SupplierPricePerLiter,
     decimal? MarginUahPerLiter,

@@ -7,6 +7,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.UnitTests.Pricing;
 
@@ -61,7 +62,7 @@ public sealed class ImportUpgWogPricesTests : IDisposable
     {
         var fuel = new FuelTypeEntity
         {
-            Id = id,
+            Id = ToUuid(id),
             BrandId = brandId,
             Name = name,
             BrandFuelCode = code,
@@ -81,7 +82,7 @@ public sealed class ImportUpgWogPricesTests : IDisposable
         {
             _context.FuelNominals.Add(new FuelNominal
             {
-        FuelTypeId = id,
+        FuelTypeId = ToUuid(id),
                 Liters = liters,
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow
@@ -164,8 +165,8 @@ public sealed class ImportUpgWogPricesTests : IDisposable
             new ImportUpgWogPricesCommand(Sheet(UpgSheet), "upg", DryRun: false), Guid.Empty, null);
 
         _context.ChangeTracker.Clear();
-    var a95 = await _context.FuelTypes.SingleAsync(f => f.Id == "upg-a95");
-    var upg95 = await _context.FuelTypes.SingleAsync(f => f.Id == "upg-95");
+    var a95 = await _context.FuelTypes.SingleAsync(f => f.Id == ToUuid("upg-a95"));
+    var upg95 = await _context.FuelTypes.SingleAsync(f => f.Id == ToUuid("upg-95"));
 
     a95.PumpPricePerLiter.Should().Be(88.90m);
     upg95.PumpPricePerLiter.Should().Be(91.90m);
@@ -198,14 +199,14 @@ public sealed class ImportUpgWogPricesTests : IDisposable
             new ImportUpgWogPricesCommand(Sheet(("upg95", 91.90m)), "upg", DryRun: false), Guid.Empty, null);
 
         _context.ChangeTracker.Clear();
-        var fuel = await _context.FuelTypes.SingleAsync(f => f.Id == "upg-95");
+        var fuel = await _context.FuelTypes.SingleAsync(f => f.Id == ToUuid("upg-95"));
         var beforeStamp = fuel.UpdatedAtUtc;
 
         var second = await Handler().HandleAsync(
             new ImportUpgWogPricesCommand(Sheet(("upg95", 91.90m)), "upg", DryRun: false), Guid.Empty, null);
 
         _context.ChangeTracker.Clear();
-        var after = await _context.FuelTypes.SingleAsync(f => f.Id == "upg-95");
+        var after = await _context.FuelTypes.SingleAsync(f => f.Id == ToUuid("upg-95"));
 
         second.Created.Should().BeEmpty();
         second.Repriced.Should().ContainSingle().Which.Changed.Should().BeFalse();
@@ -224,9 +225,9 @@ public sealed class ImportUpgWogPricesTests : IDisposable
 
         result.BelowCostSkipped.Should().ContainSingle();
         _context.ChangeTracker.Clear();
-    var fuel = await _context.FuelTypes.SingleAsync(f => f.Id == "upg-95");
+    var fuel = await _context.FuelTypes.SingleAsync(f => f.Id == ToUuid("upg-95"));
     fuel.PumpPricePerLiter.Should().Be(91.90m, "the refused pump must not be written");
-        var optedIn = await _context.FuelTypes.SingleAsync(f => f.Id == "upg-95");
+        var optedIn = await _context.FuelTypes.SingleAsync(f => f.Id == ToUuid("upg-95"));
         optedIn.AllowBelowCost = true;
         await _context.SaveChangesAsync();
 
@@ -235,7 +236,7 @@ public sealed class ImportUpgWogPricesTests : IDisposable
 
         second.BelowCostSkipped.Should().BeEmpty();
         _context.ChangeTracker.Clear();
-    (await _context.FuelTypes.SingleAsync(f => f.Id == "upg-95")).PumpPricePerLiter.Should().Be(60m);
+    (await _context.FuelTypes.SingleAsync(f => f.Id == ToUuid("upg-95"))).PumpPricePerLiter.Should().Be(60m);
     }
 
     [Fact]

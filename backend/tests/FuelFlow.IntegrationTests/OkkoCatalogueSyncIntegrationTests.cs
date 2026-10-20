@@ -15,6 +15,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -118,13 +119,13 @@ public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDataba
         context.FuelTypes.AddRange(
             new FuelTypeEntity
             {
-                Id = "prod-gas", Name = "ГАЗ", BrandId = OkkoBrandId,
+                Id = ToUuid("prod-gas"), Name = "ГАЗ", BrandId =  OkkoBrandId,
                 BasePrice = 45.50m, DiscountPrice = 44.50m,
                 CreatedAtUtc = now, UpdatedAtUtc = now
             },
             new FuelTypeEntity
             {
-                Id = "prod-a95", Name = "А95 ЄВРО", BrandId = OkkoBrandId,
+                Id = ToUuid("prod-a95"), Name = "А95 ЄВРО", BrandId =  OkkoBrandId,
                 BasePrice = 51.00m, DiscountPrice = 50.00m,
                 CreatedAtUtc = now, UpdatedAtUtc = now
             });
@@ -197,7 +198,7 @@ public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDataba
         // Our own spelling of the grade, no code - exactly the state a fresh catalogue is in.
         context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = "prod-pulls-diesel", Name = "ДП PULLS", BrandId = OkkoBrandId,
+            Id = ToUuid("prod-pulls-diesel"), Name = "ДП PULLS", BrandId =  OkkoBrandId,
             BasePrice = 105.90m, DiscountPrice = 102.90m,
             CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow,
         });
@@ -282,11 +283,11 @@ public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDataba
         await Sync(context, sheet).SyncPricesAsync();
         ForgetTrackedEntities(context);
 
-        var gas = await context.FuelTypes.SingleAsync(f => f.Id == "prod-gas");
+        var gas = await context.FuelTypes.SingleAsync(f => f.Id == ToUuid("prod-gas"));
         gas.BrandFuelCode.Should().Be(
             "SPBT", "matching by name stops the import duplicating the fuel; it does not replace the code");
 
-        var a95 = await context.FuelTypes.SingleAsync(f => f.Id == "prod-a95");
+        var a95 = await context.FuelTypes.SingleAsync(f => f.Id == ToUuid("prod-a95"));
         a95.BrandFuelCode.Should().Be("A-95");
     }
 
@@ -327,7 +328,7 @@ public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDataba
             (await context.FuelTypes.CountAsync(f => f.BrandId == OkkoBrandId))
                 .Should().Be(2, "the refused insert must not be carried into the next step's save");
 
-            var gas = await context.FuelTypes.SingleAsync(f => f.Id == "prod-gas");
+            var gas = await context.FuelTypes.SingleAsync(f => f.Id == ToUuid("prod-gas"));
             gas.BrandFuelCode.Should().Be(
                 "SPBT", "the backfill runs after the catalogue step and has a right to be unaffected by it");
             gas.BasePrice.Should().Be(

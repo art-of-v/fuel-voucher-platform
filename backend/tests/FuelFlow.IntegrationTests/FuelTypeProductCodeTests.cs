@@ -3,6 +3,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -36,7 +37,7 @@ public sealed class FuelTypeProductCodeTests : IClassFixture<TestDatabaseFixture
             .Options, TestQrCipher.Instance);
 
     private static FuelTypeProductCode Code(string fuelTypeId, Guid brandId, string productCode)
-        => new() { FuelTypeId = fuelTypeId, BrandId = brandId, ProductCode = productCode };
+        => new() { FuelTypeId = ToUuid(fuelTypeId), BrandId = brandId, ProductCode = productCode };
 
     [Fact]
     public async Task TwoFuelsAtOneNetwork_CannotClaimOneProductCode()
@@ -73,13 +74,13 @@ public sealed class FuelTypeProductCodeTests : IClassFixture<TestDatabaseFixture
         await act.Should().NotThrowAsync();
 
         var forDiesel = await context.FuelTypeProductCodes
-            .Where(c => c.FuelTypeId == "okko-dp")
+            .Where(c => c.FuelTypeId == ToUuid("okko-dp"))
             .Select(c => c.ProductCode)
             .ToListAsync();
         forDiesel.Should().BeEquivalentTo(["9018", "9518"]);
 
         await context.Database.ExecuteSqlRawAsync(
-            "DELETE FROM fuel_type_product_codes WHERE fuel_type_id IN ('okko-dp', 'okko-95')");
+            $"DELETE FROM fuel_type_product_codes WHERE fuel_type_id IN ('{ToUuid("okko-dp")}', '{ToUuid("okko-95")}')");
     }
 
     [Fact]

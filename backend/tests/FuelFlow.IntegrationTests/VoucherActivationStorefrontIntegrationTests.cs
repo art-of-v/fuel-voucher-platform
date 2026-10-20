@@ -10,6 +10,7 @@ using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -101,11 +102,11 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var now = DateTime.UtcNow;
 
-        if (!await context.FuelTypes.AnyAsync(f => f.Id == fuelTypeId, CancellationToken.None))
+        if (!await context.FuelTypes.AnyAsync(f => f.Id ==  ToUuid(fuelTypeId), CancellationToken.None))
         {
             context.FuelTypes.Add(new FuelTypeEntity
             {
-                Id = fuelTypeId,
+                Id =   ToUuid(fuelTypeId),
                 Name = fuelTypeId,
                 BrandId = BrandId,
                 BasePrice = 50,
@@ -119,7 +120,7 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
         // through the offer and the fuel's nominal list, so seeding neither would leave the shop dark
         // and every "activating turns it on" assertion would pass against a package the app cannot see.
         if (!await context.FuelNominals.AnyAsync(
-                n => n.FuelTypeId == fuelTypeId && n.Liters == liters,
+                n => n.FuelTypeId == ToUuid(fuelTypeId) && n.Liters ==    liters,
                 CancellationToken.None))
         {
             context.SeedPackage(
@@ -144,7 +145,7 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
         {
             Id = Guid.CreateVersion7(),
             Brand = brand,
-            FuelTypeId = fuelTypeId,
+            FuelTypeId =   ToUuid(fuelTypeId),
             Liters = liters,
             CostPerLiter = costPerLiter,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6)),
@@ -162,7 +163,7 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
         response.EnsureSuccessStatusCode();
         var packages = await response.Content.ReadFromJsonAsync<List<PublicPackageResponse>>();
         return packages!.Single(p =>
-            p.BrandId == BrandId && p.FuelTypeId == fuelTypeId && p.Liters == liters).IsAvailable;
+            p.BrandId == BrandId && p.FuelTypeId == ToUuid(fuelTypeId) && p.Liters ==  liters).IsAvailable;
     }
 
     private async Task<(HttpStatusCode Status, string Body)> ActivateAsync(params Guid[] ids)
@@ -208,7 +209,7 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
         {
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             tenLitre = await context.FuelVouchers
-                .Where(v => v.FuelTypeId == "act-95" && v.Liters == 10m)
+                .Where(v => v.FuelTypeId == ToUuid("act-95") && v.Liters == 10m)
                 .Select(v => v.Id)
                 .FirstAsync();
         }
@@ -249,7 +250,7 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
         using (var scope = _fixture.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            id = await context.FuelVouchers.Where(v => v.FuelTypeId == "act-uncosted").Select(v => v.Id).FirstAsync();
+            id = await context.FuelVouchers.Where(v => v.FuelTypeId == ToUuid("act-uncosted")).Select(v => v.Id).FirstAsync();
         }
 
         var (_, body) = await ActivateAsync(id);
@@ -281,7 +282,7 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
         using (var scope = _fixture.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            id = await context.FuelVouchers.Where(v => v.FuelTypeId == "act-toggle").Select(v => v.Id).FirstAsync();
+            id = await context.FuelVouchers.Where(v => v.FuelTypeId == ToUuid("act-toggle")).Select(v => v.Id).FirstAsync();
         }
 
         Assert.Equal(HttpStatusCode.OK, (await ActivateAsync(id)).Status);

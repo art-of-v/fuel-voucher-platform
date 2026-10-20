@@ -47,7 +47,7 @@ public sealed class GetAdminVoucherByIdQueryHandler
             QrPayload = item.QrPayload,
             Liters = item.Liters,
             FuelTypeId = item.FuelTypeId,
-            FuelType = item.FuelType == null ? null : new FuelTypeRefDto { Id = item.FuelType.Id, Name = item.FuelType.Name },
+            FuelType = item.FuelType == null ? null : new FuelTypeRefDto { Id = item.FuelType.Id.ToString(), Name = item.FuelType.Name },
             Brand = item.Brand,
             SupplierId = item.SupplierId,
             SupplierName = item.Supplier?.Name,

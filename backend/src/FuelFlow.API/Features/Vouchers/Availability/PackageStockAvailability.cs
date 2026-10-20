@@ -12,9 +12,9 @@ namespace FuelFlow.Features.Vouchers.Availability;
 /// order lines carry <c>okko</c> while imported stock carries <c>OKKO</c> and every matcher compares
 /// case-insensitively.
 /// </summary>
-public readonly record struct StockKey(string Brand, string FuelTypeId, decimal Liters)
+public readonly record struct StockKey(string Brand, Guid FuelTypeId, decimal Liters)
 {
-    public static StockKey For(string brand, string fuelTypeId, decimal liters)
+    public static StockKey For(string brand, Guid fuelTypeId, decimal liters)
         => new(brand.ToLowerInvariant(), fuelTypeId, liters);
 }
 
@@ -125,7 +125,7 @@ public sealed class PackageStockAvailability
     public async Task<SellablePackage?> FindPackageAsync(
         bool isTestAccount,
         Guid brandId,
-        string fuelTypeId,
+        Guid fuelTypeId,
         decimal liters,
         CancellationToken cancellationToken = default)
     {
@@ -231,10 +231,10 @@ var key = StockKey.For(row.BrandSlug, row.Fuel.Id, row.Liters);
     /// screen that lists FUELS rather than packages - a brand's page, where the customer asks "can I
     /// buy this fuel" and not "can I buy this exact size of it".
     /// </remarks>
-    public async Task<HashSet<string>> AvailableFuelIdsAsync(bool isTestAccount, CancellationToken cancellationToken = default)
+    public async Task<HashSet<Guid>> AvailableFuelIdsAsync(bool isTestAccount, CancellationToken cancellationToken = default)
     {
         var rows = await SellableKeys(isTestAccount).ToListAsync(cancellationToken);
-        return rows.Select(r => r.FuelTypeId).ToHashSet(StringComparer.Ordinal);
+        return rows.Select(r => r.FuelTypeId).ToHashSet();
     }
 
     /// <summary>
@@ -273,7 +273,7 @@ var key = StockKey.For(row.BrandSlug, row.Fuel.Id, row.Liters);
     public Task<bool> IsInStockAsync(
         bool isTestAccount,
         string brandSlug,
-        string fuelTypeId,
+        Guid fuelTypeId,
         decimal liters,
         CancellationToken cancellationToken = default)
     {
@@ -320,7 +320,7 @@ var key = StockKey.For(row.BrandSlug, row.Fuel.Id, row.Liters);
     private IQueryable<StockKey> SellableKeys(
         bool isTestAccount,
         string[]? brands = null,
-        string[]? fuelTypeIds = null,
+        Guid[]? fuelTypeIds = null,
         decimal[]? literSizes = null)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);

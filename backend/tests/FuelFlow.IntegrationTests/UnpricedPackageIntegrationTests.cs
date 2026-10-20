@@ -4,6 +4,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -43,7 +44,7 @@ public sealed class UnpricedPackageIntegrationTests : IClassFixture<TestDatabase
 
         var fuel = new FuelTypeEntity
         {
-            Id = fuelId,
+            Id =   ToUuid(fuelId),
             Name = "Unpriced test fuel",
             BrandId = BrandIds.Okko,
             BasePrice = 0m,
@@ -58,7 +59,7 @@ public sealed class UnpricedPackageIntegrationTests : IClassFixture<TestDatabase
 
         var volume = new FuelNominal
         {
-            FuelTypeId = fuelId,
+            FuelTypeId =   ToUuid(fuelId),
             Liters = 10m,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow

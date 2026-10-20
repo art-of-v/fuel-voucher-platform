@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -81,8 +82,8 @@ public sealed class SeededBrandIdsAreDerivedTests : IClassFixture<TestDatabaseFi
             .Select(f => new { f.Id, f.BrandId })
             .ToListAsync();
 
-        rows.Should().Contain(f => f.Id == "okko-95" && f.BrandId == BrandIds.Okko);
-        rows.Should().Contain(f => f.Id == "wog-95" && f.BrandId == BrandIds.Wog);
+        rows.Should().Contain(f => f.Id == ToUuid("okko-95") && f.BrandId == BrandIds.Okko);
+        rows.Should().Contain(f => f.Id == ToUuid("wog-95") && f.BrandId == BrandIds.Wog);
     }
 
     [Fact]
@@ -92,7 +93,7 @@ public sealed class SeededBrandIdsAreDerivedTests : IClassFixture<TestDatabaseFi
 
         context.FuelTypeProductCodes.Add(new FuelTypeProductCode
         {
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             BrandId = BrandIds.Okko,
             ProductCode = "9018-derived",
         });

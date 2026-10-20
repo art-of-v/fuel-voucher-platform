@@ -10,6 +10,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -68,7 +69,7 @@ public sealed class BatchCostTimelineIntegrationTests : IClassFixture<TestDataba
                     ExchangeBatchId = exchangeBatchId,
                     OldVoucherId = oldVouchers[i].Id,
                     NewVoucherId = newVouchers[i].Id,
-                    FuelTypeId = "okko-dp",
+                    FuelTypeId = ToUuid("okko-dp"),
                     Brand = "OKKO",
                     SupplierId = SupplierId,
                     SurchargeUah = 100m,
@@ -113,7 +114,7 @@ public sealed class BatchCostTimelineIntegrationTests : IClassFixture<TestDataba
                 Id = Guid.NewGuid(),
                 ExchangeBatchId = exchangeBatchId,
                 OldVoucherId = theirVoucher.Id,
-                FuelTypeId = "okko-dp",
+                FuelTypeId = ToUuid("okko-dp"),
                 Brand = "OKKO",
                     SupplierId = SupplierId,
                 SurchargeUah = 300m,
@@ -149,7 +150,7 @@ public sealed class BatchCostTimelineIntegrationTests : IClassFixture<TestDataba
                 Id = Guid.NewGuid(),
                 ExchangeBatchId = second,
                 OldVoucherId = b.Id,
-                FuelTypeId = "okko-dp",
+                FuelTypeId = ToUuid("okko-dp"),
                 Brand = "OKKO",
                     SupplierId = SupplierId,
                 SurchargeUah = 200m,
@@ -161,7 +162,7 @@ public sealed class BatchCostTimelineIntegrationTests : IClassFixture<TestDataba
                 Id = Guid.NewGuid(),
                 ExchangeBatchId = first,
                 OldVoucherId = a.Id,
-                FuelTypeId = "okko-dp",
+                FuelTypeId = ToUuid("okko-dp"),
                 Brand = "OKKO",
                     SupplierId = SupplierId,
                 SurchargeUah = 100m,
@@ -245,11 +246,11 @@ public sealed class BatchCostTimelineIntegrationTests : IClassFixture<TestDataba
 
         // fuel_types is reference data that other suites in this shared container also seed, and it is
         // not truncated here - so add it only when absent rather than colliding on the primary key.
-        if (!await seed.FuelTypes.AnyAsync(f => f.Id == "okko-dp"))
+        if (!await seed.FuelTypes.AnyAsync(f => f.Id == ToUuid("okko-dp")))
         {
             seed.FuelTypes.Add(new FuelTypeEntity
             {
-                Id = "okko-dp",
+                Id = ToUuid("okko-dp"),
                 Name = "ДП ЄВРО",
                 BrandId = BrandIds.Okko,
                 BasePrice = 60m,
@@ -278,7 +279,7 @@ public sealed class BatchCostTimelineIntegrationTests : IClassFixture<TestDataba
         {
             Id = Guid.NewGuid(),
             Brand = "OKKO",
-            FuelTypeId = "okko-dp",
+            FuelTypeId = ToUuid("okko-dp"),
             Liters = liters,
             CostPerLiter = costPerLiter,
             SupplierId = SupplierId,

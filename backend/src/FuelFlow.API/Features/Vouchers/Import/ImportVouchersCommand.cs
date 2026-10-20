@@ -275,7 +275,7 @@ public sealed class ImportVouchersCommandHandler
                     foreach (var parsed in parsedVouchers)
                     {
                         bool isValid = parsed.Confidence >= 80 &&
-                                       !string.IsNullOrEmpty(parsed.FuelTypeId) &&
+                                       parsed.FuelTypeId.HasValue &&
                                        parsed.Liters > 0 &&
                                        parsed.ExpirationDate != default &&
                                        !string.IsNullOrEmpty(parsed.VoucherNumber) &&
@@ -284,7 +284,7 @@ public sealed class ImportVouchersCommandHandler
                         if (!isValid)
                         {
                             string reason;
-                            if (string.IsNullOrEmpty(parsed.FuelTypeId))
+                            if (!parsed.FuelTypeId.HasValue)
                             {
                                 // The QR product code (digits before the first '$') is a fuel-SKU
                                 // indicator, not redeemable bearer material, so it is safe to surface
@@ -326,7 +326,7 @@ public sealed class ImportVouchersCommandHandler
                         //
                         // A fuel type with no row at all is left alone: that is an unresolved SKU, already
                         // reported above, and the foreign key is what catches it.
-                        if (brandSlugByFuelType.TryGetValue(parsed.FuelTypeId!, out var fuelBrand) &&
+                        if (brandSlugByFuelType.TryGetValue(parsed.FuelTypeId.GetValueOrDefault(), out var fuelBrand) &&
                             !BrandFuelPairing.IsConsistent(parsed.Brand, fuelBrand))
                         {
                             var errMsg = $"Brand '{parsed.Brand}' does not sell fuel '{parsed.FuelTypeId}', " +
@@ -440,7 +440,7 @@ public sealed class ImportVouchersCommandHandler
                         {
                             Id = Guid.CreateVersion7(),
                             Brand = parsed.Brand,
-                            FuelTypeId = parsed.FuelTypeId!,
+                            FuelTypeId = parsed.FuelTypeId.GetValueOrDefault(),
                             Liters = parsed.Liters,
                             // The date printed on the supplier's document is the real term. It is
                             // both columns at import: nothing has been sold yet, so the customer is

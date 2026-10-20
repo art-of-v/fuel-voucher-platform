@@ -231,7 +231,7 @@ public sealed class GiftVouchersCommandHandler
     }
 
     /// <summary>Price per (brand, fuel, litres) line on the company's own purchase, for reference.</summary>
-    private async Task<Dictionary<(string Brand, string FuelTypeId, decimal Liters), decimal>> LoadCompanyCostAsync(
+    private async Task<Dictionary<(string Brand, Guid FuelTypeId, decimal Liters), decimal>> LoadCompanyCostAsync(
         Guid? purchaseOrderId,
         CancellationToken cancellationToken)
     {

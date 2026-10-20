@@ -16,6 +16,7 @@ using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.UnitTests.Brands;
 
@@ -158,7 +159,7 @@ CreateBrandStation(StationId(1), BrandId(1), "Node A"),
         // Exactly what the import writes: a pump price and no cost, no margin.
         _context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = "ft-imported",
+            Id = ToUuid("ft-imported"),
             Name = "А-95",
             BrandId = BrandId(1),
             PumpPricePerLiter = 92.90m,
@@ -167,7 +168,7 @@ CreateBrandStation(StationId(1), BrandId(1), "Node A"),
         });
         _context.FuelNominals.Add(new FuelNominal
         {
-            FuelTypeId = "ft-imported",
+            FuelTypeId = ToUuid("ft-imported"),
             Liters = 10m,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
@@ -217,7 +218,7 @@ CreateBrandStation(StationId(1), BrandId(1), "Node A"),
         var result = await handler.HandleAsync(new GetPublicPackagesQuery(CallerUserId: null));
 
         result.Should().ContainSingle("a rehearsal package reaching the store front is purchasable");
-        result[0].Id.Should().Be(PackageIds.For("ft-a", DataKinds.Real, 10m));
+        result[0].Id.Should().Be(PackageIds.For(ToUuid("ft-a"), DataKinds.Real, 10m));
     }
 
     /// <summary>
@@ -237,7 +238,7 @@ CreateBrandStation(StationId(1), BrandId(1), "Node A"),
         var result = await handler.HandleAsync(new GetPublicPackagesByBrandQuery(BrandId(1), CallerUserId: null));
 
         result.Should().ContainSingle();
-        result[0].Id.Should().Be(PackageIds.For("ft-a", DataKinds.Real, 10m));
+        result[0].Id.Should().Be(PackageIds.For(ToUuid("ft-a"), DataKinds.Real, 10m));
     }
 
     [Fact]
@@ -283,9 +284,9 @@ CreateBrandStation(StationId(1), BrandId(1), "Node A"),
 // The id is derived from the fuel, the pool and the size, because a package is not a row
     // any more. Asserted through PackageIds rather than spelled out, so a change to the format
     // fails here instead of quietly splitting the shelf from the checkout resolver.
-    pkg.Id.Should().Be(PackageIds.For("ft-a", DataKinds.Real, 10m));
+    pkg.Id.Should().Be(PackageIds.For(ToUuid("ft-a"), DataKinds.Real, 10m));
     pkg.BrandId.Should().Be(BrandId(1));
-        pkg.FuelTypeId.Should().Be("ft-a");
+        pkg.FuelTypeId.Should().Be(ToUuid("ft-a"));
         pkg.FuelName.Should().Be("A-95");
         pkg.Liters.Should().Be(10m);
         pkg.Price.Should().Be(500);
@@ -337,8 +338,8 @@ CreateBrandStation(StationId(1), BrandId(1), "Node A"),
         var result = await handler.HandleAsync(new GetPublicPackagesQuery(CallerUserId: null));
 
 result.Should().HaveCount(2, "an empty shelf is greyed out, not removed from the catalog");
-    var inStock = PackageIds.For("ft-a", DataKinds.Real, 10m);
-    var empty = PackageIds.For("ft-a", DataKinds.Real, 20m);
+    var inStock = PackageIds.For(ToUuid("ft-a"), DataKinds.Real, 10m);
+    var empty = PackageIds.For(ToUuid("ft-a"), DataKinds.Real, 20m);
     result.Single(p => p.Id == inStock).IsAvailable.Should().BeTrue();
     result.Single(p => p.Id == empty).IsAvailable.Should().BeFalse();
 }
@@ -452,8 +453,8 @@ result.Should().HaveCount(2, "an empty shelf is greyed out, not removed from the
         var result = await handler.HandleAsync(new GetPublicPackagesByBrandQuery(BrandId(1), CallerUserId: null));
 
 result.Should().HaveCount(2);
-    var inStock = PackageIds.For("ft-a", DataKinds.Real, 10m);
-    var empty = PackageIds.For("ft-a", DataKinds.Real, 20m);
+    var inStock = PackageIds.For(ToUuid("ft-a"), DataKinds.Real, 10m);
+    var empty = PackageIds.For(ToUuid("ft-a"), DataKinds.Real, 20m);
     result.Single(p => p.Id == inStock).IsAvailable.Should().BeTrue();
     result.Single(p => p.Id == empty).IsAvailable.Should().BeFalse();
 }
@@ -500,7 +501,7 @@ result.Should().HaveCount(2);
 
         var handler = new GetAdminFuelTypeByIdQueryHandler(_context);
 
-        var result = await handler.HandleAsync(new GetAdminFuelTypeByIdQuery("ft-a"));
+        var result = await handler.HandleAsync(new GetAdminFuelTypeByIdQuery(ToUuid("ft-a")));
 
         result.Should().NotBeNull();
         result!.Name.Should().Be("A-95");
@@ -511,7 +512,7 @@ result.Should().HaveCount(2);
     {
         var handler = new GetAdminFuelTypeByIdQueryHandler(_context);
 
-        var result = await handler.HandleAsync(new GetAdminFuelTypeByIdQuery("missing"));
+        var result = await handler.HandleAsync(new GetAdminFuelTypeByIdQuery(ToUuid("missing")));
 
         result.Should().BeNull();
     }
@@ -634,7 +635,7 @@ result.Should().HaveCount(2);
 
         return new FuelTypeEntity
         {
-            Id = id,
+            Id = ToUuid(id),
             Name = name,
             BrandId = BrandId,
             BasePrice = 50,
@@ -658,11 +659,11 @@ result.Should().HaveCount(2);
         // provider that join is executed for real, so a fixture that seeds a package without seeding its
         // fuel now returns an EMPTY catalogue rather than one with a blank label - and the test fails
         // as "found 0" with nothing pointing at the cause. Seed the fuel alongside the package.
-        if (!_context.FuelTypes.Local.Any(f => f.Id == fuelTypeId) && !_context.FuelTypes.Any(f => f.Id == fuelTypeId))
+        if (!_context.FuelTypes.Local.Any(f => f.Id == ToUuid(fuelTypeId)) && !_context.FuelTypes.Any(f => f.Id == ToUuid(fuelTypeId)))
         {
             _context.FuelTypes.Add(new FuelTypeEntity
             {
-                Id = fuelTypeId,
+                Id = ToUuid(fuelTypeId),
                 Name = fuelName,
                 BrandId = BrandId,
                 CreatedAtUtc = DateTime.UtcNow,
@@ -680,7 +681,7 @@ result.Should().HaveCount(2);
 // the whole of what a package is now - there is no second row keeping the two in step.
         var nominal = new FuelNominal
         {
-FuelTypeId = fuelTypeId,
+FuelTypeId = ToUuid(fuelTypeId),
         DataKind = DataKinds.ForPool(isTestData),
         Liters = liters,
         CreatedAtUtc = DateTime.UtcNow,
@@ -707,7 +708,7 @@ FuelTypeId = fuelTypeId,
             // it, and neither knows a uuid. That is why the stock key is slug-based, so the fixture
             // takes the brand row's own code rather than a literal that could drift from it.
 Brand = brandText ?? EnsureBrand(brandId).Slug,
-        FuelTypeId = fuelTypeId,
+        FuelTypeId = ToUuid(fuelTypeId),
         Liters = liters,
             SupplierExpirationDate = expiry,
             CustomerExpirationDate = expiry,

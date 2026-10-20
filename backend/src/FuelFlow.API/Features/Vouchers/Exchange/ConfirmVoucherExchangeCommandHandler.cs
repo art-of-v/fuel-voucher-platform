@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore;
 namespace FuelFlow.Features.Vouchers.Exchange;
 
 /// <summary>The admin-entered cost/liter for one fuel in the new brand batch.</summary>
-public sealed record ExchangeFuelCost(string FuelTypeId, decimal CostPerLiter);
+public sealed record ExchangeFuelCost(Guid FuelTypeId, decimal CostPerLiter);
 
 /// <summary>
 /// Records one operator→supplier exchange (planning #104): retire the selected OLD stock vouchers,
@@ -28,7 +28,7 @@ public sealed record ConfirmVoucherExchangeCommand(
     Guid ActingUserId,
     string? ActingUserName);
 
-public sealed record ExchangeFuelBlended(string FuelTypeId, decimal? BlendedCostPerLiter);
+public sealed record ExchangeFuelBlended(Guid FuelTypeId, decimal? BlendedCostPerLiter);
 
 public sealed record ConfirmVoucherExchangeResult(
     bool Success,

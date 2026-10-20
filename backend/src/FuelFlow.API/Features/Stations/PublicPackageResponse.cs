@@ -23,7 +23,7 @@ public sealed record PublicPackageResponse(
     string Id,
     Guid BrandId,
     string BrandSlug,
-    string FuelTypeId,
+    Guid FuelTypeId,
     string FuelName,
     decimal Liters,
     decimal Price,

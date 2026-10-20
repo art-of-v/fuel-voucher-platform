@@ -6,6 +6,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -99,7 +100,7 @@ public sealed class VoucherListSortingIntegrationTests : IClassFixture<TestDatab
 
         ctx.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = fuelTypeId,
+            Id =   ToUuid(fuelTypeId),
             Name = $"A-95 {tag}",
             BrandId = BrandIds.Okko,
             BasePrice = 55,
@@ -120,7 +121,7 @@ public sealed class VoucherListSortingIntegrationTests : IClassFixture<TestDatab
                 QrPayload = $"sort-{tag}-{Guid.NewGuid():N}",
                 VoucherNumber = $"sort-{tag}-{Guid.NewGuid():N}",
                 Brand = brand,
-                FuelTypeId = fuelTypeId,
+                FuelTypeId =   ToUuid(fuelTypeId),
                 Liters = 5m,
                 SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
                 CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),

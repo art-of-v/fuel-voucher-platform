@@ -89,7 +89,7 @@ public sealed class OrderReceiptController : ControllerBase
                 .Select(l => new ReceiptLine(
                     // The line stores a fuel type ID, which for real fuels is a GUID. The receipt
                     // prints what the customer bought, so the name comes from the catalog.
-                    receipt.FuelNames.TryGetValue(l.FuelTypeId, out var name) ? name : l.FuelTypeId,
+                    receipt.FuelNames.TryGetValue(l.FuelTypeId, out var name) ? name : l.FuelTypeId.ToString(),
                     l.Liters, l.Quantity, l.UnitPrice, l.LineTotal))
                 .ToList(),
             Refund = BuildRefundSection(receipt.Status, refundable, receipt.RefundedAtUtc, receipt.Id)
@@ -130,7 +130,7 @@ public sealed class OrderReceiptController : ControllerBase
         return new RefundReceiptInfo(refundedAtUtc, refundableKopecks / 100m, orderId);
     }
 
-    private sealed record ReceiptLineData(string FuelTypeId, decimal Liters, int Quantity, decimal UnitPrice, decimal LineTotal);
+    private sealed record ReceiptLineData(Guid FuelTypeId, decimal Liters, int Quantity, decimal UnitPrice, decimal LineTotal);
 
     private sealed class ReceiptData
     {
@@ -149,7 +149,7 @@ public sealed class OrderReceiptController : ControllerBase
         /// <summary>
         /// Fuel type id to the name a customer should read, e.g. "3808d410-..." to "А 95+".
         /// </summary>
-        public required IReadOnlyDictionary<string, string> FuelNames { get; init; }
+        public required IReadOnlyDictionary<Guid, string> FuelNames { get; init; }
     }
 
     private async Task<ReceiptData?> LoadAsync(

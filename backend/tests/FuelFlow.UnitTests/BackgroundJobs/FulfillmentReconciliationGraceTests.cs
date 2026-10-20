@@ -15,6 +15,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.UnitTests.BackgroundJobs;
 
@@ -73,7 +74,7 @@ public sealed class FulfillmentReconciliationGraceTests : IDisposable
                 {
                     Id = Guid.NewGuid(),
                     Brand = "OKKO",
-                    FuelTypeId = "okko-95",
+                    FuelTypeId = ToUuid("okko-95"),
                     Liters = 10m,
                     Quantity = 1,
                     TermCode = "1m",
@@ -90,7 +91,7 @@ public sealed class FulfillmentReconciliationGraceTests : IDisposable
             {
                 Id = Guid.NewGuid(),
                 Brand = "OKKO",
-                FuelTypeId = "okko-95",
+                FuelTypeId = ToUuid("okko-95"),
                 Liters = 10m,
                 VoucherNumber = $"V-GRACE-{i}",
                 QrPayload = Guid.NewGuid().ToString(),

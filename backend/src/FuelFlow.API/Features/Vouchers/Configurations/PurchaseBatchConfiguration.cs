@@ -1,3 +1,4 @@
+using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -27,10 +28,12 @@ internal sealed class PurchaseBatchConfiguration : IEntityTypeConfiguration<Purc
         // Fuel identity is a free-text natural key everywhere in the catalog (fuel_types.id is
         // text), so this column stays text - matching the PK it points at is what makes the FK
         // expressible at all. A varchar(100)/text mismatch would have made it impossible.
-        builder.Property(e => e.FuelTypeId)
-            .HasColumnName("fuel_type_id")
-            .HasColumnType("text")
-            .IsRequired();
+        // The fuel id is a uuid since planning D-21: a uuid column, so this can carry a real
+        // foreign key one day - which is what D-02 is waiting for.
+           builder.Property(e => e.FuelTypeId)
+               .HasColumnName("fuel_type_id")
+               .HasColumnType("uuid")
+               .IsRequired();
 
         builder.Property(e => e.Brand)
             .HasColumnName("brand")
@@ -66,10 +69,7 @@ internal sealed class PurchaseBatchConfiguration : IEntityTypeConfiguration<Purc
         // FK convention above.
         builder.HasIndex(e => e.SupplierId);
 
-        // fuel_type_id is a catalog natural key, bounded by CHECK - see BrandConfiguration.
-        builder.ToTable(t =>
-        {
-            t.HasCheckConstraint("ck_purchase_batches_fuel_type_id_length", "length(fuel_type_id) <= 100");
-        });
+        // fuel_type_id is a uuid since planning D-21's second slice, and a uuid has no length to
+        // bound - the check that bounded it as text went with the text.
     }
 }

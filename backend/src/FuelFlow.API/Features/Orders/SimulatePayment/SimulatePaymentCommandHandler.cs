@@ -127,7 +127,7 @@ public sealed class SimulatePaymentCommandHandler
                             orderId = order.Id,
                             userId = order.UserId,
                             brand = firstLi?.Brand ?? "",
-                            fuelType = firstLi?.FuelTypeId ?? "",
+                            fuelType = firstLi?.FuelTypeId ?? Guid.Empty,
                             liters = firstLi?.Liters ?? 0m,
                             quantity = firstLi?.Quantity ?? 0
                         }),

@@ -8,6 +8,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -46,8 +47,8 @@ public sealed class BatchCostDivergenceIntegrationTests : IClassFixture<TestData
         var costs = await CostsAsync(context, importId);
         var pnl = await PnlAsync(context, importId);
 
-        var reportedCost = costs.Single(c => c.FuelTypeId == fuelTypeId).CostPerLiter;
-        var reportedPnl = pnl.Single(p => p.FuelTypeId == fuelTypeId).CostPerLiter;
+        var reportedCost = costs.Single(c => c.FuelTypeId ==  ToUuid(fuelTypeId)).CostPerLiter;
+        var reportedPnl = pnl.Single(p => p.FuelTypeId ==  ToUuid(fuelTypeId)).CostPerLiter;
 
         reportedCost.Should().BeApproximately(50m, 0.01m);
         reportedPnl.Should().BeApproximately(50m, 0.01m);
@@ -62,8 +63,8 @@ public sealed class BatchCostDivergenceIntegrationTests : IClassFixture<TestData
             """UPDATE fuel_vouchers SET is_deleted = TRUE WHERE id = (SELECT id FROM fuel_vouchers WHERE import_job_id = {0} ORDER BY cost_per_liter ASC LIMIT 1)""",
             importId);
 
-var afterCosts = (await CostsAsync(context, importId)).Single(c => c.FuelTypeId == fuelTypeId).CostPerLiter;
-        var afterPnl = (await PnlAsync(context, importId)).Single(p => p.FuelTypeId == fuelTypeId).CostPerLiter;
+var afterCosts = (await CostsAsync(context, importId)).Single(c => c.FuelTypeId ==  ToUuid(fuelTypeId)).CostPerLiter;
+        var afterPnl = (await PnlAsync(context, importId)).Single(p => p.FuelTypeId ==  ToUuid(fuelTypeId)).CostPerLiter;
 
         // Concretely: the 40 UAH voucher is gone, so both screens report the single remaining
         // voucher's 60. Before #980 this panel said 50 while the P&L said 60 - one batch, two costs.
@@ -89,8 +90,8 @@ var afterCosts = (await CostsAsync(context, importId)).Single(c => c.FuelTypeId 
             """UPDATE fuel_vouchers SET is_deleted = TRUE WHERE id = (SELECT id FROM fuel_vouchers WHERE import_job_id = {0} ORDER BY cost_per_liter ASC LIMIT 1)""",
             importId);
 
-        var costs = (await CostsAsync(context, importId)).Single(c => c.FuelTypeId == fuelTypeId);
-        var pnl = (await PnlAsync(context, importId)).Single(p => p.FuelTypeId == fuelTypeId);
+        var costs = (await CostsAsync(context, importId)).Single(c => c.FuelTypeId ==  ToUuid(fuelTypeId));
+        var pnl = (await PnlAsync(context, importId)).Single(p => p.FuelTypeId ==  ToUuid(fuelTypeId));
 
         costs.VoucherCount.Should().Be(1, "a deleted voucher is not stock");
         costs.TotalLiters.Should().Be(10m);
@@ -111,14 +112,14 @@ var afterCosts = (await CostsAsync(context, importId)).Single(c => c.FuelTypeId 
         var fuelTypeId = await SeedVouchersAsync(context, importId, softDeletedLiters: 0m);
         var recalculator = new BlendedCostRecalculator(context, new PriceHistoryRecorder(context));
 
-        (await recalculator.ComputeBlendedAsync(fuelTypeId)).Should().BeApproximately(50m, 0.01m,
+        (await recalculator.ComputeBlendedAsync(ToUuid(fuelTypeId))).Should().BeApproximately(50m, 0.01m,
             "10 L at 40 and 10 L at 60 blend to 50");
 
         await context.Database.ExecuteSqlRawAsync(
             """UPDATE fuel_vouchers SET is_deleted = TRUE WHERE id = (SELECT id FROM fuel_vouchers WHERE import_job_id = {0} ORDER BY cost_per_liter ASC LIMIT 1)""",
             importId);
 
-        var afterDelete = await recalculator.ComputeBlendedAsync(fuelTypeId);
+        var afterDelete = await recalculator.ComputeBlendedAsync(ToUuid(fuelTypeId));
 
         afterDelete.Should().BeApproximately(60m, 0.01m,
             "the deleted 40 UAH voucher must leave the pool, so the blend is the surviving voucher alone");
@@ -162,7 +163,7 @@ var afterCosts = (await CostsAsync(context, importId)).Single(c => c.FuelTypeId 
         });
 
         await context.SaveChangesAsync();
-        return fuel.Id;
+        return fuel.Id.ToString();
     }
 
     private async Task<List<ImportBatchCostDto>> CostsAsync(ApplicationDbContext context, Guid importId)
@@ -201,7 +202,7 @@ var afterCosts = (await CostsAsync(context, importId)).Single(c => c.FuelTypeId 
         {
 seed.FuelTypes.Add(new FuelTypeEntity
             {
-                Id = "okko-dp",
+                Id = ToUuid("okko-dp"),
                 Name = "Дизель",
                 BrandId = BrandIds.Okko,
                 BasePrice = 60m,

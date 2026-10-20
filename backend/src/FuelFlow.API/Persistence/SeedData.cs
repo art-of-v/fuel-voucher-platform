@@ -19,7 +19,30 @@ internal static class SeedData
         new() { Id = BrandIds.Klo, Slug = "klo", SortOrder = 4, Name = "KLO", LogoText = "KLO", Color = "#eab308", CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc }
     ];
 
-        // Only the OKKO fuels carry a brand fuel code, and that is a fact about evidence rather than a
+    /// <summary>
+    /// One seeded fuel, with the natural key it was identified by.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The key is kept because two readers still need it. The catalogue's own id is a uuid now, derived
+    /// from this key by <see cref="FuelIdMapper"/>, and the conversion migration uses the same rule -
+    /// so a row written before the conversion and a row written after it are the same row.
+    /// </para>
+    /// <para>
+    /// The second reader is the migration history. <c>20261015151014_SeedCatalogueAsOffers</c> reads
+    /// <see cref="Catalogue"/> and writes the fuel's key into a text column that, at that point in
+    /// history, still holds keys. A uuid there would be a key the rows around it do not have.
+    /// </para>
+    /// </remarks>
+    private sealed record SeedFuel(
+        string Key,
+        string Name,
+        Guid BrandId,
+        string? BrandFuelCode,
+        decimal BasePrice,
+        decimal DiscountPrice);
+
+    // Only the OKKO fuels carry a brand fuel code, and that is a fact about evidence rather than a
     // preference. OKKO publishes a machine-readable list (`scripts/fetch-okko-prices.mjs`,
     // `/api/uk/fuels`) whose `fuel_code` values are the five below, so each one was read off that list
     // and checked against the fuel it names. WOG gets none because nothing has ever shown us WOG's
@@ -27,21 +50,42 @@ internal static class SeedData
     // supports, and a guess here is an identity the unique index then enforces.
     //
     // With the codes, a freshly migrated catalogue is born keyed — so the catalogue import recognises
-    // these five instead of creating a second "А-95" beside "A-95" — and the seed script resolves by
+    // these five instead of creating a second "А-95" beside "А-95" — and the seed script resolves by
     // name against real rows in every environment.
-    internal static FuelTypeEntity[] FuelTypes =>
+    private static readonly SeedFuel[] SeedFuels =
     [
-        new() { Id = "okko-dp", Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BrandFuelCode = "DP", BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "okko-95", Name = "A-95", BrandId = BrandIds.Okko, BrandFuelCode = "A-95", BasePrice = 54, DiscountPrice = 51, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "okko-p95", Name = "Pulls 95", BrandId = BrandIds.Okko, BrandFuelCode = "Pulls 95", BasePrice = 60, DiscountPrice = 56, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "okko-pulls-dp", Name = "ДП PULLS", BrandId = BrandIds.Okko, BrandFuelCode = "Pulls Diesel", BasePrice = 58, DiscountPrice = 55, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "okko-gas", Name = "ГАЗ", BrandId = BrandIds.Okko, BrandFuelCode = "SPBT", BasePrice = 29, DiscountPrice = 27, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "wog-dp", Name = "ДП Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "wog-95", Name = "A-95 Mustang", BrandId = BrandIds.Wog, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "wog-95-euro", Name = "A 95 EURO", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "wog-100", Name = "Mustang 100", BrandId = BrandIds.Wog, BasePrice = 65, DiscountPrice = 61, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc },
-        new() { Id = "wog-gas", Name = "ГАЗ", BrandId = BrandIds.Wog, BasePrice = 29, DiscountPrice = 27, CreatedAtUtc = CreatedAtUtc, UpdatedAtUtc = CreatedAtUtc }
+        new("okko-dp", "ДП ЄВРО", BrandIds.Okko, "DP", 55, 52),
+        new("okko-95", "A-95", BrandIds.Okko, "A-95", 54, 51),
+        new("okko-p95", "Pulls 95", BrandIds.Okko, "Pulls 95", 60, 56),
+        new("okko-pulls-dp", "ДП PULLS", BrandIds.Okko, "Pulls Diesel", 58, 55),
+        new("okko-gas", "ГАЗ", BrandIds.Okko, "SPBT", 29, 27),
+        new("wog-dp", "ДП Mustang", BrandIds.Wog, null, 56, 53),
+        new("wog-95", "A-95 Mustang", BrandIds.Wog, null, 55, 52),
+        new("wog-95-euro", "A 95 EURO", BrandIds.Wog, null, 56, 53),
+        new("wog-100", "Mustang 100", BrandIds.Wog, null, 65, 61),
+        new("wog-gas", "ГАЗ", BrandIds.Wog, null, 29, 27)
     ];
+
+    /// <summary>
+    /// The seeded fuels, with the uuid id each of them is stored under.
+    /// </summary>
+    /// <remarks>
+    /// The id is derived, not written down: <see cref="FuelIdMapper"/> maps the natural key to a uuid
+    /// the same way the conversion migration maps the rows that carried the key, so the seeded row and
+    /// a converted row are one row and not two.
+    /// </remarks>
+    internal static FuelTypeEntity[] FuelTypes =>
+        SeedFuels.Select(fuel => new FuelTypeEntity
+        {
+            Id = FuelIdMapper.ToUuid(fuel.Key),
+            Name = fuel.Name,
+            BrandId = fuel.BrandId,
+            BrandFuelCode = fuel.BrandFuelCode,
+            BasePrice = fuel.BasePrice,
+            DiscountPrice = fuel.DiscountPrice,
+            CreatedAtUtc = CreatedAtUtc,
+            UpdatedAtUtc = CreatedAtUtc
+        }).ToArray();
 
     /// <summary>
     /// Seeded as an offer per fuel plus its volumes, because that is what the application reads.
@@ -56,6 +100,12 @@ internal static class SeedData
     /// <b>Volume ids are the old package ids</b> - <c>{fuelTypeId}-{liters}</c> - deliberately. A fresh
     /// database gets the same package identifiers it always had, so seeded fixtures, QA scripts and
     /// anything that hard-codes a package id keep resolving after this change.
+    /// </para>
+    /// <para>
+    /// <b>And the offer's fuel id is the natural key too</b>, for the same reason: this is what
+    /// <c>20261015151014_SeedCatalogueAsOffers</c> writes into a text column, at a point in history
+    /// where the fuels still carry their keys. Writing a uuid there would be a key nothing else in
+    /// that schema has.
     /// </para>
     /// <para>
     /// The live pool only. A rehearsal catalogue is seeded explicitly by the QA seed scripts, and
@@ -83,17 +133,17 @@ internal static class SeedData
             var offers = new List<FuelOffer>();
             var volumes = new List<FuelOfferVolume>();
 
-            foreach (var ft in FuelTypes)
+            foreach (var fuel in SeedFuels)
             {
-                var margin = fuelPricing.TryGetValue(ft.Id, out var p) ? p.margin : 2.0m;
-                var finalPrice = ft.DiscountPrice;
+                var margin = fuelPricing.TryGetValue(fuel.Key, out var p) ? p.margin : 2.0m;
+                var finalPrice = fuel.DiscountPrice;
                 var supplierPrice = finalPrice - margin;
 
                 var offer = new FuelOffer
                 {
-                    Id = OfferKeys.For(ft.Id, DataKinds.Real),
-                    BrandId = ft.BrandId,
-                    FuelTypeId = ft.Id,
+                    Id = OfferKeys.For(fuel.Key, DataKinds.Real),
+                    BrandId = fuel.BrandId,
+                    FuelTypeId = fuel.Key,
                     DataKind = DataKinds.Real,
                     SupplierPricePerLiter = supplierPrice,
                     // No margin here: it is the fuel's, set below. The offer repeated it for a while,
@@ -112,7 +162,7 @@ internal static class SeedData
                 {
                     volumes.Add(new FuelOfferVolume
                     {
-                        Id = $"{ft.Id}-{liters}",
+                        Id = $"{fuel.Key}-{liters}",
                         OfferId = offer.Id,
                         Liters = liters,
                         // No override: the seeded catalogue is priced from its fuel's rate, which is what
@@ -143,57 +193,6 @@ internal static class SeedData
             });
 
             return (offers.ToArray(), volumes.ToArray());
-        }
-    }
-
-    /// <summary>
-    /// The seeded catalogue's sizes, as the rows <c>fuel_nominals</c> holds them.
-    /// </summary>
-    /// <remarks>
-    /// This is what a fresh database is seeded with today. <see cref="Catalogue"/> above still
-    /// returns volume rows, and is read only by <c>20261015151014_SeedCatalogueAsOffers</c> - the
-    /// migration history is append-only, so that file keeps the shape it applied in production and
-    /// the type it needs still exists. Two views of one seed, not two answers: the litres here are
-    /// exactly the litres it writes, keyed by fuel rather than by offer, which is the only thing that
-    /// changed when a size stopped belonging to a pool.
-    /// </remarks>
-    internal static FuelNominal[] CatalogueNominals
-    {
-        get
-        {
-            var nominals = new List<FuelNominal>();
-
-            foreach (var ft in FuelTypes)
-            {
-                foreach (var liters in new[] { 10m, 20m, 50m })
-                {
-                    nominals.Add(new FuelNominal
-                    {
-                        FuelTypeId = ft.Id,
-                        Liters = liters,
-                        CreatedAtUtc = CreatedAtUtc,
-                        UpdatedAtUtc = CreatedAtUtc,
-                    });
-                }
-            }
-
-            // The two extra small nominals for okko-dp, carried over verbatim from the old seed.
-            nominals.Add(new FuelNominal
-            {
-                FuelTypeId = "okko-dp",
-                Liters = 2m,
-                CreatedAtUtc = CreatedAtUtc,
-                UpdatedAtUtc = CreatedAtUtc,
-            });
-            nominals.Add(new FuelNominal
-            {
-                FuelTypeId = "okko-dp",
-                Liters = 3m,
-                CreatedAtUtc = CreatedAtUtc,
-                UpdatedAtUtc = CreatedAtUtc,
-            });
-
-            return nominals.ToArray();
         }
     }
 }

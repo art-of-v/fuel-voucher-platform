@@ -54,18 +54,22 @@ internal static class CatalogueTestData
     {
         var pool = DataKinds.ForPool(isTestData);
         var now = DateTime.UtcNow;
+        // The fuel's id is a uuid, but a fixture still says which fuel it means by the name it has
+        // always used. The mapping is the same one the migration used, so a fixture that means
+        // "okko-95" means the row the production database actually holds.
+        var fuelId = FuelIdMapper.ToUuid(fuelTypeId);
         // The fuel is created if the fixture has not seeded one, because a fixture that states a price
         // has to be able to state what sells it - and a half-configured fuel (a margin with no name, or
         // a name with no margin) is a test that passes for a reason nobody wrote down.
-        var fuel = context.FuelTypes.Local.FirstOrDefault(f => f.Id == fuelTypeId);
+        var fuel = context.FuelTypes.Local.FirstOrDefault(f => f.Id == fuelId);
         if (fuel is null)
         {
-            fuel = context.FuelTypes.FirstOrDefault(f => f.Id == fuelTypeId);
+            fuel = context.FuelTypes.FirstOrDefault(f => f.Id == fuelId);
             if (fuel is null)
             {
                 fuel = new FuelTypeEntity
                 {
-                    Id = fuelTypeId,
+                    Id = fuelId,
                     Name = fuelTypeId,
                     BrandId = BrandId,
                     CreatedAtUtc = createdAtUtc ?? DateTime.UtcNow,
@@ -148,6 +152,7 @@ var computed = FuelPricing.FinalPerLiterOrNull(
         DateTime? updatedAtUtc = null)
     {
         var pool = DataKinds.ForPool(isTestData);
+        var fuelId = FuelIdMapper.ToUuid(fuelTypeId);
 
         context.SeedOffer(
             BrandId, fuelTypeId, isTestData,
@@ -165,7 +170,7 @@ var computed = FuelPricing.FinalPerLiterOrNull(
 
         var nominal = new FuelNominal
         {
-            FuelTypeId = fuelTypeId,
+            FuelTypeId = fuelId,
             // The pool the fixture asked for: a rehearsal size is invisible to the live shelf, and
             // a live size is not a rehearsal one. The caller says which by isTestData.
             DataKind = DataKinds.ForPool(isTestData),
@@ -178,11 +183,11 @@ var computed = FuelPricing.FinalPerLiterOrNull(
         // collides on the primary key. The size is a fact about the fuel, not about this fixture, so
         // finding it already there is the correct answer rather than something to fail over.
         var alreadyListed =
-            context.FuelNominals.Local.Any(n => n.FuelTypeId == fuelTypeId && n.DataKind == pool && n.Liters == liters)
-            || context.FuelNominals.Any(n => n.FuelTypeId == fuelTypeId && n.DataKind == pool && n.Liters == liters);
+            context.FuelNominals.Local.Any(n => n.FuelTypeId == fuelId && n.DataKind == pool && n.Liters == liters)
+            || context.FuelNominals.Any(n => n.FuelTypeId == fuelId && n.DataKind == pool && n.Liters == liters);
         if (alreadyListed)
-            return context.FuelNominals.Local.FirstOrDefault(n => n.FuelTypeId == fuelTypeId && n.Liters == liters)
-                ?? new FuelNominal { FuelTypeId = fuelTypeId, DataKind = pool, Liters = liters };
+            return context.FuelNominals.Local.FirstOrDefault(n => n.FuelTypeId == fuelId && n.Liters == liters)
+                ?? new FuelNominal { FuelTypeId = fuelId, DataKind = pool, Liters = liters };
 
         context.FuelNominals.Add(nominal);
         return nominal;

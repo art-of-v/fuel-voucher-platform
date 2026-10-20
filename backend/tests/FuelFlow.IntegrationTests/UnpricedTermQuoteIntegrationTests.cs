@@ -12,6 +12,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -58,7 +59,7 @@ public sealed class UnpricedTermQuoteIntegrationTests : IClassFixture<TestDataba
         {
             seed.FuelTypes.Add(new FuelTypeEntity
             {
-                Id = fuelId,
+                Id =   ToUuid(fuelId),
                 Name = "Unpriced term-quote fuel",
                 BrandId = BrandIds.Okko,
                 BasePrice = 0m,
@@ -72,7 +73,7 @@ public sealed class UnpricedTermQuoteIntegrationTests : IClassFixture<TestDataba
 
             seed.FuelNominals.Add(new FuelNominal
             {
-                FuelTypeId = fuelId,
+                FuelTypeId =   ToUuid(fuelId),
                 Liters = 10m,
                 DataKind = DataKinds.Real,
                 CreatedAtUtc = DateTime.UtcNow,
@@ -96,7 +97,7 @@ public sealed class UnpricedTermQuoteIntegrationTests : IClassFixture<TestDataba
             new RuntimeSettingsService(context),
             new BrandSlugResolver(context));
 
-        var quote = await handler.HandleAsync(isTestAccount: false, BrandIds.Okko, fuelId, 10m);
+        var quote = await handler.HandleAsync(isTestAccount: false, BrandIds.Okko, ToUuid(fuelId), 10m);
 
         quote.Terms.Should().OnlyContain(t => t.PricePerLiterUah == null, "there is no price to show");
         quote.Terms.Should().OnlyContain(t => t.LinePriceUah == 0m, "and no line price to charge");

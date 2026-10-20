@@ -65,7 +65,7 @@ public sealed class FuelPriceHistory
     /// The fuel this price belongs to - the key the row was always about. Moved here from
     /// <c>offer_id</c> on 2026-10-19 with the rest of the pricing.
     /// </summary>
-    public string FuelTypeId { get; set; } = null!;
+    public Guid FuelTypeId { get; set; }
 
     // The six per-litre facts, exactly as the fuel held them at this instant. Copied rather than
     // referenced: the point of a history row is that it cannot change afterwards.

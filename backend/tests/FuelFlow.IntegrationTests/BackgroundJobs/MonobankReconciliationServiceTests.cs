@@ -15,6 +15,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests.BackgroundJobs;
 
@@ -146,7 +147,7 @@ public sealed class MonobankReconciliationServiceTests : IClassFixture<TestDatab
                 {
                     Id = Guid.NewGuid(),
                     Brand = "okko",
-                    FuelTypeId = "okko-95",
+                    FuelTypeId = ToUuid("okko-95"),
                     Liters = 50,
                     Quantity = 1,
                     UnitPrice = 2500,

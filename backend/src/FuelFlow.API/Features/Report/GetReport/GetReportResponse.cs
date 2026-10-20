@@ -23,7 +23,7 @@ public sealed record PaymentEntry(
     string Status,
     DateTime CreatedAtUtc,
     string Brand,
-    string FuelType,
+    Guid FuelType,
     string FuelName,
     decimal Liters,
     int Quantity,
@@ -37,7 +37,7 @@ public sealed record PaymentEntry(
 public sealed record RedemptionEntry(
     Guid VoucherId,
     string Brand,
-    string FuelType,
+    Guid FuelType,
     string FuelName,
     decimal Liters,
     DateTime RedeemedAt

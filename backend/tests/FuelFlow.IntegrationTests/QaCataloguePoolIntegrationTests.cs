@@ -9,6 +9,7 @@ using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -98,11 +99,11 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
             });
         }
 
-        if (!await context.FuelTypes.AnyAsync(f => f.Id == FuelType, CancellationToken.None))
+        if (!await context.FuelTypes.AnyAsync(f => f.Id ==  ToUuid(FuelType), CancellationToken.None))
         {
             context.FuelTypes.Add(new FuelTypeEntity
             {
-                Id = FuelType,
+                Id =   ToUuid(FuelType),
                 Name = RealName,
                 BrandId = Brand,
                 BasePrice = 50,
@@ -128,13 +129,13 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
         // One sellable voucher per pool, seeded once. Without both, "QA can see the QA package" would
         // pass on a row that is merely visible but dark, which is not what the reviewer needs.
         if (!await context.FuelVouchers.AnyAsync(
-            v => v.FuelTypeId == FuelType && v.Liters == Liters && v.DataKind == DataKinds.Real, CancellationToken.None))
+            v => v.FuelTypeId == ToUuid(FuelType) && v.Liters == Liters && v.DataKind ==  DataKinds.Real, CancellationToken.None))
         {
             context.FuelVouchers.Add(SellableVoucher(Liters, isTestData: false));
         }
 
         if (!await context.FuelVouchers.AnyAsync(
-            v => v.FuelTypeId == FuelType && v.Liters == QaLiters && v.DataKind == DataKinds.Qa, CancellationToken.None))
+            v => v.FuelTypeId == ToUuid(FuelType) && v.Liters == QaLiters && v.DataKind ==  DataKinds.Qa, CancellationToken.None))
         {
             context.FuelVouchers.Add(SellableVoucher(QaLiters, isTestData: true));
         }
@@ -149,7 +150,7 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
         // StockKey is (brand, fuel type, nominal), so a row keyed to the brand's id instead would
         // never match its own package. See StockKey for why those two have always been the same string.
         Brand = BrandSlug,
-        FuelTypeId = FuelType,
+        FuelTypeId =   ToUuid(FuelType),
         Liters = liters,
         CostPerLiter = 45m,
         SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6)),

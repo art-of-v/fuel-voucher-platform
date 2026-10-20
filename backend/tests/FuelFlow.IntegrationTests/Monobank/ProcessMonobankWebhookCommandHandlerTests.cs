@@ -15,6 +15,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests.Monobank;
 
@@ -101,7 +102,7 @@ LineItems =
                 {
                     Id = Guid.NewGuid(),
                     Brand = "okko",
-                    FuelTypeId = "okko-95",
+                    FuelTypeId = ToUuid("okko-95"),
                     Liters = 50,
                     Quantity = 1,
                     UnitPrice = 2500,

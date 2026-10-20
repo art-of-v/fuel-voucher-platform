@@ -18,6 +18,7 @@ using Hangfire.States;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -76,7 +77,7 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
             result = await BuildHandler(ctx).HandleAsync(new ConfirmVoucherExchangeCommand(
                 OldVoucherIds: new List<Guid> { old1, old2 },
                 NewImportId: importId,
-                Costs: new List<ExchangeFuelCost> { new("okko-95", 30m) },
+                Costs: new List<ExchangeFuelCost> { new(ToUuid("okko-95"), 30m) },
                 SurchargeUah: 200m,
                 ActingUserId: actingUserId,
                 ActingUserName: "Operator"));
@@ -221,7 +222,7 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
             result = await BuildHandler(ctx).HandleAsync(new ConfirmVoucherExchangeCommand(
                 OldVoucherIds: oldIds,
                 NewImportId: importId,
-                Costs: new List<ExchangeFuelCost> { new("okko-95", 90m) },
+                Costs: new List<ExchangeFuelCost> { new(ToUuid("okko-95"), 90m) },
                 SurchargeUah: surcharge,
                 ActingUserId: actingUserId,
                 ActingUserName: "Operator"));
@@ -310,7 +311,7 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
             await seed.SaveChangesAsync();
 
             costBefore = await seed.FuelTypes.AsNoTracking()
-                .Where(f => f.Id == "okko-95")
+                .Where(f => f.Id == ToUuid("okko-95"))
                 .Select(f => f.SupplierPricePerLiter)
                 .FirstAsync();
         }
@@ -320,7 +321,7 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
             var result = await BuildHandler(ctx).HandleAsync(new ConfirmVoucherExchangeCommand(
                 OldVoucherIds: oldIds,
                 NewImportId: importId,
-                Costs: new List<ExchangeFuelCost> { new("okko-95", 60m) },
+                Costs: new List<ExchangeFuelCost> { new(ToUuid("okko-95"), 60m) },
                 SurchargeUah: 300m,
                 ActingUserId: actingUserId,
                 ActingUserName: "Operator"));
@@ -330,14 +331,14 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
         using var verify = CreateContext();
 
         (await verify.FuelTypes.AsNoTracking()
-            .Where(f => f.Id == "okko-95")
+            .Where(f => f.Id == ToUuid("okko-95"))
             .Select(f => f.SupplierPricePerLiter)
             .FirstAsync()).Should().Be(
             costBefore,
             "three vouchers left the stock, but a sale is not a purchase and moves nothing");
 
         (await verify.FuelPriceHistory.AsNoTracking()
-            .Where(p => p.FuelTypeId == "okko-95"
+            .Where(p => p.FuelTypeId == ToUuid("okko-95")
                 && p.Reason == SharedKernel.Domain.PriceHistoryReasons.ExchangeRelease)
             .CountAsync()).Should().Be(
             0,
@@ -375,7 +376,7 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
             var result = await BuildHandler(ctx).HandleAsync(new ConfirmVoucherExchangeCommand(
                 OldVoucherIds: new List<Guid> { oldA, oldB },
                 NewImportId: importId,
-                Costs: new List<ExchangeFuelCost> { new("okko-95", 90m) },
+                Costs: new List<ExchangeFuelCost> { new(ToUuid("okko-95"), 90m) },
                 SurchargeUah: 0m,
                 ActingUserId: actingUserId,
                 ActingUserName: "Operator"));
@@ -418,7 +419,7 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
             var result = await BuildHandler(ctx).HandleAsync(new ConfirmVoucherExchangeCommand(
                 OldVoucherIds: new List<Guid> { uncosted },
                 NewImportId: importId,
-                Costs: new List<ExchangeFuelCost> { new("okko-95", 90m) },
+                Costs: new List<ExchangeFuelCost> { new(ToUuid("okko-95"), 90m) },
                 SurchargeUah: 0m,
                 ActingUserId: actingUserId,
                 ActingUserName: "Operator"));
@@ -459,7 +460,7 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
         {
             result = await BuildHandler(ctx).HandleAsync(new ConfirmVoucherExchangeCommand(
                 new List<Guid> { old1 }, importId,
-                new List<ExchangeFuelCost> { new("okko-95", 30m) },
+                new List<ExchangeFuelCost> { new(ToUuid("okko-95"), 30m) },
                 SurchargeUah: 0m, actingUserId, "Operator"));
         }
 
@@ -506,7 +507,7 @@ public async Task MoreOldThanNew_IsRefused_BecausePaperWouldBeLost()
         {
             var result = await BuildHandler(ctx).HandleAsync(new ConfirmVoucherExchangeCommand(
                 new List<Guid> { old1, old2 }, importId,
-                new List<ExchangeFuelCost> { new("okko-95", 28m) },
+                new List<ExchangeFuelCost> { new(ToUuid("okko-95"), 28m) },
                 150m, actingUserId, "Operator"));
 
             result.Success.Should().BeFalse();
@@ -555,7 +556,7 @@ public async Task MoreNewThanOld_IsRefused_SoSurplusCannotEnterStockCheaply()
         {
             var result = await BuildHandler(ctx).HandleAsync(new ConfirmVoucherExchangeCommand(
                 new List<Guid> { old1 }, importId,
-                new List<ExchangeFuelCost> { new("okko-95", 26m) },
+                new List<ExchangeFuelCost> { new(ToUuid("okko-95"), 26m) },
                 100m, actingUserId, "Operator"));
 
             result.Success.Should().BeFalse();
@@ -611,7 +612,7 @@ public async Task MoreNewThanOld_IsRefused_SoSurplusCannotEnterStockCheaply()
         {
             result = await BuildHandler(ctx).HandleAsync(new ConfirmVoucherExchangeCommand(
                 new List<Guid> { assignedOld }, importId,
-                new List<ExchangeFuelCost> { new("okko-95", 30m) },
+                new List<ExchangeFuelCost> { new(ToUuid("okko-95"), 30m) },
                 200m, actingUserId, "Operator"));
         }
 
@@ -660,7 +661,7 @@ var actingUserId = Guid.NewGuid();
         using var ctx = CreateContext();
         var result = await BuildHandler(ctx).HandleAsync(new ConfirmVoucherExchangeCommand(
             new List<Guid> { old1 }, Guid.NewGuid(), // import that has no vouchers
-            new List<ExchangeFuelCost> { new("okko-95", 30m) },
+            new List<ExchangeFuelCost> { new(ToUuid("okko-95"), 30m) },
             200m, actingUserId, "Operator"));
 
         result.Success.Should().BeFalse();
@@ -699,7 +700,7 @@ var actingUserId = Guid.NewGuid();
         {
             var first = await BuildHandler(ctx).HandleAsync(new ConfirmVoucherExchangeCommand(
                 new List<Guid> { old1 }, importId,
-                new List<ExchangeFuelCost> { new("okko-95", 30m) },
+                new List<ExchangeFuelCost> { new(ToUuid("okko-95"), 30m) },
                 200m, actingUserId, "Operator"));
             first.Success.Should().BeTrue(first.Error);
         }
@@ -710,7 +711,7 @@ var actingUserId = Guid.NewGuid();
             // old1 is already recorded in voucher_exchanges → re-confirm must be refused (no double-apply).
             second = await BuildHandler(ctx).HandleAsync(new ConfirmVoucherExchangeCommand(
                 new List<Guid> { old1 }, secondImportId,
-                new List<ExchangeFuelCost> { new("okko-95", 32m) },
+                new List<ExchangeFuelCost> { new(ToUuid("okko-95"), 32m) },
                 200m, actingUserId, "Operator"));
         }
 
@@ -791,7 +792,7 @@ var actingUserId = Guid.NewGuid();
         {
             Id = id,
             Brand = brand,
-            FuelTypeId = fuelTypeId,
+            FuelTypeId =   ToUuid(fuelTypeId),
             Liters = liters,
             SupplierExpirationDate = expiry,
             CustomerExpirationDate = expiry,

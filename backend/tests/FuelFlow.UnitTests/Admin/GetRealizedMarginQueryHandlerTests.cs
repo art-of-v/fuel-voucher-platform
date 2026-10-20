@@ -7,6 +7,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.UnitTests.Admin;
 
@@ -69,7 +70,7 @@ private async Task<Order> SeedAsync(
             Id = Guid.NewGuid(),
             OrderId = order.Id,
             Brand = "okko",
-            FuelTypeId = fuelTypeId,
+            FuelTypeId = ToUuid(fuelTypeId),
             Liters = liters,
             Quantity = vouchers,
             UnitPrice = lineTotal / vouchers,
@@ -83,7 +84,7 @@ private async Task<Order> SeedAsync(
             {
                 Id = Guid.NewGuid(),
                 Brand = "okko",
-                FuelTypeId = fuelTypeId,
+                FuelTypeId = ToUuid(fuelTypeId),
                 Liters = liters,
                 CostPerLiter = deliveredCostPerLiter,
                 VoucherNumber = Guid.NewGuid().ToString("N"),
@@ -127,7 +128,7 @@ private async Task<Order> SeedAsync(
         report.LossMakingLines.Should().Be(1);
 
         var line = report.WorstLines.Should().ContainSingle().Subject;
-        line.FuelTypeId.Should().Be("okko-95");
+        line.FuelTypeId.Should().Be(ToUuid("okko-95"));
         line.SupplierCostPerLiter.Should().Be(50m);
         line.IsLossMaking.Should().BeTrue();
     }
@@ -191,7 +192,7 @@ private async Task<Order> SeedAsync(
             Id = Guid.NewGuid(),
             OrderId = order.Id,
             Brand = "okko",
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
             Quantity = 1,
             UnitPrice = 1000m,

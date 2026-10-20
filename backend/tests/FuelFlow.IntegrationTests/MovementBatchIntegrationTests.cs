@@ -15,6 +15,7 @@ using Microsoft.EntityFrameworkCore;
 using Moq;
 using Npgsql;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -51,7 +52,7 @@ public sealed class MovementBatchIntegrationTests : IClassFixture<TestDatabaseFi
             Id = Guid.NewGuid(),
             ExchangeBatchId = Guid.NewGuid(),
             OldVoucherId = oldVoucherId,
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Brand = "OKKO",
             SupplierId = supplierId,
             SurchargeUah = 10m,
@@ -100,7 +101,7 @@ public sealed class MovementBatchIntegrationTests : IClassFixture<TestDatabaseFi
             var result = await BuildHandler(ctx).HandleAsync(new ConfirmVoucherExchangeCommand(
                 OldVoucherIds: [old1, old2],
                 NewImportId: importId,
-                Costs: [new ExchangeFuelCost("okko-95", 30m)],
+                Costs: [new ExchangeFuelCost(ToUuid("okko-95"), 30m)],
                 SurchargeUah: 200m,
                 ActingUserId: actingUserId,
                 ActingUserName: "Operator Nova"));
@@ -150,7 +151,7 @@ public sealed class MovementBatchIntegrationTests : IClassFixture<TestDatabaseFi
                 Id = Guid.NewGuid(),
                 ExchangeBatchId = batchId,
                 OldVoucherId = voucherId,
-                FuelTypeId = "okko-95",
+                FuelTypeId = ToUuid("okko-95"),
                 Brand = "OKKO",
                 SupplierId = supplierId,
                 // Shares that add up to 30, deliberately NOT the settlement's 777.77.
@@ -196,7 +197,7 @@ public sealed class MovementBatchIntegrationTests : IClassFixture<TestDatabaseFi
             Id = Guid.NewGuid(),
             ExchangeBatchId = batchId,
             OldVoucherId = oldVoucherId,
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Brand = "OKKO",
             SupplierId = supplierId,
             SurchargeUah = 50m,
@@ -342,7 +343,7 @@ public sealed class MovementBatchIntegrationTests : IClassFixture<TestDatabaseFi
         {
             Id = id,
             Brand = "OKKO",
-            FuelTypeId = fuelTypeId,
+            FuelTypeId =   ToUuid(fuelTypeId),
             Liters = liters,
             SupplierExpirationDate = when,
             CustomerExpirationDate = when,

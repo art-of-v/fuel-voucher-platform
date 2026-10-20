@@ -21,6 +21,7 @@ using Moq;
 using Xunit;
 
 using FuelFlow.SharedKernel.Observability;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 namespace FuelFlow.UnitTests.Orders;
 
 /// <summary>
@@ -74,7 +75,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         });
         _context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = "okko-95",
+            Id = ToUuid("okko-95"),
             Name = "A-95",
             BrandId = BrandIds.Okko,
             BasePrice = 60,
@@ -133,7 +134,7 @@ public sealed class VoucherTermSaleTests : IDisposable
             new CheckoutItem
             {
                 
-                FuelTypeId = "okko-95",
+                FuelTypeId = ToUuid("okko-95"),
                 BrandId = BrandIds.Okko,
                 BrandName = "OKKO",
                 Liters = 10,
@@ -167,7 +168,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         {
             Id = Guid.NewGuid(),
             Brand = brand,
-            FuelTypeId = fuelTypeId,
+            FuelTypeId = ToUuid(fuelTypeId),
             Liters = liters,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(daysUntilPaperExpiry),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(daysUntilPaperExpiry),
@@ -344,7 +345,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         // Absurdly generous tier: 60 ₴/L price, 500 ₴/L discount. Normally the below-cost guard would
         // reject this outright; with the fuel opted in, the clamp is what has to hold - a bad discount
         // must never turn into money going the other way.
-        _context.FuelTypes.First(f => f.Id == "okko-95").AllowBelowCost = true;
+        _context.FuelTypes.First(f => f.Id == ToUuid("okko-95")).AllowBelowCost = true;
         _context.SaveChanges();
         EnableTermSale(("1w", 500m));
         SeedStock(daysUntilPaperExpiry: 8);
@@ -438,7 +439,7 @@ public sealed class VoucherTermSaleTests : IDisposable
     public async Task Quote_ReportsTheFeatureOffByDefault()
     {
         // The master switch drives whether the picker renders at all, so the quote has to carry it.
-        var quote = await QuoteHandler().HandleAsync(isTestAccount: false, BrandIds.Okko, "okko-95", 10m);
+        var quote = await QuoteHandler().HandleAsync(isTestAccount: false, BrandIds.Okko, ToUuid("okko-95"), 10m);
 
         quote.Enabled.Should().BeFalse();
     }
@@ -449,7 +450,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         EnableTermSale(("1w", 20m), ("1m", 5m));
         SeedStock(daysUntilPaperExpiry: 40);   // paper term past 1m, so both tiers are backed
 
-        var quote = await QuoteHandler().HandleAsync(isTestAccount: false, BrandIds.Okko, "okko-95", 10m);
+        var quote = await QuoteHandler().HandleAsync(isTestAccount: false, BrandIds.Okko, ToUuid("okko-95"), 10m);
 
         quote.Enabled.Should().BeTrue();
 
@@ -471,7 +472,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         // be unbuyable — a free 6-month term is exactly the kind of misconfiguration that must not sell.
         EnableTermSale(("1w", 20m));
 
-        var quote = await QuoteHandler().HandleAsync(isTestAccount: false, BrandIds.Okko, "okko-95", 10m);
+        var quote = await QuoteHandler().HandleAsync(isTestAccount: false, BrandIds.Okko, ToUuid("okko-95"), 10m);
 
         quote.Terms.Should().Contain(t => t.Term == "6m");
         var six = quote.Terms.Single(t => t.Term == "6m");
@@ -487,7 +488,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         EnableTermSale(("1w", 20m));
         SeedStock(daysUntilPaperExpiry: 8);
 
-        var quoted = (await QuoteHandler().HandleAsync(isTestAccount: false, BrandIds.Okko, "okko-95", 10m))
+        var quoted = (await QuoteHandler().HandleAsync(isTestAccount: false, BrandIds.Okko, ToUuid("okko-95"), 10m))
             .Terms.Single(t => t.Term == "1w");
         var checkout = await Handler().HandleAsync(Command("1w"));
         var order = await _context.Orders.AsNoTracking().FirstAsync(o => o.Id == checkout.OrderIds[0]);
@@ -503,7 +504,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         EnableTermSale(("1w", 25m));
         SeedStock(daysUntilPaperExpiry: 8);   // stock covers the 1w term, so below-cost is the only reason
 
-        var quote = await QuoteHandler().HandleAsync(isTestAccount: false, BrandIds.Okko, "okko-95", 10m);
+        var quote = await QuoteHandler().HandleAsync(isTestAccount: false, BrandIds.Okko, ToUuid("okko-95"), 10m);
 
         var week = quote.Terms.Single(t => t.Term == "1w");
         week.Available.Should().BeFalse();
@@ -514,12 +515,12 @@ public sealed class VoucherTermSaleTests : IDisposable
     public async Task Quote_HidesATierForAFuelAllowedToSellUnderCost()
     {
         // The opt-in fuel reverses the guard, so the tier becomes genuinely sellable and must be offered.
-        _context.FuelTypes.First(f => f.Id == "okko-95").AllowBelowCost = true;
+        _context.FuelTypes.First(f => f.Id == ToUuid("okko-95")).AllowBelowCost = true;
         _context.SaveChanges();
         EnableTermSale(("1w", 25m));
         SeedStock(daysUntilPaperExpiry: 8);
 
-        var quote = await QuoteHandler().HandleAsync(isTestAccount: false, BrandIds.Okko, "okko-95", 10m);
+        var quote = await QuoteHandler().HandleAsync(isTestAccount: false, BrandIds.Okko, ToUuid("okko-95"), 10m);
 
         quote.Terms.Single(t => t.Term == "1w").Available.Should().BeTrue();
     }
@@ -531,7 +532,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         // anyway, so the quote must degrade to "nothing to buy here" instead of failing the screen.
         EnableTermSale(("1w", 20m));
 
-        var quote = await QuoteHandler().HandleAsync(isTestAccount: false, BrandIds.Okko, "okko-95", 999m);
+        var quote = await QuoteHandler().HandleAsync(isTestAccount: false, BrandIds.Okko, ToUuid("okko-95"), 999m);
 
         quote.Enabled.Should().BeTrue();
         quote.Terms.Should().OnlyContain(t => !t.Available);
@@ -557,7 +558,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         );
         _context.SaveChanges();
 
-        var quote = await QuoteHandler().HandleAsync(isTestAccount: false, BrandIds.Okko, "okko-unpriced", 10m);
+        var quote = await QuoteHandler().HandleAsync(isTestAccount: false, BrandIds.Okko, ToUuid("okko-unpriced"), 10m);
 
         quote.Enabled.Should().BeTrue();
         quote.Terms.Should().OnlyContain(t => !t.Available, "a fuel with no price cannot be bought on any term");
@@ -576,7 +577,7 @@ public sealed class VoucherTermSaleTests : IDisposable
     {
         EnableTermSale(("1w", 20m), ("1m", 5m), ("6m", 1m));
 
-        var quote = await QuoteHandler().HandleAsync(isTestAccount: false, BrandIds.Okko, "okko-95", 10m);
+        var quote = await QuoteHandler().HandleAsync(isTestAccount: false, BrandIds.Okko, ToUuid("okko-95"), 10m);
 
         quote.Enabled.Should().BeTrue();
         quote.Terms.Should().OnlyContain(t => !t.Available, "nothing on the shelf can back any term");
@@ -591,7 +592,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         EnableTermSale(("1w", 20m), ("2w", 15m), ("1m", 5m), ("6m", 1m));
         SeedStock(daysUntilPaperExpiry: 21);
 
-        var quote = await QuoteHandler().HandleAsync(isTestAccount: false, BrandIds.Okko, "okko-95", 10m);
+        var quote = await QuoteHandler().HandleAsync(isTestAccount: false, BrandIds.Okko, ToUuid("okko-95"), 10m);
 
         quote.Terms.Single(t => t.Term == "1w").Available.Should().BeTrue();
         quote.Terms.Single(t => t.Term == "2w").Available.Should().BeTrue();
@@ -608,7 +609,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         {
             Id = Guid.NewGuid(),
             Brand = "OKKO",
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 10m,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(6),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(6),
@@ -620,7 +621,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         });
         _context.SaveChanges();
 
-        var quote = await QuoteHandler().HandleAsync(isTestAccount: false, BrandIds.Okko, "okko-95", 10m);
+        var quote = await QuoteHandler().HandleAsync(isTestAccount: false, BrandIds.Okko, ToUuid("okko-95"), 10m);
 
         quote.Terms.Single(t => t.Term == "1w").Available.Should().BeFalse();
     }
@@ -633,7 +634,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         EnableTermSale(("1w", 20m));
         SeedStock(daysUntilPaperExpiry: 8, brand: "OKKO");
 
-        var quote = await QuoteHandler().HandleAsync(isTestAccount: false, BrandIds.Okko, "okko-95", 10m);
+        var quote = await QuoteHandler().HandleAsync(isTestAccount: false, BrandIds.Okko, ToUuid("okko-95"), 10m);
 
         quote.Terms.Single(t => t.Term == "1w").Available.Should().BeTrue();
     }
@@ -664,7 +665,7 @@ public sealed class VoucherTermSaleTests : IDisposable
         var act = () => Handler().HandleAsync(Command(termCode: null));
 
         await act.Should().ThrowAsync<PackageOutOfStockException>()
-            .WithMessage("*okko-95*", "the message has to name what could not be bought");
+            .WithMessage($"*{ToUuid("okko-95")}*", "the message has to name what could not be bought");
         (await _context.Orders.AsNoTracking().CountAsync()).Should().Be(0, "no order, and so no invoice");
     }
 

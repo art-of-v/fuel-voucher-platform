@@ -9,7 +9,7 @@ public sealed class BulkCheckoutCommand
 
 public sealed class CheckoutItem
 {
-    public string FuelTypeId { get; set; } = null!;
+    public Guid FuelTypeId { get; set; }
     public decimal Liters { get; set; }
     public int Quantity { get; set; }
     public decimal Price { get; set; }

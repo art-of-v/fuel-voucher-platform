@@ -10,6 +10,7 @@ using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -69,7 +70,7 @@ public sealed class CostEntryAuditIntegrationTests : IClassFixture<TestDatabaseF
             ImportJobId = import.Id,
             SupplierId = supplier.Id,
             Brand = "okko",
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
             VoucherNumber = $"audit-{suffix}",
             QrPayload = $"9015$2000$;{suffix}=x?",
@@ -93,12 +94,12 @@ public sealed class CostEntryAuditIntegrationTests : IClassFixture<TestDatabaseF
 
         using var ctx = CreateContext();
         var result = await Handler(ctx).HandleAsync(
-            new SetBatchCostCommand(importId, "okko-95", 49.50m, actor, "Cost Tester"));
+            new SetBatchCostCommand(importId, ToUuid("okko-95"), 49.50m, actor, "Cost Tester"));
         result.Success.Should().BeTrue();
 
         using var verify = CreateContext();
         var row = await verify.Set<AuditEventOutbox>().AsNoTracking()
-            .Where(e => e.EventType == "BatchCostEntered" && e.AggregateId == $"{importId}:okko-95")
+            .Where(e => e.EventType == "BatchCostEntered" && e.AggregateId == $"{importId}:{ToUuid("okko-95")}")
             .SingleOrDefaultAsync();
 
         // With no invoice, this row IS the record of what we paid. If it is missing, the money that
@@ -118,13 +119,13 @@ public sealed class CostEntryAuditIntegrationTests : IClassFixture<TestDatabaseF
         using (var ctx = CreateContext())
         {
             var result = await Handler(ctx).HandleAsync(
-                new SetBatchCostCommand(importId, "okko-95", 51.25m, Guid.NewGuid(), "JSON Tester"));
+                new SetBatchCostCommand(importId, ToUuid("okko-95"), 51.25m, Guid.NewGuid(), "JSON Tester"));
             result.Success.Should().BeTrue();
         }
 
         using var verify = CreateContext();
         var row = await verify.Set<AuditEventOutbox>().AsNoTracking()
-            .Where(e => e.EventType == "BatchCostEntered" && e.AggregateId == $"{importId}:okko-95")
+            .Where(e => e.EventType == "BatchCostEntered" && e.AggregateId == $"{importId}:{ToUuid("okko-95")}")
             .SingleAsync();
 
         // A bare "51.25" is not valid JSON and the brand history cannot render it — hence an
@@ -136,7 +137,7 @@ public sealed class CostEntryAuditIntegrationTests : IClassFixture<TestDatabaseF
         doc.RootElement.ValueKind.Should().Be(JsonValueKind.Object,
             "every other audit event stores an object, so this one has to be readable the same way");
         doc.RootElement.GetProperty("CostPerLiter").GetDecimal().Should().Be(51.25m);
-        doc.RootElement.GetProperty("FuelTypeId").GetString().Should().Be("okko-95");
+        doc.RootElement.GetProperty("FuelTypeId").GetString().Should().Be(ToUuid("okko-95").ToString());
     }
 
     /// <summary>
@@ -155,13 +156,13 @@ public sealed class CostEntryAuditIntegrationTests : IClassFixture<TestDatabaseF
         using (var first = CreateContext())
         {
             await Handler(first).HandleAsync(
-                new SetBatchCostCommand(importId, "okko-95", 49.50m, Guid.NewGuid(), "First"));
+                new SetBatchCostCommand(importId, ToUuid("okko-95"), 49.50m, Guid.NewGuid(), "First"));
         }
 
         using (var second = CreateContext())
         {
             var result = await Handler(second).HandleAsync(
-                new SetBatchCostCommand(importId, "okko-95", 47.00m, Guid.NewGuid(), "Second"));
+                new SetBatchCostCommand(importId, ToUuid("okko-95"), 47.00m, Guid.NewGuid(), "Second"));
             result.Success.Should().BeFalse("the batch is already costed, and its price is not ours to rewrite");
         }
 
@@ -174,7 +175,7 @@ public sealed class CostEntryAuditIntegrationTests : IClassFixture<TestDatabaseF
                 "the refused correction must leave the bought price exactly as it was");
 
         var rows = await verify.Set<AuditEventOutbox>().AsNoTracking()
-            .Where(e => e.EventType == "BatchCostEntered" && e.AggregateId == $"{importId}:okko-95")
+            .Where(e => e.EventType == "BatchCostEntered" && e.AggregateId == $"{importId}:{ToUuid("okko-95")}")
             .ToListAsync();
 
         rows.Should().HaveCount(1,

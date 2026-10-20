@@ -160,7 +160,7 @@ from f in _context.FuelTypes.AsNoTracking()
                 o.Id,
                 null,
                 firstLi?.Brand ?? "",
-                firstLi?.FuelTypeId ?? "",
+                firstLi?.FuelTypeId ?? Guid.Empty,
                 lineItemsList.Sum(li => li.Liters * li.Quantity),
                 expected,
                 o.Price,

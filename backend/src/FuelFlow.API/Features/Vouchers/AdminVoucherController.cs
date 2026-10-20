@@ -57,7 +57,7 @@ public sealed class AdminVoucherController : ControllerBase
         [FromQuery] string? sortBy = null,
         [FromQuery] string? sortDirection = null,
         [FromQuery] string? fuelType = null,
-        [FromQuery] string? fuelTypeId = null,
+        [FromQuery] Guid? fuelTypeId = null,
         [FromQuery] string? status = null,
         [FromQuery] string? brand = null,
         [FromQuery] string? amount = null,

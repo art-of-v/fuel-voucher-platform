@@ -458,7 +458,7 @@ public sealed class RefundOrderCommandHandler
     /// <summary>One fuel line of an order, and how many of its units the customer never received.</summary>
     internal readonly record struct UnfulfilledLine(
         string Brand,
-        string FuelTypeId,
+        Guid FuelTypeId,
         decimal Liters,
         int UnfulfilledUnits,
         decimal UnitPrice);

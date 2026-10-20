@@ -32,7 +32,7 @@ namespace FuelFlow.SharedKernel.Domain;
 /// </remarks>
 public sealed class FuelNominal
 {
-    public string FuelTypeId { get; set; } = null!;
+    public Guid FuelTypeId { get; set; }
 
     /// <summary>
     /// <c>live</c> or <c>qa</c>, from <see cref="DataKinds"/>. A named value rather than a boolean, so

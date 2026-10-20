@@ -10,7 +10,7 @@ public sealed record GetAdminVouchersQuery(
     /// Preferred over <see cref="FuelType"/>: fuel names are not unique across brands, so filtering
     /// by name can mix providers when a name happens to be shared. The admin sends this.
     /// </summary>
-    string? FuelTypeId = null,
+    Guid? FuelTypeId = null,
     string? Status = null,
     string? Brand = null,
     string? Amount = null,

@@ -5,7 +5,7 @@ public sealed class AdminVoucherListItemDto
     public Guid Id { get; set; }
     public string? QrPayload { get; set; }
     public decimal Liters { get; set; }
-    public string FuelTypeId { get; set; } = null!;
+    public Guid FuelTypeId { get; set; }
     public FuelTypeRefDto? FuelType { get; set; }
     public string Brand { get; set; } = null!;
 

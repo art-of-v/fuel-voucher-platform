@@ -18,13 +18,13 @@ public static class MonobankBasketBuilder
     /// caller falls back to the brand - a receipt with a brand name is better than a receipt
     /// that declares nothing.
     /// </summary>
-    public static async Task<Dictionary<string, string>> FuelNamesAsync(
+    public static async Task<Dictionary<Guid, string>> FuelNamesAsync(
         ApplicationDbContext context,
-        IEnumerable<string> fuelTypeIds,
+        IEnumerable<Guid> fuelTypeIds,
         CancellationToken cancellationToken = default)
     {
         var ids = fuelTypeIds.Distinct().ToList();
-        if (ids.Count == 0) return new Dictionary<string, string>();
+        if (ids.Count == 0) return new Dictionary<Guid, string>();
 
         return await context.FuelTypes
             .AsNoTracking()
@@ -52,7 +52,7 @@ public static class MonobankBasketBuilder
     /// </para>
     /// </summary>
     public static List<MonobankBasketItem> Build(
-        IEnumerable<(string Brand, string FuelTypeId, string? FuelName, decimal Liters, int Quantity, decimal UnitPrice, decimal LineTotal)> lines)
+        IEnumerable<(string Brand, Guid FuelTypeId, string? FuelName, decimal Liters, int Quantity, decimal UnitPrice, decimal LineTotal)> lines)
     {
         var items = new List<MonobankBasketItem>();
 
@@ -71,7 +71,7 @@ public static class MonobankBasketBuilder
                 Sum = (long)Math.Round(Money.ToKopecks(line.UnitPrice), MidpointRounding.AwayFromZero),
                 Total = (long)Math.Round(Money.ToKopecks(line.LineTotal), MidpointRounding.AwayFromZero),
                 Unit = "╨╗",
-                Code = line.FuelTypeId,
+                Code = line.FuelTypeId.ToString(),
             });
         }
 

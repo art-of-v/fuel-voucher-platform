@@ -28,7 +28,7 @@ public sealed class GetQrCodesQueryHandler
         {
             Id = i + 1,
             BrandId = v.FuelType?.BrandId.ToString() ?? "",
-            FuelType = v.FuelType?.Name ?? v.FuelTypeId,
+            FuelType = v.FuelType?.Name ?? v.FuelTypeId.ToString(),
             Liters = v.Liters,
             QrCodeUrl = v.QrPayload,
             Status = v.Status == VoucherStatus.Available ? "available" : "sold"

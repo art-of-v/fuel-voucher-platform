@@ -16,6 +16,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.UnitTests.Providers;
 
@@ -89,7 +90,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
 
         // The exact request a client sends when it does not know about the field.
         var result = await _controller.UpdateFuel(
-            "qa-a95",
+            ToUuid("qa-a95"),
             new BrandFuelDto
             {
                 Id = "qa-a95",
@@ -107,7 +108,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         var bad = result.Should().BeOfType<BadRequestObjectResult>().Subject;
         bad.StatusCode.Should().Be((int)HttpStatusCode.BadRequest);
 
-          var sizes = await _context.FuelNominals.Where(n => n.FuelTypeId == "qa-a95").ToListAsync();
+          var sizes = await _context.FuelNominals.Where(n => n.FuelTypeId == ToUuid("qa-a95")).ToListAsync();
         sizes.Should().OnlyContain(n => n.DataKind == DataKinds.Qa,
             "an edit that does not say must not be able to put rehearsal stock on sale");
     }
@@ -274,7 +275,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
 
         (await _context.FuelTypes.CountAsync(f => f.BrandId == BrandIds.Okko && f.Name == "А95 ЄВРО(QA)"))
             .Should().Be(1, "a second row for the same fuel is a second offer the storefront would list twice");
-        (await _context.FuelNominals.CountAsync(n => n.FuelTypeId == "qa-a95"))
+        (await _context.FuelNominals.CountAsync(n => n.FuelTypeId == ToUuid("qa-a95")))
             .Should().Be(1, "and it must not have created a second size for the same pool");
         conflict.Value.Should().NotBeNull("the operator is told which fuel to reprice instead");
     }
@@ -317,7 +318,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         await SeedQaFuelAsync();
         await _context.SaveChangesAsync();
 
-        var archived = await _context.FuelTypes.FirstAsync(f => f.Id == "qa-a95");
+        var archived = await _context.FuelTypes.FirstAsync(f => f.Id == ToUuid("qa-a95"));
         archived.IsDeleted = true;
         archived.DeletedAtUtc = DateTime.UtcNow;
         await _context.SaveChangesAsync();
@@ -347,7 +348,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         await SeedQaFuelAsync();
         await _context.SaveChangesAsync();
 
-        var existing = await _context.FuelTypes.FirstAsync(f => f.Id == "qa-a95");
+        var existing = await _context.FuelTypes.FirstAsync(f => f.Id == ToUuid("qa-a95"));
         existing.BrandFuelCode = "9018";
         await _context.SaveChangesAsync();
 
@@ -391,12 +392,12 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         await SeedQaFuelAsync();
         await _context.SaveChangesAsync();
 
-        var existing = await _context.FuelTypes.FirstAsync(f => f.Id == "qa-a95");
+        var existing = await _context.FuelTypes.FirstAsync(f => f.Id == ToUuid("qa-a95"));
         existing.BrandFuelCode = "9018";
         await _context.SaveChangesAsync();
 
         await _controller.UpdateFuel(
-            "qa-a95",
+            ToUuid("qa-a95"),
             new BrandFuelDto
             {
                 Id = "qa-a95",
@@ -411,7 +412,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
             },
             CancellationToken.None);
 
-        var reloaded = await _context.FuelTypes.FirstAsync(f => f.Id == "qa-a95");
+        var reloaded = await _context.FuelTypes.FirstAsync(f => f.Id == ToUuid("qa-a95"));
         reloaded.BrandFuelCode.Should().Be("9018");
     }
 
@@ -421,12 +422,12 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         await SeedQaFuelAsync();
         await _context.SaveChangesAsync();
 
-        var existing = await _context.FuelTypes.FirstAsync(f => f.Id == "qa-a95");
+        var existing = await _context.FuelTypes.FirstAsync(f => f.Id == ToUuid("qa-a95"));
         existing.BrandFuelCode = "9018";
         await _context.SaveChangesAsync();
 
         await _controller.UpdateFuel(
-            "qa-a95",
+            ToUuid("qa-a95"),
             new BrandFuelDto
             {
                 Id = "qa-a95",
@@ -441,7 +442,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
             },
             CancellationToken.None);
 
-        var reloaded = await _context.FuelTypes.FirstAsync(f => f.Id == "qa-a95");
+        var reloaded = await _context.FuelTypes.FirstAsync(f => f.Id == ToUuid("qa-a95"));
         reloaded.BrandFuelCode.Should().BeNull();
     }
 
@@ -449,7 +450,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
     {
         _context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = "qa-a95", BrandId = BrandIds.Okko, Name = "А95 ЄВРО(QA)",
+            Id = ToUuid("qa-a95"), BrandId = BrandIds.Okko, Name = "А95 ЄВРО(QA)",
             BasePrice = 92.90m, DiscountPrice = 72.34m,
             CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
         });
@@ -459,7 +460,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         // read back.
         _context.FuelNominals.Add(new FuelNominal
         {
-            FuelTypeId = "qa-a95", Liters = 10m, DataKind = DataKinds.Qa,
+            FuelTypeId = ToUuid("qa-a95"), Liters = 10m, DataKind = DataKinds.Qa,
             CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
         });
     }

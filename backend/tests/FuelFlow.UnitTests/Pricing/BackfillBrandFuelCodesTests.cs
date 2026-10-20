@@ -6,6 +6,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.UnitTests.Pricing;
 
@@ -76,7 +77,7 @@ public sealed class BackfillBrandFuelCodesTests : IDisposable
     }
 
     private static FuelTypeEntity Fuel(string id, string name, string? code = null)
-        => new() { Id = id, Name = name, BrandId = BrandIds.Okko, BrandFuelCode = code, BasePrice = 50m, DiscountPrice = 48m };
+        => new() { Id = ToUuid(id), Name = name, BrandId = BrandIds.Okko, BrandFuelCode = code, BasePrice = 50m, DiscountPrice = 48m };
 
     [Fact]
     public async Task AHandTypedFuel_GetsTheCodeTheBrandPublishesForItsGrade()
@@ -87,8 +88,8 @@ public sealed class BackfillBrandFuelCodesTests : IDisposable
             new BackfillBrandFuelCodesCommand(Published, DryRun: false), Guid.Empty, "t");
 
         result.Filled.Should().Be(2);
-        (await _context.FuelTypes.SingleAsync(f => f.Id == "guid-a")).BrandFuelCode.Should().Be("A-95");
-        (await _context.FuelTypes.SingleAsync(f => f.Id == "guid-b")).BrandFuelCode.Should().Be("SPBT");
+        (await _context.FuelTypes.SingleAsync(f => f.Id == ToUuid("guid-a"))).BrandFuelCode.Should().Be("A-95");
+        (await _context.FuelTypes.SingleAsync(f => f.Id == ToUuid("guid-b"))).BrandFuelCode.Should().Be("SPBT");
     }
 
     [Fact]
@@ -103,7 +104,7 @@ public sealed class BackfillBrandFuelCodesTests : IDisposable
             new BackfillBrandFuelCodesCommand(Published, DryRun: false), Guid.Empty, "t");
 
         result.Filled.Should().Be(0);
-        (await _context.FuelTypes.SingleAsync(f => f.Id == "hand-set")).BrandFuelCode.Should().Be("MY OWN");
+        (await _context.FuelTypes.SingleAsync(f => f.Id == ToUuid("hand-set"))).BrandFuelCode.Should().Be("MY OWN");
     }
 
     [Fact]
@@ -118,7 +119,7 @@ public sealed class BackfillBrandFuelCodesTests : IDisposable
 
         result.Filled.Should().Be(0);
         result.Skipped.Should().ContainSingle(s => s.Name == "А 92");
-        (await _context.FuelTypes.SingleAsync(f => f.Id == "a92")).BrandFuelCode.Should().BeNull();
+        (await _context.FuelTypes.SingleAsync(f => f.Id == ToUuid("a92"))).BrandFuelCode.Should().BeNull();
     }
 
     [Fact]
@@ -170,7 +171,11 @@ public sealed class BackfillBrandFuelCodesTests : IDisposable
             new BackfillBrandFuelCodesCommand(Published, DryRun: false), Guid.Empty, "t");
 
         result.Filled.Should().Be(1);
-        result.Skipped.Should().ContainSingle(s => s.Name == "А-95");
+        // Which of the two takes the code is decided by id order, and an id is a uuid now - so the
+        // rule is asserted, not the fixture's order: exactly one is coded and exactly one is
+        // reported, and they are not the same row.
+        result.Skipped.Should().ContainSingle();
+        result.Skipped.Single().Name.Should().NotBe(result.Fills.Single().Name);
     }
 
     [Fact]
@@ -188,11 +193,11 @@ public sealed class BackfillBrandFuelCodesTests : IDisposable
             new BackfillBrandFuelCodesCommand(Published, DryRun: false), Guid.Empty, "t");
 
         result.Filled.Should().Be(1);
-        result.Fills.Single().FuelTypeId.Should().Be("live-a95");
+        result.Fills.Single().FuelTypeId.Should().Be(ToUuid("live-a95"));
 
         // IgnoreQueryFilters because fuel_types has a global !IsDeleted filter — which is itself part
         // of why the handler's explicit !IsDeleted is belt and braces rather than decoration.
-        (await _context.FuelTypes.IgnoreQueryFilters().SingleAsync(f => f.Id == "old-a95"))
+        (await _context.FuelTypes.IgnoreQueryFilters().SingleAsync(f => f.Id == ToUuid("old-a95")))
             .BrandFuelCode.Should().BeNull();
     }
 
@@ -207,7 +212,7 @@ public sealed class BackfillBrandFuelCodesTests : IDisposable
         result.DryRun.Should().BeTrue();
         result.Fills.Should().ContainSingle(f => f.Code == "A-95");
 
-        (await _context.FuelTypes.SingleAsync(f => f.Id == "guid-a")).BrandFuelCode.Should().BeNull();
+        (await _context.FuelTypes.SingleAsync(f => f.Id == ToUuid("guid-a"))).BrandFuelCode.Should().BeNull();
     }
 
     [Fact]
@@ -238,6 +243,6 @@ public sealed class BackfillBrandFuelCodesTests : IDisposable
             new BackfillBrandFuelCodesCommand([], DryRun: false), Guid.Empty, "t");
 
         result.Filled.Should().Be(0);
-        (await _context.FuelTypes.SingleAsync(f => f.Id == "guid-a")).BrandFuelCode.Should().BeNull();
+        (await _context.FuelTypes.SingleAsync(f => f.Id == ToUuid("guid-a"))).BrandFuelCode.Should().BeNull();
     }
 }

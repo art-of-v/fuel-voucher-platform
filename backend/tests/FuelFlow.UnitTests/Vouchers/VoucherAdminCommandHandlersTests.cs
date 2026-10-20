@@ -27,6 +27,7 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using UglyToad.PdfPig.Content;
 using UglyToad.PdfPig.Core;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.UnitTests.Vouchers;
 
@@ -65,11 +66,11 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
     {
         var fuelTypes = new[]
         {
-            new FuelTypeEntity { Id = "okko-dp", Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "okko-95", Name = "A-95", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "okko-p95", Name = "Pulls 95", BrandId = BrandIds.Okko, BasePrice = 62, DiscountPrice = 58, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "wog-dp", Name = "ДП Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "wog-95", Name = "A-95 Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow }
+            new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("okko-95"), Name = "A-95", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("okko-p95"), Name = "Pulls 95", BrandId = BrandIds.Okko, BasePrice = 62, DiscountPrice = 58, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("wog-dp"), Name = "ДП Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("wog-95"), Name = "A-95 Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow }
         };
         _context.FuelTypes.AddRange(fuelTypes);
         _context.SaveChanges();
@@ -103,7 +104,7 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         {
             Id = Guid.NewGuid(),
             Brand = brand,
-            FuelTypeId = fuelTypeId,
+            FuelTypeId = ToUuid(fuelTypeId),
             Liters = 50,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
@@ -937,7 +938,7 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
         return new ParsedVoucher
         {
             Brand = "OKKO",
-            FuelTypeId = "okko-95",
+            FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
             ExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             VoucherNumber = voucherNumber,
@@ -1115,10 +1116,10 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
         await _context.SaveChangesAsync();
 
         var handler = new GetVouchersQueryHandler(_context, _qrGeneratorMock.Object);
-        var result = await handler.HandleAsync(new GetVouchersQuery(Page: 1, PageSize: 50, FuelTypeId: "okko-dp"), CancellationToken.None);
+        var result = await handler.HandleAsync(new GetVouchersQuery(Page: 1, PageSize: 50, FuelTypeId: ToUuid("okko-dp")), CancellationToken.None);
 
         result.TotalCount.Should().Be(1);
-        result.Vouchers.Should().ContainSingle(v => v.FuelTypeId == "okko-dp");
+        result.Vouchers.Should().ContainSingle(v => v.FuelTypeId == ToUuid("okko-dp"));
     }
 
     // ── GetAdminVouchersQueryHandler: fuel options are scoped to the brand ──
@@ -1138,11 +1139,11 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
             .HandleAsync(new GetAdminVouchersQuery(), CancellationToken.None);
 
         result.FuelTypesByProvider.Should().ContainKey("OKKO");
-        result.FuelTypesByProvider["OKKO"].Should().ContainSingle(f => f.Id == "okko-95");
-        result.FuelTypesByProvider["WOG"].Should().ContainSingle(f => f.Id == "wog-dp");
+        result.FuelTypesByProvider["OKKO"].Should().ContainSingle(f => f.Id == ToUuid("okko-95").ToString());
+        result.FuelTypesByProvider["WOG"].Should().ContainSingle(f => f.Id == ToUuid("wog-dp").ToString());
         // Nothing that no voucher carries, even though the catalog has five fuel types.
-        result.FuelTypesByProvider["OKKO"].Should().NotContain(f => f.Id == "wog-dp");
-        result.FuelTypesByProvider["OKKO"].Should().NotContain(f => f.Id == "okko-p95");
+        result.FuelTypesByProvider["OKKO"].Should().NotContain(f => f.Id == ToUuid("wog-dp").ToString());
+        result.FuelTypesByProvider["OKKO"].Should().NotContain(f => f.Id == ToUuid("okko-p95").ToString());
     }
 
     [Fact]
@@ -1156,9 +1157,9 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
         await _context.SaveChangesAsync();
 
         var result = await new GetAdminVouchersQueryHandler(_context)
-            .HandleAsync(new GetAdminVouchersQuery(FuelTypeId: "okko-95"), CancellationToken.None);
+            .HandleAsync(new GetAdminVouchersQuery(FuelTypeId: ToUuid("okko-95")), CancellationToken.None);
 
         result.Total.Should().Be(1);
-        result.Data.Should().ContainSingle(v => v.FuelTypeId == "okko-95");
+        result.Data.Should().ContainSingle(v => v.FuelTypeId == ToUuid("okko-95"));
     }
 }

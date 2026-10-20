@@ -1,4 +1,5 @@
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -24,10 +25,12 @@ internal sealed class OrderLineItemConfiguration : IEntityTypeConfiguration<Orde
             .HasMaxLength(50)
             .IsRequired();
 
-        builder.Property(e => e.FuelTypeId)
-            .HasColumnName("fuel_type_id")
-            .HasMaxLength(100)
-            .IsRequired();
+        // The fuel id is a uuid since planning D-21: a uuid column, so this can carry a real
+        // foreign key one day - which is what D-02 is waiting for.
+           builder.Property(e => e.FuelTypeId)
+               .HasColumnName("fuel_type_id")
+               .HasColumnType("uuid")
+               .IsRequired();
 
         builder.Property(e => e.Liters)
             .HasColumnName("liters")

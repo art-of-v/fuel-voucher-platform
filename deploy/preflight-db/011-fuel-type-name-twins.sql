@@ -51,11 +51,15 @@
 BEGIN;
 SET TRANSACTION READ ONLY;
 
+-- The ids are aggregated as text: `fuel_types.id` was a text column until D-21's second slice
+-- converted it to a uuid, and `string_agg(uuid, ...)` does not exist - so a file written for the
+-- old column stops running the day the column changes, and a precondition that cannot run says
+-- nothing. The cast runs on both.
 SELECT
     f.brand_id,
     f.name                                                          AS fuel_name,
     count(*)                                                        AS live_rows,
-    string_agg(f.id, ', ' ORDER BY f.created_at_utc, f.id)          AS fuel_type_ids
+    string_agg(f.id::text, ', ' ORDER BY f.created_at_utc, f.id)    AS fuel_type_ids
 FROM fuel_types f
 WHERE NOT f.is_deleted
 GROUP BY f.brand_id, f.name

@@ -25,7 +25,7 @@ public sealed class GetInventoryCommandHandler
 
 
         var inventory = vouchers
-            .GroupBy(v => new { v.Brand, v.FuelTypeId, FuelTypeName = v.FuelType?.Name ?? v.FuelTypeId, v.Liters })
+            .GroupBy(v => new { v.Brand, v.FuelTypeId, FuelTypeName = v.FuelType?.Name ?? v.FuelTypeId.ToString(), v.Liters })
             .Select(g => new InventoryItemDto(
                 g.Key.Brand,
                 g.Key.FuelTypeId,

@@ -7,6 +7,7 @@ using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.UnitTests.Vouchers;
 
@@ -22,7 +23,7 @@ public sealed class PurchaseBatchPnlHandlerTests : IDisposable
             .Options;
         _context = new ApplicationDbContext(options, TestQrCipher.Instance);
 
-        _context.FuelTypes.Add(new FuelTypeEntity { Id = "okko-dp", Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 22, DiscountPrice = 22, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
+        _context.FuelTypes.Add(new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 22, DiscountPrice = 22, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
         // Fuel priced at 22 UAH/L (cost 20 + margin 2, no pump). The P&L reads its "current sale price"
         // off the offer, so the per-litre figures are seeded there and the volume carries only the
         // package total.
@@ -60,7 +61,7 @@ public sealed class PurchaseBatchPnlHandlerTests : IDisposable
         {
             Id = id,
             Brand = brand,
-            FuelTypeId = fuelTypeId,
+            FuelTypeId = ToUuid(fuelTypeId),
             Liters = liters,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
@@ -84,7 +85,7 @@ public sealed class PurchaseBatchPnlHandlerTests : IDisposable
         // point, and a query against the store would not see them.
         foreach (var entry in _context.ChangeTracker.Entries<FuelVoucher>())
         {
-            if (entry.Entity.ImportJobId == importId && entry.Entity.FuelTypeId == fuelTypeId)
+            if (entry.Entity.ImportJobId == importId && entry.Entity.FuelTypeId == ToUuid(fuelTypeId))
             {
                 entry.Entity.CostPerLiter = cost;
                 entry.Entity.SupplierId = supplierId;
@@ -95,7 +96,7 @@ public sealed class PurchaseBatchPnlHandlerTests : IDisposable
         {
             Id = Guid.NewGuid(),
             ImportJobId = importId,
-            FuelTypeId = fuelTypeId,
+            FuelTypeId = ToUuid(fuelTypeId),
             Brand = "OKKO",
             SupplierId = supplierId,
             CreatedAtUtc = now,
@@ -125,7 +126,7 @@ public sealed class PurchaseBatchPnlHandlerTests : IDisposable
     {
         var orderId = Guid.NewGuid();
         _context.Orders.Add(new Order { Id = orderId, UserId = Guid.NewGuid(), Price = unitPrice, Status = status, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
-        _context.OrderLineItems.Add(new OrderLineItem { Id = Guid.NewGuid(), OrderId = orderId, Brand = "okko", FuelTypeId = fuelTypeId, Liters = liters, Quantity = 1, UnitPrice = unitPrice, LineTotal = unitPrice });
+        _context.OrderLineItems.Add(new OrderLineItem { Id = Guid.NewGuid(), OrderId = orderId, Brand = "okko", FuelTypeId = ToUuid(fuelTypeId), Liters = liters, Quantity = 1, UnitPrice = unitPrice, LineTotal = unitPrice });
         _context.Fulfillments.Add(new Fulfillment { OrderId = orderId, VoucherId = voucherId, FulfilledAtUtc = DateTime.UtcNow });
     }
 
@@ -143,7 +144,7 @@ public sealed class PurchaseBatchPnlHandlerTests : IDisposable
 
         var row = (await _handler.HandleAsync(new GetImportBatchPnlQuery(import))).Should().ContainSingle().Subject;
 
-        row.FuelTypeId.Should().Be("okko-dp");
+        row.FuelTypeId.Should().Be(ToUuid("okko-dp"));
         row.FuelTypeName.Should().Be("ДП ЄВРО");
         row.VouchersIn.Should().Be(3);
         row.LitersIn.Should().Be(300m);

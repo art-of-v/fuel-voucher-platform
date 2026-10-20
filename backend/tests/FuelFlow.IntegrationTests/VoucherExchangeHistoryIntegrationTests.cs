@@ -6,6 +6,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -280,11 +281,11 @@ private async Task SeedExchangeAsync(
             });
         }
 
-        if (!await seed.FuelTypes.AnyAsync(f => f.Id == "okko-dp"))
+        if (!await seed.FuelTypes.AnyAsync(f => f.Id == ToUuid("okko-dp")))
         {
             seed.FuelTypes.Add(new FuelTypeEntity
             {
-                Id = "okko-dp",
+                Id = ToUuid("okko-dp"),
                 Name = "ДП ЄВРО",
                 BrandId = BrandIds.Okko,
                 BasePrice = 60m,
@@ -328,7 +329,7 @@ foreach (var (cost, index) in costsPerLiter.Select((c, i) => (c, i)))
                 ExchangeBatchId = batchId,
                 OldVoucherId = oldVoucher.Id,
                 NewVoucherId = newVoucher.Id,
-                FuelTypeId = "okko-dp",
+                FuelTypeId = ToUuid("okko-dp"),
                 Brand = "OKKO",
                 SupplierId = supplierId,
                 SurchargeUah = surchargePerPair,
@@ -356,7 +357,7 @@ foreach (var (cost, index) in costsPerLiter.Select((c, i) => (c, i)))
         {
             Id = Guid.NewGuid(),
             Brand = "OKKO",
-            FuelTypeId = "okko-dp",
+            FuelTypeId = ToUuid("okko-dp"),
             Liters = liters,
             CostPerLiter = costPerLiter,
             SupplierId = supplierId,

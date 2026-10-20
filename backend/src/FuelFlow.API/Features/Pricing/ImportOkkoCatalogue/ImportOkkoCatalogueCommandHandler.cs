@@ -12,7 +12,7 @@ namespace FuelFlow.Features.Pricing.ImportOkkoCatalogue;
 public sealed record ImportOkkoCatalogueCommand(IReadOnlyList<OkkoPumpPrice> Sheet, bool DryRun);
 
 /// <summary>One fuel the catalogue did not have and now has, or would have in a dry run.</summary>
-public sealed record OkkoCatalogueCreated(string FuelTypeId, string Name, string BrandFuelCode, decimal PumpPricePerLiter);
+public sealed record OkkoCatalogueCreated(Guid FuelTypeId, string Name, string BrandFuelCode, decimal PumpPricePerLiter);
 
 /// <summary>
 /// A grade the sheet publishes and we already sell, under a name of our own choosing. Nothing is written
@@ -24,7 +24,7 @@ public sealed record OkkoCatalogueGradeHeld(string SiteFuelCode, OkkoFuelCategor
 /// <summary>Two grades wanting one name; reported rather than resolved by renaming something by guesswork.</summary>
 public sealed record OkkoCatalogueNameCollision(string Name, string SiteFuelCode);
 
-public sealed record OkkoCatalogueArchived(string FuelTypeId, string Name, int LiveVouchers, bool Archived);
+public sealed record OkkoCatalogueArchived(Guid FuelTypeId, string Name, int LiveVouchers, bool Archived);
 
 public sealed record OkkoCatalogueApplyResult(
     int Created,
@@ -147,7 +147,7 @@ public sealed class ImportOkkoCatalogueCommandHandler
         var gradesHeld = new List<OkkoCatalogueGradeHeld>();
         // Which of our fuels the sheet still publishes. A fuel missing from this set is a candidate
         // for archiving - subject to the voucher check, which is what actually decides.
-        var seenFuelIds = new HashSet<string>(StringComparer.Ordinal);
+        var seenFuelIds = new HashSet<Guid>();
         var nameCollisions = new List<OkkoCatalogueNameCollision>();
 
         // What we already carry, live rows only: an archived fuel must not stop a fresh one from being
@@ -175,7 +175,7 @@ public sealed class ImportOkkoCatalogueCommandHandler
         // Code first, name second, because our own catalogue holds both spellings - "ДП" and "DP",
         // "А-95" and "А95 ЄВРО" - and each pair is one fuel. A fuel whose code is unmapped still holds
         // its grade if its name classifies.
-var gradeHolder = new Dictionary<OkkoFuelCategory, (string Id, string Name)>();
+var gradeHolder = new Dictionary<OkkoFuelCategory, (Guid Id, string Name)>();
         // Every fuel holding a grade, not only the one that "represents" it. One row per grade is the
         // rule, but until the duplicates are gone a second row must not be archived as "dropped by
         // the brand" while the brand is plainly still publishing that grade.
@@ -259,13 +259,13 @@ if (knownCodes.Contains(code))
 
             if (command.DryRun)
             {
-                created.Add(new OkkoCatalogueCreated("(dry run)", name, code, row.PricePerLiter));
+                created.Add(new OkkoCatalogueCreated(Guid.Empty, name, code, row.PricePerLiter));
                 continue;
             }
 
             var fuel = new FuelTypeEntity
             {
-                Id = Guid.CreateVersion7().ToString(),
+                Id = Guid.CreateVersion7(),
                 BrandId = okkoId.Value,
                 Name = name,
                 BrandFuelCode = code,
@@ -319,7 +319,7 @@ if (knownCodes.Contains(code))
             foreach (var c in created)
             {
                 await _events.RecordEventAsync(
-                    "Fuel", c.FuelTypeId, "FuelCreatedByImport",
+                    "Fuel", c.FuelTypeId.ToString(), "FuelCreatedByImport",
                     null,
                     JsonSerializer.Serialize(new { c.Name, c.BrandFuelCode, c.PumpPricePerLiter }),
                     actingUserId == Guid.Empty ? Guid.Empty : actingUserId,
@@ -379,7 +379,7 @@ if (knownCodes.Contains(code))
     /// </remarks>
     private async Task<IReadOnlyList<OkkoCatalogueArchived>> ArchiveDroppedFuelsAsync(
         Guid brandId,
-        IReadOnlySet<string> seenFuelIds,
+        IReadOnlySet<Guid> seenFuelIds,
         Guid actingUserId,
         string? actingUserName,
         bool dryRun,
@@ -433,7 +433,7 @@ if (knownCodes.Contains(code))
                 await _context.SaveChangesAsync(ct);
 
                 await _events.RecordEventAsync(
-                    "Fuel", fuel.Id, "FuelArchivedByImport",
+                    "Fuel", fuel.Id.ToString(), "FuelArchivedByImport",
                     null,
                     JsonSerializer.Serialize(new { fuel.Name, Reason = "no longer published by OKKO" }),
                     actingUserId == Guid.Empty ? Guid.Empty : actingUserId,

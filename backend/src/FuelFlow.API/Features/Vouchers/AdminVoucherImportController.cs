@@ -93,7 +93,7 @@ public sealed class AdminVoucherImportController : ControllerBase
     [HttpPut("{id:guid}/batch-costs/{fuelTypeId}")]
     public async Task<IActionResult> SetBatchCost(
         Guid id,
-        [FromRoute] string fuelTypeId,
+        [FromRoute] Guid fuelTypeId,
         [FromBody] SetBatchCostRequest request,
         CancellationToken cancellationToken)
     {

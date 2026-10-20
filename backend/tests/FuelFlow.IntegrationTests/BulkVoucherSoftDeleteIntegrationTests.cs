@@ -14,6 +14,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -459,7 +460,7 @@ private async Task SeedAsync()
         {
             seed.FuelTypes.Add(new FuelTypeEntity
             {
-                Id = "okko-dp",
+                Id = ToUuid("okko-dp"),
                 Name = "Дизель",
                 BrandId = BrandIds.Okko,
                 BasePrice = 60m,

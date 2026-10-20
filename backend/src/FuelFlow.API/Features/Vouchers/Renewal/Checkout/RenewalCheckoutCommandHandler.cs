@@ -398,7 +398,7 @@ public sealed class RenewalCheckoutCommandHandler
             .Select(ft => ft.Name)
             .FirstOrDefaultAsync(cancellationToken);
 
-        var label = string.IsNullOrEmpty(name) ? source.FuelTypeId : name;
+        var label = string.IsNullOrEmpty(name) ? source.FuelTypeId.ToString() : name;
         return $"{label} ({source.Brand.ToUpperInvariant()}, {source.Liters:0.##} L)";
     }
 

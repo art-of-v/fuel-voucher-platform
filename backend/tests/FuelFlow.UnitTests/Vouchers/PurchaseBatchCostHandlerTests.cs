@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.UnitTests.Vouchers;
 
@@ -36,7 +37,7 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         _context = new ApplicationDbContext(options, TestQrCipher.Instance);
 
         // okko-dp fuel with two nominals; margin 2 UAH/L, no pump (so final = blended cost + 2).
-        _context.FuelTypes.Add(new FuelTypeEntity { Id = "okko-dp", Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
+        _context.FuelTypes.Add(new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
         _context.FuelNominals.AddRange(
             NewPackage("okko-dp", 10m),
             NewPackage("okko-dp", 20m));
@@ -69,7 +70,7 @@ private FuelNominal NewPackage(string fuelTypeId, decimal liters)
     _context.SeedOffer(BrandIds.Okko, fuelTypeId, marginUahPerLiter: 2m);
     return new FuelNominal
     {
-    FuelTypeId = fuelTypeId,
+    FuelTypeId = ToUuid(fuelTypeId),
     Liters = liters,
     // The size is all a package is now. It carries no price of its own: the nominal follows its
     // fuel's rate, which is what this suite is about - the cost entry moves the offer's rate and
@@ -99,7 +100,7 @@ private FuelNominal NewPackage(string fuelTypeId, decimal liters)
         {
             Id = Guid.NewGuid(),
             Brand = brand,
-            FuelTypeId = fuelTypeId,
+            FuelTypeId = ToUuid(fuelTypeId),
             Liters = liters,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
@@ -121,7 +122,7 @@ private FuelNominal NewPackage(string fuelTypeId, decimal liters)
         {
             Id = id,
             Brand = "OKKO",
-            FuelTypeId = fuelTypeId,
+            FuelTypeId = ToUuid(fuelTypeId),
             Liters = liters,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
@@ -144,7 +145,7 @@ private FuelNominal NewPackage(string fuelTypeId, decimal liters)
     }
 
     private SetBatchCostCommand Cmd(Guid importId, string fuelTypeId, decimal cost) =>
-        new(importId, fuelTypeId, cost, AdminId, "Admin User");
+        new(importId, ToUuid(fuelTypeId), cost, AdminId, "Admin User");
 
     // ── SetBatchCostCommandHandler ───────────────────────────────────────────
 
@@ -165,7 +166,7 @@ private FuelNominal NewPackage(string fuelTypeId, decimal liters)
 
         var batch = await _context.PurchaseBatches.SingleAsync();
         batch.ImportJobId.Should().Be(import);
-        batch.FuelTypeId.Should().Be("okko-dp");
+        batch.FuelTypeId.Should().Be(ToUuid("okko-dp"));
         batch.Brand.Should().Be("OKKO");
         batch.SupplierId.Should().Be(SupplierId);   // one PDF = one supplier's delivery
         batch.EnteredByUserId.Should().Be(AdminId);
@@ -181,12 +182,12 @@ private FuelNominal NewPackage(string fuelTypeId, decimal liters)
         // Cost and final price are the FUEL's, written once; the per-package totals are the volumes'.
         // Asserting on the volumes alone would pass even if every per-litre figure stayed at zero,
         // which is precisely what this test exists to catch.
-        var fuel = await _context.FuelTypes.FirstAsync(f => f.Id == "okko-dp");
+        var fuel = await _context.FuelTypes.FirstAsync(f => f.Id == ToUuid("okko-dp"));
         fuel.SupplierPricePerLiter.Should().Be(25m);
         fuel.FinalPerLiter().Should().Be(27m);   // 25 cost + 2 margin
 
         var sizes = await _context.FuelNominals
-            .Where(v => v.FuelTypeId == "okko-dp").OrderBy(v => v.Liters).ToListAsync();
+            .Where(v => v.FuelTypeId == ToUuid("okko-dp")).OrderBy(v => v.Liters).ToListAsync();
         // Nothing per size any more: the cost moved the fuel's rate, and every nominal follows it.
         sizes.Should().HaveCount(2);
         fuel.DiscountPrice.Should().Be(27);   // final/L rounded
@@ -205,7 +206,7 @@ private FuelNominal NewPackage(string fuelTypeId, decimal liters)
 
         await _setHandler.HandleAsync(Cmd(import, "okko-dp", 25m));
 
-    var fuel = await _context.FuelTypes.FirstAsync(f => f.Id == "okko-dp");
+    var fuel = await _context.FuelTypes.FirstAsync(f => f.Id == ToUuid("okko-dp"));
     var history = await _context.FuelPriceHistory
         .Where(p => p.FuelTypeId == fuel.Id)
             .ToListAsync();
@@ -316,7 +317,7 @@ private FuelNominal NewPackage(string fuelTypeId, decimal liters)
         var result = await _setHandler.HandleAsync(Cmd(import2, "okko-dp", 30m));
 
         result.BlendedCostPerLiter.Should().Be(25m);   // (100×20 + 100×30) / 200
-    var fuel = await _context.FuelTypes.FirstAsync(f => f.Id == "okko-dp");
+    var fuel = await _context.FuelTypes.FirstAsync(f => f.Id == ToUuid("okko-dp"));
     fuel.SupplierPricePerLiter.Should().Be(25m); // priced off blended, not the just-entered 30
     fuel.FinalPerLiter().Should().Be(27m);
     }
@@ -391,7 +392,7 @@ private FuelNominal NewPackage(string fuelTypeId, decimal liters)
     {
         // A pump ceiling of 49 − 0.5 = 48.5 binds below the entered cost 50, and the fuel is
         // NOT opted in → the reprice pushes it below cost, so an emergent (Critical) alert fires.
-        _context.FuelTypes.Add(new FuelTypeEntity { Id = "okko-loss", Name = "ДП збиток", BrandId = BrandIds.Okko, BasePrice = 49, DiscountPrice = 49, AllowBelowCost = false, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
+        _context.FuelTypes.Add(new FuelTypeEntity { Id = ToUuid("okko-loss"), Name = "ДП збиток", BrandId = BrandIds.Okko, BasePrice = 49, DiscountPrice = 49, AllowBelowCost = false, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
         _context.SeedPackage(
             id: Guid.NewGuid().ToString(), BrandId: BrandIds.Okko, fuelTypeId: "okko-loss",
             liters: 10m, price: 0m,
@@ -455,7 +456,7 @@ private FuelNominal NewPackage(string fuelTypeId, decimal liters)
         var rows = await _getHandler.HandleAsync(new GetImportBatchCostsQuery(import));
 
         var row = rows.Should().ContainSingle().Subject;
-        row.FuelTypeId.Should().Be("okko-dp");
+        row.FuelTypeId.Should().Be(ToUuid("okko-dp"));
         row.FuelTypeName.Should().Be("ДП ЄВРО");
         row.Brand.Should().Be("OKKO");
         row.VoucherCount.Should().Be(2);

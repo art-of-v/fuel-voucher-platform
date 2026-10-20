@@ -55,7 +55,7 @@ internal static class BrandFuelCard
 
         return new BrandFuelDto
         {
-            Id = fuel.Id,
+            Id = fuel.Id.ToString(),
             Name = fuel.Name,
             // What we pay. The column is the truth, and the pool's blended cost is written back into
             // it by BlendedCostRecalculator when a batch of vouchers is costed - so the card shows

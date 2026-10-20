@@ -16,6 +16,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -227,7 +228,7 @@ public sealed class FulfillmentLineAttributionTests : IClassFixture<TestDatabase
         Id = id,
         OrderId = orderId,
         Brand = brand,
-        FuelTypeId = fuelTypeId,
+        FuelTypeId =   ToUuid(fuelTypeId),
         Liters = liters,
         Quantity = quantity,
         UnitPrice = unitPrice,
@@ -274,7 +275,7 @@ public sealed class FulfillmentLineAttributionTests : IClassFixture<TestDatabase
         {
             Id = Guid.NewGuid(),
             Brand = fuelTypeId.StartsWith("wog", StringComparison.Ordinal) ? "WOG" : "OKKO",
-            FuelTypeId = fuelTypeId,
+            FuelTypeId =   ToUuid(fuelTypeId),
             Liters = liters,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),

@@ -6,6 +6,7 @@ using FuelFlow.Features.Brands.UpdateBrand;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.UnitTests.Brands;
 
@@ -189,7 +190,7 @@ var persisted = await _context.Brands.FindAsync(TestBrand);
     {
         return new FuelTypeEntity
         {
-            Id = id,
+            Id = ToUuid(id),
             Name = name,
             BrandId = BrandId,
             BasePrice = basePrice,

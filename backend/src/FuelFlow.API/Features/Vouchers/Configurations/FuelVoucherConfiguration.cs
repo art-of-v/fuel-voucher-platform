@@ -29,10 +29,12 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
             .HasMaxLength(50)
             .IsRequired();
 
-        builder.Property(e => e.FuelTypeId)
-            .HasColumnName("fuel_type_id")
-            .HasMaxLength(100)
-            .IsRequired();
+        // The fuel id is a uuid since planning D-21: a uuid column, so this can carry a real
+        // foreign key one day - which is what D-02 is waiting for.
+           builder.Property(e => e.FuelTypeId)
+               .HasColumnName("fuel_type_id")
+               .HasColumnType("uuid")
+               .IsRequired();
 
         builder.Property(e => e.Liters)
             .HasColumnName("liters")
@@ -353,7 +355,6 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
         // reference cannot drift into something arbitrary - see BrandConfiguration.
         builder.ToTable(t =>
         {
-            t.HasCheckConstraint("ck_fuel_vouchers_fuel_type_id_length", "length(fuel_type_id) <= 100");
-        });
+            });
     }
 }

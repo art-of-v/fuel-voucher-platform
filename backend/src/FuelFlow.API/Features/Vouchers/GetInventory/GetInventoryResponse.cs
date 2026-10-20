@@ -2,7 +2,7 @@ namespace FuelFlow.Features.Vouchers.GetInventory;
 
 public sealed record InventoryItemDto(
     string Brand,
-    string FuelTypeId,
+    Guid FuelTypeId,
     string FuelTypeName,
     decimal Liters,
     int Available,

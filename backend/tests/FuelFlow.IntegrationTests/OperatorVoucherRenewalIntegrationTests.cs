@@ -11,6 +11,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -330,7 +331,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
             // Set explicitly: fuel_types is not truncated between tests, so the opt-in test that runs
             // before or after this one must not decide the outcome here.
             await seed.FuelTypes
-                .Where(f => f.Id == "okko-95")
+                .Where(f => f.Id == ToUuid("okko-95"))
                 .ExecuteUpdateAsync(s => s.SetProperty(f => f.AllowBelowCost, false));
             await seed.SaveChangesAsync();
         }
@@ -412,7 +413,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
             seed.FuelVouchers.Add(CustomerVoucher(voucherId, userId, purchaseOrderId, "OKKO", "okko-95", 40m, today.AddDays(-3)));
             seed.FuelVouchers.Add(StockVoucher(stockId, "OKKO", "okko-95", 40m, today.AddMonths(6), costPerLiter: 50m));
             await seed.FuelTypes
-                .Where(f => f.Id == "okko-95")
+                .Where(f => f.Id == ToUuid("okko-95"))
                 .ExecuteUpdateAsync(s => s.SetProperty(f => f.AllowBelowCost, true));
             await seed.SaveChangesAsync();
         }
@@ -769,7 +770,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
     {
         Id = id,
         Brand = brand,
-        FuelTypeId = fuelTypeId,
+        FuelTypeId =   ToUuid(fuelTypeId),
         Liters = liters,
         SupplierExpirationDate = supplierExpiry ?? expiry,
         CustomerExpirationDate = expiry,
@@ -787,7 +788,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
         {
             Id = id,
             Brand = brand,
-            FuelTypeId = fuelTypeId,
+            FuelTypeId =   ToUuid(fuelTypeId),
             Liters = liters,
             SupplierExpirationDate = expiry,
             CustomerExpirationDate = expiry,

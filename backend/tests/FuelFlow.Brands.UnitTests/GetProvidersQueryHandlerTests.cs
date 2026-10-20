@@ -4,6 +4,7 @@ using FuelFlow.Features.Brands.GetProviders;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.Providers.UnitTests;
 
@@ -52,7 +53,7 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
         // cost, and - because nobody has set a size yet - no sizes either.
         _context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = "test-fuel-imported",
+            Id = ToUuid("test-fuel-imported"),
             Name = "А-95",
             BrandId = TestOkko,
             PumpPricePerLiter = 92.90m,
@@ -63,7 +64,7 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
 
         var providers = await _handler.HandleAsync(new GetBrandsQuery());
 
-        var fuel = providers.Single(p => p.Id == TestOkko).Fuels.Single(f => f.Id == "test-fuel-imported");
+        var fuel = providers.Single(p => p.Id == TestOkko).Fuels.Single(f => f.Id == ToUuid("test-fuel-imported").ToString());
         fuel.PumpPricePerLiter.Should().Be(92.90m, "the card reads the fuel's own columns, not its sizes");
         fuel.FinalPricePerLiter.Should().Be(92.90m, "the column price stands in until there is a cost");
         fuel.SupplierPricePerLiter.Should().Be(0m, "there is no cost yet, and the card says so");
@@ -84,8 +85,8 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
             UpdatedAtUtc = DateTime.UtcNow
         });
         _context.FuelTypes.AddRange(
-            new FuelTypeEntity { Id = "test-fuel-a", Name = "A-95", BrandId = TestOkko, BasePrice = 5100, DiscountPrice = 5100, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "test-fuel-b", Name = "ДП", BrandId = TestOkko, BasePrice = 5200, DiscountPrice = 5200, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
+            new FuelTypeEntity { Id = ToUuid("test-fuel-a"), Name = "A-95", BrandId = TestOkko, BasePrice = 5100, DiscountPrice = 5100, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("test-fuel-b"), Name = "ДП", BrandId = TestOkko, BasePrice = 5200, DiscountPrice = 5200, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
         _context.SeedPackage("test-fuel-a-10", TestOkko, "test-fuel-a", 10m, 510m,
             supplierPricePerLiter: 49m, marginUahPerLiter: 2m, finalPricePerLiter: 51m);
         _context.SeedPackage("test-fuel-a-20", TestOkko, "test-fuel-a", 20m, 1020m,
@@ -103,7 +104,7 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
 
         brand.Fuels.Should().HaveCount(2);
 
-        var fuelA = brand.Fuels.Single(f => f.Id == "test-fuel-a");
+        var fuelA = brand.Fuels.Single(f => f.Id == ToUuid("test-fuel-a").ToString());
         fuelA.SupplierPricePerLiter.Should().Be(49m);
         fuelA.MarginUahPerLiter.Should().Be(2m);
         fuelA.FinalPricePerLiter.Should().Be(51m);
@@ -130,17 +131,17 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
             UpdatedAtUtc = DateTime.UtcNow
         });
         _context.FuelTypes.AddRange(
-            new FuelTypeEntity { Id = "test-coded", Name = "А-95", BrandId = TestOkko, BrandFuelCode = "A-95", BasePrice = 92.9m, DiscountPrice = 89.06m, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = "test-uncoded", Name = "А 92", BrandId = TestOkko, BrandFuelCode = null, BasePrice = 85m, DiscountPrice = 84.5m, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
+            new FuelTypeEntity { Id = ToUuid("test-coded"), Name = "А-95", BrandId = TestOkko, BrandFuelCode = "A-95", BasePrice = 92.9m, DiscountPrice = 89.06m, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("test-uncoded"), Name = "А 92", BrandId = TestOkko, BrandFuelCode = null, BasePrice = 85m, DiscountPrice = 84.5m, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
         await _context.SaveChangesAsync();
 
         var providers = await _handler.HandleAsync(new GetBrandsQuery());
 
         var brand = providers.Single(p => p.Id == TestOkko);
-        brand.Fuels.Single(f => f.Id == "test-coded").BrandFuelCode.Should().Be("A-95");
+        brand.Fuels.Single(f => f.Id == ToUuid("test-coded").ToString()).BrandFuelCode.Should().Be("A-95");
         // Null must stay null rather than becoming "" - the screen tells the two apart, and the API
         // reads an empty string on a write as "clear this".
-        brand.Fuels.Single(f => f.Id == "test-uncoded").BrandFuelCode.Should().BeNull();
+        brand.Fuels.Single(f => f.Id == ToUuid("test-uncoded").ToString()).BrandFuelCode.Should().BeNull();
     }
 
     // The production case from #202: four packages for one fuel, one of them a 0.01 L leftover with a
@@ -162,7 +163,7 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
         });
         _context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = "test-dp",
+            Id = ToUuid("test-dp"),
             Name = "ДП ЄВРО",
             BrandId = TestOkko,
             BasePrice = 110,
@@ -222,7 +223,7 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
         });
         _context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = "test-dp",
+            Id = ToUuid("test-dp"),
             Name = "ДП ЄВРО",
             BrandId = TestOkko,
             BasePrice = 110,
@@ -267,7 +268,7 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
         });
         _context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = "test-dp",
+            Id = ToUuid("test-dp"),
             Name = "ДП ЄВРО",
             BrandId = TestOkko,
             BasePrice = 110,
@@ -315,7 +316,7 @@ private FuelNominal Package(
     // is sold at all, and it is the same row whichever pool reads it.
     return new FuelNominal
     {
-        FuelTypeId = "test-dp",
+        FuelTypeId = ToUuid("test-dp"),
         Liters = liters,
         CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,

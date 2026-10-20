@@ -38,7 +38,7 @@ public sealed class VoucherExchange
     public Guid? NewVoucherId { get; set; }
 
     /// <summary>Fuel of the retired voucher (and of its paired replacement — same bucket).</summary>
-    public string FuelTypeId { get; set; } = string.Empty;
+    public Guid FuelTypeId { get; set; }
 
     /// <summary>Brand of the retired voucher (okko/wog/…), denormalized for audit.</summary>
     public string Brand { get; set; } = string.Empty;

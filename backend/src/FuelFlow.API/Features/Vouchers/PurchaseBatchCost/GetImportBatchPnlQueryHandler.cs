@@ -85,7 +85,7 @@ public sealed class GetImportBatchPnlQueryHandler
 
         var pricedFuelIds = currentPrices
             .Where(f => f.FinalPerLiter() is not null)
-            .ToDictionary(f => f.Id, f => f.FinalPerLiter()!.Value, StringComparer.Ordinal);
+            .ToDictionary(f => f.Id, f => f.FinalPerLiter()!.Value);
         var voucherById = vouchers.ToDictionary(v => v.Id);
 
         // Vouchers with at least one non-reversed fulfillment = revenue realised. Used to keep

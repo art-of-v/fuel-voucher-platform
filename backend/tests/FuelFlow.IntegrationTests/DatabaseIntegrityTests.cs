@@ -13,6 +13,7 @@ using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -154,10 +155,10 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
     }
 
     [Theory]
-    [InlineData("fuel_types", "ck_fuel_types_id_length")]
-    [InlineData("fuel_vouchers", "ck_fuel_vouchers_fuel_type_id_length")]
-    [InlineData("purchase_batches", "ck_purchase_batches_fuel_type_id_length")]
-    [InlineData("voucher_exchanges", "ck_voucher_exchanges_fuel_type_id_length")]
+    [InlineData("fuel_types", "ck_fuel_types_name_length")]
+    [InlineData("fuel_types", "ck_fuel_types_brand_fuel_code_length")]
+    [InlineData("brands", "ck_brands_slug_length")]
+    [InlineData("fuel_type_product_codes", "ck_fuel_type_product_codes_product_code_length")]
     public async Task Every_Catalog_Key_Has_Its_Length_Constraint(string table, string constraint)
     {
         await using var context = CreateContext();
@@ -198,7 +199,7 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
     {
         Id = Guid.NewGuid(),
         Brand = "okko",
-        FuelTypeId = fuelTypeId,
+        FuelTypeId =   ToUuid(fuelTypeId),
         Liters = 10m,
         SupplierExpirationDate = new DateOnly(2027, 1, 1),
         CustomerExpirationDate = new DateOnly(2027, 1, 1),
@@ -271,7 +272,7 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
         await using var context = CreateContext();
         context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = $"ft-neg-{basePrice}-{discountPrice}",
+            Id = ToUuid( $"ft-neg-{basePrice}-{discountPrice}"),
             BrandId = BrandIds.Okko,
             Name = $"Negative {basePrice}/{discountPrice}",
             BasePrice = (decimal)basePrice,
@@ -327,7 +328,7 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
     /// </remarks>
     private static FuelTypeEntity NewFuelWithPrice(string id, decimal supplierPricePerLiter) => new()
     {
-        Id = $"{id}-fuel",
+        Id = ToUuid( $"{id}-fuel"),
         Name = $"Test fuel for {id}",
         BrandId = BrandIds.Okko,
         BasePrice = 0m,
@@ -347,7 +348,7 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
     /// </summary>
     private static FuelNominal NewNominal(string fuelTypeId, double liters) => new()
     {
-        FuelTypeId = fuelTypeId,
+        FuelTypeId =   ToUuid(fuelTypeId),
         Liters = (decimal)liters,
         CreatedAtUtc = DateTime.UtcNow,
         UpdatedAtUtc = DateTime.UtcNow
@@ -812,7 +813,7 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
             Id = Guid.NewGuid(),
             OrderId = Guid.NewGuid(),   // no such order; the FK never gets that far
             Brand = "okko",
-            FuelTypeId = "okko-dp",
+            FuelTypeId = ToUuid("okko-dp"),
             Liters = 10m,
             Quantity = 1,
             UnitPrice = 100m,
@@ -1206,7 +1207,7 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
             Id = Guid.NewGuid(),
             OrderId = order.Id,
             Brand = "okko",
-            FuelTypeId = "okko-dp",
+            FuelTypeId = ToUuid("okko-dp"),
             Liters = 50m,
             Quantity = 2,
             UnitPrice = 2500m,
@@ -1340,12 +1341,12 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
         await using var context = CreateContext();
 
         var act = () => context.Database.ExecuteSqlRawAsync(
-            """
+            $$"""
             INSERT INTO fuel_vouchers (id, brand, fuel_type_id, liters, supplier_expiration_date,
                                        customer_expiration_date, voucher_number, qr_payload, qr_payload_sha256,
                                        created_at_utc, updated_at_utc, status, data_kind, is_deleted)
-            VALUES ({0}, 'okko', 'okko-dp', 10, '2027-01-01', '2027-01-01', 'bad-status', 'bad-status-qr', sha256(convert_to('bad-status-qr','UTF8')),
-                    now(), now(), 'Availble', 'real', false)
+            VALUES ({0}, 'okko', '{{ToUuid("okko-dp")}}', 10, '2027-01-01', '2027-01-01', 'bad-status', 'bad-status-qr', sha256(convert_to('bad-status-qr','UTF8')),
+                    now(), now(), 'Avilble', 'real', false)
             """, Guid.NewGuid());
 
         await act.Should().ThrowAsync<PostgresException>();
@@ -1377,11 +1378,11 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
         await using var context = CreateContext();
 
         var act = () => context.Database.ExecuteSqlRawAsync(
-            """
+            $$"""
             INSERT INTO fuel_vouchers (id, brand, fuel_type_id, liters, supplier_expiration_date,
                                        customer_expiration_date, voucher_number, qr_payload, qr_payload_sha256,
                                        created_at_utc, updated_at_utc, status, data_kind, is_deleted)
-            VALUES ({0}, 'okko', 'okko-dp', 10, '2027-01-01', '2027-01-01', 'longest-status', 'longest-status-qr', sha256(convert_to('longest-status-qr','UTF8')),
+            VALUES ({0}, 'okko', '{{ToUuid("okko-dp")}}', 10, '2027-01-01', '2027-01-01', 'longest-status', 'longest-status-qr', sha256(convert_to('longest-status-qr','UTF8')),
                     now(), now(), 'VerifiedWithWarnings', 'real', false)
             """, Guid.NewGuid());
 

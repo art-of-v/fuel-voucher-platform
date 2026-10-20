@@ -4,6 +4,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
 
@@ -42,19 +43,19 @@ public sealed class FuelTypeBrandFuelCodeTests : IClassFixture<TestDatabaseFixtu
     /// <c>https://www.okko.ua/api/uk/fuels</c> on 2026-10-17. Shared by the tests below so the mapping
     /// is stated once: two copies of it would be one too many place to forget an update.
     /// </summary>
-    private static readonly Dictionary<string, string> SeedCodeMap = new()
-    {
-        ["okko-95"] = "A-95",
-        ["okko-dp"] = "DP",
-        ["okko-p95"] = "Pulls 95",
-        ["okko-pulls-dp"] = "Pulls Diesel",
-        ["okko-gas"] = "SPBT",
-    };
+       private static readonly Dictionary<Guid, string> SeedCodeMap = new()
+       {
+           [ToUuid("okko-95")] = "A-95",
+           [ToUuid("okko-dp")] = "DP",
+           [ToUuid("okko-p95")] = "Pulls 95",
+           [ToUuid("okko-pulls-dp")] = "Pulls Diesel",
+           [ToUuid("okko-gas")] = "SPBT",
+       };
 
     private static FuelTypeEntity Fuel(string id, Guid brandId, string name, string? code)
         => new()
         {
-            Id = id,
+            Id =   ToUuid(id),
             BrandId = brandId,
             Name = name,
             BrandFuelCode = code,
@@ -81,7 +82,7 @@ public sealed class FuelTypeBrandFuelCodeTests : IClassFixture<TestDatabaseFixtu
         var act = async () => await context.SaveChangesAsync();
         await act.Should().ThrowAsync<DbUpdateException>();
 
-        await context.Database.ExecuteSqlRawAsync("DELETE FROM fuel_types WHERE id IN ('code-a', 'code-b')");
+        await context.Database.ExecuteSqlRawAsync($"DELETE FROM fuel_types WHERE id IN ('{ToUuid("code-a")}', '{ToUuid("code-b")}')");
     }
 
     [Fact]
@@ -101,7 +102,7 @@ public sealed class FuelTypeBrandFuelCodeTests : IClassFixture<TestDatabaseFixtu
         var act = async () => await context.SaveChangesAsync();
         await act.Should().NotThrowAsync();
 
-        await context.Database.ExecuteSqlRawAsync("DELETE FROM fuel_types WHERE id IN ('net-a', 'net-b')");
+        await context.Database.ExecuteSqlRawAsync($"DELETE FROM fuel_types WHERE id IN ('{ToUuid("net-a")}', '{ToUuid("net-b")}')");
     }
 
     [Fact]
@@ -117,7 +118,7 @@ public sealed class FuelTypeBrandFuelCodeTests : IClassFixture<TestDatabaseFixtu
         var act = async () => await context.SaveChangesAsync();
         await act.Should().NotThrowAsync();
 
-        await context.Database.ExecuteSqlRawAsync("DELETE FROM fuel_types WHERE id IN ('nocode-a', 'nocode-b')");
+        await context.Database.ExecuteSqlRawAsync($"DELETE FROM fuel_types WHERE id IN ('{ToUuid("nocode-a")}', '{ToUuid("nocode-b")}')");
     }
 
     [Fact]
@@ -130,7 +131,7 @@ public sealed class FuelTypeBrandFuelCodeTests : IClassFixture<TestDatabaseFixtu
         context.FuelTypes.Add(Fuel("arch-code-a", BrandIds.Klo, "ДП (code reuse test)", "9018"));
         await context.SaveChangesAsync();
         await context.Database.ExecuteSqlRawAsync(
-            "UPDATE fuel_types SET is_deleted = true, deleted_at_utc = now() WHERE id = 'arch-code-a'");
+            $"UPDATE fuel_types SET is_deleted = true, deleted_at_utc = now() WHERE id = '{ToUuid("arch-code-a")}'");
 
         context.ChangeTracker.Clear();
         context.FuelTypes.Add(Fuel("arch-code-b", BrandIds.Klo, "ДП (code reuse test)", "9018"));
@@ -139,7 +140,7 @@ public sealed class FuelTypeBrandFuelCodeTests : IClassFixture<TestDatabaseFixtu
         await act.Should().NotThrowAsync();
 
         await context.Database.ExecuteSqlRawAsync(
-            "DELETE FROM fuel_types WHERE id IN ('arch-code-a', 'arch-code-b')");
+            $"DELETE FROM fuel_types WHERE id IN ('{ToUuid("arch-code-a")}', '{ToUuid("arch-code-b")}')");
     }
 
     [Fact]
@@ -224,8 +225,8 @@ public sealed class FuelTypeBrandFuelCodeTests : IClassFixture<TestDatabaseFixtu
         var now = DateTime.UtcNow;
 
         context.FuelTypes.AddRange(
-            new FuelTypeEntity { Id = "wog-dp-e5", Name = "ДП Євро5", BrandId = BrandIds.Wog, BasePrice = 103.5m, DiscountPrice = 100m, CreatedAtUtc = now, UpdatedAtUtc = now },
-            new FuelTypeEntity { Id = "wog-95-e5-e10", Name = "95 Євро5-Е10", BrandId = BrandIds.Wog, BasePrice = 92.9m, DiscountPrice = 90m, CreatedAtUtc = now, UpdatedAtUtc = now });
+            new FuelTypeEntity { Id = ToUuid("wog-dp-e5"), Name = "ДП Євро5", BrandId = BrandIds.Wog, BasePrice = 103.5m, DiscountPrice = 100m, CreatedAtUtc = now, UpdatedAtUtc = now },
+            new FuelTypeEntity { Id = ToUuid("wog-95-e5-e10"), Name = "95 Євро5-Е10", BrandId = BrandIds.Wog, BasePrice = 92.9m, DiscountPrice = 90m, CreatedAtUtc = now, UpdatedAtUtc = now });
         await context.SaveChangesAsync();
 
         await context.Database.ExecuteSqlRawAsync(
@@ -237,7 +238,7 @@ public sealed class FuelTypeBrandFuelCodeTests : IClassFixture<TestDatabaseFixtu
 
         context.ChangeTracker.Clear();
         var coded = await context.FuelTypes
-            .Where(f => f.Id == "wog-dp-e5" || f.Id == "wog-95-e5-e10")
+            .Where(f => f.Id == ToUuid("wog-dp-e5") || f.Id == ToUuid("wog-95-e5-e10"))
             .Select(f => new { f.Name, f.BrandFuelCode })
             .ToListAsync();
 
@@ -256,6 +257,6 @@ public sealed class FuelTypeBrandFuelCodeTests : IClassFixture<TestDatabaseFixtu
         var act = async () => await context.SaveChangesAsync();
         await act.Should().ThrowAsync<DbUpdateException>();
 
-        await context.Database.ExecuteSqlRawAsync("DELETE FROM fuel_types WHERE id = 'long-code'");
+        await context.Database.ExecuteSqlRawAsync($"DELETE FROM fuel_types WHERE id = '{ToUuid("long-code")}'");
     }
 }

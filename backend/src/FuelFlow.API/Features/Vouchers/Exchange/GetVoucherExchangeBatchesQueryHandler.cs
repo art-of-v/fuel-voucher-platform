@@ -189,7 +189,7 @@ public sealed class VoucherExchangeBatchDto
     public Guid SupplierId { get; set; }
     public string? SupplierName { get; set; }
     public List<string> Providers { get; set; } = [];
-    public List<string> FuelTypeIds { get; set; } = [];
+    public List<Guid> FuelTypeIds { get; set; } = [];
     public int VouchersExchanged { get; set; }
     public decimal LitersOut { get; set; }
 
