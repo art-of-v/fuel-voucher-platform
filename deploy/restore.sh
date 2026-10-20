@@ -86,7 +86,7 @@ read -r -p "Type 'yes' to continue: " CONFIRM
 
 # Stop the API first so it isn't writing while tables are being swapped.
 echo "[1/3] Stopping the API..."
-docker compose --env-file "$SCRIPT_DIR/.env" -f "$SCRIPT_DIR/docker-compose.prod.yml" stop dotnet-backend
+docker compose --env-file "$SCRIPT_DIR/.env" -f "$SCRIPT_DIR/docker-compose.prod.yml" stop fuelflow-backend
 
 echo "[2/3] Restoring..."
 # --clean --if-exists drops existing objects first; --no-owner/--no-privileges
@@ -108,7 +108,7 @@ if (( RC != 0 )); then
 fi
 
 echo "[3/3] Starting the API again..."
-docker compose --env-file "$SCRIPT_DIR/.env" -f "$SCRIPT_DIR/docker-compose.prod.yml" start dotnet-backend
+docker compose --env-file "$SCRIPT_DIR/.env" -f "$SCRIPT_DIR/docker-compose.prod.yml" start fuelflow-backend
 
 echo
 echo "Done. Verify with:"

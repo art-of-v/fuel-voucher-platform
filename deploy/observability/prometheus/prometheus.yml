@@ -2,7 +2,7 @@
 #
 # Difference from the local development config
 # (backend/observability/prometheus/prometheus.yml): the API runs as the
-# `dotnet-backend` compose service on the `fuelflow_default` network, so the
+# `fuelflow-backend` compose service on the `fuelflow_default` network, so the
 # target is the service name instead of host.docker.internal, and every label
 # says production. There is no separate JobsWorker in production — Hangfire jobs
 # run in-process inside the API — so there is no fuelflow-jobs target.
@@ -28,7 +28,7 @@ scrape_configs:
   - job_name: fuelflow-api
     metrics_path: /metrics
     static_configs:
-      - targets: ["dotnet-backend:8080"]
+      - targets: ["fuelflow-backend:8080"]
         labels:
           service: fuelflow-api
           environment: production

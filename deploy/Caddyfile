@@ -92,7 +92,7 @@
 	# specificity rules and the deny could end up after the catch-all.
 	# Upstreams are named by the prod CONTAINER name, never by the service name. Both stacks run
 	# on this box and Caddy is attached to fuelflow_shared, where staging joins under the SAME
-	# service-name aliases (`admin-frontend`, `website-frontend`, `dotnet-backend`). Caddy is
+	# service-name aliases (`admin-frontend`, `website-frontend`, `fuelflow-backend`). Caddy is
 	# therefore on both networks with one name meaning two containers, and which one a lookup
 	# returns decides what production serves.
 	#

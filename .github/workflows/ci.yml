@@ -1511,7 +1511,7 @@ jobs:
             if [ "$i" -eq 30 ]; then
               echo "backend did not become healthy within ~90s" >&2
               cd /root/FuelFlow/deploy
-              docker compose --env-file .env -f docker-compose.prod.yml logs --tail 100 dotnet-backend >&2 || true
+              docker compose --env-file .env -f docker-compose.prod.yml logs --tail 100 fuelflow-backend >&2 || true
               exit 1
             fi
             sleep 3
