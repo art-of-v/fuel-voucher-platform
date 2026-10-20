@@ -794,10 +794,25 @@ if (!fullyAttributed && fulfillments.Count > 0)
                 var alreadyForThisLine = assignedCounts.GetValueOrDefault(key, 0);
                 var remainingNeeded = Math.Max(0, lineItem.Quantity - alreadyForThisLine);
 
+                // The candidates of this line, read once. The units of one line take different
+                // vouchers out of the same pool, in the order the pool hands them out - so the
+                // line needs this many candidates, and reading them per unit asked the database
+                // the same question once per unit.
+                //
+                // The list is read at the moment the line is reached, so a line that comes after
+                // another one still sees the vouchers that one claimed.
+                var candidates = remainingNeeded > 0
+                    ? await FindMatchingVouchersAsync(
+                        order, lineItem, usedVoucherIds, isTestAccount, remainingNeeded, cancellationToken)
+                    : [];
+
                 for (int i = 0; i < remainingNeeded; i++)
                 {
-                    var availableVoucher = await FindMatchingVoucherAsync(
-                        order, lineItem, usedVoucherIds, isTestAccount, cancellationToken);
+                    var availableVoucher = candidates.Count > 0 ? candidates[0] : null;
+                    if (availableVoucher is not null)
+                    {
+                        candidates.RemoveAt(0);
+                    }
 
                     if (availableVoucher == null)
                     {
@@ -1011,11 +1026,12 @@ if (!fullyAttributed && fulfillments.Count > 0)
         }
     }
 
-    private async Task<FuelVoucher?> FindMatchingVoucherAsync(
+    private async Task<List<FuelVoucher>> FindMatchingVouchersAsync(
         Order order,
         OrderLineItem lineItem,
         List<Guid> usedVoucherIds,
         bool isTestAccount,
+        int take,
         CancellationToken cancellationToken)
     {
         // Expiry is enforced, not optional. With this filter commented out, the ascending
@@ -1047,7 +1063,9 @@ if (!fullyAttributed && fulfillments.Count > 0)
                      && (!expiryEnabled || v.SupplierExpirationDate >= today)
                      && !usedVoucherIds.Contains(v.Id))
             .OrderBy(v => v.SupplierExpirationDate)
-            .FirstOrDefaultAsync(cancellationToken);
+            // The units of one line take different vouchers, and they take them in this order.
+            .Take(take)
+            .ToListAsync(cancellationToken);
     }
 
     /// <summary>
