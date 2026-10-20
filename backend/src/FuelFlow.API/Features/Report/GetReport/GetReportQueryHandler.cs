@@ -25,10 +25,14 @@ public sealed class GetReportQueryHandler
         var fromDate = query.FromDate ?? DateTime.MinValue;
         var toDate = query.ToDate ?? DateTime.MaxValue;
 
-        var ordersQuery = _context.Orders
-            .AsNoTracking()
-            .Include(o => o.LineItems)
-            .Include(o => o.Fulfillments)
+           var ordersQuery = _context.Orders
+               .AsNoTracking()
+               // LineItems and Fulfillments are BOTH collections, so one JOIN without the split
+               // query is the cross product of the two - one row per line item per fulfilment. The
+               // split query runs two round trips and never multiplies the rows.
+               .AsSplitQuery()
+               .Include(o => o.LineItems)
+               .Include(o => o.Fulfillments)
                 .ThenInclude(f => f.Voucher)
             .Where(o => o.CreatedAtUtc >= fromDate
                 && o.CreatedAtUtc <= toDate

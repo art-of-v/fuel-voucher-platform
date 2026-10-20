@@ -64,6 +64,9 @@ services:
       ASPNETCORE_URLS: http://+:8080
 
       Database__ConnectionString: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};SSL Mode=Disable;Trust Server Certificate=true"
+      # One cap for every pool in the process - the data source, the Hangfire storage and the
+      # health check. See the same key in docker-compose.prod.yml.
+      Database__MaxPoolSize: "5"
       ConnectionStrings__Redis: "redis:6379,password=${REDIS_PASSWORD}"
 
       Jwt__Secret: ${JWT_SECRET:?set JWT_SECRET (>=32 chars) in .env.staging}

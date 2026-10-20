@@ -82,6 +82,7 @@ using FuelFlow.Features.Settings;
 using FuelFlow.Features.Settlement;
 using FuelFlow.Middleware;
 using FuelFlow.SharedKernel.Abstractions;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Notifications.Email;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
@@ -136,7 +137,13 @@ internal static class ServiceSetup
         var redisConnection = RedisConnectionParser.Parse(config.GetConnectionString("Redis") ?? "localhost:6379");
 
         services.AddHealthChecks()
-            .AddNpgSql(connectionString, name: "postgres", tags: ["ready"])
+            // The health check opens its OWN pool, so the cap has to be on this string too -
+            // otherwise the probe's pool is uncapped and is exactly the pool that can storm the
+            // server during an incident.
+            .AddNpgSql(
+                DatabaseConnectionPool.WithMaxPoolSize(connectionString, DatabaseConnectionPool.ResolveMaxPoolSize(config)),
+                name: "postgres",
+                tags: ["ready"])
             .AddRedis(redisConnection, name: "redis", tags: ["ready"]);
 
         AddVoucherServices(services);

@@ -77,7 +77,10 @@ public sealed class AuditController : ControllerBase
         var total = await query.CountAsync(ct);
 
         var events = await query
-            .OrderByDescending(e => e.ChangedAtUtc)
+               .OrderByDescending(e => e.ChangedAtUtc)
+               // The tie-break: many audit rows share one timestamp, and without a unique second
+               // key the sort is unstable - a row can land on two pages or on none.
+               .ThenBy(e => e.Id)
             .Skip(PageLimits.ClampOffset(offset))
             .Take(PageLimits.ClampPageSize(limit))
             .Select(e => new AuditEventDto

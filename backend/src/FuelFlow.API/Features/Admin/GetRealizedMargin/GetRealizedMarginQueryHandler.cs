@@ -49,6 +49,9 @@ public sealed class GetRealizedMarginQueryHandler
 
         var orders = await _context.Orders
             .AsNoTracking()
+            // Two collections in one query (LineItems x Fulfillments) - without the split query the
+            // JOIN is their cross product and every order comes back multiplied.
+            .AsSplitQuery()
             .Include(o => o.LineItems)
             .Include(o => o.Fulfillments)
                 .ThenInclude(f => f.Voucher)

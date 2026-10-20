@@ -5,6 +5,7 @@ using FuelFlow.API.Services;
 using FuelFlow.BackgroundJobs;
 using FuelFlow.Features.ErrorLogs.Logging;
 using FuelFlow.Middleware;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
@@ -89,8 +90,11 @@ try
     builder.Services.AddFuelFlowObservability(builder.Configuration);
 
     var connectionString = builder.Configuration.BuildConnectionString();
+    // One cap for every pool in this process - the application data source, the Hangfire storage
+    // and the Postgres health check all open their own pool, and only the first one was capped.
+    var maxPoolSize = DatabaseConnectionPool.ResolveMaxPoolSize(builder.Configuration);
     builder.Services
-        .AddDatabase(connectionString)
+        .AddDatabase(connectionString, maxPoolSize)
         .AddJwtAuth(builder.Configuration, builder.Environment)
         .AddDefaultAuthorizationPolicy()
         .AddFeatureServices(builder.Configuration)
@@ -106,7 +110,7 @@ try
         .UseSimpleAssemblyNameTypeSerializer()
         .UseRecommendedSerializerSettings()
         .UsePostgreSqlStorage(c =>
-            c.UseNpgsqlConnection(connectionString)));
+            c.UseNpgsqlConnection(DatabaseConnectionPool.WithMaxPoolSize(connectionString, maxPoolSize))));
 
     builder.Services.AddHangfireServer(options =>
     {

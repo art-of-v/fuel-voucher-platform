@@ -5,6 +5,7 @@ using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Database;
 using Npgsql;
 
 namespace FuelFlow.API.Extensions;
@@ -43,11 +44,14 @@ internal static class DatabaseSetup
         return connStr;
     }
 
-    internal static IServiceCollection AddDatabase(this IServiceCollection services, string connectionString)
+    internal static IServiceCollection AddDatabase(
+        this IServiceCollection services,
+        string connectionString,
+        int maxPoolSize = DatabaseConnectionPool.DefaultMaxPoolSize)
     {
-        var poolSizeLimited = connectionString.Contains("Maximum Pool Size", StringComparison.OrdinalIgnoreCase)
-            ? connectionString
-            : $"{connectionString};Maximum Pool Size=5";
+        // The cap belongs to EVERY pool this process opens, not only to this data source - see
+        // DatabaseConnectionPool. The Hangfire storage and the health check get the same string.
+        var poolSizeLimited = DatabaseConnectionPool.WithMaxPoolSize(connectionString, maxPoolSize);
 
         services.Configure<DatabaseOptions>(opts =>
         {

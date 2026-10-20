@@ -128,6 +128,14 @@ services:
       # If omitted, the app auto-appends "SSL Mode=Require" and will fail to connect.
       Database__ConnectionString: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};SSL Mode=Disable;Trust Server Certificate=true"
 
+      # --- The connection-pool cap ---
+      # One process opens SEVERAL pools against this database: the application's data source, the
+      # Hangfire storage and the Postgres health check (the worker opens its own set). Npgsql's
+      # default cap is 100 per pool, so the cap has to be on all of them or it protects nothing.
+      # 5 per pool keeps the API inside the server's max_connections=50 even during an incident.
+      # Raise it only together with max_connections on the database.
+      Database__MaxPoolSize: "5"
+
       # --- Redis ---
       # Use the native StackExchange.Redis format, NOT a "redis://..." URI.
       # Program.cs parses URI-style values with an unguarded new Uri(), which throws if
@@ -469,8 +477,9 @@ services:
     # AND THE TWO THAT NEED A RESTART, which is why they are here rather than in the file
     # the settings above came from: shared_buffers 256M (128M was the PostgreSQL default, not a
     # choice, and a quarter of a 512M container belongs to the buffer cache) and
-    # max_connections 50 (100 on a 512M container is generous; the application's pool is
-    # capped at 5, so this is insurance against a connection storm).
+    # max_connections 50 (100 on a 512M container is generous; EVERY pool the application opens
+    # is capped at 5 - the data source, the Hangfire storage and the health check - so this is
+    # insurance against a connection storm).
     #
     # WHY THEY ARE IN THE COMPOSE FILE AND NOT ONLY ON THE BOX. They were applied to the
     # running server with ALTER SYSTEM, which writes postgresql.auto.conf - and that file lives
