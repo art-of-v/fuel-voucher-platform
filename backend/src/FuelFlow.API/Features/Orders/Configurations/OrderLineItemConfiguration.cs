@@ -26,6 +26,13 @@ internal sealed class OrderLineItemConfiguration : IEntityTypeConfiguration<Orde
             .HasMaxLength(50)
             .IsRequired();
 
+        // The key the brand text above is a copy of. Nullable for now: the column arrives with the
+        // backfill, and the rows that are written before the readers move to the id still carry
+        // only the name. The foreign key over (fuel type, brand) comes with the same migration.
+        builder.Property(e => e.BrandId)
+            .HasColumnName("brand_id")
+            .HasColumnType("uuid");
+
         // The fuel id is a uuid since planning D-21: a uuid column, so this can carry a real
         // foreign key one day - which is what D-02 is waiting for.
            builder.Property(e => e.FuelTypeId)
