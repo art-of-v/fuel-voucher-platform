@@ -4,7 +4,14 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '../../../core/api/apiClient';
 import type { User } from '../../../core/types/api';
 
-const USER_QUERY_KEY = '/api/auth/user/me';
+/**
+ * The query key of the signed-in customer.
+ *
+ * Exported because a screen that changes the customer — setting a referral
+ * code, redeeming one — has to invalidate the very query the profile screen
+ * reads. A second copy of this string would be a second thing to forget.
+ */
+export const USER_QUERY_KEY = '/api/auth/user/me';
 
 export function useAuth() {
   const queryClient = useQueryClient();
