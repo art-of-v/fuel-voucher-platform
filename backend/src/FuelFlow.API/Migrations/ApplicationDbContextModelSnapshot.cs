@@ -1005,47 +1005,57 @@ namespace FuelFlow.API.Migrations
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
-                        .HasColumnName("description");
+                        .HasColumnName("description")
+                        .HasComment("What the entry is for, in the accountant's words.");
 
                     b.Property<DateOnly>("EntryDate")
                         .HasColumnType("date")
-                        .HasColumnName("entry_date");
+                        .HasColumnName("entry_date")
+                        .HasComment("The date the entry belongs to - the accounting period it lands in, not the moment it waswritten.");
 
                     b.Property<long>("EntryNo")
                         .HasColumnType("bigint")
-                        .HasColumnName("entry_no");
+                        .HasColumnName("entry_no")
+                        .HasComment("The gapless number of this entry within its period. Allocated from document_sequences,not from here.");
 
                     b.Property<Guid>("PeriodId")
                         .HasColumnType("uuid")
-                        .HasColumnName("period_id");
+                        .HasColumnName("period_id")
+                        .HasComment("The accounting period this entry falls in.");
 
                     b.Property<DateTime?>("PostedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("posted_at_utc");
+                        .HasColumnName("posted_at_utc")
+                        .HasComment("When the entry was posted. NULL while it is a draft.");
 
                     b.Property<Guid?>("PostedByUserId")
                         .HasColumnType("uuid")
-                        .HasColumnName("posted_by_user_id");
+                        .HasColumnName("posted_by_user_id")
+                        .HasComment("Who posted it.");
 
                     b.Property<Guid?>("ReversedByEntryId")
                         .HasColumnType("uuid")
-                        .HasColumnName("reversed_by_entry_id");
+                        .HasColumnName("reversed_by_entry_id")
+                        .HasComment("The entry that reverses this one. A posted entry is never edited or deleted - it isreversed.");
 
                     b.Property<string>("SourceEvent")
                         .IsRequired()
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)")
-                        .HasColumnName("source_event");
+                        .HasColumnName("source_event")
+                        .HasComment("The domain event that caused this entry, matching ledger_mapping_rules.source_event.Stored on the entry and not just inferred from the mapping, because one business factcan produce several entries - a sale posts revenue, then VAT, then cost of sales - andidempotency has to tell those apart.");
 
                     b.Property<Guid?>("SourceId")
                         .HasColumnType("uuid")
-                        .HasColumnName("source_id");
+                        .HasColumnName("source_id")
+                        .HasComment("The operational row that caused this entry, where there is exactly one.");
 
                     b.Property<string>("SourceType")
                         .IsRequired()
                         .HasMaxLength(24)
                         .HasColumnType("character varying(24)")
-                        .HasColumnName("source_type");
+                        .HasColumnName("source_type")
+                        .HasComment("What caused the entry: a payment, a refund, a fulfilment.");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -1053,12 +1063,14 @@ namespace FuelFlow.API.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)")
                         .HasDefaultValue("Draft")
-                        .HasColumnName("status");
+                        .HasColumnName("status")
+                        .HasComment("Draft or posted. A draft is not in the books, and the balance triggers count only postedentries.");
 
                     b.Property<string>("TamperHash")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)")
-                        .HasColumnName("tamper_hash");
+                        .HasColumnName("tamper_hash")
+                        .HasComment("SHA-256 over the entry's own content. A hash that anyone can recompute is not asignature.");
 
                     b.HasKey("Id");
 
@@ -1848,23 +1860,27 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<bool>("Enabled")
                         .HasColumnType("boolean")
-                        .HasColumnName("enabled");
+                        .HasColumnName("enabled")
+                        .HasComment("Whether the operator put this tier on sale. Never acts alone: a tier is offerable onlywhen it is enabled AND its rate is positive, so a row left on at zero sells nothing.");
 
                     b.Property<decimal>("RatePerLiter")
                         .HasColumnType("numeric(14,4)")
-                        .HasColumnName("rate_per_liter");
+                        .HasColumnName("rate_per_liter")
+                        .HasComment("The number, in UAH per litre - and what it means depends on the scheme: an absoluteprice for a renewal, a subtraction for a purchase term.");
 
                     b.Property<string>("Scheme")
                         .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)")
-                        .HasColumnName("scheme");
+                        .HasColumnName("scheme")
+                        .HasComment("Which ladder this row belongs to - one of VoucherTermPricingSchemes.");
 
                     b.Property<string>("TermCode")
                         .IsRequired()
                         .HasMaxLength(4)
                         .HasColumnType("character varying(4)")
-                        .HasColumnName("term_code");
+                        .HasColumnName("term_code")
+                        .HasComment("The purchase term this row prices, from VoucherRenewalTerms.Code - '1w', '2m' and so on.A code rather than a duration, so the ladder stays aligned with the term the customeractually chose.");
 
                     b.Property<DateTime?>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
@@ -1872,20 +1888,24 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<Guid?>("UpdatedByUserId")
                         .HasColumnType("uuid")
-                        .HasColumnName("updated_by_user_id");
+                        .HasColumnName("updated_by_user_id")
+                        .HasComment("Who closed the previous row and opened this one. NULL on the rows the migration creates,because nobody opened them - that is the honest value.");
 
                     b.Property<string>("UpdatedByUserName")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
-                        .HasColumnName("updated_by_user_name");
+                        .HasColumnName("updated_by_user_name")
+                        .HasComment("The name of that user, as it read at the time.");
 
                     b.Property<DateTime>("ValidFrom")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("valid_from");
+                        .HasColumnName("valid_from")
+                        .HasComment("When this row started applying.");
 
                     b.Property<DateTime?>("ValidTo")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("valid_to");
+                        .HasColumnName("valid_to")
+                        .HasComment("When it stopped. NULL means this is the current row - and only one may be open.");
 
                     b.HasKey("Id");
 
@@ -1953,16 +1973,19 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<decimal?>("AmountUah")
                         .HasColumnType("numeric(12,2)")
-                        .HasColumnName("amount_uah");
+                        .HasColumnName("amount_uah")
+                        .HasComment("What the parser read, kept even when nothing matched.");
 
                     b.Property<long>("ChatId")
                         .HasColumnType("bigint")
-                        .HasColumnName("chat_id");
+                        .HasColumnName("chat_id")
+                        .HasComment("Telegram's chat id. Part of the idempotency key, because message ids are per-chat.");
 
                     b.Property<string>("Code")
                         .HasMaxLength(8)
                         .HasColumnType("character varying(8)")
-                        .HasColumnName("code");
+                        .HasColumnName("code")
+                        .HasComment("The code as read, upper-cased. Kept for the same reason as the amount.");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
@@ -1970,44 +1993,53 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<long>("MessageId")
                         .HasColumnType("bigint")
-                        .HasColumnName("message_id");
+                        .HasColumnName("message_id")
+                        .HasComment("Telegram's per-chat message id. Part of the idempotency key.");
 
                     b.Property<string>("Outcome")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
-                        .HasColumnName("outcome");
+                        .HasColumnName("outcome")
+                        .HasComment("What the message turned out to be: accepted, or a refusal.");
 
                     b.Property<Guid?>("PaymentId")
                         .HasColumnType("uuid")
-                        .HasColumnName("payment_id");
+                        .HasColumnName("payment_id")
+                        .HasComment("The payment this produced, when it produced one.");
 
                     b.Property<string>("RejectionReason")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
-                        .HasColumnName("rejection_reason");
+                        .HasColumnName("rejection_reason")
+                        .HasComment("Why, when the outcome is not Accepted.");
 
                     b.Property<Guid?>("ResolvedUserId")
                         .HasColumnType("uuid")
-                        .HasColumnName("resolved_user_id");
+                        .HasColumnName("resolved_user_id")
+                        .HasComment("The customer the code resolved to, when it resolved to one.");
 
                     b.Property<DateTime>("SentAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("sent_at_utc");
+                        .HasColumnName("sent_at_utc")
+                        .HasComment("Telegram's own timestamp for the message, not our receive time.");
 
                     b.Property<string>("TelegramDisplayName")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
-                        .HasColumnName("telegram_display_name");
+                        .HasColumnName("telegram_display_name")
+                        .HasComment("The display name at the time, so the record survives the person renaming themselves.");
 
                     b.Property<long>("TelegramUserId")
                         .HasColumnType("bigint")
-                        .HasColumnName("telegram_user_id");
+                        .HasColumnName("telegram_user_id")
+                        .HasComment("Who sent it. Kept even for a refused message: the refusal is only meaningful with thesender, and an authorisation row that cannot name who was refused names nothing.");
 
                     b.Property<string>("Text")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
-                        .HasColumnName("text");
+                        .HasColumnName("text")
+                        .HasComment("The message as written, trimmed. NULL only for a message that carried no text at all.");
 
                     b.HasKey("Id");
 
@@ -2956,11 +2988,13 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<decimal>("AmountKopecks")
                         .HasColumnType("numeric(14,0)")
-                        .HasColumnName("amount_kopecks");
+                        .HasColumnName("amount_kopecks")
+                        .HasComment("What the wire said, in kopecks. A second representation of the same number - and a CHECKholds the two in agreement.");
 
                     b.Property<decimal>("AmountUah")
                         .HasColumnType("numeric(12,2)")
-                        .HasColumnName("amount_uah");
+                        .HasColumnName("amount_uah")
+                        .HasComment("What WE billed, in UAH. The same type as orders.price.");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
@@ -2968,33 +3002,39 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<Guid?>("CreatedByUserId")
                         .HasColumnType("uuid")
-                        .HasColumnName("created_by_user_id");
+                        .HasColumnName("created_by_user_id")
+                        .HasComment("Who approved the refund, and whether it was automatic. Audit of the decision, not of themoney - only a refund has one, and the database refuses these on a capture.");
 
                     b.Property<string>("CreatedByUserName")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
-                        .HasColumnName("created_by_user_name");
+                        .HasColumnName("created_by_user_name")
+                        .HasComment("The approver's name as it read at approval time. A denormalised copy, never a jointarget.");
 
                     b.Property<string>("Currency")
                         .IsRequired()
                         .HasMaxLength(3)
                         .HasColumnType("character varying(3)")
-                        .HasColumnName("currency");
+                        .HasColumnName("currency")
+                        .HasComment("The currency the amounts are in.");
 
                     b.Property<string>("ErrorMessage")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
-                        .HasColumnName("error_message");
+                        .HasColumnName("error_message")
+                        .HasComment("Why the refund could not be completed, when it could not.");
 
                     b.Property<bool>("IsAutomatic")
                         .HasColumnType("boolean")
-                        .HasColumnName("is_automatic");
+                        .HasColumnName("is_automatic")
+                        .HasComment("The refund was raised by a system rule rather than by a person.");
 
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)")
-                        .HasColumnName("kind");
+                        .HasColumnName("kind")
+                        .HasComment("What this row is: a capture, or a refund.");
 
                     b.Property<string>("Merchant")
                         .HasMaxLength(20)
@@ -3003,45 +3043,54 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<Guid?>("OrderId")
                         .HasColumnType("uuid")
-                        .HasColumnName("order_id");
+                        .HasColumnName("order_id")
+                        .HasComment("The order this payment settles, or NULL when it is not yet attached to one. NULL is notan error and not a pending payment: it is money we hold that is not yet against a sale -an advance, which is a liability, not revenue. Revenue is recognised when the fuel isdelivered, never on receipt.");
 
                     b.Property<DateTime?>("PaidAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("paid_at_utc");
+                        .HasColumnName("paid_at_utc")
+                        .HasComment("When the money moved - written from the acquirer's statement when one arrives, becausethe statement is the authority on time as well as on amount.");
 
                     b.Property<Guid?>("ParentPaymentId")
                         .HasColumnType("uuid")
-                        .HasColumnName("parent_payment_id");
+                        .HasColumnName("parent_payment_id")
+                        .HasComment("The capture this refund reverses. NULL on a capture - a refund is always answerable as'money back against this exact charge'.");
 
                     b.Property<string>("Provider")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
-                        .HasColumnName("provider");
+                        .HasColumnName("provider")
+                        .HasComment("The acquiring brand, lowercase, matching the Monobank vendor token.");
 
                     b.Property<decimal?>("ProviderAmountKopecks")
                         .HasColumnType("numeric(14,0)")
-                        .HasColumnName("provider_amount_kopecks");
+                        .HasColumnName("provider_amount_kopecks")
+                        .HasComment("What the ACQUIRER reported charging, once a callback or a statement row says so. NULLuntil one arrives, and deliberately NOT constrained against amount_kopecks: the twodisagreeing is the entire point of the column, because it makes an amount mismatch aqueryable fact on the money row instead of a log line that is gone by the morning.");
 
                     b.Property<string>("ProviderInvoiceId")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
-                        .HasColumnName("provider_invoice_id");
+                        .HasColumnName("provider_invoice_id")
+                        .HasComment("The acquirer's invoice id - the identity that survives a re-issued payment link, andunique per provider and per kind, so two attempts at paying the same order coexistinstead of overwriting one another.");
 
                     b.Property<string>("ProviderPayload")
                         .HasColumnType("text")
-                        .HasColumnName("provider_payload");
+                        .HasColumnName("provider_payload")
+                        .HasComment("The acquirer's row verbatim, when we have one.");
 
                     b.Property<string>("ProviderPaymentId")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
-                        .HasColumnName("provider_payment_id");
+                        .HasColumnName("provider_payment_id")
+                        .HasComment("The acquirer's own payment-system id, where it provides one. Distinct from the invoiceid: several payments can be attempted against one invoice, and the statement rows carrythis value as rrn/approvalCode.");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)")
-                        .HasColumnName("status");
+                        .HasColumnName("status")
+                        .HasComment("Where this payment stands.");
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
@@ -3049,11 +3098,13 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<Guid?>("UserId")
                         .HasColumnType("uuid")
-                        .HasColumnName("user_id");
+                        .HasColumnName("user_id")
+                        .HasComment("The customer this money belongs to, when we know who paid. NULL together with a NULLorder_id means the payment is UNALLOCATED: the money is real and belongs to nobody yet,and an operator decides whose it is.");
 
                     b.Property<Guid?>("WebhookEventId")
                         .HasColumnType("uuid")
-                        .HasColumnName("webhook_event_id");
+                        .HasColumnName("webhook_event_id")
+                        .HasComment("The delivery that proved this payment, when the proof was a webhook. NULL when thepayment was settled from the statement instead - which is itself the answer to 'did theacquirer tell us, or did we find out on our own?'");
 
                     b.Property<uint>("xmin")
                         .IsConcurrencyToken()

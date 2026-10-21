@@ -1,4 +1,8 @@
+using FuelFlow.Features.Ledger.SharedModels;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Payments.SharedModels;
+using FuelFlow.Features.Pricing.Terms.SharedModels;
+using FuelFlow.Features.Settlement.SharedModels;
 using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.Persistence;
@@ -152,6 +156,122 @@ public sealed class SchemaCommentTests
             }
         }
     }
+
+    /// <summary>
+    /// The money tables, and the columns that answer "how much, in what, and whose".
+    /// </summary>
+    private static readonly (Type Entity, string[] Columns)[] TheMoneyTables =
+    [
+        (typeof(Payment),
+        [
+            nameof(Payment.OrderId),
+            nameof(Payment.UserId),
+            nameof(Payment.Kind),
+            nameof(Payment.ParentPaymentId),
+            nameof(Payment.Provider),
+            nameof(Payment.ProviderInvoiceId),
+            nameof(Payment.ProviderPaymentId),
+            nameof(Payment.AmountUah),
+            nameof(Payment.AmountKopecks),
+            nameof(Payment.ProviderAmountKopecks),
+            nameof(Payment.Currency),
+            nameof(Payment.Status),
+            nameof(Payment.PaidAtUtc),
+            nameof(Payment.WebhookEventId),
+            nameof(Payment.ProviderPayload),
+            nameof(Payment.CreatedByUserId),
+            nameof(Payment.CreatedByUserName),
+            nameof(Payment.IsAutomatic),
+            nameof(Payment.ErrorMessage)
+        ]),
+        (typeof(JournalEntry),
+        [
+            nameof(JournalEntry.EntryNo),
+            nameof(JournalEntry.EntryDate),
+            nameof(JournalEntry.PeriodId),
+            nameof(JournalEntry.SourceType),
+            nameof(JournalEntry.SourceEvent),
+            nameof(JournalEntry.SourceId),
+            nameof(JournalEntry.Description),
+            nameof(JournalEntry.Status),
+            nameof(JournalEntry.PostedAtUtc),
+            nameof(JournalEntry.PostedByUserId),
+            nameof(JournalEntry.ReversedByEntryId),
+            nameof(JournalEntry.TamperHash)
+        ]),
+        (typeof(SettlementMessage),
+        [
+            nameof(SettlementMessage.ChatId),
+            nameof(SettlementMessage.MessageId),
+            nameof(SettlementMessage.TelegramUserId),
+            nameof(SettlementMessage.TelegramDisplayName),
+            nameof(SettlementMessage.Text),
+            nameof(SettlementMessage.SentAtUtc),
+            nameof(SettlementMessage.Outcome),
+            nameof(SettlementMessage.RejectionReason),
+            nameof(SettlementMessage.AmountUah),
+            nameof(SettlementMessage.Code),
+            nameof(SettlementMessage.ResolvedUserId),
+            nameof(SettlementMessage.PaymentId)
+        ]),
+        (typeof(VoucherTermPricing),
+        [
+            nameof(VoucherTermPricing.Scheme),
+            nameof(VoucherTermPricing.TermCode),
+            nameof(VoucherTermPricing.Enabled),
+            nameof(VoucherTermPricing.RatePerLiter),
+            nameof(VoucherTermPricing.ValidFrom),
+            nameof(VoucherTermPricing.ValidTo),
+            nameof(VoucherTermPricing.UpdatedByUserId),
+            nameof(VoucherTermPricing.UpdatedByUserName)
+        ])
+    ];
+
+    [Fact]
+    public void The_Money_Tables_Should_Say_What_They_Are()
+    {
+        var context = BuildContext();
+
+        foreach (var (entityType, columns) in TheMoneyTables)
+        {
+            var entity = context.Model.FindEntityType(entityType);
+            Assert.NotNull(entity);
+
+            foreach (var column in columns)
+            {
+                var property = entity.FindProperty(column);
+                Assert.NotNull(property);
+
+                var comment = CommentOf(property);
+                Assert.False(string.IsNullOrWhiteSpace(comment),
+                    $"{entityType.Name}.{column} carries no comment. A money column answers 'how "
+                    + "much, in what, and whose' - and the column name alone does not say which "
+                    + "of those it is, nor whether a NULL means 'not stated' or 'nothing'.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// The two units of a payment, and the third column that is not a second copy of either.
+    /// </summary>
+    [Fact]
+    public void The_Payment_Amounts_Should_Say_Which_Is_Whose()
+    {
+        var context = BuildContext();
+        var payment = context.Model.FindEntityType(typeof(Payment));
+        Assert.NotNull(payment);
+
+        var ours = CommentOf(payment.FindProperty(nameof(Payment.AmountUah))!);
+        var wire = CommentOf(payment.FindProperty(nameof(Payment.AmountKopecks))!);
+        var acquirer = CommentOf(payment.FindProperty(nameof(Payment.ProviderAmountKopecks))!);
+
+        Assert.Contains("WE", ours, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("wire", wire, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("ACQUIRER", acquirer, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("NULL", acquirer, StringComparison.OrdinalIgnoreCase);
+    }
+
+
 
     /// <summary>
     /// The comments of a property, read as the annotation they are stored as. The relational

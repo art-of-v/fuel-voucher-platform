@@ -18,43 +18,56 @@ internal sealed class VoucherTermPricingConfiguration : IEntityTypeConfiguration
         builder.Property(e => e.Scheme)
             .HasColumnName("scheme")
             .HasMaxLength(32)
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "Which ladder this row belongs to - one of VoucherTermPricingSchemes.");
 
         builder.Property(e => e.TermCode)
             .HasColumnName("term_code")
             .HasMaxLength(4)
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "The purchase term this row prices, from VoucherRenewalTerms.Code - '1w', '2m' and so on." +
+                    "A code rather than a duration, so the ladder stays aligned with the term the customer" +
+                    "actually chose.");
 
         builder.Property(e => e.Enabled)
             .HasColumnName("enabled")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "Whether the operator put this tier on sale. Never acts alone: a tier is offerable only" +
+                    "when it is enabled AND its rate is positive, so a row left on at zero sells nothing.");
 
         // 14,4 like pricing_rules.value and fuel_offers.cost_per_liter, so the three per-litre rate
         // columns are comparable in a query rather than needing a cast.
         builder.Property(e => e.RatePerLiter)
             .HasColumnName("rate_per_liter")
             .HasColumnType("numeric(14,4)")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "The number, in UAH per litre - and what it means depends on the scheme: an absolute" +
+                    "price for a renewal, a subtraction for a purchase term.");
 
         builder.Property(e => e.ValidFrom)
             .HasColumnName("valid_from")
             .HasColumnType("timestamp with time zone")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "When this row started applying.");
 
         builder.Property(e => e.ValidTo)
             .HasColumnName("valid_to")
-            .HasColumnType("timestamp with time zone");
+            .HasColumnType("timestamp with time zone")
+            .HasComment(                "When it stopped. NULL means this is the current row - and only one may be open.");
 
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
             .HasColumnType("timestamp with time zone")
             .IsRequired();
 
-        builder.Property(e => e.UpdatedByUserId).HasColumnName("updated_by_user_id");
+        builder.Property(e => e.UpdatedByUserId).HasColumnName("updated_by_user_id")
+            .HasComment(                "Who closed the previous row and opened this one. NULL on the rows the migration creates," +
+                    "because nobody opened them - that is the honest value.");
 
         builder.Property(e => e.UpdatedByUserName)
             .HasColumnName("updated_by_user_name")
-            .HasMaxLength(200);
+            .HasMaxLength(200)
+            .HasComment(                "The name of that user, as it read at the time.");
 
         builder.Property(e => e.UpdatedAtUtc)
             .HasColumnName("updated_at_utc")

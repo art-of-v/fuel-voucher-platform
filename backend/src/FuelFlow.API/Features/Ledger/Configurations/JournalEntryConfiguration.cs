@@ -17,22 +17,42 @@ internal sealed class JournalEntryConfiguration : IEntityTypeConfiguration<Journ
         builder.HasKey(e => e.Id);
         builder.Property(e => e.Id).HasColumnName("id");
 
-        builder.Property(e => e.EntryNo).HasColumnName("entry_no").IsRequired();
-        builder.Property(e => e.EntryDate).HasColumnName("entry_date").IsRequired();
-        builder.Property(e => e.PeriodId).HasColumnName("period_id").IsRequired();
+        builder.Property(e => e.EntryNo).HasColumnName("entry_no").IsRequired()
+            .HasComment(                "The gapless number of this entry within its period. Allocated from document_sequences," +
+                    "not from here.");
+        builder.Property(e => e.EntryDate).HasColumnName("entry_date").IsRequired()
+            .HasComment(                "The date the entry belongs to - the accounting period it lands in, not the moment it was" +
+                    "written.");
+        builder.Property(e => e.PeriodId).HasColumnName("period_id").IsRequired()
+            .HasComment(                "The accounting period this entry falls in.");
         builder.Property(e => e.SourceType)
-            .HasColumnName("source_type").HasConversion<string>().HasMaxLength(24).IsRequired();
+            .HasColumnName("source_type").HasConversion<string>().HasMaxLength(24).IsRequired()
+            .HasComment(                "What caused the entry: a payment, a refund, a fulfilment.");
         builder.Property(e => e.SourceEvent)
-            .HasColumnName("source_event").HasMaxLength(40).IsRequired();
-        builder.Property(e => e.SourceId).HasColumnName("source_id");
-        builder.Property(e => e.Description).HasColumnName("description").HasMaxLength(500).IsRequired();
+            .HasColumnName("source_event").HasMaxLength(40).IsRequired()
+            .HasComment(                "The domain event that caused this entry, matching ledger_mapping_rules.source_event." +
+                    "Stored on the entry and not just inferred from the mapping, because one business fact" +
+                    "can produce several entries - a sale posts revenue, then VAT, then cost of sales - and" +
+                    "idempotency has to tell those apart.");
+        builder.Property(e => e.SourceId).HasColumnName("source_id")
+            .HasComment(                "The operational row that caused this entry, where there is exactly one.");
+        builder.Property(e => e.Description).HasColumnName("description").HasMaxLength(500).IsRequired()
+            .HasComment(                "What the entry is for, in the accountant's words.");
         builder.Property(e => e.Status)
             .HasColumnName("status").HasConversion<string>().HasMaxLength(10)
-            .HasDefaultValue(JournalEntryStatus.Draft).IsRequired();
-        builder.Property(e => e.PostedAtUtc).HasColumnName("posted_at_utc");
-        builder.Property(e => e.PostedByUserId).HasColumnName("posted_by_user_id");
-        builder.Property(e => e.ReversedByEntryId).HasColumnName("reversed_by_entry_id");
-        builder.Property(e => e.TamperHash).HasColumnName("tamper_hash").HasMaxLength(64);
+            .HasDefaultValue(JournalEntryStatus.Draft).IsRequired()
+            .HasComment(                "Draft or posted. A draft is not in the books, and the balance triggers count only posted" +
+                    "entries.");
+        builder.Property(e => e.PostedAtUtc).HasColumnName("posted_at_utc")
+            .HasComment(                "When the entry was posted. NULL while it is a draft.");
+        builder.Property(e => e.PostedByUserId).HasColumnName("posted_by_user_id")
+            .HasComment(                "Who posted it.");
+        builder.Property(e => e.ReversedByEntryId).HasColumnName("reversed_by_entry_id")
+            .HasComment(                "The entry that reverses this one. A posted entry is never edited or deleted - it is" +
+                    "reversed.");
+        builder.Property(e => e.TamperHash).HasColumnName("tamper_hash").HasMaxLength(64)
+            .HasComment(                "SHA-256 over the entry's own content. A hash that anyone can recompute is not a" +
+                    "signature.");
         builder.Property(e => e.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
         builder.Property(e => e.CreatedByUserId).HasColumnName("created_by_user_id");
 
