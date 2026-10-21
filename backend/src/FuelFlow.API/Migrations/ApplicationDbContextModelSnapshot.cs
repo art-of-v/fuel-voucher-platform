@@ -1809,11 +1809,13 @@ namespace FuelFlow.API.Migrations
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
-                        .HasColumnName("brand");
+                        .HasColumnName("brand")
+                        .HasComment("The brand's NAME - what a report groups by and what a parser reads. The id below is whatthe database can check, and the two are the same fact written twice.");
 
                     b.Property<Guid>("BrandId")
                         .HasColumnType("uuid")
-                        .HasColumnName("brand_id");
+                        .HasColumnName("brand_id")
+                        .HasComment("The brand's id - the key the text above is a copy of. The composite foreign key(fuel_type_id, brand_id) -> fuel_types(id, brand_id) is what refuses a row whose brandis not its fuel's brand. A nullable key would be a key the database does not check,because a foreign key with a NULL in it is not compared at all.");
 
                     b.Property<Guid>("FuelTypeId")
                         .HasColumnType("uuid")
@@ -1821,15 +1823,18 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<decimal>("LineTotal")
                         .HasColumnType("numeric(12,2)")
-                        .HasColumnName("line_total");
+                        .HasColumnName("line_total")
+                        .HasComment("What the customer paid for the WHOLE line, in UAH. This is the truth of the money;original_line_total is the reference it is measured against.");
 
                     b.Property<decimal>("Liters")
                         .HasColumnType("numeric(10,2)")
-                        .HasColumnName("liters");
+                        .HasColumnName("liters")
+                        .HasComment("How many litres one unit of this line is.");
 
                     b.Property<DateOnly?>("NewCustomerExpiration")
                         .HasColumnType("date")
-                        .HasColumnName("new_customer_expiration");
+                        .HasColumnName("new_customer_expiration")
+                        .HasComment("The expiry this renewal gave the customer. On a REPLACE this is the PROMISE, not thereplacement voucher's real life: what the customer bought is what they can rely on, andany longer real life on the stock voucher is a hidden reserve they may extend againlater - and showing it here would be selling twice.");
 
                     b.Property<Guid>("OrderId")
                         .HasColumnType("uuid")
@@ -1837,39 +1842,47 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<decimal?>("OriginalLineTotal")
                         .HasColumnType("numeric(12,2)")
-                        .HasColumnName("original_line_total");
+                        .HasColumnName("original_line_total")
+                        .HasComment("The pump-based LIST total for this line, in UAH, frozen at checkout. The customer'ssaving against the pump is original_line_total - line_total. NULL for rows predating thecolumn (no backfill - a historical pump price cannot be reconstructed) and for lineswith no pump reference (a voucher renewal), which therefore contribute no saving.");
 
                     b.Property<DateOnly?>("PreviousCustomerExpiration")
                         .HasColumnType("date")
-                        .HasColumnName("previous_customer_expiration");
+                        .HasColumnName("previous_customer_expiration")
+                        .HasComment("The customer's expiry on the source voucher BEFORE this renewal was applied. NULL untilfulfilment, and on every non-renewal line. A snapshot, because there is nothing left toread it from afterwards: the extend branch overwritesfuel_vouchers.customer_expiration_date in place, and no history column survives it.");
 
                     b.Property<string>("PricingBasis")
                         .HasColumnType("jsonb")
-                        .HasColumnName("pricing_basis");
+                        .HasColumnName("pricing_basis")
+                        .HasComment("The inputs that produced unit_price, frozen at checkout, as a JSON object: the per-litrecost, the margin, the pump price, the minimum discount and the terms id this line waspriced under. unit_price records WHAT the customer paid; this records WHY. NULL forevery order placed before the column existed, and deliberately not backfilled:backfilling from today's contract would manufacture a history that never happened, whichis worse than an honest gap - it looks like evidence.");
 
                     b.Property<int>("Quantity")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
                         .HasDefaultValue(1)
-                        .HasColumnName("quantity");
+                        .HasColumnName("quantity")
+                        .HasComment("How many units of this line the customer bought.");
 
                     b.Property<string>("RenewalBranch")
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)")
-                        .HasColumnName("renewal_branch");
+                        .HasColumnName("renewal_branch")
+                        .HasComment("Which fulfilment path this renewal took: 'extend' or 'replace'. NULL on every other kindof line. Stored rather than derived, because the branch is DECIDED AND PRICED atcheckout from the voucher's state that day, while fulfilment deliberately re-decides itfrom the current state - the voucher can lapse in between - so nothing reading it backlater can recompute the original answer.");
 
                     b.Property<Guid?>("SourceVoucherId")
                         .HasColumnType("uuid")
-                        .HasColumnName("source_voucher_id");
+                        .HasColumnName("source_voucher_id")
+                        .HasComment("The voucher this line renews, when the line is a renewal; NULL on every other kind ofline. It lives on the LINE and not on the fulfilment: a renewal is an intent - it existsfrom checkout, before payment and before any stock is assigned - and a paid renewal thatfinds no stock has no fulfilment row at all.");
 
                     b.Property<string>("TermCode")
                         .HasMaxLength(8)
                         .HasColumnType("character varying(8)")
-                        .HasColumnName("term_code");
+                        .HasColumnName("term_code")
+                        .HasComment("The term the customer bought this fuel for, frozen at checkout. NULL means the fullremaining supplier term was sold. A renewal line ALWAYS has one.");
 
                     b.Property<decimal>("UnitPrice")
                         .HasColumnType("numeric(12,2)")
-                        .HasColumnName("unit_price");
+                        .HasColumnName("unit_price")
+                        .HasComment("What the customer paid for ONE unit, in UAH.");
 
                     b.HasKey("Id");
 
@@ -2530,21 +2543,25 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<Guid?>("AssignedToUserId")
                         .HasColumnType("uuid")
-                        .HasColumnName("assigned_to_user_id");
+                        .HasColumnName("assigned_to_user_id")
+                        .HasComment("The customer who holds it.");
 
                     b.Property<string>("Brand")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
-                        .HasColumnName("brand");
+                        .HasColumnName("brand")
+                        .HasComment("The brand's NAME - what a report groups by and what a parser reads. The id below is whatthe database can check, and the two are the same fact written twice.");
 
                     b.Property<Guid>("BrandId")
                         .HasColumnType("uuid")
-                        .HasColumnName("brand_id");
+                        .HasColumnName("brand_id")
+                        .HasComment("The brand's id - the key the text above is a copy of. The composite foreign key(fuel_type_id, brand_id) -> fuel_types(id, brand_id) is what refuses a row whose brandis not its fuel's brand. A nullable key would be a key the database does not check,because a foreign key with a NULL in it is not compared at all.");
 
                     b.Property<decimal?>("CostPerLiter")
                         .HasColumnType("numeric(10,4)")
-                        .HasColumnName("cost_per_liter");
+                        .HasColumnName("cost_per_liter")
+                        .HasComment("What this litre cost US, in UAH - the supplier's price, not our selling price.");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
@@ -2552,13 +2569,15 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateOnly>("CustomerExpirationDate")
                         .HasColumnType("date")
-                        .HasColumnName("customer_expiration_date");
+                        .HasColumnName("customer_expiration_date")
+                        .HasComment("What the customer was actually sold, and the date their wallet shows. Normally equal tosupplier_expiration_date; it is a separate column because we sell SHORT terms - avoucher with three months of real life may be sold with one week - and only this datemoves when the customer pays to extend it.");
 
                     b.Property<string>("DataKind")
                         .IsRequired()
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)")
-                        .HasColumnName("data_kind");
+                        .HasColumnName("data_kind")
+                        .HasComment("Whether this row is business or a rehearsal: 'real' or 'qa'.");
 
                     b.Property<Guid>("FuelTypeId")
                         .HasColumnType("uuid")
@@ -2570,21 +2589,25 @@ namespace FuelFlow.API.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)")
                         .HasColumnName("holder_kind")
-                        .HasComputedColumnSql("CASE\n    WHEN worker_user_id IS NOT NULL THEN 'Worker'\n    WHEN legal_entity_id IS NOT NULL AND assigned_to_user_id IS NOT NULL THEN 'Company'\n    WHEN assigned_to_user_id IS NOT NULL THEN 'Personal'\n    ELSE 'Stock'\nEND", true);
+                        .HasComputedColumnSql("CASE\n    WHEN worker_user_id IS NOT NULL THEN 'Worker'\n    WHEN legal_entity_id IS NOT NULL AND assigned_to_user_id IS NOT NULL THEN 'Company'\n    WHEN assigned_to_user_id IS NOT NULL THEN 'Personal'\n    ELSE 'Stock'\nEND", true)
+                        .HasComment("Who may redeem it: the customer, or the worker it was issued to.");
 
                     b.Property<Guid?>("ImportJobId")
                         .HasColumnType("uuid")
-                        .HasColumnName("import_job_id");
+                        .HasColumnName("import_job_id")
+                        .HasComment("The import it came from.");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(false)
-                        .HasColumnName("is_deleted");
+                        .HasColumnName("is_deleted")
+                        .HasComment("Soft delete. The row stays: the paper was real, and the record of it has to survive thedelete.");
 
                     b.Property<DateTime?>("IssuedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("issued_at_utc");
+                        .HasColumnName("issued_at_utc")
+                        .HasComment("When this voucher was handed to a worker by a company owner. Set once, on issue; nevermoved afterwards. A column of its own rather than a reading of updated_at_utc, becauseevery mutation - a block, a recall, a deactivate - clobbers updated_at_utc, and a usagereport that answered 'when did I receive this' off it would move the date every time theowner touched it.");
 
                     b.Property<Guid?>("LegalEntityId")
                         .HasColumnType("uuid")
@@ -2592,11 +2615,13 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<decimal>("Liters")
                         .HasColumnType("numeric(10,2)")
-                        .HasColumnName("liters");
+                        .HasColumnName("liters")
+                        .HasComment("How many litres this voucher's paper is for.");
 
                     b.Property<Guid?>("OrderId")
                         .HasColumnType("uuid")
-                        .HasColumnName("order_id");
+                        .HasColumnName("order_id")
+                        .HasComment("The order it was sold with, when it was sold with one.");
 
                     b.Property<Guid?>("QrParametersId")
                         .HasColumnType("uuid")
@@ -2605,26 +2630,31 @@ namespace FuelFlow.API.Migrations
                     b.Property<byte[]>("QrPayload")
                         .IsRequired()
                         .HasColumnType("bytea")
-                        .HasColumnName("qr_payload");
+                        .HasColumnName("qr_payload")
+                        .HasComment("The supplier's QR code, verbatim - the redeemable material. Stored as AES-GCMciphertext: what sits in the column is nonce, tag and ciphertext concatenated.");
 
                     b.Property<byte[]>("QrPayloadSha256")
                         .IsRequired()
                         .HasColumnType("bytea")
-                        .HasColumnName("qr_payload_sha256");
+                        .HasColumnName("qr_payload_sha256")
+                        .HasComment("SHA-256 of the QR payload, carrying the deduplication the ciphertext cannot. Encryptedbytes cannot be compared - AES-GCM produces a fresh nonce every time, so the same QRencrypts differently every time - so the uniqueness index moved here. A hash is notreversible, and it is still a fingerprint of a redeemable code, so it is not somethingto log or expose.");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)")
-                        .HasColumnName("status");
+                        .HasColumnName("status")
+                        .HasComment("Where the voucher stands: assigned, used, expired, blocked and the rest.");
 
                     b.Property<DateOnly>("SupplierExpirationDate")
                         .HasColumnType("date")
-                        .HasColumnName("supplier_expiration_date");
+                        .HasColumnName("supplier_expiration_date")
+                        .HasComment("The real term of the SUPPLIER's voucher, read verbatim from the printed document atimport. It is the hard ceiling on everything we may promise: it bounds how long stockstays sellable and how far a customer's renewal may extend. Set once at import and nevermoved afterwards - a supplier voucher cannot be extended by us.");
 
                     b.Property<Guid?>("SupplierId")
                         .HasColumnType("uuid")
-                        .HasColumnName("supplier_id");
+                        .HasColumnName("supplier_id")
+                        .HasComment("Who we bought it from.");
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
@@ -2632,29 +2662,35 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime?>("UsedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("used_at_utc");
+                        .HasColumnName("used_at_utc")
+                        .HasComment("When this voucher was actually refuelled with. Set once, when it is marked used; nevermoved afterwards. NULL while the voucher is still unused.");
 
                     b.Property<decimal?>("VerificationMismatchPercent")
                         .HasColumnType("numeric(5,4)")
-                        .HasColumnName("verification_mismatch_percent");
+                        .HasColumnName("verification_mismatch_percent")
+                        .HasComment("How far the verification of this voucher's modules disagreed, as a percentage. NULL whenit was never verified.");
 
                     b.Property<int?>("VerificationMismatchedModules")
                         .HasColumnType("integer")
-                        .HasColumnName("verification_mismatched_modules");
+                        .HasColumnName("verification_mismatched_modules")
+                        .HasComment("How many modules disagreed.");
 
                     b.Property<int?>("VerificationTotalModules")
                         .HasColumnType("integer")
-                        .HasColumnName("verification_total_modules");
+                        .HasColumnName("verification_total_modules")
+                        .HasComment("How many modules were checked.");
 
                     b.Property<string>("VoucherNumber")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
-                        .HasColumnName("voucher_number");
+                        .HasColumnName("voucher_number")
+                        .HasComment("The voucher's own number, as the supplier printed it.");
 
                     b.Property<Guid?>("WorkerUserId")
                         .HasColumnType("uuid")
-                        .HasColumnName("worker_user_id");
+                        .HasColumnName("worker_user_id")
+                        .HasComment("The worker it was issued to.");
 
                     b.Property<uint>("xmin")
                         .IsConcurrencyToken()

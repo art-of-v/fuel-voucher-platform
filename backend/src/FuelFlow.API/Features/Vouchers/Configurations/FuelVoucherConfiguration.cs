@@ -27,7 +27,9 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
         builder.Property(e => e.Brand)
             .HasColumnName("brand")
             .HasMaxLength(50)
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "The brand's NAME - what a report groups by and what a parser reads. The id below is what" +
+                    "the database can check, and the two are the same fact written twice.");
 
         // The key the brand text above is a copy of. Required, because the composite foreign key
         // below is what refuses a row whose brand is not its fuel's brand - and a foreign key with a
@@ -36,7 +38,11 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
         builder.Property(e => e.BrandId)
             .HasColumnName("brand_id")
             .HasColumnType("uuid")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "The brand's id - the key the text above is a copy of. The composite foreign key" +
+                    "(fuel_type_id, brand_id) -> fuel_types(id, brand_id) is what refuses a row whose brand" +
+                    "is not its fuel's brand. A nullable key would be a key the database does not check," +
+                    "because a foreign key with a NULL in it is not compared at all.");
 
         // The fuel id is a uuid since planning D-21: a uuid column, so this can carry a real
         // foreign key one day - which is what D-02 is waiting for.
@@ -48,20 +54,30 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
         builder.Property(e => e.Liters)
             .HasColumnName("liters")
             .HasColumnType("numeric(10,2)")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "How many litres this voucher's paper is for.");
 
         builder.Property(e => e.SupplierExpirationDate)
             .HasColumnName("supplier_expiration_date")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "The real term of the SUPPLIER's voucher, read verbatim from the printed document at" +
+                    "import. It is the hard ceiling on everything we may promise: it bounds how long stock" +
+                    "stays sellable and how far a customer's renewal may extend. Set once at import and never" +
+                    "moved afterwards - a supplier voucher cannot be extended by us.");
 
         builder.Property(e => e.CustomerExpirationDate)
             .HasColumnName("customer_expiration_date")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "What the customer was actually sold, and the date their wallet shows. Normally equal to" +
+                    "supplier_expiration_date; it is a separate column because we sell SHORT terms - a" +
+                    "voucher with three months of real life may be sold with one week - and only this date" +
+                    "moves when the customer pays to extend it.");
 
         builder.Property(e => e.VoucherNumber)
             .HasColumnName("voucher_number")
             .HasMaxLength(100)
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "The voucher's own number, as the supplier printed it.");
 
         // Bounded on purpose. The QR payload is a bearer instrument - whoever holds it can have
         // the voucher redeemed at the pump - and it is the widest value on the table. A payload
@@ -73,7 +89,9 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
             // itself is applied in ApplicationDbContext.OnModelCreating, because it needs the cipher
             // instance and this configuration is discovered by assembly scan with no access to DI.
             .HasColumnType("bytea")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "The supplier's QR code, verbatim - the redeemable material. Stored as AES-GCM" +
+                    "ciphertext: what sits in the column is nonce, tag and ciphertext concatenated.");
 
         builder.Property(e => e.QrPayloadSha256)
             .HasColumnName("qr_payload_sha256")
@@ -86,7 +104,12 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
             .IsRequired()
             // Filled automatically on insert, so no writer has to remember. See the generator for why
             // a forgotten hash is worse than a failed write.
-            .HasValueGenerator<FuelFlow.Features.Vouchers.Security.QrPayloadHashValueGenerator>();
+            .HasValueGenerator<FuelFlow.Features.Vouchers.Security.QrPayloadHashValueGenerator>()
+            .HasComment(                "SHA-256 of the QR payload, carrying the deduplication the ciphertext cannot. Encrypted" +
+                    "bytes cannot be compared - AES-GCM produces a fresh nonce every time, so the same QR" +
+                    "encrypts differently every time - so the uniqueness index moved here. A hash is not" +
+                    "reversible, and it is still a fingerprint of a redeemable code, so it is not something" +
+                    "to log or expose.");
 
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
@@ -96,22 +119,27 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
             .HasColumnName("status")
             .HasConversion<string>()
             .HasMaxLength(32)
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "Where the voucher stands: assigned, used, expired, blocked and the rest.");
 
         builder.Property(e => e.AssignedToUserId)
-            .HasColumnName("assigned_to_user_id");
+            .HasColumnName("assigned_to_user_id")
+            .HasComment(                "The customer who holds it.");
 
         builder.Property(e => e.LegalEntityId)
             .HasColumnName("legal_entity_id");
 
         builder.Property(e => e.WorkerUserId)
-            .HasColumnName("worker_user_id");
+            .HasColumnName("worker_user_id")
+            .HasComment(                "The worker it was issued to.");
 
         builder.Property(e => e.ImportJobId)
-            .HasColumnName("import_job_id");
+            .HasColumnName("import_job_id")
+            .HasComment(                "The import it came from.");
 
         builder.Property(e => e.OrderId)
-            .HasColumnName("order_id");
+            .HasColumnName("order_id")
+            .HasComment(                "The order it was sold with, when it was sold with one.");
 
         builder.Property(e => e.QrParametersId)
             .HasColumnName("qr_parameters_id");
@@ -172,7 +200,8 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.Property(e => e.SupplierId)
-            .HasColumnName("supplier_id");
+            .HasColumnName("supplier_id")
+            .HasComment(                "Who we bought it from.");
 
         builder.HasOne(e => e.Supplier)
             .WithMany()
@@ -181,12 +210,14 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
 
         builder.Property(e => e.CostPerLiter)
             .HasColumnName("cost_per_liter")
-            .HasColumnType("numeric(10,4)");
+            .HasColumnType("numeric(10,4)")
+            .HasComment(                "What this litre cost US, in UAH - the supplier's price, not our selling price.");
 
         builder.Property(e => e.DataKind)
             .HasColumnName("data_kind")
             .HasMaxLength(10)
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "Whether this row is business or a rehearsal: 'real' or 'qa'.");
 
         // HasDefaultValue as well as the CLR default: the value has to reach the database for the
         // write paths that never mention this axis (every existing import path among them), and EF
@@ -201,7 +232,9 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
         builder.Property(e => e.IsDeleted)
             .HasColumnName("is_deleted")
             .HasDefaultValue(false)
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "Soft delete. The row stays: the paper was real, and the record of it has to survive the" +
+                    "delete.");
 
         builder.HasQueryFilter(e => !e.IsDeleted);
 
@@ -287,7 +320,8 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
                 END
                 """,
                 stored: true)
-            .ValueGeneratedOnAddOrUpdate();
+            .ValueGeneratedOnAddOrUpdate()
+            .HasComment(                "Who may redeem it: the customer, or the worker it was issued to.");
 
         builder.Property(e => e.UpdatedAtUtc)
             .HasColumnName("updated_at_utc")
@@ -296,20 +330,31 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
         // These two arrived in PascalCase because the mapping was forgotten - the only
         // snake_case violations left on this table. Named explicitly, like every other column.
         builder.Property(e => e.IssuedAtUtc)
-            .HasColumnName("issued_at_utc");
+            .HasColumnName("issued_at_utc")
+            .HasComment(                "When this voucher was handed to a worker by a company owner. Set once, on issue; never" +
+                    "moved afterwards. A column of its own rather than a reading of updated_at_utc, because" +
+                    "every mutation - a block, a recall, a deactivate - clobbers updated_at_utc, and a usage" +
+                    "report that answered 'when did I receive this' off it would move the date every time the" +
+                    "owner touched it.");
 
         builder.Property(e => e.UsedAtUtc)
-            .HasColumnName("used_at_utc");
+            .HasColumnName("used_at_utc")
+            .HasComment(                "When this voucher was actually refuelled with. Set once, when it is marked used; never" +
+                    "moved afterwards. NULL while the voucher is still unused.");
 
         builder.Property(e => e.VerificationMismatchPercent)
             .HasColumnName("verification_mismatch_percent")
-            .HasColumnType("numeric(5,4)");
+            .HasColumnType("numeric(5,4)")
+            .HasComment(                "How far the verification of this voucher's modules disagreed, as a percentage. NULL when" +
+                    "it was never verified.");
 
         builder.Property(e => e.VerificationMismatchedModules)
-            .HasColumnName("verification_mismatched_modules");
+            .HasColumnName("verification_mismatched_modules")
+            .HasComment(                "How many modules disagreed.");
 
         builder.Property(e => e.VerificationTotalModules)
-            .HasColumnName("verification_total_modules");
+            .HasColumnName("verification_total_modules")
+            .HasComment(                "How many modules were checked.");
 
         // Both keys are filtered to live rows, so an archived voucher releases its number and its
         // QR payload for reuse. Without the filter the two paths disagree: the import's duplicate
