@@ -237,9 +237,9 @@ public sealed class AdminQueryHandlersTests : IDisposable
         // Margin earned on the one delivered voucher: 2 UAH/L * 50 L * 1.
         response.Summary.TotalRevenueUah.Should().Be(100);
 
-        response.ThreeWayMatch.Should().HaveCount(2);
-        response.ThreeWayMatch.Should().ContainSingle(t => t.OrderId == fulfilledOrder.Id && t.MatchStatus == "OK");
-        response.ThreeWayMatch.Should().ContainSingle(t => t.OrderId == pendingOrder.Id && t.MatchStatus == "UNFULFILLED");
+        response.ThreeWayMatch.Items.Should().HaveCount(2);
+        response.ThreeWayMatch.Items.Should().ContainSingle(t => t.OrderId == fulfilledOrder.Id && t.MatchStatus == "OK");
+        response.ThreeWayMatch.Items.Should().ContainSingle(t => t.OrderId == pendingOrder.Id && t.MatchStatus == "UNFULFILLED");
 
         response.Exceptions.Should().Contain(e => e.Type == "UNFULFILLED");
 
@@ -292,12 +292,12 @@ public sealed class AdminQueryHandlersTests : IDisposable
         // Margin is earned only on the delivered voucher: 2 UAH/L * 50 L * 1.
         response.Summary.TotalRevenueUah.Should().Be(100);
 
-        response.ThreeWayMatch.Should().ContainSingle(t =>
+        response.ThreeWayMatch.Items.Should().ContainSingle(t =>
             t.OrderId == refundedOrder.Id
             && t.MatchStatus == "REFUNDED"
             && t.RefundStatus == "Completed"
             && t.RefundedKopecks == 100000);
-        response.ThreeWayMatch.Should().ContainSingle(t =>
+        response.ThreeWayMatch.Items.Should().ContainSingle(t =>
             t.OrderId == partialOrder.Id
             && t.MatchStatus == "PARTIAL_REFUNDED"
             && t.RefundStatus == "Completed"
@@ -365,7 +365,7 @@ public sealed class AdminQueryHandlersTests : IDisposable
 
         response.Should().NotBeNull();
         response.Summary.TotalOrders.Should().Be(0);
-        response.ThreeWayMatch.Should().BeEmpty();
+        response.ThreeWayMatch.Items.Should().BeEmpty();
         response.Exceptions.Should().BeEmpty();
         response.VoucherFunnel.Should().BeEmpty();
         response.RevenueSummary.Should().BeEmpty();

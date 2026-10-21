@@ -132,6 +132,19 @@ public sealed class GetReconciliationQueryHandler
             .Distinct()
             .CountAsync(cancellationToken);
 
+        // THE THREE-WAY MATCH IS A PAGE.
+        //
+        // It is a row per order, so it grows with every order the shop has ever taken, and it
+        // used to be answered with ALL of them - each with its fulfillments, its vouchers and
+        // its line items - on a 4 GB box with 1 GB of Postgres. The summary above is now the
+        // database's arithmetic, so a page of orders does not change a single figure on the
+        // screen.
+        //
+        // The order is the newest first, with a tie-break: two orders created in the same tick
+        // would otherwise swap places between two pages and one of them would be shown twice.
+        var pageSize = PageLimits.ClampPageSize(query.Limit);
+        var page = PageLimits.ClampPage(query.Page);
+
         var orders = await _context.Orders
             .AsNoTracking()
             // Same cross product as above: LineItems x Fulfillments.
@@ -140,20 +153,23 @@ public sealed class GetReconciliationQueryHandler
                 .ThenInclude(f => f.Voucher)
             .Include(o => o.LineItems)
             .OrderByDescending(o => o.CreatedAtUtc)
+            .ThenBy(o => o.Id)
+            .Skip(PageLimits.SkipFor(page, pageSize))
+            .Take(pageSize)
             .ToListAsync(cancellationToken);
 
         var orderIds = orders.Select(o => o.Id).ToList();
-        var allFulfillments = await _context.Fulfillments
-            .Where(f => orderIds.Contains(f.OrderId))
-            .ToListAsync(cancellationToken);
-        var fulfillByOrder = allFulfillments.GroupBy(f => f.OrderId).ToDictionary(g => g.Key, g => g.Count());
-
         var refundsByOrder = await _context.Payments
             .AsNoTracking()
 // A refund reverses a capture, and a capture always has an order. Stated as a filter rather than a
                 // null-forgiving cast so the guarantee is visible: an orderless payment is money we hold,
                 // not something a statement line can be reconciled against.
                 .Where(p => p.Kind == PaymentKind.Refund && p.OrderId != null && orderIds.Contains(p.OrderId.Value))
+                // One refund per order, and the LAST one wins: an order can be refunded twice, and
+                // the dictionary used to throw on the second one - a crash on the very screen an
+                // operator opens to find out what is wrong.
+                .GroupBy(p => p.OrderId!.Value)
+                .Select(g => g.OrderByDescending(p => p.CreatedAtUtc).First())
                 .ToDictionaryAsync(p => p.OrderId!.Value, cancellationToken);
 
         var threeWayMatch = orders.Select(o =>
@@ -161,7 +177,7 @@ public sealed class GetReconciliationQueryHandler
             var lineItemsList = o.LineItems.ToList();
             var firstLi = lineItemsList.FirstOrDefault();
             var expected = lineItemsList.Sum(li => li.Quantity);
-            var delivered = fulfillByOrder.GetValueOrDefault(o.Id, 0);
+            var delivered = o.Fulfillments.Count;
             var matchStatus = (o.Status == OrderStatus.Fulfilled && delivered >= expected) ? "OK"
                 : o.Status == OrderStatus.Cancelled ? "CANCELLED"
                 : o.Status == OrderStatus.Refunded ? "REFUNDED"
@@ -192,22 +208,114 @@ public sealed class GetReconciliationQueryHandler
                 refund is { Status: PaymentStatus.Succeeded } ? refund.AmountKopecks : 0L);
         }).ToList();
 
+        // THE EXCEPTIONS ARE NOT THE PAGE'S EXCEPTIONS.
+        //
+        // The issues panel is the operator's "what needs attention" list, and it must not be the
+        // page's: an order that was never fulfilled is usually an OLD order, so a page-scoped
+        // list would be empty exactly when there is something to look at, and the most urgent
+        // order - the one that has been waiting longest - would sit on the last page of a list
+        // sorted newest first.
+        //
+        // So the candidates are found by the database, over the whole table: the orders with no
+        // delivery at all, and the ones whose deliveries are short of what they promised. The
+        // rule that decides which of them is an exception stays here, in one place.
+        var candidateOrders = await _context.Orders
+            .AsNoTracking()
+            .Where(o => o.Status != OrderStatus.Cancelled
+                     && o.Status != OrderStatus.Refunded
+                     && o.Status != OrderStatus.PartiallyFulfilled
+                     && o.Status != OrderStatus.PendingPayment
+                     && o.Status != OrderStatus.Paid)
+            .Where(o => !o.Fulfillments.Any())
+            .Include(o => o.LineItems)
+            .ToListAsync(cancellationToken);
+
+        var shortfalls = await (
+            from o in _context.Orders.AsNoTracking()
+            join lg in _context.OrderLineItems.AsNoTracking()
+                .GroupBy(li => new { li.OrderId, li.Brand, li.FuelTypeId, li.Liters })
+                .Select(g => new
+                {
+                    g.Key.OrderId,
+                    g.Key.Brand,
+                    g.Key.FuelTypeId,
+                    g.Key.Liters,
+                    OrderedQty = g.Sum(li => li.Quantity)
+                })
+            on o.Id equals lg.OrderId
+            join d in _context.Fulfillments.AsNoTracking()
+                .Where(f => f.VoucherId != null && f.ReleasedAtUtc == null)
+                .Select(f => new { f.OrderId, f.Voucher!.Brand, f.Voucher.FuelTypeId, f.Voucher.Liters })
+                .GroupBy(x => new { x.OrderId, x.Brand, x.FuelTypeId, x.Liters })
+                .Select(g => new
+                {
+                    g.Key.OrderId,
+                    g.Key.Brand,
+                    g.Key.FuelTypeId,
+                    g.Key.Liters,
+                    DeliveredQty = g.Count()
+                })
+            on new { lg.OrderId, lg.Brand, lg.FuelTypeId, lg.Liters }
+                equals new { d.OrderId, d.Brand, d.FuelTypeId, d.Liters }
+            where o.Status != OrderStatus.Cancelled
+               && o.Status != OrderStatus.Refunded
+               && o.Status != OrderStatus.PartiallyRefunded
+               && o.Status != OrderStatus.PendingPayment
+               && o.Status != OrderStatus.Paid
+            group new { o, lg, d } by new { o.Id, o.Status, o.MonobankStatus, o.CreatedAtUtc, o.Price } into g
+            select new
+            {
+                g.Key.Id,
+                g.Key.Status,
+                g.Key.MonobankStatus,
+                g.Key.CreatedAtUtc,
+                g.Key.Price,
+                Brand = g.Max(x => x.lg.Brand),
+                Expected = g.Sum(x => x.lg.OrderedQty),
+                Delivered = g.Sum(x => x.d.DeliveredQty),
+                Shortfall = g.Sum(x => Math.Max(x.lg.OrderedQty - x.d.DeliveredQty, 0))
+            })
+            .Where(x => x.Shortfall > 0)
+            .ToListAsync(cancellationToken);
+
         var exceptions = new List<GetReconciliationResponse.ExceptionItem>();
 
-        foreach (var o in threeWayMatch)
+        foreach (var c in candidateOrders)
         {
-            if (o.MatchStatus == "UNFULFILLED" && o.MonobankStatus == "Success")
-                exceptions.Add(new(o.OrderId, "UNPAID_FULFILLMENT",
-                    $"Order paid ({o.TotalPrice} UAH) but no vouchers assigned — {o.DaysSinceCreated}d old",
-                    "critical", o.CreatedAtUtc));
-            else if (o.MatchStatus == "UNFULFILLED")
-                exceptions.Add(new(o.OrderId, "UNFULFILLED",
-                    $"{o.Brand} {o.FuelType} {o.Liters}L×{o.Quantity} — no inventory ({o.DaysSinceCreated}d waiting)",
-                    "warning", o.CreatedAtUtc));
-            else if (o.MatchStatus == "PARTIAL")
-                exceptions.Add(new(o.OrderId, "PARTIAL",
-                    $"Only {o.VouchersDelivered}/{o.VouchersExpected} vouchers delivered for {o.Brand} {o.FuelType}",
-                    "warning", o.CreatedAtUtc));
+            var lineItems = c.LineItems.ToList();
+            var firstLi = lineItems.FirstOrDefault();
+            var days = (DateTime.UtcNow - c.CreatedAtUtc).Days;
+
+            // The brand confirmed it took the money and the customer got nothing - the one
+            // exception on this screen that is critical.
+            if (c.MonobankStatus == MonobankStatus.Success)
+            {
+                exceptions.Add(new GetReconciliationResponse.ExceptionItem(
+                    c.Id,
+                    "UNPAID_FULFILLMENT",
+                    $"Order paid ({c.Price} UAH) but no vouchers assigned — {days}d old",
+                    "critical",
+                    c.CreatedAtUtc));
+            }
+            else
+            {
+                exceptions.Add(new GetReconciliationResponse.ExceptionItem(
+                    c.Id,
+                    "UNFULFILLED",
+                    $"{firstLi?.Brand ?? ""} {firstLi?.FuelTypeId.ToString() ?? ""} {lineItems.Sum(li => li.Liters * li.Quantity)}L×{lineItems.Sum(li => li.Quantity)} — no inventory ({days}d waiting)",
+                    "warning",
+                    c.CreatedAtUtc));
+            }
+        }
+
+        foreach (var s in shortfalls)
+        {
+            exceptions.Add(new GetReconciliationResponse.ExceptionItem(
+                s.Id,
+                "PARTIAL",
+                $"Only {s.Delivered}/{s.Expected} units delivered for {s.Brand} ({(DateTime.UtcNow - s.CreatedAtUtc).Days}d waiting)",
+                "warning",
+                s.CreatedAtUtc));
         }
 
         if (orphanVouchers > 0)
@@ -338,7 +446,18 @@ public sealed class GetReconciliationQueryHandler
             deliveredValueKopecks,
             totalRefundedKopecks);
 
-        return new GetReconciliationResponse(summary, threeWayMatch, exceptions, funnel, revenueSummary);
+        return new GetReconciliationResponse(
+            summary,
+            new PagedResult<GetReconciliationResponse.ThreeWayMatchItem>
+            {
+                Items = threeWayMatch,
+                TotalCount = totalOrders,
+                Page = page,
+                PageSize = pageSize
+            },
+            exceptions,
+            funnel,
+            revenueSummary);
     }
 
     /// <summary>

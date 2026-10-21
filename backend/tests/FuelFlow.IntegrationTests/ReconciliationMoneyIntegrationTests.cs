@@ -122,8 +122,8 @@ public sealed class ReconciliationMoneyIntegrationTests : IClassFixture<TestData
         {
             Id = fuelId,
             BrandId = brand.Id,
-            Name = "Reconciliation test fuel",
-            BrandFuelCode = "recon-test",
+            Name = $"Reconciliation test fuel {Guid.NewGuid():N}",
+            BrandFuelCode = $"recon-test-{Guid.NewGuid():N}",
             BasePrice = 1200m,
             DiscountPrice = 1000m,
             MarginUahPerLiter = MarginUahPerLiter,
