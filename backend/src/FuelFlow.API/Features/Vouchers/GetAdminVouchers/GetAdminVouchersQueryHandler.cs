@@ -26,25 +26,54 @@ public sealed class GetAdminVouchersQueryHandler
             .Include(v => v.Supplier)
             .AsQueryable();
 
+        // The global total is the whole table, and the filtered total is the same number when nothing
+        // is filtered - so it is counted once, not twice.
+        //
+        // The flag is set in the same branch that narrows the list, so it cannot drift from the
+        // logic: a filter that parses to nothing ("Amount=abc") narrows nothing, and one that names
+        // a source we do not know narrows nothing either.
+        var hasFilter = false;
+
         if (!string.IsNullOrWhiteSpace(query.Status) && Enum.TryParse<VoucherStatus>(query.Status, true, out var parsedStatus))
+        {
             q = q.Where(v => v.Status == parsedStatus);
+            hasFilter = true;
+        }
 
         if (!string.IsNullOrWhiteSpace(query.Brand))
+        {
             q = q.Where(v => v.Brand == query.Brand);
+            hasFilter = true;
+        }
 
         if (query.FuelTypeId.HasValue)
-            q = q.Where(v => v.FuelTypeId == query.FuelTypeId);
+        {
+            q = q.Where(v => v.FuelTypeId == query.FuelTypeId.Value);
+            hasFilter = true;
+        }
         else if (!string.IsNullOrWhiteSpace(query.FuelType))
+        {
             q = q.Where(v => v.FuelType != null && v.FuelType.Name == query.FuelType);
+            hasFilter = true;
+        }
 
         if (!string.IsNullOrWhiteSpace(query.Amount) && decimal.TryParse(query.Amount, out var parsedAmount))
+        {
             q = q.Where(v => v.Liters == parsedAmount);
+            hasFilter = true;
+        }
 
         if (!string.IsNullOrWhiteSpace(query.ExpirationDate) && DateOnly.TryParse(query.ExpirationDate, out var parsedDate))
+        {
             q = q.Where(v => v.SupplierExpirationDate == parsedDate);
+            hasFilter = true;
+        }
 
         if (query.WorkerUserId.HasValue)
+        {
             q = q.Where(v => v.WorkerUserId == query.WorkerUserId.Value);
+            hasFilter = true;
+        }
 
         // Unset means both, so an operator sees exactly what they saw before the flag existed. Both arms
         // compare the mapped column, not the IsTestData shim: a [NotMapped] getter is not
@@ -55,6 +84,10 @@ public sealed class GetAdminVouchersQueryHandler
             "exclude" => q.Where(v => v.DataKind == DataKinds.Real),
             _ => q
         };
+        if (query.TestData?.Trim().ToLowerInvariant() is "only" or "exclude")
+        {
+            hasFilter = true;
+        }
 
         // Same "unset means both" contract as TestData above, and for a sharper reason: the column
         // existed for a while before any voucher was acquired on the secondary route, so a filter
@@ -64,12 +97,19 @@ public sealed class GetAdminVouchersQueryHandler
         if (!string.IsNullOrWhiteSpace(query.AcquisitionSource))
         {
             var requested = query.AcquisitionSource.Trim().ToLowerInvariant();
-            q = AcquisitionSources.IsKnown(requested)
-                ? q.Where(v => v.AcquisitionSource == requested)
-                : q;
+            if (AcquisitionSources.IsKnown(requested))
+            {
+                q = q.Where(v => v.AcquisitionSource == requested);
+                hasFilter = true;
+            }
         }
 
-        var total = await q.CountAsync(cancellationToken);
+        // The global total is the whole table. The filtered total is the same number when nothing is
+        // filtered, and counting the table twice was a third of what this screen costs.
+        var globalTotal = await _context.FuelVouchers.IgnoreQueryFilters().CountAsync(cancellationToken);
+        var total = hasFilter
+            ? await q.CountAsync(cancellationToken)
+            : globalTotal;
 
         // Every arm ends in the same tie-break on Id. None of these sort keys is unique - sorting by
         // supplier puts every voucher from one supplier next to its neighbour, and they routinely
@@ -147,7 +187,6 @@ public sealed class GetAdminVouchersQueryHandler
             IsDeleted = v.IsDeleted
         }).ToList();
 
-        var globalTotal = await _context.FuelVouchers.IgnoreQueryFilters().CountAsync(cancellationToken);
         var testDataTotal = await _context.FuelVouchers.CountAsync(v => v.DataKind == DataKinds.Qa, cancellationToken);
         var fuelTypeOptions = await _context.FuelVouchers
             .IgnoreQueryFilters()
