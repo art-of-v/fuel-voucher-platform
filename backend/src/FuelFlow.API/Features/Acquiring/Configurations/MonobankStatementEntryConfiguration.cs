@@ -42,6 +42,14 @@ internal sealed class MonobankStatementEntryConfiguration : IEntityTypeConfigura
             .HasColumnName("reference")
             .HasMaxLength(200);
 
+        // The payment purpose as the acquirer shows it on the receipt. Evidence, like the reference
+        // beside it and never a join key - the same purpose string appears on thousands of
+        // unrelated payments, so a match key built on it would match a customer's own memo to
+        // somebody else's invoice.
+        builder.Property(e => e.Destination)
+            .HasColumnName("destination")
+            .HasMaxLength(200);
+
 builder.Property(e => e.AmountKopecks)
                .HasColumnName("amount_kopecks")
                .HasColumnType("numeric(14,0)");

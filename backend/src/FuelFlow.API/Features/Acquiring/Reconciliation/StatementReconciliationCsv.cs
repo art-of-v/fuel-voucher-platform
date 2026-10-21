@@ -35,7 +35,10 @@ public static class StatementReconciliationCsv
         sb.AppendLine("Unmatched total UAH," + FormattableString.Invariant($"{act.Summary.UnmatchedTotalUah:0.00}"));
         sb.AppendLine();
 
-        sb.AppendLine("StatementId,Status,InvoiceId,Reference,AcquirerAmount,LocalAmount,OrderId,OrderStatus,AcquirerCreatedAt,Note");
+        // The destination sits BESIDE the reference, not instead of it: the reference is our own
+        // echo, which is what ties the row to our invoice, and the destination is what the
+        // customer typed - evidence for a dispute, and never a match key.
+        sb.AppendLine("StatementId,Status,InvoiceId,Reference,Destination,AcquirerAmount,LocalAmount,OrderId,OrderStatus,AcquirerCreatedAt,Note");
 
         foreach (var row in act.Rows)
         {
@@ -47,6 +50,7 @@ public static class StatementReconciliationCsv
                 Q(row.Status.ToString()),
                 Q(row.InvoiceId),
                 Q(row.Reference),
+                Q(row.Destination),
                 Q(A(row.AcquirerAmount)),
                 Q(A(row.LocalAmount)),
                 Q(row.OrderReference),

@@ -170,6 +170,9 @@ public class MonobankStatementImportService
                 StatementId = item.StatementId,
                 InvoiceId = item.InvoiceId,
                 Reference = item.Reference,
+                // The payment purpose the acquirer shows on the receipt. Evidence for a dispute,
+                // never a match key - the reconciliation joins on the invoice id.
+                Destination = item.Destination,
                 AmountKopecks = item.Amount,
                 Ccy = item.Ccy,
                 Status = item.Status,

@@ -32,6 +32,9 @@ public sealed record StatementMatchRow(
     StatementMatchStatus Status,
     string? InvoiceId,
     string? Reference,
+    /// <summary>The payment purpose the acquirer shows on the receipt. Evidence, and never a key:
+    /// the same string appears on thousands of unrelated payments.</summary>
+    string? Destination,
     decimal? AcquirerAmountKopecks,
     decimal? AcquirerAmount,
     Guid? OrderId,
@@ -98,6 +101,7 @@ public static class StatementMatcher
 
                 rows.Add(new StatementMatchRow(
                     entry.StatementId, StatementMatchStatus.RefundMatch, invoiceId, entry.Reference,
+                    entry.Destination,
                     entry.AmountKopecks, amount, refundOrderId, refund.AmountKopecks / 100m,
                     refund.ProviderInvoiceId, null, entry.AcquirerCreatedAtUtc,
                     $"Reversal of refund {refund.Id:N} on {reference}"));
@@ -116,6 +120,7 @@ public static class StatementMatcher
                     entry.StatementId,
                     agrees ? StatementMatchStatus.Matched : StatementMatchStatus.AmountMismatch,
                     invoiceId, entry.Reference,
+                    entry.Destination,
                     entry.AmountKopecks, amount,
                     order.Id, order.Price, order.Id.ToString(), order.Status,
                     entry.AcquirerCreatedAtUtc,
@@ -133,6 +138,7 @@ public static class StatementMatcher
 
             rows.Add(new StatementMatchRow(
                 entry.StatementId, StatementMatchStatus.Unmatched, invoiceId, entry.Reference,
+                entry.Destination,
                 entry.AmountKopecks, amount,
                 null, null, null, null, entry.AcquirerCreatedAtUtc,
                 "No order or refund of ours carries this invoice"));
