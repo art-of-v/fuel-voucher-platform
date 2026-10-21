@@ -24,33 +24,38 @@ public sealed class DatabaseConnectionPoolTests
     private const string ConnectionString = "Host=postgres;Database=fuelflow;Username=fuelflow";
 
     [Fact]
-    public void WithMaxPoolSize_ShouldCapAStringThatHasNoCap()
+    public void WithPoolSettings_ShouldCapAStringThatHasNoCap()
     {
-        var capped = DatabaseConnectionPool.WithMaxPoolSize(ConnectionString, 7);
+        var capped = DatabaseConnectionPool.WithPoolSettings(ConnectionString, 7);
 
-        capped.Should().Be($"{ConnectionString};Maximum Pool Size=7");
+        capped.Should().Be($"{ConnectionString};Maximum Pool Size=7;No Reset On Close=true");
     }
 
     [Fact]
-    public void WithMaxPoolSize_ShouldKeepAnExplicitCapInTheString()
+    public void WithPoolSettings_ShouldKeepAnExplicitCapInTheString()
     {
         var withCap = $"{ConnectionString};Maximum Pool Size=42";
 
-        DatabaseConnectionPool.WithMaxPoolSize(withCap, 7).Should().Be(withCap);
+        DatabaseConnectionPool.WithPoolSettings(withCap, 7)
+            .Should().Be($"{withCap};No Reset On Close=true");
     }
 
     [Fact]
-    public void WithMaxPoolSize_ShouldIgnoreANonPositiveCap()
+    public void WithPoolSettings_ShouldIgnoreANonPositiveCap()
     {
-        DatabaseConnectionPool.WithMaxPoolSize(ConnectionString, 0).Should().Be(ConnectionString);
-        DatabaseConnectionPool.WithMaxPoolSize(ConnectionString, -1).Should().Be(ConnectionString);
+        // The cap is ignored; the reset policy is not - it is not a cap, and the string it
+        // applies to is still the string the pools are opened with.
+        DatabaseConnectionPool.WithPoolSettings(ConnectionString, 0)
+            .Should().Be($"{ConnectionString};No Reset On Close=true");
+        DatabaseConnectionPool.WithPoolSettings(ConnectionString, -1)
+            .Should().Be($"{ConnectionString};No Reset On Close=true");
     }
 
     [Fact]
-    public void WithMaxPoolSize_ShouldNotDoubleTheSeparator()
+    public void WithPoolSettings_ShouldNotDoubleTheSeparator()
     {
-        DatabaseConnectionPool.WithMaxPoolSize(ConnectionString + ";", 5)
-            .Should().Be($"{ConnectionString};Maximum Pool Size=5");
+        DatabaseConnectionPool.WithPoolSettings(ConnectionString + ";", 5)
+            .Should().Be($"{ConnectionString};Maximum Pool Size=5;No Reset On Close=true");
     }
 
     [Fact]
@@ -99,6 +104,44 @@ public sealed class DatabaseConnectionPoolTests
         using var provider = services.BuildServiceProvider();
         var options = provider.GetRequiredService<IOptions<DatabaseOptions>>().Value;
 
-        options.ConnectionString.Should().Be($"{ConnectionString};Maximum Pool Size=9");
+        options.ConnectionString.Should().Be($"{ConnectionString};Maximum Pool Size=9;No Reset On Close=true");
     }
+
+    /// <summary>
+    /// The reset policy is the second thing this method applies, and it is the one with a cost:
+    /// a connection returned to the pool keeps whatever the last user left on it. This
+    /// application leaves nothing behind, and that is what makes the setting safe here.
+    /// </summary>
+    [Fact]
+    public void WithPoolSettings_ShouldTurnTheResetOff()
+    {
+        DatabaseConnectionPool.WithPoolSettings(ConnectionString, 5)
+            .Should().Contain("No Reset On Close=true");
+    }
+
+    [Fact]
+    public void WithPoolSettings_ShouldKeepAnExplicitResetSettingInTheString()
+    {
+        // The operator's string is the one that knows: an explicit setting wins, exactly as an
+        // explicit cap does.
+        var withReset = $"{ConnectionString};No Reset On Close=false";
+
+        DatabaseConnectionPool.WithPoolSettings(withReset, 5)
+            .Should().Be($"{withReset};Maximum Pool Size=5");
+    }
+
+    /// <summary>
+    /// The Hangfire storage's pool keeps the reset. The storage sets a session variable of its
+    /// own and LISTENs, and Npgsql's reset is what stops that state from reaching the next user
+    /// of the same physical connection.
+    /// </summary>
+    [Fact]
+    public void WithMaxPoolSize_ShouldNotTouchTheReset()
+    {
+        var capped = DatabaseConnectionPool.WithMaxPoolSize(ConnectionString, 7);
+
+        capped.Should().Be($"{ConnectionString};Maximum Pool Size=7");
+        capped.Should().NotContain("No Reset On Close");
+    }
+
 }

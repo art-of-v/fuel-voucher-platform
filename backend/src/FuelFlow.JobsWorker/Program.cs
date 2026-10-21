@@ -75,7 +75,11 @@ try
     // and the Postgres health check. The worker shares the database with the API, so an uncapped
     // pool here eats the server's max_connections budget without the API's cap noticing.
     var maxPoolSize = DatabaseConnectionPool.ResolveMaxPoolSize(builder.Configuration);
-    var cappedConnectionString = DatabaseConnectionPool.WithMaxPoolSize(connectionString!, maxPoolSize);
+    var cappedConnectionString = DatabaseConnectionPool.WithPoolSettings(connectionString!, maxPoolSize);
+
+    // The Hangfire storage gets the cap and NOT the reset: it sets a session variable of its
+    // own and LISTENs, and that state belongs to a library whose SQL is not ours to read.
+    var storageConnectionString = DatabaseConnectionPool.WithMaxPoolSize(connectionString!, maxPoolSize);
 
     builder.Services.AddHealthChecks()
         .AddNpgSql(cappedConnectionString, name: "postgres", tags: ["ready"]);
@@ -122,7 +126,7 @@ try
         .UseSimpleAssemblyNameTypeSerializer()
         .UseRecommendedSerializerSettings()
         .UsePostgreSqlStorage(c =>
-            c.UseNpgsqlConnection(cappedConnectionString)));
+            c.UseNpgsqlConnection(storageConnectionString)));
 
     builder.Services.AddHangfireServer(options =>
     {

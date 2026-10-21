@@ -58,8 +58,8 @@ public sealed class ConnectionPoolCapGuardTests
         }
 
         violations.Should().BeEmpty(
-            "every pool in the process needs the cap - use DatabaseConnectionPool.WithMaxPoolSize " +
-            "(or a connection string that already carries Maximum Pool Size). Offenders:{0}",
+            "every pool in the process needs the cap - use DatabaseConnectionPool.WithPoolSettings " +
+            "(or WithMaxPoolSize, for the pool whose SQL is a library's and not ours). Offenders:{0}",
             string.Join(" | ", violations));
     }
 
@@ -88,7 +88,8 @@ public sealed class ConnectionPoolCapGuardTests
                 if (capped.Contains(name))
                     continue;
 
-                var carriesTheCap = rightHandSide.Contains("WithMaxPoolSize", StringComparison.Ordinal)
+                var carriesTheCap = rightHandSide.Contains("WithPoolSettings", StringComparison.Ordinal)
+                    || rightHandSide.Contains("WithMaxPoolSize", StringComparison.Ordinal)
                     || capped.Any(cappedName => Regex.IsMatch(rightHandSide, $@"\b{Regex.Escape(cappedName)}\b"));
 
                 if (!carriesTheCap)
@@ -104,7 +105,8 @@ public sealed class ConnectionPoolCapGuardTests
 
     private static bool IsCapped(string argument, HashSet<string> cappedVariables)
     {
-        if (argument.Contains("WithMaxPoolSize", StringComparison.Ordinal)
+        if (argument.Contains("WithPoolSettings", StringComparison.Ordinal)
+            || argument.Contains("WithMaxPoolSize", StringComparison.Ordinal)
             || argument.Contains("Maximum Pool Size", StringComparison.OrdinalIgnoreCase))
         {
             return true;

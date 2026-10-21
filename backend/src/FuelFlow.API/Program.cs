@@ -110,7 +110,10 @@ try
         .UseSimpleAssemblyNameTypeSerializer()
         .UseRecommendedSerializerSettings()
         .UsePostgreSqlStorage(c =>
-            c.UseNpgsqlConnection(DatabaseConnectionPool.WithMaxPoolSize(connectionString, maxPoolSize))));
+                // The Hangfire storage gets the cap and NOT the reset: it sets a session
+                // variable of its own and LISTENs, and that state belongs to a library whose
+                // SQL is not ours to read.
+                c.UseNpgsqlConnection(DatabaseConnectionPool.WithMaxPoolSize(connectionString, maxPoolSize))));
 
     builder.Services.AddHangfireServer(options =>
     {
