@@ -703,6 +703,36 @@ if (!fullyAttributed && fulfillments.Count > 0)
                 order = freshOrder;
             }
 
+            // The money question, asked before a single voucher is claimed. An order that owes
+            // fuel has to have paid for it: the job selects its work by status alone, and the
+            // status is a field a bug, an operator or a script can write. The payment row is the
+            // money record - only a capture in state Succeeded means the money is ours - so this
+            // is the check that holds even when nothing else does.
+            //
+            // The order is left alone rather than failed: the sweep picks it up again, and if the
+            // money lands in the meantime it is fulfilled then. What must not happen is fuel for
+            // nothing.
+            if (!await OrderPayment.HasCapturedPaymentAsync(_context, order.Id, cancellationToken))
+            {
+                _logger.LogError(
+                    "Order {OrderId} is eligible for fulfilment but has no captured payment; no vouchers were assigned",
+                    order.Id);
+
+                if (outboxEvent != null)
+                {
+                    outboxEvent.Processed = true;
+                    outboxEvent.ProcessedAtUtc = DateTime.UtcNow;
+                    _context.OutboxEvents.Update(outboxEvent);
+                    await _context.SaveChangesAsync(cancellationToken);
+                }
+
+                if (transaction != null)
+                {
+                    await transaction.CommitAsync(cancellationToken);
+                }
+                return;
+            }
+
             var lineItems = order.LineItems?.ToList() ?? [];
             var totalNeeded = lineItems.Sum(li => li.Quantity);
 
@@ -1250,6 +1280,21 @@ var lastFailedAtUtc = await _context.Payments
             if (order == null ||
                 (order.Status != OrderStatus.PendingFulfillment && order.Status != OrderStatus.PartiallyFulfilled))
             {
+                if (transaction != null)
+                {
+                    await transaction.CommitAsync(cancellationToken);
+                }
+                return;
+            }
+
+            // The same money question the buy-fuel path asks, for the same reason: a renewal
+            // extends a customer's fuel, and handing out an extension is handing out fuel.
+            if (!await OrderPayment.HasCapturedPaymentAsync(_context, order.Id, cancellationToken))
+            {
+                _logger.LogError(
+                    "Renewal order {OrderId} is eligible for fulfilment but has no captured payment; no vouchers were extended",
+                    orderId);
+
                 if (transaction != null)
                 {
                     await transaction.CommitAsync(cancellationToken);

@@ -8,6 +8,7 @@ using FuelFlow.Features.Brands;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
+using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -182,6 +183,22 @@ public sealed class ApiFulfillmentServicePartialBackfillTests : IDisposable
         _context.Orders.Add(order);
         _context.FuelVouchers.AddRange(existingAssignedVoucher, newAvailableVoucher);
         _context.Fulfillments.Add(existingFulfillment);
+        // The money record of a paid order: fulfilment asks it whether the money arrived
+        // before it hands out a voucher.
+        _context.Payments.Add(new Payment
+        {
+            Id = Guid.NewGuid(),
+            OrderId = orderId,
+            Kind = PaymentKind.Capture,
+            Provider = "monobank",
+            ProviderInvoiceId = $"INV-{orderId:N}",
+            AmountUah = order.Price,
+            AmountKopecks = (long)(order.Price * 100),
+            Currency = "UAH",
+            Status = PaymentStatus.Succeeded,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
         await _context.SaveChangesAsync();
 
         await _service.ProcessPendingOrdersAsync();

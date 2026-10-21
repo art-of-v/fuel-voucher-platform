@@ -6,6 +6,7 @@ using FuelFlow.Features.Brands;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
+using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
@@ -60,8 +61,8 @@ public sealed class QaTestPoolSegregationIntegrationTests : IClassFixture<TestDa
             seed.Users.Add(MakeUser(qaUserId, isQaAccount: true));
             seed.Users.Add(MakeUser(realUserId, isQaAccount: false));
 
-            seed.Orders.Add(MakeOrder(qaOrderId, qaUserId));
-            seed.Orders.Add(MakeOrder(realOrderId, realUserId));
+            AddPaidOrder(seed, MakeOrder(qaOrderId, qaUserId));
+            AddPaidOrder(seed, MakeOrder(realOrderId, realUserId));
 
             // One voucher in each pool, identical on brand/fuel/nominal so only the flag can decide
             // who gets which.
@@ -104,7 +105,7 @@ public sealed class QaTestPoolSegregationIntegrationTests : IClassFixture<TestDa
             await ResetDataAsync(seed);
 
             seed.Users.Add(MakeUser(qaUserId, isQaAccount: true));
-            seed.Orders.Add(MakeOrder(qaOrderId, qaUserId));
+            AddPaidOrder(seed, MakeOrder(qaOrderId, qaUserId));
 
             // Only real stock exists. A QA account must not be fulfilled from it.
             seed.FuelVouchers.Add(MakeVoucher(realVoucherId, "real", isTestData: false));
@@ -148,8 +149,8 @@ public sealed class QaTestPoolSegregationIntegrationTests : IClassFixture<TestDa
 
             seed.Users.Add(MakeUser(qaUserId, isQaAccount: true));
             seed.Users.Add(MakeUser(realUserId, isQaAccount: false));
-            seed.Orders.Add(MakeOrder(qaOrderId, qaUserId));
-            seed.Orders.Add(MakeOrder(realOrderId, realUserId));
+            AddPaidOrder(seed, MakeOrder(qaOrderId, qaUserId));
+            AddPaidOrder(seed, MakeOrder(realOrderId, realUserId));
 
             seed.FuelVouchers.Add(MakeVoucher(realForQaId, "real-for-qa", isTestData: false));
             seed.FuelVouchers.Add(MakeVoucher(testForRealId, "test-for-real", isTestData: true));
@@ -273,5 +274,29 @@ public sealed class QaTestPoolSegregationIntegrationTests : IClassFixture<TestDa
 
         public Task<int> ClaimAsync(Guid voucherId, Guid userId, Guid orderId)
             => TryAssignVoucherAsync(voucherId, userId, null, orderId, null, CancellationToken.None);
+    }
+    /// <summary>
+    /// Adds an order AND the money record of a paid order. Fulfilment asks the payment row
+    /// whether the money arrived before it hands out a voucher, so a fixture that expects
+    /// vouchers has to say the order was paid for.
+    /// </summary>
+    private static void AddPaidOrder(ApplicationDbContext seed, Order order)
+    {
+        seed.Orders.Add(order);
+        seed.Payments.Add(new Payment
+        {
+            Id = Guid.NewGuid(),
+            OrderId = order.Id,
+            Kind = PaymentKind.Capture,
+            Provider = "monobank",
+            ProviderInvoiceId = $"INV-{order.Id:N}",
+            AmountUah = order.Price,
+            AmountKopecks = (long)(order.Price * 100),
+            Currency = "UAH",
+            Status = PaymentStatus.Succeeded,
+            PaidAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
     }
 }

@@ -8,6 +8,7 @@ using FuelFlow.Features.Settings;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
+using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
@@ -70,7 +71,7 @@ public sealed class FulfillmentLineAttributionTests : IClassFixture<TestDatabase
             await ResetDataAsync(seed);
 
             seed.Users.Add(User(userId));
-            seed.Orders.Add(TwoLineOrder(orderId, userId, okkoLine, wogLine));
+            AddPaidOrder(seed, TwoLineOrder(orderId, userId, okkoLine, wogLine));
 
             // Three OKKO vouchers for a line that wanted two, and nothing at all for the WOG line.
             AddVoucherWithFulfilment(seed, orderId, okkoLine, userId, "okko-95", "A");
@@ -112,7 +113,7 @@ public sealed class FulfillmentLineAttributionTests : IClassFixture<TestDatabase
             await ResetDataAsync(seed);
 
             seed.Users.Add(User(userId));
-            seed.Orders.Add(TwoLineOrder(orderId, userId, okkoLine, wogLine));
+            AddPaidOrder(seed, TwoLineOrder(orderId, userId, okkoLine, wogLine));
             AddVoucherWithFulfilment(seed, orderId, okkoLine, userId, "okko-95", "A");
             AddVoucherWithFulfilment(seed, orderId, okkoLine, userId, "okko-95", "B");
             AddVoucherWithFulfilment(seed, orderId, wogLine, userId, "wog-95", "C");
@@ -150,7 +151,7 @@ public sealed class FulfillmentLineAttributionTests : IClassFixture<TestDatabase
             var order = SingleLineOrder(orderId, userId, lineId, quantity: 2);
             order.Status = OrderStatus.Fulfilled;
             order.FulfilledAtUtc = DateTime.UtcNow;
-            seed.Orders.Add(order);
+            AddPaidOrder(seed, order);
 
             // Right count, no line named: the legacy shape. Under litres this is correct, and the
             // order is old enough that the repair would decline it anyway - both are asserted here.
@@ -319,5 +320,29 @@ public sealed class FulfillmentLineAttributionTests : IClassFixture<TestDatabase
             new RuntimeSettingsService(context),
             NotificationDispatcher.Disabled,
             new ConfigurationBuilder().Build());
+    }
+    /// <summary>
+    /// Adds an order AND the money record of a paid order. Fulfilment asks the payment row
+    /// whether the money arrived before it hands out a voucher, so a fixture that expects
+    /// vouchers has to say the order was paid for.
+    /// </summary>
+    private static void AddPaidOrder(ApplicationDbContext seed, Order order)
+    {
+        seed.Orders.Add(order);
+        seed.Payments.Add(new Payment
+        {
+            Id = Guid.NewGuid(),
+            OrderId = order.Id,
+            Kind = PaymentKind.Capture,
+            Provider = "monobank",
+            ProviderInvoiceId = $"INV-{order.Id:N}",
+            AmountUah = order.Price,
+            AmountKopecks = (long)(order.Price * 100),
+            Currency = "UAH",
+            Status = PaymentStatus.Succeeded,
+            PaidAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
     }
 }

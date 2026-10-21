@@ -60,7 +60,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 UpdatedAtUtc = DateTime.UtcNow
             });
 
-            seed.Orders.Add(new Order
+            AddPaidOrder(seed, new Order
             {
                 Id = orderId,
                 UserId = userId,
@@ -169,7 +169,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 UpdatedAtUtc = DateTime.UtcNow
             });
 
-            seed.Orders.Add(new Order
+            AddPaidOrder(seed, new Order
             {
                 Id = orderId,
                 UserId = userId,
@@ -289,7 +289,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
     {
         var orderId = Guid.NewGuid();
 
-        seed.Orders.Add(new Order
+        AddPaidOrder(seed, new Order
         {
             Id = orderId,
             UserId = userId,
@@ -358,7 +358,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 UpdatedAtUtc = DateTime.UtcNow
             });
 
-            seed.Orders.Add(new Order
+            AddPaidOrder(seed, new Order
             {
                 Id = orderId,
                 UserId = userId,
@@ -484,7 +484,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 UpdatedAtUtc = DateTime.UtcNow
             });
 
-            seed.Orders.Add(new Order
+            AddPaidOrder(seed, new Order
             {
                 Id = partialOrderId,
                 UserId = userId,
@@ -534,7 +534,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 });
             }
 
-            seed.Orders.Add(new Order
+            AddPaidOrder(seed, new Order
             {
                 Id = fullOrderId,
                 UserId = userId,
@@ -688,5 +688,29 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
         }
 
         public Task WaitForPeerAsync() => _first.Task;
+    }
+    /// <summary>
+    /// Adds an order AND the money record of a paid order. Fulfilment asks the payment row
+    /// whether the money arrived before it hands out a voucher, so a fixture that expects
+    /// vouchers has to say the order was paid for.
+    /// </summary>
+    private static void AddPaidOrder(ApplicationDbContext seed, Order order)
+    {
+        seed.Orders.Add(order);
+        seed.Payments.Add(new Payment
+        {
+            Id = Guid.NewGuid(),
+            OrderId = order.Id,
+            Kind = PaymentKind.Capture,
+            Provider = "monobank",
+            ProviderInvoiceId = $"INV-{order.Id:N}",
+            AmountUah = order.Price,
+            AmountKopecks = (long)(order.Price * 100),
+            Currency = "UAH",
+            Status = PaymentStatus.Succeeded,
+            PaidAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
     }
 }

@@ -165,6 +165,8 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
         };
 
         _context.Orders.Add(order);
+
+        _context.Payments.Add(CapturedPaymentFor(order));
         _context.FuelVouchers.Add(voucher);
         _context.OutboxEvents.Add(outboxEvent);
         await _context.SaveChangesAsync();
@@ -256,6 +258,8 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
         };
 
         _context.Orders.Add(order);
+
+        _context.Payments.Add(CapturedPaymentFor(order));
         _context.FuelVouchers.Add(voucher);
         _context.OutboxEvents.Add(outboxEvent);
         await _context.SaveChangesAsync();
@@ -321,6 +325,8 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
         };
 
         _context.Orders.Add(order);
+
+        _context.Payments.Add(CapturedPaymentFor(order));
         _context.FuelVouchers.Add(voucher);
         await _context.SaveChangesAsync();
 
@@ -440,7 +446,27 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
         }
 
         _context.Orders.Add(order);
+        _context.Payments.Add(CapturedPaymentFor(order));
         await _context.SaveChangesAsync();
         return order;
     }
+
+    /// <summary>
+    /// The money record of a paid order. Fulfilment asks it whether the money arrived before it
+    /// hands out a voucher, so a fixture that expects vouchers has to say the order was paid for.
+    /// </summary>
+    private static Payment CapturedPaymentFor(Order order) => new()
+    {
+        Id = Guid.NewGuid(),
+        OrderId = order.Id,
+        Kind = PaymentKind.Capture,
+        Provider = "monobank",
+        ProviderInvoiceId = $"INV-{order.Id:N}",
+        AmountUah = order.Price,
+        AmountKopecks = (long)(order.Price * 100),
+        Currency = "UAH",
+        Status = PaymentStatus.Succeeded,
+        CreatedAtUtc = DateTime.UtcNow,
+        UpdatedAtUtc = DateTime.UtcNow
+    };
 }
