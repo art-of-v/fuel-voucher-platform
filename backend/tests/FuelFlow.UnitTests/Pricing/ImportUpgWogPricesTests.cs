@@ -218,33 +218,6 @@ public sealed class ImportUpgWogPricesTests : IDisposable
         second.Repriced.Should().ContainSingle().Which.Changed.Should().BeFalse();
         after.UpdatedAtUtc.Should().Be(beforeStamp, "an unchanged sheet is not an edit");
     }
-
-    [Fact]
-    public async Task APumpThatWouldSellBelowCost_IsSkippedUnlessTheFuelOptsIn()
-    {
-        SeedFuel("upg-95", BrandIds.Upg, "upg95", "upg95", cost: 86.90m, profit: 5m, pump: 91.90m);
-        await _context.SaveChangesAsync();
-
-        // A brand crashing its own price must not be able to take the fuel below what we pay.
-        var result = await Handler().HandleAsync(
-            new ImportUpgWogPricesCommand(Sheet(("upg95", 60m)), "upg", DryRun: false), Guid.Empty, null);
-
-        result.BelowCostSkipped.Should().ContainSingle();
-        _context.ChangeTracker.Clear();
-    var fuel = await _context.FuelTypes.SingleAsync(f => f.Id == ToUuid("upg-95"));
-    fuel.PumpPricePerLiter.Should().Be(91.90m, "the refused pump must not be written");
-        var optedIn = await _context.FuelTypes.SingleAsync(f => f.Id == ToUuid("upg-95"));
-        optedIn.AllowBelowCost = true;
-        await _context.SaveChangesAsync();
-
-        var second = await Handler().HandleAsync(
-            new ImportUpgWogPricesCommand(Sheet(("upg95", 60m)), "upg", DryRun: false), Guid.Empty, null);
-
-        second.BelowCostSkipped.Should().BeEmpty();
-        _context.ChangeTracker.Clear();
-    (await _context.FuelTypes.SingleAsync(f => f.Id == ToUuid("upg-95"))).PumpPricePerLiter.Should().Be(60m);
-    }
-
     [Fact]
     public async Task AFuelNobodyHasPriced_IsNotGivenAPriceOfZero()
     {
@@ -282,7 +255,7 @@ public sealed class ImportUpgWogPricesTests : IDisposable
         var priced = await _context.FuelTypes.SingleAsync(f => f.Id == ToUuid("upg-95"));
         priced.PumpPricePerLiter.Should().Be(95.00m);
         // The price the customer pays is the formula's answer, not a stored number.
-        FuelPricing.FinalPerLiterOrNull(86.90m, 5m, 95.00m).Should().Be(91.90m, "min(cost + margin, pump)");
+        FuelPricing.FinalPerLiterOrNull(86.90m, 5m).Should().Be(91.90m, "cost + margin");
     }
 
     [Fact]

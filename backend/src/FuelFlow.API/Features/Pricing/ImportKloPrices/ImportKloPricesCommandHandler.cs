@@ -124,7 +124,6 @@ public sealed class ImportKloPricesCommandHandler
 
         var created = new List<KloPriceFuelCreated>();
         var repriced = new List<KloPriceFuelRepriced>();
-        var belowCost = new List<string>();
         var notSold = new List<string>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
 
@@ -153,12 +152,6 @@ public sealed class ImportKloPricesCommandHandler
             var cost = fuel.SupplierPricePerLiter ?? 0m;
             var profit = fuel.MarginUahPerLiter ?? 0m;
             var minDiscount = fuel.MinDiscountPerLiter ?? 0m;
-
-            if (!fuel.AllowBelowCost && FuelPricing.IsBelowCost(cost, profit, row.PricePerLiter))
-            {
-                belowCost.Add(fuel.Name);
-                continue;
-            }
 
             if (!command.DryRun)
             {
@@ -196,7 +189,7 @@ public sealed class ImportKloPricesCommandHandler
             }
         }
 
-        return new KloPriceImportResult(created, repriced, belowCost, notSold, command.DryRun);
+        return new KloPriceImportResult(created, repriced, [], notSold, command.DryRun);
     }
 
     /// <summary>

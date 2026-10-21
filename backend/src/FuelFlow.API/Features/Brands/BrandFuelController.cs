@@ -187,22 +187,7 @@ public sealed class BrandFuelController : ControllerBase
         // model refuses to build a price out of a missing number, because "we do not know what we
         // paid" is not the same fact as "we paid nothing".
         var finalPerLiter = FuelPricing.FinalPerLiterOrNull(
-            request.SupplierPricePerLiter, request.MarginUahPerLiter,
-            request.PumpPricePerLiter);
-
-        // Slice-3 hard block at the operator write path: refuse to persist a below-cost price
-        // unless a manager has consciously opted this supplier+fuel in as a loss-leader.
-        //
-        // A fuel with no stated cost is NOT below cost - there is nothing to compare against - so it
-        // is saved as it is: unpriced. The storefront shows it at the column with "not in stock", and
-        // it cannot be sold until the cost is recorded. What it must never become is a fuel with a cost
-        // of zero, which would price itself at its margin and blind the guard.
-        var belowCost = request.SupplierPricePerLiter is { } knownCost
-                        && request.MarginUahPerLiter is { } knownMargin
-                        && FuelPricing.IsBelowCost(
-                            knownCost, knownMargin, request.PumpPricePerLiter);
-        if (belowCost && !request.AllowBelowCost)
-            return BadRequest(new { code = BelowCostSaleBlockedException.Code, message = "Price is below supplier cost; enable the below-cost opt-in to save it." });
+            request.SupplierPricePerLiter, request.MarginUahPerLiter);
 
         // The price the customer pays is COMPUTED from the knobs, so there is nothing to store for it
         // and nothing to write. The column price is the reference the saving is measured against,
@@ -296,12 +281,6 @@ public sealed class BrandFuelController : ControllerBase
             Brand!.Slug,
             ct);
 
-        // Record the deliberate loss-leader decision (we only reach here below-cost when opted in).
-        if (belowCost)
-            await _notifications.BelowCostAsync(
-            Brand.Name, fuel.Name, request.SupplierPricePerLiter, finalPerLiter ?? request.PumpPricePerLiter ?? 0m,
-            deliberate: true, ct);
-
         return Created($"/api/admin/brand-fuels/{fuel.Id}", new { id = fuel.Id });
     }
 
@@ -375,17 +354,7 @@ public sealed class BrandFuelController : ControllerBase
 
         // The price, or null when we cannot know it - see the create path above.
         var finalPerLiter = FuelPricing.FinalPerLiterOrNull(
-            request.SupplierPricePerLiter, request.MarginUahPerLiter,
-            request.PumpPricePerLiter);
-
-        // Slice-3 hard block: reject a below-cost price unless this supplier+fuel is opted in.
-        // A cost that is not stated is not below cost; it is unpriced, and it is saved as it is.
-        var belowCost = request.SupplierPricePerLiter is { } knownCost
-                        && request.MarginUahPerLiter is { } knownMargin
-                        && FuelPricing.IsBelowCost(
-                            knownCost, knownMargin, request.PumpPricePerLiter);
-        if (belowCost && !request.AllowBelowCost)
-            return BadRequest(new { code = BelowCostSaleBlockedException.Code, message = "Price is below supplier cost; enable the below-cost opt-in to save it." });
+            request.SupplierPricePerLiter, request.MarginUahPerLiter);
 
         // The reference and the price are computed, so there is nothing to write for them here either.
         // The operator's four knobs are the whole truth: the cost, the margin, the column price and
@@ -420,8 +389,7 @@ public sealed class BrandFuelController : ControllerBase
         // though nothing stores it.
         var oldFinalPrice = FuelPricing.FinalPerLiterOrNull(
             oldSupplierPrice,
-            oldMarginPrice,
-            fuel.PumpPricePerLiter);
+            oldMarginPrice);
 
         var oldValue = JsonSerializer.Serialize(new
         {
@@ -526,12 +494,6 @@ public sealed class BrandFuelController : ControllerBase
             summary,
             Brand!.Slug,
             ct);
-
-        // Record the deliberate loss-leader decision (we only reach here below-cost when opted in).
-        if (belowCost)
-            await _notifications.BelowCostAsync(
-                BrandName, fuel.Name, request.SupplierPricePerLiter, finalPerLiter ?? request.PumpPricePerLiter ?? 0m,
-                deliberate: true, ct);
 
         return Ok(new { success = true });
     }

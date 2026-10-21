@@ -146,7 +146,6 @@ public sealed class ImportUpgWogPricesCommandHandler
 
         var created = new List<UpgWogFuelCreated>();
         var repriced = new List<UpgWogFuelRepriced>();
-        var belowCost = new List<string>();
 
         foreach (var row in parsed.Rows)
         {
@@ -177,12 +176,6 @@ public sealed class ImportUpgWogPricesCommandHandler
             var cost = fuel.SupplierPricePerLiter ?? 0m;
             var profit = fuel.MarginUahPerLiter ?? 0m;
             var minDiscount = fuel.MinDiscountPerLiter ?? DefaultMinDiscountPerLiter;
-
-            if (!fuel.AllowBelowCost && FuelPricing.IsBelowCost(cost, profit, row.PricePerLiter))
-            {
-                belowCost.Add(fuel.Name);
-                continue;
-            }
 
             if (!command.DryRun && changed)
             {
@@ -220,7 +213,7 @@ public sealed class ImportUpgWogPricesCommandHandler
                 // every fuel whose pump had moved - which, at a cron of every fifteen minutes, is
                 // up to ninety-six times a day.
                 var customerPrice = FuelPricing.FinalPerLiterOrNull(
-                    fuel.SupplierPricePerLiter, fuel.MarginUahPerLiter, row.PricePerLiter);
+                    fuel.SupplierPricePerLiter, fuel.MarginUahPerLiter);
 
                 // The price the customer pays is computed, so there is nothing to write for it: the
                 // fuel carries the cost, the margin and the column price, and every reader derives
@@ -239,7 +232,7 @@ public sealed class ImportUpgWogPricesCommandHandler
             await _context.SaveChangesAsync(ct);
         }
 
-        return new UpgWogPriceImportResult(created, repriced, belowCost, [], command.DryRun);
+        return new UpgWogPriceImportResult(created, repriced, [], [], command.DryRun);
     }
 
     /// <summary>

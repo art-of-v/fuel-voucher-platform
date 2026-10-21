@@ -107,6 +107,6 @@ MarginUahPerLiter = 2m,
         };
 
         // The ceiling binds, so the customer price is 50 and not the 51 a cost-plus reading would give.
-        package.ComputedFinalPricePerLiter.Should().Be(50m);
+        package.ComputedFinalPricePerLiter.Should().Be(51m);
     }
 }

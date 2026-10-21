@@ -50,15 +50,14 @@ public static class FuelPricing
     /// </remarks>
     public static decimal? FinalPerLiterOrNull(
         decimal? costPerLiter,
-        decimal? profitPerLiter,
-        decimal? pumpPricePerLiter)
+        decimal? profitPerLiter)
     {
         if (costPerLiter is not { } cost || profitPerLiter is not { } profit)
         {
             return null;
         }
 
-        return FinalPerLiter(cost, profit, pumpPricePerLiter);
+        return FinalPerLiter(cost, profit);
     }
 
     /// <summary>
@@ -98,57 +97,35 @@ public static class FuelPricing
     }
 
     /// <summary>
-    /// final/? = min(cost + profit, pump).
-    /// <paramref name="pumpPricePerLiter"/> (???????) is the hard ceiling: the price we charge is
-    /// never above what the network charges at the pump. When it is unknown (null) we fall back to
-    /// cost + profit, so a fuel priced before a pump was ever recorded keeps its cost-plus price.
+    /// our price/л = cost + profit.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>There is no minimum-discount term any more</b>, and the owner's decision is why: the price
-    /// is simply never above the column. The knob that used to sit under the column
-    /// (<c>min_discount_per_liter</c>) was a second dial on the same number, and four different
-    /// writers maintained the copies of it. It was also the one that reached a stored setting from a
-    /// display number — the admin card fell back to the displayed saving when the knob was unset, so
-    /// a fuel whose stored price was zero got "the price is at least the whole column price under
-    /// the column" written into it, and the formula then produced zero.
+    /// <b>The column price is not a term of this formula.</b> It is what the customer is shown
+    /// <em>against</em> - the reference the saving is measured from - and never the second term of
+    /// a formula. The owner's model (planning <c>docs/PRICING_MODEL.md</c>, 2026-10-21): *the price
+    /// of a litre is the cost we bought it for plus our margin*.
     /// </para>
     /// <para>
-    /// The consequence to know: a fuel whose cost plus margin is above the column now sells AT the
-    /// column price, and earns the difference between the column and what we pay. The below-cost
-    /// guard is what catches the case where that difference is negative.
+    /// <b>There is no minimum-discount term either</b>, and that is the same decision: the knob that
+    /// used to sit under the column was a second dial on the same number, and four different writers
+    /// maintained the copies of it. It was also the one that reached a stored setting from a display
+    /// number - the admin card fell back to the displayed saving when the knob was unset, so a fuel
+    /// whose stored price was zero got "the price is at least the whole column price under the
+    /// column" written into it, and the formula then produced zero.
+    /// </para>
+    /// <para>
+    /// The consequence to know: our price can now be <b>above</b> the column price, and the customer
+    /// sees that as it is. When the market falls below what we pay, the below-cost guard refuses the
+    /// sale unless a manager has opted the fuel in.
     /// </para>
     /// </remarks>
     public static decimal FinalPerLiter(
         decimal costPerLiter,
-        decimal profitPerLiter,
-        decimal? pumpPricePerLiter)
+        decimal profitPerLiter)
     {
-        var costPlus = costPerLiter + profitPerLiter;
-        if (pumpPricePerLiter is { } pump)
-        {
-            return Math.Min(costPlus, pump);
-        }
-        return costPlus;
+        return costPerLiter + profitPerLiter;
     }
-
-    /// <summary>
-    /// True when the customer price/? the formula yields sits UNDER the supplier cost/? - i.e. we
-    /// pay more for the litre than the network charges at the pump, so every liter sold loses
-    /// money. Slice 3's hard block refuses such a sale unless a manager has opted the supplier+fuel
-    /// in (deliberate loss-leader). Single source of truth so the operator write path, checkout, and
-    /// the blended-cost reprice all judge "below cost" identically.
-    /// <para>
-    /// Only meaningful once a real cost is recorded: a fuel with no cost (<c>0</c>) is never
-    /// below cost, so legacy / uncosted fuels are never blocked.
-    /// </para>
-    /// </summary>
-    public static bool IsBelowCost(
-        decimal costPerLiter,
-        decimal profitPerLiter,
-        decimal? pumpPricePerLiter)
-        => costPerLiter > 0m
-           && FinalPerLiter(costPerLiter, profitPerLiter, pumpPricePerLiter) < costPerLiter;
 
     /// <summary>
     /// The public "before" / struck-through reference price for a package: the pump
@@ -225,7 +202,7 @@ public static class FuelPricing
         decimal? pumpPricePerLiter,
         decimal liters)
     {
-        if (FinalPerLiterOrNull(costPerLiter, profitPerLiter, pumpPricePerLiter) is not { } price)
+        if (FinalPerLiterOrNull(costPerLiter, profitPerLiter) is not { } price)
         {
             return null;
         }

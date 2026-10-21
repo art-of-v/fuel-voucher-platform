@@ -104,8 +104,7 @@ internal static class CatalogueTestData
         {
 var computed = FuelPricing.FinalPerLiterOrNull(
             fuel.SupplierPricePerLiter,
-            margin,
-            fuel.PumpPricePerLiter);
+            margin);
         if (computed != finalPricePerLiter)
         {
             throw new InvalidOperationException(

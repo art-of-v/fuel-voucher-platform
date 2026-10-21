@@ -289,10 +289,12 @@ CreateBrandStation(StationId(1), BrandId(1), "Node A"),
         pkg.FuelTypeId.Should().Be(ToUuid("ft-a"));
         pkg.FuelName.Should().Be("A-95");
         pkg.Liters.Should().Be(10m);
-        pkg.Price.Should().Be(500);
+        pkg.Price.Should().Be(600);
         // Pump × liters (60 × 10), NOT the stale stored 420 nor the supplier cost.
         pkg.OriginalPrice.Should().Be(600);
-        pkg.FinalPricePerLiter.Should().Be(50m);
+        // Out of stock, the shelf shows the COLUMN price - our price is what we charge when the
+        // fuel is there. The saving is shown only when there is stock to save it on.
+        pkg.FinalPricePerLiter.Should().Be(60m);
     }
 
     [Fact]

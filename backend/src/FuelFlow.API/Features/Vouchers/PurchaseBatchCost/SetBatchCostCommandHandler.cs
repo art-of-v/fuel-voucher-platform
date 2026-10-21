@@ -195,21 +195,10 @@ public sealed class SetBatchCostCommandHandler
             // every sale/activation — surface that immediately so pricing can be fixed.
             var fuelType = await _context.FuelTypes.AsNoTracking()
                 .FirstOrDefaultAsync(f => f.Id == command.FuelTypeId, cancellationToken);
-            // The margin the new cost would be sold at belongs to the fuel, once - reading it off
-            // "the first package of this fuel" was an arbitrary pick between rows that now cannot differ
-            // at all, which is the point of the split. Every knob is on the one row loaded above, so
-            // the whole question - is this fuel allowed below cost, and against which ceiling - is
-            // answered without a second query.
-            if (fuelType is { AllowBelowCost: false })
-            {
-                var profit = fuelType.MarginUahPerLiter ?? 0m;
-                var minDiscount = fuelType.MinDiscountPerLiter ?? 0m;
-                if (FuelPricing.IsBelowCost(b, profit, fuelType.PumpPricePerLiter))
-                {
-                    var finalPerLiter = FuelPricing.FinalPerLiter(b, profit, fuelType.PumpPricePerLiter);
-                    await _notifications.BelowCostAsync(brand, command.FuelTypeId.ToString(), b, finalPerLiter, deliberate: false, cancellationToken);
-                }
-            }
+            // Our price is the cost plus the margin, and the margin is not negative, so a new cost
+            // cannot make the price fall under it. There is nothing to alert about here any more: the
+            // below-cost guard that is left is the one that judges the price the customer is
+            // actually charged, which a term discount can take under the cost.
         }
 
         if (actingUser is { } userId)

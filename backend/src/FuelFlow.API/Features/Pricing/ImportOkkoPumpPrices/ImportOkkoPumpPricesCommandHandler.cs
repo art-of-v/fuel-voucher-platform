@@ -177,7 +177,6 @@ public sealed class ImportOkkoPumpPricesCommandHandler
 
         var applied = new List<OkkoPumpApplied>();
         var withoutPrice = new List<string>();
-        var belowCostSkipped = new List<string>();
         var matchedCategories = new HashSet<OkkoFuelCategory>();
         var matchedCodes = new HashSet<string>(StringComparer.Ordinal);
         var changedCount = 0;
@@ -230,7 +229,7 @@ public sealed class ImportOkkoPumpPricesCommandHandler
             var cost = ft.SupplierPricePerLiter ?? 0m; // held constant: a pump change is not a cost event
             var profit = ft.MarginUahPerLiter ?? 0m;
             var minDiscount = ft.MinDiscountPerLiter ?? 0m;
-            var finalPerLiter = FuelPricing.FinalPerLiter(cost, profit, pump);
+            var finalPerLiter = FuelPricing.FinalPerLiter(cost, profit);
 
             // What the CUSTOMER pays, which is a different question from what the knobs add up
             // to. A fuel with no cost or no margin has no customer price at all, and the column
@@ -246,12 +245,6 @@ public sealed class ImportOkkoPumpPricesCommandHandler
             // The manual path refuses the same write unless the fuel is opted in via AllowBelowCost
             // (BrandsController.UpdateFuel); the automatic path must behave identically, or a
             // third party's price move could take a fuel off sale unattended.
-            if (!ft.AllowBelowCost && FuelPricing.IsBelowCost(cost, profit, pump))
-            {
-                belowCostSkipped.Add(ft.Name);
-                continue;
-            }
-
             if (category is { } matched) matchedCategories.Add(matched);
 
             var previousPump = ft.PumpPricePerLiter;
@@ -314,7 +307,7 @@ public sealed class ImportOkkoPumpPricesCommandHandler
             Applied: applied,
             UnmatchedSiteFuels: unmatchedSheet,
             OkkoFuelsWithoutPrice: withoutPrice,
-            BelowCostSkipped: belowCostSkipped,
+            BelowCostSkipped: [],
             Errors: Array.Empty<OkkoPriceSheetError>(),
             DryRun: dryRun);
     }
