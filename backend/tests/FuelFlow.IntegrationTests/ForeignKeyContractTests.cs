@@ -55,7 +55,11 @@ public sealed class ForeignKeyContractTests : IClassFixture<TestDatabaseFixture>
             .SelectMany(e => e.GetForeignKeys().Select(fk => new
             {
                 Table = e.GetTableName(),
-                Column = fk.Properties.Single().GetColumnName(),
+                // One entry per column of the key, so a key over two columns is compared the same
+                // way as a key over one. A composite key - (fuel type, brand) -> the fuel's own
+                // (id, brand_id) - is one constraint that covers two columns, and the database
+                // reports it as one constraint too; the comparison is per column on both sides.
+                Columns = fk.Properties.Select(p => p.GetColumnName()).ToArray(),
                 Principal = fk.PrincipalEntityType.GetTableName(),
                 Rule = fk.DeleteBehavior
             }))
@@ -81,6 +85,7 @@ public sealed class ForeignKeyContractTests : IClassFixture<TestDatabaseFixture>
             .ToHashSet(StringComparer.Ordinal);
 
         var missing = declared
+            .SelectMany(d => d.Columns.Select(c => (d.Table, Column: c, d.Principal, d.Rule)))
             .Where(d => !installed.Contains($"{d.Table}.{d.Column} -> {d.Principal} {RuleToRule(d.Rule)}"))
             .Select(d => $"{d.Table}.{d.Column} -> {d.Principal} ({d.Rule})")
             .ToArray();
@@ -97,19 +102,40 @@ public sealed class ForeignKeyContractTests : IClassFixture<TestDatabaseFixture>
 
         // Postgres does not index a foreign key on its own: the check on the parent's delete scans
         // the child table, and so does every join down that column.
+        //
+        // The rule is stated over the KEY, not over the column, because a key can span more than
+        // one column - (fuel type, brand) -> the fuel's own (id, brand_id) is one constraint over
+        // two - and the index that serves such a key is one over the same pair. Asking for an index
+        // per column would ask for a second index over brand_id alone, which nothing queries and
+        // which the pair's index already covers as a prefix.
         var withoutIndex = (await context.Database
             .SqlQueryRaw<string>(
                 """
-                SELECT tc.table_name || '.' || kcu.column_name
-                FROM information_schema.table_constraints tc
-                JOIN information_schema.key_column_usage kcu
-                  ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
-                WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = 'public'
-                  AND NOT EXISTS (
-                    SELECT 1 FROM pg_index i
-                    JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = i.indkey[0]
-                    WHERE i.indrelid = format('%I.%I', tc.table_schema, tc.table_name)::regclass
-                      AND a.attname = kcu.column_name)
+                WITH fk AS (
+                    SELECT tc.table_name,
+                           array_agg(kcu.column_name::text ORDER BY kcu.ordinal_position) AS cols
+                    FROM information_schema.table_constraints tc
+                    JOIN information_schema.key_column_usage kcu
+                      ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
+                    WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = 'public'
+                    GROUP BY tc.table_name, tc.constraint_name
+                ),
+                idx AS (
+                    SELECT i.indrelid,
+                           (SELECT array_agg(a.attname::text ORDER BY x.ord)
+                              FROM unnest(i.indkey) WITH ORDINALITY AS x(attnum, ord)
+                              JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = x.attnum) AS cols
+                    FROM pg_index i
+                    WHERE i.indexprs IS NULL
+                )
+                SELECT f.table_name || ' (' || array_to_string(f.cols, ',') || ')'
+                FROM fk f
+                JOIN pg_class c ON c.relname = f.table_name AND c.relnamespace = 'public'::regnamespace
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM idx i
+                    WHERE i.indrelid = c.oid
+                      AND i.cols[1:array_length(f.cols, 1)] = f.cols
+                )
                 """)
             .ToListAsync())
             .ToArray();

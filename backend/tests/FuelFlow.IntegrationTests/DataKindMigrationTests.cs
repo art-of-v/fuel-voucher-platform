@@ -98,9 +98,9 @@ public sealed class DataKindMigrationTests : IClassFixture<TestDatabaseFixture>
         // The regression pin. Under the scaffolded ordering this insert would have failed on the
         // CHECK with data_kind = '', and the failure would have appeared only on a database that
         // actually holds stock.
-        var (fuelId, brandSlug) = await NewFuelAsync();
+        var (fuelId, brandId, brandSlug) = await NewFuelAsync();
         var size = NewSize(fuelId);
-        var voucher = NewVoucher(fuelId, brandSlug);
+        var voucher = NewVoucher(fuelId, brandSlug, brandId);
 
         await using (var context = CreateContext())
         {
@@ -121,9 +121,9 @@ public sealed class DataKindMigrationTests : IClassFixture<TestDatabaseFixture>
     [Fact]
     public async Task TheQaFlag_RoundTrips_ThroughTheColumn()
     {
-        var (fuelId, brandSlug) = await NewFuelAsync();
+        var (fuelId, brandId, brandSlug) = await NewFuelAsync();
         var size = NewSize(fuelId, isTestData: true);
-        var voucher = NewVoucher(fuelId, brandSlug, isTestData: true);
+        var voucher = NewVoucher(fuelId, brandSlug, brandId, isTestData: true);
 
         await using (var context = CreateContext())
         {
@@ -158,8 +158,8 @@ public sealed class DataKindMigrationTests : IClassFixture<TestDatabaseFixture>
     {
         await using var context = CreateContext();
 
-        var (sandboxFuelId, sandboxSlug) = await NewFuelAsync();
-        context.FuelVouchers.Add(NewVoucher(sandboxFuelId, sandboxSlug, dataKind: "sandbox"));
+        var (sandboxFuelId, sandboxBrandId, sandboxSlug) = await NewFuelAsync();
+        context.FuelVouchers.Add(NewVoucher(sandboxFuelId, sandboxSlug, sandboxBrandId, dataKind: "sandbox"));
 
         var act = async () => await context.SaveChangesAsync();
         await act.Should().ThrowAsync<DbUpdateException>(
@@ -202,7 +202,7 @@ public sealed class DataKindMigrationTests : IClassFixture<TestDatabaseFixture>
     /// A fuel nobody seeded, with the brand it belongs to. The size hangs off it: the pool lives on
     /// the size, and a size cannot exist without its fuel.
     /// </summary>
-    private async Task<(Guid FuelTypeId, string BrandSlug)> NewFuelAsync()
+    private async Task<(Guid FuelTypeId, Guid BrandId, string BrandSlug)> NewFuelAsync()
     {
         await using var context = CreateContext();
 
@@ -235,7 +235,7 @@ public sealed class DataKindMigrationTests : IClassFixture<TestDatabaseFixture>
         context.FuelTypes.Add(fuel);
 
         await context.SaveChangesAsync();
-        return (fuel.Id, slug);
+        return (fuel.Id, brand.Id, slug);
     }
 
     /// <summary>
@@ -258,7 +258,7 @@ public sealed class DataKindMigrationTests : IClassFixture<TestDatabaseFixture>
         return size;
     }
 
-    private static FuelVoucher NewVoucher(Guid fuelTypeId, string brandSlug, bool isTestData = false, string? dataKind = null)
+    private static FuelVoucher NewVoucher(Guid fuelTypeId, string brandSlug, Guid brandId, bool isTestData = false, string? dataKind = null)
     {
         var expiry = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3));
 
@@ -268,7 +268,9 @@ public sealed class DataKindMigrationTests : IClassFixture<TestDatabaseFixture>
                 // The voucher's network is the brand's slug, and the database refuses a row that names
                 // a different network than the fuel it claims.
                 Brand = brandSlug,
-                BrandId = BrandIds.ForSlug(brandSlug),
+                // The brand's key is the network this test created - a runtime network with an id
+                // of its own, so the voucher's key is that id, not a derived one.
+                BrandId = brandId,
                 FuelTypeId = fuelTypeId,
             Liters = 10m,
             SupplierExpirationDate = expiry,

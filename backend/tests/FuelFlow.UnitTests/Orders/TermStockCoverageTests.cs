@@ -4,6 +4,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Availability;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -122,6 +123,7 @@ public sealed class TermStockCoverageTests : IDisposable
         VoucherStatus status = VoucherStatus.Available) => new()
     {
         Id = Guid.NewGuid(),
+        BrandId = BrandIds.ForSlug(brand),
         Brand = brand,
         FuelTypeId = fuelTypeId,
         Liters = liters,
