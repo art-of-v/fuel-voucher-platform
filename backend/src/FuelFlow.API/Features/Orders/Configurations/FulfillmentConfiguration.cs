@@ -57,6 +57,28 @@ internal sealed class FulfillmentConfiguration : IEntityTypeConfiguration<Fulfil
         builder.HasQueryFilter(e => e.ReleasedAtUtc == null);
         builder.HasIndex(e => e.OrderId)
             .HasFilter("released_at_utc IS NULL");
+
+        // One voucher, one live fulfilment PER ORDER - the database's half of the compare-and-swap.
+        //
+        // The reconciliation counts what an order delivered by COUNTING its live fulfilment rows and
+        // comparing that with the quantity the order asked for. A duplicate row - the same paper
+        // delivered twice under one order - would inflate that count, and the money that follows from
+        // it: the realised margin is margin per litre TIMES the delivered quantity, so a second row
+        // is a second margin earned on fuel that was never handed over twice. The application prevents
+        // it today by excluding the vouchers an order already has, but that is a read followed by a
+        // write, and a second worker on the same order reads the same list.
+        //
+        // NOT "one voucher, one live fulfilment" in the global sense, because that is NOT what this
+        // product does: a renewal's extend branch delivers the SAME paper again under the renewal
+        // order, and a voucher that a customer handed back goes back to the pool and is sold to the
+        // next customer - so one voucher legitimately has a live fulfilment under each order it was
+        // delivered by. What is true, and what the money depends on, is that one order never
+        // delivers one voucher twice.
+        builder.HasIndex(e => new { e.OrderId, e.VoucherId })
+            .IsUnique()
+            .HasFilter("released_at_utc IS NULL")
+            .HasDatabaseName("ux_fulfillments_order_id_voucher_id");
+
         builder.HasIndex(e => e.VoucherId);
 
         // Every release is a thing an operator may need to see. This is the only query that reports

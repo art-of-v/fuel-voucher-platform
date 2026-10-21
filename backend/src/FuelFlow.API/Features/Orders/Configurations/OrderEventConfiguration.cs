@@ -18,6 +18,17 @@ internal sealed class OrderEventConfiguration : IEntityTypeConfiguration<OrderEv
             t.HasCheckConstraint("ck_order_events_from_to",
                 "(event_type = 'Created' AND from_status IS NULL) " +
                 "OR (event_type <> 'Created' AND to_status IS NOT NULL)");
+            // The statuses themselves, not only their pairing. `ck_order_events_from_to` says a
+            // non-Created event must carry a to_status; it does not say WHICH status - so a typo
+            // ("PartiallyRefundedd", "fulfilled") was accepted by the database and written into a
+            // row that is supposed to be the order's history. The vocabulary is the one the code
+            // writes: `OrderStatus`, spelled by `ToString()` in ApplicationDbContext, and the same
+            // eight names `orders.status` is already pinned to by `ck_order_status`.
+            t.HasCheckConstraint("ck_order_events_statuses",
+                "(from_status IS NULL OR from_status IN ('PendingPayment', 'Paid', 'PendingFulfillment', " +
+                "'PartiallyFulfilled', 'Fulfilled', 'PartiallyRefunded', 'Refunded', 'Cancelled')) AND " +
+                "(to_status IS NULL OR to_status IN ('PendingPayment', 'Paid', 'PendingFulfillment', " +
+                "'PartiallyFulfilled', 'Fulfilled', 'PartiallyRefunded', 'Refunded', 'Cancelled'))");
         });
 
         builder.HasKey(e => e.Id);
@@ -39,12 +50,12 @@ internal sealed class OrderEventConfiguration : IEntityTypeConfiguration<OrderEv
         builder.Property(e => e.FromStatus)
             .HasColumnName("from_status")
             .HasMaxLength(20)
-            .HasComment(                "The status before. Set for a status change only.");
+            .HasComment(                "The status before. Set for a status change only. One of the order's eight statuses - a CHECK pins the vocabulary.");
 
         builder.Property(e => e.ToStatus)
             .HasColumnName("to_status")
             .HasMaxLength(20)
-            .HasComment(                "The status after. Set for a status change only.");
+            .HasComment(                "The status after. Set for a status change only. One of the order's eight statuses - a CHECK pins the vocabulary.");
 
         builder.Property(e => e.ExternalRef)
             .HasColumnName("external_ref")
