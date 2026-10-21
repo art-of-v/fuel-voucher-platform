@@ -6,6 +6,7 @@ using FuelFlow.Features.Auth.SendCode.Services;
 using FuelFlow.Features.Auth.Verify;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -72,8 +73,11 @@ public sealed class AuthController : ControllerBase
     // the stale one first, tripping refresh-token reuse detection into a logout loop.
     private const string RefreshTokenCookiePath = "/api/auth/refresh";
 
-    private void SetRefreshTokenCookie(string refreshToken)
+    private void SetRefreshTokenCookie(string? refreshToken)
     {
+        if (string.IsNullOrEmpty(refreshToken))
+            return;
+
         Response.Cookies.Append(RefreshTokenCookieName, refreshToken, new CookieOptions
         {
             HttpOnly = true,
@@ -83,6 +87,17 @@ public sealed class AuthController : ControllerBase
             MaxAge = TimeSpan.FromDays(_jwtOptions.RefreshTokenExpirationDays)
         });
     }
+
+    /// <summary>
+    /// Whether the caller is the native mobile app.
+    /// <para>
+    /// The native app has no cookie jar, so the refresh token has to travel in the response body;
+    /// a browser has one, and there the token belongs in the <c>HttpOnly</c> cookie and nowhere
+    /// else. A browser that also got the token in the body would keep a copy that any script on
+    /// the origin can read — see <c>ClientPlatform</c>.
+    /// </para>
+    /// </summary>
+    private bool IsNativeClient => ClientPlatform.IsNative(Request.Headers);
 
     private void ClearRefreshTokenCookie()
     {
@@ -140,7 +155,9 @@ public sealed class AuthController : ControllerBase
         {
             var result = await _verifyCodeHandler.HandleAsync(command, cancellationToken);
             SetRefreshTokenCookie(result.RefreshToken);
-            return Ok(result);
+            // The body carries the refresh token only for the native app. A browser gets the
+            // HttpOnly cookie and nothing else.
+            return Ok(IsNativeClient ? result : result with { RefreshToken = null });
         }
         catch (UnauthorizedAccessException ex)
         {
@@ -198,7 +215,9 @@ public sealed class AuthController : ControllerBase
         {
             var result = await _adminVerifyCodeHandler.HandleAsync(command, cancellationToken);
             SetRefreshTokenCookie(result.RefreshToken);
-            return Ok(result);
+            // The admin panel is a browser: it keeps the refresh token in the HttpOnly cookie
+            // and never sees it in the body.
+            return Ok(IsNativeClient ? result : result with { RefreshToken = null });
         }
         catch (UnauthorizedAccessException ex)
         {
@@ -234,7 +253,9 @@ public sealed class AuthController : ControllerBase
         {
             var result = await _refreshTokenHandler.HandleAsync(new RefreshTokenCommand(refreshToken), cancellationToken);
             SetRefreshTokenCookie(result.RefreshToken);
-            return Ok(result);
+            // The body carries the rotated refresh token only for the native app. A browser
+            // reads the new one from the HttpOnly cookie and never sees it in the body.
+            return Ok(IsNativeClient ? result : result with { RefreshToken = null });
         }
         catch (UnauthorizedAccessException ex)
         {
