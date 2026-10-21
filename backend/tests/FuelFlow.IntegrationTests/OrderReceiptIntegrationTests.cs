@@ -196,6 +196,7 @@ public sealed class OrderReceiptIntegrationTests : IClassFixture<TestDatabaseFix
         {
             Id = Guid.NewGuid(),
             OrderId = order.Id,
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("diesel"),
             Liters = 50m,

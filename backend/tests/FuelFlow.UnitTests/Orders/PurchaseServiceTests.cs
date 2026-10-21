@@ -117,6 +117,7 @@ public OrderCommandHandlersTests()
         _context.FuelVouchers.Add(new FuelVoucher
         {
             Id = Guid.NewGuid(),
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid(fuelTypeId),
             Liters = liters,
@@ -226,6 +227,7 @@ public OrderCommandHandlersTests()
             new OrderLineItem
             {
                 Id = Guid.NewGuid(),
+                BrandId = BrandIds.ForSlug("okko"),
                 Brand = "okko",
                 FuelTypeId = ToUuid("okko-95"),
                 Liters = 50,

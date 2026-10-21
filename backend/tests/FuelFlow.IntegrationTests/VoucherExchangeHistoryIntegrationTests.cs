@@ -331,6 +331,7 @@ foreach (var (cost, index) in costsPerLiter.Select((c, i) => (c, i)))
                 OldVoucherId = oldVoucher.Id,
                 NewVoucherId = newVoucher.Id,
                 FuelTypeId = ToUuid("okko-dp"),
+                BrandId = BrandIds.ForSlug("okko"),
                 Brand = "okko",
                 SupplierId = supplierId,
                 SurchargeUah = surchargePerPair,

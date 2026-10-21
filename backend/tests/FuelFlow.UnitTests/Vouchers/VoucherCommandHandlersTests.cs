@@ -70,6 +70,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         var assignedVoucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
@@ -86,6 +87,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         var usedVoucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-dp"),
             Liters = 50,
@@ -102,6 +104,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         var availableVoucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
@@ -152,6 +155,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
             _context.FuelVouchers.Add(new FuelVoucher
             {
                 Id = Guid.NewGuid(),
+                BrandId = BrandIds.ForSlug("okko"),
                 Brand = "okko",
                 FuelTypeId = ToUuid("okko-95"),
                 Liters = 10,
@@ -205,6 +209,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         var giftedVoucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 20,
@@ -285,6 +290,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         var voucher = new FuelVoucher
         {
             Id = voucherId,
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
@@ -318,6 +324,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         var voucher = new FuelVoucher
         {
             Id = voucherId,
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
@@ -352,6 +359,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         var voucher = new FuelVoucher
         {
             Id = voucherId,
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
@@ -393,6 +401,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         var voucher = new FuelVoucher
         {
             Id = voucherId,
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
@@ -429,6 +438,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         var voucher = new FuelVoucher
         {
             Id = voucherId,
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
@@ -462,6 +472,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         var voucher = new FuelVoucher
         {
             Id = voucherId,
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
@@ -495,6 +506,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
         return new FuelVoucher
         {
             Id = Guid.NewGuid(),
+            BrandId = BrandIds.ForSlug(brand),
             Brand = brand,
             FuelTypeId = ToUuid(fuelTypeId),
             Liters = liters,

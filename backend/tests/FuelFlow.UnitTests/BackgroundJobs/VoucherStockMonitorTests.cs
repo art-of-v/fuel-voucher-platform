@@ -66,6 +66,7 @@ public sealed class VoucherStockMonitorTests : IDisposable
         => _context.FuelVouchers.Add(new FuelVoucher
         {
             Id = Guid.NewGuid(),
+            BrandId = BrandIds.ForSlug(brand ?? _provider),
             Brand = brand ?? _provider,
             FuelTypeId = ToUuid("test-expiring-dp"),
             Liters = 10,

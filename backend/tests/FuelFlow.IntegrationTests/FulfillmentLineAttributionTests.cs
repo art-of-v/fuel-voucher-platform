@@ -270,11 +270,13 @@ public sealed class FulfillmentLineAttributionTests : IClassFixture<TestDatabase
     private static FuelVoucher Voucher(Guid userId, Guid orderId, string fuelTypeId, decimal liters, string tag)
     {
         var nonce = $"{tag}-{Guid.NewGuid():N}";
+        var brand = fuelTypeId.StartsWith("wog", StringComparison.Ordinal) ? "wog" : "okko";
 
         return new FuelVoucher
         {
             Id = Guid.NewGuid(),
-            Brand = fuelTypeId.StartsWith("wog", StringComparison.Ordinal) ? "wog" : "okko",
+            Brand = brand,
+            BrandId = BrandIds.ForSlug(brand),
             FuelTypeId =   ToUuid(fuelTypeId),
             Liters = liters,
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),

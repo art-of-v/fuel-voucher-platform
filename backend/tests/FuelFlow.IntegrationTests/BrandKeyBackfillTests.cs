@@ -84,6 +84,7 @@ public sealed class BrandKeyBackfillTests : IClassFixture<TestDatabaseFixture>
             seed.FuelVouchers.Add(new FuelVoucher
             {
                 Id = voucherId,
+                BrandId = BrandIds.ForSlug("okko"),
                 Brand = "okko",
                 FuelTypeId = fuelTypeId,
                 Liters = 50m,
@@ -110,6 +111,7 @@ public sealed class BrandKeyBackfillTests : IClassFixture<TestDatabaseFixture>
             {
                 Id = Guid.NewGuid(),
                 OrderId = orderId,
+                BrandId = BrandIds.ForSlug("okko"),
                 Brand = "okko",
                 FuelTypeId = fuelTypeId,
                 Liters = 50m,

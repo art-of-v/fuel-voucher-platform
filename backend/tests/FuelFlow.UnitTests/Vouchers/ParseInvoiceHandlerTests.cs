@@ -54,6 +54,7 @@ public sealed class ParseInvoiceHandlerTests : IDisposable
         _context.FuelVouchers.Add(new FuelVoucher
         {
             Id = Guid.NewGuid(),
+            BrandId = BrandIds.ForSlug(brand),
             Brand = brand,
             FuelTypeId = ToUuid(fuelTypeId),
             Liters = liters,

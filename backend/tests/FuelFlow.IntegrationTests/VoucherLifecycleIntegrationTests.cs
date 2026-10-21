@@ -278,6 +278,7 @@ public sealed class VoucherLifecycleIntegrationTests : IClassFixture<TestDatabas
     {
         Id = id,
         Brand = "okko",
+        BrandId = BrandIds.ForSlug("okko"),
         FuelTypeId = ToUuid("okko-95"),
         Liters = liters,
         SupplierExpirationDate = new DateOnly(2027, 1, 1),
@@ -334,6 +335,7 @@ public sealed class VoucherLifecycleIntegrationTests : IClassFixture<TestDatabas
         {
             Id = lineId,
             OrderId = orderId,
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,

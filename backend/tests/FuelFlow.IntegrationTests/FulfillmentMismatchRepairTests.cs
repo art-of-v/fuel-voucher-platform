@@ -249,6 +249,7 @@ public sealed class FulfillmentMismatchRepairTests : IClassFixture<TestDatabaseF
             {
                 Id = Guid.NewGuid(),
                 OrderId = id,
+                BrandId = BrandIds.ForSlug("okko"),
                 Brand = "okko",
                 FuelTypeId = ToUuid("okko-95"),
                 Liters = 50m,

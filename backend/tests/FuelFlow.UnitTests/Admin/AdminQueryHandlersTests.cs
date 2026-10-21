@@ -52,6 +52,7 @@ public sealed class AdminQueryHandlersTests : IDisposable
         return new FuelVoucher
         {
             Id = Guid.NewGuid(),
+            BrandId = BrandIds.ForSlug(brand),
             Brand = brand,
             FuelTypeId = ToUuid(fuelTypeId),
             Liters = 50,
@@ -85,6 +86,7 @@ public sealed class AdminQueryHandlersTests : IDisposable
         order.LineItems.Add(new OrderLineItem
         {
             Id = Guid.NewGuid(),
+            BrandId = BrandIds.ForSlug(brand),
             Brand = brand,
             FuelTypeId = ToUuid(fuelTypeId),
             Liters = liters,

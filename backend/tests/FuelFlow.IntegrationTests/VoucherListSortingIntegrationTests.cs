@@ -136,6 +136,7 @@ public sealed class VoucherListSortingIntegrationTests : IClassFixture<TestDatab
                 Id = Guid.NewGuid(),
                 QrPayload = $"sort-{tag}-{Guid.NewGuid():N}",
                 VoucherNumber = $"sort-{tag}-{Guid.NewGuid():N}",
+                BrandId = BrandIds.ForSlug(brand),
                 Brand = brand,
                 FuelTypeId =   ToUuid(fuelTypeId),
                 Liters = 5m,

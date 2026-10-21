@@ -199,6 +199,7 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
     {
         Id = Guid.NewGuid(),
         Brand = "okko",
+        BrandId = BrandIds.ForSlug("okko"),
         FuelTypeId =   ToUuid(fuelTypeId),
         Liters = 10m,
         SupplierExpirationDate = new DateOnly(2027, 1, 1),
@@ -620,6 +621,7 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
             {
                 Id = Guid.NewGuid(),
                 OrderId = order.Id,
+                BrandId = BrandIds.ForSlug(source.Brand),
                 Brand = source.Brand,
                 FuelTypeId = source.FuelTypeId,
                 Liters = source.Liters,
@@ -815,6 +817,7 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
         {
             Id = Guid.NewGuid(),
             OrderId = Guid.NewGuid(),   // no such order; the FK never gets that far
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-dp"),
             Liters = 10m,
@@ -1209,6 +1212,7 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
         {
             Id = Guid.NewGuid(),
             OrderId = order.Id,
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-dp"),
             Liters = 50m,
@@ -1345,10 +1349,10 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
 
         var act = () => context.Database.ExecuteSqlRawAsync(
             $$"""
-            INSERT INTO fuel_vouchers (id, brand, fuel_type_id, liters, supplier_expiration_date,
+            INSERT INTO fuel_vouchers (id, brand, brand_id, fuel_type_id, liters, supplier_expiration_date,
                                        customer_expiration_date, voucher_number, qr_payload, qr_payload_sha256,
                                        created_at_utc, updated_at_utc, status, data_kind, is_deleted)
-            VALUES ({0}, 'okko', '{{ToUuid("okko-dp")}}', 10, '2027-01-01', '2027-01-01', 'bad-status', 'bad-status-qr', sha256(convert_to('bad-status-qr','UTF8')),
+            VALUES ({0}, 'okko', '{{BrandIds.Okko}}', '{{ToUuid("okko-dp")}}', 10, '2027-01-01', '2027-01-01', 'bad-status', 'bad-status-qr', sha256(convert_to('bad-status-qr','UTF8')),
                     now(), now(), 'Avilble', 'real', false)
             """, Guid.NewGuid());
 
@@ -1382,10 +1386,10 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
 
         var act = () => context.Database.ExecuteSqlRawAsync(
             $$"""
-            INSERT INTO fuel_vouchers (id, brand, fuel_type_id, liters, supplier_expiration_date,
+            INSERT INTO fuel_vouchers (id, brand, brand_id, fuel_type_id, liters, supplier_expiration_date,
                                        customer_expiration_date, voucher_number, qr_payload, qr_payload_sha256,
                                        created_at_utc, updated_at_utc, status, data_kind, is_deleted)
-            VALUES ({0}, 'okko', '{{ToUuid("okko-dp")}}', 10, '2027-01-01', '2027-01-01', 'longest-status', 'longest-status-qr', sha256(convert_to('longest-status-qr','UTF8')),
+            VALUES ({0}, 'okko', '{{BrandIds.Okko}}', '{{ToUuid("okko-dp")}}', 10, '2027-01-01', '2027-01-01', 'longest-status', 'longest-status-qr', sha256(convert_to('longest-status-qr','UTF8')),
                     now(), now(), 'VerifiedWithWarnings', 'real', false)
             """, Guid.NewGuid());
 

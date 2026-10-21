@@ -148,6 +148,7 @@ public sealed class UnarchiveVoucherIntegrationTests : IClassFixture<TestDatabas
         seed.FuelVouchers.Add(new FuelVoucher
         {
             Id = voucherId,
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,

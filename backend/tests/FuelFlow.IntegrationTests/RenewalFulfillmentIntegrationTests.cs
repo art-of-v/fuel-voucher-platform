@@ -1166,6 +1166,7 @@ var exchangedId = Guid.NewGuid();
                 ExchangeBatchId = exchangeBatchId,
                 OldVoucherId = exchangedId,
                 FuelTypeId = ToUuid("okko-95"),
+                BrandId = BrandIds.ForSlug("okko"),
                 Brand = "okko",
                 SupplierId = supplierId,
                 SurchargeUah = 0m,
@@ -1505,6 +1506,7 @@ var exchangedId = Guid.NewGuid();
             {
                 Id = Guid.NewGuid(),
                 OrderId = orderId,
+                BrandId = BrandIds.ForSlug(brand),
                 Brand = brand,
                 FuelTypeId =   ToUuid(fuelTypeId),
                 Liters = liters,

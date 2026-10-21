@@ -70,6 +70,7 @@ public sealed class CostEntryAuditIntegrationTests : IClassFixture<TestDatabaseF
             Id = Guid.NewGuid(),
             ImportJobId = import.Id,
             SupplierId = supplier.Id,
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,

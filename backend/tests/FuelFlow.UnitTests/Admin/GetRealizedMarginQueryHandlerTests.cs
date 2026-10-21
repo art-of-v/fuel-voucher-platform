@@ -69,6 +69,7 @@ private async Task<Order> SeedAsync(
         {
             Id = Guid.NewGuid(),
             OrderId = order.Id,
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid(fuelTypeId),
             Liters = liters,
@@ -83,6 +84,7 @@ private async Task<Order> SeedAsync(
             var voucher = new FuelVoucher
             {
                 Id = Guid.NewGuid(),
+                BrandId = BrandIds.ForSlug("okko"),
                 Brand = "okko",
                 FuelTypeId = ToUuid(fuelTypeId),
                 Liters = liters,
@@ -191,6 +193,7 @@ private async Task<Order> SeedAsync(
         {
             Id = Guid.NewGuid(),
             OrderId = order.Id,
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,

@@ -7,6 +7,7 @@ using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -63,6 +64,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
                 new OrderLineItem
                 {
                     Id = Guid.NewGuid(),
+                    BrandId = BrandIds.ForSlug("okko"),
                     Brand = "okko",
                     FuelTypeId = ToUuid("okko-95"),
                     Liters = 50,
@@ -86,6 +88,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
                 new OrderLineItem
                 {
                     Id = Guid.NewGuid(),
+                    BrandId = BrandIds.ForSlug("okko"),
                     Brand = "okko",
                     FuelTypeId = ToUuid("okko-dp"),
                     Liters = 50,
@@ -99,6 +102,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
         var voucher1 = new FuelVoucher
         {
             Id = Guid.NewGuid(),
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
@@ -115,6 +119,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
         var voucher2 = new FuelVoucher
         {
             Id = Guid.NewGuid(),
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
@@ -131,6 +136,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
         var voucher3 = new FuelVoucher
         {
             Id = Guid.NewGuid(),
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-dp"),
             Liters = 50,
@@ -224,6 +230,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
                 new OrderLineItem
                 {
                     Id = Guid.NewGuid(),
+                    BrandId = BrandIds.ForSlug("okko"),
                     Brand = "okko",
                     FuelTypeId = ToUuid("okko-95"),
                     Liters = 50,
@@ -267,6 +274,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
                 new OrderLineItem
                 {
                     Id = Guid.NewGuid(),
+                    BrandId = BrandIds.ForSlug("okko"),
                     Brand = "okko",
                     FuelTypeId = ToUuid("okko-95"),
                     Liters = 50,
@@ -290,6 +298,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
                 new OrderLineItem
                 {
                     Id = Guid.NewGuid(),
+                    BrandId = BrandIds.ForSlug("okko"),
                     Brand = "okko",
                     FuelTypeId = ToUuid("okko-dp"),
                     Liters = 50,
@@ -334,6 +343,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
                 new OrderLineItem
                 {
                     Id = Guid.NewGuid(),
+                    BrandId = BrandIds.ForSlug("okko"),
                     Brand = "okko",
                     FuelTypeId = ToUuid("okko-95"),
                     Liters = 50,
@@ -357,6 +367,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
                 new OrderLineItem
                 {
                     Id = Guid.NewGuid(),
+                    BrandId = BrandIds.ForSlug("okko"),
                     Brand = "okko",
                     FuelTypeId = ToUuid("okko-95"),
                     Liters = 20,
@@ -374,6 +385,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
         {
             Id = Guid.NewGuid(),
             OrderId = renewalOrderId,
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 20,

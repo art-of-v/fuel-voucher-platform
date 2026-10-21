@@ -95,6 +95,7 @@ public sealed class AdminVoucherControllerAttributionTests : IDisposable
         _context.FuelVouchers.Add(new FuelVoucher
         {
             Id = id,
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,

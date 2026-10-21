@@ -40,12 +40,14 @@ internal sealed class PurchaseBatchConfiguration : IEntityTypeConfiguration<Purc
             .HasMaxLength(50)
             .IsRequired();
 
-        // The key the brand text above is a copy of. Nullable for now: the column arrives with the
-        // backfill, and the rows that are written before the readers move to the id still carry
-        // only the name. The foreign key over (fuel type, brand) comes with the same migration.
+        // The key the brand text above is a copy of. Required, because the composite foreign key
+        // below is what refuses a row whose brand is not its fuel's brand - and a foreign key with a
+        // NULL in it is not compared at all, so a nullable key would be a key the database does not
+        // check.
         builder.Property(e => e.BrandId)
             .HasColumnName("brand_id")
-            .HasColumnType("uuid");
+            .HasColumnType("uuid")
+            .IsRequired();
 
         builder.Property(e => e.SupplierId)
             .HasColumnName("supplier_id")
@@ -82,9 +84,20 @@ internal sealed class PurchaseBatchConfiguration : IEntityTypeConfiguration<Purc
         // The reference is real and single-parent, so the database enforces it. ON DELETE is stated
         // explicitly rather than left to the default: a schema that says NO ACTION by accident is a
         // schema nobody has thought about.
+        //
+        // The key is the PAIR (fuel type, brand), not the fuel alone - which is what D-21's second
+        // slice needs. A foreign key over one column says "this fuel exists"; a foreign key over two
+        // says "this fuel exists AND this batch's brand is that fuel's brand", and the second half
+        // is the fact the brand text on this row is a copy of. The pair points at the fuel's own
+        // alternate key (id, brand_id), so the key spans one hop instead of two.
+        //
+        // Both halves of the pair are NOT NULL, which is what makes the key a key: a foreign key
+        // with a NULL in it is not compared at all, so a nullable brand_id would be a brand the
+        // database never checks.
         builder.HasOne<FuelTypeEntity>()
             .WithMany()
-            .HasForeignKey(e => e.FuelTypeId)
+            .HasForeignKey(e => new { e.FuelTypeId, e.BrandId })
+            .HasPrincipalKey(e => new { e.Id, e.BrandId })
             .OnDelete(DeleteBehavior.Restrict);
 
         // Postgres does not index a foreign key column on its own, and the parent's delete check and

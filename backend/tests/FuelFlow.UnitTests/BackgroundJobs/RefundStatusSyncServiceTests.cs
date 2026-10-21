@@ -6,6 +6,7 @@ using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -117,6 +118,7 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
     {
         Id = Guid.NewGuid(),
         Brand = "okko",
+        BrandId = BrandIds.ForSlug("okko"),
         FuelTypeId = ToUuid("okko-95"),
         Liters = 50,
         VoucherNumber = $"V-{Guid.NewGuid():N}",

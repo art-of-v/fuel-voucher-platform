@@ -707,6 +707,7 @@ FuelTypeId = ToUuid(fuelTypeId),
             // A voucher names its network as TEXT - the import prints it, the fulfilment worker reads
             // it, and neither knows a uuid. That is why the stock key is slug-based, so the fixture
             // takes the brand row's own code rather than a literal that could drift from it.
+BrandId = BrandIds.ForSlug(brandText ?? EnsureBrand(brandId).Slug),
 Brand = brandText ?? EnsureBrand(brandId).Slug,
         FuelTypeId = ToUuid(fuelTypeId),
         Liters = liters,

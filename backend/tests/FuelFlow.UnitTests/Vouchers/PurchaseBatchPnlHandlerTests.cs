@@ -60,6 +60,7 @@ public sealed class PurchaseBatchPnlHandlerTests : IDisposable
         _context.FuelVouchers.Add(new FuelVoucher
         {
             Id = id,
+            BrandId = BrandIds.ForSlug(brand),
             Brand = brand,
             FuelTypeId = ToUuid(fuelTypeId),
             Liters = liters,
@@ -97,6 +98,7 @@ public sealed class PurchaseBatchPnlHandlerTests : IDisposable
             Id = Guid.NewGuid(),
             ImportJobId = importId,
             FuelTypeId = ToUuid(fuelTypeId),
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             SupplierId = supplierId,
             CreatedAtUtc = now,
@@ -127,7 +129,7 @@ public sealed class PurchaseBatchPnlHandlerTests : IDisposable
     {
         var orderId = Guid.NewGuid();
         _context.Orders.Add(new Order { Id = orderId, UserId = Guid.NewGuid(), Price = unitPrice, Status = status, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
-        _context.OrderLineItems.Add(new OrderLineItem { Id = Guid.NewGuid(), OrderId = orderId, Brand = "okko", FuelTypeId = ToUuid(fuelTypeId), Liters = liters, Quantity = 1, UnitPrice = unitPrice, LineTotal = unitPrice });
+        _context.OrderLineItems.Add(new OrderLineItem { Id = Guid.NewGuid(), OrderId = orderId, Brand = "okko", BrandId = BrandIds.ForSlug("okko"), FuelTypeId = ToUuid(fuelTypeId), Liters = liters, Quantity = 1, UnitPrice = unitPrice, LineTotal = unitPrice });
         _context.Fulfillments.Add(new Fulfillment { OrderId = orderId, VoucherId = voucherId, FulfilledAtUtc = DateTime.UtcNow });
     }
 

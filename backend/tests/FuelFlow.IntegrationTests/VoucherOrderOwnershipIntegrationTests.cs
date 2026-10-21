@@ -536,6 +536,7 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
             {
                 Id = Guid.NewGuid(),
                 OrderId = orderId,
+                BrandId = BrandIds.ForSlug(brand),
                 Brand = brand,
                 FuelTypeId =   ToUuid(fuelTypeId),
                 Liters = liters,
@@ -571,6 +572,7 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
                 {
                     Id = Guid.NewGuid(),
                     OrderId = orderId,
+                    BrandId = BrandIds.ForSlug("wog"),
                     Brand = "wog",
                     FuelTypeId = ToUuid("wog-95"),
                     Liters = 40m,

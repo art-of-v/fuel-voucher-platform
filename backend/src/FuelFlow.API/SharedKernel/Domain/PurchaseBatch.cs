@@ -28,8 +28,14 @@ public sealed class PurchaseBatch
     /// and - from the key - as the id of the brand itself. The name is what a report groups by and
     /// what a parser reads; the id is what the database can check. A composite foreign key over
     /// (fuel type, brand) says the two copies are the same fact; a trigger can only ask.
+    /// <para>
+    /// The key is required, and the database says so: the composite foreign key
+    /// <c>(fuel_type_id, brand_id) → fuel_types(id, brand_id)</c> is what refuses a row whose brand
+    /// is not its fuel's brand. A nullable key would be a key the database does not check, because a
+    /// foreign key with a NULL in it is not compared at all.
+    /// </para>
     /// </remarks>
-    public Guid? BrandId { get; set; }
+    public Guid BrandId { get; set; }
 
     /// <summary>
     /// The company this stock was bought from. Unlike <see cref="Brand"/> (the brand) this is the party we

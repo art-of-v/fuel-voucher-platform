@@ -5,6 +5,7 @@ using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.Features.Monobank.ProcessWebhook;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
 using Hangfire;
@@ -146,6 +147,7 @@ public sealed class MonobankReconciliationServiceTests : IClassFixture<TestDatab
                 new OrderLineItem
                 {
                     Id = Guid.NewGuid(),
+                    BrandId = BrandIds.ForSlug("okko"),
                     Brand = "okko",
                     FuelTypeId = ToUuid("okko-95"),
                     Liters = 50,

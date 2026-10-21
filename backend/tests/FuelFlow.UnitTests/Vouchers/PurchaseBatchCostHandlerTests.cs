@@ -100,6 +100,7 @@ private FuelNominal NewPackage(string fuelTypeId, decimal liters)
         _context.FuelVouchers.Add(new FuelVoucher
         {
             Id = Guid.NewGuid(),
+            BrandId = BrandIds.ForSlug(brand),
             Brand = brand,
             FuelTypeId = ToUuid(fuelTypeId),
             Liters = liters,
@@ -122,6 +123,7 @@ private FuelNominal NewPackage(string fuelTypeId, decimal liters)
         _context.FuelVouchers.Add(new FuelVoucher
         {
             Id = id,
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid(fuelTypeId),
             Liters = liters,
