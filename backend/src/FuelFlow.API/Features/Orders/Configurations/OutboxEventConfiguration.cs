@@ -19,24 +19,26 @@ internal sealed class OutboxEventConfiguration : IEntityTypeConfiguration<Outbox
             .HasColumnName("event_type")
             .HasConversion<string>()
             .HasMaxLength(100)
-            .IsRequired();
+            .IsRequired().HasComment("What kind of event this is - the routing key the publisher reads.");
 
         builder.Property(e => e.Payload)
             .HasColumnName("payload")
             .HasColumnType("jsonb")
-            .IsRequired();
+            .IsRequired().HasComment("The event itself, as JSON: what the subscriber will receive, frozen at the moment it was" +
+                    "written.");
 
         builder.Property(e => e.Processed)
             .HasColumnName("processed")
             .HasDefaultValue(false)
-            .IsRequired();
+            .IsRequired().HasComment("Whether the event has been published. A row that says processed and carries no time" +
+                    "cannot say when.");
 
         builder.Property(e => e.ProcessedAtUtc)
-            .HasColumnName("processed_at_utc");
+            .HasColumnName("processed_at_utc").HasComment("When it was published. NULL while it is not.");
 
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
-            .IsRequired();
+            .IsRequired().HasComment("When the event was written.");
 
         builder.HasIndex(e => e.Processed);
         builder.HasIndex(e => e.CreatedAtUtc);

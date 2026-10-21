@@ -650,17 +650,20 @@ namespace FuelFlow.API.Migrations
                     b.Property<long>("TelegramChatId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bigint")
-                        .HasColumnName("telegram_chat_id");
+                        .HasColumnName("telegram_chat_id")
+                        .HasComment("The Telegram chat id of the customer's private chat.");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("TelegramChatId"));
 
                     b.Property<DateTime>("BoundAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("bound_at_utc");
+                        .HasColumnName("bound_at_utc")
+                        .HasComment("When the chat was bound.");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid")
-                        .HasColumnName("user_id");
+                        .HasColumnName("user_id")
+                        .HasComment("The user whose chat it is.");
 
                     b.HasKey("TelegramChatId");
 
@@ -825,35 +828,42 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<long?>("DeliveredMessageId")
                         .HasColumnType("bigint")
-                        .HasColumnName("delivered_message_id");
+                        .HasColumnName("delivered_message_id")
+                        .HasComment("The id the reply got in the customer's chat, or NULL when the delivery failed.");
 
                     b.Property<string>("DeliveryError")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
-                        .HasColumnName("delivery_error");
+                        .HasColumnName("delivery_error")
+                        .HasComment("The last delivery failure reason, truncated. NULL on success.");
 
                     b.Property<Guid>("FeedbackMessageId")
                         .HasColumnType("uuid")
-                        .HasColumnName("feedback_message_id");
+                        .HasColumnName("feedback_message_id")
+                        .HasComment("The message this replies to.");
 
                     b.Property<DateTime>("SentAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("sent_at_utc");
+                        .HasColumnName("sent_at_utc")
+                        .HasComment("When it was sent.");
 
                     b.Property<long>("StaffUserId")
                         .HasColumnType("bigint")
-                        .HasColumnName("staff_user_id");
+                        .HasColumnName("staff_user_id")
+                        .HasComment("The Telegram id of the staff member who wrote it.");
 
                     b.Property<string>("StaffUserName")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
-                        .HasColumnName("staff_user_name");
+                        .HasColumnName("staff_user_name")
+                        .HasComment("Their display name as it was at the moment of sending - Telegram ids are not a readableaudit trail.");
 
                     b.Property<string>("Text")
                         .IsRequired()
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)")
-                        .HasColumnName("text");
+                        .HasColumnName("text")
+                        .HasComment("What was written.");
 
                     b.HasKey("Id");
 
@@ -1599,40 +1609,48 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
+                        .HasColumnName("created_at_utc")
+                        .HasComment("When the row was written.");
 
                     b.Property<string>("DeviceId")
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")
-                        .HasColumnName("device_id");
+                        .HasColumnName("device_id")
+                        .HasComment("An optional correlation to the registering device. NULL when the client did not say.");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
-                        .HasColumnName("is_active");
+                        .HasColumnName("is_active")
+                        .HasComment("Cleared when Expo later reports the token is no longer registered. A token that is notactive is not a failure - it is a phone that was replaced.");
 
                     b.Property<DateTime>("LastSeenAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("last_seen_at_utc");
+                        .HasColumnName("last_seen_at_utc")
+                        .HasComment("When the token was last used successfully. A token nobody has heard from in months is atoken to stop sending to.");
 
                     b.Property<string>("Platform")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
-                        .HasColumnName("platform");
+                        .HasColumnName("platform")
+                        .HasComment("The reporting platform of the registering client: ios or android.");
 
                     b.Property<string>("Token")
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")
-                        .HasColumnName("token");
+                        .HasColumnName("token")
+                        .HasComment("The Expo push token. Unique across users - one device, one token, one owner.");
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
+                        .HasColumnName("updated_at_utc")
+                        .HasComment("When it was last changed.");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid")
-                        .HasColumnName("user_id");
+                        .HasColumnName("user_id")
+                        .HasComment("The user the token belongs to.");
 
                     b.HasKey("Id");
 
@@ -1658,28 +1676,34 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime>("FulfilledAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("fulfilled_at_utc");
+                        .HasColumnName("fulfilled_at_utc")
+                        .HasComment("When the voucher was handed over.");
 
                     b.Property<Guid?>("LineItemId")
                         .HasColumnType("uuid")
-                        .HasColumnName("line_item_id");
+                        .HasColumnName("line_item_id")
+                        .HasComment("Which line of the order this voucher satisfied. NULL is the honest state of the data: afulfilment without it says only that the order delivered a voucher, and thereconciliation cannot tell two lines of the same volume apart - which is how an order for'OKKO A95 10 L x2' and 'WOG A95 10 L x1' can pass while the customer is short a line.");
 
                     b.Property<Guid>("OrderId")
                         .HasColumnType("uuid")
-                        .HasColumnName("order_id");
+                        .HasColumnName("order_id")
+                        .HasComment("The order that delivered this voucher.");
 
                     b.Property<string>("ReleaseReason")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)")
-                        .HasColumnName("release_reason");
+                        .HasColumnName("release_reason")
+                        .HasComment("Why the voucher was returned to stock. NULL while the delivery stands.");
 
                     b.Property<DateTime?>("ReleasedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("released_at_utc");
+                        .HasColumnName("released_at_utc")
+                        .HasComment("Set when the reconciliation takes the voucher back off this order, NULL while the deliverystands. The row is kept either way: the fulfilment records that a delivery happened, andthe correction is the fact that it was undone - not a reason to erase the first part.");
 
                     b.Property<Guid>("VoucherId")
                         .HasColumnType("uuid")
-                        .HasColumnName("voucher_id");
+                        .HasColumnName("voucher_id")
+                        .HasComment("The voucher that was handed over.");
 
                     b.HasKey("Id");
 
@@ -1710,22 +1734,26 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
+                        .HasColumnName("created_at_utc")
+                        .HasComment("When the row was written.");
 
                     b.Property<DateTime?>("FulfilledAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("fulfilled_at_utc");
+                        .HasColumnName("fulfilled_at_utc")
+                        .HasComment("When the order was fulfilled. NULL while it is not.");
 
                     b.Property<string>("IdempotencyKey")
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)")
-                        .HasColumnName("idempotency_key");
+                        .HasColumnName("idempotency_key")
+                        .HasComment("The key the customer sent with the request. Two requests with the same key are one order,which is what makes a double-tap one order and not two.");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(false)
-                        .HasColumnName("is_deleted");
+                        .HasColumnName("is_deleted")
+                        .HasComment("Soft delete. The row is hidden, not erased: the orders, the money and the vouchers behindit have to stay readable.");
 
                     b.Property<string>("Kind")
                         .IsRequired()
@@ -1733,66 +1761,80 @@ namespace FuelFlow.API.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasDefaultValue("Purchase")
-                        .HasColumnName("kind");
+                        .HasColumnName("kind")
+                        .HasComment("What this order represents: a purchase, a renewal, or an issuance. Everything createdbefore this column existed is a purchase.");
 
                     b.Property<DateTime?>("LastWebhookModifiedDateUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("last_webhook_modified_date_utc");
+                        .HasColumnName("last_webhook_modified_date_utc")
+                        .HasComment("The modification date of the acquirer's own record, as it was when we last read it. Theacquirer's clock, not ours - which is what makes it worth storing.");
 
                     b.Property<DateTime?>("LastWebhookProcessedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("last_webhook_processed_at_utc");
+                        .HasColumnName("last_webhook_processed_at_utc")
+                        .HasComment("The last webhook of the acquirer we have processed - the clock that says we are notbehind.");
 
                     b.Property<Guid?>("LegalEntityId")
                         .HasColumnType("uuid")
-                        .HasColumnName("legal_entity_id");
+                        .HasColumnName("legal_entity_id")
+                        .HasComment("The company the order is for. NULL for an order placed by a person without a company.");
 
                     b.Property<string>("MonobankInvoiceId")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
-                        .HasColumnName("monobank_invoice_id");
+                        .HasColumnName("monobank_invoice_id")
+                        .HasComment("The invoice id the acquirer gave us - the link back to the acquirer's own record. NULLuntil the invoice is created.");
 
                     b.Property<string>("MonobankMerchant")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
-                        .HasColumnName("monobank_merchant");
+                        .HasColumnName("monobank_merchant")
+                        .HasComment("Which merchant the acquirer says the payment went to. The acquirer's word, not ours -which is why it is compared against what we expect rather than being our own field.");
 
                     b.Property<string>("MonobankPaymentUrl")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
-                        .HasColumnName("monobank_payment_url");
+                        .HasColumnName("monobank_payment_url")
+                        .HasComment("The payment link the customer is given. It is handed out, not derived: a link that couldbe recomputed would not be a link the acquirer knows.");
 
                     b.Property<string>("MonobankStatus")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
-                        .HasColumnName("monobank_status");
+                        .HasColumnName("monobank_status")
+                        .HasComment("The acquirer's state of the payment, as the acquirer reports it. NULL while nothing isknown.");
 
                     b.Property<DateTime?>("PartiallyFulfilledSinceUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("partially_fulfilled_since_utc");
+                        .HasColumnName("partially_fulfilled_since_utc")
+                        .HasComment("Since when the order has been partly fulfilled. A row that says 'partly fulfilled' and nodate cannot say how long it has been waiting.");
 
                     b.Property<decimal>("Price")
                         .HasColumnType("numeric(12,2)")
-                        .HasColumnName("price");
+                        .HasColumnName("price")
+                        .HasComment("What the customer is charged for the order, in UAH. The order's own number - the linetotals are what the price is made of, and this is what was agreed.");
 
                     b.Property<Guid?>("SourceOrderId")
                         .HasColumnType("uuid")
-                        .HasColumnName("source_order_id");
+                        .HasColumnName("source_order_id")
+                        .HasComment("For an issuance, the purchase the fuel originally came from. NULL on purchases andrenewals.");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)")
-                        .HasColumnName("status");
+                        .HasColumnName("status")
+                        .HasComment("Where the order stands: new, partly fulfilled, fulfilled, cancelled. The screens readthis column, and the database holds it to the enum.");
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at_utc")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("now()")
+                        .HasComment("When it was last changed.");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid")
-                        .HasColumnName("user_id");
+                        .HasColumnName("user_id")
+                        .HasComment("The customer who placed the order.");
 
                     b.Property<uint>("xmin")
                         .IsConcurrencyToken()
@@ -1972,28 +2014,33 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
+                        .HasColumnName("created_at_utc")
+                        .HasComment("When the event was written.");
 
                     b.Property<string>("EventType")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
-                        .HasColumnName("event_type");
+                        .HasColumnName("event_type")
+                        .HasComment("What kind of event this is - the routing key the publisher reads.");
 
                     b.Property<string>("Payload")
                         .IsRequired()
                         .HasColumnType("jsonb")
-                        .HasColumnName("payload");
+                        .HasColumnName("payload")
+                        .HasComment("The event itself, as JSON: what the subscriber will receive, frozen at the moment it waswritten.");
 
                     b.Property<bool>("Processed")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(false)
-                        .HasColumnName("processed");
+                        .HasColumnName("processed")
+                        .HasComment("Whether the event has been published. A row that says processed and carries no timecannot say when.");
 
                     b.Property<DateTime?>("ProcessedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("processed_at_utc");
+                        .HasColumnName("processed_at_utc")
+                        .HasComment("When it was published. NULL while it is not.");
 
                     b.HasKey("Id");
 
@@ -2101,26 +2148,31 @@ namespace FuelFlow.API.Migrations
                     b.Property<string>("Key")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
-                        .HasColumnName("key");
+                        .HasColumnName("key")
+                        .HasComment("The setting's name. It IS the key - the row's identity is its name, not a number.");
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
+                        .HasColumnName("updated_at_utc")
+                        .HasComment("When the setting was last changed.");
 
                     b.Property<Guid?>("UpdatedByUserId")
                         .HasColumnType("uuid")
-                        .HasColumnName("updated_by_user_id");
+                        .HasColumnName("updated_by_user_id")
+                        .HasComment("Who changed it. NULL when the change came from a job rather than from a person.");
 
                     b.Property<string>("UpdatedByUserName")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
-                        .HasColumnName("updated_by_user_name");
+                        .HasColumnName("updated_by_user_name")
+                        .HasComment("Their name at the time. A copy, so the record stays readable after a rename.");
 
                     b.Property<string>("Value")
                         .IsRequired()
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)")
-                        .HasColumnName("value");
+                        .HasColumnName("value")
+                        .HasComment("The value, as text. Every setting is text here, and the one that is a number says so inits own name.");
 
                     b.HasKey("Key");
 
@@ -2404,49 +2456,59 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime?>("ConfirmedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("confirmed_at_utc");
+                        .HasColumnName("confirmed_at_utc")
+                        .HasComment("When the settlement was confirmed. Non-null exactly when the status is confirmed, whichis a database CHECK rather than a convention: a batch that says confirmed and carries notimestamp cannot answer 'when'.");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
+                        .HasColumnName("created_at_utc")
+                        .HasComment("When the row was written.");
 
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
-                        .HasColumnName("kind");
+                        .HasColumnName("kind")
+                        .HasComment("What kind of settlement this is - an exchange, a return, a write-off.");
 
                     b.Property<DateTime>("OpenedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("opened_at_utc");
+                        .HasColumnName("opened_at_utc")
+                        .HasComment("When the settlement was opened.");
 
                     b.Property<Guid>("OpenedByUserId")
                         .HasColumnType("uuid")
-                        .HasColumnName("opened_by_user_id");
+                        .HasColumnName("opened_by_user_id")
+                        .HasComment("The operator who opened the settlement.");
 
                     b.Property<string>("OpenedByUserName")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
-                        .HasColumnName("opened_by_user_name");
+                        .HasColumnName("opened_by_user_name")
+                        .HasComment("That operator's name as it read at the time. A copy, so the record stays readable after arename - never a join target.");
 
                     b.Property<string>("RejectionReason")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
-                        .HasColumnName("rejection_reason");
+                        .HasColumnName("rejection_reason")
+                        .HasComment("Why a batch was rejected, when it was.");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(12)
                         .HasColumnType("character varying(12)")
-                        .HasColumnName("status");
+                        .HasColumnName("status")
+                        .HasComment("The lifecycle state. A batch is created already confirmed, because that is the only waythe application makes one: the operator confirms the exchange and the batch records it inthe same transaction. The rest of the set is the forward shape - a draft that is opened andlater settled is the obvious next workflow - and the CHECK is what stops an unrecognisedword arriving as a status later.");
 
                     b.Property<Guid?>("SupplierId")
                         .HasColumnType("uuid")
-                        .HasColumnName("supplier_id");
+                        .HasColumnName("supplier_id")
+                        .HasComment("The counterparty. NULL for a batch that is not a supplier settlement.");
 
                     b.Property<decimal>("SurchargeUah")
                         .HasColumnType("numeric(14,2)")
-                        .HasColumnName("surcharge_uah");
+                        .HasColumnName("surcharge_uah")
+                        .HasComment("What the brand charged for the settlement AS A WHOLE. This is the amount on the command,not the sum of the rows' shares: each exchange row carries only its own share, and thoseshares sum back to the total only when every retired voucher was paired with areplacement. An exchange that returns vouchers without reissuing them contributes retiredlitres to the numerators and nothing to the denominator, so the shares over-count. Thenumber the brand charged is the authoritative one, so it is this.");
 
                     b.HasKey("Id");
 
@@ -3008,61 +3070,74 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<Guid>("ActingUserId")
                         .HasColumnType("uuid")
-                        .HasColumnName("acting_user_id");
+                        .HasColumnName("acting_user_id")
+                        .HasComment("The admin who recorded the renewal.");
 
                     b.Property<string>("ActingUserName")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
-                        .HasColumnName("acting_user_name");
+                        .HasColumnName("acting_user_name")
+                        .HasComment("Their display name at the time, for the audit.");
 
                     b.Property<string>("Branch")
                         .IsRequired()
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)")
-                        .HasColumnName("branch");
+                        .HasColumnName("branch")
+                        .HasComment("Which branch ran: extend or replace.");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
+                        .HasColumnName("created_at_utc")
+                        .HasComment("When the renewal was recorded.");
 
                     b.Property<Guid>("CustomerUserId")
                         .HasColumnType("uuid")
-                        .HasColumnName("customer_user_id");
+                        .HasColumnName("customer_user_id")
+                        .HasComment("The customer who owns the voucher at the time of the renewal.");
 
                     b.Property<DateOnly?>("InvoiceDate")
                         .HasColumnType("date")
-                        .HasColumnName("invoice_date");
+                        .HasColumnName("invoice_date")
+                        .HasComment("The brand's накладна / invoice date, when there is one.");
 
                     b.Property<string>("InvoiceNumber")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
-                        .HasColumnName("invoice_number");
+                        .HasColumnName("invoice_number")
+                        .HasComment("The brand's накладна / invoice number, when there is one.");
 
                     b.Property<DateOnly>("NewExpiration")
                         .HasColumnType("date")
-                        .HasColumnName("new_expiration");
+                        .HasColumnName("new_expiration")
+                        .HasComment("The expiry the customer ends up with - the extended voucher's new expiry, or the stockvoucher's expiry.");
 
                     b.Property<DateOnly>("OldExpiration")
                         .HasColumnType("date")
-                        .HasColumnName("old_expiration");
+                        .HasColumnName("old_expiration")
+                        .HasComment("The expiry of the customer's voucher before the renewal.");
 
                     b.Property<Guid?>("ReplacementVoucherId")
                         .HasColumnType("uuid")
-                        .HasColumnName("replacement_voucher_id");
+                        .HasColumnName("replacement_voucher_id")
+                        .HasComment("The fresh stock voucher handed to the customer on the replace branch, or NULL on theextend branch (the same voucher was kept).");
 
                     b.Property<decimal>("SurchargeUah")
                         .HasColumnType("numeric(10,2)")
-                        .HasColumnName("surcharge_uah");
+                        .HasColumnName("surcharge_uah")
+                        .HasComment("The доплата the customer paid off-platform; 0 means a free compensation. Audit only - itnever reprices the stock.");
 
                     b.Property<string>("TermCode")
                         .IsRequired()
                         .HasMaxLength(8)
                         .HasColumnType("character varying(8)")
-                        .HasColumnName("term_code");
+                        .HasColumnName("term_code")
+                        .HasComment("The chosen term as a stable code (1w/2w/1m...6m).");
 
                     b.Property<Guid>("VoucherId")
                         .HasColumnType("uuid")
-                        .HasColumnName("voucher_id");
+                        .HasColumnName("voucher_id")
+                        .HasComment("The customer's voucher that was renewed (extended) or retired (replace).");
 
                     b.Property<uint>("xmin")
                         .IsConcurrencyToken()

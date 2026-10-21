@@ -9,6 +9,8 @@ using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Feedback.SharedModels;
 using FuelFlow.Features.Notifications.SharedModels;
+using FuelFlow.Features.Vouchers.Renewal.Operator;
+using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Support.SharedModels;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.Features.Pricing.Terms.SharedModels;
@@ -1013,6 +1015,161 @@ public sealed class SchemaCommentTests
         var comment = CommentOf(contract.FindProperty(nameof(Contract.ExpiresAtUtc))!);
 
         Assert.Contains("stops a signature", comment, StringComparison.OrdinalIgnoreCase);
+    }
+
+
+    /// <summary>
+    /// The order and the rest: the order, what it delivered, what it published, the settlement
+    /// and the renewal, the push token, the settings, and the two tables of the feedback chat.
+    /// </summary>
+    private static readonly (Type Entity, string[] Columns)[] TheOrderAndTheRest =
+    [
+        (typeof(Order),
+        [
+            nameof(Order.UserId),
+            nameof(Order.LegalEntityId),
+            nameof(Order.Price),
+            nameof(Order.Status),
+            nameof(Order.Kind),
+            nameof(Order.SourceOrderId),
+            nameof(Order.MonobankInvoiceId),
+            nameof(Order.MonobankPaymentUrl),
+            nameof(Order.MonobankStatus),
+            nameof(Order.MonobankMerchant),
+            nameof(Order.IdempotencyKey),
+            nameof(Order.CreatedAtUtc),
+            nameof(Order.UpdatedAtUtc),
+            nameof(Order.FulfilledAtUtc),
+            nameof(Order.PartiallyFulfilledSinceUtc),
+            nameof(Order.LastWebhookProcessedAtUtc),
+            nameof(Order.LastWebhookModifiedDateUtc),
+            nameof(Order.IsDeleted)
+        ]),
+        (typeof(Fulfillment),
+        [
+            nameof(Fulfillment.OrderId),
+            nameof(Fulfillment.VoucherId),
+            nameof(Fulfillment.FulfilledAtUtc),
+            nameof(Fulfillment.LineItemId),
+            nameof(Fulfillment.ReleasedAtUtc),
+            nameof(Fulfillment.ReleaseReason)
+        ]),
+        (typeof(OutboxEvent),
+        [
+            nameof(OutboxEvent.EventType),
+            nameof(OutboxEvent.Payload),
+            nameof(OutboxEvent.Processed),
+            nameof(OutboxEvent.ProcessedAtUtc),
+            nameof(OutboxEvent.CreatedAtUtc)
+        ]),
+        (typeof(MovementBatch),
+        [
+            nameof(MovementBatch.Kind),
+            nameof(MovementBatch.SupplierId),
+            nameof(MovementBatch.Status),
+            nameof(MovementBatch.SurchargeUah),
+            nameof(MovementBatch.OpenedByUserId),
+            nameof(MovementBatch.OpenedByUserName),
+            nameof(MovementBatch.OpenedAtUtc),
+            nameof(MovementBatch.ConfirmedAtUtc),
+            nameof(MovementBatch.RejectionReason),
+            nameof(MovementBatch.CreatedAtUtc)
+        ]),
+        (typeof(OperatorVoucherRenewal),
+        [
+            nameof(OperatorVoucherRenewal.VoucherId),
+            nameof(OperatorVoucherRenewal.ReplacementVoucherId),
+            nameof(OperatorVoucherRenewal.CustomerUserId),
+            nameof(OperatorVoucherRenewal.Branch),
+            nameof(OperatorVoucherRenewal.TermCode),
+            nameof(OperatorVoucherRenewal.OldExpiration),
+            nameof(OperatorVoucherRenewal.NewExpiration),
+            nameof(OperatorVoucherRenewal.SurchargeUah),
+            nameof(OperatorVoucherRenewal.InvoiceNumber),
+            nameof(OperatorVoucherRenewal.InvoiceDate),
+            nameof(OperatorVoucherRenewal.ActingUserId),
+            nameof(OperatorVoucherRenewal.ActingUserName),
+            nameof(OperatorVoucherRenewal.CreatedAtUtc)
+        ]),
+        (typeof(UserPushToken),
+        [
+            nameof(UserPushToken.UserId),
+            nameof(UserPushToken.Token),
+            nameof(UserPushToken.Platform),
+            nameof(UserPushToken.DeviceId),
+            nameof(UserPushToken.IsActive),
+            nameof(UserPushToken.CreatedAtUtc),
+            nameof(UserPushToken.UpdatedAtUtc),
+            nameof(UserPushToken.LastSeenAtUtc)
+        ]),
+        (typeof(AppSetting),
+        [
+            nameof(AppSetting.Key),
+            nameof(AppSetting.Value),
+            nameof(AppSetting.UpdatedAtUtc),
+            nameof(AppSetting.UpdatedByUserId),
+            nameof(AppSetting.UpdatedByUserName)
+        ]),
+        (typeof(FeedbackMessageReply),
+        [
+            nameof(FeedbackMessageReply.FeedbackMessageId),
+            nameof(FeedbackMessageReply.StaffUserId),
+            nameof(FeedbackMessageReply.StaffUserName),
+            nameof(FeedbackMessageReply.Text),
+            nameof(FeedbackMessageReply.DeliveredMessageId),
+            nameof(FeedbackMessageReply.DeliveryError),
+            nameof(FeedbackMessageReply.SentAtUtc)
+        ]),
+        (typeof(FeedbackChatBinding),
+        [
+            nameof(FeedbackChatBinding.TelegramChatId),
+            nameof(FeedbackChatBinding.UserId),
+            nameof(FeedbackChatBinding.BoundAtUtc)
+        ])
+    ];
+
+
+
+    [Fact]
+    public void The_Order_And_The_Rest_Should_Say_What_They_Are()
+    {
+        var context = BuildContext();
+
+        foreach (var (entityType, columns) in TheOrderAndTheRest)
+        {
+            var entity = context.Model.FindEntityType(entityType);
+            Assert.NotNull(entity);
+
+            foreach (var column in columns)
+            {
+                var property = entity.FindProperty(column);
+                Assert.NotNull(property);
+
+                var comment = CommentOf(property);
+                Assert.False(string.IsNullOrWhiteSpace(comment),
+                    $"{entityType.Name}.{column} carries no comment. The order, the delivery, the"
+                    + " settlement, the renewal, the push token, the settings - the tables a person"
+                    + " opens the database to find, with the code closed.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// The settlement's surcharge is the amount the brand charged - the authoritative number -
+    /// and not the sum of the rows' shares, which over-count when a retired voucher was not
+    /// replaced. That distinction has already cost real money once.
+    /// </summary>
+    [Fact]
+    public void The_Settlement_Should_Say_That_Its_Surcharge_Is_The_Authoritative_Number()
+    {
+        var context = BuildContext();
+        var batch = context.Model.FindEntityType(typeof(MovementBatch));
+        Assert.NotNull(batch);
+
+        var comment = CommentOf(batch.FindProperty(nameof(MovementBatch.SurchargeUah))!);
+
+        Assert.Contains("AS A WHOLE", comment, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("over-count", comment, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

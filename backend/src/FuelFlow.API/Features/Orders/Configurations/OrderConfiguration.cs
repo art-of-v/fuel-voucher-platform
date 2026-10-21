@@ -24,57 +24,66 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
 
         builder.Property(e => e.UserId)
             .HasColumnName("user_id")
-            .IsRequired();
+            .IsRequired().HasComment("The customer who placed the order.");
 
         builder.Property(e => e.LegalEntityId)
-            .HasColumnName("legal_entity_id");
+            .HasColumnName("legal_entity_id").HasComment("The company the order is for. NULL for an order placed by a person without a company.");
 
         builder.Property(e => e.Price)
             .HasColumnName("price")
             .HasColumnType("numeric(12,2)")
-            .IsRequired();
+            .IsRequired().HasComment("What the customer is charged for the order, in UAH. The order's own number - the line" +
+                    "totals are what the price is made of, and this is what was agreed.");
 
         builder.Property(e => e.Status)
             .HasColumnName("status")
             .HasConversion<string>()
             .HasMaxLength(30)
-            .IsRequired();
+            .IsRequired().HasComment("Where the order stands: new, partly fulfilled, fulfilled, cancelled. The screens read" +
+                    "this column, and the database holds it to the enum.");
 
         builder.Property(e => e.Kind)
             .HasColumnName("kind")
             .HasConversion<string>()
             .HasMaxLength(20)
             .HasDefaultValue(OrderKind.Purchase)
-            .IsRequired();
+            .IsRequired().HasComment("What this order represents: a purchase, a renewal, or an issuance. Everything created" +
+                    "before this column existed is a purchase.");
 
         builder.Property(e => e.SourceOrderId)
-            .HasColumnName("source_order_id");
+            .HasColumnName("source_order_id").HasComment("For an issuance, the purchase the fuel originally came from. NULL on purchases and" +
+                    "renewals.");
 
         builder.Property(e => e.MonobankInvoiceId)
             .HasColumnName("monobank_invoice_id")
-            .HasMaxLength(100);
+            .HasMaxLength(100).HasComment("The invoice id the acquirer gave us - the link back to the acquirer's own record. NULL" +
+                    "until the invoice is created.");
 
         builder.Property(e => e.MonobankStatus)
             .HasColumnName("monobank_status")
             .HasConversion<string>()
-            .HasMaxLength(50);
+            .HasMaxLength(50).HasComment("The acquirer's state of the payment, as the acquirer reports it. NULL while nothing is" +
+                    "known.");
 
         builder.Property(e => e.MonobankMerchant)
             .HasColumnName("monobank_merchant")
             .HasConversion<string>()
-            .HasMaxLength(20);
+            .HasMaxLength(20).HasComment("Which merchant the acquirer says the payment went to. The acquirer's word, not ours -" +
+                    "which is why it is compared against what we expect rather than being our own field.");
 
         builder.Property(e => e.MonobankPaymentUrl)
             .HasColumnName("monobank_payment_url")
-            .HasMaxLength(500);
+            .HasMaxLength(500).HasComment("The payment link the customer is given. It is handed out, not derived: a link that could" +
+                    "be recomputed would not be a link the acquirer knows.");
 
         builder.Property(e => e.IdempotencyKey)
             .HasColumnName("idempotency_key")
-            .HasMaxLength(150);
+            .HasMaxLength(150).HasComment("The key the customer sent with the request. Two requests with the same key are one order," +
+                    "which is what makes a double-tap one order and not two.");
 
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
-            .IsRequired();
+            .IsRequired().HasComment("When the row was written.");
 
         // The default used to be '-infinity', and it was not chosen: it is what Npgsql writes for
         // DateTime.MinValue, which is what EF's convention put into the migrations that created this
@@ -89,26 +98,30 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
             .HasColumnName("updated_at_utc")
             .HasDefaultValueSql("now()")
             .ValueGeneratedNever()
-            .IsRequired();
+            .IsRequired().HasComment("When it was last changed.");
 
         builder.Property(e => e.FulfilledAtUtc)
-            .HasColumnName("fulfilled_at_utc");
+            .HasColumnName("fulfilled_at_utc").HasComment("When the order was fulfilled. NULL while it is not.");
 
         builder.Property(e => e.PartiallyFulfilledSinceUtc)
-            .HasColumnName("partially_fulfilled_since_utc");
+            .HasColumnName("partially_fulfilled_since_utc").HasComment("Since when the order has been partly fulfilled. A row that says 'partly fulfilled' and no" +
+                    "date cannot say how long it has been waiting.");
 
         // These two arrived in PascalCase because the mapping was forgotten - the only
         // snake_case violations left on this table. Named explicitly, like every other column.
         builder.Property(e => e.LastWebhookProcessedAtUtc)
-            .HasColumnName("last_webhook_processed_at_utc");
+            .HasColumnName("last_webhook_processed_at_utc").HasComment("The last webhook of the acquirer we have processed - the clock that says we are not" +
+                    "behind.");
 
         builder.Property(e => e.LastWebhookModifiedDateUtc)
-            .HasColumnName("last_webhook_modified_date_utc");
+            .HasColumnName("last_webhook_modified_date_utc").HasComment("The modification date of the acquirer's own record, as it was when we last read it. The" +
+                    "acquirer's clock, not ours - which is what makes it worth storing.");
 
         builder.Property(e => e.IsDeleted)
             .HasColumnName("is_deleted")
             .HasDefaultValue(false)
-            .IsRequired();
+            .IsRequired().HasComment("Soft delete. The row is hidden, not erased: the orders, the money and the vouchers behind" +
+                    "it have to stay readable.");
 
         builder.HasQueryFilter(e => !e.IsDeleted);
 
