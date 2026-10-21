@@ -20,10 +20,16 @@ describe("assignableRoles", () => {
     // The only way out of the state: the owner may place an account the hierarchy cannot place.
     expect(assignableRoles(ROLE_PRODUCT_OWNER, null)).toEqual([
       ROLE_USER,
-      ROLE_QA,
       ROLE_MANAGER,
       ROLE_ADMIN,
     ]);
+  });
+
+  it("never offers the retired QA role to assign", () => {
+    // The backend refuses to hand it out (SeedRoles.IsValidRoleName), so a dropdown that offers
+    // it is a control that is guaranteed to fail.
+    expect(assignableRoles(ROLE_PRODUCT_OWNER, ROLE_USER)).not.toContain(ROLE_QA);
+    expect(assignableRoles(ROLE_PRODUCT_OWNER, null)).not.toContain(ROLE_QA);
   });
 
   it("gives an Admin nothing for an account that has no role", () => {
