@@ -37,6 +37,18 @@ internal sealed class NotificationConfiguration : IEntityTypeConfiguration<Notif
             .IsRequired()
             .HasComment(                "Whether the customer has read it.");
 
+        builder.Property(e => e.Type)
+            .HasColumnName("type")
+            .HasMaxLength(32)
+            .HasDefaultValue(NotificationTypes.Generic)
+            .IsRequired()
+            .HasComment(                "What the notification is about - the routing key the client reads.");
+
+        builder.Property(e => e.Payload)
+            .HasColumnName("payload")
+            .HasColumnType("jsonb")
+            .HasComment(                "What a client needs to open what the notification is about, as JSON. NULL when there is nothing to open.");
+
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
             .IsRequired()
@@ -76,5 +88,15 @@ internal sealed class NotificationConfiguration : IEntityTypeConfiguration<Notif
         // predicate's own order and turns it into a bitmap scan (0.114 ms). Read-only
         // notifications are kept indefinitely, so IsRead has to lead, not trail.
         builder.HasIndex(e => new { e.IsRead, e.CreatedAtUtc });
+
+        // The value set NotificationTypes defines. A typo in a routing key is the worst shape a
+        // notification can take: the row reads as ordinary, and the one thing it was for never
+        // happens. The same reasoning as ck_outbox_event_type.
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_notification_type", """
+                type IN ('generic', 'order_fulfilled', 'voucher_issued')
+                """);
+        });
     }
 }

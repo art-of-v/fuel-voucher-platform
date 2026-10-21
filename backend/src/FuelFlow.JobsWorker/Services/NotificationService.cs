@@ -84,6 +84,13 @@ public sealed class NotificationService
             UserId = userId,
             Title = "Замовлення виконано",
             Message = $"Ваше замовлення #{payload.OrderId} виконано. Ваучери призначені та готові до використання.",
+            // The same type and payload the API's notification service writes, so the two paths
+            // produce the same row: the copy is prose, the type and the payload are the contract.
+            Type = NotificationTypes.OrderFulfilled,
+            Payload = NotificationPayload.Serialize(new NotificationPayload
+            {
+                OrderId = payload.OrderId.ToString(),
+            }),
             IsRead = false,
             CreatedAtUtc = DateTime.UtcNow
         };

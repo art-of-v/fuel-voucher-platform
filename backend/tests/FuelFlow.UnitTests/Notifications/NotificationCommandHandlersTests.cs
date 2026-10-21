@@ -75,6 +75,75 @@ public sealed class NotificationCommandHandlersTests : IDisposable
         notifications.Should().BeEmpty();
     }
 
+    /// <summary>
+    /// The type and the target are the contract: the copy is prose, and a client that has to
+    /// understand the prose to route a notification is a client that breaks when the prose changes.
+    /// </summary>
+    [Fact]
+    public async Task GetNotifications_ShouldCarryTheTypeAndTheTarget()
+    {
+        var companyId = Guid.NewGuid();
+        var notification = CreateNotification(Guid.NewGuid(), UserId, "Вам видано паливо", false, DateTime.UtcNow);
+        notification.Type = NotificationTypes.VoucherIssued;
+        notification.Payload = NotificationPayload.Serialize(new NotificationPayload
+        {
+            LegalEntityId = companyId.ToString(),
+            VoucherCount = 3,
+        });
+        _context.Notifications.Add(notification);
+        await _context.SaveChangesAsync();
+
+        var handler = new GetNotificationsQueryHandler(_context);
+
+        var dto = (await handler.HandleAsync(new GetNotificationsQuery(UserId))).Single();
+
+        dto.Type.Should().Be(NotificationTypes.VoucherIssued);
+        dto.LegalEntityId.Should().Be(companyId);
+        dto.OrderId.Should().BeNull();
+    }
+
+    /// <summary>
+    /// Every row written before the type existed reads as what it is: a plain row with nothing to
+    /// open. The columns are added with a default, so the old rows are not a migration problem -
+    /// but they are a reading problem if the reader expects a target that is not there.
+    /// </summary>
+    [Fact]
+    public async Task GetNotifications_ShouldReadAnOldRowAsAPlainRow()
+    {
+        var notification = CreateNotification(Guid.NewGuid(), UserId, "Замовлення виконано", true, DateTime.UtcNow);
+        _context.Notifications.Add(notification);
+        await _context.SaveChangesAsync();
+
+        var handler = new GetNotificationsQueryHandler(_context);
+
+        var dto = (await handler.HandleAsync(new GetNotificationsQuery(UserId))).Single();
+
+        dto.Type.Should().Be(NotificationTypes.Generic);
+        dto.LegalEntityId.Should().BeNull();
+        dto.OrderId.Should().BeNull();
+    }
+
+    /// <summary>
+    /// A payload that is not JSON is a broken row, not a broken request. The list still reads.
+    /// </summary>
+    [Fact]
+    public async Task GetNotifications_ShouldSurviveABrokenPayload()
+    {
+        var notification = CreateNotification(Guid.NewGuid(), UserId, "Вам видано паливо", false, DateTime.UtcNow);
+        notification.Type = NotificationTypes.VoucherIssued;
+        notification.Payload = "{not json";
+        _context.Notifications.Add(notification);
+        await _context.SaveChangesAsync();
+
+        var handler = new GetNotificationsQueryHandler(_context);
+
+        var dto = (await handler.HandleAsync(new GetNotificationsQuery(UserId))).Single();
+
+        dto.Type.Should().Be(NotificationTypes.VoucherIssued);
+        dto.LegalEntityId.Should().BeNull();
+        dto.OrderId.Should().BeNull();
+    }
+
     [Fact]
     public async Task MarkNotificationRead_ShouldMarkRead()
     {
