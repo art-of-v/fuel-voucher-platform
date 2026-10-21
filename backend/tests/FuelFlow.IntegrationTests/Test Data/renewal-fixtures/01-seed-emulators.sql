@@ -279,8 +279,8 @@ FROM _qa q, _fuel f, _src s, _qa_company c WHERE s.voucher_number = 'EMU2-SRC-CO
 -- This must run AFTER the vouchers exist, since it points at them.
 -- ---------------------------------------------------------------------------------------------
 
-INSERT INTO fulfillments (order_id, voucher_id, fulfilled_at_utc)
-SELECT s.order_id, v.id, now()
+INSERT INTO fulfillments (id, order_id, voucher_id, fulfilled_at_utc)
+SELECT gen_random_uuid(), s.order_id, v.id, now()
 FROM _src s
 JOIN fuel_vouchers v ON v.voucher_number = s.voucher_number;
 

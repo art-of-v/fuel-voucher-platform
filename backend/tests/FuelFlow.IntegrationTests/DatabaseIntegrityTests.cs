@@ -1365,10 +1365,12 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
         await using var context = CreateContext();
 
         // The jsonb payload is doubled up because ExecuteSqlRaw treats braces as placeholders.
+        // The id is given because the column is a uuid with no default - the key is the
+        // application's to write, and a raw INSERT has to write it too.
         var act = () => context.Database.ExecuteSqlRawAsync(
             """
-            INSERT INTO outbox_events (event_type, payload, processed, created_at_utc)
-            VALUES ('OrderFuifilled', '{{}}', false, now())
+            INSERT INTO outbox_events (id, event_type, payload, processed, created_at_utc)
+            VALUES (gen_random_uuid(), 'OrderFuifilled', '{{}}', false, now())
             """);
 
         await act.Should().ThrowAsync<PostgresException>(

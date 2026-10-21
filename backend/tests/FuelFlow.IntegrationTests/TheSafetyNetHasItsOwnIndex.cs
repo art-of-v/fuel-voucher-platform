@@ -101,8 +101,9 @@ public sealed class TheSafetyNetHasItsOwnIndex : IClassFixture<TestDatabaseFixtu
                     now() - (interval '1 minute' * (i % 43200)) AS created_at
                 FROM generate_series(1, 60000) AS i
             )
-            INSERT INTO outbox_events (event_type, payload, processed, processed_at_utc, created_at_utc)
+            INSERT INTO outbox_events (id, event_type, payload, processed, processed_at_utc, created_at_utc)
             SELECT
+                gen_random_uuid(),
                 event_type,
                 '{}',
                 CASE WHEN event_type = 'OrderFulfilled' THEN created_at < now() - interval '10 minutes' ELSE consumed END,
