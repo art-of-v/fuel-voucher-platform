@@ -142,7 +142,7 @@ internal static class ServiceSetup
             // otherwise the probe's pool is uncapped and is exactly the pool that can storm the
             // server during an incident.
             .AddNpgSql(
-                DatabaseConnectionPool.WithMaxPoolSize(connectionString, DatabaseConnectionPool.ResolveMaxPoolSize(config)),
+                DatabaseConnectionPool.WithPoolSettings(connectionString, DatabaseConnectionPool.ResolveMaxPoolSize(config)),
                 name: "postgres",
                 tags: ["ready"])
             .AddRedis(redisConnection, name: "redis", tags: ["ready"]);

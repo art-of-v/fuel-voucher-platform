@@ -51,7 +51,7 @@ internal static class DatabaseSetup
     {
         // The cap belongs to EVERY pool this process opens, not only to this data source - see
         // DatabaseConnectionPool. The Hangfire storage and the health check get the same string.
-        var poolSizeLimited = DatabaseConnectionPool.WithMaxPoolSize(connectionString, maxPoolSize);
+        var poolSizeLimited = DatabaseConnectionPool.WithPoolSettings(connectionString, maxPoolSize);
 
         services.Configure<DatabaseOptions>(opts =>
         {
