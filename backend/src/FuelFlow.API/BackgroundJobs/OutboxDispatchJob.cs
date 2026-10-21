@@ -56,7 +56,7 @@ public sealed class OutboxDispatchJob
         _logger = logger;
     }
 
-    public async Task DispatchAsync(int eventId, CancellationToken cancellationToken = default)
+    public async Task DispatchAsync(Guid eventId, CancellationToken cancellationToken = default)
     {
         var outboxEvent = await _context.OutboxEvents
             .FirstOrDefaultAsync(e => e.Id == eventId, cancellationToken);

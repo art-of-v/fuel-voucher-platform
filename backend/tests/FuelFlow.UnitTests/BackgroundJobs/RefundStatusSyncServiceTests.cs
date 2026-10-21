@@ -131,7 +131,7 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
 
     private static Fulfillment BuildFulfillment(Guid orderId) => new()
     {
-        Id = 1,
+        Id = Guid.NewGuid(),
         OrderId = orderId,
         VoucherId = Guid.NewGuid(),
         FulfilledAtUtc = DateTime.UtcNow,
