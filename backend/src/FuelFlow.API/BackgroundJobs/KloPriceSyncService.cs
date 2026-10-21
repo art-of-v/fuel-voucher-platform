@@ -145,16 +145,6 @@ public sealed class KloPriceSyncService
                     changed.Count,
                     string.Join(", ", changed.Select(r => $"{r.Name} {r.PreviousPumpPricePerLiter:F2}→{r.PumpPricePerLiter:F2}")));
             }
-
-            foreach (var skipped in result.BelowCostSkipped)
-            {
-                // Warning, not Error: refusing a below-cost price is the guard doing its job, and
-                // this runs every fifteen minutes. At Error it filled the admin error journal with
-                // the same refusal until a real failure could not be found in it.
-                _logger.LogWarning(
-                    "KLO price sync refused {Grade}: the price Minfin lists would sell it below our cost.",
-                    skipped);
-            }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

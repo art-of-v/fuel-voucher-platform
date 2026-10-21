@@ -251,22 +251,6 @@ public sealed class OkkoPriceSyncService
                 "OKKO price sync: {Changed} of {Matched} fuel(s) changed, {Packages} package(s) repriced",
                 result.FuelsChanged, result.FuelsMatched, result.PackagesRepriced);
         }
-
-        // A pump low enough to undercut our own cost is refused by the importer (as it is on the
-        // manual path). Surfaced here because, unlike a typed rejection, nobody is watching for it.
-        //
-        // Warning, not Error, and deliberately so: refusing a below-cost pump is the guard doing its
-        // job, and this runs every 15 minutes. At Error it filled the admin error journal with the
-        // same refusal until a real failure could not be found in it - the journal is only worth
-        // reading while it holds things somebody has to act on.
-        if (result.BelowCostSkipped.Count > 0)
-        {
-            _logger.LogWarning(
-                "OKKO price sync refused {Count} fuel(s) whose published pump price would sell below cost: " +
-                "{Fuels}. They keep their previous pump price and will stay off sale until reviewed. " +
-                "Enable the below-cost opt-in on the fuel if that is deliberate.",
-                result.BelowCostSkipped.Count, string.Join(", ", result.BelowCostSkipped));
-        }
     }
 
     /// <summary>
