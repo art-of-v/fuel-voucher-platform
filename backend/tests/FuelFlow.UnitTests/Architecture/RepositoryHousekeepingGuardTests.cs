@@ -55,13 +55,15 @@ public sealed class RepositoryHousekeepingGuardTests
     ];
 
     /// <summary>
-    /// The build files, at the root, where the tools look for them.
+    /// The build files, where the tools look for them: the editor conventions and the pinned
+    /// SDK at the root, and the shared MSBuild properties in backend/ - where every project
+    /// and the image build's Docker context can both see them.
     /// </summary>
     private static readonly string[] BuildFiles =
     [
         ".editorconfig",
-        "Directory.Build.props",
         "global.json",
+        Path.Combine("backend", "Directory.Build.props"),
     ];
 
     [Fact]
@@ -94,10 +96,11 @@ public sealed class RepositoryHousekeepingGuardTests
             .ToArray();
 
         missing.Should().BeEmpty(
-            "the build settings that make a build reproducible live in three files at the root: "
-            + "the editor conventions (.editorconfig), the shared MSBuild properties "
-            + "(Directory.Build.props) and the pinned SDK (global.json). A missing one does not "
-            + "announce itself - it just makes the build depend on the machine it runs on");
+            "the build settings that make a build reproducible live in three files: the editor "
+            + "conventions (.editorconfig) and the pinned SDK (global.json) at the root, and the "
+            + "shared MSBuild properties (backend/Directory.Build.props) where every project and "
+            + "the image build's Docker context can both see them. A missing one does not announce "
+            + "itself - it just makes the build depend on the machine it runs on");
     }
 
     [Fact]

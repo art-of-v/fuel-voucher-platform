@@ -4,12 +4,23 @@
     The build settings every project in this repository shares, in one place.
 
     There are five projects (the API, the standalone jobs worker and three test projects).
-    Until this file existed each of them repeated the same three lines, and the settings
-    that only make sense repository-wide - how strict the build is, which SDK answers for
-    it, whether the NuGet graph may float - had nowhere to live at all.
+    Until this file existed each of them repeated the same two lines, and the settings
+    that only make sense repository-wide - how strict the build is, whether the NuGet
+    graph may float - had nowhere to live at all.
 
-    The SDK is pinned in global.json, the editor conventions in .editorconfig, and the
-    resolved package graph in one packages.lock.json per project (see below).
+    The SDK is pinned in global.json and the editor conventions in .editorconfig, both at
+    the repository root; the resolved package graph is in one packages.lock.json per
+    project (see below).
+
+    WHY THIS FILE IS IN backend/ AND NOT AT THE ROOT. MSBuild finds it by walking up
+    from the project directory, so either place would do for a local build - but the
+    image build's context is backend/ (`docker build -f backend/src/FuelFlow.API/
+    Dockerfile ... backend`), and a file at the repository root is not inside that
+    context at all. A root props file is invisible to the image build, and the first
+    version of this change proved it: the image build compiled without the implicit
+    usings and failed on `IServiceCollection` and `WebApplication` - in a job that
+    runs only after the merge, so nothing on the pull request would have shown it.
+    Here it is one level down, where every project and the image build can both see it.
   -->
 
   <PropertyGroup>

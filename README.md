@@ -56,6 +56,7 @@ travel over a transactional outbox, and every domain/admin change is audited.
 FuelFlow/
 ├── admin/                    # React 19 admin dashboard (Vite + Tailwind 4 + shadcn/ui)
 ├── backend/                  # .NET 10 ASP.NET Core API + standalone jobs worker
+│   ├── Directory.Build.props # The MSBuild settings every project shares
 │   └── src/
 │       ├── FuelFlow.API/
 │       └── FuelFlow.JobsWorker/
@@ -67,6 +68,8 @@ FuelFlow/
 ├── deploy/                   # Production stack (compose, Caddyfile, backup/restore)
 ├── scripts/                  # Repository maintenance helpers
 ├── .github/                  # CI workflows
+├── .editorconfig             # Editor conventions for the whole repository
+├── global.json               # The pinned .NET SDK
 ├── docker-compose.yml        # Full local stack
 └── .env.example              # Template for required environment variables
 ```
