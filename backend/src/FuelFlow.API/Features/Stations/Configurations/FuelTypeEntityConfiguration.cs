@@ -123,9 +123,11 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
         builder.Property(e => e.DiscountPrice)
             .HasColumnName("discount_price")
             .HasColumnType("numeric(12,2)")
-            .IsRequired()
-            .HasComment("What the customer pays per litre. While the fuel is unpriced it equals the "
-                + "column price, because a fuel with no stated cost has no price of its own.");
+            .IsRequired(false)
+            .HasComment("What the customer pays per litre. NULL means it is not set: the grade is "
+                + "in the catalogue and nobody has priced it yet. A price of zero is a price, and "
+                + "a price of zero means the customer takes the fuel for nothing - so the unset "
+                + "state is NULL and never 0.");
 
         builder.Property(e => e.AllowBelowCost)
             .HasColumnName("allow_below_cost")
@@ -206,24 +208,17 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
             // code. Generous for what it is, bounded because it is indexed and unique per Brand.
             t.HasCheckConstraint("ck_fuel_types_brand_fuel_code_length", "brand_fuel_code IS NULL OR length(brand_fuel_code) <= 50");
 
-            // A negative discount price means the customer is paid to take the fuel, which is not a
-            // discount policy anyone has agreed to. The only guard today is the application-level
-            // below-cost opt-in (BrandsController), which is a business decision rather than a
-            // constraint, so a hand-written PUT or a future code path can still land here.
+            // A price of zero is a price, and a price of zero means the customer takes the fuel
+            // for nothing. So the unset state is NULL - which is what the cost beside it says - and
+            // zero is not a price anybody may write.
             //
-            // Zero is allowed, and it means something: a grade the network lists but nobody has
-            // priced yet. The OKKO catalogue import leaves exactly that behind - the pump is
-            // published, no cost and no margin are set - and
-            // UnpricedPackageIntegrationTests.A_Nominal_With_Neither_Rate_Nor_Margin_Is_Not_Charged
-            // says so in its own name. Forbidding zero here would refuse every grade the
-            // catalogue sync creates, which is the opposite of what a guard is for.
-            //
-            // What keeps a zero-priced grade off the shelf is not this column. It is that its price
-            // computes to null: SellablePackage.ComputedFinalPricePerLiter is null without a cost
-            // or a margin, and the storefront does not list a package with no price. The 1 UAH leak
-            // was a copy that wrote a number where the offer held NULL, and the number - not the
-            // missing one - is what reaches the customer.
-            t.HasCheckConstraint("ck_fuel_types_prices_non_negative", "base_price >= 0 AND discount_price >= 0");
+            // This is the business's call (2026-10-21): a grade the network lists but nobody has
+            // priced yet has NO customer price, and the column says so by being empty. The
+            // catalogue import leaves exactly that behind - the pump is published, no cost and no
+            // margin are set - and a grade with no price is not on the shelf: its computed price
+            // is null and the storefront does not list a package with no price.
+            t.HasCheckConstraint("ck_fuel_types_prices_non_negative",
+                "base_price >= 0 AND (discount_price IS NULL OR discount_price > 0)");
 
             // The four knobs the fuel took off the offer on 2026-10-19 keep the constraints the offer
             // carried. A negative cost makes every price computed from it negative as well, and a

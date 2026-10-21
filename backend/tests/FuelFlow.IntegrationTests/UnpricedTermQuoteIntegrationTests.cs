@@ -63,7 +63,7 @@ public sealed class UnpricedTermQuoteIntegrationTests : IClassFixture<TestDataba
                 Name = "Unpriced term-quote fuel",
                 BrandId = BrandIds.Okko,
                 BasePrice = 0m,
-                DiscountPrice = 0m,
+                DiscountPrice = null,
                 // What the catalogue import leaves behind: the pump is published, nobody has set a
                 // cost or a margin, so there is no price to quote.
                 PumpPricePerLiter = 92.90m,

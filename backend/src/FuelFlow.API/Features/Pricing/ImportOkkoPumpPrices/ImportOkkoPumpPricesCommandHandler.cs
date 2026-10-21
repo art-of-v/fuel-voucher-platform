@@ -232,6 +232,14 @@ public sealed class ImportOkkoPumpPricesCommandHandler
             var minDiscount = ft.MinDiscountPerLiter ?? 0m;
             var finalPerLiter = FuelPricing.FinalPerLiter(cost, profit, pump, minDiscount);
 
+            // What the CUSTOMER pays, which is a different question from what the knobs add up
+            // to. A fuel with no cost or no margin has no customer price at all, and the column
+            // says so by being empty - the old code read the missing knobs as zero and published
+            // a price of 0, which is a price: a zero discount price means the customer takes the
+            // fuel for nothing.
+            var customerPrice = FuelPricing.FinalPerLiterOrNull(
+                ft.SupplierPricePerLiter, ft.MarginUahPerLiter, pump, ft.MinDiscountPerLiter);
+
             // A pump low enough that the ceiling (pump - minDiscount) drops under our own cost would
             // make every sale of this fuel below cost - and checkout then refuses to sell it at all
             // (BelowCostSaleBlockedException), so the fuel becomes unbuyable until a human intervenes.
@@ -255,7 +263,9 @@ public sealed class ImportOkkoPumpPricesCommandHandler
 
                 // Keep the fuel-type base/discount headline in step, as the operator write path does.
                 ft.BasePrice = Math.Round(pump, 2, MidpointRounding.AwayFromZero);
-                ft.DiscountPrice = Math.Round(finalPerLiter, 2, MidpointRounding.AwayFromZero);
+                ft.DiscountPrice = customerPrice is { } price
+                    ? Math.Round(price, 2, MidpointRounding.AwayFromZero)
+                    : null;
                 ft.UpdatedAtUtc = now;
 
                 // Nothing per nominal is restated, and that is the change: a nominal's price is the

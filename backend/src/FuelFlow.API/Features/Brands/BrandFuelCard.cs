@@ -40,6 +40,18 @@ internal static class BrandFuelCard
             .ThenBy(p => p.PackageId, StringComparer.Ordinal)
             .FirstOrDefault();
 
+    /// <summary>
+    /// What the customer saves against the column price, per litre.
+    /// </summary>
+    /// <remarks>
+    /// The column price is what the pump says; the customer price is what they pay; the saving is
+    /// the difference. A fuel with no customer price yet saves nothing, because nothing has been
+    /// promised - and the old code read a zero as the price and made the saving the whole pump
+    /// price, which is the "a price of zero is a price" trap showing up on a screen.
+    /// </remarks>
+    private static decimal CustomerSavingPerLiter(FuelTypeEntity fuel)
+        => Math.Max(0, fuel.BasePrice - (fuel.DiscountPrice ?? fuel.BasePrice));
+
     public static BrandFuelDto Build(FuelTypeEntity fuel, IReadOnlyList<SellablePackage> packages)
     {
         var reference = Reference(packages);
@@ -78,10 +90,10 @@ internal static class BrandFuelCard
             PumpPricePerLiter = fuel.PumpPricePerLiter,
             // Fall back to the historical marketing discount (base - final) so a fuel
             // priced before the min-discount column existed shows a sane initial knob.
-            MinDiscountPerLiter = fuel.MinDiscountPerLiter ?? Math.Max(0, fuel.BasePrice - fuel.DiscountPrice),
+            MinDiscountPerLiter = fuel.MinDiscountPerLiter ?? CustomerSavingPerLiter(fuel),
             // base_price is the pump/reference price; the actual customer discount
             // is base - final. Derived here (display only) so the admin UI can show it.
-            DiscountPerLiter = Math.Max(0, fuel.BasePrice - fuel.DiscountPrice),
+            DiscountPerLiter = CustomerSavingPerLiter(fuel),
             AllowBelowCost = fuel.AllowBelowCost,
             // Read off the fuel, not derived from the packages. A code is how the catalogue import
             // recognises this grade on the next tick, so an operator cannot see it without knowing
