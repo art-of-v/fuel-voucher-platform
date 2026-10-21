@@ -193,6 +193,53 @@ public sealed class CatalogueReferentialIntegrityTests : IClassFixture<TestDatab
         return id.ToString();
     }
 
+    /// <summary>
+    /// The switch that says "this fuel may be sold below cost" needs a cost to be below.
+    /// </summary>
+    /// <remarks>
+    /// All twenty-three fuels carried the switch on, and none of them had a supplier cost, so it
+    /// was a switch that disarmed the below-cost guard for nothing - and became a live one the
+    /// moment a cost was recorded. The rule belongs in the schema: the switch can only be on for
+    /// a fuel whose cost is known.
+    /// </remarks>
+    [Fact]
+    public async Task A_Fuel_Without_A_Cost_May_Not_Be_Flagged_Sellable_Below_Cost()
+    {
+        await using var context = CreateContext();
+        var brandId = await SeededBrand(context);
+
+        var fuel = NewFuel("catalogue-below-cost-without-a-cost", brandId);
+        fuel.AllowBelowCost = true;
+        fuel.SupplierPricePerLiter = null;
+
+        var act = async () => { context.Set<FuelTypeEntity>().Add(fuel); await context.SaveChangesAsync(); };
+
+        await AssertRefusedAsync(act, PostgresErrorCodes.CheckViolation);
+    }
+
+    [Fact]
+    public async Task A_Fuel_With_A_Cost_May_Be_Flagged_Sellable_Below_Cost()
+    {
+        await using var context = CreateContext();
+        var brandId = await SeededBrand(context);
+
+        var fuel = NewFuel("catalogue-below-cost-with-a-cost", brandId);
+        fuel.AllowBelowCost = true;
+        fuel.SupplierPricePerLiter = 45m;
+
+        context.Set<FuelTypeEntity>().Add(fuel);
+        await context.SaveChangesAsync();
+
+        (await context.Set<FuelTypeEntity>()
+            .IgnoreQueryFilters()
+            .SingleAsync(f => f.Id == ToUuid("catalogue-below-cost-with-a-cost"))).AllowBelowCost
+            .Should().BeTrue("a manager who has priced the fuel may allow it to be sold below cost");
+
+        await context.Set<FuelTypeEntity>()
+            .Where(f => f.Id == ToUuid("catalogue-below-cost-with-a-cost"))
+            .ExecuteDeleteAsync();
+    }
+
     private static FuelTypeEntity NewFuel(string id, Guid brandId) => new()
     {
         Id =   ToUuid(id),
