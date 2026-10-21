@@ -26,6 +26,18 @@ describe('fuelSaving', () => {
     expect(r.hasSaving).toBe(false);
     expect(r.amount).toBe(0);
   });
+
+  it('shows no saving when the discount price is zero', () => {
+    // A discount price of ZERO is a price, not a discount: it says the customer takes the fuel
+    // for nothing. The fuel is sold at the column price, so a "saving" of the whole column
+    // price - a struck-through price and a badge - is a lie the customer reads.
+    //
+    // This is the state of the catalogue: fourteen of the twenty-three fuels carried a stored
+    // discount price of zero while their price is the column price.
+    const r = fuelSaving({ basePrice: 92.9, discountPrice: 0 });
+    expect(r.hasSaving).toBe(false);
+    expect(r.amount).toBe(0);
+  });
 });
 
 describe('fuelHeadlinePrice', () => {

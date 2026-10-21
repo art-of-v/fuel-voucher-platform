@@ -19,7 +19,15 @@ export interface FuelSaving {
 export function fuelSaving(fuel: Pick<FuelType, 'basePrice' | 'discountPrice'>): FuelSaving {
   const base = fuel.basePrice || 0;
   const discount = fuel.discountPrice || 0;
-  const hasSaving = base > discount;
+  // A discount price of ZERO is not a discount, it is a price: it says the customer takes the
+  // fuel for nothing. The guard is `base > discount`, which a zero passes, so a fuel whose
+  // stored discount price is zero used to be shown with the whole column price struck through
+  // and a badge promising a saving of the whole column price - fourteen of the twenty-three
+  // fuels on the catalogue, while the price they are sold at is the column price itself.
+  //
+  // A saving needs a real price on both sides. The zero here is "not set", and "not set" is
+  // shown as no saving at all.
+  const hasSaving = discount > 0 && base > discount;
   return { amount: hasSaving ? base - discount : 0, hasSaving };
 }
 
