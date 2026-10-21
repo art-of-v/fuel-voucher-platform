@@ -31,7 +31,7 @@
 --     catalogue gone they are leftovers that only say "somebody seeded something once".
 --   * the audit and custody rows that restrict against the vouchers: `voucher_events`,
 --     `voucher_movements` (three FKs - `voucher_id`, `from_voucher_id`, `to_voucher_id`),
---     `voucher_exchanges` and `operator_voucher_renewals`.
+--     `voucher_movements` and the renewal lines on `order_line_items`.
 --
 -- `voucher_renewal_items` is deliberately absent: `20261017073518_DropVoucherRenewalItems` removed the
 -- table, and `20261017065731` moved its RESTRICT onto `order_line_items.order_id`, which is deleted
@@ -229,30 +229,19 @@ DELETE FROM voucher_movements
 WHERE voucher_id IN (SELECT id FROM qa_vouchers);
 \endif
 
--- Exchanges before their batches: `voucher_exchanges.exchange_batch_id` is RESTRICT onto
--- `movement_batches`, so the rows go first and the batches follow. The batches are collected while
--- the exchanges still exist, and only ones left with no member are removed - a batch that still has
--- an exchange in it belongs to somebody else's chain, and an already-empty batch was not ours to
--- sweep up.
+-- The exchange pairs live in the ledger now (#319), on the row of the retired paper. The movements
+-- go before the batches they were part of, and the batches are collected while the movements still
+-- exist - only ones left with no member are removed, a batch that still has a movement in it
+-- belongs to somebody else's chain, and an already-empty batch was not ours to sweep up.
 CREATE TEMP TABLE qa_movement_batches ON COMMIT DROP AS
-SELECT DISTINCT exchange_batch_id AS id
-FROM voucher_exchanges
-WHERE old_voucher_id IN (SELECT id FROM qa_vouchers)
-   OR new_voucher_id IN (SELECT id FROM qa_vouchers);
-
-DELETE FROM voucher_exchanges
-WHERE old_voucher_id IN (SELECT id FROM qa_vouchers)
-   OR new_voucher_id IN (SELECT id FROM qa_vouchers);
+SELECT DISTINCT batch_id AS id
+FROM voucher_movements
+WHERE voucher_id IN (SELECT id FROM qa_vouchers)
+   OR replaced_by_voucher_id IN (SELECT id FROM qa_vouchers);
 
 DELETE FROM movement_batches b
 WHERE b.id IN (SELECT id FROM qa_movement_batches)
-  AND NOT EXISTS (SELECT 1 FROM voucher_exchanges e WHERE e.exchange_batch_id = b.id);
-
--- The operator renewal audit row restricts against the voucher on both `voucher_id` and
--- `replacement_voucher_id`, so it has to be gone before the vouchers it points at.
-DELETE FROM operator_voucher_renewals
-WHERE voucher_id IN (SELECT id FROM qa_vouchers)
-   OR (replacement_voucher_id IS NOT NULL AND replacement_voucher_id IN (SELECT id FROM qa_vouchers));
+  AND NOT EXISTS (SELECT 1 FROM voucher_movements m WHERE m.batch_id = b.id);
 
 DELETE FROM fulfillments
 WHERE voucher_id IN (SELECT id FROM qa_vouchers)
@@ -285,14 +274,14 @@ WHERE id IN (SELECT id FROM qa_batches)
 DELETE FROM voucher_imports WHERE id IN (SELECT id FROM qa_imports);
 
 -- The emulated supplier, only once nothing points at it: `purchase_batches`, `fuel_vouchers`,
--- `movement_batches` and `voucher_exchanges` all restrict onto it. (`payments` has no `supplier_id`
+-- `movement_batches` and the ledger's `voucher_movements` (through the batch) all restrict onto it. (`payments` has no `supplier_id`
 -- - it carries `qr_parameters_id` and the payer - so it is not one of the blockers here.)
 DELETE FROM suppliers
 WHERE name = 'QA Supplier (emulated)'
   AND NOT EXISTS (SELECT 1 FROM purchase_batches b WHERE b.supplier_id = suppliers.id)
   AND NOT EXISTS (SELECT 1 FROM fuel_vouchers v WHERE v.supplier_id = suppliers.id)
   AND NOT EXISTS (SELECT 1 FROM movement_batches m WHERE m.supplier_id = suppliers.id)
-  AND NOT EXISTS (SELECT 1 FROM voucher_exchanges e WHERE e.supplier_id = suppliers.id);
+  AND NOT EXISTS (SELECT 1 FROM voucher_movements m WHERE m.batch_id IN (SELECT id FROM movement_batches mb WHERE mb.supplier_id = suppliers.id));
 
 -- The catalogue itself: the QA size list, and the QA price history.
 --

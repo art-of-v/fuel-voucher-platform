@@ -215,17 +215,10 @@ public sealed class ConfirmOperatorRenewalCommandHandler
             // same pair for the same reasons: the replacement leaves the pool for the customer, and the
             // old paper comes back. `replace_out` rather than `issued` because the reason differs, which
             // is the same split the self-serve writer uses for the identical physical fact.
-            _context.VoucherMovements.Add(new VoucherMovement
-            {
-                Id = Guid.CreateVersion7(),
-                Kind = VoucherMovementKinds.ReplaceOut,
-                VoucherId = stock.Id,
-                FromLocation = VoucherLocations.Pool,
-                ToLocation = VoucherLocations.Customer,
-                ActorKind = VoucherActorKinds.User,
-                ActorUserId = command.ActingUserId,
-                OccurredAtUtc = now
-            });
+            //
+            // The rows themselves are written further down, once the order and the line they settle
+            // exist - a movement names the order and the line it settled, and those are created after
+            // this branch knows what the renewal is.
 
             _context.VoucherEvents.Add(new VoucherEvent
             {
@@ -252,17 +245,9 @@ public sealed class ConfirmOperatorRenewalCommandHandler
             voucher.UpdatedAtUtc = now;
 
             // And the customer's half of the round trip: the paper they handed over is stock again.
-            _context.VoucherMovements.Add(new VoucherMovement
-            {
-                Id = Guid.CreateVersion7(),
-                Kind = VoucherMovementKinds.Returned,
-                VoucherId = voucher.Id,
-                FromLocation = VoucherLocations.Customer,
-                ToLocation = VoucherLocations.Pool,
-                ActorKind = VoucherActorKinds.User,
-                ActorUserId = command.ActingUserId,
-                OccurredAtUtc = now
-            });
+            // The movement that says so is written further down, with the order and the line it
+            // settles - and it names the replacement, because the retired paper's row is where the
+            // trade is recorded (planning #319).
 
             // `releasedFromStatus` rather than a literal: the voucher may be `Assigned` or `Expired`
             // (both are renewable), and the history has to say which one it actually was.
@@ -320,6 +305,33 @@ public sealed class ConfirmOperatorRenewalCommandHandler
         // from, and the surcharge would have no document. Price is the surcharge actually paid, so
         // the renewal shows up in revenue instead of vanishing; Kind marks it as a renewal rather
         // than a fuel purchase.
+        var branchCode = branch == VoucherRenewalBranch.Extend ? "extend" : "replace";
+
+        var renewalLine = new OrderLineItem
+        {
+            Id = Guid.CreateVersion7(),
+            Brand = voucher.Brand,
+            // The brand's key beside its name - the voucher's own key, because the line is
+            // about the same fuel the customer brings back.
+            BrandId = voucher.BrandId,
+            FuelTypeId = voucher.FuelTypeId,
+            Liters = voucher.Liters,
+            Quantity = 1,
+            UnitPrice = command.SurchargeUah,
+            LineTotal = command.SurchargeUah,
+            // The renewal's INTENT, on the line - the same columns the self-serve path writes
+            // (D-13's steps 2 and 3). The operator's renewal used to keep all of this in a table
+            // of its own; the line is where a renewal's facts live, and the two paths now read the
+            // same way.
+            TermCode = term.Code(),
+            RenewalBranch = branchCode,
+            SourceVoucherId = voucher.Id,
+            // The pair, because the customer's own expiry is overwritten in place by the renewal,
+            // so "what was it before" exists nowhere else.
+            PreviousCustomerExpiration = oldExpiration,
+            NewCustomerExpiration = newExpiration
+        };
+
         var renewalOrder = new Order
         {
             Id = Guid.CreateVersion7(),
@@ -331,22 +343,11 @@ public sealed class ConfirmOperatorRenewalCommandHandler
             FulfilledAtUtc = now,
             CreatedAtUtc = now,
             UpdatedAtUtc = now,
-            LineItems = new List<OrderLineItem>
-            {
-                new()
-                {
-                    Id = Guid.CreateVersion7(),
-                    Brand = voucher.Brand,
-                    // The brand's key beside its name - the voucher's own key, because the line is
-                    // about the same fuel the customer brings back.
-                    BrandId = voucher.BrandId,
-                    FuelTypeId = voucher.FuelTypeId,
-                    Liters = voucher.Liters,
-                    Quantity = 1,
-                    UnitPrice = command.SurchargeUah,
-                    LineTotal = command.SurchargeUah
-                }
-            }
+            // The brand's накладна for the off-platform renewal: the document the customer paid
+            // against. A self-serve order has none - the acquirer's invoice is monobank_invoice_id.
+            ExternalInvoiceNumber = string.IsNullOrWhiteSpace(command.InvoiceNumber) ? null : command.InvoiceNumber.Trim(),
+            ExternalInvoiceDate = command.InvoiceDate,
+            LineItems = new List<OrderLineItem> { renewalLine }
         };
 
         _context.Orders.Add(renewalOrder);
@@ -363,25 +364,42 @@ public sealed class ConfirmOperatorRenewalCommandHandler
         if (replacementStock is not null)
             replacementStock.OrderId = renewalOrder.Id;
 
-        var branchCode = branch == VoucherRenewalBranch.Extend ? "extend" : "replace";
-
-        _context.OperatorVoucherRenewals.Add(new OperatorVoucherRenewal
+        // The custody rows, now that the order and the line they settle exist: the replacement
+        // leaves the pool for the customer, and the paper they handed over comes back. Both name
+        // the order and the line, so "which renewal was this" is answerable from the ledger alone.
+        if (replacementStock is not null)
         {
-            Id = Guid.CreateVersion7(),
-            VoucherId = voucher.Id,
-            ReplacementVoucherId = replacementVoucherId,
-            CustomerUserId = customerUserId,
-            Branch = branchCode,
-            TermCode = term.Code(),
-            OldExpiration = oldExpiration,
-            NewExpiration = newExpiration,
-            SurchargeUah = command.SurchargeUah,
-            InvoiceNumber = string.IsNullOrWhiteSpace(command.InvoiceNumber) ? null : command.InvoiceNumber.Trim(),
-            InvoiceDate = command.InvoiceDate,
-            ActingUserId = command.ActingUserId,
-            ActingUserName = command.ActingUserName,
-            CreatedAtUtc = now
-        });
+            _context.VoucherMovements.Add(new VoucherMovement
+            {
+                Id = Guid.CreateVersion7(),
+                Kind = VoucherMovementKinds.ReplaceOut,
+                VoucherId = replacementStock.Id,
+                FromLocation = VoucherLocations.Pool,
+                ToLocation = VoucherLocations.Customer,
+                ActorKind = VoucherActorKinds.User,
+                ActorUserId = command.ActingUserId,
+                OccurredAtUtc = now,
+                OrderId = renewalOrder.Id,
+                LineItemId = renewalLine.Id
+            });
+
+            // The retired paper's own row names its successor: the customer's old voucher was
+            // replaced by the fresh one (planning #319).
+            _context.VoucherMovements.Add(new VoucherMovement
+            {
+                Id = Guid.CreateVersion7(),
+                Kind = VoucherMovementKinds.Returned,
+                VoucherId = voucher.Id,
+                FromLocation = VoucherLocations.Customer,
+                ToLocation = VoucherLocations.Pool,
+                ActorKind = VoucherActorKinds.User,
+                ActorUserId = command.ActingUserId,
+                OccurredAtUtc = now,
+                OrderId = renewalOrder.Id,
+                LineItemId = renewalLine.Id,
+                ReplacedByVoucherId = replacementVoucherId
+            });
+        }
 
         try
         {
@@ -390,7 +408,7 @@ public sealed class ConfirmOperatorRenewalCommandHandler
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException
         {
             SqlState: PostgresErrorCodes.UniqueViolation,
-            ConstraintName: "ix_operator_voucher_renewals_voucher_id_new_expiration"
+            ConstraintName: "ix_order_line_items_renewal_once"
         })
         {
             // The database refused the row, because this voucher already has a renewal to this date.

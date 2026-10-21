@@ -1,4 +1,5 @@
 using FluentAssertions;
+using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Exchange;
 using FuelFlow.Features.Vouchers.Movements;
@@ -95,6 +96,7 @@ public sealed class ExchangeRenewalIdempotencyContractTests : IClassFixture<Test
     {
         var voucherId = Guid.NewGuid();
         var supplierId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
 
         await using (var seed = CreateContext())
         {
@@ -102,6 +104,7 @@ public sealed class ExchangeRenewalIdempotencyContractTests : IClassFixture<Test
             await ResetAsync(seed);
 
             seed.Suppliers.Add(SeedSupplier(supplierId));
+            seed.Users.Add(SeedUser(userId));
             seed.FuelVouchers.Add(Stock(voucherId, supplierId));
             await seed.SaveChangesAsync();
         }
@@ -110,20 +113,20 @@ public sealed class ExchangeRenewalIdempotencyContractTests : IClassFixture<Test
 
         await using (var first = CreateContext())
         {
-            first.OperatorVoucherRenewals.Add(RenewalRow(voucherId, today, today.AddMonths(1)));
+            AddRenewalLine(first, userId, voucherId, today, today.AddMonths(1));
             await first.SaveChangesAsync();
         }
 
         await using var second = CreateContext();
-        second.OperatorVoucherRenewals.Add(RenewalRow(voucherId, today, today.AddMonths(1)));
+        AddRenewalLine(second, userId, voucherId, today, today.AddMonths(1));
         var act = () => second.SaveChangesAsync();
 
         var violation = (await act.Should().ThrowAsync<DbUpdateException>())
             .WithInnerException<PostgresException>().Which;
 
         violation.SqlState.Should().Be(PostgresErrorCodes.UniqueViolation,
-            "the same renewal to the same date is the same settlement row, recorded twice");
-        violation.ConstraintName.Should().Be("ix_operator_voucher_renewals_voucher_id_new_expiration");
+            "the same renewal to the same date is the same settlement, recorded twice");
+        violation.ConstraintName.Should().Be("ix_order_line_items_renewal_once");
     }
 
     [Fact]
@@ -131,6 +134,7 @@ public sealed class ExchangeRenewalIdempotencyContractTests : IClassFixture<Test
     {
         var voucherId = Guid.NewGuid();
         var supplierId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
 
         await using (var seed = CreateContext())
         {
@@ -138,6 +142,7 @@ public sealed class ExchangeRenewalIdempotencyContractTests : IClassFixture<Test
             await ResetAsync(seed);
 
             seed.Suppliers.Add(SeedSupplier(supplierId));
+            seed.Users.Add(SeedUser(userId));
             seed.FuelVouchers.Add(Stock(voucherId, supplierId));
             await seed.SaveChangesAsync();
         }
@@ -146,20 +151,34 @@ public sealed class ExchangeRenewalIdempotencyContractTests : IClassFixture<Test
 
         await using (var first = CreateContext())
         {
-            first.OperatorVoucherRenewals.Add(RenewalRow(voucherId, today, today.AddMonths(1)));
+            AddRenewalLine(first, userId, voucherId, today, today.AddMonths(1));
             await first.SaveChangesAsync();
         }
 
         // The business answer the key was built around: a voucher may be renewed any number of times.
         // What the key refuses is the SAME renewal twice, not a second, later renewal.
         await using var second = CreateContext();
-        second.OperatorVoucherRenewals.Add(RenewalRow(voucherId, today, today.AddMonths(2)));
+        AddRenewalLine(second, userId, voucherId, today, today.AddMonths(2));
         var act = () => second.SaveChangesAsync();
 
         await act.Should().NotThrowAsync();
     }
 
     // ---- Helpers -------------------------------------------------------------------------------
+
+    /// <summary>
+    /// The customer the renewal belongs to. The order carries the customer, so the renewal cannot be
+    /// written without one.
+    /// </summary>
+    private static User SeedUser(Guid userId)
+        => new()
+        {
+            Id = userId,
+            PhoneNumber = $"+38{userId:N}"[..20],
+            IsActive = true,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
 
     private static Supplier SeedSupplier(Guid supplierId)
         => new()
@@ -206,25 +225,51 @@ public sealed class ExchangeRenewalIdempotencyContractTests : IClassFixture<Test
             OccurredAtUtc = DateTime.UtcNow
         };
 
-    private static OperatorVoucherRenewal RenewalRow(Guid voucherId, DateOnly oldExpiration, DateOnly newExpiration)
-        => new()
+    /// <summary>
+    /// A renewal, written the way the operator's path writes it now (planning #319): an order with
+    /// one line, and the line carries the renewal's intent and its outcome.
+    /// </summary>
+    private static void AddRenewalLine(
+        ApplicationDbContext ctx,
+        Guid customerUserId,
+        Guid voucherId,
+        DateOnly oldExpiry,
+        DateOnly newExpiration)
+    {
+        ctx.Orders.Add(new Order
         {
             Id = Guid.NewGuid(),
-            VoucherId = voucherId,
-            CustomerUserId = Guid.NewGuid(),
-            Branch = "extend",
-            TermCode = "1m",
-            OldExpiration = oldExpiration,
-            NewExpiration = newExpiration,
-            SurchargeUah = 0m,
-            ActingUserId = Guid.NewGuid(),
-            ActingUserName = "Operator",
-            CreatedAtUtc = DateTime.UtcNow
-        };
+            UserId = customerUserId,
+            Price = 10m,
+            Kind = OrderKind.Renewal,
+            Status = OrderStatus.Fulfilled,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+            LineItems = new List<OrderLineItem>
+            {
+                new()
+                {
+                    Id = Guid.NewGuid(),
+                    Brand = "okko",
+                    BrandId = BrandIds.ForSlug("okko"),
+                    FuelTypeId = ToUuid("okko-95"),
+                    Liters = 50m,
+                    Quantity = 1,
+                    UnitPrice = 10m,
+                    LineTotal = 10m,
+                    TermCode = "1m",
+                    RenewalBranch = "extend",
+                    SourceVoucherId = voucherId,
+                    PreviousCustomerExpiration = oldExpiry,
+                    NewCustomerExpiration = newExpiration
+                }
+            }
+        });
+    }
 
     private static async Task ResetAsync(ApplicationDbContext context)
     {
         await context.Database.ExecuteSqlRawAsync(
-            """TRUNCATE TABLE "operator_voucher_renewals", "movement_batches", "purchase_batches", "voucher_imports", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "suppliers", "users", "provider_event_outbox" RESTART IDENTITY CASCADE""");
+            """TRUNCATE TABLE "movement_batches", "purchase_batches", "voucher_imports", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "suppliers", "users", "provider_event_outbox" RESTART IDENTITY CASCADE""");
     }
 }

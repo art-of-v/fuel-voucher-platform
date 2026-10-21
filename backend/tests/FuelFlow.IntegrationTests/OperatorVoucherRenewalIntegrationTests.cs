@@ -78,14 +78,17 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
         voucher.AssignedToUserId.Should().Be(userId);
         voucher.CustomerExpirationDate.Should().Be(oldExpiry.AddMonths(1)); // OLD expiry + term, leftover days kept
 
-        var row = await verify.OperatorVoucherRenewals.AsNoTracking().FirstAsync(r => r.VoucherId == voucherId);
-        row.Branch.Should().Be("extend");
-        row.ReplacementVoucherId.Should().BeNull();
-        row.TermCode.Should().Be("1m");
-        row.SurchargeUah.Should().Be(120.50m);
-        row.CustomerUserId.Should().Be(userId);
-        row.ActingUserId.Should().Be(actingUserId);
-        row.InvoiceNumber.Should().Be("INV-1");
+        var facts = await RenewalAsync(verify, voucherId);
+        facts.Branch.Should().Be("extend");
+        facts.ReplacementVoucherId.Should().BeNull("an extend keeps the same paper - nothing replaced it");
+        facts.TermCode.Should().Be("1m");
+        facts.SurchargeUah.Should().Be(120.50m);
+        facts.CustomerUserId.Should().Be(userId);
+        facts.ActingUserId.Should().Be(actingUserId);
+        facts.InvoiceNumber.Should().Be("INV-1");
+        facts.InvoiceDate.Should().Be(today);
+        facts.OldExpiration.Should().Be(oldExpiry);
+        facts.NewExpiration.Should().Be(oldExpiry.AddMonths(1));
 
         var audit = await verify.AuditEventOutbox.AsNoTracking()
             .Where(e => e.AggregateId == voucherId.ToString() && e.EventType == "VoucherRenewedByOperator")
@@ -165,8 +168,8 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
         voucher.CustomerExpirationDate.Should().Be(customerExpiry,
             "a refused renewal must leave the customer exactly where they were");
         voucher.Status.Should().Be(VoucherStatus.Assigned);
-        (await verify.OperatorVoucherRenewals.AsNoTracking().AnyAsync(r => r.VoucherId == voucherId))
-            .Should().BeFalse("no settlement row for an operation that did not happen");
+        (await verify.OrderLineItems.AsNoTracking().AnyAsync(l => l.SourceVoucherId == voucherId))
+            .Should().BeFalse("no settlement for an operation that did not happen");
     }
 
     [Fact]
@@ -227,10 +230,11 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
         source.AssignedToUserId.Should().BeNull();
         source.OrderId.Should().Be(originPurchaseId, "it keeps the purchase it arrived under — not re-homed");
 
-        var row = await verify.OperatorVoucherRenewals.AsNoTracking().FirstAsync(r => r.VoucherId == voucherId);
-        row.Branch.Should().Be("replace");
-        row.ReplacementVoucherId.Should().Be(stockId);
-        row.NewExpiration.Should().Be(today.AddMonths(1));
+        var facts = await RenewalAsync(verify, voucherId);
+        facts.Branch.Should().Be("replace");
+        facts.ReplacementVoucherId.Should().Be(stockId);
+        facts.NewExpiration.Should().Be(today.AddMonths(1));
+        facts.OldExpiration.Should().Be(today.AddDays(-3));
 
         // D-13. The same pair the self-serve renewal writes, for the same reason: a replace makes two
         // statements, so one row would have recorded only one of them. `replace_out` for the replacement
@@ -303,7 +307,8 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
         using var verify = CreateContext();
         var voucher = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == voucherId);
         voucher.Status.Should().Be(VoucherStatus.Assigned); // untouched — transaction rolled back
-        (await verify.OperatorVoucherRenewals.AsNoTracking().AnyAsync()).Should().BeFalse();
+        (await verify.OrderLineItems.AsNoTracking().AnyAsync(l => l.SourceVoucherId == voucherId))
+            .Should().BeFalse("no renewal line for an operation that did not happen");
     }
 
     /// <summary>
@@ -359,7 +364,8 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
         using var verify = CreateContext();
         (await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == stockId))
             .Status.Should().Be(VoucherStatus.Available, "the transaction rolled back");
-        (await verify.OperatorVoucherRenewals.AsNoTracking().AnyAsync()).Should().BeFalse();
+        (await verify.OrderLineItems.AsNoTracking().AnyAsync(l => l.SourceVoucherId == voucherId))
+            .Should().BeFalse("no renewal line for an operation that did not happen");
     }
 
     [Fact]
@@ -463,8 +469,8 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
         }
 
         using var verify = CreateContext();
-        var row = await verify.OperatorVoucherRenewals.AsNoTracking().FirstAsync(r => r.VoucherId == voucherId);
-        row.SurchargeUah.Should().Be(0m);
+        var facts = await RenewalAsync(verify, voucherId);
+        facts.SurchargeUah.Should().Be(0m, "a free compensation is a zero surcharge, and it is still recorded");
     }
 
     [Fact]
@@ -631,7 +637,8 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
         (await handlerTask).Should().NotBeNull("releasing the lock lets the renewal through");
 
         using var verify = CreateContext();
-        (await verify.OperatorVoucherRenewals.CountAsync(r => r.VoucherId == voucherId)).Should().Be(1);
+        (await verify.OrderLineItems.AsNoTracking().CountAsync(l => l.SourceVoucherId == voucherId))
+            .Should().Be(1, "the renewal is one line of one order");
         (await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == voucherId))
             .CustomerExpirationDate.Should().Be(today.AddDays(5).AddMonths(1));
     }
@@ -672,17 +679,18 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
             await seed.SaveChangesAsync();
         }
 
-        // The first renewal, recorded.
+        // The first renewal, recorded. It is an ORDER now (planning #319): the line carries the
+        // renewal's intent and its outcome, the order carries the money.
         using (var ctx = CreateContext())
         {
-            ctx.OperatorVoucherRenewals.Add(Renewal(voucherId, userId, oldExpiry, newExpiry));
+            AddRenewal(ctx, voucherId, userId, oldExpiry, newExpiry);
             await ctx.SaveChangesAsync();
         }
 
         // The same renewal again - a double-clicked "confirm renewal" - must be refused.
         using (var ctx = CreateContext())
         {
-            ctx.OperatorVoucherRenewals.Add(Renewal(voucherId, userId, oldExpiry, newExpiry));
+            AddRenewal(ctx, voucherId, userId, oldExpiry, newExpiry);
             var act = () => ctx.SaveChangesAsync();
 
             await act.Should().ThrowAsync<DbUpdateException>(
@@ -693,7 +701,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
         // that a customer may renew as often as they like.
         using (var ctx = CreateContext())
         {
-            ctx.OperatorVoucherRenewals.Add(Renewal(voucherId, userId, newExpiry, newExpiry.AddMonths(1)));
+            AddRenewal(ctx, voucherId, userId, newExpiry, newExpiry.AddMonths(1));
             var act = () => ctx.SaveChangesAsync();
 
             await act.Should().NotThrowAsync(
@@ -701,23 +709,100 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
         }
 
         using var verify = CreateContext();
-        (await verify.OperatorVoucherRenewals.CountAsync(r => r.VoucherId == voucherId)).Should().Be(2);
+        (await verify.OrderLineItems.AsNoTracking().CountAsync(l => l.SourceVoucherId == voucherId))
+            .Should().Be(2);
     }
 
-    private static OperatorVoucherRenewal Renewal(Guid voucherId, Guid customerUserId, DateOnly oldExpiry, DateOnly newExpiration)
-        => new()
+    /// <summary>
+    /// A renewal, written the way the operator's path writes it now (planning #319): an order with
+    /// one line, and the line carries the renewal's intent and its outcome.
+    /// </summary>
+    private static void AddRenewal(
+        ApplicationDbContext ctx,
+        Guid voucherId,
+        Guid customerUserId,
+        DateOnly oldExpiry,
+        DateOnly newExpiration)
+    {
+        var order = new Order
         {
             Id = Guid.NewGuid(),
-            VoucherId = voucherId,
-            CustomerUserId = customerUserId,
-            Branch = "extend",
-            TermCode = "1m",
-            OldExpiration = oldExpiry,
-            NewExpiration = newExpiration,
-            SurchargeUah = 10m,
-            ActingUserId = Guid.NewGuid(),
-            CreatedAtUtc = DateTime.UtcNow
+            UserId = customerUserId,
+            Price = 10m,
+            Kind = OrderKind.Renewal,
+            Status = OrderStatus.Fulfilled,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+            LineItems = new List<OrderLineItem>
+            {
+                new()
+                {
+                    Id = Guid.NewGuid(),
+                    Brand = "okko",
+                    BrandId = BrandIds.ForSlug("okko"),
+                    FuelTypeId = ToUuid("okko-95"),
+                    Liters = 50m,
+                    Quantity = 1,
+                    UnitPrice = 10m,
+                    LineTotal = 10m,
+                    TermCode = "1m",
+                    RenewalBranch = "extend",
+                    SourceVoucherId = voucherId,
+                    PreviousCustomerExpiration = oldExpiry,
+                    NewCustomerExpiration = newExpiration
+                }
+            }
         };
+
+        ctx.Orders.Add(order);
+    }
+
+    /// <summary>
+    /// The renewal's facts, read where they live now (planning #319): the line carries the intent
+    /// and the outcome, the order carries the money and the brand's invoice, the ledger carries the
+    /// custody, and the audit event names the operator.
+    /// </summary>
+    private static async Task<RenewalFacts> RenewalAsync(ApplicationDbContext ctx, Guid voucherId)
+    {
+        var line = await ctx.OrderLineItems.AsNoTracking()
+            .Include(l => l.Order)
+            .FirstAsync(l => l.SourceVoucherId == voucherId);
+
+        var replacement = await ctx.VoucherMovements.AsNoTracking()
+            .Where(m => m.LineItemId == line.Id && m.Kind == VoucherMovementKinds.ReplaceOut)
+            .Select(m => (Guid?)m.VoucherId)
+            .FirstOrDefaultAsync();
+
+        var actingUserId = await ctx.AuditEventOutbox.AsNoTracking()
+            .Where(e => e.EventType == "VoucherRenewedByOperator")
+            .OrderByDescending(e => e.ChangedAtUtc)
+            .Select(e => (Guid?)e.ChangedByUserId)
+            .FirstOrDefaultAsync();
+
+        return new RenewalFacts(
+            line.RenewalBranch ?? string.Empty,
+            line.TermCode ?? string.Empty,
+            line.PreviousCustomerExpiration,
+            line.NewCustomerExpiration,
+            line.Order.Price,
+            line.Order.UserId,
+            line.Order.ExternalInvoiceNumber,
+            line.Order.ExternalInvoiceDate,
+            replacement,
+            actingUserId);
+    }
+
+    private sealed record RenewalFacts(
+        string Branch,
+        string TermCode,
+        DateOnly? OldExpiration,
+        DateOnly? NewExpiration,
+        decimal SurchargeUah,
+        Guid CustomerUserId,
+        string? InvoiceNumber,
+        DateOnly? InvoiceDate,
+        Guid? ReplacementVoucherId,
+        Guid? ActingUserId);
 
     // ---- Helpers -------------------------------------------------------------------------------
 
@@ -805,7 +890,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
     private static async Task ResetDataAsync(ApplicationDbContext context)
     {
         await context.Database.ExecuteSqlRawAsync(
-            """TRUNCATE TABLE "operator_voucher_renewals", "fuel_vouchers", "users", "provider_event_outbox" RESTART IDENTITY CASCADE""");
+            """TRUNCATE TABLE "fuel_vouchers", "users", "provider_event_outbox" RESTART IDENTITY CASCADE""");
     }
 
     private ApplicationDbContext CreateContext()

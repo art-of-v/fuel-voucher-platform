@@ -1070,22 +1070,6 @@ public sealed class SchemaCommentTests
             nameof(MovementBatch.RejectionReason),
             nameof(MovementBatch.CreatedAtUtc)
         ]),
-        (typeof(OperatorVoucherRenewal),
-        [
-            nameof(OperatorVoucherRenewal.VoucherId),
-            nameof(OperatorVoucherRenewal.ReplacementVoucherId),
-            nameof(OperatorVoucherRenewal.CustomerUserId),
-            nameof(OperatorVoucherRenewal.Branch),
-            nameof(OperatorVoucherRenewal.TermCode),
-            nameof(OperatorVoucherRenewal.OldExpiration),
-            nameof(OperatorVoucherRenewal.NewExpiration),
-            nameof(OperatorVoucherRenewal.SurchargeUah),
-            nameof(OperatorVoucherRenewal.InvoiceNumber),
-            nameof(OperatorVoucherRenewal.InvoiceDate),
-            nameof(OperatorVoucherRenewal.ActingUserId),
-            nameof(OperatorVoucherRenewal.ActingUserName),
-            nameof(OperatorVoucherRenewal.CreatedAtUtc)
-        ]),
         (typeof(UserPushToken),
         [
             nameof(UserPushToken.UserId),

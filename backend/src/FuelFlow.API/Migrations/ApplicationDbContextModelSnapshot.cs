@@ -1828,6 +1828,17 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("created_at_utc")
                         .HasComment("When the row was written.");
 
+                    b.Property<DateOnly?>("ExternalInvoiceDate")
+                        .HasColumnType("date")
+                        .HasColumnName("external_invoice_date")
+                        .HasComment("The date on that invoice. NULL with it.");
+
+                    b.Property<string>("ExternalInvoiceNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("external_invoice_number")
+                        .HasComment("The brand's invoice for an off-platform renewal - the document the customer paid against. NULL fora self-serve order, where the acquirer's invoice is monobank_invoice_id.");
+
                     b.Property<DateTime?>("FulfilledAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("fulfilled_at_utc")
@@ -2075,6 +2086,11 @@ namespace FuelFlow.API.Migrations
 
                     b.HasIndex("FuelTypeId", "BrandId")
                         .HasDatabaseName("ix_order_line_items_fuel_type_id_brand_id");
+
+                    b.HasIndex("SourceVoucherId", "NewCustomerExpiration")
+                        .IsUnique()
+                        .HasDatabaseName("ix_order_line_items_renewal_once")
+                        .HasFilter("source_voucher_id IS NOT NULL AND new_customer_expiration IS NOT NULL");
 
                     b.ToTable("order_line_items", null, t =>
                         {
@@ -3146,118 +3162,6 @@ namespace FuelFlow.API.Migrations
                             t.HasCheckConstraint("ck_qr_parameters_mask_pattern", "mask_pattern IS NULL OR mask_pattern BETWEEN 0 AND 7");
 
                             t.HasCheckConstraint("ck_qr_parameters_version", "version IS NULL OR version BETWEEN 1 AND 40");
-                        });
-                });
-
-            modelBuilder.Entity("FuelFlow.Features.Vouchers.Renewal.Operator.OperatorVoucherRenewal", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("ActingUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("acting_user_id")
-                        .HasComment("The admin who recorded the renewal.");
-
-                    b.Property<string>("ActingUserName")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("acting_user_name")
-                        .HasComment("Their display name at the time, for the audit.");
-
-                    b.Property<string>("Branch")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("branch")
-                        .HasComment("Which branch ran: extend or replace.");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc")
-                        .HasComment("When the renewal was recorded.");
-
-                    b.Property<Guid>("CustomerUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("customer_user_id")
-                        .HasComment("The customer who owns the voucher at the time of the renewal.");
-
-                    b.Property<DateOnly?>("InvoiceDate")
-                        .HasColumnType("date")
-                        .HasColumnName("invoice_date")
-                        .HasComment("The brand's накладна / invoice date, when there is one.");
-
-                    b.Property<string>("InvoiceNumber")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("invoice_number")
-                        .HasComment("The brand's накладна / invoice number, when there is one.");
-
-                    b.Property<DateOnly>("NewExpiration")
-                        .HasColumnType("date")
-                        .HasColumnName("new_expiration")
-                        .HasComment("The expiry the customer ends up with - the extended voucher's new expiry, or the stockvoucher's expiry.");
-
-                    b.Property<DateOnly>("OldExpiration")
-                        .HasColumnType("date")
-                        .HasColumnName("old_expiration")
-                        .HasComment("The expiry of the customer's voucher before the renewal.");
-
-                    b.Property<Guid?>("ReplacementVoucherId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("replacement_voucher_id")
-                        .HasComment("The fresh stock voucher handed to the customer on the replace branch, or NULL on theextend branch (the same voucher was kept).");
-
-                    b.Property<decimal>("SurchargeUah")
-                        .HasColumnType("numeric(10,2)")
-                        .HasColumnName("surcharge_uah")
-                        .HasComment("The доплата the customer paid off-platform; 0 means a free compensation. Audit only - itnever reprices the stock.");
-
-                    b.Property<string>("TermCode")
-                        .IsRequired()
-                        .HasMaxLength(8)
-                        .HasColumnType("character varying(8)")
-                        .HasColumnName("term_code")
-                        .HasComment("The chosen term as a stable code (1w/2w/1m...6m).");
-
-                    b.Property<Guid>("VoucherId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("voucher_id")
-                        .HasComment("The customer's voucher that was renewed (extended) or retired (replace).");
-
-                    b.Property<uint>("xmin")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedAtUtc")
-                        .HasDatabaseName("ix_operator_voucher_renewals_created_at_utc");
-
-                    b.HasIndex("CustomerUserId")
-                        .HasDatabaseName("ix_operator_voucher_renewals_customer_user_id");
-
-                    b.HasIndex("ReplacementVoucherId")
-                        .HasDatabaseName("ix_operator_voucher_renewals_replacement_voucher_id");
-
-                    b.HasIndex("VoucherId")
-                        .HasDatabaseName("ix_operator_voucher_renewals_voucher_id");
-
-                    b.HasIndex("VoucherId", "NewExpiration")
-                        .IsUnique()
-                        .HasDatabaseName("ix_operator_voucher_renewals_voucher_id_new_expiration");
-
-                    b.ToTable("operator_voucher_renewals", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_operator_renewal_branch", "branch IN ('extend', 'replace')");
-
-                            t.HasCheckConstraint("ck_operator_renewal_expiration_moves_forward", "new_expiration > old_expiration");
-
-                            t.HasCheckConstraint("ck_operator_renewal_surcharge_non_negative", "surcharge_uah >= 0");
                         });
                 });
 
@@ -5444,24 +5348,6 @@ namespace FuelFlow.API.Migrations
                         .HasForeignKey("VoucherId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("FuelFlow.Features.Vouchers.Renewal.Operator.OperatorVoucherRenewal", b =>
-                {
-                    b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", "ReplacementVoucher")
-                        .WithMany()
-                        .HasForeignKey("ReplacementVoucherId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", "Voucher")
-                        .WithMany()
-                        .HasForeignKey("VoucherId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("ReplacementVoucher");
-
-                    b.Navigation("Voucher");
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Vouchers.VoucherImportError", b =>

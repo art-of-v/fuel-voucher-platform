@@ -711,7 +711,7 @@ var actingUserId = Guid.NewGuid();
         ConfirmVoucherExchangeResult second;
         using (var ctx = CreateContext())
         {
-            // old1 is already recorded in voucher_exchanges → re-confirm must be refused (no double-apply).
+            // old1 is already recorded in the ledger → re-confirm must be refused (no double-apply).
             second = await BuildHandler(ctx).HandleAsync(new ConfirmVoucherExchangeCommand(
                 new List<Guid> { old1 }, secondImportId,
                 new List<ExchangeFuelCost> { new(ToUuid("okko-95"), 32m) },

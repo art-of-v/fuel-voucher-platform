@@ -59,6 +59,20 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
             .HasMaxLength(100).HasComment("The invoice id the acquirer gave us - the link back to the acquirer's own record. NULL" +
                     "until the invoice is created.");
 
+        // The brand's накладна for an off-platform renewal (planning #319). The renewal is an order
+        // like any other, so the document the customer paid against belongs with the order's other
+        // money columns - and a self-serve order has none, because the acquirer's invoice is
+        // monobank_invoice_id.
+        builder.Property(e => e.ExternalInvoiceNumber)
+            .HasColumnName("external_invoice_number")
+            .HasMaxLength(100)
+            .HasComment("The brand's invoice for an off-platform renewal - the document the customer paid against. NULL for" +
+                    "a self-serve order, where the acquirer's invoice is monobank_invoice_id.");
+
+        builder.Property(e => e.ExternalInvoiceDate)
+            .HasColumnName("external_invoice_date")
+            .HasComment("The date on that invoice. NULL with it.");
+
         builder.Property(e => e.MonobankStatus)
             .HasColumnName("monobank_status")
             .HasConversion<string>()

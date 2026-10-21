@@ -77,7 +77,6 @@ private readonly FuelFlow.Features.Vouchers.Security.IQrCipher _qrCipher;
     // paper (see VoucherMovement.ReplacedByVoucherId).
     public DbSet<VoucherMovement> VoucherMovements => Set<VoucherMovement>();
     public DbSet<MonobankStatementEntry> MonobankStatementEntries => Set<MonobankStatementEntry>();
-    public DbSet<OperatorVoucherRenewal> OperatorVoucherRenewals => Set<OperatorVoucherRenewal>();
     public DbSet<User> Users => Set<User>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<VerificationCode> VerificationCodes => Set<VerificationCode>();
