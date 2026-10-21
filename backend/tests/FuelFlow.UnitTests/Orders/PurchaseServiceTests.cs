@@ -114,7 +114,7 @@ public OrderCommandHandlersTests()
     private void SeedSellableStock(string fuelTypeId = "okko-95", decimal liters = 50m)
     {
         var expiry = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1));
-        _context.FuelVouchers.Add(new FuelVoucher
+        var voucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
             BrandId = BrandIds.ForSlug("okko"),
@@ -128,7 +128,12 @@ public OrderCommandHandlersTests()
             Status = VoucherStatus.Available,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
-        });
+        };
+        _context.FuelVouchers.Add(voucher);
+        // The stock queries read the summary, not the vouchers, and the in-memory provider has no
+        // trigger to keep it in step. The row is derived from the voucher, so it cannot disagree
+        // with it - see StockSummaryFollowsTheVouchers for the real thing.
+        _context.StockSummary.Add(TestStock.SummaryFor(voucher));
         _context.SaveChanges();
     }
 

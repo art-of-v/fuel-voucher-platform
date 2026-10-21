@@ -2,6 +2,7 @@ using FluentAssertions;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.Availability;
 using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Vouchers.BulkActionVouchers;
@@ -90,6 +91,29 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         CreatedAtUtc = DateTime.UtcNow,
         UpdatedAtUtc = DateTime.UtcNow
     };
+
+    /// <summary>
+    /// The summary rows for the given (brand, fuel) pairs, as the database's trigger would leave
+    /// them. The in-memory provider has no trigger, so a test that reads the summary seeds it -
+    /// and <c>StockSummaryFollowsTheVouchers</c> is the one that proves the two agree.
+    /// </summary>
+    private void SeedSummary(params (string Brand, string FuelTypeId)[] groups)
+    {
+        foreach (var (brand, fuelTypeId) in groups)
+        {
+            _context.StockSummary.Add(new StockSummary
+            {
+                Brand = brand,
+                FuelTypeId = ToUuid(fuelTypeId),
+                Liters = 50m,
+                Status = VoucherStatus.Available,
+                DataKind = DataKinds.Real,
+                IsDeleted = false,
+                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+                VoucherCount = 1
+            });
+        }
+    }
 
     private FuelVoucher CreateVoucher(
         string brand = "okko",
@@ -1109,9 +1133,16 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
         // The fuel dropdown used to come from the whole fuel_types catalog, so with OKKO selected
         // it still offered WOG's diesel - a pairing that can never match a voucher row and always
         // returns an empty page.
+        //
+        // The dropdown is read from the summary the database keeps of the inventory, not from the
+        // voucher table: the same question, asked of a few dozen rows instead of half a million.
+        // In this test the summary is seeded by hand, because the trigger that keeps it is the
+        // database's - `StockSummaryFollowsTheVouchers` proves the two agree, against a real
+        // PostgreSQL.
         _context.FuelVouchers.AddRange(
             CreateVoucher(brand: "okko", fuelTypeId: "okko-95", voucherNumber: "OKKO-95-1"),
             CreateVoucher(brand: "wog", fuelTypeId: "wog-dp", voucherNumber: "WOG-DP-1"));
+        SeedSummary(("okko", "okko-95"), ("wog", "wog-dp"));
         await _context.SaveChangesAsync();
 
         var result = await new GetAdminVouchersQueryHandler(_context)

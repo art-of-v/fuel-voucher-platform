@@ -703,7 +703,7 @@ FuelTypeId = ToUuid(fuelTypeId),
         string? brandText = null)
     {
         var expiry = providerExpiration ?? DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1));
-        return new FuelVoucher
+        var voucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
             // A voucher names its network as TEXT - the import prints it, the fulfilment worker reads
@@ -722,5 +722,11 @@ Brand = brandText ?? EnsureBrand(brandId).Slug,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };
+
+        // The stock queries read the summary, not the vouchers - the storefront's package list and
+        // the term ladder's stock coverage - and the in-memory provider has no trigger to keep it
+        // in step. The row is derived from the voucher, so it cannot disagree with it.
+        _context.StockSummary.Add(TestStock.SummaryFor(voucher));
+        return voucher;
     }
 }

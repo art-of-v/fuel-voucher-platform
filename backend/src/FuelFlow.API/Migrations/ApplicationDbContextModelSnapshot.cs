@@ -2433,6 +2433,66 @@ namespace FuelFlow.API.Migrations
                     b.ToTable("support_messages", (string)null);
                 });
 
+            modelBuilder.Entity("FuelFlow.Features.Vouchers.Availability.StockSummary", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()")
+                        .HasComment("The row's own key: a uuid, like every other key in the schema. It says nothing - the group below is what makes the row unique.");
+
+                    b.Property<string>("Brand")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("brand")
+                        .HasComment("The network as the voucher rows spell it - the same text the operator's list filters on.");
+
+                    b.Property<string>("DataKind")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("data_kind")
+                        .HasComment("Which pool the vouchers belong to - 'real' or 'qa'.");
+
+                    b.Property<Guid>("FuelTypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("fuel_type_id")
+                        .HasComment("The grade.");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted")
+                        .HasComment("Whether the rows are soft-deleted: the operator's list counts them, the storefront does not sell them.");
+
+                    b.Property<decimal>("Liters")
+                        .HasColumnType("numeric(10,2)")
+                        .HasColumnName("liters")
+                        .HasComment("The size, in litres.");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status")
+                        .HasComment("The vouchers' status. The storefront sells only 'Available'; the operator's list shows every status.");
+
+                    b.Property<DateOnly>("SupplierExpirationDate")
+                        .HasColumnType("date")
+                        .HasColumnName("supplier_expiration_date")
+                        .HasComment("The supplier's expiry date - the storefront does not sell what has expired.");
+
+                    b.Property<int>("VoucherCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("voucher_count")
+                        .HasComment("How many vouchers are in this group.");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("stock_summary", (string)null);
+                });
+
             modelBuilder.Entity("FuelFlow.Features.Vouchers.Events.VoucherEvent", b =>
                 {
                     b.Property<Guid>("Id")

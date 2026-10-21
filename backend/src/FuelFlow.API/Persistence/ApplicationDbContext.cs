@@ -12,6 +12,7 @@ using FuelFlow.Features.Settlement.SharedModels;
 using FuelFlow.Features.Support.SharedModels;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.Features.Vouchers;
+using FuelFlow.Features.Vouchers.Availability;
 using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.Exchange;
 using FuelFlow.Features.Vouchers.Import;
@@ -59,6 +60,9 @@ private readonly FuelFlow.Features.Vouchers.Security.IQrCipher _qrCipher;
     }
 
     public DbSet<FuelVoucher> FuelVouchers => Set<FuelVoucher>();
+    // The inventory, counted once, and kept by a trigger on fuel_vouchers. Read-only here: the
+    // application never writes it - see StockSummary.
+    public DbSet<StockSummary> StockSummary => Set<StockSummary>();
     public DbSet<Supplier> Suppliers => Set<Supplier>();
     public DbSet<PurchaseBatch> PurchaseBatches => Set<PurchaseBatch>();
     public DbSet<QrParameters> QrParameters => Set<QrParameters>();
