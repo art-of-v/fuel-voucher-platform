@@ -225,6 +225,7 @@ public sealed class QaTestPoolSegregationIntegrationTests : IClassFixture<TestDa
     {
         Id = id,
         Brand = Brand,
+        BrandId = BrandIds.ForSlug(Brand),
         FuelTypeId =   ToUuid(FuelTypeId),
         Liters = Liters,
         SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(3),

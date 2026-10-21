@@ -2,6 +2,7 @@ using FluentAssertions;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
@@ -106,6 +107,7 @@ public sealed class ArchivedVoucherKeysIntegrationTests : IClassFixture<TestData
     {
         Id = Guid.NewGuid(),
         Brand = "okko",
+        BrandId = BrandIds.ForSlug("okko"),
         FuelTypeId = ToUuid("okko-95"),
         Liters = 10m,
         SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),

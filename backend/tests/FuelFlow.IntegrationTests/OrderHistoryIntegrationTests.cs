@@ -42,6 +42,7 @@ public sealed class OrderHistoryIntegrationTests : IClassFixture<TestDatabaseFix
             {
                 Id = Guid.CreateVersion7(),
                 OrderId = order.Id,
+                BrandId = BrandIds.ForSlug("okko"),
                 Brand = "okko",
                 FuelTypeId = ToUuid("okko-95"),
                 Liters = 10m,
@@ -277,6 +278,7 @@ public sealed class OrderHistoryIntegrationTests : IClassFixture<TestDatabaseFix
             {
                 Id = Guid.CreateVersion7(),
                 OrderId = order.Id,
+                BrandId = BrandIds.ForSlug("okko"),
                 Brand = "okko",
                 FuelTypeId = ToUuid("okko-95"),
                 Liters = 10m,

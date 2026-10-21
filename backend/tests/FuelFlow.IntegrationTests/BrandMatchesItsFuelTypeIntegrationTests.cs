@@ -11,8 +11,7 @@ using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 namespace FuelFlow.IntegrationTests;
 
 /// <summary>
-/// The brand on a row and the brand of the fuel it claims are the same fact, and the database says
-/// so.
+/// The brand key on a row is the brand of the fuel it claims, and the database says so.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -27,6 +26,14 @@ namespace FuelFlow.IntegrationTests;
 /// when it reads a PDF, which is the application keeping the database's promise. This asserts that
 /// the database keeps it too - so a row written by a script, a hand-written psql session, a
 /// backfill, or a future code path that forgets the check is refused rather than accepted.
+/// </para>
+/// <para>
+/// <b>The instrument is a foreign key, not a trigger.</b> The key is the pair
+/// <c>(fuel_type_id, brand_id)</c> pointing at the fuel's own <c>(id, brand_id)</c>, so the row's
+/// brand and its fuel's brand are one fact rather than two that a function compares. The key is
+/// enforced by the engine, it cannot fall out of step with the schema, and it costs one index probe
+/// rather than a query per write. The trigger that stood here asked the same question in plpgsql and
+/// is gone.
 /// </para>
 /// <para>
 /// The seeded catalogue is what the test leans on: <c>okko-95</c> is an OKKO fuel and <c>wog-95</c> is
@@ -52,6 +59,7 @@ public sealed class BrandMatchesItsFuelTypeIntegrationTests : IClassFixture<Test
         {
             Id = Guid.NewGuid(),
             // WOG, on a fuel that belongs to OKKO.
+            BrandId = BrandIds.ForSlug("wog"),
             Brand = "wog",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
@@ -75,8 +83,8 @@ public sealed class BrandMatchesItsFuelTypeIntegrationTests : IClassFixture<Test
 
         var inner = thrown.InnerException;
         var message = (inner?.Message ?? thrown.Message);
-        message.Should().Contain("is not the brand",
-            "the refusal says which brand was wrong and which one was right");
+        message.Should().Contain("FK_fuel_vouchers_fuel_types_fuel_type_id_brand_id",
+            "the refusal names the key that was violated - the pair, because the pair is what says the brand");
     }
 
     [Fact]
@@ -87,6 +95,7 @@ public sealed class BrandMatchesItsFuelTypeIntegrationTests : IClassFixture<Test
         var voucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
@@ -117,6 +126,7 @@ public sealed class BrandMatchesItsFuelTypeIntegrationTests : IClassFixture<Test
             Id = Guid.NewGuid(),
             OrderId = Guid.NewGuid(),
             // KLO, on a fuel that belongs to OKKO.
+            BrandId = BrandIds.ForSlug("klo"),
             Brand = "klo",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
@@ -130,6 +140,46 @@ public sealed class BrandMatchesItsFuelTypeIntegrationTests : IClassFixture<Test
         var act = async () => await context.SaveChangesAsync();
 
         await act.Should().ThrowAsync<DbUpdateException>();
+    }
+
+    [Fact]
+    public async Task The_Key_Is_A_Foreign_Key_And_Not_A_Trigger()
+    {
+        // The instrument is the claim this test makes. A trigger would ask the same question in
+        // plpgsql on every write and would have to be kept in step with the schema by hand; a key
+        // is enforced by the engine and cannot fall out of step. So the shape of the schema is
+        // asserted, not just its effect: a schema that has the key AND the trigger would be doing
+        // the work twice.
+        await using var context = CreateContext();
+
+        var keys = await context.Database
+            .SqlQueryRaw<string>(
+                """
+                SELECT con.conname AS "Value"
+                FROM pg_constraint con
+                JOIN pg_class rel ON rel.oid = con.conrelid
+                WHERE rel.relname IN ('fuel_vouchers', 'order_line_items', 'purchase_batches', 'voucher_exchanges')
+                  AND con.contype = 'f'
+                  AND con.conname LIKE '%fuel_type_id_brand_id'
+                """)
+            .ToListAsync();
+
+        keys.Should().HaveCount(4, "every table that carries a brand is checked by the pair");
+
+        var triggers = await context.Database
+            .SqlQueryRaw<string>(
+                """
+                SELECT tg.tgname AS "Value"
+                FROM pg_trigger tg
+                JOIN pg_class rel ON rel.oid = tg.tgrelid
+                WHERE rel.relname IN ('fuel_vouchers', 'order_line_items', 'purchase_batches', 'voucher_exchanges')
+                  AND NOT tg.tgisinternal
+                  AND tg.tgname LIKE '%brand%'
+                """)
+            .ToListAsync();
+
+        triggers.Should().BeEmpty(
+            "the trigger that asked the same question in plpgsql is gone - the key is the instrument now");
     }
 
     private ApplicationDbContext CreateContext()

@@ -114,7 +114,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
     /// needs real <c>Available</c> vouchers under the line it buys — the same thing an operator does by
     /// importing a PDF, costing the batch and activating it.
     /// </summary>
-    private void SeedSellableStock(string BrandId, string fuelTypeId, decimal liters, int count = 1)
+    private void SeedSellableStock(string brandId, string fuelTypeId, decimal liters, int count = 1)
     {
         using var scope = _fixture.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -125,12 +125,13 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
             context.FuelVouchers.Add(new FuelVoucher
             {
                 Id = Guid.CreateVersion7(),
-                Brand = BrandId,
+                Brand = brandId,
+                BrandId = BrandIds.ForSlug(brandId),
                 FuelTypeId =   ToUuid(fuelTypeId),
                 Liters = liters,
                 SupplierExpirationDate = expiry,
                 CustomerExpirationDate = expiry,
-                VoucherNumber = $"STOCK-{BrandId}-{fuelTypeId}-{liters}-{Guid.NewGuid().ToString()[..8]}",
+                VoucherNumber = $"STOCK-{brandId}-{fuelTypeId}-{liters}-{Guid.NewGuid().ToString()[..8]}",
                 QrPayload = Guid.NewGuid().ToString(),
                 Status = VoucherStatus.Available,
                 CreatedAtUtc = DateTime.UtcNow,

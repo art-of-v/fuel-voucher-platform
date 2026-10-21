@@ -1,5 +1,6 @@
 using FluentAssertions;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Xunit;
@@ -76,11 +77,11 @@ public sealed class VoucherHolderKindTests : IClassFixture<TestDatabaseFixture>
     // The fuel id is a uuid, and the mapping is the one the runtime uses - so the fuel this probe
     // names is the same fuel the production database holds.
     private static readonly string InsertVoucher = $$"""
-        INSERT INTO fuel_vouchers (id, brand, fuel_type_id, liters, supplier_expiration_date,
+        INSERT INTO fuel_vouchers (id, brand, brand_id, fuel_type_id, liters, supplier_expiration_date,
                                    customer_expiration_date, voucher_number, qr_payload, qr_payload_sha256,
                                    created_at_utc, updated_at_utc, status, data_kind, is_deleted,
                                    assigned_to_user_id, legal_entity_id, worker_user_id)
-        VALUES ('{0}', 'okko', '{{ToUuid("okko-dp")}}', 10, '2027-01-01', '2027-01-01', '{1}',
+        VALUES ('{0}', 'okko', '{{BrandIds.Okko}}', '{{ToUuid("okko-dp")}}', 10, '2027-01-01', '2027-01-01', '{1}',
                 convert_to('{2}', 'UTF8'), sha256(convert_to('{2}', 'UTF8')),
                 now(), now(), 'Imported', 'real', false,
                 {3}, {4}, {5})

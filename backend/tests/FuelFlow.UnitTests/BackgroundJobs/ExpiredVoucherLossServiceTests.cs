@@ -99,6 +99,7 @@ public sealed class ExpiredVoucherLossServiceTests : IDisposable
         => _context.FuelVouchers.Add(new FuelVoucher
         {
             Id = Guid.NewGuid(),
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-dp"),
             Liters = 10m,

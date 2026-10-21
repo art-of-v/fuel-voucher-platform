@@ -1781,7 +1781,7 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("brand");
 
-                    b.Property<Guid?>("BrandId")
+                    b.Property<Guid>("BrandId")
                         .HasColumnType("uuid")
                         .HasColumnName("brand_id");
 
@@ -1854,6 +1854,9 @@ namespace FuelFlow.API.Migrations
 
                     b.HasIndex("SourceVoucherId")
                         .HasDatabaseName("ix_order_line_items_source_voucher_id");
+
+                    b.HasIndex("FuelTypeId", "BrandId")
+                        .HasDatabaseName("ix_order_line_items_fuel_type_id_brand_id");
 
                     b.ToTable("order_line_items", null, t =>
                         {
@@ -2410,7 +2413,7 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("brand");
 
-                    b.Property<Guid?>("BrandId")
+                    b.Property<Guid>("BrandId")
                         .HasColumnType("uuid")
                         .HasColumnName("brand_id");
 
@@ -2467,6 +2470,9 @@ namespace FuelFlow.API.Migrations
                     b.HasIndex("SupplierId")
                         .HasDatabaseName("ix_voucher_exchanges_supplier_id");
 
+                    b.HasIndex("FuelTypeId", "BrandId")
+                        .HasDatabaseName("ix_voucher_exchanges_fuel_type_id_brand_id");
+
                     b.ToTable("voucher_exchanges", null, t =>
                         {
                             t.HasCheckConstraint("ck_voucher_exchange_cost_non_negative", "cost_per_liter_applied IS NULL OR cost_per_liter_applied >= 0");
@@ -2502,7 +2508,7 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("brand");
 
-                    b.Property<Guid?>("BrandId")
+                    b.Property<Guid>("BrandId")
                         .HasColumnType("uuid")
                         .HasColumnName("brand_id");
 
@@ -2665,6 +2671,9 @@ namespace FuelFlow.API.Migrations
                     b.HasIndex("CreatedAtUtc", "Id")
                         .IsDescending(true, false)
                         .HasDatabaseName("ix_fuel_vouchers_created_at_utc_id");
+
+                    b.HasIndex("FuelTypeId", "BrandId")
+                        .HasDatabaseName("ix_fuel_vouchers_fuel_type_id_brand_id");
 
                     b.HasIndex("FuelTypeId", "Status", "IsDeleted")
                         .HasDatabaseName("ix_fuel_vouchers_fuel_type_id_status_is_deleted");
@@ -4009,8 +4018,6 @@ namespace FuelFlow.API.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasAlternateKey("Id", "BrandId");
-
                     b.HasIndex("BrandId")
                         .HasDatabaseName("ix_fuel_types_brand_id");
 
@@ -4289,7 +4296,7 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("brand");
 
-                    b.Property<Guid?>("BrandId")
+                    b.Property<Guid>("BrandId")
                         .HasColumnType("uuid")
                         .HasColumnName("brand_id");
 
@@ -4324,6 +4331,9 @@ namespace FuelFlow.API.Migrations
 
                     b.HasIndex("SupplierId")
                         .HasDatabaseName("ix_purchase_batches_supplier_id");
+
+                    b.HasIndex("FuelTypeId", "BrandId")
+                        .HasDatabaseName("ix_purchase_batches_fuel_type_id_brand_id");
 
                     b.HasIndex("ImportJobId", "FuelTypeId")
                         .IsUnique()
@@ -4940,12 +4950,6 @@ namespace FuelFlow.API.Migrations
 
             modelBuilder.Entity("FuelFlow.Features.Orders.SharedModels.OrderLineItem", b =>
                 {
-                    b.HasOne("FuelFlow.SharedKernel.Domain.FuelTypeEntity", null)
-                        .WithMany()
-                        .HasForeignKey("FuelTypeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("FuelFlow.Features.Orders.SharedModels.Order", "Order")
                         .WithMany("LineItems")
                         .HasForeignKey("OrderId")
@@ -4956,6 +4960,13 @@ namespace FuelFlow.API.Migrations
                         .WithMany()
                         .HasForeignKey("SourceVoucherId")
                         .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("FuelFlow.SharedKernel.Domain.FuelTypeEntity", null)
+                        .WithMany()
+                        .HasForeignKey("FuelTypeId", "BrandId")
+                        .HasPrincipalKey("Id", "BrandId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.Navigation("Order");
 
@@ -5014,6 +5025,13 @@ namespace FuelFlow.API.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("FuelFlow.SharedKernel.Domain.FuelTypeEntity", null)
+                        .WithMany()
+                        .HasForeignKey("FuelTypeId", "BrandId")
+                        .HasPrincipalKey("Id", "BrandId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("MovementBatch");
 
                     b.Navigation("NewVoucher");
@@ -5029,12 +5047,6 @@ namespace FuelFlow.API.Migrations
                         .WithMany()
                         .HasForeignKey("AssignedToUserId")
                         .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("FuelFlow.SharedKernel.Domain.FuelTypeEntity", "FuelType")
-                        .WithMany()
-                        .HasForeignKey("FuelTypeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
 
                     b.HasOne("FuelFlow.Features.Vouchers.VoucherImport", "ImportJob")
                         .WithMany()
@@ -5065,6 +5077,13 @@ namespace FuelFlow.API.Migrations
                         .WithMany()
                         .HasForeignKey("WorkerUserId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("FuelFlow.SharedKernel.Domain.FuelTypeEntity", "FuelType")
+                        .WithMany()
+                        .HasForeignKey("FuelTypeId", "BrandId")
+                        .HasPrincipalKey("Id", "BrandId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.Navigation("AssignedToUser");
 
@@ -5221,12 +5240,6 @@ namespace FuelFlow.API.Migrations
 
             modelBuilder.Entity("FuelFlow.SharedKernel.Domain.PurchaseBatch", b =>
                 {
-                    b.HasOne("FuelFlow.SharedKernel.Domain.FuelTypeEntity", null)
-                        .WithMany()
-                        .HasForeignKey("FuelTypeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("FuelFlow.Features.Vouchers.VoucherImport", null)
                         .WithMany()
                         .HasForeignKey("ImportJobId")
@@ -5236,6 +5249,13 @@ namespace FuelFlow.API.Migrations
                     b.HasOne("FuelFlow.SharedKernel.Domain.Supplier", "Supplier")
                         .WithMany()
                         .HasForeignKey("SupplierId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FuelFlow.SharedKernel.Domain.FuelTypeEntity", null)
+                        .WithMany()
+                        .HasForeignKey("FuelTypeId", "BrandId")
+                        .HasPrincipalKey("Id", "BrandId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 

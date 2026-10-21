@@ -79,6 +79,7 @@ public sealed class SavingsReportSqlIntegrationTests : IClassFixture<TestDatabas
             {
                 Id = Guid.NewGuid(),
                 OrderId = order.Id,
+                BrandId = BrandIds.ForSlug("okko"),
                 Brand = "okko",
                 FuelTypeId = fuelTypeId,
                 Liters = 100m,
@@ -93,6 +94,7 @@ public sealed class SavingsReportSqlIntegrationTests : IClassFixture<TestDatabas
             var voucher = new FuelVoucher
             {
                 Id = Guid.NewGuid(),
+                BrandId = BrandIds.ForSlug("okko"),
                 Brand = "okko",
                 FuelTypeId = fuelTypeId,
                 Liters = 100m,

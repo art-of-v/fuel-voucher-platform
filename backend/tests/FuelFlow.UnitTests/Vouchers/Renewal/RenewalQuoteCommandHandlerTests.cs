@@ -217,6 +217,7 @@ public sealed class RenewalQuoteCommandHandlerTests : IDisposable
         var voucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = liters,
@@ -239,6 +240,7 @@ public sealed class RenewalQuoteCommandHandlerTests : IDisposable
         _context.FuelVouchers.Add(new FuelVoucher
         {
             Id = Guid.NewGuid(),
+            BrandId = BrandIds.ForSlug(matching.Brand),
             Brand = matching.Brand,
             FuelTypeId = matching.FuelTypeId,
             Liters = matching.Liters,

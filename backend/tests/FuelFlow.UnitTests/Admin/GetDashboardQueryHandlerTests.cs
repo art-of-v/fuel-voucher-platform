@@ -152,6 +152,7 @@ public sealed class GetDashboardQueryHandlerTests : IDisposable
         {
             Id = Guid.NewGuid(),
             OrderId = order.Id,
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = fuelTypeId,
             Liters = liters,

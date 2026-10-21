@@ -60,6 +60,7 @@ public sealed class GetReportQueryHandlerTests : IDisposable
         {
             Id = Guid.NewGuid(),
             OrderId = paidOrder.Id,
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
@@ -82,6 +83,7 @@ public sealed class GetReportQueryHandlerTests : IDisposable
         {
             Id = Guid.NewGuid(),
             OrderId = pendingOrder.Id,
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-dp"),
             Liters = 20m,
@@ -129,6 +131,7 @@ public sealed class GetReportQueryHandlerTests : IDisposable
         var voucher95 = new FuelVoucher
         {
             Id = Guid.NewGuid(),
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
@@ -144,6 +147,7 @@ public sealed class GetReportQueryHandlerTests : IDisposable
         var voucherDp = new FuelVoucher
         {
             Id = Guid.NewGuid(),
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-dp"),
             Liters = 20m,
@@ -162,6 +166,7 @@ public sealed class GetReportQueryHandlerTests : IDisposable
             new FuelVoucher
             {
                 Id = Guid.NewGuid(),
+                BrandId = BrandIds.ForSlug("okko"),
                 Brand = "okko",
                 FuelTypeId = ToUuid("okko-95"),
                 Liters = 50m,
@@ -290,6 +295,7 @@ public sealed class GetReportQueryHandlerTests : IDisposable
         {
             Id = Guid.NewGuid(),
             OrderId = orderA.Id,
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 10m,
@@ -311,6 +317,7 @@ public sealed class GetReportQueryHandlerTests : IDisposable
         {
             Id = Guid.NewGuid(),
             OrderId = orderB.Id,
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 10m,

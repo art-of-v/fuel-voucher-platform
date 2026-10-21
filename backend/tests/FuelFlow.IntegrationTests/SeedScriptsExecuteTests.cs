@@ -192,10 +192,12 @@ public sealed class SeedScriptsExecuteTests : IClassFixture<TestDatabaseFixture>
             ON CONFLICT (fuel_type_id, data_kind, liters) DO NOTHING;
 
             INSERT INTO fuel_vouchers
-                (id, brand, fuel_type_id, liters, supplier_expiration_date, customer_expiration_date,
+                (id, brand, brand_id, fuel_type_id, liters, supplier_expiration_date, customer_expiration_date,
                  voucher_number, qr_payload, qr_payload_sha256, status, data_kind, acquisition_source,
                  is_deleted, created_at_utc, updated_at_utc)
-            VALUES ('44444444-4444-4444-8444-0000000000aa', 'okko', '33333333-3333-4333-8333-0000000000cc',
+            VALUES ('44444444-4444-4444-8444-0000000000aa', 'okko',
+                    (SELECT id FROM brands WHERE slug = 'okko'),
+                    '33333333-3333-4333-8333-0000000000cc',
                     10.00, current_date + 180, current_date + 7, 'QA-REMOVE-1', 'QA-QR-REMOVE-1',
                     sha256(convert_to('QA-QR-REMOVE-1', 'UTF8')), 'Available', 'qa', 'direct', false, now(), now())
             ON CONFLICT (id) DO NOTHING;
@@ -221,9 +223,10 @@ public sealed class SeedScriptsExecuteTests : IClassFixture<TestDatabaseFixture>
             ON CONFLICT (id) DO NOTHING;
 
             INSERT INTO purchase_batches
-                (id, import_job_id, fuel_type_id, brand, supplier_id, created_at_utc, updated_at_utc)
+                (id, import_job_id, fuel_type_id, brand, brand_id, supplier_id, created_at_utc, updated_at_utc)
             VALUES ('88888888-8888-4888-8888-0000000000aa', '77777777-7777-4777-8777-0000000000aa',
                     '33333333-3333-4333-8333-0000000000cc', 'okko',
+                    (SELECT id FROM brands WHERE slug = 'okko'),
                     '66666666-6666-4666-8666-0000000000aa', now(), now())
             ON CONFLICT (id) DO NOTHING;
             """,

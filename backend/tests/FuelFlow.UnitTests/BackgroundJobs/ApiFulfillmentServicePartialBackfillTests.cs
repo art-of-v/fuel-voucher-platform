@@ -9,6 +9,7 @@ using FuelFlow.Features.Settings;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -127,6 +128,7 @@ public sealed class ApiFulfillmentServicePartialBackfillTests : IDisposable
             {
                 new OrderLineItem
                 {
+                    BrandId = BrandIds.ForSlug("okko"),
                     Brand = "okko",
                     FuelTypeId = ToUuid("okko-95"),
                     Liters = 20,
@@ -140,6 +142,7 @@ public sealed class ApiFulfillmentServicePartialBackfillTests : IDisposable
         var existingAssignedVoucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 20,
@@ -163,6 +166,7 @@ public sealed class ApiFulfillmentServicePartialBackfillTests : IDisposable
         var newAvailableVoucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 20,

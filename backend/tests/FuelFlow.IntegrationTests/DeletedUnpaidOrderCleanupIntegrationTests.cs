@@ -141,6 +141,7 @@ public sealed class DeletedUnpaidOrderCleanupIntegrationTests : IClassFixture<Te
             seed.FuelVouchers.Add(new FuelVoucher
             {
                 Id = voucherId,
+                BrandId = BrandIds.ForSlug("okko"),
                 Brand = "okko",
                 FuelTypeId = ToUuid("okko-dp"),
                 Liters = 10m,

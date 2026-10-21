@@ -102,6 +102,7 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         return new FuelVoucher
         {
             Id = Guid.NewGuid(),
+            BrandId = BrandIds.ForSlug(brand),
             Brand = brand,
             FuelTypeId = ToUuid(fuelTypeId),
             Liters = 50,

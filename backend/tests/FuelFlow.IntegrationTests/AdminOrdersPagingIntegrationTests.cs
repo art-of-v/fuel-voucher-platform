@@ -162,6 +162,7 @@ public sealed class AdminOrdersPagingIntegrationTests : IClassFixture<TestDataba
                     {
                         Id = Guid.NewGuid(),
                         OrderId = orderId,
+                        BrandId = BrandIds.ForSlug("okko"),
                         Brand = "okko",
                         FuelTypeId = ToUuid("okko-95"),
                         Liters = 50m,

@@ -237,6 +237,7 @@ public sealed class FulfillmentTransactionScopeTests : IClassFixture<TestDatabas
             {
                 Id = Guid.NewGuid(),
                 OrderId = id,
+                BrandId = BrandIds.ForSlug(brand),
                 Brand = brand,
                 FuelTypeId = ToUuid(fuelTypeId),
                 Liters = liters,

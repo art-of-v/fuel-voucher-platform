@@ -74,6 +74,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                     {
                         Id = Guid.NewGuid(),
                         OrderId = orderId,
+                        BrandId = BrandIds.ForSlug(brand),
                         Brand = brand,
                         FuelTypeId =   ToUuid(fuelTypeId),
                         Liters = liters,
@@ -89,6 +90,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 seed.FuelVouchers.Add(new FuelVoucher
                 {
                     Id = Guid.NewGuid(),
+                    BrandId = BrandIds.ForSlug(brand),
                     Brand = brand,
                     FuelTypeId =   ToUuid(fuelTypeId),
                     Liters = liters,
@@ -181,6 +183,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                     {
                         Id = Guid.NewGuid(),
                         OrderId = orderId,
+                        BrandId = BrandIds.ForSlug(brand),
                         Brand = brand,
                         FuelTypeId =   ToUuid(fuelTypeId),
                         Liters = liters,
@@ -196,6 +199,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 seed.FuelVouchers.Add(new FuelVoucher
                 {
                     Id = Guid.NewGuid(),
+                    BrandId = BrandIds.ForSlug("okko"),
                     Brand = "okko",
                     FuelTypeId =   ToUuid(fuelTypeId),
                     Liters = liters,
@@ -299,6 +303,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 {
                     Id = Guid.NewGuid(),
                     OrderId = orderId,
+                    BrandId = BrandIds.ForSlug("okko"),
                     Brand = "okko",
                     FuelTypeId =   ToUuid(fuelTypeId),
                     Liters = liters,
@@ -314,6 +319,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
             seed.FuelVouchers.Add(new FuelVoucher
             {
                 Id = Guid.NewGuid(),
+                BrandId = BrandIds.ForSlug("okko"),
                 Brand = "okko",
                 FuelTypeId =   ToUuid(fuelTypeId),
                 Liters = liters,
@@ -366,6 +372,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                     {
                         Id = Guid.NewGuid(),
                         OrderId = orderId,
+                        BrandId = BrandIds.ForSlug("okko"),
                         Brand = "okko",
                         FuelTypeId = ToUuid("okko-dp"),
                         Liters = 10m,
@@ -380,6 +387,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
             seed.FuelVouchers.Add(new FuelVoucher
             {
                 Id = usedVoucherId,
+                BrandId = BrandIds.ForSlug("okko"),
                 Brand = "okko",
                 FuelTypeId = ToUuid("okko-dp"),
                 Liters = 10m,
@@ -406,6 +414,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 seed.FuelVouchers.Add(new FuelVoucher
                 {
                     Id = Guid.NewGuid(),
+                    BrandId = BrandIds.ForSlug("okko"),
                     Brand = "okko",
                     FuelTypeId = ToUuid("okko-dp"),
                     Liters = 10m,
@@ -495,6 +504,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                     {
                         Id = Guid.NewGuid(),
                         OrderId = partialOrderId,
+                        BrandId = BrandIds.ForSlug("okko"),
                         Brand = "okko",
                         FuelTypeId = ToUuid("okko-dp"),
                         Liters = 10m,
@@ -510,6 +520,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 seed.FuelVouchers.Add(new FuelVoucher
                 {
                     Id = Guid.NewGuid(),
+                    BrandId = BrandIds.ForSlug("okko"),
                     Brand = "okko",
                     FuelTypeId = ToUuid("okko-dp"),
                     Liters = 10m,
@@ -539,6 +550,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                     {
                         Id = Guid.NewGuid(),
                         OrderId = fullOrderId,
+                        BrandId = BrandIds.ForSlug("okko"),
                         Brand = "okko",
                         FuelTypeId = ToUuid("okko-95"),
                         Liters = 50m,
@@ -554,6 +566,7 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 seed.FuelVouchers.Add(new FuelVoucher
                 {
                     Id = Guid.NewGuid(),
+                    BrandId = BrandIds.ForSlug("okko"),
                     Brand = "okko",
                     FuelTypeId = ToUuid("okko-95"),
                     Liters = 50m,

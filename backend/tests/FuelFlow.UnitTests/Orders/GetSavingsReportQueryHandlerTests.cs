@@ -4,6 +4,7 @@ using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
@@ -53,6 +54,7 @@ public sealed class GetSavingsReportQueryHandlerTests : IDisposable
         {
             Id = Guid.NewGuid(),
             OrderId = order.Id,
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-dp"),
             Liters = liters,
@@ -71,6 +73,7 @@ public sealed class GetSavingsReportQueryHandlerTests : IDisposable
         _context.FuelVouchers.Add(new FuelVoucher
         {
             Id = voucherId,
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-dp"),
             Liters = liters,

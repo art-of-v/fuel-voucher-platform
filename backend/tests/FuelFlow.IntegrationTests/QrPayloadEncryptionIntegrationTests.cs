@@ -2,6 +2,7 @@ using FluentAssertions;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Security;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Xunit;
@@ -34,6 +35,7 @@ public sealed class QrPayloadEncryptionIntegrationTests : IClassFixture<TestData
     {
         Id = Guid.CreateVersion7(),
         Brand = "okko",
+        BrandId = BrandIds.ForSlug("okko"),
         FuelTypeId = ToUuid("okko-95"),
         Liters = 10m,
         SupplierExpirationDate = new DateOnly(2027, 1, 1),

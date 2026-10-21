@@ -100,6 +100,7 @@ public sealed class PublicFuelTypesIntegrationTests : IClassFixture<TestDatabase
             context.FuelVouchers.Add(new FuelVoucher
             {
                 Id = Guid.NewGuid(),
+                BrandId = BrandIds.ForSlug(slug),
                 Brand = slug,
                 FuelTypeId =   fuelId,
                 Liters = 10m,

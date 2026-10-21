@@ -233,6 +233,7 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
             seed.FuelVouchers.Add(new FuelVoucher
             {
                 Id = voucherId,
+                BrandId = BrandIds.ForSlug("okko"),
                 Brand = "okko",
                 FuelTypeId = ToUuid("okko-dp"),
                 Liters = 10m,
@@ -385,6 +386,7 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
                 Id = Guid.NewGuid(),
                 ImportJobId = costedId,
                 FuelTypeId = ToUuid("okko-95"),
+                BrandId = BrandIds.ForSlug("okko"),
                 Brand = "okko",
                 SupplierId = supplierId,
                 CreatedAtUtc = Old(),

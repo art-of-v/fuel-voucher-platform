@@ -8,6 +8,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
@@ -236,6 +237,7 @@ public sealed class MyCompanyMembershipsIntegrationTests : IClassFixture<TestDat
         seed.FuelVouchers.Add(new FuelVoucher
         {
             Id = id,
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,

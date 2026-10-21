@@ -104,6 +104,7 @@ public sealed class FuelArchiveRuleIntegrationTests : IClassFixture<TestDatabase
         context.FuelVouchers.Add(new FuelVoucher
         {
             Id = Guid.CreateVersion7(),
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId =   ToUuid(fuelId),
             Liters = 10m,

@@ -1,4 +1,5 @@
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -56,12 +57,14 @@ internal sealed class VoucherExchangeConfiguration : IEntityTypeConfiguration<Vo
             .HasMaxLength(50)
             .IsRequired();
 
-        // The key the brand text above is a copy of. Nullable for now: the column arrives with the
-        // backfill, and the rows that are written before the readers move to the id still carry
-        // only the name. The foreign key over (fuel type, brand) comes with the same migration.
+        // The key the brand text above is a copy of. Required, because the composite foreign key
+        // below is what refuses a row whose brand is not its fuel's brand - and a foreign key with a
+        // NULL in it is not compared at all, so a nullable key would be a key the database does not
+        // check.
         builder.Property(e => e.BrandId)
             .HasColumnName("brand_id")
-            .HasColumnType("uuid");
+            .HasColumnType("uuid")
+            .IsRequired();
 
         builder.Property(e => e.SurchargeUah)
             .HasColumnName("surcharge_uah")
@@ -112,6 +115,31 @@ internal sealed class VoucherExchangeConfiguration : IEntityTypeConfiguration<Vo
             .WithMany()
             .HasForeignKey(e => e.NewVoucherId)
             .OnDelete(DeleteBehavior.Restrict);
+        // The key is the PAIR (fuel type, brand), not the fuel alone - which is what D-21's second
+        // slice needs. A foreign key over one column says "this fuel exists"; a foreign key over two
+        // says "this fuel exists AND this exchange's brand is that fuel's brand", and the second half
+        // is the fact the brand text on this row is a copy of. The pair points at the fuel's own
+        // alternate key (id, brand_id), so the key spans one hop instead of two.
+        //
+        // This table carried no foreign key to fuel_types at all before - the reference was real and
+        // single-parent, but nothing in the database said so. The composite key says more than a
+        // plain one would: it also says the exchange's brand is the fuel's brand.
+        //
+        // Both halves of the pair are NOT NULL, which is what makes the key a key: a foreign key
+        // with a NULL in it is not compared at all, so a nullable brand_id would be a brand the
+        // database never checks.
+        builder.HasOne<FuelTypeEntity>()
+            .WithMany()
+            .HasForeignKey(e => new { e.FuelTypeId, e.BrandId })
+            .HasPrincipalKey(e => new { e.Id, e.BrandId })
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Postgres does not index a foreign key on its own, and the parent's delete check and
+        // every join down the pair scan without one. The pair's index serves the joins down
+        // fuel_type_id too - it leads with that column - so there is no second index on it.
+        builder.HasIndex(e => new { e.FuelTypeId, e.BrandId })
+            .HasDatabaseName("ix_voucher_exchanges_fuel_type_id_brand_id");
+
         // acting_user_id stays a bare uuid - an exchange is a settlement record and must always be
         // writable; it cannot be refused because an actor row is missing.
         builder.HasIndex(e => e.ExchangeBatchId);

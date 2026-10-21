@@ -75,6 +75,7 @@ public sealed class AdminAggregationSqlTests : IClassFixture<TestDatabaseFixture
                 {
                     Id = Guid.NewGuid(),
                     OrderId = orderId,
+                    BrandId = BrandIds.ForSlug(fuel.b.Slug),
                     Brand = fuel.b.Slug,
                     FuelTypeId = fuel.f.Id,
                     Liters = fuel.n.Liters,
@@ -151,6 +152,7 @@ public sealed class AdminAggregationSqlTests : IClassFixture<TestDatabaseFixture
     {
         Id = Guid.NewGuid(),
         Brand = brand,
+        BrandId = BrandIds.ForSlug(brand),
         FuelTypeId = fuelTypeId,
         Liters = liters,
         VoucherNumber = Guid.NewGuid().ToString("N"),

@@ -85,6 +85,7 @@ public sealed class TermStockCoverageIntegrationTests : IClassFixture<TestDataba
     {
         Id = Guid.NewGuid(),
         Brand = brand,
+        BrandId = BrandIds.ForSlug(brand),
         FuelTypeId = fuelTypeId,
         Liters = liters,
         VoucherNumber = Guid.NewGuid().ToString("N"),

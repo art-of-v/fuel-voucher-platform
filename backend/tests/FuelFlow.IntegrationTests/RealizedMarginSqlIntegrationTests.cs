@@ -155,6 +155,7 @@ public sealed class RealizedMarginSqlIntegrationTests : IClassFixture<TestDataba
         {
             Id = Guid.NewGuid(),
             OrderId = orderId,
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = fuelTypeId,
             Liters = liters,
@@ -170,6 +171,7 @@ public sealed class RealizedMarginSqlIntegrationTests : IClassFixture<TestDataba
             var voucher = new FuelVoucher
             {
                 Id = Guid.NewGuid(),
+                BrandId = BrandIds.ForSlug("okko"),
                 Brand = "okko",
                 FuelTypeId = fuelTypeId,
                 Liters = liters,
