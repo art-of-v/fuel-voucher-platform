@@ -1279,6 +1279,76 @@ public sealed class SchemaCommentTests
         Assert.Contains("never the token itself", comment, StringComparison.OrdinalIgnoreCase);
     }
 
+
+    /// <summary>
+    /// The contract text and the version that carries it - the columns a customer reads before
+    /// signing, and the number that ties a signature to the words they read.
+    /// </summary>
+    private static readonly (Type Entity, string[] Columns)[] TheContractText =
+    [
+        (typeof(ContractVersion),
+        [
+            nameof(ContractVersion.BrandId),
+            nameof(ContractVersion.Version),
+            nameof(ContractVersion.Body),
+            nameof(ContractVersion.TermDays),
+            nameof(ContractVersion.CreatedAtUtc),
+            nameof(ContractVersion.CreatedByUserId)
+        ]),
+        (typeof(Contract),
+        [
+            nameof(Contract.TermsVersion)
+        ]),
+        (typeof(UserContract),
+        [
+            nameof(UserContract.TermsVersion)
+        ])
+    ];
+
+
+
+    [Fact]
+    public void The_Contract_Text_Should_Say_What_It_And_Its_Version_Are()
+    {
+        var context = BuildContext();
+
+        foreach (var (entityType, columns) in TheContractText)
+        {
+            var entity = context.Model.FindEntityType(entityType);
+            Assert.NotNull(entity);
+
+            foreach (var column in columns)
+            {
+                var property = entity.FindProperty(column);
+                Assert.NotNull(property);
+
+                var comment = CommentOf(property);
+                Assert.False(string.IsNullOrWhiteSpace(comment),
+                    $"{entityType.Name}.{column} carries no comment. The text a customer reads "
+                    + "before signing, and the version that ties a signature to it, are the "
+                    + "columns the audit trail reads - and they are new enough that a reader "
+                    + "cannot guess what a version of 2 means.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// The term belongs to the text: a new version of the terms is a different agreement, and a
+    /// contract that inherited its term from somewhere else could outlive the text it was signed
+    /// against.
+    /// </summary>
+    [Fact]
+    public void The_Contract_Text_Should_Say_Why_The_Term_Lives_There()
+    {
+        var context = BuildContext();
+        var version = context.Model.FindEntityType(typeof(ContractVersion));
+        Assert.NotNull(version);
+
+        var comment = CommentOf(version.FindProperty(nameof(ContractVersion.TermDays))!);
+
+        Assert.Contains("different agreement", comment, StringComparison.OrdinalIgnoreCase);
+    }
+
     /// <summary>
     /// The comments of a property, read as the annotation they are stored as.
     /// </summary>

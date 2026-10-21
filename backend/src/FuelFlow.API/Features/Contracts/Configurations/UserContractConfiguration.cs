@@ -31,6 +31,21 @@ internal sealed class UserContractConfiguration : IEntityTypeConfiguration<UserC
             .HasColumnName("signed_at_utc")
             .IsRequired().HasComment("When it was signed.");
 
+        // The version of the text that was actually signed. The contract's own version is what
+        // it points at NOW; this is what the customer read when they signed, and a new version
+        // of the terms does not rewrite a signature.
+        //
+        // The default of 1 is the backfill for the signatures that were made before the
+        // versions existed: they were against the only text there was.
+        builder.Property(e => e.TermsVersion)
+            .HasColumnName("terms_version")
+            .HasDefaultValue((short)1)
+            .IsRequired()
+            .HasComment("The version of the text that was actually signed. The contract's own version is what it points at NOW; this is what the customer read at the moment they signed, and the two can differ.");
+
+        builder.ToTable(t =>
+            t.HasCheckConstraint("ck_user_contracts_terms_version_positive", "terms_version > 0"));
+
         // A signature outlives the account that gave it. Cascade here meant that deleting a user
         // erased every contract they had signed - which is exactly the history #217 keeps.
         builder.HasOne(e => e.User)

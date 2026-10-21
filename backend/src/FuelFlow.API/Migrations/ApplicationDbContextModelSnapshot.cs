@@ -503,6 +503,13 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("legal_entity_id")
                         .HasComment("The company the contract is for.");
 
+                    b.Property<short>("TermsVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("smallint")
+                        .HasDefaultValue((short)1)
+                        .HasColumnName("terms_version")
+                        .HasComment("The version of the provider's text this contract is against - the one the customer reads and signs. A contract that says 'version 2' while the provider's text is at version 3 is a question the act and the audit trail have to be able to answer.");
+
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid")
                         .HasColumnName("user_id")
@@ -522,9 +529,75 @@ namespace FuelFlow.API.Migrations
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_contracts_user_id");
 
+                    b.HasIndex("LegalEntityId", "BrandId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_contracts_legal_entity_id_brand_id");
+
                     b.ToTable("contracts", null, t =>
                         {
                             t.HasCheckConstraint("ck_contracts_expiry_after_creation", "expires_at_utc > created_at_utc");
+
+                            t.HasCheckConstraint("ck_contracts_terms_version_positive", "terms_version > 0");
+                        });
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Contracts.SharedModels.ContractVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("body")
+                        .HasComment("The text itself - what the customer reads before signing. This is the whole point of the row: before it, the screen's REVIEW THE TEXT had nothing behind it.");
+
+                    b.Property<Guid>("BrandId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("brand_id")
+                        .HasComment("The provider whose text this is. One text per provider - the terms of one network, not of the platform.");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc")
+                        .HasComment("When this version was published.");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id")
+                        .HasComment("Who published it. NULL for a version that was seeded rather than written by somebody.");
+
+                    b.Property<int>("TermDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("term_days")
+                        .HasComment("How long a contract made against this version is valid, in days. The term belongs to the text: a new version of the terms is a different agreement with a different term.");
+
+                    b.Property<short>("Version")
+                        .HasColumnType("smallint")
+                        .HasColumnName("version")
+                        .HasComment("The version number, counting up from 1 within the provider. A new version never overwrites the old one - what a customer signed is a question the audit trail has to answer.");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BrandId")
+                        .HasDatabaseName("ix_contract_versions_brand_id");
+
+                    b.HasIndex("CreatedByUserId")
+                        .HasDatabaseName("ix_contract_versions_created_by_user_id");
+
+                    b.HasIndex("BrandId", "Version")
+                        .IsUnique()
+                        .HasDatabaseName("ix_contract_versions_brand_id_version");
+
+                    b.ToTable("contract_versions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_contract_versions_body_not_blank", "btrim(body) <> ''");
+
+                            t.HasCheckConstraint("ck_contract_versions_term_positive", "term_days > 0");
+
+                            t.HasCheckConstraint("ck_contract_versions_version_positive", "version > 0");
                         });
                 });
 
@@ -630,6 +703,13 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("signed_at_utc")
                         .HasComment("When it was signed.");
 
+                    b.Property<short>("TermsVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("smallint")
+                        .HasDefaultValue((short)1)
+                        .HasColumnName("terms_version")
+                        .HasComment("The version of the text that was actually signed. The contract's own version is what it points at NOW; this is what the customer read at the moment they signed, and the two can differ.");
+
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid")
                         .HasColumnName("user_id")
@@ -643,7 +723,10 @@ namespace FuelFlow.API.Migrations
                     b.HasIndex("UserId")
                         .HasDatabaseName("ix_user_contracts_user_id");
 
-                    b.ToTable("user_contracts", (string)null);
+                    b.ToTable("user_contracts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_user_contracts_terms_version_positive", "terms_version > 0");
+                        });
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Feedback.SharedModels.FeedbackChatBinding", b =>
@@ -4989,6 +5072,22 @@ namespace FuelFlow.API.Migrations
                     b.Navigation("Entity");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Contracts.SharedModels.ContractVersion", b =>
+                {
+                    b.HasOne("FuelFlow.SharedKernel.Domain.Brand", "Brand")
+                        .WithMany()
+                        .HasForeignKey("BrandId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FuelFlow.SharedKernel.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Brand");
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Contracts.SharedModels.LegalEntity", b =>

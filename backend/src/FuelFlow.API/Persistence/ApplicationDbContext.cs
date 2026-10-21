@@ -125,6 +125,7 @@ private readonly FuelFlow.Features.Vouchers.Security.IQrCipher _qrCipher;
     // name. #349 step 3b.
     public DbSet<FuelTypeProductCode> FuelTypeProductCodes => Set<FuelTypeProductCode>();
     public DbSet<Contract> Contracts => Set<Contract>();
+    public DbSet<ContractVersion> ContractVersions => Set<ContractVersion>();
     public DbSet<UserContract> UserContracts => Set<UserContract>();
     public DbSet<LegalEntity> LegalEntities => Set<LegalEntity>();
     public DbSet<CompanyInvitation> CompanyInvitations => Set<CompanyInvitation>();
