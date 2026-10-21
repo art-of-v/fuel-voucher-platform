@@ -2,7 +2,21 @@ namespace FuelFlow.Features.Orders.SharedModels;
 
 public class OutboxEvent
 {
-    public int Id { get; set; }
+    /// <summary>
+    /// The row's own key: a uuid, like every other key in the schema.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// It was an integer sequence, and it was the last table in the schema where a key was
+    /// still a counter. The whole point of the key is that it says nothing: a number taken
+    /// from a sequence says how many rows came before it, which is a fact about the past that
+    /// a reader does not need and cannot un-see.
+    /// </para>
+    /// <para>
+    /// A uuid the database assigns (EF omits it from the INSERT, so the store generates it).
+    /// </para>
+    /// </remarks>
+    public Guid Id { get; set; }
     public OutboxEventType EventType { get; set; }
     public string Payload { get; set; } = null!;
     public bool Processed { get; set; }

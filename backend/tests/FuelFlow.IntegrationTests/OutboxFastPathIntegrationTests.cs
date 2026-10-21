@@ -253,7 +253,7 @@ public sealed class OutboxFastPathIntegrationTests : IClassFixture<TestDatabaseF
         context.SaveChanges();
     }
 
-    private async Task<(int Id, DateTime CreatedAt)?> WaitForOutboxEventAsync(string eventType, TimeSpan timeout)
+    private async Task<(Guid Id, DateTime CreatedAt)?> WaitForOutboxEventAsync(string eventType, TimeSpan timeout)
     {
         var deadline = DateTime.UtcNow + timeout;
         while (DateTime.UtcNow < deadline)
@@ -274,7 +274,7 @@ public sealed class OutboxFastPathIntegrationTests : IClassFixture<TestDatabaseF
         return null;
     }
 
-    private async Task<DateTime?> WaitForProcessedAsync(int eventId, TimeSpan timeout)
+    private async Task<DateTime?> WaitForProcessedAsync(Guid eventId, TimeSpan timeout)
     {
         var deadline = DateTime.UtcNow + timeout;
         while (DateTime.UtcNow < deadline)

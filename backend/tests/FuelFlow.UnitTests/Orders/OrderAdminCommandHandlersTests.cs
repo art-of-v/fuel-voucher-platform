@@ -350,7 +350,7 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
         order.FulfilledAtUtc = DateTime.UtcNow;
         order.Fulfillments.Add(new Fulfillment
         {
-            Id = 1,
+            Id = Guid.NewGuid(),
             OrderId = order.Id,
             VoucherId = Guid.NewGuid(),
             FulfilledAtUtc = DateTime.UtcNow,

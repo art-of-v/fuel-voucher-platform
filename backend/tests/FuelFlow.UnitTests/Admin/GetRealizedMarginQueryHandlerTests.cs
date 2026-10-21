@@ -24,7 +24,7 @@ public sealed class GetRealizedMarginQueryHandlerTests : IDisposable
     /// EF Core needs an int identity, so it must be unique across the whole context and not just
     /// within one order - hence a counter on the fixture rather than a fresh 1 per seed.
     /// </summary>
-    private int _nextFulfillmentId = 1000;
+
 
     public GetRealizedMarginQueryHandlerTests()
     {
@@ -100,7 +100,7 @@ private async Task<Order> SeedAsync(
             _context.FuelVouchers.Add(voucher);
             order.Fulfillments.Add(new Fulfillment
             {
-                Id = Interlocked.Increment(ref _nextFulfillmentId),
+                Id = Guid.CreateVersion7(),
                 OrderId = order.Id,
                 VoucherId = voucher.Id,
                 Voucher = voucher,

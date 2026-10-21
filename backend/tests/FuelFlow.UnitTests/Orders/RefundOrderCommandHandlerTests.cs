@@ -159,7 +159,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         var order = BuildOrder();
         order.Fulfillments.Add(new Fulfillment
         {
-            Id = 1,
+            Id = Guid.NewGuid(),
             OrderId = order.Id,
             VoucherId = Guid.NewGuid(),
             FulfilledAtUtc = DateTime.UtcNow,
@@ -199,7 +199,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         order.MonobankMerchant = MonobankMerchant.Sandbox;
         order.Fulfillments.Add(new Fulfillment
         {
-            Id = 1,
+            Id = Guid.NewGuid(),
             OrderId = order.Id,
             VoucherId = Guid.NewGuid(),
             FulfilledAtUtc = DateTime.UtcNow,
@@ -223,7 +223,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         order.MonobankMerchant = null;
         order.Fulfillments.Add(new Fulfillment
         {
-            Id = 1,
+            Id = Guid.NewGuid(),
             OrderId = order.Id,
             VoucherId = Guid.NewGuid(),
             FulfilledAtUtc = DateTime.UtcNow,
@@ -243,7 +243,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         var order = BuildOrder();
         order.Fulfillments.Add(new Fulfillment
         {
-            Id = 1,
+            Id = Guid.NewGuid(),
             OrderId = order.Id,
             VoucherId = Guid.NewGuid(),
             FulfilledAtUtc = DateTime.UtcNow,
@@ -277,7 +277,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         var order = BuildOrder();
         order.Fulfillments.Add(new Fulfillment
         {
-            Id = 1,
+            Id = Guid.NewGuid(),
             OrderId = order.Id,
             VoucherId = Guid.NewGuid(),
             FulfilledAtUtc = DateTime.UtcNow,
@@ -347,7 +347,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         var order = BuildOrder();
         order.Fulfillments.Add(new Fulfillment
         {
-            Id = 1,
+            Id = Guid.NewGuid(),
             OrderId = order.Id,
             VoucherId = Guid.NewGuid(),
             FulfilledAtUtc = DateTime.UtcNow,
@@ -390,7 +390,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         var order = BuildOrder();
         order.Fulfillments.Add(new Fulfillment
         {
-            Id = 1,
+            Id = Guid.NewGuid(),
             OrderId = order.Id,
             VoucherId = Guid.NewGuid(),
             FulfilledAtUtc = DateTime.UtcNow.AddMinutes(-5),
@@ -422,7 +422,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         var order = BuildOrder();
         order.Fulfillments.Add(new Fulfillment
         {
-            Id = 1,
+            Id = Guid.NewGuid(),
             OrderId = order.Id,
             VoucherId = Guid.NewGuid(),
             FulfilledAtUtc = DateTime.UtcNow,
@@ -430,7 +430,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         });
         order.Fulfillments.Add(new Fulfillment
         {
-            Id = 2,
+            Id = Guid.NewGuid(),
             OrderId = order.Id,
             VoucherId = Guid.NewGuid(),
             FulfilledAtUtc = DateTime.UtcNow.AddMinutes(-5),
@@ -457,7 +457,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         var order = BuildOrder();
         order.Fulfillments.Add(new Fulfillment
         {
-            Id = 1,
+            Id = Guid.NewGuid(),
             OrderId = order.Id,
             VoucherId = Guid.NewGuid(),
             FulfilledAtUtc = DateTime.UtcNow,
@@ -482,7 +482,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         var order = BuildOrder(OrderStatus.Fulfilled);
         order.Fulfillments.Add(new Fulfillment
         {
-            Id = 1,
+            Id = Guid.NewGuid(),
             OrderId = order.Id,
             VoucherId = Guid.NewGuid(),
             FulfilledAtUtc = DateTime.UtcNow,
@@ -490,7 +490,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         });
         order.Fulfillments.Add(new Fulfillment
         {
-            Id = 2,
+            Id = Guid.NewGuid(),
             OrderId = order.Id,
             VoucherId = Guid.NewGuid(),
             FulfilledAtUtc = DateTime.UtcNow,
@@ -690,7 +690,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         var order = BuildOrder();
         order.Fulfillments.Add(new Fulfillment
         {
-            Id = 1,
+            Id = Guid.NewGuid(),
             OrderId = order.Id,
             VoucherId = Guid.NewGuid(),
             FulfilledAtUtc = DateTime.UtcNow,
@@ -698,7 +698,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         });
         order.Fulfillments.Add(new Fulfillment
         {
-            Id = 2,
+            Id = Guid.NewGuid(),
             OrderId = order.Id,
             VoucherId = Guid.NewGuid(),
             FulfilledAtUtc = DateTime.UtcNow.AddMinutes(-5),

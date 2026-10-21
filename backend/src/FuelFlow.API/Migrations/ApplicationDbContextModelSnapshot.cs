@@ -1642,12 +1642,10 @@ namespace FuelFlow.API.Migrations
 
             modelBuilder.Entity("FuelFlow.Features.Orders.SharedModels.Fulfillment", b =>
                 {
-                    b.Property<int>("Id")
+                    b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
+                        .HasColumnType("uuid")
                         .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime>("FulfilledAtUtc")
                         .HasColumnType("timestamp with time zone")
@@ -1958,12 +1956,10 @@ namespace FuelFlow.API.Migrations
 
             modelBuilder.Entity("FuelFlow.Features.Orders.SharedModels.OutboxEvent", b =>
                 {
-                    b.Property<int>("Id")
+                    b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
+                        .HasColumnType("uuid")
                         .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
