@@ -61,8 +61,8 @@ public sealed class GetStatementReconciliationQueryHandler
 
         // The refunds the act needs, in one query, and they are two sets:
         //
-        //   - the refunds whose invoice the statement mentions, so a statement row can be recognised
-        //     as a reversal of a refund of ours;
+        //   - the refunds whose invoice the statement mentions, so a row that no order of ours
+        //     carries can still be reported against the refund that gave the invoice back;
         //   - the refunds we issued inside the period, which are the act's own refunds section.
         //
         // The first is narrowed by the statement's own ids and the second by the period, so the

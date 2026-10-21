@@ -217,14 +217,17 @@ public sealed class StatementIssuedRefundsIntegrationTests : IClassFixture<TestD
 
         var act = await ActAsync();
 
-        // The statement row is unchanged by the refunds section: it carries the invoice we refunded,
-        // so the matcher reads it as a reversal - exactly as it did before.
-        act.Rows.Should().ContainSingle(r => r.Status == StatementMatchStatus.RefundMatch);
+        // The statement row is the capture: it carries the invoice we refunded, and what the
+        // acquirer filed is a capture - money in - with the reversal hanging off it. So the row is
+        // matched against the order, and the acquirer's gross for it is in the matched total
+        // instead of in no total at all.
+        act.Rows.Should().ContainSingle(r => r.Status == StatementMatchStatus.Matched);
+        act.Rows.Should().ContainSingle(r => r.LocalAmount == 500m);
 
         // The refunds figure sits beside the matched total and does not reduce it. Nobody has to
         // subtract two numbers whose periods may differ.
         act.Summary.IssuedRefundTotalUah.Should().Be(500m);
-        act.Summary.MatchedTotalUah.Should().Be(0m);
+        act.Summary.MatchedTotalUah.Should().Be(500m);
         act.Summary.UnmatchedTotalUah.Should().Be(0m);
     }
 
