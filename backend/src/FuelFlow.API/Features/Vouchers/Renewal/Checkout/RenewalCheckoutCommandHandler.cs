@@ -1,5 +1,6 @@
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
+using FuelFlow.Features.Orders.CreateCheckout;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Vouchers.SharedModels;
@@ -10,8 +11,6 @@ using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using System.Security.Cryptography;
-using System.Text;
 
 namespace FuelFlow.Features.Vouchers.Renewal.Checkout;
 
@@ -287,73 +286,68 @@ public sealed class RenewalCheckoutCommandHandler
         if (totalUah <= 0)
             throw new VoucherRenewalException("invalid_total", "Renewal total must be greater than zero.");
 
-        // Idempotency (mirrors BulkCheckoutCommandHandler): collapse an accidental resend of the SAME
-        // batch onto the live pending order + invoice instead of double-charging. The "renew:" prefix
-        // keeps a renewal bucket from ever matching a buy-fuel order's key on the StartsWith probe.
-        // No clock in the key, for the same reason the other two handlers have none: a rolled
-        // bucket makes the window discontinuous, and a retry across the boundary is a second charge.
-        var cartSignature = string.Join("|", command.Items
-            .Select(i => $"{i.VoucherId:N}:{i.TermCode}")
-            .OrderBy(s => s, StringComparer.Ordinal));
-        var cartDigest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(cartSignature)))[..32];
-        var bucketKey = $"renew:{userId:N}:{cartDigest}";
+        // The basket: the batch of vouchers, normalized so that the same batch always keys alike,
+        // and digested so that the key fits the column no matter how many vouchers the batch has.
+        //
+        // The key names the batch and nothing else: no clock, no random suffix, and the "renew:"
+        // prefix keeps a renewal basket from ever matching a buy-fuel basket.
+        var cartSignature = CheckoutBasket.CartSignature(command.Items
+            .Select(i => $"{i.VoucherId:N}:{i.TermCode}"));
 
-        var existingOrder = await _context.Orders
-            .Where(o => o.Status == OrderStatus.PendingPayment
-                        && o.IdempotencyKey!.StartsWith(bucketKey)
-                        && o.CreatedAtUtc > DateTime.UtcNow.AddHours(-1))
-            .OrderByDescending(o => o.CreatedAtUtc)
-            .FirstOrDefaultAsync(cancellationToken);
+        var checkoutKey = CheckoutBasket.Key(CheckoutBasket.Renewal, userId, cartSignature);
 
-        if (existingOrder != null && !string.IsNullOrEmpty(existingOrder.MonobankPaymentUrl))
+        var now = DateTime.UtcNow;
+
+        // The order that already holds this batch, if there is one. A retry or a double tap finds it
+        // here and is given the same invoice. The read is an equality on an indexed column; it used
+        // to be a prefix match on a key that carried a random suffix, which no b-tree can serve and
+        // which two requests could both miss.
+        var existingOrder = await CheckoutGuard.FindPendingAsync(_context, checkoutKey, cancellationToken);
+
+        if (existingOrder != null)
         {
-            _logger.LogWarning(
-                "Duplicate renewal checkout; reusing pending order {OrderId} / invoice {InvoiceId}",
-                existingOrder.Id, existingOrder.MonobankInvoiceId);
-
-            return new RenewalCheckoutResponse
+            if (CheckoutGuard.IsStale(existingOrder, now))
             {
-                OrderId = existingOrder.Id,
-                MonobankInvoiceId = existingOrder.MonobankInvoiceId,
-                PaymentUrl = existingOrder.MonobankPaymentUrl,
-                TotalUah = existingOrder.Price
-            };
-        }
+                // A checkout the customer walked away from. The order keeps everything it was, and
+                // gives the batch back, so that the next request for it is a new purchase.
+                CheckoutGuard.Release(existingOrder);
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+            else
+            {
+                // The attempt that holds this batch is the current one: a retry finds its invoice,
+                // and a request that arrived while it was still running waits for it. Either way it
+                // is the same order and the same invoice, and the acquirer is not asked twice.
+                var withInvoice = await CheckoutGuard.WaitForInvoiceAsync(
+                    _context, existingOrder.Id, cancellationToken);
 
-        // Per-attempt suffix keeps the unique idempotency_key index satisfied once this bucket
-        // already holds a settled order, so a fresh purchase of the same batch never collides.
-        var idempotencyKey = $"{bucketKey}:{Guid.NewGuid():N}";
+                if (withInvoice != null)
+                {
+                    _logger.LogWarning(
+                        "Duplicate renewal checkout; reusing pending order {OrderId} / invoice {InvoiceId}",
+                        withInvoice.Id, withInvoice.MonobankInvoiceId);
+
+                    return new RenewalCheckoutResponse
+                    {
+                        OrderId = withInvoice.Id,
+                        MonobankInvoiceId = withInvoice.MonobankInvoiceId,
+                        PaymentUrl = withInvoice.MonobankPaymentUrl,
+                        TotalUah = withInvoice.Price
+                    };
+                }
+
+                // The attempt is over and it produced no invoice: the acquirer refused it, or the
+                // request that owned it died. The batch is free, so this request makes a new
+                // attempt.
+                CheckoutGuard.Release(existingOrder);
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+        }
 
         // Resolve merchant for this account. Outside the try below on purpose: a QA account routed
         // to an unconfigured sandbox is refused outright rather than degraded into an order with
         // no invoice, and never quietly pointed at the live merchant.
         var merchant = _merchantResolver.Resolve(user.PhoneNumber, user.IsQaAccount);
-
-        MonobankInvoiceResponse invoiceResponse;
-        try
-        {
-            var monobankClient = _monobankClientFactory.ForMerchant(merchant);
-
-            invoiceResponse = await monobankClient.CreateInvoiceAsync(
-                new MonobankInvoiceRequest
-                {
-                    Amount = Money.ForMonobank(totalUah),
-                    MerchantPaymentInfo = "FuelFlow Voucher Renewal",
-                    RedirectUrl = _monobankOptions.RedirectUrl,
-                    WebhookUrl = _monobankOptions.WebhookUrl
-                }, cancellationToken);
-
-            _logger.LogInformation(
-                "Monobank invoice created on {Merchant} merchant for renewal: {InvoiceId}",
-                merchant, invoiceResponse.InvoiceId);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to create Monobank invoice for renewal batch");
-            throw;
-        }
-
-        var now = DateTime.UtcNow;
         var order = new Order
         {
             Id = Guid.CreateVersion7(),
@@ -364,9 +358,12 @@ public sealed class RenewalCheckoutCommandHandler
             Price = totalUah,
             Kind = OrderKind.Renewal,
             Status = OrderStatus.PendingPayment,
-            IdempotencyKey = idempotencyKey,
-            MonobankInvoiceId = invoiceResponse.InvoiceId,
-            MonobankPaymentUrl = invoiceResponse.PageUrl,
+            // The order's own key: unique per order, and the external reference the acquirer is
+            // given when this order is refunded. The random suffix is what keeps it that way - the
+            // batch's identity is checkout_key, and two orders may share a batch but may not share
+            // this.
+            IdempotencyKey = $"{checkoutKey}:{Guid.NewGuid():N}",
+            CheckoutKey = checkoutKey,
             MonobankMerchant = merchant,
             CreatedAtUtc = now,
             UpdatedAtUtc = now
@@ -414,6 +411,76 @@ public sealed class RenewalCheckoutCommandHandler
         // source voucher, the term and the branch, and its UnitPrice/LineTotal is the money the customer
         // paid. voucher_renewal_items repeated all of it, which is why D-13 could drop it.
 
+        // The order is written BEFORE the acquirer is asked for an invoice, and that order is what
+        // decides the race. The second request for this batch is refused by the unique index at this
+        // line and never reaches the acquirer - so a double tap cannot become two invoices.
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (CheckoutGuard.IsUniqueViolation(ex))
+        {
+            // Another request for this batch got there first. Its order is the answer to this one -
+            // and this request has not asked the acquirer for anything, so there is no second
+            // invoice to cancel.
+            _context.ChangeTracker.Clear();
+
+            var winner = await CheckoutGuard.FindPendingAsync(_context, checkoutKey, cancellationToken);
+            if (winner == null) throw;
+
+            _logger.LogWarning(
+                "Concurrent renewal checkout for basket {CheckoutKey} lost the race; reusing order {OrderId}",
+                checkoutKey, winner.Id);
+
+            var withInvoice = await CheckoutGuard.WaitForInvoiceAsync(_context, winner.Id, cancellationToken) ?? winner;
+
+            return new RenewalCheckoutResponse
+            {
+                OrderId = withInvoice.Id,
+                MonobankInvoiceId = withInvoice.MonobankInvoiceId,
+                PaymentUrl = withInvoice.MonobankPaymentUrl,
+                TotalUah = withInvoice.Price
+            };
+        }
+
+        MonobankInvoiceResponse invoiceResponse;
+        try
+        {
+            var monobankClient = _monobankClientFactory.ForMerchant(merchant);
+
+            invoiceResponse = await monobankClient.CreateInvoiceAsync(
+                new MonobankInvoiceRequest
+                {
+                    Amount = Money.ForMonobank(totalUah),
+                    MerchantPaymentInfo = "FuelFlow Voucher Renewal",
+                    RedirectUrl = _monobankOptions.RedirectUrl,
+                    WebhookUrl = _monobankOptions.WebhookUrl
+                }, cancellationToken);
+
+            _logger.LogInformation(
+                "Monobank invoice created on {Merchant} merchant for renewal: {InvoiceId}",
+                merchant,
+                invoiceResponse.InvoiceId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create Monobank invoice for renewal batch");
+
+            // The invoice never came, so this attempt is over - and an attempt that is over must
+            // not hold the batch against the customer's next try. The order itself stays: it is the
+            // record of what was attempted.
+            CheckoutGuard.Release(order);
+            await _context.SaveChangesAsync(cancellationToken);
+
+            throw;
+        }
+
+        order.MonobankInvoiceId = invoiceResponse.InvoiceId;
+        order.MonobankPaymentUrl = invoiceResponse.PageUrl;
+
+        // The invoice, written onto the order that is already there. A second attempt for this batch
+        // is refused by the index above and never reaches this point, so this is the one and only
+        // invoice for this batch.
         await _context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation(

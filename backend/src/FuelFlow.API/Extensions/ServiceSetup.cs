@@ -336,8 +336,16 @@ services.AddScoped<TermQuoteQueryHandler>();
 
         if (monobankOptions?.Enabled == true)
         {
-            services.AddHttpClient($"monobank-{MonobankMerchant.Live}");
-            services.AddHttpClient($"monobank-{MonobankMerchant.Sandbox}");
+            // A timeout on the acquirer's own client, where there was none - the default is 100
+            // seconds, which is how a slow acquirer holds a request thread for a minute and a half.
+            //
+            // The checkout depends on it: the request that loses the race waits for the winner's
+            // invoice, and that wait is bounded by what the acquirer can do to us. A call that hangs
+            // for a hundred seconds would make the wait meaningless.
+            services.AddHttpClient($"monobank-{MonobankMerchant.Live}", client =>
+                client.Timeout = TimeSpan.FromSeconds(MonobankOptions.ClientTimeoutSeconds));
+            services.AddHttpClient($"monobank-{MonobankMerchant.Sandbox}", client =>
+                client.Timeout = TimeSpan.FromSeconds(MonobankOptions.ClientTimeoutSeconds));
         }
 
         services.AddScoped<ProcessMonobankWebhookCommandHandler>();

@@ -171,38 +171,69 @@ public sealed class CreateCheckoutCommandHandler
                 command.Price, lineTotal, command.UserId);
         }
 
-        // The key names WHAT was bought and by whom; the window is the `CreatedAtUtc` filter below.
-// The minute of the clock used to be in here, rounded down to a five-minute bucket, which made
-        // the window discontinuous: a retry one millisecond before the bucket rolls over produced a
-        // different key, the dedupe missed, and the customer was charged twice for one tap. The
-        // filter below already asks "within the last hour", so nothing here needs the clock at all.
-        var bucketKey = $"{command.UserId}:{command.BrandId}:{command.FuelTypeId}:{command.Liters}:{command.Quantity}";
+        // The basket this checkout is for. It names what was bought and by whom and nothing else:
+        // no clock, no random suffix. The minute of the clock used to be in the key, rounded down
+        // to a five-minute bucket, which made the window discontinuous - a retry one millisecond
+        // before the bucket rolled over produced a different key, the dedupe missed, and the
+        // customer was charged twice for one tap.
+        //
+        // This key is what the order is guarded by: it is written on the order, and a unique index
+        // over the orders awaiting payment refuses a second one for the same basket.
+        var checkoutKey = CheckoutBasket.Key(
+            CheckoutBasket.Purchase,
+            command.UserId.Value,
+            CheckoutBasket.PurchaseSignature(
+                command.BrandId.Value, command.FuelTypeId, command.Liters, command.Quantity));
 
-        // Dedupe only while the previous attempt is still awaiting payment:
-        // retries and double-taps reuse the same invoice, but once an order is
-        // settled a legitimate repeat purchase in the same bucket gets a fresh one.
-        var existingOrder = await _context.Orders
-            .Where(o => o.Status == OrderStatus.PendingPayment
-                        && o.IdempotencyKey!.StartsWith(bucketKey)
-                        && o.CreatedAtUtc > DateTime.UtcNow.AddHours(-1))
-            .OrderByDescending(o => o.CreatedAtUtc)
-            .FirstOrDefaultAsync(cancellationToken);
+        var now = DateTime.UtcNow;
 
-        if (existingOrder != null && !string.IsNullOrEmpty(existingOrder.MonobankPaymentUrl))
+        // The order that already holds this basket, if there is one. A retry or a double tap finds
+        // it here and is given the same invoice. The read is an equality on an indexed column; it
+        // used to be a prefix match on a key that carried a random suffix, which no b-tree can
+        // serve and which two requests could both miss.
+        var existingOrder = await CheckoutGuard.FindPendingAsync(_context, checkoutKey, cancellationToken);
+
+        if (existingOrder != null)
         {
-            _logger.LogWarning("Duplicate order creation attempt detected for key {IdempotencyKey}", bucketKey);
-            return new CreateCheckoutResponse
+            if (CheckoutGuard.IsStale(existingOrder, now))
             {
-                OrderId = existingOrder.Id,
-                Status = existingOrder.Status.ToString(),
-                MonobankInvoiceId = existingOrder.MonobankInvoiceId,
-                PaymentUrl = existingOrder.MonobankPaymentUrl
-            };
-        }
+                // A checkout the customer walked away from. The order keeps everything it was - its
+                // price, its status, its invoice, and a customer who pays that invoice late still
+                // gets what they paid for - and gives the basket back, so that the next request
+                // for it is a new purchase.
+                CheckoutGuard.Release(existingOrder);
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+            else
+            {
+                // The attempt that holds this basket is the current one: a retry finds its invoice,
+                // and a request that arrived while it was still running waits for it. Either way it
+                // is the same order and the same invoice, and the acquirer is not asked twice.
+                var withInvoice = await CheckoutGuard.WaitForInvoiceAsync(
+                    _context, existingOrder.Id, cancellationToken);
 
-        // Per-attempt suffix keeps the unique index satisfied when the bucket
-        // already holds settled orders from the same user.
-        var idempotencyKey = $"{bucketKey}:{Guid.NewGuid():N}";
+                if (withInvoice != null)
+                {
+                    _logger.LogWarning(
+                        "Duplicate order creation attempt detected for basket {CheckoutKey}; reusing order {OrderId}",
+                        checkoutKey, withInvoice.Id);
+
+                    return new CreateCheckoutResponse
+                    {
+                        OrderId = withInvoice.Id,
+                        Status = withInvoice.Status.ToString(),
+                        MonobankInvoiceId = withInvoice.MonobankInvoiceId,
+                        PaymentUrl = withInvoice.MonobankPaymentUrl
+                    };
+                }
+
+                // The attempt is over and it produced no invoice: the acquirer refused it, or the
+                // request that owned it died. The basket is free, so this request makes a new
+                // attempt.
+                CheckoutGuard.Release(existingOrder);
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+        }
 
         var order = new Order
         {
@@ -211,7 +242,12 @@ public sealed class CreateCheckoutCommandHandler
             LegalEntityId = command.LegalEntityId,
             Price = lineTotal,
             Status = OrderStatus.PendingPayment,
-            IdempotencyKey = idempotencyKey,
+            // The order's own key: unique per order, and the external reference the acquirer is
+            // given when this order is refunded. The random suffix is what keeps it that way - the
+            // basket's identity is checkout_key, and two orders may share a basket but may not
+            // share this.
+            IdempotencyKey = $"{checkoutKey}:{Guid.NewGuid():N}",
+            CheckoutKey = checkoutKey,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };
@@ -245,6 +281,42 @@ public sealed class CreateCheckoutCommandHandler
         // and an order with no payment URL at least cannot be paid by mistake.
         var merchant = _merchantResolver.Resolve(user.PhoneNumber, user.IsQaAccount);
         order.MonobankMerchant = merchant;
+
+        // The order is written BEFORE the acquirer is asked for an invoice, and that order is what
+        // decides the race. The second request for this basket is refused by the unique index at
+        // this line and never reaches the acquirer - so a double tap, and the client's automatic
+        // resend of the same POST, cannot become two invoices for one basket.
+        //
+        // It is also the order the money belongs to: from here on the invoice is attached to a row
+        // that exists, whatever happens to the call below.
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (CheckoutGuard.IsUniqueViolation(ex))
+        {
+            // Another request for this basket got there first. Its order is the answer to this
+            // one - and this request has not asked the acquirer for anything, so there is no second
+            // invoice to cancel.
+            _context.ChangeTracker.Clear();
+
+            var winner = await CheckoutGuard.FindPendingAsync(_context, checkoutKey, cancellationToken);
+            if (winner == null) throw;
+
+            _logger.LogWarning(
+                "Concurrent checkout for basket {CheckoutKey} lost the race; reusing order {OrderId}",
+                checkoutKey, winner.Id);
+
+            var withInvoice = await CheckoutGuard.WaitForInvoiceAsync(_context, winner.Id, cancellationToken) ?? winner;
+
+            return new CreateCheckoutResponse
+            {
+                OrderId = withInvoice.Id,
+                Status = withInvoice.Status.ToString(),
+                MonobankInvoiceId = withInvoice.MonobankInvoiceId,
+                PaymentUrl = withInvoice.MonobankPaymentUrl
+            };
+        }
 
         var invoiceStopwatch = System.Diagnostics.Stopwatch.StartNew();
 
@@ -300,12 +372,23 @@ public sealed class CreateCheckoutCommandHandler
         }
         catch (Exception ex)
         {
-            // The exception is deliberately swallowed so checkout still returns an order,
-            // which means this metric is the only lasting signal that payment setup broke.
+            // The exception is deliberately swallowed so checkout still returns an order, and the
+            // order is already written - it was, on purpose, committed before the acquirer was
+            // asked. So the customer gets an order with no payment link instead of an error, and
+            // the metric below is the only lasting signal that payment setup broke.
             _metrics.MonobankInvoiceFailed(ex.GetType().Name);
             _logger.LogError(ex, "Failed to create Monobank invoice for order {OrderId}", order.Id);
+
+            // The invoice never came, so this attempt is over - and an attempt that is over must
+            // not hold the basket against the customer's next try. The order itself stays: it is
+            // the record of what was attempted.
+            CheckoutGuard.Release(order);
+            await _context.SaveChangesAsync(cancellationToken);
         }
 
+        // The invoice, written onto the order that is already there. A second attempt for this
+        // basket is refused by the index above and never reaches this point, so this is the one
+        // and only invoice for this basket.
         await _context.SaveChangesAsync(cancellationToken);
 
         _metrics.OrderCreated(order.LegalEntityId.HasValue);

@@ -1033,6 +1033,7 @@ public sealed class SchemaCommentTests
             nameof(Order.MonobankStatus),
             nameof(Order.MonobankMerchant),
             nameof(Order.IdempotencyKey),
+            nameof(Order.CheckoutKey),
             nameof(Order.CreatedAtUtc),
             nameof(Order.UpdatedAtUtc),
             nameof(Order.FulfilledAtUtc),

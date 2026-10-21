@@ -41,7 +41,27 @@ public class Order
     public string? MonobankPaymentUrl { get; set; }
     public MonobankStatus? MonobankStatus { get; set; }
     public MonobankMerchant? MonobankMerchant { get; set; }
+
+    /// <summary>
+    /// This order's own key: unique per order, and the external reference the acquirer is given when
+    /// the order is refunded. It is NOT the checkout's identity - see <see cref="CheckoutKey"/> for
+    /// that - and it must not become one: a refund is matched back to its order through this
+    /// reference, so two orders sharing it would make the acquirer's reversal rows ambiguous.
+    /// </summary>
     public string? IdempotencyKey { get; set; }
+
+    /// <summary>
+    /// The basket this order is the live attempt for: the customer, the brand, the fuel, the litres
+    /// and the quantity (a digest of the whole cart for a bulk checkout). Two orders may not hold the
+    /// same basket while both await payment - the index on this column refuses the second one - so a
+    /// double tap and a retried request are one order and one invoice instead of two.
+    /// </summary>
+    /// <remarks>
+    /// NULL once the attempt is over: an order that has been paid keeps its key (the index stops
+    /// counting it because the order is no longer awaiting payment), and an order that a newer
+    /// attempt took over from gives it up, so that the customer can buy the same basket again.
+    /// </remarks>
+    public string? CheckoutKey { get; set; }
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
     public DateTime? FulfilledAtUtc { get; set; }
