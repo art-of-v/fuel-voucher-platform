@@ -16,23 +16,25 @@ internal sealed class QrParametersConfiguration : IEntityTypeConfiguration<QrPar
             .HasColumnName("id");
 
         builder.Property(e => e.Version)
-            .HasColumnName("version");
+            .HasColumnName("version").HasComment("The QR code version (1-40), read from the aligned bit-matrix width. It controls the grid" +
+                    "density.");
 
         builder.Property(e => e.EccLevel)
             .HasColumnName("ecc_level")
             .HasMaxLength(1)
-            .IsRequired();
+            .IsRequired().HasComment("The error correction level of the original QR: L, M, Q or H.");
 
         builder.Property(e => e.MaskPattern)
-            .HasColumnName("mask_pattern");
+            .HasColumnName("mask_pattern").HasComment("The data-mask reference number (0-7), read from the format-information strip.");
 
         builder.Property(e => e.EncodingMode)
             .HasColumnName("encoding_mode")
-            .HasMaxLength(16);
+            .HasMaxLength(16).HasComment("The data-encoding mode of the original QR: NUMERIC, ALPHANUMERIC or BYTE. A hint when the" +
+                    "code is regenerated.");
 
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
-            .IsRequired();
+            .IsRequired().HasComment("When the row was written.");
 
         // NULLS NOT DISTINCT, and it is not a style choice. Three of the four columns are nullable, and
 // Postgres treats NULLs as distinct in a plain unique btree - so `('M', NULL, NULL, NULL)` could be

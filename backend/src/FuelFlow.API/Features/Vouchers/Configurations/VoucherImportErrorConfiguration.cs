@@ -17,30 +17,34 @@ internal sealed class VoucherImportErrorConfiguration : IEntityTypeConfiguration
 
         builder.Property(e => e.ImportId)
             .HasColumnName("import_id")
-            .IsRequired();
+            .IsRequired().HasComment("The import this error belongs to. Every failed row points at the run that produced it, so" +
+                    "one file's failures are read together.");
 
         builder.Property(e => e.PageNumber)
             .HasColumnName("page_number")
-            .IsRequired();
+            .IsRequired().HasComment("The page of the file the row was read from. The page, not the row: a page is what a person" +
+                    "can look at.");
 
         builder.Property(e => e.VoucherNumber)
             .HasColumnName("voucher_number")
-            .HasMaxLength(100);
+            .HasMaxLength(100).HasComment("The voucher number as it was read, if it could be read at all. NULL when the line was" +
+                    "unreadable - which is often exactly why it is an error.");
 
         builder.Property(e => e.ErrorMessage)
             .HasColumnName("error_message")
             .HasMaxLength(2000)
-            .IsRequired();
+            .IsRequired().HasComment("What went wrong, in words. The reason the row was refused.");
 
         // Bounded, and written through PrepareRawTextForStorage so the embedded QR payload - a
         // bearer instrument - never lands here verbatim.
         builder.Property(e => e.RawText)
             .HasColumnName("raw_text")
-            .HasMaxLength(4000);
+            .HasMaxLength(4000).HasComment("The line as it arrived, exactly as the file had it. The evidence: without it, nobody can" +
+                    "tell whether the importer read the file wrong or the file was wrong.");
 
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
-            .IsRequired();
+            .IsRequired().HasComment("When the row was written.");
 
         builder.HasOne<VoucherImport>()
             .WithMany()

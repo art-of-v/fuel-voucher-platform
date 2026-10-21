@@ -18,7 +18,7 @@ internal sealed class PurchaseBatchConfiguration : IEntityTypeConfiguration<Purc
 
         builder.Property(e => e.ImportJobId)
             .HasColumnName("import_job_id")
-            .IsRequired();
+            .IsRequired().HasComment("The import that brought this stock in.");
 
         builder.HasOne<VoucherImport>()
             .WithMany()
@@ -33,12 +33,13 @@ internal sealed class PurchaseBatchConfiguration : IEntityTypeConfiguration<Purc
            builder.Property(e => e.FuelTypeId)
                .HasColumnName("fuel_type_id")
                .HasColumnType("uuid")
-               .IsRequired();
+               .IsRequired().HasComment("The fuel this batch is.");
 
         builder.Property(e => e.Brand)
             .HasColumnName("brand")
             .HasMaxLength(50)
-            .IsRequired();
+            .IsRequired().HasComment("The brand's NAME - what a report groups by and what a parser reads. The id below is what" +
+                    "the database can check, and the two are the same fact written twice.");
 
         // The key the brand text above is a copy of. Required, because the composite foreign key
         // below is what refuses a row whose brand is not its fuel's brand - and a foreign key with a
@@ -47,11 +48,14 @@ internal sealed class PurchaseBatchConfiguration : IEntityTypeConfiguration<Purc
         builder.Property(e => e.BrandId)
             .HasColumnName("brand_id")
             .HasColumnType("uuid")
-            .IsRequired();
+            .IsRequired().HasComment("The brand's id - the key the text above is a copy of. The composite foreign key" +
+                    "(fuel_type_id, brand_id) -> fuel_types(id, brand_id) is what refuses a row whose brand is" +
+                    "not its fuel's brand.");
 
         builder.Property(e => e.SupplierId)
             .HasColumnName("supplier_id")
-            .IsRequired();
+            .IsRequired().HasComment("The company this stock was bought from. Unlike the brand, this is the party we settle with" +
+                    "and hand vouchers back to.");
 
         builder.HasOne(e => e.Supplier)
             .WithMany()
@@ -59,16 +63,16 @@ internal sealed class PurchaseBatchConfiguration : IEntityTypeConfiguration<Purc
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.Property(e => e.EnteredByUserId)
-            .HasColumnName("entered_by_user_id");
+            .HasColumnName("entered_by_user_id").HasComment("The user who entered the batch. NULL for a batch that came in through an import.");
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
             .HasColumnType("timestamp with time zone")
-            .IsRequired();
+            .IsRequired().HasComment("When the row was written.");
 
         builder.Property(e => e.UpdatedAtUtc)
             .HasColumnName("updated_at_utc")
             .HasColumnType("timestamp with time zone")
-            .IsRequired();
+            .IsRequired().HasComment("When it was last changed.");
 
         // One row per (import × fuel). Upserts key on this pair.
         builder.HasIndex(e => new { e.ImportJobId, e.FuelTypeId })

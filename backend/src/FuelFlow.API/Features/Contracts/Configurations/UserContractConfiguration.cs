@@ -17,18 +17,19 @@ internal sealed class UserContractConfiguration : IEntityTypeConfiguration<UserC
 
         builder.Property(e => e.UserId)
             .HasColumnName("user_id")
-            .IsRequired();
+            .IsRequired().HasComment("The user who signed.");
 
         builder.Property(e => e.ContractId)
             .HasColumnName("contract_id")
-            .IsRequired();
+            .IsRequired().HasComment("The contract that was signed.");
 
         builder.Property(e => e.SignatureData)
-            .HasColumnName("signature_data");
+            .HasColumnName("signature_data").HasComment("The signature itself, as it was captured. NULL for a contract signed on paper and keyed in" +
+                    "by hand - which is a real answer, not a missing value.");
 
         builder.Property(e => e.SignedAtUtc)
             .HasColumnName("signed_at_utc")
-            .IsRequired();
+            .IsRequired().HasComment("When it was signed.");
 
         // A signature outlives the account that gave it. Cascade here meant that deleting a user
         // erased every contract they had signed - which is exactly the history #217 keeps.
