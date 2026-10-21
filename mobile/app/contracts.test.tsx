@@ -377,9 +377,7 @@ describe('Contracts — which document gets signed', () => {
     expect(screen.getByText('Romashka')).toBeTruthy();
     expect(screen.getByText('contracts.expiresAt')).toBeTruthy();
     expect(screen.getByTestId('contract-text')).toBeTruthy();
-    expect(
-      screen.getByText('The terms the customer reads before signing.'),
-    ).toBeTruthy();
+    expect(screen.getByText('The terms the customer reads before signing.')).toBeTruthy();
   });
 
   it('says so when the provider has published no text for this version', () => {

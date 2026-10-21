@@ -553,8 +553,8 @@ export default function ContractsScreen() {
               {/* The text of the terms, when the card has one. This is what the customer
                   signs, so it is shown in full and above the facts: the facts say which
                   agreement this is, the text says what it says. */}
-              {readingCard?.text !== undefined && (
-                readingCard.text ? (
+              {readingCard?.text !== undefined &&
+                (readingCard.text ? (
                   <Text
                     testID="contract-text"
                     style={[
@@ -580,8 +580,7 @@ export default function ContractsScreen() {
                   >
                     {t('contracts.noTextPublished')}
                   </Text>
-                )
-              )}
+                ))}
               {readingCard?.facts.map((fact) => (
                 <View
                   key={fact.label}
