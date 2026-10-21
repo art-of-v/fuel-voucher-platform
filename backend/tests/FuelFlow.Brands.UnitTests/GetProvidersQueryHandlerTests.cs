@@ -116,6 +116,59 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
         fuelA.PriceSpread.Should().BeNull();
     }
 
+    // A price of zero is a price, and it says the customer takes the fuel for nothing. The card
+    // read a stored zero as the customer price and made the saving the whole column price - and it
+    // seeded the minimum-discount KNOB with that same display number, so an operator saving the
+    // card wrote "the price is at least 92.90 under the column" into the fuel. The price formula
+    // then yields min(cost + margin, pump - 92.90) = 0 and the below-cost guard refuses every sale
+    // of that fuel.
+    //
+    // Five of the twenty-three fuels on production are in that state, and it is dormant only
+    // because no fuel has a cost yet.
+    [Fact]
+    public async Task Handle_APriceOfZeroIsNotASavingAndNotAKnobValue()
+    {
+        _context.Brands.Add(new Brand
+        {
+            Id = TestOkko,
+            Slug = "test-okko",
+            Name = "okko",
+            LogoText = "okko",
+            Color = "#fff",
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+
+        // Exactly the state the catalogue import leaves behind on a fuel nobody has priced: the
+        // column price is known, and the stored price is a zero - "not set", not "free".
+        _context.FuelTypes.Add(new FuelTypeEntity
+        {
+            Id = ToUuid("test-fuel-zero-priced"),
+            Name = "А-95",
+            BrandId = TestOkko,
+            BasePrice = 92.90m,
+            DiscountPrice = 0m,
+            PumpPricePerLiter = 92.90m,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        await _context.SaveChangesAsync();
+
+        var providers = await _handler.HandleAsync(new GetBrandsQuery());
+
+        var fuel = providers.Single(p => p.Id == TestOkko).Fuels
+            .Single(f => f.Id == ToUuid("test-fuel-zero-priced").ToString());
+
+        // The saving is the difference between the column price and what the customer pays, and
+        // the customer pays the column price here - so there is no saving to promise. A saving of
+        // the whole column price is a discount the business is not giving.
+        fuel.DiscountPerLiter.Should().Be(0m, "a stored price of zero is not set, not free");
+
+        // And the knob is the knob. An unset minimum discount is zero in the formula anyway, so
+        // zero is the honest report - and a display number must never reach a stored setting.
+        fuel.MinDiscountPerLiter.Should().Be(0m, "the card must not seed a knob from a display number");
+    }
+
     // The card never carried the code, so every fuel serialised as null and the admin screen had
     // nothing to show. That matters beyond cosmetics: the code is what the catalogue import matches
     // on, so a fuel whose code the operator cannot see is a fuel they cannot tell apart from a
