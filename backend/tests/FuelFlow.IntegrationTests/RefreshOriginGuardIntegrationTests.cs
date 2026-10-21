@@ -66,7 +66,8 @@ public sealed class RefreshOriginGuardIntegrationTests : IClassFixture<TestDatab
         var phone = $"+1555{DateTime.UtcNow.Ticks % 10_000_000:0000000}";
         await client.PostAsJsonAsync("/api/auth/send-code", new SendCodeCommand(phone));
 
-        var verified = await client.PostAsJsonAsync(
+        // As the native client: the refresh token is in the body only for it (ClientPlatform).
+        var verified = await client.PostAsNativeAsync(
             "/api/auth/verify", new VerifyCodeCommand(phone, "000000"));
         verified.StatusCode.Should().Be(HttpStatusCode.OK);
 

@@ -143,7 +143,7 @@ public class QaTestAccessIntegrationTests : WebApplicationFactory<Program>, ICla
         // Ask for a code, then present the QA code. With the switch off it must be rejected — the
         // QA hash is never issued, and the verify-time gate blocks the QA phone.
         await client.PostAsJsonAsync("/api/auth/send-code", new SendCodeCommand(QaPhone));
-        var response = await client.PostAsJsonAsync("/api/auth/verify", new VerifyCodeCommand(QaPhone, TestQaCode));
+        var response = await client.PostAsNativeAsync("/api/auth/verify", new VerifyCodeCommand(QaPhone, TestQaCode));
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -168,7 +168,7 @@ public class QaTestAccessIntegrationTests : WebApplicationFactory<Program>, ICla
             code.Code.Should().Be(TestQaCodeHash);
         }
 
-        var verify = await client.PostAsJsonAsync("/api/auth/verify", new VerifyCodeCommand(QaPhone, TestQaCode));
+        var verify = await client.PostAsNativeAsync("/api/auth/verify", new VerifyCodeCommand(QaPhone, TestQaCode));
         verify.StatusCode.Should().Be(HttpStatusCode.OK);
         var result = await verify.Content.ReadFromJsonAsync<VerifyCodeResponse>();
         result!.AccessToken.Should().NotBeNullOrEmpty();
@@ -218,7 +218,7 @@ public class QaTestAccessIntegrationTests : WebApplicationFactory<Program>, ICla
         (await client.PostAsJsonAsync("/api/auth/send-code", new SendCodeCommand(QaPhone)))
             .StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var verify = await client.PostAsJsonAsync("/api/auth/verify", new VerifyCodeCommand(QaPhone, TestQaCode));
+        var verify = await client.PostAsNativeAsync("/api/auth/verify", new VerifyCodeCommand(QaPhone, TestQaCode));
         verify.StatusCode.Should().Be(HttpStatusCode.OK);
 
         using (var scope = Services.CreateScope())
@@ -268,7 +268,7 @@ public class QaTestAccessIntegrationTests : WebApplicationFactory<Program>, ICla
         var phone = OrdinaryPhone;
         (await client.PostAsJsonAsync("/api/auth/send-code", new SendCodeCommand(phone)))
             .StatusCode.Should().Be(HttpStatusCode.OK);
-        (await client.PostAsJsonAsync("/api/auth/verify",
+        (await client.PostAsNativeAsync("/api/auth/verify",
                 new VerifyCodeCommand(phone, "000000")))
             .StatusCode.Should().Be(HttpStatusCode.OK, "the dev bypass code applies to an ordinary phone");
 
@@ -310,9 +310,9 @@ public class QaTestAccessIntegrationTests : WebApplicationFactory<Program>, ICla
 
         // Neither the QA code nor the dev-bypass code gets through: the QA gate runs before the
         // code is compared, so the response is indistinguishable from any wrong guess.
-        (await client.PostAsJsonAsync("/api/auth/verify", new VerifyCodeCommand(QaPhone, TestQaCode)))
+        (await client.PostAsNativeAsync("/api/auth/verify", new VerifyCodeCommand(QaPhone, TestQaCode)))
             .StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        (await client.PostAsJsonAsync("/api/auth/verify", new VerifyCodeCommand(QaPhone, "000000")))
+        (await client.PostAsNativeAsync("/api/auth/verify", new VerifyCodeCommand(QaPhone, "000000")))
             .StatusCode.Should().Be(HttpStatusCode.Unauthorized,
                 "the dev-bypass code must not become a way around the QA gate");
 
@@ -333,18 +333,18 @@ public class QaTestAccessIntegrationTests : WebApplicationFactory<Program>, ICla
         var client = CreateClient();
 
         await client.PostAsJsonAsync("/api/auth/send-code", new SendCodeCommand(QaPhone));
-        var verify = await client.PostAsJsonAsync("/api/auth/verify", new VerifyCodeCommand(QaPhone, TestQaCode));
+        var verify = await client.PostAsNativeAsync("/api/auth/verify", new VerifyCodeCommand(QaPhone, TestQaCode));
         var tokens = await verify.Content.ReadFromJsonAsync<VerifyCodeResponse>();
 
         // The refresh token works while enabled...
-        var okRefresh = await client.PostAsJsonAsync("/api/auth/refresh", new RefreshTokenCommand(tokens!.RefreshToken));
+        var okRefresh = await client.PostAsNativeAsync("/api/auth/refresh", new RefreshTokenCommand(tokens!.RefreshToken));
         okRefresh.StatusCode.Should().Be(HttpStatusCode.OK);
         var refreshed = await okRefresh.Content.ReadFromJsonAsync<RefreshTokenResponse>();
 
         // ...then the admin disables QA, which revokes the QA session.
         await SetSwitchAsync(false);
 
-        var deniedRefresh = await client.PostAsJsonAsync("/api/auth/refresh", new RefreshTokenCommand(refreshed!.RefreshToken));
+        var deniedRefresh = await client.PostAsNativeAsync("/api/auth/refresh", new RefreshTokenCommand(refreshed!.RefreshToken));
         deniedRefresh.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 

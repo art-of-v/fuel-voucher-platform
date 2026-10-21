@@ -91,7 +91,7 @@ public class AuthIntegrationTests : WebApplicationFactory<Program>, IClassFixtur
         await client.PostAsJsonAsync("/api/auth/send-code", new SendCodeCommand(phoneNumber));
 
         var verifyRequest = new VerifyCodeCommand(phoneNumber, "000000");
-        var response = await client.PostAsJsonAsync("/api/auth/verify", verifyRequest);
+        var response = await client.PostAsNativeAsync("/api/auth/verify", verifyRequest);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var result = await response.Content.ReadFromJsonAsync<VerifyCodeResponse>();
@@ -118,7 +118,7 @@ public class AuthIntegrationTests : WebApplicationFactory<Program>, IClassFixtur
         await client.PostAsJsonAsync("/api/auth/send-code", new SendCodeCommand(normalizedPhone));
 
         var verifyRequest = new VerifyCodeCommand("(987) 654-3210", "000000");
-        var response = await client.PostAsJsonAsync("/api/auth/verify", verifyRequest);
+        var response = await client.PostAsNativeAsync("/api/auth/verify", verifyRequest);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -139,7 +139,7 @@ public class AuthIntegrationTests : WebApplicationFactory<Program>, IClassFixtur
         await client.PostAsJsonAsync("/api/auth/send-code", new SendCodeCommand(phoneNumber));
 
         var verifyRequest = new VerifyCodeCommand(phoneNumber, "123456");
-        var response = await client.PostAsJsonAsync("/api/auth/verify", verifyRequest);
+        var response = await client.PostAsNativeAsync("/api/auth/verify", verifyRequest);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -167,7 +167,7 @@ public class AuthIntegrationTests : WebApplicationFactory<Program>, IClassFixtur
         }
 
         var verifyRequest = new VerifyCodeCommand(phoneNumber, "000000");
-        var response = await client.PostAsJsonAsync("/api/auth/verify", verifyRequest);
+        var response = await client.PostAsNativeAsync("/api/auth/verify", verifyRequest);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -181,7 +181,7 @@ public class AuthIntegrationTests : WebApplicationFactory<Program>, IClassFixtur
         await client.PostAsJsonAsync("/api/auth/send-code", new SendCodeCommand(phoneNumber));
 
         var verifyRequest = new VerifyCodeCommand(phoneNumber, "000000");
-        await client.PostAsJsonAsync("/api/auth/verify", verifyRequest);
+        await client.PostAsNativeAsync("/api/auth/verify", verifyRequest);
 
         using var scope = Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -203,12 +203,12 @@ public class AuthIntegrationTests : WebApplicationFactory<Program>, IClassFixtur
 
         await client.PostAsJsonAsync("/api/auth/send-code", new SendCodeCommand(phoneNumber));
 
-        var verifyResponse = await client.PostAsJsonAsync("/api/auth/verify",
+        var verifyResponse = await client.PostAsNativeAsync("/api/auth/verify",
             new VerifyCodeCommand(phoneNumber, "000000"));
         var verifyResult = await verifyResponse.Content.ReadFromJsonAsync<VerifyCodeResponse>();
 
         var refreshRequest = new RefreshTokenCommand(verifyResult!.RefreshToken);
-        var response = await client.PostAsJsonAsync("/api/auth/refresh", refreshRequest);
+        var response = await client.PostAsNativeAsync("/api/auth/refresh", refreshRequest);
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var result = await response.Content.ReadFromJsonAsync<RefreshTokenResponse>();
@@ -225,7 +225,7 @@ public class AuthIntegrationTests : WebApplicationFactory<Program>, IClassFixtur
         var client = CreateClient();
         var refreshRequest = new RefreshTokenCommand("invalid-refresh-token");
 
-        var response = await client.PostAsJsonAsync("/api/auth/refresh", refreshRequest);
+        var response = await client.PostAsNativeAsync("/api/auth/refresh", refreshRequest);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -238,7 +238,7 @@ public class AuthIntegrationTests : WebApplicationFactory<Program>, IClassFixtur
 
         await client.PostAsJsonAsync("/api/auth/send-code", new SendCodeCommand(phoneNumber));
 
-        var verifyResponse = await client.PostAsJsonAsync("/api/auth/verify",
+        var verifyResponse = await client.PostAsNativeAsync("/api/auth/verify",
             new VerifyCodeCommand(phoneNumber, "000000"));
         var verifyResult = await verifyResponse.Content.ReadFromJsonAsync<VerifyCodeResponse>();
 
@@ -256,7 +256,7 @@ public class AuthIntegrationTests : WebApplicationFactory<Program>, IClassFixtur
         }
 
         var refreshRequest = new RefreshTokenCommand(verifyResult!.RefreshToken);
-        var response = await client.PostAsJsonAsync("/api/auth/refresh", refreshRequest);
+        var response = await client.PostAsNativeAsync("/api/auth/refresh", refreshRequest);
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -273,7 +273,7 @@ public class AuthIntegrationTests : WebApplicationFactory<Program>, IClassFixtur
 
         await client.PostAsJsonAsync("/api/auth/send-code", new SendCodeCommand(phoneNumber));
 
-        var verifyResponse = await client.PostAsJsonAsync("/api/auth/verify",
+        var verifyResponse = await client.PostAsNativeAsync("/api/auth/verify",
             new VerifyCodeCommand(phoneNumber, "000000"));
         var verifyResult = await verifyResponse.Content.ReadFromJsonAsync<VerifyCodeResponse>();
 
@@ -283,7 +283,7 @@ public class AuthIntegrationTests : WebApplicationFactory<Program>, IClassFixtur
             new RefreshTokenCommand(verifyResult!.RefreshToken));
         logoutResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var refreshResponse = await client.PostAsJsonAsync("/api/auth/refresh",
+        var refreshResponse = await client.PostAsNativeAsync("/api/auth/refresh",
             new RefreshTokenCommand(verifyResult.RefreshToken));
         refreshResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -308,11 +308,11 @@ public class AuthIntegrationTests : WebApplicationFactory<Program>, IClassFixtur
 
         await client.PostAsJsonAsync("/api/auth/send-code", new SendCodeCommand(phoneNumber));
 
-        var verifyResponse = await client.PostAsJsonAsync("/api/auth/verify",
+        var verifyResponse = await client.PostAsNativeAsync("/api/auth/verify",
             new VerifyCodeCommand(phoneNumber, "000000"));
         var verifyResult = await verifyResponse.Content.ReadFromJsonAsync<VerifyCodeResponse>();
 
-        await client.PostAsJsonAsync("/api/auth/refresh",
+        await client.PostAsNativeAsync("/api/auth/refresh",
             new RefreshTokenCommand(verifyResult!.RefreshToken));
 
         using var scope = Services.CreateScope();
@@ -334,12 +334,12 @@ public class AuthIntegrationTests : WebApplicationFactory<Program>, IClassFixtur
             new SendCodeCommand("(555) 999-8888"));
         sendCodeResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var verifyResponse = await client.PostAsJsonAsync("/api/auth/verify",
+        var verifyResponse = await client.PostAsNativeAsync("/api/auth/verify",
             new VerifyCodeCommand("555-999-8888", "000000"));
         verifyResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var verifyResult = await verifyResponse.Content.ReadFromJsonAsync<VerifyCodeResponse>();
 
-        var refreshResponse = await client.PostAsJsonAsync("/api/auth/refresh",
+        var refreshResponse = await client.PostAsNativeAsync("/api/auth/refresh",
             new RefreshTokenCommand(verifyResult!.RefreshToken));
         refreshResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var refreshResult = await refreshResponse.Content.ReadFromJsonAsync<RefreshTokenResponse>();
