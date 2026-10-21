@@ -1,4 +1,5 @@
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Contracts.GetAdminContracts;
@@ -55,7 +56,7 @@ public sealed class GetAdminContractsQueryHandler
             .ToListAsync(ct);
 
         var signedAtByContract = signatures.ToDictionary(s => s.ContractId, s => s.SignedAtUtc);
-        var now = DateTime.UtcNow;
+        var now = SystemClock.UtcNow;
 
         return rows.Select(r =>
         {

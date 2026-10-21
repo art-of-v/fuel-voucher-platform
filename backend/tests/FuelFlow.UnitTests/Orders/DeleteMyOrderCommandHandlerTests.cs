@@ -2,6 +2,7 @@ using FluentAssertions;
 using FuelFlow.Features.Orders.DeleteMyOrder;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -105,8 +106,8 @@ public sealed class DeleteMyOrderCommandHandlerTests
             UserId = userId,
             Price = 2500,
             Status = status,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
         };
         context.Orders.Add(order);
         await context.SaveChangesAsync();

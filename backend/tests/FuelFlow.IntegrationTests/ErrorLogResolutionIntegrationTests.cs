@@ -5,6 +5,7 @@ using FuelFlow.Features.ErrorLogs;
 using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -163,12 +164,12 @@ public sealed class ErrorLogResolutionIntegrationTests : IClassFixture<TestDatab
     private static ErrorLog NewRow(string message, string? traceId = null, Guid? resolvedBy = null, string? resolvedName = null) => new()
     {
         Id = Guid.NewGuid(),
-        LoggedAtUtc = DateTime.UtcNow,
+        LoggedAtUtc = TestClock.UtcNow,
         Level = "Error",
         Message = message,
         Source = "FuelFlow.Middleware.GlobalExceptionHandler",
         TraceId = traceId,
-        ResolvedAtUtc = resolvedBy is null ? null : DateTime.UtcNow.AddMinutes(-5),
+        ResolvedAtUtc = resolvedBy is null ? null : TestClock.UtcNow.AddMinutes(-5),
         ResolvedByUserId = resolvedBy,
         ResolvedByUserName = resolvedName
     };

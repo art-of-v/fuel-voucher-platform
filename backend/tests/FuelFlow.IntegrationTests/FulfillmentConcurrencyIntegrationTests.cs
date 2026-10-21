@@ -12,6 +12,7 @@ using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -56,8 +57,8 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 Id = userId,
                 PhoneNumber = $"+38{userId:N}"[..20],
                 IsActive = true,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
 
             AddPaidOrder(seed, new Order
@@ -66,8 +67,8 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 UserId = userId,
                 Price = quantity * 2500,
                 Status = OrderStatus.PendingFulfillment,
-                CreatedAtUtc = DateTime.UtcNow.AddDays(-1),
-                UpdatedAtUtc = DateTime.UtcNow.AddDays(-1),
+                CreatedAtUtc = TestClock.UtcNow.AddDays(-1),
+                UpdatedAtUtc = TestClock.UtcNow.AddDays(-1),
                 LineItems = new List<OrderLineItem>
                 {
                     new OrderLineItem
@@ -94,13 +95,13 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                     Brand = brand,
                     FuelTypeId =   ToUuid(fuelTypeId),
                     Liters = liters,
-                    SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
-                    CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                    SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
+                    CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
                     VoucherNumber = $"OKKO-{orderId:N}-{i:D3}",
                     QrPayload = $"payload-{orderId:N}-{i:D3}",
                     Status = VoucherStatus.Available,
-                    CreatedAtUtc = DateTime.UtcNow,
-                    UpdatedAtUtc = DateTime.UtcNow
+                    CreatedAtUtc = TestClock.UtcNow,
+                    UpdatedAtUtc = TestClock.UtcNow
                 });
             }
 
@@ -165,8 +166,8 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 Id = userId,
                 PhoneNumber = $"+38{userId:N}"[..20],
                 IsActive = true,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
 
             AddPaidOrder(seed, new Order
@@ -175,8 +176,8 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 UserId = userId,
                 Price = quantity * 520,
                 Status = OrderStatus.PendingFulfillment,
-                CreatedAtUtc = DateTime.UtcNow.AddDays(-1),
-                UpdatedAtUtc = DateTime.UtcNow.AddDays(-1),
+                CreatedAtUtc = TestClock.UtcNow.AddDays(-1),
+                UpdatedAtUtc = TestClock.UtcNow.AddDays(-1),
                 LineItems = new List<OrderLineItem>
                 {
                     new OrderLineItem
@@ -203,13 +204,13 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                     Brand = "okko",
                     FuelTypeId =   ToUuid(fuelTypeId),
                     Liters = liters,
-                    SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
-                    CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                    SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
+                    CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
                     VoucherNumber = $"PF-{orderId:N}-{i:D3}",
                     QrPayload = $"payload-{orderId:N}-{i:D3}",
                     Status = VoucherStatus.Available,
-                    CreatedAtUtc = DateTime.UtcNow,
-                    UpdatedAtUtc = DateTime.UtcNow
+                    CreatedAtUtc = TestClock.UtcNow,
+                    UpdatedAtUtc = TestClock.UtcNow
                 });
             }
 
@@ -256,8 +257,8 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 Id = userId,
                 PhoneNumber = $"+38{userId:N}"[..20],
                 IsActive = true,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
 
             AddOrder(seed, userId, "okko-95", 50m, 2500, quantity: 1, voucherCount: 1, "FULL");
@@ -295,8 +296,8 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
             UserId = userId,
             Price = quantity * unitPrice,
             Status = OrderStatus.PendingFulfillment,
-            CreatedAtUtc = DateTime.UtcNow.AddDays(-1),
-            UpdatedAtUtc = DateTime.UtcNow.AddDays(-1),
+            CreatedAtUtc = TestClock.UtcNow.AddDays(-1),
+            UpdatedAtUtc = TestClock.UtcNow.AddDays(-1),
             LineItems = new List<OrderLineItem>
             {
                 new OrderLineItem
@@ -323,13 +324,13 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 Brand = "okko",
                 FuelTypeId =   ToUuid(fuelTypeId),
                 Liters = liters,
-                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
-                CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
+                CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
                 VoucherNumber = $"{prefix}-{orderId:N}-{i:D3}",
                 QrPayload = $"payload-{orderId:N}-{i:D3}",
                 Status = VoucherStatus.Available,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
         }
     }
@@ -354,8 +355,8 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 Id = userId,
                 PhoneNumber = $"+38{userId:N}"[..20],
                 IsActive = true,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
 
             AddPaidOrder(seed, new Order
@@ -364,8 +365,8 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 UserId = userId,
                 Price = 3 * 520,
                 Status = OrderStatus.PartiallyFulfilled,
-                CreatedAtUtc = DateTime.UtcNow.AddDays(-1),
-                UpdatedAtUtc = DateTime.UtcNow.AddDays(-1),
+                CreatedAtUtc = TestClock.UtcNow.AddDays(-1),
+                UpdatedAtUtc = TestClock.UtcNow.AddDays(-1),
                 LineItems = new List<OrderLineItem>
                 {
                     new OrderLineItem
@@ -391,22 +392,22 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 Brand = "okko",
                 FuelTypeId = ToUuid("okko-dp"),
                 Liters = 10m,
-                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
-                CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
+                CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
                 VoucherNumber = $"EX-{orderId:N}-used",
                 QrPayload = $"payload-{orderId:N}-used",
                 Status = VoucherStatus.Assigned,
                 AssignedToUserId = userId,
                 OrderId = orderId,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
 
             seed.Fulfillments.Add(new Fulfillment
             {
                 OrderId = orderId,
                 VoucherId = usedVoucherId,
-                FulfilledAtUtc = DateTime.UtcNow.AddHours(-2)
+                FulfilledAtUtc = TestClock.UtcNow.AddHours(-2)
             });
 
             for (var i = 0; i < 2; i++)
@@ -418,13 +419,13 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                     Brand = "okko",
                     FuelTypeId = ToUuid("okko-dp"),
                     Liters = 10m,
-                    SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
-                    CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                    SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
+                    CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
                     VoucherNumber = $"EX-{orderId:N}-avail-{i}",
                     QrPayload = $"payload-{orderId:N}-avail-{i}",
                     Status = VoucherStatus.Available,
-                    CreatedAtUtc = DateTime.UtcNow,
-                    UpdatedAtUtc = DateTime.UtcNow
+                    CreatedAtUtc = TestClock.UtcNow,
+                    UpdatedAtUtc = TestClock.UtcNow
                 });
             }
 
@@ -466,13 +467,13 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
             {
                 Key = AppSettingKeys.AutoRefundEnabled,
                 Value = "true",
-                UpdatedAtUtc = DateTime.UtcNow
+                UpdatedAtUtc = TestClock.UtcNow
             });
             seed.AppSettings.Add(new AppSetting
             {
                 Key = AppSettingKeys.AutoRefundDelayDays,
                 Value = "0",
-                UpdatedAtUtc = DateTime.UtcNow
+                UpdatedAtUtc = TestClock.UtcNow
             });
 
             seed.Users.Add(new User
@@ -480,8 +481,8 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 Id = userId,
                 PhoneNumber = $"+38{userId:N}"[..20],
                 IsActive = true,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
 
             AddPaidOrder(seed, new Order
@@ -496,8 +497,8 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 // service is asked to auto-refund is one money was collected for. Stated
                 // explicitly because refundable value is now gated on the brand's word.
                 MonobankStatus = MonobankStatus.Success,
-                CreatedAtUtc = DateTime.UtcNow.AddDays(-2),
-                UpdatedAtUtc = DateTime.UtcNow.AddDays(-2),
+                CreatedAtUtc = TestClock.UtcNow.AddDays(-2),
+                UpdatedAtUtc = TestClock.UtcNow.AddDays(-2),
                 LineItems = new List<OrderLineItem>
                 {
                     new OrderLineItem
@@ -524,13 +525,13 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                     Brand = "okko",
                     FuelTypeId = ToUuid("okko-dp"),
                     Liters = 10m,
-                    SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
-                    CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                    SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
+                    CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
                     VoucherNumber = $"AR-{partialOrderId:N}-{i:D3}",
                     QrPayload = $"payload-{partialOrderId:N}-{i:D3}",
                     Status = VoucherStatus.Available,
-                    CreatedAtUtc = DateTime.UtcNow,
-                    UpdatedAtUtc = DateTime.UtcNow
+                    CreatedAtUtc = TestClock.UtcNow,
+                    UpdatedAtUtc = TestClock.UtcNow
                 });
             }
 
@@ -542,8 +543,8 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                 Status = OrderStatus.PendingFulfillment,
                 MonobankInvoiceId = $"test-invoice-{fullOrderId:N}",
                 MonobankStatus = MonobankStatus.Success,
-                CreatedAtUtc = DateTime.UtcNow.AddDays(-1),
-                UpdatedAtUtc = DateTime.UtcNow.AddDays(-1),
+                CreatedAtUtc = TestClock.UtcNow.AddDays(-1),
+                UpdatedAtUtc = TestClock.UtcNow.AddDays(-1),
                 LineItems = new List<OrderLineItem>
                 {
                     new OrderLineItem
@@ -570,13 +571,13 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
                     Brand = "okko",
                     FuelTypeId = ToUuid("okko-95"),
                     Liters = 50m,
-                    SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
-                    CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                    SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
+                    CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
                     VoucherNumber = $"AR-{fullOrderId:N}-{i:D3}",
                     QrPayload = $"payload-{fullOrderId:N}-{i:D3}",
                     Status = VoucherStatus.Available,
-                    CreatedAtUtc = DateTime.UtcNow,
-                    UpdatedAtUtc = DateTime.UtcNow
+                    CreatedAtUtc = TestClock.UtcNow,
+                    UpdatedAtUtc = TestClock.UtcNow
                 });
             }
 
@@ -708,9 +709,9 @@ public sealed class FulfillmentConcurrencyIntegrationTests : IClassFixture<TestD
             AmountKopecks = (long)(order.Price * 100),
             Currency = "UAH",
             Status = PaymentStatus.Succeeded,
-            PaidAtUtc = DateTime.UtcNow,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            PaidAtUtc = TestClock.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
     }
 }

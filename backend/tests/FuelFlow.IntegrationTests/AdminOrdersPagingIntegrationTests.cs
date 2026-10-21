@@ -6,6 +6,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
@@ -137,8 +138,8 @@ public sealed class AdminOrdersPagingIntegrationTests : IClassFixture<TestDataba
             Id = userId,
             PhoneNumber = $"+38{userId:N}"[..20],
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         // Distinct timestamps, so the ORDER BY has something to sort on.

@@ -4,6 +4,7 @@ using FuelFlow.Features.Vouchers.GetAdminVouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
@@ -39,8 +40,8 @@ public sealed class AdminVoucherListSortTests : IDisposable
         _context = new ApplicationDbContext(options, TestQrCipher.Instance);
 
         _context.Suppliers.AddRange(
-            new Supplier { Id = AlphaId, Name = "Альфа Палив", EdrIpn = "9000000017", CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new Supplier { Id = BetaId, Name = "Бета Палив", EdrIpn = "9000000103", CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
+            new Supplier { Id = AlphaId, Name = "Альфа Палив", EdrIpn = "9000000017", CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow },
+            new Supplier { Id = BetaId, Name = "Бета Палив", EdrIpn = "9000000103", CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow });
 
         _context.FuelTypes.Add(new FuelTypeEntity
         {
@@ -49,8 +50,8 @@ public sealed class AdminVoucherListSortTests : IDisposable
             BrandId = BrandIds.Okko,
             BasePrice = 55,
             DiscountPrice = 52,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         _context.SaveChanges();
@@ -74,7 +75,7 @@ public sealed class AdminVoucherListSortTests : IDisposable
         CustomerExpirationDate = new DateOnly(2027, 1, 31),
         VoucherNumber = number,
         Status = VoucherStatus.Available,
-        CreatedAtUtc = DateTime.UtcNow,
+        CreatedAtUtc = TestClock.UtcNow,
         SupplierId = supplierId,
         CostPerLiter = costPerLiter
     };

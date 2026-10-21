@@ -3,6 +3,7 @@ using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using System.Security.Cryptography;
@@ -59,7 +60,7 @@ public sealed class GenerateChallengeCommandHandler
         }
 
         var challenge = Convert.ToBase64String(challengeBytes);
-        var expiresAt = DateTime.UtcNow.AddSeconds(_options.ChallengeExpirySeconds);
+        var expiresAt = SystemClock.UtcNow.AddSeconds(_options.ChallengeExpirySeconds);
 
         // Only persist a challenge for a device that exists and is active. Storing one for any
         // attacker-supplied string let an anonymous caller grow the Redis keyspace at 5 writes

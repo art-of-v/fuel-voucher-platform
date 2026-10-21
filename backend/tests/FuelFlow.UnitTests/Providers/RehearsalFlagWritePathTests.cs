@@ -11,6 +11,7 @@ using FuelFlow.Features.Brands.GetProviders;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.Testing;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -76,7 +77,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         _context.Brands.Add(new Brand
         {
             Id = BrandIds.Okko, Slug = "okko", Name = "okko", Color = "#22c55e", LogoText = "okko",
-            CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow
         });
         _context.SaveChanges();
     }
@@ -322,7 +323,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         _context.Brands.Add(new Brand
         {
             Id = BrandIds.Wog, Slug = "wog", Name = "wog", Color = "#10b981", LogoText = "wog",
-            CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow
         });
         await _context.SaveChangesAsync();
 
@@ -351,7 +352,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
 
         var archived = await _context.FuelTypes.FirstAsync(f => f.Id == ToUuid("qa-a95"));
         archived.IsDeleted = true;
-        archived.DeletedAtUtc = DateTime.UtcNow;
+        archived.DeletedAtUtc = TestClock.UtcNow;
         await _context.SaveChangesAsync();
 
         var result = await _controller.AddFuel(
@@ -567,7 +568,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         {
             Id = ToUuid("empty-dp"), BrandId = BrandIds.Okko, Name = "ДП ЄВРО (empty)",
             BasePrice = 50m, DiscountPrice = 50m,
-            CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow
         });
         await _context.SaveChangesAsync();
 
@@ -601,12 +602,12 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         {
             Id = ToUuid("live-dp"), BrandId = BrandIds.Okko, Name = "ДП ЄВРО",
             BasePrice = 92.90m, DiscountPrice = 72.34m,
-            CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow
         });
         _context.FuelNominals.Add(new FuelNominal
         {
             FuelTypeId = ToUuid("live-dp"), Liters = 10m, DataKind = DataKinds.Real,
-            CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow
         });
         await _context.SaveChangesAsync();
     }
@@ -617,7 +618,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         {
             Id = ToUuid("qa-a95"), BrandId = BrandIds.Okko, Name = "А95 ЄВРО(QA)",
             BasePrice = 92.90m, DiscountPrice = 72.34m,
-            CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow
         });
         // The rehearsal flag lives on the NOMINAL now - the pool is part of the size's identity, and it is
         // what the storefront filters on. The size is here because a fuel with no nominal on it is
@@ -626,7 +627,7 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         _context.FuelNominals.Add(new FuelNominal
         {
             FuelTypeId = ToUuid("qa-a95"), Liters = 10m, DataKind = DataKinds.Qa,
-            CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow
         });
     }
 }

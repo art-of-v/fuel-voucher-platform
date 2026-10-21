@@ -2,6 +2,7 @@ using FuelFlow.Features.Brands;
 using FluentAssertions;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
@@ -61,8 +62,8 @@ public sealed class FuelTypeBrandFuelCodeTests : IClassFixture<TestDatabaseFixtu
             BrandFuelCode = code,
             BasePrice = 50m,
             DiscountPrice = 48m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
     [Fact]
@@ -71,7 +72,7 @@ public sealed class FuelTypeBrandFuelCodeTests : IClassFixture<TestDatabaseFixtu
         // The ambiguity the import would otherwise resolve arbitrarily: one code, two fuels, and
         // whichever row it picks becomes the fuel a voucher gets priced against.
         await using var context = CreateContext();
-        var now = DateTime.UtcNow;
+        var now = TestClock.UtcNow;
 
         context.FuelTypes.Add(Fuel("$1", BrandIds.Okko, "ДП ЄВРО (code test)", "9018"));
         await context.SaveChangesAsync();
@@ -222,7 +223,7 @@ public sealed class FuelTypeBrandFuelCodeTests : IClassFixture<TestDatabaseFixtu
         // The production shape, and the reason the migration above can exist at all: an operator
         // typed these off WOG's own sheet, so the name already is the token.
         await using var context = CreateContext();
-        var now = DateTime.UtcNow;
+        var now = TestClock.UtcNow;
 
         context.FuelTypes.AddRange(
             new FuelTypeEntity { Id = ToUuid("wog-dp-e5"), Name = "ДП Євро5", BrandId = BrandIds.Wog, BasePrice = 103.5m, DiscountPrice = 100m, CreatedAtUtc = now, UpdatedAtUtc = now },

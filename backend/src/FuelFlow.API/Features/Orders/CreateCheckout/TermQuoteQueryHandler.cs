@@ -4,6 +4,7 @@ using FuelFlow.Features.Settings;
 using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Orders.CreateCheckout;
@@ -75,7 +76,7 @@ from fuel in _context.FuelTypes.AsNoTracking()
         // The ladder must not offer a term the Brand cannot honour. Charging the long-term price and
         // then clamping the delivered validity down to the stock's paper term is exactly the mis-sell this
         // gate exists to prevent, so a term with no backing stock is simply not on the ladder.
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(SystemClock.UtcNow);
         var bestStockExpiration = await TermStockCoverage.BestStockExpirationAsync(
             _context, brandSlug ?? string.Empty, fuelTypeId, liters, cancellationToken);
 

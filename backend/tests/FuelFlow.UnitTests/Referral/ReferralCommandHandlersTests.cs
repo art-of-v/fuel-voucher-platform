@@ -3,6 +3,7 @@ using FuelFlow.Features.Referral.CreateReferralCode;
 using FuelFlow.Features.Referral.RedeemReferralCode;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.UnitTests.Referral;
@@ -37,8 +38,8 @@ public sealed class ReferralCommandHandlersTests : IDisposable
             PhoneNumber = phone,
             ReferralCode = referralCode,
             ReferredBy = referredBy,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
     }
 

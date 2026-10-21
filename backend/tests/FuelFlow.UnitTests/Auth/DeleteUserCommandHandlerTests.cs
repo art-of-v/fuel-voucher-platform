@@ -4,6 +4,7 @@ using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -141,11 +142,11 @@ public sealed class DeleteUserCommandHandlerTests
         // The levels mirror what production ships: migration 20260917192136 writes
         // ProductOwner 100 / Admin 50 / Manager 10 / User 0, and AddQaRole writes QA 5.
         context.Roles.AddRange(
-            new Role { Id = SeedRoles.ProductOwnerId, Name = SeedRoles.ProductOwnerName, Level = 100, CreatedAtUtc = DateTime.UtcNow },
-            new Role { Id = SeedRoles.AdminRoleId, Name = SeedRoles.AdminName, Level = 50, CreatedAtUtc = DateTime.UtcNow },
-            new Role { Id = SeedRoles.ManagerRoleId, Name = SeedRoles.ManagerName, Level = 10, CreatedAtUtc = DateTime.UtcNow },
-            new Role { Id = SeedRoles.QaRoleId, Name = SeedRoles.QaName, Level = 5, CreatedAtUtc = DateTime.UtcNow },
-            new Role { Id = SeedRoles.UserRoleId, Name = SeedRoles.UserName, Level = 0, CreatedAtUtc = DateTime.UtcNow });
+            new Role { Id = SeedRoles.ProductOwnerId, Name = SeedRoles.ProductOwnerName, Level = 100, CreatedAtUtc = TestClock.UtcNow },
+            new Role { Id = SeedRoles.AdminRoleId, Name = SeedRoles.AdminName, Level = 50, CreatedAtUtc = TestClock.UtcNow },
+            new Role { Id = SeedRoles.ManagerRoleId, Name = SeedRoles.ManagerName, Level = 10, CreatedAtUtc = TestClock.UtcNow },
+            new Role { Id = SeedRoles.QaRoleId, Name = SeedRoles.QaName, Level = 5, CreatedAtUtc = TestClock.UtcNow },
+            new Role { Id = SeedRoles.UserRoleId, Name = SeedRoles.UserName, Level = 0, CreatedAtUtc = TestClock.UtcNow });
         await context.SaveChangesAsync();
     }
 
@@ -165,7 +166,7 @@ public sealed class DeleteUserCommandHandlerTests
         {
             Id = Guid.NewGuid(), PhoneNumber = "+38099123456" + Random.Shared.Next(100),
             RoleId = rid, IsActive = true, TokenVersion = 1,
-            CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow
         };
         context.Users.Add(user);
         await context.SaveChangesAsync();

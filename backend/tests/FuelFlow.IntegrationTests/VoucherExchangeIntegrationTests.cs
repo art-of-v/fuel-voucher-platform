@@ -12,6 +12,7 @@ using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.Testing;
 using Hangfire;
 using Hangfire.Common;
 using Hangfire.States;
@@ -50,7 +51,7 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
         var old2 = Guid.NewGuid();
         var new1 = Guid.NewGuid();
         var new2 = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
 
         using (var seed = CreateContext())
         {
@@ -181,7 +182,7 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
         var actingUserId = Guid.NewGuid();
         var supplierId = Guid.NewGuid();
         var importId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
 
         var oldCosts = new[] { 88.00m, 91.50m, 93.00m, 95.25m, 97.00m };
         var oldIds = Enumerable.Range(0, 5).Select(_ => Guid.NewGuid()).ToList();
@@ -287,7 +288,7 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
         var importId = Guid.NewGuid();
         var oldIds = Enumerable.Range(0, 3).Select(_ => Guid.NewGuid()).ToList();
         var newIds = Enumerable.Range(0, 3).Select(_ => Guid.NewGuid()).ToList();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
 
         decimal? costBefore;
         using (var seed = CreateContext())
@@ -355,7 +356,7 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
         var importId = Guid.NewGuid();
         var oldA = Guid.NewGuid();
         var oldB = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
 
         using (var seed = CreateContext())
         {
@@ -400,7 +401,7 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
         var actingUserId = Guid.NewGuid();
         var supplierId = Guid.NewGuid();
         var importId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
         var uncosted = Guid.NewGuid();
 
         using (var seed = CreateContext())
@@ -440,7 +441,7 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
         var importId = Guid.NewGuid();
         var old1 = Guid.NewGuid();
         var new1 = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
 
         using (var seed = CreateContext())
         {
@@ -489,7 +490,7 @@ public async Task MoreOldThanNew_IsRefused_BecausePaperWouldBeLost()
         var old1 = Guid.NewGuid();
         var old2 = Guid.NewGuid();
         var new1 = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
 
         using (var seed = CreateContext())
         {
@@ -538,7 +539,7 @@ public async Task MoreNewThanOld_IsRefused_SoSurplusCannotEnterStockCheaply()
         var old1 = Guid.NewGuid();
         var new1 = Guid.NewGuid();
         var new2 = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
 
         using (var seed = CreateContext())
         {
@@ -588,7 +589,7 @@ public async Task MoreNewThanOld_IsRefused_SoSurplusCannotEnterStockCheaply()
         var importId = Guid.NewGuid();
         var assignedOld = Guid.NewGuid();
         var new1 = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
 
         using (var seed = CreateContext())
         {
@@ -647,7 +648,7 @@ public async Task MoreNewThanOld_IsRefused_SoSurplusCannotEnterStockCheaply()
 var actingUserId = Guid.NewGuid();
         var supplierId = Guid.NewGuid();
         var old1 = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
 
         using (var seed = CreateContext())
         {
@@ -681,7 +682,7 @@ var actingUserId = Guid.NewGuid();
         var old1 = Guid.NewGuid();
         var new1 = Guid.NewGuid();
         var new2 = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
 
         using (var seed = CreateContext())
         {
@@ -748,7 +749,7 @@ var actingUserId = Guid.NewGuid();
         var old2 = Guid.NewGuid();
         var new1 = Guid.NewGuid();
         var new2 = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
 
         using (var seed = CreateContext())
         {
@@ -830,8 +831,8 @@ var actingUserId = Guid.NewGuid();
             Id = userId,
             PhoneNumber = $"+38{userId:N}"[..20],
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
     private static void SeedSupplier(ApplicationDbContext ctx, Guid supplierId, string name = "Seed Supplier")
@@ -841,8 +842,8 @@ var actingUserId = Guid.NewGuid();
             Id = supplierId,
             Name = name,
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
     private static void SeedImport(ApplicationDbContext ctx, Guid importId)
@@ -851,8 +852,8 @@ var actingUserId = Guid.NewGuid();
             Id = importId,
             FileName = $"import-{importId:N}.pdf",
             Status = "Completed",
-            StartedAtUtc = DateTime.UtcNow,
-            CompletedAtUtc = DateTime.UtcNow
+            StartedAtUtc = TestClock.UtcNow,
+            CompletedAtUtc = TestClock.UtcNow
         });
 
     /// <summary>
@@ -869,8 +870,8 @@ var actingUserId = Guid.NewGuid();
             UserId = userId,
             Price = 0,
             Status = OrderStatus.Fulfilled,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         return orderId;
     }
@@ -892,8 +893,8 @@ var actingUserId = Guid.NewGuid();
             OrderId = orderId,
             SupplierId = supplierId,
             CostPerLiter = costPerLiter,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
     private static async Task ResetDataAsync(ApplicationDbContext context)

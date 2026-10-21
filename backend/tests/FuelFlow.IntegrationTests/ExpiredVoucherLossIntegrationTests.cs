@@ -10,6 +10,7 @@ using FuelFlow.Features.Vouchers.PurchaseBatchCost;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -81,7 +82,7 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
     [Fact]
     public async Task BookExpiredLoss_RespectsTheGraceWindow_OnRealPostgres()
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
 
         await SeedAsync(seed =>
         {
@@ -90,9 +91,9 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
             {
                 Id = ImportId,
                 FileName = "grace-window.pdf",
-                CompletedAtUtc = DateTime.UtcNow,
+                CompletedAtUtc = TestClock.UtcNow,
                 Status = "Completed",
-                StartedAtUtc = DateTime.UtcNow
+                StartedAtUtc = TestClock.UtcNow
             });
 
             // Default window is 14 days. The boundary is pinned on both sides, because the day it falls
@@ -370,7 +371,7 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
             {
                 Key = AppSettingKeys.ExpiredVoucherLossEnabled,
                 Value = "true",
-                UpdatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow,
                 // No author: the setting was written by hand rather than through the admin screen.
                 UpdatedByUserId = null,
                 UpdatedByUserName = null
@@ -408,15 +409,15 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
             Id = operatorId,
             PhoneNumber = $"+38{operatorId:N}"[..20],
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         seed.AppSettings.Add(new AppSetting
         {
             Key = AppSettingKeys.ExpiredVoucherLossEnabled,
             Value = "true",
-            UpdatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
             UpdatedByUserId = operatorId,
             UpdatedByUserName = "Test Operator"
         });
@@ -430,7 +431,7 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
     /// </summary>
     private static void SeedBatchCost(ApplicationDbContext seed, decimal costPerLiter)
     {
-        var now = DateTime.UtcNow;
+        var now = TestClock.UtcNow;
 
         var supplierId = seed.Suppliers.Select(s => s.Id).FirstOrDefault();
         if (supplierId == Guid.Empty)
@@ -490,7 +491,7 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
     // pins the window itself; these fixtures pin what happens once it has closed.
     private static void SeedFixture(ApplicationDbContext seed)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
         var lapsed = today.AddDays(-LapsedDaysAgo);
         var tomorrow = today.AddDays(1);
 
@@ -500,9 +501,9 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
         {
             Id = ImportId,
             FileName = "batch.pdf",
-            CompletedAtUtc = DateTime.UtcNow,
+            CompletedAtUtc = TestClock.UtcNow,
             Status = "Completed",
-            StartedAtUtc = DateTime.UtcNow
+            StartedAtUtc = TestClock.UtcNow
         });
 
         // The already-sold vouchers below sit in somebody's hands, so ck_voucher_held_has_order
@@ -513,8 +514,8 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
             Id = holderId,
             PhoneNumber = $"+38{holderId:N}"[..20],
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         var soldOrderId = SeedPurchaseOrder(seed, holderId);
 
@@ -536,8 +537,8 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
             UserId = userId,
             Price = 0,
             Status = OrderStatus.Fulfilled,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         return orderId;
     }
@@ -562,8 +563,8 @@ public sealed class ExpiredVoucherLossIntegrationTests : IClassFixture<TestDatab
         AssignedToUserId = assignedToUserId,
         OrderId = orderId,
         ImportJobId = ImportId,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 
     private async Task SeedAsync(Action<ApplicationDbContext> seed)

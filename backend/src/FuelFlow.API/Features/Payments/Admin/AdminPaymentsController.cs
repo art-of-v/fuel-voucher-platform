@@ -5,6 +5,7 @@ using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -277,7 +278,7 @@ public sealed class AdminPaymentsController : ControllerBase
         });
         payment.OrderId = orderId;
         payment.UserId = customerId;
-        payment.UpdatedAtUtc = DateTime.UtcNow;
+        payment.UpdatedAtUtc = SystemClock.UtcNow;
 
         await _context.SaveChangesAsync(ct);
         await RecordAsync(payment, before, after, ct);

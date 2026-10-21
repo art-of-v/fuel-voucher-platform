@@ -1,5 +1,6 @@
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Orders.DeleteMyOrder;
@@ -34,7 +35,7 @@ public sealed class DeleteMyOrderCommandHandler
         if (order is null) return false;
 
         order.IsDeleted = true;
-        order.UpdatedAtUtc = DateTime.UtcNow;
+        order.UpdatedAtUtc = SystemClock.UtcNow;
         await _context.SaveChangesAsync(cancellationToken);
         return true;
     }

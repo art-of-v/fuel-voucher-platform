@@ -19,6 +19,7 @@ using FuelFlow.Features.Settings;
 using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Time;
 using FuelFlow.Persistence;
 using Hangfire;
 using Hangfire.Dashboard;
@@ -55,6 +56,10 @@ try
         .Get<ObservabilityOptions>() ?? new ObservabilityOptions();
 
     builder.WebHost.UseUrls($"http://0.0.0.0:{observability.Prometheus.WorkerPort}");
+
+    // The application's clock, as a service - the same registration the API makes, so the worker
+    // and the API read the same time. See SystemClock.
+    builder.Services.AddSingleton<TimeProvider>(SystemClock.Provider);
 
     builder.Services.AddSerilog((services, lc) =>
     {

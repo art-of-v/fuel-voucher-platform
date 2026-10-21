@@ -3,6 +3,7 @@ using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Acquiring.Reconciliation;
@@ -182,7 +183,7 @@ public sealed class GetStatementReconciliationQueryHandler
 
         var reference = (query.Year, query.Month) is var (year, month) && year is not null && month is not null
             ? new DateTime(year.Value, month.Value, 1, 0, 0, 0, DateTimeKind.Utc)
-            : new DateTime((now ?? DateTime.UtcNow).Year, (now ?? DateTime.UtcNow).Month, 1, 0, 0, 0, DateTimeKind.Utc);
+            : new DateTime((now ?? SystemClock.UtcNow).Year, (now ?? SystemClock.UtcNow).Month, 1, 0, 0, 0, DateTimeKind.Utc);
 
         var nextMonth = reference.AddMonths(1);
 

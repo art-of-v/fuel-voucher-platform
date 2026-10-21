@@ -4,6 +4,7 @@ using FuelFlow.Features.Settings;
 using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.Testing;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -314,13 +315,13 @@ public sealed class AdminSettingsControllerVoucherRenewalTests : IDisposable
             {
                 Key = FuelFlow.Features.Settings.SharedModels.AppSettingKeys.VoucherRenewalEnabled,
                 Value = "true",
-                UpdatedAtUtc = DateTime.UtcNow
+                UpdatedAtUtc = TestClock.UtcNow
             },
             new FuelFlow.Features.Settings.SharedModels.AppSetting
             {
                 Key = FuelFlow.Features.Settings.SharedModels.AppSettingKeys.DeletedUnpaidOrderCleanupRetentionDays,
                 Value = "45",
-                UpdatedAtUtc = DateTime.UtcNow
+                UpdatedAtUtc = TestClock.UtcNow
             });
         _context.SaveChanges();
 

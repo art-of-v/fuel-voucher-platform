@@ -1,6 +1,7 @@
 using FuelFlow.Features.Ledger;
 using FuelFlow.Features.Ledger.SharedModels;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.SharedKernel.Time;
 
 namespace FuelFlow.Features.Monobank.ProcessWebhook;
 
@@ -40,7 +41,7 @@ public sealed partial class ProcessMonobankWebhookCommandHandler
                 SourceEvent = "payment.received",
                 SourceType = JournalSourceType.Payment,
                 SourceId = order.Id,
-                EntryDate = DateOnly.FromDateTime(DateTime.UtcNow),
+                EntryDate = DateOnly.FromDateTime(SystemClock.UtcNow),
                 AmountUah = netUah + vatUah,
                 Description = $"Оплата замовлення {order.Id}",
                 PostedByUserId = order.UserId,
@@ -56,7 +57,7 @@ public sealed partial class ProcessMonobankWebhookCommandHandler
                 SourceEvent = "payment.received.vat",
                 SourceType = JournalSourceType.Payment,
                 SourceId = order.Id,
-                EntryDate = DateOnly.FromDateTime(DateTime.UtcNow),
+                EntryDate = DateOnly.FromDateTime(SystemClock.UtcNow),
                 AmountUah = vatUah,
                 Description = $"ПДВ з оплати замовлення {order.Id}",
                 PostedByUserId = order.UserId,

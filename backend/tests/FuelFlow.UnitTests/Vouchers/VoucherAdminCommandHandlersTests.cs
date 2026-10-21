@@ -17,6 +17,7 @@ using FuelFlow.Features.Vouchers.UnblockVoucher;
 using FuelFlow.Features.Vouchers.UpdateVoucher;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Hangfire;
 using Hangfire.Common;
 using Hangfire.States;
@@ -66,11 +67,11 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
     {
         var fuelTypes = new[]
         {
-            new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = ToUuid("okko-95"), Name = "A-95", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = ToUuid("okko-p95"), Name = "Pulls 95", BrandId = BrandIds.Okko, BasePrice = 62, DiscountPrice = 58, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = ToUuid("wog-dp"), Name = "ДП Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = ToUuid("wog-95"), Name = "A-95 Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow }
+            new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("okko-95"), Name = "A-95", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("okko-p95"), Name = "Pulls 95", BrandId = BrandIds.Okko, BasePrice = 62, DiscountPrice = 58, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("wog-dp"), Name = "ДП Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("wog-95"), Name = "A-95 Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow }
         };
         _context.FuelTypes.AddRange(fuelTypes);
         _context.SaveChanges();
@@ -88,8 +89,8 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
         UserId = UserId,
         Price = 2500,
         Status = OrderStatus.Fulfilled,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 
     /// <summary>
@@ -109,7 +110,7 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
                 Status = VoucherStatus.Available,
                 DataKind = DataKinds.Real,
                 IsDeleted = false,
-                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+                SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
                 VoucherCount = 1
             });
         }
@@ -130,15 +131,15 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
             Brand = brand,
             FuelTypeId = ToUuid(fuelTypeId),
             Liters = 50,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
             VoucherNumber = voucherNumber ?? $"{brand}-{Guid.NewGuid().ToString()[..8]}",
             QrPayload = Guid.NewGuid().ToString(),
             Status = status,
             AssignedToUserId = status == VoucherStatus.Assigned || status == VoucherStatus.Used ? UserId : null,
             ImportJobId = importJobId,
-            CreatedAtUtc = createdAtUtc ?? DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = createdAtUtc ?? TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
     }
 
@@ -278,14 +279,14 @@ public sealed class VoucherAdminCommandHandlersTests : IDisposable
             UserId = UserId,
             Price = 2500,
             Status = OrderStatus.Fulfilled,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         _context.Fulfillments.Add(new Fulfillment
         {
             OrderId = orderId,
             VoucherId = voucher.Id,
-            FulfilledAtUtc = DateTime.UtcNow
+            FulfilledAtUtc = TestClock.UtcNow
         });
         await _context.SaveChangesAsync();
 
@@ -583,7 +584,7 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
     [Fact]
     public async Task BulkAction_Assign_ShouldRejectAndKeepVoucherUnchanged()
     {
-        var voucher = CreateVoucher(status: VoucherStatus.Available, createdAtUtc: DateTime.UtcNow);
+        var voucher = CreateVoucher(status: VoucherStatus.Available, createdAtUtc: TestClock.UtcNow);
         _context.FuelVouchers.Add(voucher);
         await _context.SaveChangesAsync();
 
@@ -652,9 +653,9 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
     public async Task GetAdminVouchers_ShouldReturnPagedListAndTotal()
     {
         _context.FuelVouchers.AddRange(
-            CreateVoucher(createdAtUtc: DateTime.UtcNow),
-            CreateVoucher(createdAtUtc: DateTime.UtcNow.AddDays(-1)),
-            CreateVoucher(createdAtUtc: DateTime.UtcNow.AddDays(-2)));
+            CreateVoucher(createdAtUtc: TestClock.UtcNow),
+            CreateVoucher(createdAtUtc: TestClock.UtcNow.AddDays(-1)),
+            CreateVoucher(createdAtUtc: TestClock.UtcNow.AddDays(-2)));
         await _context.SaveChangesAsync();
 
         var handler = new GetAdminVouchersQueryHandler(_context);
@@ -689,8 +690,8 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
             PhoneNumber = "+10000000002",
             FirstName = "Ivan",
             LastName = "Petrenko",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         var gifted = CreateVoucher(status: VoucherStatus.Assigned, voucherNumber: "OKKO-GIFT-1");
@@ -802,8 +803,8 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
             Id = Guid.NewGuid(),
             FileName = fileName,
             PageCount = 1,
-            StartedAtUtc = DateTime.UtcNow.AddHours(-1),
-            CompletedAtUtc = DateTime.UtcNow,
+            StartedAtUtc = TestClock.UtcNow.AddHours(-1),
+            CompletedAtUtc = TestClock.UtcNow,
             Status = "Completed",
             ImportedCount = importedCount,
             DuplicateCount = 0,
@@ -910,8 +911,8 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
             Id = id,
             Name = "Seed Supplier",
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         await _context.SaveChangesAsync();
         return id;
@@ -943,7 +944,7 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
-            ExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            ExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
             VoucherNumber = voucherNumber,
             QrPayload = qrPayload,
             Confidence = 100,
@@ -1076,8 +1077,8 @@ public async Task BulkAction_Activate_ShouldRefuse_WhenVoucherHasNoCost()
     [Fact]
     public async Task GetVouchers_ShouldReturnVouchersWithFields()
     {
-        var v1 = CreateVoucher(voucherNumber: "OKKO-LIST-1", createdAtUtc: DateTime.UtcNow);
-        var v2 = CreateVoucher(voucherNumber: "OKKO-LIST-2", createdAtUtc: DateTime.UtcNow.AddMinutes(-1));
+        var v1 = CreateVoucher(voucherNumber: "OKKO-LIST-1", createdAtUtc: TestClock.UtcNow);
+        var v2 = CreateVoucher(voucherNumber: "OKKO-LIST-2", createdAtUtc: TestClock.UtcNow.AddMinutes(-1));
         _context.FuelVouchers.AddRange(v1, v2);
         await _context.SaveChangesAsync();
 

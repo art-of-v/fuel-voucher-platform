@@ -4,6 +4,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
@@ -41,8 +42,8 @@ internal static class CompanyTestFactory
             FirstName = firstName,
             LastName = lastName,
             IsDeleted = isDeleted,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
     public static LegalEntity NewLegalEntity(
@@ -56,8 +57,8 @@ internal static class CompanyTestFactory
             UserId = ownerUserId,
             Name = name,
             Edrpou = edrpou,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
     public static CompanyMember NewMember(Guid id, Guid legalEntityId, Guid workerUserId)
@@ -66,7 +67,7 @@ internal static class CompanyTestFactory
             Id = id,
             LegalEntityId = legalEntityId,
             WorkerUserId = workerUserId,
-            JoinedAtUtc = DateTime.UtcNow
+            JoinedAtUtc = TestClock.UtcNow
         };
 
     public static CompanyInvitation NewInvitation(
@@ -84,8 +85,8 @@ internal static class CompanyTestFactory
             WorkerUserId = workerUserId,
             WorkerPhoneNumber = workerPhoneNumber,
             Status = status,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
     public static FuelVoucher NewVoucher(
@@ -104,15 +105,15 @@ internal static class CompanyTestFactory
             Brand = brand,
             FuelTypeId = ToUuid(fuelTypeId),
             Liters = liters,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
             VoucherNumber = $"V-{id.ToString()[..8]}",
             QrPayload = $"qr-{id}",
             Status = status,
             LegalEntityId = legalEntityId,
             AssignedToUserId = assignedToUserId,
             WorkerUserId = workerUserId,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 }

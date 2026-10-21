@@ -1,5 +1,6 @@
 using FuelFlow.Persistence;
 using FuelFlow.Features.Auth.SharedModels;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Auth.Logout;
@@ -40,7 +41,7 @@ public sealed class LogoutDeviceCommandHandler
                         && !rt.IsRevoked)
             .ToListAsync(cancellationToken);
 
-        var now = DateTime.UtcNow;
+        var now = SystemClock.UtcNow;
         foreach (var refreshToken in refreshTokens)
         {
             refreshToken.IsRevoked = true;
@@ -79,7 +80,7 @@ public sealed class LogoutEverywhereCommandHandler
             .Where(rt => rt.UserId == command.UserId && !rt.IsRevoked)
             .ToListAsync(cancellationToken);
 
-        var now = DateTime.UtcNow;
+        var now = SystemClock.UtcNow;
         foreach (var refreshToken in refreshTokens)
         {
             refreshToken.IsRevoked = true;

@@ -4,6 +4,7 @@ using System.Threading.Channels;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Npgsql;
+using FuelFlow.SharedKernel.Time;
 
 namespace FuelFlow.Features.ErrorLogs.Logging;
 
@@ -184,7 +185,7 @@ internal sealed class DatabaseLogger : ILogger, ISupportExternalScope
 
         _writer.TryWrite(new ErrorLogEntry(
             Guid.NewGuid(),
-            DateTime.UtcNow,
+            SystemClock.UtcNow,
             logLevel.ToString(),
             Truncate(message, MaxMessageLength),
             exception?.GetType().FullName,

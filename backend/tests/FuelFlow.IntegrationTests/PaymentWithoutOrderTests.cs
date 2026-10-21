@@ -2,6 +2,7 @@ using FluentAssertions;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -57,7 +58,7 @@ public class PaymentWithoutOrderTests : WebApplicationFactory<Program>, IClassFi
             .Where(r => r.Name == SeedRoles.UserName)
             .Select(r => r.Id)
             .FirstAsync();
-        var now = DateTime.UtcNow;
+        var now = TestClock.UtcNow;
 
         var user = new User
         {
@@ -92,11 +93,11 @@ public class PaymentWithoutOrderTests : WebApplicationFactory<Program>, IClassFi
             AmountKopecks = 150000,
             Currency = "UAH",
             Status = PaymentStatus.Succeeded,
-            PaidAtUtc = DateTime.UtcNow,
+            PaidAtUtc = TestClock.UtcNow,
             CreatedByUserId = authorId ?? userId,
             CreatedByUserName = authorName ?? "finance",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
         };
 
         context.Payments.Add(payment);
@@ -196,7 +197,7 @@ public class PaymentWithoutOrderTests : WebApplicationFactory<Program>, IClassFi
         // starts passing, something is writing an approval onto provider evidence.
         using var context = NewContext();
         var roleId = await context.Roles.Where(r => r.Name == SeedRoles.UserName).Select(r => r.Id).FirstAsync();
-        var now = DateTime.UtcNow;
+        var now = TestClock.UtcNow;
 
         var customer = new User
         {

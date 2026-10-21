@@ -2,6 +2,7 @@ using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
@@ -64,7 +65,7 @@ public sealed class UpdateVoucherCommandHandler
         if (command.AssignedToUserId.HasValue)
             entity.AssignedToUserId = newAssignedToUserId;
 
-        var changedAtUtc = DateTime.UtcNow;
+        var changedAtUtc = SystemClock.UtcNow;
         entity.UpdatedAtUtc = changedAtUtc;
         _context.FuelVouchers.Update(entity);
 

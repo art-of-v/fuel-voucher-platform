@@ -4,6 +4,7 @@ using FuelFlow.Features.Vouchers.GetAdminVouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
@@ -47,8 +48,8 @@ public sealed class UnarchiveVoucherListTests : IDisposable
             BrandId = BrandIds.Okko,
             BasePrice = 55,
             DiscountPrice = 52,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         _context.SaveChanges();
     }
@@ -62,14 +63,14 @@ public sealed class UnarchiveVoucherListTests : IDisposable
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
             VoucherNumber = $"OKKO-{Guid.NewGuid():N}"[..20],
             QrPayload = Guid.NewGuid().ToString(),
             Status = VoucherStatus.Available,
             IsDeleted = archived,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         await _context.SaveChangesAsync();

@@ -3,6 +3,7 @@ using FluentAssertions;
 using FuelFlow.Features.Feedback;
 using FuelFlow.Features.Feedback.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.Testing;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -152,7 +153,7 @@ public sealed class AdminFeedbackIntegrationTests : IClassFixture<TestDatabaseFi
                 StaffUserName = "Artem",
                 Text = "додамо",
                 DeliveredMessageId = 42,
-                SentAtUtc = DateTime.UtcNow
+                SentAtUtc = TestClock.UtcNow
             });
             await context.SaveChangesAsync();
         }
@@ -231,7 +232,7 @@ public sealed class AdminFeedbackIntegrationTests : IClassFixture<TestDatabaseFi
                 FeedbackMessageId = junk,
                 StaffUserId = 1,
                 Text = "відповідь",
-                SentAtUtc = DateTime.UtcNow
+                SentAtUtc = TestClock.UtcNow
             });
             await context.SaveChangesAsync();
         }
@@ -332,7 +333,7 @@ public sealed class AdminFeedbackIntegrationTests : IClassFixture<TestDatabaseFi
             Language = FeedbackLanguage.Uk,
             Summary = summary,
             Status = FeedbackStatus.New,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow
         };
 
         await using var context = CreateContext();

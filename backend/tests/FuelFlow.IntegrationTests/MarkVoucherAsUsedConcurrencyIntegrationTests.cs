@@ -6,6 +6,7 @@ using FuelFlow.Features.Vouchers.MarkVoucherAsUsed;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -61,7 +62,7 @@ public sealed class MarkVoucherAsUsedConcurrencyIntegrationTests : IClassFixture
             .SingleAsync();
 
         stored.Status.Should().Be(VoucherStatus.Used);
-        stored.UpdatedAtUtc.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(10));
+        stored.UpdatedAtUtc.Should().BeCloseTo(TestClock.UtcNow, TimeSpan.FromSeconds(10));
     }
 
     /// <summary>
@@ -209,8 +210,8 @@ public sealed class MarkVoucherAsUsedConcurrencyIntegrationTests : IClassFixture
             Id = userId,
             PhoneNumber = $"+38{userId:N}"[..20],
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         seed.FuelVouchers.Add(new FuelVoucher
@@ -220,15 +221,15 @@ public sealed class MarkVoucherAsUsedConcurrencyIntegrationTests : IClassFixture
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
             VoucherNumber = $"OKKO-{voucherId:N}"[..20],
             QrPayload = $"payload-{voucherId:N}",
             Status = VoucherStatus.Assigned,
             AssignedToUserId = userId,
             OrderId = SeedPurchaseOrder(seed, userId),
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         await seed.SaveChangesAsync();
@@ -247,8 +248,8 @@ public sealed class MarkVoucherAsUsedConcurrencyIntegrationTests : IClassFixture
             UserId = userId,
             Price = 0,
             Status = OrderStatus.Fulfilled,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         return orderId;
     }

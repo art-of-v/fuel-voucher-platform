@@ -12,6 +12,7 @@ using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -86,8 +87,8 @@ public sealed class FulfillmentTransactionScopeTests : IClassFixture<TestDatabas
                 Id = userId,
                 PhoneNumber = $"+38{userId:N}"[..20],
                 IsActive = true,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
 
             // Two orders that will be left alone: a mismatch, and an age past the grace window.
@@ -96,7 +97,7 @@ public sealed class FulfillmentTransactionScopeTests : IClassFixture<TestDatabas
             {
                 var order = Order(orderId, userId, brand, fuelTypeId, liters, quantity: 1, unitPrice: 2500);
                 order.Status = OrderStatus.Fulfilled;
-                order.FulfilledAtUtc = DateTime.UtcNow.AddHours(-2);
+                order.FulfilledAtUtc = TestClock.UtcNow.AddHours(-2);
                 AddPaidOrder(seed, order);
 
                 // Two delivery records for one line item: the mismatch. Both are left standing - the
@@ -109,7 +110,7 @@ public sealed class FulfillmentTransactionScopeTests : IClassFixture<TestDatabas
                     {
                         OrderId = orderId,
                         VoucherId = voucherId,
-                        FulfilledAtUtc = DateTime.UtcNow.AddHours(-2)
+                        FulfilledAtUtc = TestClock.UtcNow.AddHours(-2)
                     });
                 }
             }
@@ -189,13 +190,13 @@ public sealed class FulfillmentTransactionScopeTests : IClassFixture<TestDatabas
                 Id = userId,
                 PhoneNumber = $"+38{userId:N}"[..20],
                 IsActive = true,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
 
             var order = Order(leftAloneOrderId, userId, brand, fuelTypeId, liters, quantity: 1, unitPrice: 2500);
             order.Status = OrderStatus.Fulfilled;
-            order.FulfilledAtUtc = DateTime.UtcNow.AddHours(-2);
+            order.FulfilledAtUtc = TestClock.UtcNow.AddHours(-2);
             AddPaidOrder(seed, order);
 
             foreach (var tag in new[] { "TX-A", "TX-B" })
@@ -206,7 +207,7 @@ public sealed class FulfillmentTransactionScopeTests : IClassFixture<TestDatabas
                 {
                     OrderId = leftAloneOrderId,
                     VoucherId = voucherId,
-                    FulfilledAtUtc = DateTime.UtcNow.AddHours(-2)
+                    FulfilledAtUtc = TestClock.UtcNow.AddHours(-2)
                 });
             }
 
@@ -230,8 +231,8 @@ public sealed class FulfillmentTransactionScopeTests : IClassFixture<TestDatabas
         UserId = userId,
         Price = quantity * unitPrice,
         Status = OrderStatus.PendingFulfillment,
-        CreatedAtUtc = DateTime.UtcNow.AddDays(-1),
-        UpdatedAtUtc = DateTime.UtcNow.AddDays(-1),
+        CreatedAtUtc = TestClock.UtcNow.AddDays(-1),
+        UpdatedAtUtc = TestClock.UtcNow.AddDays(-1),
         LineItems = new List<OrderLineItem>
         {
             new OrderLineItem
@@ -257,15 +258,15 @@ public sealed class FulfillmentTransactionScopeTests : IClassFixture<TestDatabas
         Brand = brand,
         FuelTypeId = ToUuid(fuelTypeId),
         Liters = liters,
-        SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
-        CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+        SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
+        CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
         VoucherNumber = $"{tag}-{id:N}",
         QrPayload = $"{tag}-{id:N}",
         Status = VoucherStatus.Assigned,
         AssignedToUserId = userId,
         OrderId = orderId,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 
     private static FuelVoucher Available(
@@ -276,13 +277,13 @@ public sealed class FulfillmentTransactionScopeTests : IClassFixture<TestDatabas
         Brand = brand,
         FuelTypeId = ToUuid(fuelTypeId),
         Liters = liters,
-        SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
-        CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+        SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
+        CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
         VoucherNumber = $"{tag}-{id:N}",
         QrPayload = $"{tag}-{id:N}",
         Status = VoucherStatus.Available,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 
     private static async Task ResetDataAsync(ApplicationDbContext context)
@@ -329,9 +330,9 @@ public sealed class FulfillmentTransactionScopeTests : IClassFixture<TestDatabas
             AmountKopecks = (long)(order.Price * 100),
             Currency = "UAH",
             Status = PaymentStatus.Succeeded,
-            PaidAtUtc = DateTime.UtcNow,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            PaidAtUtc = TestClock.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
     }
 }

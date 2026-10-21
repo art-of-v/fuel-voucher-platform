@@ -6,6 +6,7 @@ using FuelFlow.Features.Vouchers.GetInventory;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -55,8 +56,8 @@ public sealed class AdminAggregationSqlTests : IClassFixture<TestDatabaseFixture
             Id = userId,
             PhoneNumber = $"+38{userId:N}"[..20],
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         var orderId = Guid.NewGuid();
@@ -66,9 +67,9 @@ public sealed class AdminAggregationSqlTests : IClassFixture<TestDatabaseFixture
             UserId = userId,
             Price = 100m,
             Status = OrderStatus.Fulfilled,
-            FulfilledAtUtc = DateTime.UtcNow,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            FulfilledAtUtc = TestClock.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
             LineItems =
             [
                 new OrderLineItem
@@ -114,8 +115,8 @@ public sealed class AdminAggregationSqlTests : IClassFixture<TestDatabaseFixture
             Id = userId,
             PhoneNumber = $"+38{userId:N}"[..20],
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         var orderId = Guid.NewGuid();
@@ -125,8 +126,8 @@ public sealed class AdminAggregationSqlTests : IClassFixture<TestDatabaseFixture
             UserId = userId,
             Price = 100m,
             Status = OrderStatus.PendingFulfillment,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         context.FuelVouchers.AddRange(
@@ -161,7 +162,7 @@ public sealed class AdminAggregationSqlTests : IClassFixture<TestDatabaseFixture
         CustomerExpirationDate = new DateOnly(2027, 1, 1),
         Status = status,
         OrderId = orderId,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 }

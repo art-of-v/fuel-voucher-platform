@@ -11,6 +11,7 @@ using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Notifications.Email;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -99,7 +100,7 @@ public sealed class AdminLoginHandlersTests : IDisposable
 
     private async Task SeedUser(string phone, string roleName, bool banned = false, bool deleted = false)
     {
-        var role = new Role { Id = Guid.NewGuid(), Name = roleName, CreatedAtUtc = DateTime.UtcNow };
+        var role = new Role { Id = Guid.NewGuid(), Name = roleName, CreatedAtUtc = TestClock.UtcNow };
         _context.Roles.Add(role);
         _context.Users.Add(new User
         {
@@ -109,8 +110,8 @@ public sealed class AdminLoginHandlersTests : IDisposable
             IsActive = true,
             IsBanned = banned,
             IsDeleted = deleted,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         await _context.SaveChangesAsync();
     }
@@ -122,8 +123,8 @@ public sealed class AdminLoginHandlersTests : IDisposable
             Id = Guid.NewGuid(),
             PhoneNumber = phone,
             Code = SecretsHasher.Hash(rawCode),
-            ExpiresAtUtc = DateTime.UtcNow.AddMinutes(5),
-            CreatedAtUtc = DateTime.UtcNow,
+            ExpiresAtUtc = TestClock.UtcNow.AddMinutes(5),
+            CreatedAtUtc = TestClock.UtcNow,
             IsUsed = false
         });
         await _context.SaveChangesAsync();

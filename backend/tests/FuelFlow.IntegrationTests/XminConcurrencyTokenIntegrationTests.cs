@@ -5,6 +5,7 @@ using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Features.Vouchers.Renewal.Operator;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -146,8 +147,8 @@ public sealed class XminConcurrencyTokenIntegrationTests : IClassFixture<TestDat
             Id = orderId,
             PhoneNumber = $"+38{orderId:N}"[..20],
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         seed.Orders.Add(new Order
@@ -156,8 +157,8 @@ public sealed class XminConcurrencyTokenIntegrationTests : IClassFixture<TestDat
             UserId = orderId,
             Price = 100m,
             Status = OrderStatus.Refunded,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         // A refund is a payment of kind 'Refund', and a refund must name the capture it reverses - so this
@@ -174,9 +175,9 @@ public sealed class XminConcurrencyTokenIntegrationTests : IClassFixture<TestDat
             AmountKopecks = amount,
             Currency = "UAH",
             Status = PaymentStatus.Succeeded,
-            PaidAtUtc = DateTime.UtcNow,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            PaidAtUtc = TestClock.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
         };
         seed.Payments.Add(capture);
 
@@ -192,8 +193,8 @@ public sealed class XminConcurrencyTokenIntegrationTests : IClassFixture<TestDat
             AmountKopecks = amount,
             Currency = "UAH",
             Status = PaymentStatus.Pending,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
         };
         seed.Payments.Add(refund);
 

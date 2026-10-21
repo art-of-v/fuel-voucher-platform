@@ -5,6 +5,7 @@ using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Company.BlockWorkerVoucher;
@@ -79,7 +80,7 @@ public sealed class BlockWorkerVoucherCommandHandler
 
         // Repeat the status predicate in the UPDATE so a block cannot race a redemption:
         // exactly one of a concurrent block / mark-as-used wins.
-        var blockedAtUtc = DateTime.UtcNow;
+        var blockedAtUtc = SystemClock.UtcNow;
         var affected = await _context.FuelVouchers
             .Where(v => v.Id == command.VoucherId
                         && v.Status == VoucherStatus.Assigned

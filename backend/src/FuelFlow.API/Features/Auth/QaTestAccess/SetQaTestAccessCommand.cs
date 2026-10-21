@@ -5,6 +5,7 @@ using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
@@ -111,7 +112,7 @@ public sealed class SetQaTestAccessCommandHandler
     /// </summary>
     private async Task<int> RevokeQaSessionsAsync(CancellationToken cancellationToken)
     {
-        var now = DateTime.UtcNow;
+        var now = SystemClock.UtcNow;
 
         // The context runs with global NoTracking, so every entity we intend to mutate must be
         // loaded AsTracking() or SaveChanges would silently persist nothing (mirrors

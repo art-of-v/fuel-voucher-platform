@@ -4,6 +4,7 @@ using FuelFlow.Features.Pricing.ImportKloPrices;
 using FuelFlow.Features.Pricing.ScrapeMinfinPrices;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -54,8 +55,8 @@ public sealed class ImportKloPricesCommandHandlerTests : IDisposable
             Name = "klo",
             LogoText = "klo",
             Color = "#000",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         await _context.SaveChangesAsync();
         _context.ChangeTracker.Clear();
@@ -74,8 +75,8 @@ public sealed class ImportKloPricesCommandHandlerTests : IDisposable
                 Id = Guid.CreateVersion7(),
                 BrandId = BrandIds.Klo,
                 Name = name,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
         }
 
@@ -170,8 +171,8 @@ public sealed class ImportKloPricesCommandHandlerTests : IDisposable
             BrandId = BrandIds.Klo,
             SupplierPricePerLiter = 40m,
             MarginUahPerLiter = 3m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         await _context.SaveChangesAsync();
         _context.ChangeTracker.Clear();

@@ -1,4 +1,5 @@
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Time;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -20,7 +21,7 @@ public sealed class DeleteBrandCommandHandler
         // Archive, never Remove: contracts and Brand_nodes cascade from here, and those point
         // toward vouchers, so removing a Brand could reach paid-for paper (#217).
         entity.IsDeleted = true;
-        entity.DeletedAtUtc = DateTime.UtcNow;
+        entity.DeletedAtUtc = SystemClock.UtcNow;
         await _context.SaveChangesAsync(ct);
         return true;
     }

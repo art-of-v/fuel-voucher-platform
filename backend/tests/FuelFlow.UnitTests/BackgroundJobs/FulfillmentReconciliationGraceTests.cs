@@ -10,6 +10,7 @@ using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -65,9 +66,9 @@ public sealed class FulfillmentReconciliationGraceTests : IDisposable
             Kind = OrderKind.Purchase,
             Status = OrderStatus.Fulfilled,
             Price = 100m,
-            CreatedAtUtc = DateTime.UtcNow - age,
-            FulfilledAtUtc = DateTime.UtcNow - age,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow - age,
+            FulfilledAtUtc = TestClock.UtcNow - age,
+            UpdatedAtUtc = TestClock.UtcNow,
             LineItems =
             [
                 new OrderLineItem
@@ -98,12 +99,12 @@ public sealed class FulfillmentReconciliationGraceTests : IDisposable
                 VoucherNumber = $"V-GRACE-{i}",
                 QrPayload = Guid.NewGuid().ToString(),
                 Status = VoucherStatus.Assigned,
-                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
-                CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
+                SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(3)),
+                CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(3)),
                 OrderId = order.Id,
                 AssignedToUserId = userId,
-                CreatedAtUtc = DateTime.UtcNow - age,
-                UpdatedAtUtc = DateTime.UtcNow,
+                CreatedAtUtc = TestClock.UtcNow - age,
+                UpdatedAtUtc = TestClock.UtcNow,
             };
             _context.FuelVouchers.Add(voucher);
             _context.Fulfillments.Add(new Fulfillment
@@ -111,7 +112,7 @@ public sealed class FulfillmentReconciliationGraceTests : IDisposable
                 OrderId = order.Id,
                 VoucherId = voucher.Id,
                 // Newest first, the way the reconciler ranks them when choosing what to remove.
-                FulfilledAtUtc = DateTime.UtcNow - age + TimeSpan.FromSeconds(i),
+                FulfilledAtUtc = TestClock.UtcNow - age + TimeSpan.FromSeconds(i),
             });
         }
 

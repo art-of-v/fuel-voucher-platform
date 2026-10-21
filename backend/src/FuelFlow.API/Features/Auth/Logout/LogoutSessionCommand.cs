@@ -1,4 +1,5 @@
 using FuelFlow.SharedKernel.Security;
+using FuelFlow.SharedKernel.Time;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -42,7 +43,7 @@ public sealed class LogoutSessionCommandHandler
             return;
 
         refreshToken.IsRevoked = true;
-        refreshToken.RevokedAtUtc = DateTime.UtcNow;
+        refreshToken.RevokedAtUtc = SystemClock.UtcNow;
         _context.RefreshTokens.Update(refreshToken);
 
         await _context.SaveChangesAsync(cancellationToken);

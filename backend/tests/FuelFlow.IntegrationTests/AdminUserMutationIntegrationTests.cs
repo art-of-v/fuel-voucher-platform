@@ -10,6 +10,7 @@ using FuelFlow.Features.Users.UpdateUser;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Security;
+using FuelFlow.Testing;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -44,7 +45,7 @@ public class AdminUserMutationIntegrationTests : WebApplicationFactory<Program>,
         using var scope = Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var role = await context.Roles.FirstAsync(r => r.Name == roleName);
-        var now = DateTime.UtcNow;
+        var now = TestClock.UtcNow;
 
         var user = new User
         {
@@ -69,7 +70,7 @@ public class AdminUserMutationIntegrationTests : WebApplicationFactory<Program>,
     {
         using var scope = Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var now = DateTime.UtcNow;
+        var now = TestClock.UtcNow;
 
         context.RefreshTokens.Add(new RefreshToken
         {

@@ -17,6 +17,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using System.Globalization;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.SharedKernel.Time;
 
 namespace FuelFlow.Features.Orders.CreateCheckout;
 
@@ -211,7 +212,7 @@ private readonly RuntimeSettingsService _runtimeSettings;
                 var bestStockExpiration = bestStockExpirations.GetValueOrDefault(
                     StockKey.For(brandSlugs[item.BrandId!.Value], item.FuelTypeId, item.Liters));
 
-                if (!TermStockCoverage.CanHonour(bestStockExpiration, DateOnly.FromDateTime(DateTime.UtcNow), purchasedTerm))
+                if (!TermStockCoverage.CanHonour(bestStockExpiration, DateOnly.FromDateTime(SystemClock.UtcNow), purchasedTerm))
                 {
                     throw new TermStockUnavailableException(item.FuelTypeId);
                 }
@@ -264,7 +265,7 @@ private readonly RuntimeSettingsService _runtimeSettings;
 
         var checkoutKey = CheckoutBasket.Key(CheckoutBasket.Cart, command.UserId!.Value, cartSignature);
 
-        var now = DateTime.UtcNow;
+        var now = SystemClock.UtcNow;
 
         // The order that already holds this cart, if there is one. A retry or a double tap finds it
         // here and is given the same invoice. The read is an equality on an indexed column; it used
@@ -330,8 +331,8 @@ private readonly RuntimeSettingsService _runtimeSettings;
             IdempotencyKey = $"{checkoutKey}:{Guid.NewGuid():N}",
             CheckoutKey = checkoutKey,
             MonobankMerchant = merchant,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = SystemClock.UtcNow,
+            UpdatedAtUtc = SystemClock.UtcNow
         };
 
         foreach (var (item, package, discountPerLiter, unitPrice, lineTotal, originalLineTotal, termCode) in itemPricing)
@@ -432,7 +433,7 @@ private readonly RuntimeSettingsService _runtimeSettings;
         // See CreateCheckoutCommandHandler for why the payment is its own row. Same reason here: this
         // is the only moment the invoice exists, so it is the only moment it can be recorded.
         _context.Payments.Add(PaymentFactory.CreateCapture(
-            order, merchant, invoiceResponse.InvoiceId, DateTime.UtcNow));
+            order, merchant, invoiceResponse.InvoiceId, SystemClock.UtcNow));
 
         // The invoice, written onto the order that is already there. A second attempt for this cart
         // is refused by the index above and never reaches this point, so this is the one and only

@@ -3,6 +3,7 @@ using FuelFlow.Payments.SharedModels;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -71,8 +72,8 @@ public sealed class RefundsViewTests : IClassFixture<TestDatabaseFixture>
                 Id = userId,
                 PhoneNumber = $"+38{userId:N}"[..20],
                 IsActive = true,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
 
             context.Orders.Add(new Order
@@ -81,8 +82,8 @@ public sealed class RefundsViewTests : IClassFixture<TestDatabaseFixture>
                 UserId = userId,
                 Price = 100m,
                 Status = OrderStatus.Refunded,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
 
             context.Payments.Add(Capture(captureId, orderId));
@@ -115,9 +116,9 @@ public sealed class RefundsViewTests : IClassFixture<TestDatabaseFixture>
         AmountKopecks = 10_000m,
         Currency = "UAH",
         Status = PaymentStatus.Succeeded,
-        PaidAtUtc = DateTime.UtcNow,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        PaidAtUtc = TestClock.UtcNow,
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 
     private static Payment Refund(Guid id, Guid parentPaymentId, Guid? orderId) => new()
@@ -131,8 +132,8 @@ public sealed class RefundsViewTests : IClassFixture<TestDatabaseFixture>
         AmountKopecks = 10_000m,
         Currency = "UAH",
         Status = PaymentStatus.Succeeded,
-        PaidAtUtc = DateTime.UtcNow,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        PaidAtUtc = TestClock.UtcNow,
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 }

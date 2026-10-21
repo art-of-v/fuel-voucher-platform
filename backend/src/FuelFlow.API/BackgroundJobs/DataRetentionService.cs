@@ -2,6 +2,7 @@ using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Settings;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.API.BackgroundJobs;
@@ -152,7 +153,7 @@ public class DataRetentionService
         var dryRun = !enabled;
 
         // One clock read shared by every predicate so a slow run can't apply drifting cutoffs.
-        var now = DateTime.UtcNow;
+        var now = SystemClock.UtcNow;
         var verificationCutoff = now.AddDays(-VerificationCodeRetentionDays);
         var refreshTokenCutoff = now.AddDays(-RefreshTokenRetentionDays);
         var outboxCutoff = now.AddDays(-OutboxEventRetentionDays);

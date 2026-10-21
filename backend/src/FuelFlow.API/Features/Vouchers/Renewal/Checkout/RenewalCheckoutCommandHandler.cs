@@ -9,6 +9,7 @@ using FuelFlow.SharedKernel;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -94,7 +95,7 @@ public sealed class RenewalCheckoutCommandHandler
             .Where(v => voucherIds.Contains(v.Id))
             .ToListAsync(cancellationToken);
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(SystemClock.UtcNow);
 
         var resolved = new List<ResolvedLine>();
         foreach (var item in command.Items)
@@ -296,7 +297,7 @@ public sealed class RenewalCheckoutCommandHandler
 
         var checkoutKey = CheckoutBasket.Key(CheckoutBasket.Renewal, userId, cartSignature);
 
-        var now = DateTime.UtcNow;
+        var now = SystemClock.UtcNow;
 
         // The order that already holds this batch, if there is one. A retry or a double tap finds it
         // here and is given the same invoice. The read is an equality on an indexed column; it used

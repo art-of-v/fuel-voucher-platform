@@ -4,6 +4,7 @@ using FuelFlow.Features.Vouchers.GetInventory;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.UnitTests.Vouchers;
@@ -47,8 +48,8 @@ public sealed class GetInventoryCommandHandlerTests : IDisposable
             Name = "Diesel",
             BrandId = Guid.NewGuid(),
             BasePrice = 50m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         _context.FuelVouchers.AddRange(
@@ -85,8 +86,8 @@ public sealed class GetInventoryCommandHandlerTests : IDisposable
                 Name = "Diesel",
                 BrandId = Guid.NewGuid(),
                 BasePrice = 50m,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             },
             new FuelTypeEntity
             {
@@ -94,8 +95,8 @@ public sealed class GetInventoryCommandHandlerTests : IDisposable
                 Name = "Petrol",
                 BrandId = Guid.NewGuid(),
                 BasePrice = 60m,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
 
         _context.FuelVouchers.AddRange(
@@ -137,7 +138,7 @@ public sealed class GetInventoryCommandHandlerTests : IDisposable
         SupplierExpirationDate = new DateOnly(2027, 1, 1),
         CustomerExpirationDate = new DateOnly(2027, 1, 1),
         Status = status,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 }

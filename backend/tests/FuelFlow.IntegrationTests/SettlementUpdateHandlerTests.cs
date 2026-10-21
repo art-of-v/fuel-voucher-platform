@@ -8,6 +8,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -66,7 +67,7 @@ public class SettlementUpdateHandlerTests : IClassFixture<TestDatabaseFixture>
     private async Task<(Guid UserId, string Code)> SeedCustomerAsync(ApplicationDbContext context)
     {
         var roleId = await context.Roles.Where(r => r.Name == SeedRoles.UserName).Select(r => r.Id).FirstAsync();
-        var now = DateTime.UtcNow;
+        var now = TestClock.UtcNow;
         var code = NewCode();
 
         var user = new User
@@ -95,8 +96,8 @@ public class SettlementUpdateHandlerTests : IClassFixture<TestDatabaseFixture>
             UserId = userId,
             Price = price,
             Status = OrderStatus.PendingPayment,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
         };
 
         context.Orders.Add(order);
@@ -111,7 +112,7 @@ public class SettlementUpdateHandlerTests : IClassFixture<TestDatabaseFixture>
         {
             MessageId = messageId,
             Text = text,
-            Date = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+            Date = TestClock.Now.ToUnixTimeSeconds(),
             From = new TelegramUser { Id = sender, FirstName = "Finance", LastName = "Ops" },
             Chat = new TelegramChat { Id = chat, Type = "supergroup" },
         },

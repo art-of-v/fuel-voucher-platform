@@ -1,6 +1,7 @@
 using FuelFlow.Features.Company.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Abstractions;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Company.SendInvitation;
@@ -92,8 +93,8 @@ public sealed class SendInvitationCommandHandler
             WorkerPhoneNumber = normalizedPhone,
             WorkerUserId = worker.Id,
             Status = InvitationStatus.Pending,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = SystemClock.UtcNow,
+            UpdatedAtUtc = SystemClock.UtcNow
         };
 
         _context.CompanyInvitations.Add(invitation);

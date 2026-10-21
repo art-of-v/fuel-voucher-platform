@@ -3,6 +3,7 @@ using FuelFlow.Features.Company.SharedModels;
 using FuelFlow.Features.Contracts.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -88,7 +89,7 @@ public sealed class WorkerMayWorkForNCompaniesIntegrationTests : IClassFixture<T
 
         var fired = NewMember(workerId, legalEntityId);
         fired.IsDeleted = true;
-        fired.DeletedAtUtc = DateTime.UtcNow;
+        fired.DeletedAtUtc = TestClock.UtcNow;
         context.CompanyMembers.Add(fired);
         await context.SaveChangesAsync();
 
@@ -151,8 +152,8 @@ public sealed class WorkerMayWorkForNCompaniesIntegrationTests : IClassFixture<T
             // Unique per company, not a shared literal: edrpou carries a unique index, and two
             // companies in this test are deliberately distinct rows.
             Edrpou = $"1{ownerId:N}"[..10],
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
         });
         await context.SaveChangesAsync();
         return legalEntityId;
@@ -163,8 +164,8 @@ public sealed class WorkerMayWorkForNCompaniesIntegrationTests : IClassFixture<T
         Id = id,
         PhoneNumber = $"+38{id:N}"[..20],
         IsActive = true,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow,
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow,
     };
 
     private static CompanyMember NewMember(Guid workerUserId, Guid legalEntityId) => new()
@@ -172,7 +173,7 @@ public sealed class WorkerMayWorkForNCompaniesIntegrationTests : IClassFixture<T
         Id = Guid.CreateVersion7(),
         LegalEntityId = legalEntityId,
         WorkerUserId = workerUserId,
-        JoinedAtUtc = DateTime.UtcNow,
+        JoinedAtUtc = TestClock.UtcNow,
     };
 
     private async Task ResetAsync(ApplicationDbContext context)

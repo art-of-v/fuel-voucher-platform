@@ -9,6 +9,7 @@ using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
@@ -38,7 +39,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
         var userId = Guid.NewGuid();
         var voucherId = Guid.NewGuid();
         var actingUserId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
         var oldExpiry = today.AddDays(5); // still valid → Extend
 
         using (var seed = CreateContext())
@@ -133,7 +134,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
         var userId = Guid.NewGuid();
         var voucherId = Guid.NewGuid();
         var actingUserId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
         var customerExpiry = today.AddDays(5);
         // Deliberately NOT given a supplierExpiry override: both dates are the same, five days out.
 
@@ -178,7 +179,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
         var userId = Guid.NewGuid();
         var voucherId = Guid.NewGuid();
         var stockId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
         var originPurchaseId = Guid.NewGuid();
         // Named so the D-13 assertions below can say WHO was recorded - an inline Guid.NewGuid()
         // would make the actor unassertable.
@@ -279,7 +280,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
     {
         var userId = Guid.NewGuid();
         var voucherId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
 
         using (var seed = CreateContext())
         {
@@ -322,7 +323,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
         var userId = Guid.NewGuid();
         var voucherId = Guid.NewGuid();
         var stockId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
 
         using (var seed = CreateContext())
         {
@@ -374,7 +375,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
         var userId = Guid.NewGuid();
         var voucherId = Guid.NewGuid();
         var stockId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
 
         using (var seed = CreateContext())
         {
@@ -408,7 +409,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
         var userId = Guid.NewGuid();
         var voucherId = Guid.NewGuid();
         var stockId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
 
         using (var seed = CreateContext())
         {
@@ -445,7 +446,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
     {
         var userId = Guid.NewGuid();
         var voucherId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
 
         using (var seed = CreateContext())
         {
@@ -477,7 +478,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
     public async Task Confirm_UnassignedStockVoucher_RejectedAsNotCustomerVoucher()
     {
         var stockId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
 
         using (var seed = CreateContext())
         {
@@ -504,7 +505,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
     {
         var userId = Guid.NewGuid();
         var voucherId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
 
         using (var seed = CreateContext())
         {
@@ -535,7 +536,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
     {
         var userId = Guid.NewGuid();
         var voucherId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
 
         using (var seed = CreateContext())
         {
@@ -595,7 +596,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
         var userId = Guid.NewGuid();
         var voucherId = Guid.NewGuid();
         var actingUserId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
 
         using (var seed = CreateContext())
         {
@@ -665,7 +666,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
     {
         var userId = Guid.NewGuid();
         var voucherId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
         var oldExpiry = today.AddDays(5);
         var newExpiry = oldExpiry.AddMonths(1);
 
@@ -731,8 +732,8 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
             Price = 10m,
             Kind = OrderKind.Renewal,
             Status = OrderStatus.Fulfilled,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
             LineItems = new List<OrderLineItem>
             {
                 new()
@@ -817,8 +818,8 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
             FirstName = "Cust",
             LastName = "Omer",
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
     /// <summary>
@@ -836,8 +837,8 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
             UserId = userId,
             Price = 0,
             Status = OrderStatus.Fulfilled,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         return orderId;
     }
@@ -865,8 +866,8 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
             Status = VoucherStatus.Assigned,
             AssignedToUserId = userId,
             OrderId = orderId,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
     private static FuelVoucher StockVoucher(Guid id, string brand, string fuelTypeId, decimal liters, DateOnly expiry, decimal? costPerLiter = null)
@@ -883,8 +884,8 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
             QrPayload = $"qr-{id:N}",
             Status = VoucherStatus.Available,
             CostPerLiter = costPerLiter,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
     private static async Task ResetDataAsync(ApplicationDbContext context)

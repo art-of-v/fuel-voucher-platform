@@ -21,6 +21,7 @@ using Moq;
 using Xunit;
 
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.Testing;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 namespace FuelFlow.UnitTests.Orders;
 
@@ -64,14 +65,14 @@ public sealed class VoucherTermSaleTests : IDisposable
                 PageUrl = $"https://pay.test/INV{_invoiceSeq}"
             });
 
-        _context.Roles.Add(new Role { Id = Guid.NewGuid(), Name = "User", Level = 0, CreatedAtUtc = DateTime.UtcNow });
+        _context.Roles.Add(new Role { Id = Guid.NewGuid(), Name = "User", Level = 0, CreatedAtUtc = TestClock.UtcNow });
         _context.Users.Add(new User
         {
             Id = Guid.NewGuid(),
             PhoneNumber = "+380110010203",
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         _context.FuelTypes.Add(new FuelTypeEntity
         {
@@ -80,8 +81,8 @@ public sealed class VoucherTermSaleTests : IDisposable
             BrandId = BrandIds.Okko,
             BasePrice = 60,
             DiscountPrice = 60,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 // Seeded as an offer plus a volume: that is what checkout and the term quote resolve against. A
         // fixture in fuel_packages would leave every test here exercising the "no package" path and
@@ -110,17 +111,17 @@ public sealed class VoucherTermSaleTests : IDisposable
         {
             Key = AppSettingKeys.VoucherTermSaleEnabled,
             Value = "true",
-            UpdatedAtUtc = DateTime.UtcNow
+            UpdatedAtUtc = TestClock.UtcNow
         });
         foreach (var (code, discount) in tiers)
         {
             _context.AppSettings.AddRange(
-                new AppSetting { Key = AppSettingKeys.VoucherTermTierEnabled(code), Value = "true", UpdatedAtUtc = DateTime.UtcNow },
+                new AppSetting { Key = AppSettingKeys.VoucherTermTierEnabled(code), Value = "true", UpdatedAtUtc = TestClock.UtcNow },
                 new AppSetting
                 {
                     Key = AppSettingKeys.VoucherTermTierDiscountPerLiter(code),
                     Value = discount.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                    UpdatedAtUtc = DateTime.UtcNow
+                    UpdatedAtUtc = TestClock.UtcNow
                 });
         }
         _context.SaveChanges();
@@ -171,13 +172,13 @@ public sealed class VoucherTermSaleTests : IDisposable
             Brand = brand,
             FuelTypeId = ToUuid(fuelTypeId),
             Liters = liters,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(daysUntilPaperExpiry),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(daysUntilPaperExpiry),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddDays(daysUntilPaperExpiry),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddDays(daysUntilPaperExpiry),
             VoucherNumber = $"STOCK-{Guid.NewGuid().ToString()[..8]}",
             QrPayload = Guid.NewGuid().ToString(),
             Status = VoucherStatus.Available,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
         _context.FuelVouchers.Add(voucher);
         // The stock queries read the summary, not the vouchers, and the in-memory provider has no
@@ -618,13 +619,13 @@ public sealed class VoucherTermSaleTests : IDisposable
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 10m,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(6),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(6),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(6),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(6),
             VoucherNumber = "OKKO-ASSIGNED",
             QrPayload = Guid.NewGuid().ToString(),
             Status = VoucherStatus.Assigned,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         _context.SaveChanges();
 

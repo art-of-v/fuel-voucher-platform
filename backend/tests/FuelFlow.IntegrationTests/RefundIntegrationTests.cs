@@ -12,6 +12,7 @@ using FuelFlow.Payments.SharedModels;
 using FuelFlow.SharedKernel;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -63,7 +64,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
                         Status = "success",
                         Amount = 200000,
                         ExtRef = orderId.ToString(),
-                        ModifiedDate = DateTime.UtcNow
+                        ModifiedDate = TestClock.UtcNow
                     }
                 }
             });
@@ -130,7 +131,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
 
         // Same length (111) a real BulkCheckoutCommandHandler idempotency key has.
         var longIdempotencyKey =
-            $"{userId:N}:{DateTime.UtcNow:yyyyMMddHH}00:{Guid.NewGuid():N}:{Guid.NewGuid():N}";
+            $"{userId:N}:{TestClock.UtcNow:yyyyMMddHH}00:{Guid.NewGuid():N}:{Guid.NewGuid():N}";
         longIdempotencyKey.Length.Should().BeGreaterThan(100);
 
         await SeedAsync(seed =>
@@ -343,22 +344,22 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
                 Brand = "okko",
                 FuelTypeId = ToUuid("okko-dp"),
                 Liters = 10m,
-                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
-                CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
+                CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
                 VoucherNumber = $"OC-{orderId:N}-000",
                 QrPayload = $"payload-{orderId:N}-000",
                 Status = VoucherStatus.Assigned,
                 AssignedToUserId = userId,
                 OrderId = orderId, // the order under test is the purchase that delivered it
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             };
             seed.FuelVouchers.Add(voucher);
             seed.Fulfillments.Add(new Fulfillment
             {
                 OrderId = orderId,
                 VoucherId = voucher.Id,
-                FulfilledAtUtc = DateTime.UtcNow.AddHours(-1)
+                FulfilledAtUtc = TestClock.UtcNow.AddHours(-1)
             });
         });
 
@@ -411,22 +412,22 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
                 Brand = "okko",
                 FuelTypeId = ToUuid("okko-dp"),
                 Liters = 10m,
-                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
-                CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
+                CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
                 VoucherNumber = $"MR-{orderId:N}-000",
                 QrPayload = $"payload-{orderId:N}-000",
                 Status = VoucherStatus.Assigned,
                 AssignedToUserId = userId,
                 OrderId = orderId, // the order under test is the purchase that delivered it
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             };
             seed.FuelVouchers.Add(voucher);
             seed.Fulfillments.Add(new Fulfillment
             {
                 OrderId = orderId,
                 VoucherId = voucher.Id,
-                FulfilledAtUtc = DateTime.UtcNow.AddHours(-1)
+                FulfilledAtUtc = TestClock.UtcNow.AddHours(-1)
             });
         });
 
@@ -442,7 +443,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
                     {
                         Status = "success",
                         ExtRef = orderId.ToString(),
-                        ModifiedDate = DateTime.UtcNow
+                        ModifiedDate = TestClock.UtcNow
                     }
                 }
             });
@@ -501,7 +502,7 @@ public sealed class RefundIntegrationTests : IClassFixture<TestDatabaseFixture>
                     {
                         Status = "failure",
                         ExtRef = orderId.ToString(),
-                        ModifiedDate = DateTime.UtcNow
+                        ModifiedDate = TestClock.UtcNow
                     }
                 }
             });
@@ -555,22 +556,22 @@ var order = CreateOrder(orderId, userId, $"test-invoice-{orderId:N}", OrderStatu
                 Brand = "okko",
                 FuelTypeId = ToUuid("okko-dp"),
                 Liters = 10m,
-                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
-                CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
+                CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
                 VoucherNumber = $"SR-{orderId:N}-000",
                 QrPayload = $"payload-{orderId:N}-000",
                 Status = VoucherStatus.Assigned,
                 AssignedToUserId = userId,
                 OrderId = orderId, // the order under test is the purchase that delivered it
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             };
             seed.FuelVouchers.Add(voucher);
             seed.Fulfillments.Add(new Fulfillment
             {
                 OrderId = orderId,
                 VoucherId = voucher.Id,
-                FulfilledAtUtc = DateTime.UtcNow.AddDays(-2)
+                FulfilledAtUtc = TestClock.UtcNow.AddDays(-2)
             });
 
             // 25h old, so the sync service's stale-refund sweep picks it up.
@@ -603,8 +604,8 @@ var order = CreateOrder(orderId, userId, $"test-invoice-{orderId:N}", OrderStatu
         Id = userId,
         PhoneNumber = $"+38{userId:N}"[..20],
         IsActive = true,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 
     /// <summary>
@@ -660,8 +661,8 @@ private static Order AddPaidOrder(
         Status = status,
         MonobankInvoiceId = invoiceId,
         MonobankStatus = MonobankStatus.Success,
-        CreatedAtUtc = DateTime.UtcNow.AddDays(-1),
-        UpdatedAtUtc = DateTime.UtcNow.AddDays(-1),
+        CreatedAtUtc = TestClock.UtcNow.AddDays(-1),
+        UpdatedAtUtc = TestClock.UtcNow.AddDays(-1),
         LineItems = new List<OrderLineItem>
         {
             new()
@@ -711,8 +712,8 @@ private static Payment SeedRefundPayment(
             ErrorMessage = status == PaymentStatus.Failed ? "Monobank reported refund failure" : null,
             // A failed refund reads as a past attempt; the sync service's stale sweep only ever looks
             // BACK from a cutoff, so a refund dated in the future would sit there forever.
-            CreatedAtUtc = DateTime.UtcNow - (age ?? TimeSpan.FromMinutes(5)),
-            UpdatedAtUtc = DateTime.UtcNow - (age ?? TimeSpan.FromMinutes(5))
+            CreatedAtUtc = TestClock.UtcNow - (age ?? TimeSpan.FromMinutes(5)),
+            UpdatedAtUtc = TestClock.UtcNow - (age ?? TimeSpan.FromMinutes(5))
         };
 
         seed.Payments.Add(refund);

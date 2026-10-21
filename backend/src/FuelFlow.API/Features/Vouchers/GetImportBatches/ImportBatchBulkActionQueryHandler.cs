@@ -2,6 +2,7 @@ using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Vouchers.GetImportBatches;
@@ -105,7 +106,7 @@ public sealed class ImportBatchBulkActionQueryHandler
         }
 
         var to = query.Action == "activate" ? VoucherStatus.Available : VoucherStatus.Deactivated;
-        var now = DateTime.UtcNow;
+        var now = SystemClock.UtcNow;
         var actor = query.ActingAdminUserId is { } a && a != Guid.Empty ? (Guid?)a : null;
 
         foreach (var voucher in vouchers)

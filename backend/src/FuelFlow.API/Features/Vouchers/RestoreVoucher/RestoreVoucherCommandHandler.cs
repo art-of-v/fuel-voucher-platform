@@ -1,6 +1,7 @@
 using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Vouchers.RestoreVoucher;
@@ -69,7 +70,7 @@ public sealed class RestoreVoucherCommandHandler
         //
         // One instant for both writes, for the same reason as MarkVoucherAsUsed: the voucher's stamp
         // and the event's have to agree or the two tables answer "when" differently.
-        var occurredAtUtc = DateTime.UtcNow;
+        var occurredAtUtc = SystemClock.UtcNow;
 
         // The transition and the record of it are one fact, so they commit together - see the same
         // note in MarkVoucherAsUsedCommandHandler.

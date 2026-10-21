@@ -4,6 +4,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
@@ -44,7 +45,7 @@ public sealed class FulfillmentOrderForeignKeyIntegrationTests : IClassFixture<T
             await seed.Database.MigrateAsync();
             await ResetDataAsync(seed);
 
-            seed.Users.Add(new User { Id = userId, PhoneNumber = $"+3809{DateTime.UtcNow:HHmmssff}" });
+            seed.Users.Add(new User { Id = userId, PhoneNumber = $"+3809{TestClock.UniqueDigits(8)}" });
             seed.FuelVouchers.Add(AssignedVoucher(voucherId));
             seed.Orders.Add(Order(orderId, userId));
             await seed.SaveChangesAsync();
@@ -53,7 +54,7 @@ public sealed class FulfillmentOrderForeignKeyIntegrationTests : IClassFixture<T
             {
                 OrderId = orderId,
                 VoucherId = voucherId,
-                FulfilledAtUtc = DateTime.UtcNow
+                FulfilledAtUtc = TestClock.UtcNow
             });
             await seed.SaveChangesAsync();
         }
@@ -105,13 +106,13 @@ public sealed class FulfillmentOrderForeignKeyIntegrationTests : IClassFixture<T
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 10m,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(7)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(3)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddDays(7)),
             VoucherNumber = $"fk-test-{id:N}",
             QrPayload = $"fk-qr-{id:N}",
             Status = VoucherStatus.Available,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
     private static Order Order(Guid orderId, Guid userId)
@@ -121,8 +122,8 @@ public sealed class FulfillmentOrderForeignKeyIntegrationTests : IClassFixture<T
             UserId = userId,
             Price = 500m,
             Status = OrderStatus.PendingFulfillment,
-            CreatedAtUtc = DateTime.UtcNow.AddDays(-1),
-            UpdatedAtUtc = DateTime.UtcNow.AddDays(-1)
+            CreatedAtUtc = TestClock.UtcNow.AddDays(-1),
+            UpdatedAtUtc = TestClock.UtcNow.AddDays(-1)
         };
 
     private static async Task ResetDataAsync(ApplicationDbContext context)

@@ -6,6 +6,7 @@ using FuelFlow.Features.Vouchers.PurchaseBatchCost;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
@@ -23,7 +24,7 @@ public sealed class PurchaseBatchPnlHandlerTests : IDisposable
             .Options;
         _context = new ApplicationDbContext(options, TestQrCipher.Instance);
 
-        _context.FuelTypes.Add(new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 22, DiscountPrice = 22, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
+        _context.FuelTypes.Add(new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 22, DiscountPrice = 22, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow });
         // Fuel priced at 22 UAH/L (cost 20 + margin 2, no pump). The P&L reads its "current sale price"
         // off the offer, so the per-litre figures are seeded there and the volume carries only the
         // package total.
@@ -50,7 +51,7 @@ public sealed class PurchaseBatchPnlHandlerTests : IDisposable
     private Guid SeedImport()
     {
         var id = Guid.NewGuid();
-        _context.VoucherImports.Add(new VoucherImport { Id = id, FileName = "batch.pdf", Status = "Completed", StartedAtUtc = DateTime.UtcNow });
+        _context.VoucherImports.Add(new VoucherImport { Id = id, FileName = "batch.pdf", Status = "Completed", StartedAtUtc = TestClock.UtcNow });
         return id;
     }
 
@@ -64,14 +65,14 @@ public sealed class PurchaseBatchPnlHandlerTests : IDisposable
             Brand = brand,
             FuelTypeId = ToUuid(fuelTypeId),
             Liters = liters,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
             VoucherNumber = $"V-{Guid.NewGuid().ToString()[..8]}",
             QrPayload = Guid.NewGuid().ToString(),
             Status = status,
             ImportJobId = importId,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         return id;
     }
@@ -79,7 +80,7 @@ public sealed class PurchaseBatchPnlHandlerTests : IDisposable
     /// <summary>Cost lives on the vouchers, so "costing a batch" stamps its vouchers and records the supplier.</summary>
     private void SeedBatchCost(Guid importId, decimal cost, string fuelTypeId = "okko-dp")
     {
-        var now = DateTime.UtcNow;
+        var now = TestClock.UtcNow;
         var supplierId = SeedSupplier();
 
         // Read through the change tracker, not a LINQ query: these vouchers are still in Added state at this
@@ -118,8 +119,8 @@ public sealed class PurchaseBatchPnlHandlerTests : IDisposable
             Id = id,
             Name = "ТОВ Постачальник",
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         return id;
     }
@@ -128,9 +129,9 @@ public sealed class PurchaseBatchPnlHandlerTests : IDisposable
     private void SeedSale(Guid voucherId, decimal liters, int unitPrice, OrderStatus status, string fuelTypeId = "okko-dp")
     {
         var orderId = Guid.NewGuid();
-        _context.Orders.Add(new Order { Id = orderId, UserId = Guid.NewGuid(), Price = unitPrice, Status = status, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
+        _context.Orders.Add(new Order { Id = orderId, UserId = Guid.NewGuid(), Price = unitPrice, Status = status, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow });
         _context.OrderLineItems.Add(new OrderLineItem { Id = Guid.NewGuid(), OrderId = orderId, Brand = "okko", BrandId = BrandIds.ForSlug("okko"), FuelTypeId = ToUuid(fuelTypeId), Liters = liters, Quantity = 1, UnitPrice = unitPrice, LineTotal = unitPrice });
-        _context.Fulfillments.Add(new Fulfillment { OrderId = orderId, VoucherId = voucherId, FulfilledAtUtc = DateTime.UtcNow });
+        _context.Fulfillments.Add(new Fulfillment { OrderId = orderId, VoucherId = voucherId, FulfilledAtUtc = TestClock.UtcNow });
     }
 
     [Fact]

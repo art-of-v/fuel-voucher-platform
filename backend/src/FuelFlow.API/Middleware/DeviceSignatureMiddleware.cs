@@ -2,6 +2,7 @@ using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
+using FuelFlow.SharedKernel.Time;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -92,7 +93,7 @@ public sealed class DeviceSignatureMiddleware
         }
 
         var requestTime = DateTimeOffset.FromUnixTimeMilliseconds(timestampMs);
-        var now = DateTimeOffset.UtcNow;
+        var now = SystemClock.Now;
         var timeDiff = Math.Abs((now - requestTime).TotalMilliseconds);
 
         if (timeDiff > deviceAuthOptions.TimestampToleranceMs)
@@ -195,7 +196,7 @@ public sealed class DeviceSignatureMiddleware
             "1",
             TimeSpan.FromSeconds(nonceTtlSeconds));
 
-        device.LastSeenAt = DateTime.UtcNow;
+        device.LastSeenAt = SystemClock.UtcNow;
         dbContext.Devices.Update(device);
         await dbContext.SaveChangesAsync();
 

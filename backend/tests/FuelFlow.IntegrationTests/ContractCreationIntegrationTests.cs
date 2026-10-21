@@ -6,6 +6,7 @@ using FluentAssertions;
 using FuelFlow.Features.Contracts.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -66,8 +67,8 @@ public sealed class ContractCreationIntegrationTests : IClassFixture<TestDatabas
         var wog = rows.Single(r => r.GetProperty("brandName").GetString() == "WOG");
         var okkoExpiry = okko.GetProperty("expiresAt").GetDateTime();
         var wogExpiry = wog.GetProperty("expiresAt").GetDateTime();
-        okkoExpiry.Should().BeCloseTo(DateTime.UtcNow.AddDays(30), TimeSpan.FromMinutes(2));
-        wogExpiry.Should().BeCloseTo(DateTime.UtcNow.AddDays(90), TimeSpan.FromMinutes(2));
+        okkoExpiry.Should().BeCloseTo(TestClock.UtcNow.AddDays(30), TimeSpan.FromMinutes(2));
+        wogExpiry.Should().BeCloseTo(TestClock.UtcNow.AddDays(90), TimeSpan.FromMinutes(2));
     }
 
     [Fact]
@@ -139,7 +140,7 @@ public sealed class ContractCreationIntegrationTests : IClassFixture<TestDatabas
                 Name = "WOG",
                 Color = "#00ff80",
                 LogoText = "WOG",
-                CreatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow
             });
             await context.SaveChangesAsync();
         }
@@ -172,7 +173,7 @@ public sealed class ContractCreationIntegrationTests : IClassFixture<TestDatabas
                 Name = slug.ToUpperInvariant(),
                 Color = "#00ff80",
                 LogoText = slug.ToUpperInvariant(),
-                CreatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow
             };
             context.Brands.Add(brand);
         }
@@ -184,7 +185,7 @@ public sealed class ContractCreationIntegrationTests : IClassFixture<TestDatabas
             Version = 1,
             Body = body,
             TermDays = termDays,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow
         });
 
         await context.SaveChangesAsync();

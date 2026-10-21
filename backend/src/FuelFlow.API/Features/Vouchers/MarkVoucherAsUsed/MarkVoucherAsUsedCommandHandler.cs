@@ -2,6 +2,7 @@ using FuelFlow.Features.Ledger;
 using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -77,7 +78,7 @@ public sealed partial class MarkVoucherAsUsedCommandHandler
         // One instant for both writes. The stamp that lands on the voucher and the one on the event
         // have to be the same moment, or "when was this redeemed" answers differently depending on
         // which table you ask - and the event is the one an audit reads.
-        var occurredAtUtc = DateTime.UtcNow;
+        var occurredAtUtc = SystemClock.UtcNow;
 
         // The transition and the record of it are one fact, so they commit together. Without the
         // transaction a failed SaveChanges leaves status = Used with nothing naming who did it,

@@ -1,6 +1,7 @@
 using FluentAssertions;
 using FuelFlow.Features.Pricing.Terms.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -172,6 +173,6 @@ public sealed class TermPricingOverlapTests : IClassFixture<TestDatabaseFixture>
         RatePerLiter = 10m,
         ValidFrom = from,
         ValidTo = to,
-        CreatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow
     };
 }

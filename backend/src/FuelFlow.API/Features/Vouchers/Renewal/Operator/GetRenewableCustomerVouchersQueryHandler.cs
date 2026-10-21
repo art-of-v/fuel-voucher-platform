@@ -1,5 +1,6 @@
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Vouchers.Renewal.Operator;
@@ -70,7 +71,7 @@ public sealed class GetRenewableCustomerVouchersQueryHandler
                     || (v.AssignedToUser.LastName != null && EF.Functions.ILike(v.AssignedToUser.LastName, $"%{term}%")))));
         }
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(SystemClock.UtcNow);
 
         var items = await q
             .OrderBy(v => v.CustomerExpirationDate)

@@ -1,6 +1,7 @@
 using FluentAssertions;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
@@ -56,8 +57,8 @@ MarginUahPerLiter = 2m,
         SupplierPricePerLiter = 49m,
             MarginPercent = 4m,
             PumpPricePerLiter = 55m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         var nominal = new FuelNominal

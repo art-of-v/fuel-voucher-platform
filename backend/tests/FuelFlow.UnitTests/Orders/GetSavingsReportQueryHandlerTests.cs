@@ -5,6 +5,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
@@ -47,8 +48,8 @@ public sealed class GetSavingsReportQueryHandlerTests : IDisposable
             UserId = userId ?? _userId,
             Price = lineTotal,
             Status = status,
-            CreatedAtUtc = createdAt ?? DateTime.UtcNow,
-            UpdatedAtUtc = createdAt ?? DateTime.UtcNow
+            CreatedAtUtc = createdAt ?? TestClock.UtcNow,
+            UpdatedAtUtc = createdAt ?? TestClock.UtcNow
         };
         order.LineItems.Add(new OrderLineItem
         {
@@ -77,16 +78,16 @@ public sealed class GetSavingsReportQueryHandlerTests : IDisposable
             Brand = "okko",
             FuelTypeId = ToUuid("okko-dp"),
             Liters = liters,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
             VoucherNumber = $"V-{Guid.NewGuid().ToString()[..8]}",
             QrPayload = Guid.NewGuid().ToString(),
             Status = status,
             ImportJobId = Guid.NewGuid(),
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
-        _context.Fulfillments.Add(new Fulfillment { OrderId = order.Id, VoucherId = voucherId, FulfilledAtUtc = DateTime.UtcNow });
+        _context.Fulfillments.Add(new Fulfillment { OrderId = order.Id, VoucherId = voucherId, FulfilledAtUtc = TestClock.UtcNow });
     }
 
     [Fact]

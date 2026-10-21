@@ -4,6 +4,7 @@ using FuelFlow.Features.Pricing.BackfillBrandFuelCodes;
 using FuelFlow.Features.Pricing.ImportOkkoPumpPrices;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
@@ -67,8 +68,8 @@ public sealed class BackfillBrandFuelCodesTests : IDisposable
         foreach (var fuel in fuels)
         {
             fuel.BrandId = BrandIds.Okko;
-            fuel.CreatedAtUtc = DateTime.UtcNow;
-            fuel.UpdatedAtUtc = DateTime.UtcNow;
+            fuel.CreatedAtUtc = TestClock.UtcNow;
+            fuel.UpdatedAtUtc = TestClock.UtcNow;
             _context.FuelTypes.Add(fuel);
         }
 
@@ -185,7 +186,7 @@ public sealed class BackfillBrandFuelCodesTests : IDisposable
         // mean", and the index is partial on NOT is_deleted, so nothing would stop both.
         var archived = Fuel("old-a95", "А95 ЄВРО");
         archived.IsDeleted = true;
-        archived.DeletedAtUtc = DateTime.UtcNow;
+        archived.DeletedAtUtc = TestClock.UtcNow;
 
         await SeedAsync(archived, Fuel("live-a95", "А95 ЄВРО"));
 

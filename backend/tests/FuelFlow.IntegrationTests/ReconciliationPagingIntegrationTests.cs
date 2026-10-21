@@ -5,6 +5,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using Xunit.Abstractions;
@@ -115,8 +116,8 @@ public sealed class ReconciliationPagingIntegrationTests : IClassFixture<TestDat
             Id = userId,
             PhoneNumber = $"+38{userId:N}"[..20],
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         var brand = await context.Brands.AsNoTracking().SingleAsync(b => b.Slug == "okko");
@@ -132,16 +133,16 @@ public sealed class ReconciliationPagingIntegrationTests : IClassFixture<TestDat
             DiscountPrice = 1000m,
             MarginUahPerLiter = 10m,
             PumpPricePerLiter = 1200m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         context.FuelNominals.Add(new FuelNominal
         {
             FuelTypeId = fuelId,
             Liters = 50m,
             DataKind = DataKinds.Real,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         await context.SaveChangesAsync();

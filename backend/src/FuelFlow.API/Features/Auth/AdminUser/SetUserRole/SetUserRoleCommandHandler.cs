@@ -2,6 +2,7 @@ using FuelFlow.Features.Auth.Logout;
 using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
@@ -84,7 +85,7 @@ public sealed class SetUserRoleCommandHandler
 
         target.RoleId = targetRole.Id;
         target.Role = targetRole;
-        target.UpdatedAtUtc = DateTime.UtcNow;
+        target.UpdatedAtUtc = SystemClock.UtcNow;
 
         // A demotion (new role ranks lower than the old one) strips privileges the user's live
         // sessions still carry, so §16 requires revoking every session immediately — mobile and

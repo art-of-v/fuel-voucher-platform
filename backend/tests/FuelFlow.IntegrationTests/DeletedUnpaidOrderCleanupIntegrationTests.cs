@@ -7,6 +7,7 @@ using FuelFlow.Features.Settings;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -145,15 +146,15 @@ public sealed class DeletedUnpaidOrderCleanupIntegrationTests : IClassFixture<Te
                 Brand = "okko",
                 FuelTypeId = ToUuid("okko-dp"),
                 Liters = 10m,
-                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
-                CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
+                CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
                 VoucherNumber = $"OC-{voucherId:N}"[..16],
                 QrPayload = $"qr-{voucherId:N}",
                 Status = VoucherStatus.Assigned,
                 AssignedToUserId = userId,
                 OrderId = deliversFuelId,
-                CreatedAtUtc = DateTime.UtcNow.AddDays(-40),
-                UpdatedAtUtc = DateTime.UtcNow.AddDays(-40)
+                CreatedAtUtc = TestClock.UtcNow.AddDays(-40),
+                UpdatedAtUtc = TestClock.UtcNow.AddDays(-40)
             });
         });
 
@@ -172,13 +173,13 @@ public sealed class DeletedUnpaidOrderCleanupIntegrationTests : IClassFixture<Te
         {
             Key = AppSettingKeys.DeletedUnpaidOrderCleanupEnabled,
             Value = "true",
-            UpdatedAtUtc = DateTime.UtcNow
+            UpdatedAtUtc = TestClock.UtcNow
         });
         seed.AppSettings.Add(new AppSetting
         {
             Key = AppSettingKeys.DeletedUnpaidOrderCleanupRetentionDays,
             Value = retentionDays.ToString(),
-            UpdatedAtUtc = DateTime.UtcNow
+            UpdatedAtUtc = TestClock.UtcNow
         });
     }
 
@@ -195,8 +196,8 @@ public sealed class DeletedUnpaidOrderCleanupIntegrationTests : IClassFixture<Te
         Id = userId,
         PhoneNumber = $"+38{userId:N}"[..20],
         IsActive = true,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 
     private static Order CreateOrder(
@@ -206,7 +207,7 @@ public sealed class DeletedUnpaidOrderCleanupIntegrationTests : IClassFixture<Te
         bool isDeleted,
         int ageDays)
     {
-        var timestamp = DateTime.UtcNow.AddDays(-ageDays);
+        var timestamp = TestClock.UtcNow.AddDays(-ageDays);
         return new Order
         {
             Id = orderId,

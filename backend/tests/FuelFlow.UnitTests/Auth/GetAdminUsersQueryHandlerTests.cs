@@ -2,6 +2,7 @@ using FluentAssertions;
 using FuelFlow.Features.Auth.AdminUser.GetAdminUsers;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.UnitTests.Auth;
@@ -34,7 +35,7 @@ public sealed class GetAdminUsersQueryHandlerTests : IDisposable
         {
             Id = Guid.NewGuid(),
             Name = "Admin",
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow
         };
 
         var userWithRole = new User

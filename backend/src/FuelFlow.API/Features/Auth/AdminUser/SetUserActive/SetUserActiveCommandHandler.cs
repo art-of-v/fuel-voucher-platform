@@ -1,5 +1,6 @@
 using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
@@ -52,7 +53,7 @@ public sealed class SetUserActiveCommandHandler
             return SetUserActiveResult.CreateSuccess(); // idempotent
 
         target.IsActive = command.IsActive;
-        target.UpdatedAtUtc = DateTime.UtcNow;
+        target.UpdatedAtUtc = SystemClock.UtcNow;
         // Activation changes purchase eligibility, not the validity of the session.
 
         await _context.SaveChangesAsync(cancellationToken);

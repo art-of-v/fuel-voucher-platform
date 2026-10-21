@@ -9,6 +9,7 @@ using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
@@ -241,16 +242,16 @@ public sealed class MyCompanyMembershipsIntegrationTests : IClassFixture<TestDat
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
             VoucherNumber = $"OKKO-{id:N}"[..20],
             QrPayload = $"payload-{id:N}",
             Status = VoucherStatus.Assigned,
             LegalEntityId = legalEntityId,
             AssignedToUserId = ownerUserId,
             OrderId = orderId,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         await seed.SaveChangesAsync();
         return id;
@@ -269,8 +270,8 @@ public sealed class MyCompanyMembershipsIntegrationTests : IClassFixture<TestDat
             UserId = userId,
             Price = 0,
             Status = OrderStatus.Fulfilled,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         return orderId;
     }

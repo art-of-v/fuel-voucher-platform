@@ -7,6 +7,7 @@ using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Notifications.Email;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -169,10 +170,10 @@ public sealed class SetUserEmailCommandHandlerTests
     private static async Task SeedRolesAsync(ApplicationDbContext context)
     {
         context.Roles.AddRange(
-            new Role { Id = SeedRoles.ProductOwnerId, Name = SeedRoles.ProductOwnerName, CreatedAtUtc = DateTime.UtcNow },
-            new Role { Id = SeedRoles.AdminRoleId, Name = SeedRoles.AdminName, CreatedAtUtc = DateTime.UtcNow },
-            new Role { Id = SeedRoles.ManagerRoleId, Name = SeedRoles.ManagerName, CreatedAtUtc = DateTime.UtcNow },
-            new Role { Id = SeedRoles.UserRoleId, Name = SeedRoles.UserName, CreatedAtUtc = DateTime.UtcNow });
+            new Role { Id = SeedRoles.ProductOwnerId, Name = SeedRoles.ProductOwnerName, CreatedAtUtc = TestClock.UtcNow },
+            new Role { Id = SeedRoles.AdminRoleId, Name = SeedRoles.AdminName, CreatedAtUtc = TestClock.UtcNow },
+            new Role { Id = SeedRoles.ManagerRoleId, Name = SeedRoles.ManagerName, CreatedAtUtc = TestClock.UtcNow },
+            new Role { Id = SeedRoles.UserRoleId, Name = SeedRoles.UserName, CreatedAtUtc = TestClock.UtcNow });
         await context.SaveChangesAsync();
     }
 
@@ -185,8 +186,8 @@ public sealed class SetUserEmailCommandHandlerTests
             RoleId = roleId,
             Email = email,
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
         };
         context.Users.Add(user);
         await context.SaveChangesAsync();

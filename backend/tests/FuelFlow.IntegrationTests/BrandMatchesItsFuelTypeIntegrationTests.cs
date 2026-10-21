@@ -4,6 +4,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
@@ -69,14 +70,14 @@ public sealed class BrandMatchesItsFuelTypeIntegrationTests : IClassFixture<Test
             Brand = "wog",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
             VoucherNumber = $"WRONG-BRAND-{Guid.NewGuid():N}",
             QrPayload = $"payload-{Guid.NewGuid():N}",
             Status = VoucherStatus.Available,
             DataKind = DataKinds.Real,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         context.FuelVouchers.Add(voucher);
@@ -114,14 +115,14 @@ public sealed class BrandMatchesItsFuelTypeIntegrationTests : IClassFixture<Test
             BrandId = BrandIds.ForSlug("wog"),
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
             VoucherNumber = $"WRONG-KEY-{Guid.NewGuid():N}",
             QrPayload = $"payload-{Guid.NewGuid():N}",
             Status = VoucherStatus.Available,
             DataKind = DataKinds.Real,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         context.FuelVouchers.Add(voucher);
@@ -150,14 +151,14 @@ public sealed class BrandMatchesItsFuelTypeIntegrationTests : IClassFixture<Test
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
             VoucherNumber = $"RIGHT-BRAND-{Guid.NewGuid():N}",
             QrPayload = $"payload-{Guid.NewGuid():N}",
             Status = VoucherStatus.Available,
             DataKind = DataKinds.Real,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         context.FuelVouchers.Add(voucher);

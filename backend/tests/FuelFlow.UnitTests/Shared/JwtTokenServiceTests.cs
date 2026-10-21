@@ -3,7 +3,9 @@ using System.Security.Claims;
 using System.Text;
 using FluentAssertions;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Security;
 using FuelFlow.SharedKernel.Services;
+using FuelFlow.Testing;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
@@ -59,7 +61,12 @@ public class JwtTokenServiceTests
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(Secret)),
-            ClockSkew = TimeSpan.Zero
+            ClockSkew = TimeSpan.Zero,
+            // The application's own lifetime rule, not the framework's: the token was minted
+            // against the application's clock, so it has to be judged against the same one. The
+            // framework would judge it against the machine's clock - and on the suite's fixed
+            // instant it would call every token expired.
+            LifetimeValidator = (notBefore, expires, _, _) => TokenLifetime.IsValid(notBefore, expires)
         }, out _);
 
         principal.Should().NotBeNull();
@@ -97,6 +104,6 @@ public class JwtTokenServiceTests
         var token = service.GenerateAccessToken(Guid.NewGuid(), "+380991234567", null);
 
         var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
-        jwt.ValidTo.Should().BeCloseTo(DateTime.UtcNow.AddMinutes(minutes), TimeSpan.FromSeconds(10));
+        jwt.ValidTo.Should().BeCloseTo(TestClock.UtcNow.AddMinutes(minutes), TimeSpan.FromSeconds(10));
     }
 }

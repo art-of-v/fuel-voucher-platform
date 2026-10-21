@@ -2,6 +2,7 @@ using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -59,7 +60,7 @@ public sealed class VoucherStockMonitor
         // they stop being worth anything on their expiry date, and nothing else in this job
         // (or, before this, in the whole system) says so while there is still time to price
         // them for renewal. A combination qualifies if *either* number is worth reporting.
-        var horizon = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(config.ExpiringWithinDays);
+        var horizon = DateOnly.FromDateTime(SystemClock.UtcNow).AddDays(config.ExpiringWithinDays);
 
         var counts = await _context.FuelVouchers
             .Where(v => !v.IsDeleted)

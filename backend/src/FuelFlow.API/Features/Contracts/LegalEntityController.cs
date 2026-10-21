@@ -1,6 +1,7 @@
 using FuelFlow.Features.Contracts.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -80,7 +81,7 @@ public sealed class LegalEntityController : ControllerBase
             {
                 Id = Guid.CreateVersion7(),
                 UserId = userId.Value,
-                CreatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = SystemClock.UtcNow
             };
             _dbContext.LegalEntities.Add(entity);
             isNewEntity = true;
@@ -93,7 +94,7 @@ public sealed class LegalEntityController : ControllerBase
         entity.DirectorName = request.DirectorName;
         entity.Phone = request.Phone;
         entity.Email = request.Email;
-        entity.UpdatedAtUtc = DateTime.UtcNow;
+        entity.UpdatedAtUtc = SystemClock.UtcNow;
 
         if (!isNewEntity)
         {
@@ -187,8 +188,8 @@ public sealed class LegalEntityController : ControllerBase
             DirectorName = request.DirectorName,
             Phone = request.Phone,
             Email = request.Email,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = SystemClock.UtcNow,
+            UpdatedAtUtc = SystemClock.UtcNow
         };
         _dbContext.LegalEntities.Add(entity);
 
@@ -256,7 +257,7 @@ public sealed class LegalEntityController : ControllerBase
         entity.DirectorName = request.DirectorName;
         entity.Phone = request.Phone;
         entity.Email = request.Email;
-        entity.UpdatedAtUtc = DateTime.UtcNow;
+        entity.UpdatedAtUtc = SystemClock.UtcNow;
         _dbContext.LegalEntities.Update(entity);
 
         try
@@ -316,7 +317,7 @@ public sealed class LegalEntityController : ControllerBase
                 // The validity term, and whether it has run out. A contract list that does not
                 // say when a contract ends cannot answer "which of these is about to expire".
                 expiresAt = c.ExpiresAtUtc,
-                expired = c.ExpiresAtUtc <= DateTime.UtcNow,
+                expired = c.ExpiresAtUtc <= SystemClock.UtcNow,
                 // Which version of the provider's text this contract is against, and the text
                 // itself. The mobile's "REVIEW THE TEXT" had nothing behind it before this.
                 termsVersion = c.TermsVersion,
@@ -359,7 +360,7 @@ public sealed class LegalEntityController : ControllerBase
         // A contract that has already expired is not signed. The term is the whole point of
         // having one: without this check the expiry would be a field nobody reads, and the
         // signature would outlive the agreement it is a signature of.
-        if (!ContractValidity.CanBeSigned(contract.ExpiresAtUtc, DateTime.UtcNow))
+        if (!ContractValidity.CanBeSigned(contract.ExpiresAtUtc, SystemClock.UtcNow))
             return BadRequest($"This contract expired on {contract.ExpiresAtUtc:yyyy-MM-dd} and cannot be signed.");
 
         var alreadySigned = await _dbContext.UserContracts
@@ -374,7 +375,7 @@ public sealed class LegalEntityController : ControllerBase
             UserId = userId.Value,
             ContractId = request.ContractId,
             SignatureData = request.SignatureData,
-            SignedAtUtc = DateTime.UtcNow,
+            SignedAtUtc = SystemClock.UtcNow,
             // The version that was actually signed, frozen into the signature. A later version
             // of the terms does not rewrite what the customer read, and the audit trail has to
             // be able to say which one it was.
@@ -423,7 +424,7 @@ public sealed class LegalEntityController : ControllerBase
             // A signature outlives the contract it is a signature of, so the term travels
             // with it - otherwise a signed-contract list cannot say which of them has run out.
             expiresAt = uc.Contract?.ExpiresAtUtc,
-            expired = uc.Contract?.ExpiresAtUtc <= DateTime.UtcNow
+            expired = uc.Contract?.ExpiresAtUtc <= SystemClock.UtcNow
         });
 
         return Ok(result);

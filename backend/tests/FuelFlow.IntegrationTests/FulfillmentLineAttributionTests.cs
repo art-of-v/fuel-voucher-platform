@@ -12,6 +12,7 @@ using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -150,7 +151,7 @@ public sealed class FulfillmentLineAttributionTests : IClassFixture<TestDatabase
 
             var order = SingleLineOrder(orderId, userId, lineId, quantity: 2);
             order.Status = OrderStatus.Fulfilled;
-            order.FulfilledAtUtc = DateTime.UtcNow;
+            order.FulfilledAtUtc = TestClock.UtcNow;
             AddPaidOrder(seed, order);
 
             // Right count, no line named: the legacy shape. Under litres this is correct, and the
@@ -199,9 +200,9 @@ public sealed class FulfillmentLineAttributionTests : IClassFixture<TestDatabase
         UserId = userId,
         Price = 7500m,
         Status = OrderStatus.Fulfilled,
-        FulfilledAtUtc = DateTime.UtcNow,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow,
+        FulfilledAtUtc = TestClock.UtcNow,
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow,
         LineItems = new List<OrderLineItem>
         {
             Line(okkoLine, orderId, "okko", "okko-95", 10m, quantity: 2, unitPrice: 2500m),
@@ -215,8 +216,8 @@ public sealed class FulfillmentLineAttributionTests : IClassFixture<TestDatabase
         UserId = userId,
         Price = quantity * 2500m,
         Status = OrderStatus.PendingFulfillment,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow,
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow,
         LineItems = new List<OrderLineItem>
         {
             Line(lineId, orderId, "okko", "okko-95", 10m, quantity, 2500m)
@@ -281,15 +282,15 @@ public sealed class FulfillmentLineAttributionTests : IClassFixture<TestDatabase
             BrandId = BrandIds.ForSlug(brand),
             FuelTypeId =   ToUuid(fuelTypeId),
             Liters = liters,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
             VoucherNumber = nonce,
             QrPayload = nonce,
             Status = VoucherStatus.Assigned,
             AssignedToUserId = userId,
             OrderId = orderId,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
     }
 
@@ -298,8 +299,8 @@ public sealed class FulfillmentLineAttributionTests : IClassFixture<TestDatabase
         Id = id,
         PhoneNumber = $"+38{id:N}"[..20],
         IsActive = true,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 
     private static async Task ResetDataAsync(ApplicationDbContext context)
@@ -340,9 +341,9 @@ public sealed class FulfillmentLineAttributionTests : IClassFixture<TestDatabase
             AmountKopecks = (long)(order.Price * 100),
             Currency = "UAH",
             Status = PaymentStatus.Succeeded,
-            PaidAtUtc = DateTime.UtcNow,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            PaidAtUtc = TestClock.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
     }
 }

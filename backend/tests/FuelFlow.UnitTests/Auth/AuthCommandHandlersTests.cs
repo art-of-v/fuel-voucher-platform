@@ -14,6 +14,7 @@ using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Notifications.Email;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -50,8 +51,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
         {
             Id = UserId,
             PhoneNumber = "+380991234567",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
             IsActive = true,
             IsDeleted = false,
             TokenVersion = 1
@@ -64,8 +65,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
             DeviceId = "device-1",
             PublicKey = "public-key",
             Status = DeviceStatus.Active,
-            CreatedAt = DateTime.UtcNow,
-            LastSeenAt = DateTime.UtcNow
+            CreatedAt = TestClock.UtcNow,
+            LastSeenAt = TestClock.UtcNow
         };
 
         var refreshToken = new RefreshToken
@@ -73,8 +74,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
             Id = Guid.NewGuid(),
             UserId = UserId,
             Token = "refresh-token-1",
-            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
-            CreatedAtUtc = DateTime.UtcNow,
+            ExpiresAtUtc = TestClock.UtcNow.AddDays(7),
+            CreatedAtUtc = TestClock.UtcNow,
             IsRevoked = false,
             User = user
         };
@@ -160,8 +161,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
             PublicKey = "old-key",
             DeviceModel = "Old Model",
             Status = DeviceStatus.Active,
-            CreatedAt = DateTime.UtcNow.AddDays(-1),
-            LastSeenAt = DateTime.UtcNow.AddDays(-1)
+            CreatedAt = TestClock.UtcNow.AddDays(-1),
+            LastSeenAt = TestClock.UtcNow.AddDays(-1)
         };
 
         _context.Devices.Add(existingDevice);
@@ -214,8 +215,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
             PublicKey = "victim-key",
             DeviceModel = "Victim Phone",
             Status = DeviceStatus.Revoked,
-            CreatedAt = DateTime.UtcNow.AddDays(-1),
-            LastSeenAt = DateTime.UtcNow.AddDays(-1)
+            CreatedAt = TestClock.UtcNow.AddDays(-1),
+            LastSeenAt = TestClock.UtcNow.AddDays(-1)
         };
 
         _context.Devices.Add(victimDevice);
@@ -257,8 +258,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
             DeviceId = "device-abc",
             PublicKey = "public-key",
             Status = DeviceStatus.Active,
-            CreatedAt = DateTime.UtcNow,
-            LastSeenAt = DateTime.UtcNow
+            CreatedAt = TestClock.UtcNow,
+            LastSeenAt = TestClock.UtcNow
         };
 
         _context.Devices.Add(device);
@@ -284,8 +285,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
         {
             Id = UserId,
             PhoneNumber = "+380991234567",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
             IsActive = true,
             IsDeleted = false,
             TokenVersion = 1
@@ -298,8 +299,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
             DeviceId = "device-abc",
             PublicKey = "public-key",
             Status = DeviceStatus.Active,
-            CreatedAt = DateTime.UtcNow,
-            LastSeenAt = DateTime.UtcNow
+            CreatedAt = TestClock.UtcNow,
+            LastSeenAt = TestClock.UtcNow
         };
 
         // Token bound to the device being logged out.
@@ -309,8 +310,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
             UserId = UserId,
             DeviceId = "device-abc",
             Token = "refresh-token-this-device",
-            ExpiresAtUtc = DateTime.UtcNow.AddDays(14),
-            CreatedAtUtc = DateTime.UtcNow,
+            ExpiresAtUtc = TestClock.UtcNow.AddDays(14),
+            CreatedAtUtc = TestClock.UtcNow,
             IsRevoked = false,
             User = user
         };
@@ -322,8 +323,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
             UserId = UserId,
             DeviceId = "device-xyz",
             Token = "refresh-token-other-device",
-            ExpiresAtUtc = DateTime.UtcNow.AddDays(14),
-            CreatedAtUtc = DateTime.UtcNow,
+            ExpiresAtUtc = TestClock.UtcNow.AddDays(14),
+            CreatedAtUtc = TestClock.UtcNow,
             IsRevoked = false,
             User = user
         };
@@ -363,8 +364,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
         {
             Id = OtherUserId,
             PhoneNumber = "+380997654321",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
             IsActive = true,
             IsDeleted = false,
             TokenVersion = 3
@@ -375,8 +376,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
             Id = Guid.NewGuid(),
             UserId = OtherUserId,
             Token = "other-refresh-token",
-            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
-            CreatedAtUtc = DateTime.UtcNow,
+            ExpiresAtUtc = TestClock.UtcNow.AddDays(7),
+            CreatedAtUtc = TestClock.UtcNow,
             IsRevoked = false,
             User = otherUser
         };
@@ -406,8 +407,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
             DeviceId = "device-abc",
             PublicKey = "public-key",
             Status = DeviceStatus.Active,
-            CreatedAt = DateTime.UtcNow,
-            LastSeenAt = DateTime.UtcNow
+            CreatedAt = TestClock.UtcNow,
+            LastSeenAt = TestClock.UtcNow
         };
 
         _context.Devices.Add(device);
@@ -436,8 +437,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
         {
             Id = UserId,
             PhoneNumber = "+380991234567",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
             IsActive = true,
             IsDeleted = false,
             TokenVersion = 1
@@ -449,8 +450,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
             UserId = UserId,
             DeviceId = null, // admin-panel session: no device linkage
             Token = SecretsHasher.Hash(presentedRaw),
-            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
-            CreatedAtUtc = DateTime.UtcNow,
+            ExpiresAtUtc = TestClock.UtcNow.AddDays(7),
+            CreatedAtUtc = TestClock.UtcNow,
             IsRevoked = false,
             User = user
         };
@@ -461,8 +462,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
             UserId = UserId,
             DeviceId = null,
             Token = SecretsHasher.Hash(otherRaw),
-            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
-            CreatedAtUtc = DateTime.UtcNow,
+            ExpiresAtUtc = TestClock.UtcNow.AddDays(7),
+            CreatedAtUtc = TestClock.UtcNow,
             IsRevoked = false,
             User = user
         };
@@ -585,7 +586,7 @@ public sealed class AuthCommandHandlersTests : IDisposable
 
     private async Task SeedUserWithRole(string phone, string roleName, string? email, bool isActive = true)
     {
-        var role = new Role { Id = Guid.NewGuid(), Name = roleName, CreatedAtUtc = DateTime.UtcNow };
+        var role = new Role { Id = Guid.NewGuid(), Name = roleName, CreatedAtUtc = TestClock.UtcNow };
         _context.Roles.Add(role);
         _context.Users.Add(new User
         {
@@ -595,8 +596,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
             RoleId = role.Id,
             IsActive = isActive,
             IsDeleted = false,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         await _context.SaveChangesAsync();
     }
@@ -779,8 +780,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
         {
             Id = UserId,
             PhoneNumber = "+380991234567",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
             IsActive = true,
             TokenVersion = 1
         };
@@ -794,8 +795,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
             // would make this test pass through the "token not found" branch instead of
             // the rotation branch it is meant to cover.
             Token = SecretsHasher.Hash("old-refresh-token"),
-            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
-            CreatedAtUtc = DateTime.UtcNow,
+            ExpiresAtUtc = TestClock.UtcNow.AddDays(7),
+            CreatedAtUtc = TestClock.UtcNow,
             IsRevoked = false,
             User = user
         };
@@ -851,13 +852,13 @@ public sealed class AuthCommandHandlersTests : IDisposable
         // The user has since been promoted to Admin, but the SESSION was created as a plain User.
         // §16: promotion must not silently upgrade an existing session — refresh mints with the
         // role the session was born with (RoleNameAtIssue), and carries it forward on rotation.
-        var adminRole = new Role { Id = SeedRoles.AdminRoleId, Name = SeedRoles.AdminName, CreatedAtUtc = DateTime.UtcNow };
+        var adminRole = new Role { Id = SeedRoles.AdminRoleId, Name = SeedRoles.AdminName, CreatedAtUtc = TestClock.UtcNow };
         var user = new User
         {
             Id = UserId,
             PhoneNumber = "+380991234567",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
             IsActive = true,
             TokenVersion = 1,
             RoleId = adminRole.Id,
@@ -871,8 +872,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
             FamilyId = Guid.NewGuid(),
             RoleNameAtIssue = SeedRoles.UserName, // session born before the promotion
             Token = SecretsHasher.Hash("old-refresh-token"),
-            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
-            CreatedAtUtc = DateTime.UtcNow,
+            ExpiresAtUtc = TestClock.UtcNow.AddDays(7),
+            CreatedAtUtc = TestClock.UtcNow,
             IsRevoked = false,
             User = user
         };
@@ -942,8 +943,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
         {
             Id = UserId,
             PhoneNumber = "+380991234567",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
             IsActive = true,
             TokenVersion = 1
         };
@@ -955,8 +956,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
             // Hashed: a raw seed is unfindable and the test would pass on the
             // "not found" branch without ever reaching the expiry check.
             Token = SecretsHasher.Hash("expired-refresh-token"),
-            ExpiresAtUtc = DateTime.UtcNow.AddDays(-1),
-            CreatedAtUtc = DateTime.UtcNow.AddDays(-8),
+            ExpiresAtUtc = TestClock.UtcNow.AddDays(-1),
+            CreatedAtUtc = TestClock.UtcNow.AddDays(-8),
             IsRevoked = false,
             User = user
         };
@@ -988,8 +989,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
         {
             Id = UserId,
             PhoneNumber = "+380991234567",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
             IsActive = true,
             TokenVersion = 1
         };
@@ -1006,10 +1007,10 @@ public sealed class AuthCommandHandlersTests : IDisposable
             UserId = UserId,
             FamilyId = family,
             Token = SecretsHasher.Hash("stolen-token"),
-            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
-            CreatedAtUtc = DateTime.UtcNow.AddMinutes(-10),
+            ExpiresAtUtc = TestClock.UtcNow.AddDays(7),
+            CreatedAtUtc = TestClock.UtcNow.AddMinutes(-10),
             IsRevoked = true,
-            RevokedAtUtc = DateTime.UtcNow.AddMinutes(-5),
+            RevokedAtUtc = TestClock.UtcNow.AddMinutes(-5),
             User = user
         };
 
@@ -1020,8 +1021,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
             UserId = UserId,
             FamilyId = family,
             Token = SecretsHasher.Hash("current-token"),
-            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
-            CreatedAtUtc = DateTime.UtcNow,
+            ExpiresAtUtc = TestClock.UtcNow.AddDays(7),
+            CreatedAtUtc = TestClock.UtcNow,
             IsRevoked = false,
             User = user
         };
@@ -1033,8 +1034,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
             UserId = UserId,
             FamilyId = otherFamily,
             Token = SecretsHasher.Hash("other-device-token"),
-            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
-            CreatedAtUtc = DateTime.UtcNow,
+            ExpiresAtUtc = TestClock.UtcNow.AddDays(7),
+            CreatedAtUtc = TestClock.UtcNow,
             IsRevoked = false,
             User = user
         };
@@ -1075,8 +1076,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
         {
             Id = UserId,
             PhoneNumber = "+380991234567",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
             IsActive = true,
             TokenVersion = 1
         };
@@ -1090,10 +1091,10 @@ public sealed class AuthCommandHandlersTests : IDisposable
             UserId = UserId,
             FamilyId = family,
             Token = SecretsHasher.Hash("lost-parent"),
-            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
-            CreatedAtUtc = DateTime.UtcNow.AddSeconds(-30),
+            ExpiresAtUtc = TestClock.UtcNow.AddDays(7),
+            CreatedAtUtc = TestClock.UtcNow.AddSeconds(-30),
             IsRevoked = true,
-            RevokedAtUtc = DateTime.UtcNow.AddSeconds(-5),
+            RevokedAtUtc = TestClock.UtcNow.AddSeconds(-5),
             User = user
         };
 
@@ -1104,8 +1105,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
             UserId = UserId,
             FamilyId = family,
             Token = SecretsHasher.Hash("orphan-successor"),
-            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
-            CreatedAtUtc = DateTime.UtcNow.AddSeconds(-5),
+            ExpiresAtUtc = TestClock.UtcNow.AddDays(7),
+            CreatedAtUtc = TestClock.UtcNow.AddSeconds(-5),
             IsRevoked = false,
             User = user
         };
@@ -1151,8 +1152,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
         {
             Id = UserId,
             PhoneNumber = "+380991234567",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
             IsActive = true,
             TokenVersion = 1
         };
@@ -1165,10 +1166,10 @@ public sealed class AuthCommandHandlersTests : IDisposable
             UserId = UserId,
             FamilyId = family,
             Token = SecretsHasher.Hash("replayed-token"),
-            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
-            CreatedAtUtc = DateTime.UtcNow.AddSeconds(-30),
+            ExpiresAtUtc = TestClock.UtcNow.AddDays(7),
+            CreatedAtUtc = TestClock.UtcNow.AddSeconds(-30),
             IsRevoked = true,
-            RevokedAtUtc = DateTime.UtcNow.AddSeconds(-5),
+            RevokedAtUtc = TestClock.UtcNow.AddSeconds(-5),
             User = user
         };
 
@@ -1179,10 +1180,10 @@ public sealed class AuthCommandHandlersTests : IDisposable
             UserId = UserId,
             FamilyId = family,
             Token = SecretsHasher.Hash("dead-successor"),
-            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
-            CreatedAtUtc = DateTime.UtcNow.AddSeconds(-5),
+            ExpiresAtUtc = TestClock.UtcNow.AddDays(7),
+            CreatedAtUtc = TestClock.UtcNow.AddSeconds(-5),
             IsRevoked = true,
-            RevokedAtUtc = DateTime.UtcNow.AddSeconds(-2),
+            RevokedAtUtc = TestClock.UtcNow.AddSeconds(-2),
             User = user
         };
         _context.Users.Add(user);
@@ -1219,8 +1220,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
         {
             Id = UserId,
             PhoneNumber = "+380991234567",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
             IsActive = true,
             TokenVersion = 1
         };
@@ -1232,8 +1233,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
             UserId = UserId,
             FamilyId = family,
             Token = SecretsHasher.Hash("rotatable-token"),
-            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
-            CreatedAtUtc = DateTime.UtcNow,
+            ExpiresAtUtc = TestClock.UtcNow.AddDays(7),
+            CreatedAtUtc = TestClock.UtcNow,
             IsRevoked = false,
             User = user
         };
@@ -1274,8 +1275,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
         {
             Id = UserId,
             PhoneNumber = "+380991234567",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
             IsActive = true,
             TokenVersion = 1
         };
@@ -1287,10 +1288,10 @@ public sealed class AuthCommandHandlersTests : IDisposable
             UserId = UserId,
             FamilyId = Guid.Empty,
             Token = SecretsHasher.Hash("legacy-stolen-token"),
-            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
-            CreatedAtUtc = DateTime.UtcNow,
+            ExpiresAtUtc = TestClock.UtcNow.AddDays(7),
+            CreatedAtUtc = TestClock.UtcNow,
             IsRevoked = true,
-            RevokedAtUtc = DateTime.UtcNow,
+            RevokedAtUtc = TestClock.UtcNow,
             User = user
         };
 
@@ -1300,8 +1301,8 @@ public sealed class AuthCommandHandlersTests : IDisposable
             UserId = UserId,
             FamilyId = Guid.NewGuid(),
             Token = SecretsHasher.Hash("active-token"),
-            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
-            CreatedAtUtc = DateTime.UtcNow,
+            ExpiresAtUtc = TestClock.UtcNow.AddDays(7),
+            CreatedAtUtc = TestClock.UtcNow,
             IsRevoked = false,
             User = user
         };

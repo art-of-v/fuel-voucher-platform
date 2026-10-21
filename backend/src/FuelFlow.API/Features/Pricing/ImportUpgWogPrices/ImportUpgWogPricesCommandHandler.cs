@@ -3,6 +3,7 @@ using FuelFlow.Features.Brands;
 using FuelFlow.Features.Pricing.ImportOkkoPumpPrices;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Pricing.ImportUpgWogPrices;
@@ -168,7 +169,7 @@ public sealed class ImportUpgWogPricesCommandHandler
             .GroupBy(f => FuelGrade.Key(f.Name)!, StringComparer.Ordinal)
             .ToDictionary(g => g.Key, g => g.OrderBy(f => f.Id).First());
 
-        var now = DateTime.UtcNow;
+        var now = SystemClock.UtcNow;
         var actor = actingUserId == Guid.Empty ? (Guid?)null : actingUserId;
         var seen = new HashSet<string>(StringComparer.Ordinal);
 

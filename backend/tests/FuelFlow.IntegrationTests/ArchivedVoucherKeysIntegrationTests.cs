@@ -3,6 +3,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
@@ -110,13 +111,13 @@ public sealed class ArchivedVoucherKeysIntegrationTests : IClassFixture<TestData
         BrandId = BrandIds.ForSlug("okko"),
         FuelTypeId = ToUuid("okko-95"),
         Liters = 10m,
-        SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
-        CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
+        SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(3)),
+        CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(3)),
         VoucherNumber = number,
         QrPayload = qr,
         Status = VoucherStatus.Available,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 
     private ApplicationDbContext CreateContext()

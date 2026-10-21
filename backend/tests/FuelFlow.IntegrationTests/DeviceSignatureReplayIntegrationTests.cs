@@ -9,6 +9,7 @@ using FuelFlow.Features.Auth.SendCode;
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Auth.Verify;
 using FuelFlow.Persistence;
+using FuelFlow.Testing;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -112,7 +113,7 @@ public sealed class DeviceSignatureReplayIntegrationTests : IClassFixture<TestDa
 
         // Signed as if the device's clock is three quarters of the tolerance AHEAD of the server's -
         // inside the window, and far enough past zero that the old TTL dropped the nonce early.
-        var timestamp = (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + (ToleranceMs * 3 / 4))
+        var timestamp = (TestClock.Now.ToUnixTimeMilliseconds() + (ToleranceMs * 3 / 4))
             .ToString();
         var body = JsonSerializer.Serialize(new { anything = "goes" });
         var signature = Sign($"{HttpMethod.Post}{PurchasePath}{body}{timestamp}");
@@ -177,7 +178,7 @@ public sealed class DeviceSignatureReplayIntegrationTests : IClassFixture<TestDa
             DeviceId = _deviceId,
             PublicKey = publicKeyPem,
             Status = DeviceStatus.Active,
-            CreatedAt = DateTime.UtcNow,
+            CreatedAt = TestClock.UtcNow,
         });
         await context.SaveChangesAsync();
     }

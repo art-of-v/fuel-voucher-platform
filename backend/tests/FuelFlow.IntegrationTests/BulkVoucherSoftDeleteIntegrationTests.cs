@@ -9,6 +9,7 @@ using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -96,15 +97,15 @@ public sealed class BulkVoucherSoftDeleteIntegrationTests : IClassFixture<TestDa
         var voucher = await context.FuelVouchers.IgnoreQueryFilters().FirstAsync();
 
         var userId = Guid.NewGuid();
-        context.Users.Add(new User { Id = userId, PhoneNumber = "+380000007777", CreatedAtUtc = DateTime.UtcNow });
+        context.Users.Add(new User { Id = userId, PhoneNumber = "+380000007777", CreatedAtUtc = TestClock.UtcNow });
         context.Orders.Add(new Order
         {
             Id = Guid.NewGuid(),
             UserId = userId,
             Price = 100m,
             Status = OrderStatus.Fulfilled,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         await context.SaveChangesAsync();
 
@@ -305,7 +306,7 @@ public async Task Delete_All_Records_An_Archived_Event_For_Every_Voucher_It_Arch
             Liters = 10m,
             CostPerLiter = 40m,
             Status = VoucherStatus.Imported,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow
         });
     }
 
@@ -425,7 +426,7 @@ private Guid AddOrder(ApplicationDbContext context)
         {
             Id = userId,
             PhoneNumber = "+380" + (20000000 + Interlocked.Increment(ref _phoneCounter)),
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow
         });
 
         var orderId = Guid.NewGuid();
@@ -435,8 +436,8 @@ private Guid AddOrder(ApplicationDbContext context)
             UserId = userId,
             Price = 100m,
             Status = OrderStatus.Fulfilled,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         return orderId;
@@ -455,7 +456,7 @@ private async Task SeedAsync()
                 Id = Guid.NewGuid(),
                 Name = "S",
                 IsActive = true,
-                CreatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow
             });
         }
         if (!await seed.FuelTypes.AnyAsync())
@@ -467,8 +468,8 @@ private async Task SeedAsync()
                 BrandId = BrandIds.Okko,
                 BasePrice = 60m,
                 DiscountPrice = 60m,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
         }
 
@@ -476,9 +477,9 @@ private async Task SeedAsync()
         {
             Id = Guid.NewGuid(),
             FileName = "soft.pdf",
-            CompletedAtUtc = DateTime.UtcNow,
+            CompletedAtUtc = TestClock.UtcNow,
             Status = "Completed",
-            StartedAtUtc = DateTime.UtcNow
+            StartedAtUtc = TestClock.UtcNow
         });
         await seed.SaveChangesAsync();
 
@@ -501,7 +502,7 @@ private async Task SeedAsync()
                 Liters = 10m,
                 CostPerLiter = cost,
                 Status = VoucherStatus.Imported,
-                CreatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow
             });
         }
 

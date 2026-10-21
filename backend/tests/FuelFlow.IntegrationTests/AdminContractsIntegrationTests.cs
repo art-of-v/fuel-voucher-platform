@@ -6,6 +6,7 @@ using FluentAssertions;
 using FuelFlow.Features.Contracts.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -62,7 +63,7 @@ public sealed class AdminContractsIntegrationTests : IClassFixture<TestDatabaseF
         row.GetProperty("signed").GetBoolean().Should().BeFalse();
         row.GetProperty("signedAtUtc").ValueKind.Should().Be(JsonValueKind.Null);
         row.GetProperty("expiresAtUtc").GetDateTime()
-            .Should().BeCloseTo(DateTime.UtcNow.AddDays(30), TimeSpan.FromMinutes(2));
+            .Should().BeCloseTo(TestClock.UtcNow.AddDays(30), TimeSpan.FromMinutes(2));
 
         // The fields the tab used to read and the server never had. They are gone, so the
         // next person who writes a tab cannot read them again.
@@ -191,7 +192,7 @@ public sealed class AdminContractsIntegrationTests : IClassFixture<TestDatabaseF
                 Name = slug.ToUpperInvariant(),
                 Color = "#00ff80",
                 LogoText = slug.ToUpperInvariant(),
-                CreatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow
             };
             context.Brands.Add(brand);
             await context.SaveChangesAsync();
@@ -214,7 +215,7 @@ public sealed class AdminContractsIntegrationTests : IClassFixture<TestDatabaseF
             Version = 1,
             Body = body,
             TermDays = termDays,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow
         });
 
         await context.SaveChangesAsync();
@@ -246,7 +247,7 @@ public sealed class AdminContractsIntegrationTests : IClassFixture<TestDatabaseF
         {
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var role = await context.Roles.FirstAsync(r => r.Name == SeedRoles.AdminName);
-            var now = DateTime.UtcNow;
+            var now = TestClock.UtcNow;
 
             context.Users.Add(new User
             {

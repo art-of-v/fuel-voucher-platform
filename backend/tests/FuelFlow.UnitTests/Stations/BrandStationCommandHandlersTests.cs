@@ -8,6 +8,7 @@ using FuelFlow.Features.Brands.ImportBrandStations;
 using FuelFlow.Features.Brands.UpdateBrandStation;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.UnitTests.Brands;
@@ -65,7 +66,7 @@ public sealed class BrandStationCommandHandlersTests : IDisposable
         result.Node.Should().BeSameAs(node);
         var persisted = await ByExternalIdAsync("okko-1");
         persisted.Should().NotBeNull();
-        persisted!.CreatedAtUtc.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+        persisted!.CreatedAtUtc.Should().BeCloseTo(TestClock.UtcNow, TimeSpan.FromSeconds(5));
     }
 
     [Fact]

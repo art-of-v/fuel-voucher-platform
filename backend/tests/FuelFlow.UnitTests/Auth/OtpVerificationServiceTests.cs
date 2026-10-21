@@ -3,6 +3,7 @@ using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Auth.Verify;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Security;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.UnitTests.Auth;
@@ -43,8 +44,8 @@ public sealed class OtpVerificationServiceTests : IDisposable
             PhoneNumber = phone,
             Code = SecretsHasher.Hash(code),
             IsUsed = used,
-            ExpiresAtUtc = expiresAt ?? DateTime.UtcNow.AddMinutes(5),
-            CreatedAtUtc = createdAt ?? DateTime.UtcNow
+            ExpiresAtUtc = expiresAt ?? TestClock.UtcNow.AddMinutes(5),
+            CreatedAtUtc = createdAt ?? TestClock.UtcNow
         };
         _context.VerificationCodes.Add(vc);
         await _context.SaveChangesAsync();
@@ -110,7 +111,7 @@ public sealed class OtpVerificationServiceTests : IDisposable
     [Fact]
     public async Task TryConsume_WithExpiredCode_ReturnsFalse()
     {
-        await SeedCodeAsync("123456", expiresAt: DateTime.UtcNow.AddMinutes(-1));
+        await SeedCodeAsync("123456", expiresAt: TestClock.UtcNow.AddMinutes(-1));
 
         (await _service.TryConsumeAsync(Phone, "123456", CancellationToken.None)).Should().BeFalse();
     }
@@ -128,8 +129,8 @@ public sealed class OtpVerificationServiceTests : IDisposable
     {
         // Only the newest active code wins: an older still-live code with a different value is
         // never accepted (matches the login path's OrderByDescending(CreatedAtUtc)).
-        await SeedCodeAsync("111111", createdAt: DateTime.UtcNow.AddMinutes(-2));
-        await SeedCodeAsync("222222", createdAt: DateTime.UtcNow);
+        await SeedCodeAsync("111111", createdAt: TestClock.UtcNow.AddMinutes(-2));
+        await SeedCodeAsync("222222", createdAt: TestClock.UtcNow);
 
         (await _service.TryConsumeAsync(Phone, "111111", CancellationToken.None)).Should().BeFalse();
         (await _service.TryConsumeAsync(Phone, "222222", CancellationToken.None)).Should().BeTrue();

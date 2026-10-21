@@ -6,6 +6,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -80,7 +81,7 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
     {
         using var scope = _fixture.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var now = DateTime.UtcNow;
+        var now = TestClock.UtcNow;
 
         // The public catalogue joins the brand row for the slug, so a package whose brand was never
         // seeded would silently vanish from the response instead of failing the test.
@@ -154,14 +155,14 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
         FuelTypeId =   ToUuid(FuelType),
         Liters = liters,
         CostPerLiter = 45m,
-        SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6)),
-        CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6)),
+        SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(6)),
+        CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(6)),
         VoucherNumber = $"QA-POOL-{isTestData}-{liters:0.##}",
         QrPayload = Guid.NewGuid().ToString(),
         Status = VoucherStatus.Available,
         IsTestData = isTestData,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 
     /// <summary>
@@ -187,7 +188,7 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
             var user = await context.Users.SingleAsync(u => u.PhoneNumber == phone, CancellationToken.None);
             user.IsQaAccount = isQaAccount;
             user.IsActive = true;
-            user.UpdatedAtUtc = DateTime.UtcNow;
+            user.UpdatedAtUtc = TestClock.UtcNow;
             await context.SaveChangesAsync();
         }
 

@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -421,15 +422,34 @@ public sealed class NotificationDispatcher
 
     private static bool TryClaimSlot(string key, int throttleMinutes)
     {
-        var now = DateTime.UtcNow;
+        var now = SystemClock.UtcNow;
         var interval = TimeSpan.FromMinutes(throttleMinutes);
+        var claimed = false;
 
-        var updated = LastSentUtc.AddOrUpdate(
+        // Whether the slot was claimed is decided by the branch that writes, NOT by comparing the
+        // stored timestamp with "now": on a clock that does not move between two calls (the test
+        // suite's fixed instant, or two calls inside one clock tick) the stored value and "now"
+        // are the same value, and a comparison would report a slot that was never re-claimed as
+        // claimed - which is how a throttled alert repeated itself.
+        LastSentUtc.AddOrUpdate(
             key,
-            now,
-            (_, previous) => now - previous >= interval ? now : previous);
+            _ =>
+            {
+                claimed = true;
+                return now;
+            },
+            (_, previous) =>
+            {
+                if (now - previous >= interval)
+                {
+                    claimed = true;
+                    return now;
+                }
 
-        return updated == now;
+                return previous;
+            });
+
+        return claimed;
     }
 
     private static string Truncate(string value, int maxLength)

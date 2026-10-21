@@ -8,6 +8,7 @@ using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -57,8 +58,8 @@ public sealed class SyncCommandHandlerTests : IDisposable
             UserId = userId,
             Price = 5000,
             Status = OrderStatus.Fulfilled,
-            CreatedAtUtc = DateTime.UtcNow.AddDays(-5),
-            FulfilledAtUtc = DateTime.UtcNow.AddDays(-4),
+            CreatedAtUtc = TestClock.UtcNow.AddDays(-5),
+            FulfilledAtUtc = TestClock.UtcNow.AddDays(-4),
             LineItems =
             {
                 new OrderLineItem
@@ -81,8 +82,8 @@ public sealed class SyncCommandHandlerTests : IDisposable
             UserId = userId,
             Price = 2500,
             Status = OrderStatus.Fulfilled,
-            CreatedAtUtc = DateTime.UtcNow.AddDays(-2),
-            FulfilledAtUtc = DateTime.UtcNow.AddDays(-1),
+            CreatedAtUtc = TestClock.UtcNow.AddDays(-2),
+            FulfilledAtUtc = TestClock.UtcNow.AddDays(-1),
             LineItems =
             {
                 new OrderLineItem
@@ -106,14 +107,14 @@ public sealed class SyncCommandHandlerTests : IDisposable
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
             VoucherNumber = "OKKO-1",
             QrPayload = "payload-1",
             Status = VoucherStatus.Assigned,
             AssignedToUserId = userId,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         var voucher2 = new FuelVoucher
@@ -123,14 +124,14 @@ public sealed class SyncCommandHandlerTests : IDisposable
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
             VoucherNumber = "OKKO-2",
             QrPayload = "payload-2",
             Status = VoucherStatus.Assigned,
             AssignedToUserId = userId,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         var voucher3 = new FuelVoucher
@@ -140,35 +141,35 @@ public sealed class SyncCommandHandlerTests : IDisposable
             Brand = "okko",
             FuelTypeId = ToUuid("okko-dp"),
             Liters = 50,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(2)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(2)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(2)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(2)),
             VoucherNumber = "OKKO-3",
             QrPayload = "payload-3",
             Status = VoucherStatus.Assigned,
             AssignedToUserId = userId,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         var fulfillment1 = new Fulfillment
         {
             OrderId = order1Id,
             VoucherId = voucher1.Id,
-            FulfilledAtUtc = DateTime.UtcNow.AddDays(-4)
+            FulfilledAtUtc = TestClock.UtcNow.AddDays(-4)
         };
 
         var fulfillment2 = new Fulfillment
         {
             OrderId = order1Id,
             VoucherId = voucher2.Id,
-            FulfilledAtUtc = DateTime.UtcNow.AddDays(-4)
+            FulfilledAtUtc = TestClock.UtcNow.AddDays(-4)
         };
 
         var fulfillment3 = new Fulfillment
         {
             OrderId = order2Id,
             VoucherId = voucher3.Id,
-            FulfilledAtUtc = DateTime.UtcNow.AddDays(-1)
+            FulfilledAtUtc = TestClock.UtcNow.AddDays(-1)
         };
 
         _context.Orders.AddRange(order1, order2);
@@ -224,7 +225,7 @@ public sealed class SyncCommandHandlerTests : IDisposable
             UserId = userId,
             Price = 2500,
             Status = OrderStatus.PendingFulfillment,
-            CreatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
             LineItems =
             {
                 new OrderLineItem
@@ -267,8 +268,8 @@ public sealed class SyncCommandHandlerTests : IDisposable
             UserId = userId,
             Price = 2500,
             Status = OrderStatus.Fulfilled,
-            CreatedAtUtc = DateTime.UtcNow.AddDays(-10),
-            FulfilledAtUtc = DateTime.UtcNow.AddDays(-9),
+            CreatedAtUtc = TestClock.UtcNow.AddDays(-10),
+            FulfilledAtUtc = TestClock.UtcNow.AddDays(-9),
             LineItems =
             {
                 new OrderLineItem
@@ -291,8 +292,8 @@ public sealed class SyncCommandHandlerTests : IDisposable
             UserId = userId,
             Price = 2500,
             Status = OrderStatus.Fulfilled,
-            CreatedAtUtc = DateTime.UtcNow.AddDays(-1),
-            FulfilledAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow.AddDays(-1),
+            FulfilledAtUtc = TestClock.UtcNow,
             LineItems =
             {
                 new OrderLineItem
@@ -336,8 +337,8 @@ public sealed class SyncCommandHandlerTests : IDisposable
             UserId = userId,
             Price = 2500,
             Status = OrderStatus.Fulfilled,
-            CreatedAtUtc = DateTime.UtcNow.AddDays(-3),
-            FulfilledAtUtc = DateTime.UtcNow.AddDays(-2),
+            CreatedAtUtc = TestClock.UtcNow.AddDays(-3),
+            FulfilledAtUtc = TestClock.UtcNow.AddDays(-2),
             LineItems =
             {
                 new OrderLineItem
@@ -360,8 +361,8 @@ public sealed class SyncCommandHandlerTests : IDisposable
             UserId = userId,
             Price = 800,
             Status = OrderStatus.Fulfilled,
-            CreatedAtUtc = DateTime.UtcNow.AddDays(-1),
-            FulfilledAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow.AddDays(-1),
+            FulfilledAtUtc = TestClock.UtcNow,
             LineItems =
             {
                 new OrderLineItem

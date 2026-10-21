@@ -4,6 +4,7 @@ using FluentAssertions;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
@@ -137,8 +138,8 @@ public sealed class OrderHistoryIntegrationTests : IClassFixture<TestDatabaseFix
         await WithFreshContextAsync(async context =>
         {
             var order = await context.Orders.FirstAsync(o => o.Id == orderId);
-            order.LastWebhookProcessedAtUtc = DateTime.UtcNow;
-            order.UpdatedAtUtc = DateTime.UtcNow;
+            order.LastWebhookProcessedAtUtc = TestClock.UtcNow;
+            order.UpdatedAtUtc = TestClock.UtcNow;
             await context.SaveChangesAsync();
         });
 
@@ -233,7 +234,7 @@ public sealed class OrderHistoryIntegrationTests : IClassFixture<TestDatabaseFix
             OrderId = orderId,
             EventType = "PaymntCaptured",   // the typo this constraint exists for
             ToStatus = OrderStatus.Fulfilled.ToString(),
-            OccurredAtUtc = DateTime.UtcNow
+            OccurredAtUtc = TestClock.UtcNow
         });
 
         var act = async () => await context.SaveChangesAsync();
@@ -253,7 +254,7 @@ public sealed class OrderHistoryIntegrationTests : IClassFixture<TestDatabaseFix
             Id = Guid.CreateVersion7(),
             OrderId = Guid.CreateVersion7(),
             EventType = "Created",
-            OccurredAtUtc = DateTime.UtcNow
+            OccurredAtUtc = TestClock.UtcNow
         });
 
         var act = async () => await context.SaveChangesAsync();
@@ -313,8 +314,8 @@ public sealed class OrderHistoryIntegrationTests : IClassFixture<TestDatabaseFix
         Price = 890.60m,
         Status = OrderStatus.PendingPayment,
         Kind = OrderKind.Purchase,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 
     private async Task<Guid> SeedUserAsync()
@@ -324,9 +325,9 @@ public sealed class OrderHistoryIntegrationTests : IClassFixture<TestDatabaseFix
         context.Users.Add(new User
         {
             Id = id,
-            PhoneNumber = $"+38050{DateTime.UtcNow.Ticks % 10_000_000:0000000}",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            PhoneNumber = $"+38050{TestClock.UniqueDigits(7)}",
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         await context.SaveChangesAsync();
         return id;

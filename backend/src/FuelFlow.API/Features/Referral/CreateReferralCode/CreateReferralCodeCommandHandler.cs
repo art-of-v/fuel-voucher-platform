@@ -1,4 +1,5 @@
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Referral.CreateReferralCode;
@@ -38,7 +39,7 @@ public sealed class CreateReferralCodeCommandHandler
             throw new InvalidOperationException("Referral code already taken");
 
         user.ReferralCode = code;
-        user.UpdatedAtUtc = DateTime.UtcNow;
+        user.UpdatedAtUtc = SystemClock.UtcNow;
         _context.Users.Update(user);
 
         await _context.SaveChangesAsync(cancellationToken);

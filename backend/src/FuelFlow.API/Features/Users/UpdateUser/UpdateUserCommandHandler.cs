@@ -1,4 +1,5 @@
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Users.UpdateUser;
@@ -42,7 +43,7 @@ public sealed class UpdateUserCommandHandler
         if (command.ProfileImageUrl is not null)
             user.ProfileImageUrl = command.ProfileImageUrl;
 
-        user.UpdatedAtUtc = DateTime.UtcNow;
+        user.UpdatedAtUtc = SystemClock.UtcNow;
         _context.Users.Update(user);
 
         await _context.SaveChangesAsync(cancellationToken);

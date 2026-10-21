@@ -1,5 +1,6 @@
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Pricing;
@@ -129,7 +130,7 @@ public sealed class PriceHistoryRecorder
         DateTime? effectiveFromUtc,
         Dictionary<Guid, FuelPriceHistory> latest)
     {
-        var at = effectiveFromUtc ?? DateTime.UtcNow;
+        var at = effectiveFromUtc ?? SystemClock.UtcNow;
         var margin = fuel.MarginUahPerLiter;
 
         fuel.PriceUpdatedAt = at;
@@ -160,7 +161,7 @@ public sealed class PriceHistoryRecorder
                 // as they are - a history is a record of what was true then.
                 MinDiscountPerLiter = null,
             EffectiveFromUtc = at,
-            RecordedAtUtc = DateTime.UtcNow,
+            RecordedAtUtc = SystemClock.UtcNow,
             ChangedByUserId = actingUserId == Guid.Empty ? null : actingUserId,
             Reason = reason
         });

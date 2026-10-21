@@ -12,6 +12,7 @@ using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -80,8 +81,8 @@ public sealed class AuthHandlersExtraTests : IDisposable
             Id = Guid.NewGuid(),
             PhoneNumber = "+380991234567",
             Code = SecretsHasher.Hash("123456"),
-            ExpiresAtUtc = DateTime.UtcNow.AddMinutes(10),
-            CreatedAtUtc = DateTime.UtcNow,
+            ExpiresAtUtc = TestClock.UtcNow.AddMinutes(10),
+            CreatedAtUtc = TestClock.UtcNow,
             IsUsed = false
         };
         _context.VerificationCodes.Add(code);
@@ -118,8 +119,8 @@ public sealed class AuthHandlersExtraTests : IDisposable
         {
             Id = Guid.NewGuid(),
             PhoneNumber = "+380991234567",
-            CreatedAtUtc = DateTime.UtcNow.AddDays(-5),
-            UpdatedAtUtc = DateTime.UtcNow.AddDays(-5),
+            CreatedAtUtc = TestClock.UtcNow.AddDays(-5),
+            UpdatedAtUtc = TestClock.UtcNow.AddDays(-5),
             IsActive = true,
             IsDeleted = false,
             TokenVersion = 1
@@ -131,8 +132,8 @@ public sealed class AuthHandlersExtraTests : IDisposable
             Id = Guid.NewGuid(),
             PhoneNumber = "+380991234567",
             Code = SecretsHasher.Hash("123456"),
-            ExpiresAtUtc = DateTime.UtcNow.AddMinutes(10),
-            CreatedAtUtc = DateTime.UtcNow,
+            ExpiresAtUtc = TestClock.UtcNow.AddMinutes(10),
+            CreatedAtUtc = TestClock.UtcNow,
             IsUsed = false
         };
         _context.VerificationCodes.Add(code);
@@ -166,8 +167,8 @@ public sealed class AuthHandlersExtraTests : IDisposable
             Id = Guid.NewGuid(),
             PhoneNumber = "+380991234567",
             Code = SecretsHasher.Hash("000000"),
-            ExpiresAtUtc = DateTime.UtcNow.AddMinutes(10),
-            CreatedAtUtc = DateTime.UtcNow,
+            ExpiresAtUtc = TestClock.UtcNow.AddMinutes(10),
+            CreatedAtUtc = TestClock.UtcNow,
             IsUsed = false
         });
         await _context.SaveChangesAsync();
@@ -187,8 +188,8 @@ public sealed class AuthHandlersExtraTests : IDisposable
             Id = Guid.NewGuid(),
             PhoneNumber = "+380991234567",
             Code = SecretsHasher.Hash("123456"),
-            ExpiresAtUtc = DateTime.UtcNow.AddMinutes(10),
-            CreatedAtUtc = DateTime.UtcNow,
+            ExpiresAtUtc = TestClock.UtcNow.AddMinutes(10),
+            CreatedAtUtc = TestClock.UtcNow,
             IsUsed = true
         });
         await _context.SaveChangesAsync();
@@ -208,8 +209,8 @@ public sealed class AuthHandlersExtraTests : IDisposable
             Id = Guid.NewGuid(),
             PhoneNumber = "+380991234567",
             Code = SecretsHasher.Hash("123456"),
-            ExpiresAtUtc = DateTime.UtcNow.AddMinutes(-5),
-            CreatedAtUtc = DateTime.UtcNow.AddHours(-1),
+            ExpiresAtUtc = TestClock.UtcNow.AddMinutes(-5),
+            CreatedAtUtc = TestClock.UtcNow.AddHours(-1),
             IsUsed = false
         });
         await _context.SaveChangesAsync();
@@ -229,8 +230,8 @@ public sealed class AuthHandlersExtraTests : IDisposable
             Id = Guid.NewGuid(),
             PhoneNumber = "+380991234567",
             Code = SecretsHasher.Hash("123456"),
-            ExpiresAtUtc = DateTime.UtcNow.AddMinutes(10),
-            CreatedAtUtc = DateTime.UtcNow,
+            ExpiresAtUtc = TestClock.UtcNow.AddMinutes(10),
+            CreatedAtUtc = TestClock.UtcNow,
             IsUsed = false
         };
         _context.VerificationCodes.Add(code);
@@ -254,8 +255,8 @@ public sealed class AuthHandlersExtraTests : IDisposable
             Id = Guid.NewGuid(),
             PhoneNumber = "+380991234567",
             Code = SecretsHasher.Hash("123456"),
-            ExpiresAtUtc = DateTime.UtcNow.AddMinutes(10),
-            CreatedAtUtc = DateTime.UtcNow,
+            ExpiresAtUtc = TestClock.UtcNow.AddMinutes(10),
+            CreatedAtUtc = TestClock.UtcNow,
             IsUsed = false
         };
         _context.VerificationCodes.Add(code);
@@ -287,8 +288,8 @@ public sealed class AuthHandlersExtraTests : IDisposable
             Id = Guid.NewGuid(),
             PhoneNumber = "+380991234567",
             Code = SecretsHasher.Hash("123456"),
-            ExpiresAtUtc = DateTime.UtcNow.AddMinutes(10),
-            CreatedAtUtc = DateTime.UtcNow,
+            ExpiresAtUtc = TestClock.UtcNow.AddMinutes(10),
+            CreatedAtUtc = TestClock.UtcNow,
             IsUsed = false
         };
         _context.VerificationCodes.Add(code);
@@ -326,7 +327,7 @@ public sealed class AuthHandlersExtraTests : IDisposable
         {
             Id = Guid.NewGuid(),
             PhoneNumber = $"+38099{Guid.NewGuid().ToString("N")[..7]}",
-            CreatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
             IsActive = true,
             IsDeleted = false
         };
@@ -339,8 +340,8 @@ public sealed class AuthHandlersExtraTests : IDisposable
             DeviceId = deviceId,
             PublicKey = publicKey ?? "public-key",
             Status = DeviceStatus.Active,
-            CreatedAt = DateTime.UtcNow,
-            LastSeenAt = DateTime.UtcNow
+            CreatedAt = TestClock.UtcNow,
+            LastSeenAt = TestClock.UtcNow
         };
         _context.Devices.Add(device);
         await _context.SaveChangesAsync();
@@ -360,8 +361,8 @@ public sealed class AuthHandlersExtraTests : IDisposable
 
         response.Challenge.Should().NotBeNullOrEmpty();
         Convert.FromBase64String(response.Challenge).Should().HaveCount(32);
-        response.ExpiresAt.Should().BeAfter(DateTime.UtcNow);
-        response.ExpiresAt.Should().BeCloseTo(DateTime.UtcNow.AddSeconds(30), TimeSpan.FromSeconds(5));
+        response.ExpiresAt.Should().BeAfter(TestClock.UtcNow);
+        response.ExpiresAt.Should().BeCloseTo(TestClock.UtcNow.AddSeconds(30), TimeSpan.FromSeconds(5));
 
         // Keyed by the challenge value, not by device alone, so a second challenge request
         // cannot displace an outstanding one.
@@ -388,7 +389,7 @@ public sealed class AuthHandlersExtraTests : IDisposable
         // an oracle for "is this device_id enrolled".
         response.Challenge.Should().NotBeNullOrEmpty();
         Convert.FromBase64String(response.Challenge).Should().HaveCount(32);
-        response.ExpiresAt.Should().BeAfter(DateTime.UtcNow);
+        response.ExpiresAt.Should().BeAfter(TestClock.UtcNow);
     }
 
     [Fact]
@@ -499,7 +500,7 @@ public sealed class AuthHandlersExtraTests : IDisposable
         {
             Id = Guid.NewGuid(),
             PhoneNumber = "+380991234567",
-            CreatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
             IsActive = true,
             IsDeleted = false
         };
@@ -513,8 +514,8 @@ public sealed class AuthHandlersExtraTests : IDisposable
             DeviceId = "device-1",
             PublicKey = rsa.ExportSubjectPublicKeyInfoPem(),
             Status = DeviceStatus.Active,
-            CreatedAt = DateTime.UtcNow,
-            LastSeenAt = DateTime.UtcNow
+            CreatedAt = TestClock.UtcNow,
+            LastSeenAt = TestClock.UtcNow
         });
         await _context.SaveChangesAsync();
 

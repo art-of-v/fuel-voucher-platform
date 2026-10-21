@@ -10,6 +10,7 @@ using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
+using FuelFlow.Testing;
 using Hangfire;
 using Hangfire.Dashboard;
 using Microsoft.AspNetCore.Hosting;
@@ -315,7 +316,7 @@ public sealed class MiddlewareTests : IDisposable
         context.Request.Path = "/api/purchases";
         context.Request.Headers["X-Device-Id"] = "dev-bound-1";
         context.Request.Headers["X-Signature"] = "sig";
-        context.Request.Headers["X-Timestamp"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
+        context.Request.Headers["X-Timestamp"] = TestClock.Now.ToUnixTimeMilliseconds().ToString();
 
         var cache = new Mock<ICacheService>();
         cache.Setup(c => c.ExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
@@ -356,7 +357,7 @@ public sealed class MiddlewareTests : IDisposable
         context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes("{\"x\":1}"));
         context.Request.Headers["X-Device-Id"] = "dev-bound-2";
         context.Request.Headers["X-Signature"] = "sig";
-        context.Request.Headers["X-Timestamp"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
+        context.Request.Headers["X-Timestamp"] = TestClock.Now.ToUnixTimeMilliseconds().ToString();
 
         var cache = new Mock<ICacheService>();
         cache.Setup(c => c.ExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(false);
@@ -378,8 +379,8 @@ public sealed class MiddlewareTests : IDisposable
         {
             Id = userId,
             PhoneNumber = "+380990000001",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
             IsActive = isActive,
             TokenVersion = tokenVersion
         });
@@ -395,8 +396,8 @@ public sealed class MiddlewareTests : IDisposable
             DeviceId = deviceId,
             PublicKey = publicKey,
             Status = DeviceStatus.Active,
-            CreatedAt = DateTime.UtcNow,
-            LastSeenAt = DateTime.UtcNow
+            CreatedAt = TestClock.UtcNow,
+            LastSeenAt = TestClock.UtcNow
         });
         await _context.SaveChangesAsync();
     }

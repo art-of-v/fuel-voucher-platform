@@ -5,6 +5,7 @@ using FuelFlow.Persistence;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.API.BackgroundJobs;
@@ -85,7 +86,7 @@ return refunds
 
     public virtual async Task SyncPendingRefundsAsync(CancellationToken cancellationToken = default)
     {
-        var cutoff = DateTime.UtcNow.AddHours(-24);
+        var cutoff = SystemClock.UtcNow.AddHours(-24);
         // AsTracking is redundant but harmless: the default is TrackAll (DatabaseSetup). Kept
         // mutated below and must be persisted by SaveChanges.
         var staleRefunds = await _context.Payments
@@ -118,7 +119,7 @@ return refunds
             foreach (var staleRefund in staleRefunds)
             {
                 PaymentFactory.ApplyStatus(
-                    staleRefund, PaymentStatus.Failed, observedAtUtc: null, DateTime.UtcNow);
+                    staleRefund, PaymentStatus.Failed, observedAtUtc: null, SystemClock.UtcNow);
                 staleRefund.ErrorMessage = "Timed out waiting for Monobank confirmation (refund abandoned)";
                 var staleOrder = staleRefund.OrderId.HasValue ? staleOrders.GetValueOrDefault(staleRefund.OrderId.Value) : null;
                 var staleDelivered = staleRefund.OrderId.HasValue ? staleDeliveredCounts.GetValueOrDefault(staleRefund.OrderId.Value) : 0;
@@ -312,7 +313,7 @@ return refunds
         if (matchingEntry.Status.Equals("success", StringComparison.OrdinalIgnoreCase))
         {
             PaymentFactory.ApplyStatus(
-                refund, PaymentStatus.Succeeded, matchingEntry.ModifiedDate, DateTime.UtcNow);
+                refund, PaymentStatus.Succeeded, matchingEntry.ModifiedDate, SystemClock.UtcNow);
             refund.ErrorMessage = null;
 
             await ApplyConfirmedRefundToOrderAsync(refund, cancellationToken);
@@ -320,7 +321,7 @@ return refunds
         else if (matchingEntry.Status.Equals("failure", StringComparison.OrdinalIgnoreCase))
         {
             PaymentFactory.ApplyStatus(
-                refund, PaymentStatus.Failed, observedAtUtc: null, DateTime.UtcNow);
+                refund, PaymentStatus.Failed, observedAtUtc: null, SystemClock.UtcNow);
             refund.ErrorMessage = "Monobank reported refund failure";
 
             // One refund, so one lookup is one lookup - the batch paths above do the same work
@@ -406,7 +407,7 @@ return refunds
         if (trackedOrder is not null)
         {
             trackedOrder.Status = status;
-            trackedOrder.UpdatedAtUtc = DateTime.UtcNow;
+            trackedOrder.UpdatedAtUtc = SystemClock.UtcNow;
             if (status != OrderStatus.PartiallyFulfilled)
             {
                 trackedOrder.PartiallyFulfilledSinceUtc = null;
@@ -415,7 +416,7 @@ return refunds
         }
 
         order.Status = status;
-        order.UpdatedAtUtc = DateTime.UtcNow;
+        order.UpdatedAtUtc = SystemClock.UtcNow;
         if (status != OrderStatus.PartiallyFulfilled)
         {
             order.PartiallyFulfilledSinceUtc = null;

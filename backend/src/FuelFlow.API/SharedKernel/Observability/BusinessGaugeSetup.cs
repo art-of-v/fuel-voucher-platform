@@ -3,6 +3,7 @@ using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -76,7 +77,7 @@ public static class BusinessGaugeSetup
                 // the webhook was lost AND the backstop did not recover it. Orders older than the
                 // polling ceiling count too - those are no longer polled at all, so they would
                 // otherwise sit here forever, unpaid and unfulfillable, with nothing to show for it.
-                var stuckBefore = DateTime.UtcNow.AddMinutes(-options.ReconciliationMinAgeMinutes);
+                var stuckBefore = SystemClock.UtcNow.AddMinutes(-options.ReconciliationMinAgeMinutes);
 
                 return db.Orders
                     .Where(o => o.Status == OrderStatus.PendingPayment

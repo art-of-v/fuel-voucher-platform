@@ -5,6 +5,7 @@ using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Company.RecallVoucher;
@@ -73,7 +74,7 @@ public sealed class RecallVoucherCommandHandler
         voucher.WorkerUserId = null;
         if (restored.TryGetValue(voucher.Id, out var orderId))
             voucher.OrderId = orderId;
-        voucher.UpdatedAtUtc = DateTime.UtcNow;
+        voucher.UpdatedAtUtc = SystemClock.UtcNow;
 
         _context.Update(voucher);
 

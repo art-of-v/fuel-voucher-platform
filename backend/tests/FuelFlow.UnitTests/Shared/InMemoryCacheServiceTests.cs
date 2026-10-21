@@ -1,5 +1,6 @@
 using FluentAssertions;
 using FuelFlow.SharedKernel.Services;
+using FuelFlow.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace FuelFlow.UnitTests.Shared;
@@ -7,10 +8,12 @@ namespace FuelFlow.UnitTests.Shared;
 public class InMemoryCacheServiceTests
 {
     private readonly InMemoryCacheService _service;
+    private readonly TestTimeProvider _clock;
 
     public InMemoryCacheServiceTests()
     {
-        _service = new InMemoryCacheService(NullLogger<InMemoryCacheService>.Instance);
+        _clock = new TestTimeProvider(TestClock.Now);
+        _service = new InMemoryCacheService(NullLogger<InMemoryCacheService>.Instance, _clock);
     }
 
     [Fact]
@@ -51,11 +54,26 @@ public class InMemoryCacheServiceTests
         const string key = "expiring-key";
 
         await _service.SetAsync(key, "value", TimeSpan.FromMilliseconds(50));
-        await Task.Delay(150);
+
+        // The clock moves, not the test: waiting for the TTL to elapse in real time made the
+        // test's duration the TTL, and measured the machine's clock instead of the code.
+        _clock.Advance(TimeSpan.FromMilliseconds(150));
 
         var result = await _service.GetAsync(key);
         result.Should().BeNull();
         (await _service.ExistsAsync(key)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Get_ShouldReturnTheValue_WhileTheEntryHasNotExpired()
+    {
+        const string key = "live-key";
+
+        await _service.SetAsync(key, "value", TimeSpan.FromMinutes(5));
+
+        _clock.Advance(TimeSpan.FromMinutes(4));
+
+        (await _service.GetAsync(key)).Should().Be("value");
     }
 
     [Fact]

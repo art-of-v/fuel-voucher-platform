@@ -11,6 +11,7 @@ using FuelFlow.Persistence;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -70,7 +71,7 @@ public class FulfillmentService
         // The safety net for the ORDER_CREATED outbox. The fast path is the job the outbox
         // interceptor queued when the row was written, and it claims the event within seconds.
         // This waits longer than that, so the two never race for the same row.
-        var claimCutoff = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow;
+        var claimCutoff = SystemClock.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow;
 
         var unprocessedEvents = await _context.OutboxEvents
             .Where(e => !e.Processed && e.EventType == OutboxEventType.OrderCreated && e.CreatedAtUtc < claimCutoff)
@@ -311,7 +312,7 @@ if (!fullyAttributed && fulfillments.Count > 0)
                             // is the record that a delivery happened; the correction is the fact that
                             // it was undone, and both are true at once. Deleting it destroyed the
                             // only evidence, in the same statement that took the fuel away.
-                            var releasedAtUtc = DateTime.UtcNow;
+                            var releasedAtUtc = SystemClock.UtcNow;
                             fulfillment.ReleasedAtUtc = releasedAtUtc;
                             fulfillment.ReleaseReason = "quantity_mismatch";
 
@@ -390,9 +391,9 @@ if (!fullyAttributed && fulfillments.Count > 0)
                             : OrderStatus.PendingFulfillment;
                         currentOrder.FulfilledAtUtc = null;
                         currentOrder.PartiallyFulfilledSinceUtc = currentOrder.Status == OrderStatus.PartiallyFulfilled
-                            ? DateTime.UtcNow
+                            ? SystemClock.UtcNow
                             : null;
-                        currentOrder.UpdatedAtUtc = DateTime.UtcNow;
+                        currentOrder.UpdatedAtUtc = SystemClock.UtcNow;
                         // No Update() call. The entity is tracked and its properties are mutated in
                         // place, so change detection handles it - and Update() would mark the whole
                         // graph Modified, rewriting every line item of the order to change four fields
@@ -455,7 +456,7 @@ if (!fullyAttributed && fulfillments.Count > 0)
     /// than from "now", so a replayed or re-run job behaves the same as the original.
     private static bool IsWithinReconciliationGrace(Order order)
     {
-        var since = DateTime.UtcNow - (order.FulfilledAtUtc ?? order.CreatedAtUtc);
+        var since = SystemClock.UtcNow - (order.FulfilledAtUtc ?? order.CreatedAtUtc);
         return since <= TimeSpan.FromMinutes(ReconciliationGraceMinutes);
     }
 
@@ -611,7 +612,7 @@ if (!fullyAttributed && fulfillments.Count > 0)
         {
             _logger.LogWarning("Invalid ORDER_CREATED payload for event {EventId}", outboxEvent.Id);
             outboxEvent.Processed = true;
-            outboxEvent.ProcessedAtUtc = DateTime.UtcNow;
+            outboxEvent.ProcessedAtUtc = SystemClock.UtcNow;
             _context.OutboxEvents.Update(outboxEvent);
             await _context.SaveChangesAsync(cancellationToken);
             return;
@@ -625,7 +626,7 @@ if (!fullyAttributed && fulfillments.Count > 0)
         {
             _logger.LogWarning("Order {OrderId} not found for event {EventId}", payload.OrderId, outboxEvent.Id);
             outboxEvent.Processed = true;
-            outboxEvent.ProcessedAtUtc = DateTime.UtcNow;
+            outboxEvent.ProcessedAtUtc = SystemClock.UtcNow;
             _context.OutboxEvents.Update(outboxEvent);
             await _context.SaveChangesAsync(cancellationToken);
             return;
@@ -635,7 +636,7 @@ if (!fullyAttributed && fulfillments.Count > 0)
         {
             _logger.LogInformation("Order {OrderId} already {Status}, marking event as processed", order.Id, order.Status);
             outboxEvent.Processed = true;
-            outboxEvent.ProcessedAtUtc = DateTime.UtcNow;
+            outboxEvent.ProcessedAtUtc = SystemClock.UtcNow;
             _context.OutboxEvents.Update(outboxEvent);
             await _context.SaveChangesAsync(cancellationToken);
             return;
@@ -691,7 +692,7 @@ if (!fullyAttributed && fulfillments.Count > 0)
                     if (outboxEvent != null)
                     {
                         outboxEvent.Processed = true;
-                        outboxEvent.ProcessedAtUtc = DateTime.UtcNow;
+                        outboxEvent.ProcessedAtUtc = SystemClock.UtcNow;
                         _context.OutboxEvents.Update(outboxEvent);
                         await _context.SaveChangesAsync(cancellationToken);
                     }
@@ -721,7 +722,7 @@ if (!fullyAttributed && fulfillments.Count > 0)
                 if (outboxEvent != null)
                 {
                     outboxEvent.Processed = true;
-                    outboxEvent.ProcessedAtUtc = DateTime.UtcNow;
+                    outboxEvent.ProcessedAtUtc = SystemClock.UtcNow;
                     _context.OutboxEvents.Update(outboxEvent);
                     await _context.SaveChangesAsync(cancellationToken);
                 }
@@ -742,7 +743,7 @@ if (!fullyAttributed && fulfillments.Count > 0)
                 if (outboxEvent != null)
                 {
                     outboxEvent.Processed = true;
-                    outboxEvent.ProcessedAtUtc = DateTime.UtcNow;
+                    outboxEvent.ProcessedAtUtc = SystemClock.UtcNow;
                     _context.OutboxEvents.Update(outboxEvent);
                     await _context.SaveChangesAsync(cancellationToken);
                 }
@@ -775,7 +776,7 @@ if (!fullyAttributed && fulfillments.Count > 0)
                 if (outboxEvent != null)
                 {
                     outboxEvent.Processed = true;
-                    outboxEvent.ProcessedAtUtc = DateTime.UtcNow;
+                    outboxEvent.ProcessedAtUtc = SystemClock.UtcNow;
                     _context.OutboxEvents.Update(outboxEvent);
                     await _context.SaveChangesAsync(cancellationToken);
                 }
@@ -868,7 +869,7 @@ if (!fullyAttributed && fulfillments.Count > 0)
                         break;
                     }
 
-                    var now = DateTime.UtcNow;
+                    var now = SystemClock.UtcNow;
                     var assignedCount = await TryAssignVoucherAsync(availableVoucher.Id, order.UserId, order.LegalEntityId, order.Id, CustomerExpirationFor(lineItem), cancellationToken);
 
                     if (assignedCount == 0)
@@ -931,7 +932,7 @@ if (!fullyAttributed && fulfillments.Count > 0)
                         // the reconciliation can only compare litres, which cannot tell two lines of
                         // the same volume apart - see Fulfillment.LineItemId.
                         LineItemId = lineItem.Id,
-                        FulfilledAtUtc = DateTime.UtcNow
+                        FulfilledAtUtc = SystemClock.UtcNow
                     };
 
                     _context.Fulfillments.Add(fulfillment);
@@ -978,10 +979,10 @@ if (!fullyAttributed && fulfillments.Count > 0)
                             {
                                 orderId = order.Id,
                                 userId = order.UserId,
-                                fulfilledAt = DateTime.UtcNow
+                                fulfilledAt = SystemClock.UtcNow
                             }),
                             Processed = false,
-                            CreatedAtUtc = DateTime.UtcNow
+                            CreatedAtUtc = SystemClock.UtcNow
                         };
 
                         _context.OutboxEvents.Add(fulfilledEvent);
@@ -1007,8 +1008,8 @@ if (!fullyAttributed && fulfillments.Count > 0)
                     // Keep the original timestamp when the order first became partially
                     // fulfilled so the auto-refund grace period is measured from then, not
                     // from every re-assignment run.
-                    orderToUpdate.PartiallyFulfilledSinceUtc ??= DateTime.UtcNow;
-                    orderToUpdate.UpdatedAtUtc = DateTime.UtcNow;
+                    orderToUpdate.PartiallyFulfilledSinceUtc ??= SystemClock.UtcNow;
+                    orderToUpdate.UpdatedAtUtc = SystemClock.UtcNow;
                     _context.Orders.Update(orderToUpdate);
                     await _context.SaveChangesAsync(cancellationToken);
 
@@ -1023,7 +1024,7 @@ if (!fullyAttributed && fulfillments.Count > 0)
             if (outboxEvent != null)
             {
                 outboxEvent.Processed = true;
-                outboxEvent.ProcessedAtUtc = DateTime.UtcNow;
+                outboxEvent.ProcessedAtUtc = SystemClock.UtcNow;
                 _context.OutboxEvents.Update(outboxEvent);
                 await _context.SaveChangesAsync(cancellationToken);
             }
@@ -1068,7 +1069,7 @@ if (!fullyAttributed && fulfillments.Count > 0)
         // brand-term sort handed every paying customer the *most* expired stock first, and
         // nothing in the system ever flips stale rows to Expired (that is a manual admin
         // action), so the oldest unredeemable voucher was permanently at the head of the queue.
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(SystemClock.UtcNow);
 
         // TODO: temporary testing escape hatch — remove once the import workflow no longer
         // needs to run against expired test stock. Only ever flip it in a disposable/staging
@@ -1111,13 +1112,13 @@ if (!fullyAttributed && fulfillments.Count > 0)
     /// </remarks>
     private static DateOnly? CustomerExpirationFor(OrderLineItem lineItem)
         => VoucherRenewalTerms.TryFromCode(lineItem.TermCode, out var term)
-            ? term.ApplyTo(DateOnly.FromDateTime(DateTime.UtcNow))
+            ? term.ApplyTo(DateOnly.FromDateTime(SystemClock.UtcNow))
             : null;
 
     protected internal virtual async Task<int> TryMarkOrderFulfilledAsync(Guid orderId, CancellationToken cancellationToken)
     {
         var rowsAffected = await _context.Database.ExecuteSqlInterpolatedAsync(
-            $"""UPDATE "orders" SET status = 'Fulfilled', fulfilled_at_utc = {DateTime.UtcNow}, updated_at_utc = {DateTime.UtcNow}, partially_fulfilled_since_utc = NULL WHERE id = {orderId} AND (status = 'PendingFulfillment' OR status = 'PartiallyFulfilled')""",
+            $"""UPDATE "orders" SET status = 'Fulfilled', fulfilled_at_utc = {SystemClock.UtcNow}, updated_at_utc = {SystemClock.UtcNow}, partially_fulfilled_since_utc = NULL WHERE id = {orderId} AND (status = 'PendingFulfillment' OR status = 'PartiallyFulfilled')""",
             cancellationToken);
 
         return rowsAffected;
@@ -1128,7 +1129,7 @@ if (!fullyAttributed && fulfillments.Count > 0)
         // The expiry predicate is repeated here on purpose: this UPDATE is the atomic claim, and
         // between the SELECT that chose this voucher and this statement the date can roll over
         // or an admin can edit the row. The claim itself must refuse expired stock.
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(SystemClock.UtcNow);
         var expiryEnabled = _configuration.GetValue<bool>("VoucherExpiration:Enabled", true);
         var expiryCutoff = expiryEnabled ? today : DateOnly.MinValue;
 
@@ -1151,10 +1152,10 @@ if (!fullyAttributed && fulfillments.Count > 0)
         // and this statement can never hand stock across the pools.
         var rowsAffected = customerExpiration is null
             ? await _context.Database.ExecuteSqlInterpolatedAsync(
-                $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND supplier_expiration_date >= {expiryCutoff} AND data_kind = (SELECT CASE WHEN u.is_qa_account THEN 'qa' ELSE 'real' END FROM "users" u WHERE u.id = {userId})""",
+                $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, updated_at_utc = {SystemClock.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND supplier_expiration_date >= {expiryCutoff} AND data_kind = (SELECT CASE WHEN u.is_qa_account THEN 'qa' ELSE 'real' END FROM "users" u WHERE u.id = {userId})""",
                 cancellationToken)
             : await _context.Database.ExecuteSqlInterpolatedAsync(
-                $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, customer_expiration_date = LEAST({customerExpiration.Value}, supplier_expiration_date), updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND supplier_expiration_date >= {expiryCutoff} AND data_kind = (SELECT CASE WHEN u.is_qa_account THEN 'qa' ELSE 'real' END FROM "users" u WHERE u.id = {userId})""",
+                $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, customer_expiration_date = LEAST({customerExpiration.Value}, supplier_expiration_date), updated_at_utc = {SystemClock.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND supplier_expiration_date >= {expiryCutoff} AND data_kind = (SELECT CASE WHEN u.is_qa_account THEN 'qa' ELSE 'real' END FROM "users" u WHERE u.id = {userId})""",
                 cancellationToken);
 
         return rowsAffected;
@@ -1183,7 +1184,7 @@ if (!fullyAttributed && fulfillments.Count > 0)
             }
 
             var delayDays = await _settings.GetAutoRefundDelayDaysAsync(cancellationToken);
-            if (DateTime.UtcNow - sinceUtc.Value < TimeSpan.FromDays(delayDays))
+            if (SystemClock.UtcNow - sinceUtc.Value < TimeSpan.FromDays(delayDays))
             {
                 return;
             }
@@ -1198,7 +1199,7 @@ var lastFailedAtUtc = await _context.Payments
                 .FirstOrDefaultAsync(cancellationToken);
 
             if (lastFailedAtUtc is not null &&
-                DateTime.UtcNow - lastFailedAtUtc.Value < TimeSpan.FromMinutes(60))
+                SystemClock.UtcNow - lastFailedAtUtc.Value < TimeSpan.FromMinutes(60))
             {
                 return;
             }
@@ -1350,8 +1351,8 @@ var lastFailedAtUtc = await _context.Payments
                 .Where(v => sourceIds.Contains(v.Id))
                 .ToListAsync(cancellationToken);
 
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
-            var now = DateTime.UtcNow;
+            var today = DateOnly.FromDateTime(SystemClock.UtcNow);
+            var now = SystemClock.UtcNow;
             var usedStockIds = new List<Guid>();
             var fulfilledCount = 0;
 
@@ -1653,10 +1654,10 @@ var lastFailedAtUtc = await _context.Payments
                             {
                                 orderId,
                                 userId = order.UserId,
-                                fulfilledAt = DateTime.UtcNow
+                                fulfilledAt = SystemClock.UtcNow
                             }),
                             Processed = false,
-                            CreatedAtUtc = DateTime.UtcNow
+                            CreatedAtUtc = SystemClock.UtcNow
                         });
                         await _context.SaveChangesAsync(cancellationToken);
                     }
@@ -1675,8 +1676,8 @@ var lastFailedAtUtc = await _context.Payments
                     orderToUpdate.FulfilledAtUtc = null;
                     // Keep the first partial timestamp so the auto-refund grace is measured from
                     // then, not from every re-run.
-                    orderToUpdate.PartiallyFulfilledSinceUtc ??= DateTime.UtcNow;
-                    orderToUpdate.UpdatedAtUtc = DateTime.UtcNow;
+                    orderToUpdate.PartiallyFulfilledSinceUtc ??= SystemClock.UtcNow;
+                    orderToUpdate.UpdatedAtUtc = SystemClock.UtcNow;
                     _context.Orders.Update(orderToUpdate);
                     await _context.SaveChangesAsync(cancellationToken);
 
@@ -1810,7 +1811,7 @@ var lastFailedAtUtc = await _context.Payments
         CancellationToken cancellationToken)
     {
         return await _context.Database.ExecuteSqlInterpolatedAsync(
-            $"""UPDATE "fuel_vouchers" SET customer_expiration_date = {newExpiration}, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND assigned_to_user_id = {userId} AND status = 'Assigned' AND customer_expiration_date = {expectedCustomerExpiration} AND {newExpiration} <= supplier_expiration_date""",
+            $"""UPDATE "fuel_vouchers" SET customer_expiration_date = {newExpiration}, updated_at_utc = {SystemClock.UtcNow} WHERE id = {voucherId} AND assigned_to_user_id = {userId} AND status = 'Assigned' AND customer_expiration_date = {expectedCustomerExpiration} AND {newExpiration} <= supplier_expiration_date""",
             cancellationToken);
     }
 
@@ -1833,7 +1834,7 @@ var lastFailedAtUtc = await _context.Payments
         // Same QA/test segregation as the buy claim: the replacement must come from the owner's pool
         // (test for a QA account, real otherwise), re-asserted atomically here against the owning user.
         return await _context.Database.ExecuteSqlInterpolatedAsync(
-            $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, customer_expiration_date = {promisedExpiration}, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND supplier_expiration_date >= {promisedExpiration} AND data_kind = (SELECT CASE WHEN u.is_qa_account THEN 'qa' ELSE 'real' END FROM "users" u WHERE u.id = {userId})""",
+            $"""UPDATE "fuel_vouchers" SET status = 'Assigned', assigned_to_user_id = {userId}, legal_entity_id = {legalEntityId}, worker_user_id = NULL, order_id = {orderId}, customer_expiration_date = {promisedExpiration}, updated_at_utc = {SystemClock.UtcNow} WHERE id = {voucherId} AND status = 'Available' AND supplier_expiration_date >= {promisedExpiration} AND data_kind = (SELECT CASE WHEN u.is_qa_account THEN 'qa' ELSE 'real' END FROM "users" u WHERE u.id = {userId})""",
             cancellationToken);
     }
 
@@ -1864,7 +1865,7 @@ var lastFailedAtUtc = await _context.Payments
         Guid voucherId, Guid userId, CancellationToken cancellationToken)
     {
         return await _context.Database.ExecuteSqlInterpolatedAsync(
-            $"""UPDATE "fuel_vouchers" SET status = 'Available', assigned_to_user_id = NULL, legal_entity_id = NULL, worker_user_id = NULL, updated_at_utc = {DateTime.UtcNow} WHERE id = {voucherId} AND assigned_to_user_id = {userId} AND status = 'Assigned'""",
+            $"""UPDATE "fuel_vouchers" SET status = 'Available', assigned_to_user_id = NULL, legal_entity_id = NULL, worker_user_id = NULL, updated_at_utc = {SystemClock.UtcNow} WHERE id = {voucherId} AND assigned_to_user_id = {userId} AND status = 'Assigned'""",
             cancellationToken);
     }
 }

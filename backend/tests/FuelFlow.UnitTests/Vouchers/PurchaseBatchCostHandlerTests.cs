@@ -8,6 +8,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -37,7 +38,7 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
         _context = new ApplicationDbContext(options, TestQrCipher.Instance);
 
         // okko-dp fuel with two nominals; margin 2 UAH/L, no pump (so final = blended cost + 2).
-        _context.FuelTypes.Add(new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
+        _context.FuelTypes.Add(new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow });
         _context.FuelNominals.AddRange(
             NewPackage("okko-dp", 10m),
             NewPackage("okko-dp", 20m));
@@ -47,8 +48,8 @@ public sealed class PurchaseBatchCostHandlerTests : IDisposable
             Id = SupplierId,
             Name = "ТОВ Постачальник",
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         _context.SaveChanges();
 
@@ -76,8 +77,8 @@ private FuelNominal NewPackage(string fuelTypeId, decimal liters)
     // The size is all a package is now. It carries no price of its own: the nominal follows its
     // fuel's rate, which is what this suite is about - the cost entry moves the offer's rate and
     // every size prices move with it.
-    CreatedAtUtc = DateTime.UtcNow,
-    UpdatedAtUtc = DateTime.UtcNow,
+    CreatedAtUtc = TestClock.UtcNow,
+    UpdatedAtUtc = TestClock.UtcNow,
     };
     }
 
@@ -88,9 +89,9 @@ private FuelNominal NewPackage(string fuelTypeId, decimal liters)
         {
             Id = id,
             FileName = "batch.pdf",
-            CompletedAtUtc = DateTime.UtcNow,
+            CompletedAtUtc = TestClock.UtcNow,
             Status = "Completed",
-            StartedAtUtc = DateTime.UtcNow
+            StartedAtUtc = TestClock.UtcNow
         });
         return id;
     }
@@ -104,16 +105,16 @@ private FuelNominal NewPackage(string fuelTypeId, decimal liters)
             Brand = brand,
             FuelTypeId = ToUuid(fuelTypeId),
             Liters = liters,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
             VoucherNumber = $"V-{Guid.NewGuid().ToString()[..8]}",
             QrPayload = Guid.NewGuid().ToString(),
             Status = status,
             ImportJobId = importId,
             CostPerLiter = costPerLiter,
             SupplierId = supplierId ?? SupplierId,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
     }
 
@@ -127,16 +128,16 @@ private FuelNominal NewPackage(string fuelTypeId, decimal liters)
             Brand = "okko",
             FuelTypeId = ToUuid(fuelTypeId),
             Liters = liters,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
             VoucherNumber = $"V-{id.ToString()[..8]}",
             QrPayload = Guid.NewGuid().ToString(),
             Status = VoucherStatus.Imported,
             ImportJobId = importId,
             CostPerLiter = costPerLiter,
             SupplierId = SupplierId,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         return id;
     }

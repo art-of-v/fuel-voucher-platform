@@ -7,6 +7,7 @@ using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Security;
+using FuelFlow.Testing;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -44,7 +45,7 @@ public class AdminRoleDemotionIntegrationTests : WebApplicationFactory<Program>,
         {
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var managerRole = await context.Roles.FirstAsync(r => r.Name == "Manager");
-            var now = DateTime.UtcNow;
+            var now = TestClock.UtcNow;
 
             var user = new User
             {
@@ -137,7 +138,7 @@ public class AdminRoleDemotionIntegrationTests : WebApplicationFactory<Program>,
         {
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var userRole = await context.Roles.FirstAsync(r => r.Name == "User");
-            var now = DateTime.UtcNow;
+            var now = TestClock.UtcNow;
 
             var user = new User
             {
@@ -217,7 +218,7 @@ public class AdminRoleDemotionIntegrationTests : WebApplicationFactory<Program>,
         using (var scope = Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            var now = DateTime.UtcNow;
+            var now = TestClock.UtcNow;
 
             // Between Admin (50) and ProductOwner (100). No C# constant ever mentions this role.
             context.Roles.Add(new Role

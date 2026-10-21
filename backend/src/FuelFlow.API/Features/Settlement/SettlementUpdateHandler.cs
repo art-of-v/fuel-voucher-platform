@@ -5,6 +5,7 @@ using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -169,8 +170,8 @@ public sealed class SettlementUpdateHandler
         PaidAtUtc = DateTimeOffset.FromUnixTimeSeconds(update.Message!.Date).UtcDateTime,
         CreatedByUserName = update.Message.From!.DisplayName,
         IsAutomatic = true,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow,
+        CreatedAtUtc = SystemClock.UtcNow,
+        UpdatedAtUtc = SystemClock.UtcNow,
     };
 
     /// <summary>
@@ -217,6 +218,6 @@ public sealed class SettlementUpdateHandler
             Code = code,
             ResolvedUserId = userId,
             PaymentId = paymentId,
-            CreatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = SystemClock.UtcNow,
         };
 }

@@ -12,6 +12,7 @@ using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
@@ -55,7 +56,7 @@ public sealed class VoucherExchangeTransactionAtomicityTests : IClassFixture<Tes
         var old2 = Guid.NewGuid();
         var new1 = Guid.NewGuid();
         var new2 = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
 
         using (var seed = CreateContext())
         {
@@ -162,8 +163,8 @@ public sealed class VoucherExchangeTransactionAtomicityTests : IClassFixture<Tes
         PhoneNumber = $"+38{userId:N}"[..20],
         FirstName = "Operator",
         IsActive = true,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     });
 
     private static void SeedSupplier(ApplicationDbContext ctx, Guid supplierId) => ctx.Suppliers.Add(new Supplier
@@ -173,8 +174,8 @@ public sealed class VoucherExchangeTransactionAtomicityTests : IClassFixture<Tes
         Name = "Seed Supplier",
         LegalForm = "ФОП",
         IsActive = true,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     });
 
     private static void SeedImport(ApplicationDbContext ctx, Guid importId)
@@ -183,8 +184,8 @@ public sealed class VoucherExchangeTransactionAtomicityTests : IClassFixture<Tes
             Id = importId,
             FileName = $"import-{importId:N}.pdf",
             Status = "Completed",
-            StartedAtUtc = DateTime.UtcNow,
-            CompletedAtUtc = DateTime.UtcNow
+            StartedAtUtc = TestClock.UtcNow,
+            CompletedAtUtc = TestClock.UtcNow
         });
 
     private static FuelVoucher Stock(
@@ -209,8 +210,8 @@ public sealed class VoucherExchangeTransactionAtomicityTests : IClassFixture<Tes
             SupplierId = supplierId,
             CostPerLiter = costPerLiter,
             ImportJobId = importId,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
     private static async Task ResetDataAsync(ApplicationDbContext context)

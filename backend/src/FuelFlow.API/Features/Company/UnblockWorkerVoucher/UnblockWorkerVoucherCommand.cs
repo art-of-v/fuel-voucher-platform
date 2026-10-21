@@ -5,6 +5,7 @@ using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Company.UnblockWorkerVoucher;
@@ -74,7 +75,7 @@ public sealed class UnblockWorkerVoucherCommandHandler
             ? await _context.Database.BeginTransactionAsync(cancellationToken)
             : null;
 
-        var unblockedAtUtc = DateTime.UtcNow;
+        var unblockedAtUtc = SystemClock.UtcNow;
         var affected = await _context.FuelVouchers
             .Where(v => v.Id == command.VoucherId
                         && v.Status == VoucherStatus.Blocked

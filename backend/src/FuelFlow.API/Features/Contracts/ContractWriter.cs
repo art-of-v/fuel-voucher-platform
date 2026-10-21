@@ -1,5 +1,6 @@
 using FuelFlow.Features.Contracts.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Contracts;
@@ -148,7 +149,7 @@ public sealed class ContractWriter(ApplicationDbContext db)
         HashSet<Guid> existing,
         CancellationToken cancellationToken)
     {
-        var now = DateTime.UtcNow;
+        var now = SystemClock.UtcNow;
         var added = 0;
 
         foreach (var version in current)

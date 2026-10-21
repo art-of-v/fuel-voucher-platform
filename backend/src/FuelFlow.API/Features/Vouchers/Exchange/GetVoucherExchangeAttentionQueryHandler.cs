@@ -2,6 +2,7 @@ using FuelFlow.Features.Settings;
 using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Vouchers.Exchange;
@@ -26,7 +27,7 @@ public sealed class GetVoucherExchangeAttentionQueryHandler
     public async Task<VoucherExchangeAttentionResponse> HandleAsync(CancellationToken ct = default)
     {
         var threshold = await _settings.GetVoucherRenewalThresholdDaysAsync(ct);
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(SystemClock.UtcNow);
         var cutoff = today.AddDays(threshold);
 
         var items = await Filter(cutoff)
@@ -63,7 +64,7 @@ public sealed class GetVoucherExchangeAttentionQueryHandler
     public async Task<int> CountAsync(CancellationToken ct = default)
     {
         var threshold = await _settings.GetVoucherRenewalThresholdDaysAsync(ct);
-        var cutoff = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(threshold);
+        var cutoff = DateOnly.FromDateTime(SystemClock.UtcNow).AddDays(threshold);
         return await Filter(cutoff).CountAsync(ct);
     }
 

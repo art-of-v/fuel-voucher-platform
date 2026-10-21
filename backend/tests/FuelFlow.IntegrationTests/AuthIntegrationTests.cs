@@ -7,6 +7,7 @@ using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Auth.Verify;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Security;
+using FuelFlow.Testing;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -158,8 +159,8 @@ public class AuthIntegrationTests : WebApplicationFactory<Program>, IClassFixtur
                 Id = Guid.NewGuid(),
                 PhoneNumber = phoneNumber,
                 Code = SecretsHasher.Hash("000000"),
-                CreatedAtUtc = DateTime.UtcNow.AddMinutes(-20),
-                ExpiresAtUtc = DateTime.UtcNow.AddMinutes(-10),
+                CreatedAtUtc = TestClock.UtcNow.AddMinutes(-20),
+                ExpiresAtUtc = TestClock.UtcNow.AddMinutes(-10),
                 IsUsed = false
             };
             context.VerificationCodes.Add(expiredCode);
@@ -250,7 +251,7 @@ public class AuthIntegrationTests : WebApplicationFactory<Program>, IClassFixtur
 
             refreshToken.Should().NotBeNull();
             refreshToken!.IsRevoked = true;
-            refreshToken.RevokedAtUtc = DateTime.UtcNow;
+            refreshToken.RevokedAtUtc = TestClock.UtcNow;
             context.Update(refreshToken);
             await context.SaveChangesAsync();
         }

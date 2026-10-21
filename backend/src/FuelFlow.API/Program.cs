@@ -9,6 +9,7 @@ using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
+using FuelFlow.SharedKernel.Time;
 using Hangfire;
 using Hangfire.Dashboard;
 using Hangfire.PostgreSql;
@@ -72,6 +73,13 @@ try
             options.TracesSampleRate = observability.Sentry.TracesSampleRatio;
         });
     }
+
+    // The application's clock, as a service. The clock itself lives in SystemClock (one holder,
+    // because the clock has to reach EF value converters, entity factories and static helpers that
+    // the container never builds); registering it here means a class that prefers constructor
+    // injection gets the very same clock the static reads see. In production this is the system
+    // clock and nothing changes; in a test it is the fixed instant the suite runs on.
+    builder.Services.AddSingleton<TimeProvider>(SystemClock.Provider);
 
     // writeToProviders: true keeps the other registered ILoggerProviders in the logging
     // pipeline alongside Serilog's own sinks (Console/Loki). Without it Serilog owns logging

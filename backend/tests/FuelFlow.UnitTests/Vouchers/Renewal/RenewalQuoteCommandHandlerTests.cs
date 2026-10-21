@@ -7,6 +7,7 @@ using FuelFlow.Features.Vouchers.Renewal.Quote;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
@@ -25,7 +26,7 @@ public sealed class RenewalQuoteCommandHandlerTests : IDisposable
     private readonly RenewalQuoteCommandHandler _handler;
     private readonly Guid _userId = Guid.NewGuid();
 
-    private static readonly DateOnly Today = DateOnly.FromDateTime(DateTime.UtcNow);
+    private static readonly DateOnly Today = DateOnly.FromDateTime(TestClock.UtcNow);
 
     public RenewalQuoteCommandHandlerTests()
     {
@@ -189,16 +190,16 @@ public sealed class RenewalQuoteCommandHandlerTests : IDisposable
 
     private void EnableRenewal(params (string Code, decimal Rate)[] tiers)
     {
-        _context.AppSettings.Add(new AppSetting { Key = AppSettingKeys.VoucherRenewalEnabled, Value = "true", UpdatedAtUtc = DateTime.UtcNow });
+        _context.AppSettings.Add(new AppSetting { Key = AppSettingKeys.VoucherRenewalEnabled, Value = "true", UpdatedAtUtc = TestClock.UtcNow });
 
         foreach (var (code, rate) in tiers)
         {
-            _context.AppSettings.Add(new AppSetting { Key = AppSettingKeys.VoucherRenewalTierEnabled(code), Value = "true", UpdatedAtUtc = DateTime.UtcNow });
+            _context.AppSettings.Add(new AppSetting { Key = AppSettingKeys.VoucherRenewalTierEnabled(code), Value = "true", UpdatedAtUtc = TestClock.UtcNow });
             _context.AppSettings.Add(new AppSetting
             {
                 Key = AppSettingKeys.VoucherRenewalTierRatePerLiter(code),
                 Value = rate.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                UpdatedAtUtc = DateTime.UtcNow
+                UpdatedAtUtc = TestClock.UtcNow
             });
         }
 
@@ -227,8 +228,8 @@ public sealed class RenewalQuoteCommandHandlerTests : IDisposable
             QrPayload = $"qr-{Guid.NewGuid():N}",
             Status = status,
             AssignedToUserId = ownerId ?? _userId,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
         _context.FuelVouchers.Add(voucher);
         _context.SaveChanges();
@@ -249,15 +250,15 @@ public sealed class RenewalQuoteCommandHandlerTests : IDisposable
             VoucherNumber = $"S-{Guid.NewGuid():N}"[..16],
             QrPayload = $"qr-{Guid.NewGuid():N}",
             Status = VoucherStatus.Available,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         _context.SaveChanges();
     }
 
     private void SeedActiveUser()
     {
-        var role = new Role { Id = SeedRoles.UserRoleId, Name = SeedRoles.UserName, CreatedAtUtc = DateTime.UtcNow };
+        var role = new Role { Id = SeedRoles.UserRoleId, Name = SeedRoles.UserName, CreatedAtUtc = TestClock.UtcNow };
         _context.Roles.Add(role);
         _context.Users.Add(new User
         {
@@ -268,8 +269,8 @@ public sealed class RenewalQuoteCommandHandlerTests : IDisposable
             IsActive = true,
             IsDeleted = false,
             TokenVersion = 1,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         _context.SaveChanges();
     }

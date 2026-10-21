@@ -9,6 +9,7 @@ using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
@@ -75,9 +76,9 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         AmountKopecks = FuelFlow.SharedKernel.Money.ToKopecks(order.Price),
         Currency = "UAH",
         Status = PaymentStatus.Succeeded,
-        PaidAtUtc = DateTime.UtcNow,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        PaidAtUtc = TestClock.UtcNow,
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
     _context.Payments.Add(capture);
 
@@ -93,9 +94,9 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         AmountKopecks = capture.AmountKopecks,
         Currency = "UAH",
         Status = status,
-        PaidAtUtc = status == PaymentStatus.Succeeded ? DateTime.UtcNow : null,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        PaidAtUtc = status == PaymentStatus.Succeeded ? TestClock.UtcNow : null,
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     });
 }
 
@@ -120,8 +121,8 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         MonobankInvoiceId = "INV123",
         MonobankStatus = monobankStatus,
         IdempotencyKey = "idem-key-1",
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow,
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow,
         LineItems =
         {
             new OrderLineItem
@@ -147,10 +148,10 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
         Liters = liters,
         VoucherNumber = $"V-{Guid.NewGuid():N}",
         QrPayload = "q",
-        SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
-        CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddDays(30)),
+        CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddDays(30)),
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 
     [Fact]
@@ -162,7 +163,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
             Id = Guid.NewGuid(),
             OrderId = order.Id,
             VoucherId = Guid.NewGuid(),
-            FulfilledAtUtc = DateTime.UtcNow,
+            FulfilledAtUtc = TestClock.UtcNow,
             Voucher = BuildVoucher("okko", "okko-95", 50)
         });
         _context.Orders.Add(order);
@@ -202,7 +203,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
             Id = Guid.NewGuid(),
             OrderId = order.Id,
             VoucherId = Guid.NewGuid(),
-            FulfilledAtUtc = DateTime.UtcNow,
+            FulfilledAtUtc = TestClock.UtcNow,
             Voucher = BuildVoucher("okko", "okko-95", 50)
         });
         _context.Orders.Add(order);
@@ -226,7 +227,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
             Id = Guid.NewGuid(),
             OrderId = order.Id,
             VoucherId = Guid.NewGuid(),
-            FulfilledAtUtc = DateTime.UtcNow,
+            FulfilledAtUtc = TestClock.UtcNow,
             Voucher = BuildVoucher("okko", "okko-95", 50)
         });
         _context.Orders.Add(order);
@@ -246,7 +247,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
             Id = Guid.NewGuid(),
             OrderId = order.Id,
             VoucherId = Guid.NewGuid(),
-            FulfilledAtUtc = DateTime.UtcNow,
+            FulfilledAtUtc = TestClock.UtcNow,
             Voucher = BuildVoucher("okko", "okko-95", 50)
         });
         _context.Orders.Add(order);
@@ -280,7 +281,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
             Id = Guid.NewGuid(),
             OrderId = order.Id,
             VoucherId = Guid.NewGuid(),
-            FulfilledAtUtc = DateTime.UtcNow,
+            FulfilledAtUtc = TestClock.UtcNow,
             Voucher = BuildVoucher("okko", "okko-95", 50)
         });
         _context.Orders.Add(order);
@@ -350,7 +351,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
             Id = Guid.NewGuid(),
             OrderId = order.Id,
             VoucherId = Guid.NewGuid(),
-            FulfilledAtUtc = DateTime.UtcNow,
+            FulfilledAtUtc = TestClock.UtcNow,
             Voucher = BuildVoucher("okko", "okko-95", 50)
         });
         _context.Orders.Add(order);
@@ -393,8 +394,8 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
             Id = Guid.NewGuid(),
             OrderId = order.Id,
             VoucherId = Guid.NewGuid(),
-            FulfilledAtUtc = DateTime.UtcNow.AddMinutes(-5),
-            ReleasedAtUtc = DateTime.UtcNow,
+            FulfilledAtUtc = TestClock.UtcNow.AddMinutes(-5),
+            ReleasedAtUtc = TestClock.UtcNow,
             ReleaseReason = "stock exhausted",
             Voucher = BuildVoucher("okko", "okko-95", 50)
         });
@@ -425,7 +426,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
             Id = Guid.NewGuid(),
             OrderId = order.Id,
             VoucherId = Guid.NewGuid(),
-            FulfilledAtUtc = DateTime.UtcNow,
+            FulfilledAtUtc = TestClock.UtcNow,
             Voucher = BuildVoucher("okko", "okko-95", 50)
         });
         order.Fulfillments.Add(new Fulfillment
@@ -433,8 +434,8 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
             Id = Guid.NewGuid(),
             OrderId = order.Id,
             VoucherId = Guid.NewGuid(),
-            FulfilledAtUtc = DateTime.UtcNow.AddMinutes(-5),
-            ReleasedAtUtc = DateTime.UtcNow,
+            FulfilledAtUtc = TestClock.UtcNow.AddMinutes(-5),
+            ReleasedAtUtc = TestClock.UtcNow,
             ReleaseReason = "quantity_mismatch",
             Voucher = BuildVoucher("okko", "okko-95", 50)
         });
@@ -460,7 +461,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
             Id = Guid.NewGuid(),
             OrderId = order.Id,
             VoucherId = Guid.NewGuid(),
-            FulfilledAtUtc = DateTime.UtcNow,
+            FulfilledAtUtc = TestClock.UtcNow,
             Voucher = BuildVoucher("okko", "okko-95", 50)
         });
         _context.Orders.Add(order);
@@ -485,7 +486,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
             Id = Guid.NewGuid(),
             OrderId = order.Id,
             VoucherId = Guid.NewGuid(),
-            FulfilledAtUtc = DateTime.UtcNow,
+            FulfilledAtUtc = TestClock.UtcNow,
             Voucher = BuildVoucher("okko", "okko-95", 50)
         });
         order.Fulfillments.Add(new Fulfillment
@@ -493,7 +494,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
             Id = Guid.NewGuid(),
             OrderId = order.Id,
             VoucherId = Guid.NewGuid(),
-            FulfilledAtUtc = DateTime.UtcNow,
+            FulfilledAtUtc = TestClock.UtcNow,
             Voucher = BuildVoucher("okko", "okko-95", 50)
         });
         _context.Orders.Add(order);
@@ -693,7 +694,7 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
             Id = Guid.NewGuid(),
             OrderId = order.Id,
             VoucherId = Guid.NewGuid(),
-            FulfilledAtUtc = DateTime.UtcNow,
+            FulfilledAtUtc = TestClock.UtcNow,
             Voucher = BuildVoucher("okko", "okko-95", 50)
         });
         order.Fulfillments.Add(new Fulfillment
@@ -701,8 +702,8 @@ public sealed class RefundOrderCommandHandlerTests : IDisposable
             Id = Guid.NewGuid(),
             OrderId = order.Id,
             VoucherId = Guid.NewGuid(),
-            FulfilledAtUtc = DateTime.UtcNow.AddMinutes(-5),
-            ReleasedAtUtc = DateTime.UtcNow,
+            FulfilledAtUtc = TestClock.UtcNow.AddMinutes(-5),
+            ReleasedAtUtc = TestClock.UtcNow,
             ReleaseReason = "stock exhausted",
             Voucher = BuildVoucher("okko", "okko-95", 50)
         });

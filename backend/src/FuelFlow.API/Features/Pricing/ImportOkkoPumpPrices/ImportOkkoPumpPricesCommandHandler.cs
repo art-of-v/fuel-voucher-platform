@@ -3,6 +3,7 @@ using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Pricing.ImportOkkoPumpPrices;
@@ -164,7 +165,7 @@ public sealed class ImportOkkoPumpPricesCommandHandler
         // reader already looks at. A nominal carries no stored price, so a pump change does not
         // rewrite anything per size - it moves the fuel's rate and every size of both pools follows.
         // The counts the report gives back are the fuel's nominal count across the pools.
-        var now = DateTime.UtcNow;
+        var now = SystemClock.UtcNow;
         var nominalCountByFuel = await _context.FuelNominals
             .AsNoTracking()
             .GroupBy(n => n.FuelTypeId)

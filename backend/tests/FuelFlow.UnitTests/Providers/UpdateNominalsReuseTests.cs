@@ -9,6 +9,7 @@ using FuelFlow.Features.Brands.GetProviderHistory;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.Testing;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -109,8 +110,8 @@ public sealed class UpdateNominalsReuseTests : IDisposable
             Color = "#00ff80",
             LogoText = "OK",
             SortOrder = 1,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
         });
         _context.FuelTypes.Add(new FuelTypeEntity
         {
@@ -119,8 +120,8 @@ public sealed class UpdateNominalsReuseTests : IDisposable
             BrandId = BrandIds.Okko,
             BasePrice = 50m,
             DiscountPrice = 45m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
         });
 
 // Seeded as one offer plus a volume per nominal, and returned so the tests can assert on volume ids -
@@ -132,8 +133,8 @@ public sealed class UpdateNominalsReuseTests : IDisposable
         {
             FuelTypeId = ToUuid("okko-a95"),
             Liters = l,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
         }).ToList();
 
         _context.FuelNominals.AddRange(rows);

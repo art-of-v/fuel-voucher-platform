@@ -2,6 +2,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -68,7 +69,7 @@ public sealed class ProductOwnerBootstrap
 
         user.RoleId = productOwnerRole.Id;
         user.Role = productOwnerRole;
-        user.UpdatedAtUtc = DateTime.UtcNow;
+        user.UpdatedAtUtc = SystemClock.UtcNow;
 
         await _context.SaveChangesAsync(ct);
 

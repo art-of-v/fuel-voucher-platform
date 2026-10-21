@@ -3,6 +3,7 @@ using System.Text.Json;
 using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -173,7 +174,7 @@ public sealed class ErrorLogsController : ControllerBase
         var actingName = GetUserName();
         var changed = await query.ExecuteUpdateAsync(setters => setters
                 .SetProperty(e => e.ResolvedAtUtc,
-                    request.Resolved ? DateTime.UtcNow : (DateTime?)null)
+                    request.Resolved ? SystemClock.UtcNow : (DateTime?)null)
                 .SetProperty(e => e.ResolvedByUserId,
                     request.Resolved ? actingId : (Guid?)null)
                 .SetProperty(e => e.ResolvedByUserName,

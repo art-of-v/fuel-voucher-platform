@@ -12,6 +12,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.Testing;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -124,8 +125,8 @@ public sealed class BrandFuelControllerTests : IDisposable
             Name = name,
             LogoText = name,
             Color = "#ffffff",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         await _context.SaveChangesAsync();
         _context.ChangeTracker.Clear();
@@ -140,8 +141,8 @@ public sealed class BrandFuelControllerTests : IDisposable
             Name = name,
             BasePrice = 100,
             DiscountPrice = 100,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         await _context.SaveChangesAsync();
         _context.ChangeTracker.Clear();

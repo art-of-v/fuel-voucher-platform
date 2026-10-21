@@ -2,6 +2,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
+using FuelFlow.Testing;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -216,8 +217,8 @@ public sealed class TheBelowCostGateAsksAboutStock : IClassFixture<TestDatabaseF
             Name = "TEST",
             LogoText = "TEST",
             Color = "#000",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         context.FuelTypes.Add(new FuelTypeEntity
@@ -228,8 +229,8 @@ public sealed class TheBelowCostGateAsksAboutStock : IClassFixture<TestDatabaseF
             SupplierPricePerLiter = cost,
             MarginUahPerLiter = margin,
             PumpPricePerLiter = 92.90m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         context.FuelTypes.Add(new FuelTypeEntity
@@ -240,8 +241,8 @@ public sealed class TheBelowCostGateAsksAboutStock : IClassFixture<TestDatabaseF
             SupplierPricePerLiter = cost,
             MarginUahPerLiter = margin,
             PumpPricePerLiter = 101.90m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         if (withStock)
@@ -255,11 +256,11 @@ public sealed class TheBelowCostGateAsksAboutStock : IClassFixture<TestDatabaseF
                 Liters = 10m,
                 Status = VoucherStatus.Available,
                 DataKind = DataKinds.Real,
-                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+                SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
                 VoucherNumber = $"V-{Guid.NewGuid():N}",
                 QrPayload = $"9018$500$;{Guid.NewGuid():N}",
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
         }
 

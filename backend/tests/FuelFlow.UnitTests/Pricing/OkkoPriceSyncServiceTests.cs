@@ -8,6 +8,7 @@ using FuelFlow.Features.Pricing.ScrapeOkkoPrices;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.Testing;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -108,8 +109,8 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
                 SupplierPricePerLiter = 40m,
                 MarginUahPerLiter = 3m,
                 PumpPricePerLiter = pump,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
 
             // The sizes it is sold in, in the real pool. The pool lives on the size, so this is
@@ -121,8 +122,8 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
                     FuelTypeId = fuelId,
                     DataKind = DataKinds.Real,
                     Liters = liters,
-                    CreatedAtUtc = DateTime.UtcNow,
-                    UpdatedAtUtc = DateTime.UtcNow
+                    CreatedAtUtc = TestClock.UtcNow,
+                    UpdatedAtUtc = TestClock.UtcNow
                 });
             }
         }

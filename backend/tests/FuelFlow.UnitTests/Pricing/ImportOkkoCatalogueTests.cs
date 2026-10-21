@@ -4,6 +4,7 @@ using FuelFlow.Features.Pricing.ImportOkkoCatalogue;
 using FuelFlow.Features.Pricing.ImportOkkoPumpPrices;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -185,8 +186,8 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
             SupplierPricePerLiter = 49m,
             MarginUahPerLiter = 2m, // 49 + 2 = the 51 the assertion below expects; the column price (60) is a reference
             AllowBelowCost = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
         _context.FuelTypes.Add(existing);
         await _context.SaveChangesAsync();
@@ -224,8 +225,8 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
             BrandFuelCode = "DP-OLD",
             BasePrice = 50m,
             DiscountPrice = 48m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         await _context.SaveChangesAsync();
         _context.ChangeTracker.Clear();
@@ -292,8 +293,8 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
         await SeedBrandAsync();
         _context.FuelTypes.Add(new FuelTypeEntity
         {
-            Id = Guid.NewGuid(), Name = "ДП PULLS", BrandId = BrandIds.Okko, CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            Id = Guid.NewGuid(), Name = "ДП PULLS", BrandId = BrandIds.Okko, CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
         });
         await _context.SaveChangesAsync();
 
@@ -319,7 +320,7 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
         _context.FuelTypes.Add(new FuelTypeEntity
         {
             Id = Guid.NewGuid(), Name = "DP", BrandId = BrandIds.Okko,
-            BrandFuelCode = "DP", CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow,
+            BrandFuelCode = "DP", CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow,
         });
         await _context.SaveChangesAsync();
 
@@ -377,9 +378,9 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
             Name = "А-95 (archived)",
             BrandFuelCode = "A-95",
             IsDeleted = true,
-            DeletedAtUtc = DateTime.UtcNow,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            DeletedAtUtc = TestClock.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         await _context.SaveChangesAsync();
         _context.ChangeTracker.Clear();

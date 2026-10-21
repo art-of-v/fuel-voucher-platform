@@ -4,6 +4,7 @@ using FuelFlow.Features.Vouchers.Exchange;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
@@ -278,8 +279,8 @@ private async Task SeedExchangeAsync(
                 Id = supplierId,
                 Name = supplierName,
                 IsActive = true,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
         }
 
@@ -292,8 +293,8 @@ private async Task SeedExchangeAsync(
                 BrandId = BrandIds.Okko,
                 BasePrice = 60m,
                 DiscountPrice = 60m,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
         }
 
@@ -302,7 +303,7 @@ private async Task SeedExchangeAsync(
         {
             Id = importId,
             FileName = "history.pdf",
-            CompletedAtUtc = DateTime.UtcNow,
+            CompletedAtUtc = TestClock.UtcNow,
             Status = "Completed",
             StartedAtUtc = atUtc
         });
@@ -356,12 +357,12 @@ foreach (var (cost, index) in costsPerLiter.Select((c, i) => (c, i)))
             Liters = liters,
             CostPerLiter = costPerLiter,
             SupplierId = supplierId,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(6)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(6)),
             VoucherNumber = number,
             QrPayload = Guid.NewGuid().ToString(),
             Status = VoucherStatus.Available,
             ImportJobId = importId,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow
         };
 }

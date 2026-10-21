@@ -5,6 +5,7 @@ using FuelFlow.Persistence;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.SharedKernel;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
@@ -79,7 +80,7 @@ public sealed class RefundOrderCommandHandler
             {
                 existing.AmountKopecks = correctedAmount;
                 existing.AmountUah = Money.FromKopecks(correctedAmount);
-                existing.UpdatedAtUtc = DateTime.UtcNow;
+                existing.UpdatedAtUtc = SystemClock.UtcNow;
                 await _context.SaveChangesAsync(cancellationToken);
             }
 
@@ -201,12 +202,12 @@ public sealed class RefundOrderCommandHandler
                 order,
                 order.MonobankMerchant ?? MonobankMerchant.Live,
                 order.MonobankInvoiceId,
-                DateTime.UtcNow);
+                SystemClock.UtcNow);
             PaymentFactory.ApplyStatus(
                 capture,
                 PaymentStatus.Succeeded,
                 order.UpdatedAtUtc,
-                DateTime.UtcNow);
+                SystemClock.UtcNow);
 
             _context.Payments.Add(capture);
         }
@@ -246,7 +247,7 @@ public sealed class RefundOrderCommandHandler
                 command.ChangedByUserId,
                 command.ChangedByUserName,
                 command.IsAutomatic,
-                DateTime.UtcNow);
+                SystemClock.UtcNow);
 
             _context.Payments.Add(refundPayment);
         }
@@ -255,7 +256,7 @@ public sealed class RefundOrderCommandHandler
             refundPayment.AmountUah = Money.FromKopecks(amount);
             refundPayment.AmountKopecks = amount;
             PaymentFactory.ApplyStatus(
-                refundPayment, PaymentStatus.Pending, observedAtUtc: null, DateTime.UtcNow);
+                refundPayment, PaymentStatus.Pending, observedAtUtc: null, SystemClock.UtcNow);
             refundPayment.ErrorMessage = null;
             refundPayment.IsAutomatic = command.IsAutomatic;
             if (command.ChangedByUserId is not null)
@@ -266,7 +267,7 @@ public sealed class RefundOrderCommandHandler
             {
                 refundPayment.CreatedByUserName = command.ChangedByUserName;
             }
-            refundPayment.UpdatedAtUtc = DateTime.UtcNow;
+            refundPayment.UpdatedAtUtc = SystemClock.UtcNow;
         }
 
 
@@ -343,7 +344,7 @@ public sealed class RefundOrderCommandHandler
             // Order status update is delayed to avoid confusing "PartiallyRefunded + Refund pending" state
             // Order status will be updated by RefundStatusSyncService when Monobank confirms
 
-            refundPayment.UpdatedAtUtc = DateTime.UtcNow;
+            refundPayment.UpdatedAtUtc = SystemClock.UtcNow;
             await _context.SaveChangesAsync(cancellationToken);
 
             await _providerEventService.RecordEventAsync(
@@ -372,7 +373,7 @@ public sealed class RefundOrderCommandHandler
         catch (Exception ex)
         {
             PaymentFactory.ApplyStatus(
-                refundPayment, PaymentStatus.Failed, observedAtUtc: null, DateTime.UtcNow);
+                refundPayment, PaymentStatus.Failed, observedAtUtc: null, SystemClock.UtcNow);
             // error_message column is limited to 500 chars; a longer brand exception
             // (e.g. a full HTML error body) would make this SaveChanges throw and turn a
             // handled refund failure into an unhandled 500.
@@ -380,7 +381,7 @@ public sealed class RefundOrderCommandHandler
             // body) would make this SaveChanges throw and turn a handled refund failure into an
             // unhandled 500.
             refundPayment.ErrorMessage = ex.Message.Length <= 500 ? ex.Message : ex.Message[..500];
-            refundPayment.UpdatedAtUtc = DateTime.UtcNow;
+            refundPayment.UpdatedAtUtc = SystemClock.UtcNow;
             await _context.SaveChangesAsync(cancellationToken);
 
             await _providerEventService.RecordEventAsync(
@@ -414,7 +415,7 @@ public sealed class RefundOrderCommandHandler
         if (trackedOrder is not null)
         {
             trackedOrder.Status = status;
-            trackedOrder.UpdatedAtUtc = DateTime.UtcNow;
+            trackedOrder.UpdatedAtUtc = SystemClock.UtcNow;
             if (status != OrderStatus.PartiallyFulfilled)
             {
                 trackedOrder.PartiallyFulfilledSinceUtc = null;
@@ -423,7 +424,7 @@ public sealed class RefundOrderCommandHandler
         }
 
         order.Status = status;
-        order.UpdatedAtUtc = DateTime.UtcNow;
+        order.UpdatedAtUtc = SystemClock.UtcNow;
         if (status != OrderStatus.PartiallyFulfilled)
         {
             order.PartiallyFulfilledSinceUtc = null;

@@ -4,6 +4,7 @@ using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -198,12 +199,12 @@ public sealed class SetUserBannedCommandHandlerTests
 
         await using (var seed = CreateNoTrackingContext(dbName, root))
         {
-            var role = new Role { Id = Guid.NewGuid(), Name = "User", CreatedAtUtc = DateTime.UtcNow };
+            var role = new Role { Id = Guid.NewGuid(), Name = "User", CreatedAtUtc = TestClock.UtcNow };
             var user = new User
             {
                 Id = Guid.NewGuid(), PhoneNumber = "+380991234567", RoleId = role.Id,
                 IsActive = true, IsBanned = false, TokenVersion = 7,
-                CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow
             };
             seed.Roles.Add(role);
             seed.Users.Add(user);
@@ -244,11 +245,11 @@ public sealed class SetUserBannedCommandHandlerTests
         // Reuse an already-tracked role of the same id so two users can share one role
         // (needed for the last-ProductOwner scenarios where roleId is the fixed seed GUID).
         var role = await context.Roles.FirstOrDefaultAsync(r => r.Id == id)
-                   ?? new Role { Id = id, Name = roleName, CreatedAtUtc = DateTime.UtcNow };
+                   ?? new Role { Id = id, Name = roleName, CreatedAtUtc = TestClock.UtcNow };
         var user = new User
         {
             Id = Guid.NewGuid(), PhoneNumber = "+380991234567", RoleId = role.Id,
-            IsActive = true, TokenVersion = 7, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
+            IsActive = true, TokenVersion = 7, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow
         };
         if (context.Entry(role).State == EntityState.Detached)
             user.Role = role;
@@ -263,14 +264,14 @@ public sealed class SetUserBannedCommandHandlerTests
         var a = new RefreshToken
         {
             Id = Guid.NewGuid(), UserId = userId, FamilyId = Guid.NewGuid(), Token = Guid.NewGuid().ToString("N"),
-            ExpiresAtUtc = DateTime.UtcNow.AddDays(7), CreatedAtUtc = DateTime.UtcNow,
-            IsRevoked = revoked, RevokedAtUtc = revoked ? DateTime.UtcNow : null
+            ExpiresAtUtc = TestClock.UtcNow.AddDays(7), CreatedAtUtc = TestClock.UtcNow,
+            IsRevoked = revoked, RevokedAtUtc = revoked ? TestClock.UtcNow : null
         };
         var b = new RefreshToken
         {
             Id = Guid.NewGuid(), UserId = userId, FamilyId = Guid.NewGuid(), Token = Guid.NewGuid().ToString("N"),
-            ExpiresAtUtc = DateTime.UtcNow.AddDays(7), CreatedAtUtc = DateTime.UtcNow,
-            IsRevoked = revoked, RevokedAtUtc = revoked ? DateTime.UtcNow : null
+            ExpiresAtUtc = TestClock.UtcNow.AddDays(7), CreatedAtUtc = TestClock.UtcNow,
+            IsRevoked = revoked, RevokedAtUtc = revoked ? TestClock.UtcNow : null
         };
         context.RefreshTokens.AddRange(a, b);
         await context.SaveChangesAsync();
@@ -283,7 +284,7 @@ public sealed class SetUserBannedCommandHandlerTests
         {
             Id = Guid.NewGuid(), UserId = userId, DeviceId = "device-" + Guid.NewGuid().ToString("N"),
             PublicKey = "pk", Status = DeviceStatus.Active,
-            CreatedAt = DateTime.UtcNow, LastSeenAt = DateTime.UtcNow
+            CreatedAt = TestClock.UtcNow, LastSeenAt = TestClock.UtcNow
         };
         context.Devices.Add(device);
         await context.SaveChangesAsync();

@@ -2,6 +2,7 @@ using FluentAssertions;
 using FuelFlow.Features.Notifications.DeregisterPushToken;
 using FuelFlow.Features.Notifications.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.UnitTests.Notifications;
@@ -32,7 +33,7 @@ public sealed class DeregisterPushTokenCommandHandlerTests : IDisposable
 
     private async Task<UserPushToken> SeedAsync(Guid userId, string token, string? deviceId, bool isActive)
     {
-        var now = DateTime.UtcNow;
+        var now = TestClock.UtcNow;
         var entity = new UserPushToken
         {
             Id = Guid.NewGuid(),

@@ -1,5 +1,6 @@
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Security;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Auth.Verify;
@@ -44,7 +45,7 @@ public sealed class OtpVerificationService
         // Load the newest active code regardless of whether it matches, so a wrong guess can be
         // counted against it (matches the login path's brute-force accounting).
         var verificationCode = await _context.VerificationCodes
-            .Where(v => v.PhoneNumber == normalizedPhone && !v.IsUsed && v.ExpiresAtUtc > DateTime.UtcNow)
+            .Where(v => v.PhoneNumber == normalizedPhone && !v.IsUsed && v.ExpiresAtUtc > SystemClock.UtcNow)
             .OrderByDescending(v => v.CreatedAtUtc)
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -57,7 +58,7 @@ public sealed class OtpVerificationService
             if (verificationCode.FailedAttempts >= MaxFailedAttempts)
             {
                 verificationCode.IsUsed = true;
-                verificationCode.UsedAtUtc = DateTime.UtcNow;
+                verificationCode.UsedAtUtc = SystemClock.UtcNow;
             }
 
             _context.VerificationCodes.Update(verificationCode);
@@ -66,7 +67,7 @@ public sealed class OtpVerificationService
         }
 
         verificationCode.IsUsed = true;
-        verificationCode.UsedAtUtc = DateTime.UtcNow;
+        verificationCode.UsedAtUtc = SystemClock.UtcNow;
         _context.VerificationCodes.Update(verificationCode);
         await _context.SaveChangesAsync(cancellationToken);
         return true;

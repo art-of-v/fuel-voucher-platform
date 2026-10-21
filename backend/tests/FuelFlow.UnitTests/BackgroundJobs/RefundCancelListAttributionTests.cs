@@ -8,6 +8,7 @@ using FuelFlow.SharedKernel.Domain;
 using Microsoft.Extensions.Logging;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 using Xunit;
@@ -69,8 +70,8 @@ public sealed class RefundCancelListAttributionTests : IDisposable
             Id = userId,
             PhoneNumber = $"+38{userId:N}"[..20],
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         _context.Orders.Add(new Order
@@ -80,8 +81,8 @@ public sealed class RefundCancelListAttributionTests : IDisposable
             Price = 100m,
             Status = OrderStatus.PartiallyFulfilled,
             IdempotencyKey = extRef,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         var capture = new Payment
@@ -95,9 +96,9 @@ public sealed class RefundCancelListAttributionTests : IDisposable
             AmountKopecks = 50000,
             Currency = "UAH",
             Status = PaymentStatus.Succeeded,
-            PaidAtUtc = DateTime.UtcNow,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            PaidAtUtc = TestClock.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
         _context.Payments.Add(capture);
 
@@ -113,8 +114,8 @@ public sealed class RefundCancelListAttributionTests : IDisposable
             AmountKopecks = 50000,
             Currency = "UAH",
             Status = PaymentStatus.Pending,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
         _context.Payments.Add(refund);
 
@@ -127,7 +128,7 @@ public sealed class RefundCancelListAttributionTests : IDisposable
     {
         Status = status,
         ExtRef = extRef,
-        ModifiedDate = DateTime.UtcNow.AddMinutes(-minutesAgo),
+        ModifiedDate = TestClock.UtcNow.AddMinutes(-minutesAgo),
     };
 
     [Fact]

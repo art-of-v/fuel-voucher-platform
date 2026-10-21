@@ -5,6 +5,7 @@ using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
+using FuelFlow.SharedKernel.Time;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -115,7 +116,7 @@ public sealed class VerifyCodeCommandHandler
         // Load the newest active code regardless of whether it matches, so
         // wrong guesses can be counted against it.
         var verificationCode = await _context.VerificationCodes
-            .Where(v => v.PhoneNumber == phoneNumber && !v.IsUsed && v.ExpiresAtUtc > DateTime.UtcNow)
+            .Where(v => v.PhoneNumber == phoneNumber && !v.IsUsed && v.ExpiresAtUtc > SystemClock.UtcNow)
             .OrderByDescending(v => v.CreatedAtUtc)
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -135,7 +136,7 @@ public sealed class VerifyCodeCommandHandler
                 // Invalidate the code so it cannot be brute-forced further;
                 // the user must request a new one (rate-limited per IP).
                 verificationCode.IsUsed = true;
-                verificationCode.UsedAtUtc = DateTime.UtcNow;
+                verificationCode.UsedAtUtc = SystemClock.UtcNow;
                 _logger.LogWarning(
                     "Verification code invalidated after {MaxAttempts} failed attempts for {PhoneNumber}",
                     MaxFailedAttempts,
@@ -152,7 +153,7 @@ public sealed class VerifyCodeCommandHandler
         }
 
         verificationCode.IsUsed = true;
-        verificationCode.UsedAtUtc = DateTime.UtcNow;
+        verificationCode.UsedAtUtc = SystemClock.UtcNow;
         _context.VerificationCodes.Update(verificationCode);
 
         var user = await _context.Users
@@ -219,7 +220,7 @@ public sealed class VerifyCodeCommandHandler
                 // same way the seeded one did.
                 IsActive = isQaRegistration,
                 IsQaAccount = isQaRegistration,
-                CreatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = SystemClock.UtcNow
             };
             _context.Users.Add(user);
             isNewUser = true;
@@ -231,7 +232,7 @@ public sealed class VerifyCodeCommandHandler
         // account granted at creation above as the single exception.
         // No change to user.IsActive for an account that already existed.
 
-        user.LastLoginAtUtc = DateTime.UtcNow;
+        user.LastLoginAtUtc = SystemClock.UtcNow;
         if (!isNewUser)
         {
             _context.Users.Update(user);
@@ -257,8 +258,8 @@ public sealed class VerifyCodeCommandHandler
             DeviceId = null, // Device will be linked during challenge verification
             RoleNameAtIssue = user.Role?.Name, // Pin the session to the role it was born with (§16)
             Token = SecretsHasher.Hash(refreshTokenValue),
-            ExpiresAtUtc = DateTime.UtcNow.AddDays(_jwtOptions.RefreshTokenExpirationDays),
-            CreatedAtUtc = DateTime.UtcNow,
+            ExpiresAtUtc = SystemClock.UtcNow.AddDays(_jwtOptions.RefreshTokenExpirationDays),
+            CreatedAtUtc = SystemClock.UtcNow,
             IsRevoked = false
         };
 

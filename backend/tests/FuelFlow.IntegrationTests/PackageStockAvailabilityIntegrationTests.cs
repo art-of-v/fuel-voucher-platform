@@ -5,6 +5,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Xunit;
@@ -50,7 +51,7 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
     [Fact]
     public async Task AvailableKeys_ForACart_ReturnsOnlyTheSellableKeysThatWereAskedFor()
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
 
         using var seed = CreateContext();
         await seed.Database.ExecuteSqlRawAsync(
@@ -83,7 +84,7 @@ public sealed class PackageStockAvailabilityIntegrationTests : IClassFixture<Tes
     [Fact]
     public async Task AvailableKeys_ForACartWithNoStockBehindOneLine_OmitsThatKey()
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
 
         using var seed = CreateContext();
         await seed.Database.ExecuteSqlRawAsync(
@@ -299,7 +300,7 @@ var chosen = await availability.FindPackageAsync(false, BrandIds.Okko, ToUuid("o
             ?? seed.FuelTypes.FirstOrDefault(f => f.Id == ToUuid("okko-95"));
         fuel!.MarginUahPerLiter = pricePerLiter - 30m;
         fuel.SupplierPricePerLiter = 30m;
-        fuel.UpdatedAtUtc = DateTime.UtcNow.AddMinutes(-updatedMinutesAgo);
+        fuel.UpdatedAtUtc = TestClock.UtcNow.AddMinutes(-updatedMinutesAgo);
 
         // Availability resolves sizes from fuel_nominals, and the size list is per pool - so a
         // rehearsal size exists only in the rehearsal pool and is invisible to the live shelf.
@@ -334,8 +335,8 @@ var chosen = await availability.FindPackageAsync(false, BrandIds.Okko, ToUuid("o
             QrPayload = $"qr-{Guid.NewGuid():N}",
             Status = VoucherStatus.Available,
             CostPerLiter = 30m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
         };
 
     private ApplicationDbContext CreateContext()

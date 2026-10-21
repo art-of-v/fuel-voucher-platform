@@ -5,6 +5,7 @@ using FuelFlow.Features.Brands.GetProviderById;
 using FuelFlow.Features.Brands.GetProviderHistory;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
@@ -41,7 +42,7 @@ public sealed class GetProviderByIdAndHistoryTests : IDisposable
     [Fact]
     public async Task GetProviderById_ShouldReturnProvider()
     {
-        var now = DateTime.UtcNow;
+        var now = TestClock.UtcNow;
         _context.Brands.Add(new Brand
         {
             Id = TestOkko,
@@ -115,7 +116,7 @@ public sealed class GetProviderByIdAndHistoryTests : IDisposable
     [Fact]
     public async Task GetProviderHistory_ShouldReturnEvents_ForProvider()
     {
-        var now = DateTime.UtcNow;
+        var now = TestClock.UtcNow;
         var e1 = CreateEvent("test-okko", now.AddMinutes(-3), "v1");
         var e2 = CreateEvent("test-okko", now.AddMinutes(-1), "v2");
         var e3 = CreateEvent("test-okko", now.AddMinutes(-2), "v3");
@@ -141,7 +142,7 @@ public sealed class GetProviderByIdAndHistoryTests : IDisposable
     [Fact]
     public async Task GetProviderHistory_ShouldRespectLimit()
     {
-        var now = DateTime.UtcNow;
+        var now = TestClock.UtcNow;
         var events = new[]
         {
             CreateEvent("test-okko", now.AddMinutes(-5), "v1"),
@@ -190,6 +191,6 @@ public sealed class GetProviderByIdAndHistoryTests : IDisposable
         evt.ChangedByUserId.Should().Be(changedByUserId);
         evt.ChangedByUserName.Should().Be("Admin User");
         evt.Summary.Should().Be("Price updated");
-        evt.ChangedAtUtc.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+        evt.ChangedAtUtc.Should().BeCloseTo(TestClock.UtcNow, TimeSpan.FromSeconds(5));
     }
 }

@@ -4,6 +4,7 @@ using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -59,7 +60,7 @@ public class MonobankReconciliationService
             return;
         }
 
-        var now = DateTime.UtcNow;
+        var now = SystemClock.UtcNow;
         var minAgeCutoff = now.AddMinutes(-_options.ReconciliationMinAgeMinutes);
         var maxAgeCutoff = now.AddHours(-_options.ReconciliationMaxAgeHours);
 
@@ -114,8 +115,8 @@ public class MonobankReconciliationService
                     InvoiceId = candidate.MonobankInvoiceId!,
                     Status = status.Status,
                     Amount = status.Amount ?? 0,
-                    CreatedDate = status.CreatedDate ?? DateTime.UtcNow,
-                    ModifiedDate = status.ModifiedDate ?? DateTime.UtcNow,
+                    CreatedDate = status.CreatedDate ?? SystemClock.UtcNow,
+                    ModifiedDate = status.ModifiedDate ?? SystemClock.UtcNow,
                     CancelList = status.CancelList
                 };
 

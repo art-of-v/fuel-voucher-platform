@@ -16,6 +16,7 @@ using FuelFlow.Features.Vouchers.UnarchiveVoucher;
 using FuelFlow.Features.Vouchers.UpdateVoucher;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Hangfire;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -103,8 +104,8 @@ public sealed class AdminVoucherControllerAttributionTests : IDisposable
             QrPayload = $"qr-{id:N}",
             Status = VoucherStatus.Available,
             CostPerLiter = 40m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         await _context.SaveChangesAsync();
         _context.ChangeTracker.Clear();

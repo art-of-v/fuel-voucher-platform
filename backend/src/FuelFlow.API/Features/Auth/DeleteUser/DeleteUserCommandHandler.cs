@@ -3,6 +3,7 @@ using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
@@ -86,7 +87,7 @@ public sealed class DeleteUserCommandHandler
         user.IsDeleted = true;
         user.IsActive = false;
         user.TokenVersion++;
-        user.UpdatedAtUtc = DateTime.UtcNow;
+        user.UpdatedAtUtc = SystemClock.UtcNow;
         _context.Users.Update(user);
 
         var devices = await _context.Devices
@@ -104,7 +105,7 @@ public sealed class DeleteUserCommandHandler
         foreach (var refreshToken in refreshTokens)
         {
             refreshToken.IsRevoked = true;
-            refreshToken.RevokedAtUtc = DateTime.UtcNow;
+            refreshToken.RevokedAtUtc = SystemClock.UtcNow;
             _context.RefreshTokens.Update(refreshToken);
         }
 

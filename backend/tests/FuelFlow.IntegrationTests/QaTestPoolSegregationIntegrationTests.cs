@@ -10,6 +10,7 @@ using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -194,8 +195,8 @@ public sealed class QaTestPoolSegregationIntegrationTests : IClassFixture<TestDa
         PhoneNumber = $"+38{id:N}"[..20],
         IsActive = true,
         IsQaAccount = isQaAccount,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 
     private static Order MakeOrder(Guid orderId, Guid userId) => new()
@@ -204,8 +205,8 @@ public sealed class QaTestPoolSegregationIntegrationTests : IClassFixture<TestDa
         UserId = userId,
         Price = 520,
         Status = OrderStatus.PendingFulfillment,
-        CreatedAtUtc = DateTime.UtcNow.AddDays(-1),
-        UpdatedAtUtc = DateTime.UtcNow.AddDays(-1),
+        CreatedAtUtc = TestClock.UtcNow.AddDays(-1),
+        UpdatedAtUtc = TestClock.UtcNow.AddDays(-1),
         LineItems = new List<OrderLineItem>
         {
             new()
@@ -230,14 +231,14 @@ public sealed class QaTestPoolSegregationIntegrationTests : IClassFixture<TestDa
         BrandId = BrandIds.ForSlug(Brand),
         FuelTypeId =   ToUuid(FuelTypeId),
         Liters = Liters,
-        SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(3),
-        CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(3),
+        SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(3),
+        CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(3),
         VoucherNumber = $"{tag}-{id:N}",
         QrPayload = $"{tag}-qr-{id:N}",
         Status = VoucherStatus.Available,
         IsTestData = isTestData,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 
     private static async Task ResetDataAsync(ApplicationDbContext context)
@@ -294,9 +295,9 @@ public sealed class QaTestPoolSegregationIntegrationTests : IClassFixture<TestDa
             AmountKopecks = (long)(order.Price * 100),
             Currency = "UAH",
             Status = PaymentStatus.Succeeded,
-            PaidAtUtc = DateTime.UtcNow,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            PaidAtUtc = TestClock.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
     }
 }

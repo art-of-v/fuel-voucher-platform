@@ -1,5 +1,6 @@
 using FuelFlow.Features.Notifications.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Notifications.RegisterPushToken;
@@ -17,7 +18,7 @@ public sealed class RegisterPushTokenCommandHandler
         RegisterPushTokenCommand command,
         CancellationToken cancellationToken = default)
     {
-        var now = DateTime.UtcNow;
+        var now = SystemClock.UtcNow;
 
         // Tokens are globally unique. Look up by token so a device that re-logs-in as a
         // different user re-points the same token at the current user instead of duplicating

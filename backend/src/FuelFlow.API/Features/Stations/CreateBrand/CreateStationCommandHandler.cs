@@ -1,4 +1,5 @@
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Time;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -29,7 +30,7 @@ public sealed class CreateBrandCommandHandler
         // Assigned here, never taken from the caller: an id the client chose is an id nothing else
         // can vouch for.
         command.Brand.Id = Guid.CreateVersion7();
-        command.Brand.CreatedAtUtc = DateTime.UtcNow;
+        command.Brand.CreatedAtUtc = SystemClock.UtcNow;
         _context.Brands.Add(command.Brand);
         await _context.SaveChangesAsync(ct);
         return new CreateBrandResult { Success = true, Brand = command.Brand };

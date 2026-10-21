@@ -9,6 +9,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -167,7 +168,7 @@ public sealed class OutboxFastPathIntegrationTests : IClassFixture<TestDatabaseF
                 {
                     Id = Guid.NewGuid(),
                     Name = "Admin",
-                    CreatedAtUtc = DateTime.UtcNow
+                    CreatedAtUtc = TestClock.UtcNow
                 };
                 context.Roles.Add(adminRole);
                 await context.SaveChangesAsync();
@@ -176,7 +177,7 @@ public sealed class OutboxFastPathIntegrationTests : IClassFixture<TestDatabaseF
             var user = await context.Users.FirstAsync(u => u.PhoneNumber == phoneNumber);
             user.RoleId = adminRole.Id;
             user.IsActive = true;
-            user.UpdatedAtUtc = DateTime.UtcNow;
+            user.UpdatedAtUtc = TestClock.UtcNow;
             context.Update(user);
             await context.SaveChangesAsync();
         }
@@ -214,8 +215,8 @@ public sealed class OutboxFastPathIntegrationTests : IClassFixture<TestDatabaseF
                 BrandId = brandId,
                 BasePrice = 50m,
                 DiscountPrice = 50m,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
         }
 
@@ -225,12 +226,12 @@ public sealed class OutboxFastPathIntegrationTests : IClassFixture<TestDatabaseF
             {
                 FuelTypeId =   ToUuid(fuelTypeId),
                 Liters = liters,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
         }
 
-        var expiry = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6));
+        var expiry = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(6));
         for (var i = 0; i < count; i++)
         {
             context.FuelVouchers.Add(new FuelVoucher
@@ -245,8 +246,8 @@ public sealed class OutboxFastPathIntegrationTests : IClassFixture<TestDatabaseF
                 VoucherNumber = $"FASTPATH-{fuelTypeId}-{liters}-{Guid.NewGuid().ToString()[..8]}",
                 QrPayload = Guid.NewGuid().ToString(),
                 Status = VoucherStatus.Available,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
         }
 
@@ -255,8 +256,8 @@ public sealed class OutboxFastPathIntegrationTests : IClassFixture<TestDatabaseF
 
     private async Task<(Guid Id, DateTime CreatedAt)?> WaitForOutboxEventAsync(string eventType, TimeSpan timeout)
     {
-        var deadline = DateTime.UtcNow + timeout;
-        while (DateTime.UtcNow < deadline)
+        var deadline = TestClock.UtcNow + timeout;
+        while (TestClock.UtcNow < deadline)
         {
             using var scope = _fixture.Services.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -276,8 +277,8 @@ public sealed class OutboxFastPathIntegrationTests : IClassFixture<TestDatabaseF
 
     private async Task<DateTime?> WaitForProcessedAsync(Guid eventId, TimeSpan timeout)
     {
-        var deadline = DateTime.UtcNow + timeout;
-        while (DateTime.UtcNow < deadline)
+        var deadline = TestClock.UtcNow + timeout;
+        while (TestClock.UtcNow < deadline)
         {
             using var scope = _fixture.Services.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();

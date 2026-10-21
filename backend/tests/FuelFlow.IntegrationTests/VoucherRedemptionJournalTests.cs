@@ -7,6 +7,7 @@ using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -47,7 +48,7 @@ public sealed class VoucherRedemptionJournalTests : IClassFixture<TestDatabaseFi
         var userId = Guid.NewGuid();
         var voucherId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
-        var now = DateTime.UtcNow;
+        var now = TestClock.UtcNow;
 
         context.Users.Add(new User
         {
@@ -240,7 +241,7 @@ public sealed class VoucherRedemptionJournalTests : IClassFixture<TestDatabaseFi
         var userId = Guid.NewGuid();
         var voucherId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
-        var now = DateTime.UtcNow;
+        var now = TestClock.UtcNow;
 
         setup.Users.Add(new User
         {
