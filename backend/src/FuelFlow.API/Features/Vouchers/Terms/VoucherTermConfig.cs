@@ -9,8 +9,9 @@ namespace FuelFlow.Features.Vouchers.Terms;
 /// <param name="Enabled">Whether the term is offered at all.</param>
 /// <param name="DiscountPerLiterUah">
 /// Taken off the package price, in UAH per litre. A discount rather than an absolute price so the sell
-/// price keeps coming from the cost + margin engine and stays capped by the pump price — a term can
-/// never be configured into selling below cost, and the below-cost guard still applies on top.
+/// price keeps coming from the cost + margin engine. A generous term CAN take a sale under what we
+/// paid, and the below-cost guard is what refuses it — it judges the price the customer is actually
+/// charged, term discount included.
 /// </param>
 public sealed record VoucherTermTierConfig(VoucherRenewalTerm Term, bool Enabled, decimal DiscountPerLiterUah)
 {

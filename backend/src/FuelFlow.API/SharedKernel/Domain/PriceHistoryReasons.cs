@@ -24,7 +24,7 @@ public static class PriceHistoryReasons
     /// <summary>An operator typed the price in the admin panel, or an admin API called it directly.</summary>
     public const string Operator = "operator";
 
-    /// <summary>The OKKO pump-price import moved the ceiling on its own, unattended.</summary>
+    /// <summary>The OKKO pump-price import moved the column price on its own, unattended.</summary>
     public const string PumpImport = "pump-import";
 
     /// <summary>

@@ -239,7 +239,7 @@ public sealed class BrandFuelController : ControllerBase
     // them in step.
     var pool = DataKinds.ForPool(request.IsTestData.Value);
     // The cost and the margin are not nullable on the request: an operator who leaves them blank
-    // means zero, and the fuel records that. Only the ceiling and the margin percent are
+    // means zero, and the fuel records that. Only the column price and the margin percent are
     // "not stated", and those stay null rather than being invented as zero.
     fuel.SupplierPricePerLiter = request.SupplierPricePerLiter;
     if (request.MarginPercent is not null) fuel.MarginPercent = request.MarginPercent;
@@ -605,7 +605,7 @@ var BrandFuels = await _context.FuelTypes.Where(f => f.BrandId == id).ToListAsyn
         // package an order referenced was never the package in the catalog. Reusing a package that
         // stays keeps its id, so historical rows keep resolving to the thing they bought.
         //
-        // Pricing is unchanged: the cost, the pump ceiling and the margin are all the fuel's, and only
+        // Pricing is unchanged: the cost, the column price and the margin are all the fuel's, and only
         // the derived package total is rewritten on each volume.
         var wanted = nominals.Distinct().ToHashSet();
         var now = DateTime.UtcNow;

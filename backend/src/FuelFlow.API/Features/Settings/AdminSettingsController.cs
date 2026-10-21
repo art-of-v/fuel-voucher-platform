@@ -144,7 +144,7 @@ public sealed class AdminSettingsController : ControllerBase
         // and now they cannot.
         //
         // Materialised before the projection, because the customer price is not a column any more: it
-        // is `min(cost + profit, pump - minDiscount)` over four nullable columns, which SQL cannot
+        // is `cost + profit` over two nullable columns, which SQL cannot
         // express through the one function that owns it. The row count is one per fuel - 25 on
         // production - so this is a list, not a scan.
         var priced = (await _context.FuelTypes

@@ -55,13 +55,15 @@ public sealed record BrandFuelDto
 
     public decimal? MarginPercent { get; init; }
 
-    /// <summary>Computed customer price/liter = min(cost + profit, pump − minDiscount).
-    /// Server-authoritative; any value sent on write is ignored and recomputed. Null when the fuel's cost or
+    /// <summary>Computed customer price/liter = cost + profit.
+    /// Server-authoritative; any value sent on write is ignored and recomputed. The column price is a
+    /// reference, not a term of it, so this can sit above what the pump charges. Null when the fuel's cost or
     /// margin is not stated — there is no honest price to publish then.</summary>
     public decimal? FinalPricePerLiter { get; init; }
 
-    /// <summary>Pump/board price (колонка), UAH/liter - the ceiling. Null until an
-    /// operator records it; while null the price is the legacy cost + profit. Manual in MVP.</summary>
+    /// <summary>Pump/board price (колонка), UAH/liter - the reference the customer's saving is
+    /// measured against. Null until an operator records it; while null the price is the cost + profit.
+    /// Manual in MVP.</summary>
     public decimal? PumpPricePerLiter { get; init; }
 
     /// <summary>Actual customer discount vs the column price (UAH/liter), derived for display:
