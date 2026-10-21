@@ -17,37 +17,37 @@ internal sealed class LegalEntityConfiguration : IEntityTypeConfiguration<LegalE
 
         builder.Property(e => e.UserId)
             .HasColumnName("user_id")
-            .IsRequired();
+            .IsRequired().HasComment("The user who owns this company.");
 
         builder.Property(e => e.Name)
             .HasColumnName("name")
             .HasMaxLength(200)
-            .IsRequired();
+            .IsRequired().HasComment("The company's name.");
 
         builder.Property(e => e.Edrpou)
             .HasColumnName("edrpou")
             .HasMaxLength(20)
-            .IsRequired();
+            .IsRequired().HasComment("The EDDRPOU - the state registry number that identifies the company.");
 
         builder.Property(e => e.VatNumber)
             .HasColumnName("vat_number")
-            .HasMaxLength(20);
+            .HasMaxLength(20).HasComment("The VAT number, if the company is a VAT payer. NULL is a real answer.");
 
         builder.Property(e => e.Address)
             .HasColumnName("address")
-            .HasMaxLength(500);
+            .HasMaxLength(500).HasComment("The company's address.");
 
         builder.Property(e => e.DirectorName)
             .HasColumnName("director_name")
-            .HasMaxLength(200);
+            .HasMaxLength(200).HasComment("The director's name, as the documents name them.");
 
         builder.Property(e => e.Phone)
             .HasColumnName("phone")
-            .HasMaxLength(20);
+            .HasMaxLength(20).HasComment("The contact phone.");
 
         builder.Property(e => e.Email)
             .HasColumnName("email")
-            .HasMaxLength(200);
+            .HasMaxLength(200).HasComment("The contact email.");
 
         // The default used to be '-infinity', and it was not chosen: it is what Npgsql writes for
         // DateTime.MinValue, which is what EF's convention put into the migrations that created this
@@ -62,7 +62,7 @@ internal sealed class LegalEntityConfiguration : IEntityTypeConfiguration<LegalE
             .HasColumnName("created_at_utc")
             .HasDefaultValueSql("now()")
             .ValueGeneratedNever()
-            .IsRequired();
+            .IsRequired().HasComment("When the row was written.");
 
         // The default used to be '-infinity', and it was not chosen: it is what Npgsql writes for
         // DateTime.MinValue, which is what EF's convention put into the migrations that created this
@@ -77,7 +77,7 @@ internal sealed class LegalEntityConfiguration : IEntityTypeConfiguration<LegalE
             .HasColumnName("updated_at_utc")
             .HasDefaultValueSql("now()")
             .ValueGeneratedNever()
-            .IsRequired();
+            .IsRequired().HasComment("When it was last changed.");
 
         builder.HasOne(e => e.User)
             .WithMany()

@@ -532,53 +532,63 @@ namespace FuelFlow.API.Migrations
                     b.Property<string>("Address")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
-                        .HasColumnName("address");
+                        .HasColumnName("address")
+                        .HasComment("The company's address.");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("now()")
+                        .HasComment("When the row was written.");
 
                     b.Property<string>("DirectorName")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
-                        .HasColumnName("director_name");
+                        .HasColumnName("director_name")
+                        .HasComment("The director's name, as the documents name them.");
 
                     b.Property<string>("Edrpou")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
-                        .HasColumnName("edrpou");
+                        .HasColumnName("edrpou")
+                        .HasComment("The EDDRPOU - the state registry number that identifies the company.");
 
                     b.Property<string>("Email")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
-                        .HasColumnName("email");
+                        .HasColumnName("email")
+                        .HasComment("The contact email.");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
-                        .HasColumnName("name");
+                        .HasColumnName("name")
+                        .HasComment("The company's name.");
 
                     b.Property<string>("Phone")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
-                        .HasColumnName("phone");
+                        .HasColumnName("phone")
+                        .HasComment("The contact phone.");
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at_utc")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("now()")
+                        .HasComment("When it was last changed.");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid")
-                        .HasColumnName("user_id");
+                        .HasColumnName("user_id")
+                        .HasComment("The user who owns this company.");
 
                     b.Property<string>("VatNumber")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
-                        .HasColumnName("vat_number");
+                        .HasColumnName("vat_number")
+                        .HasComment("The VAT number, if the company is a VAT payer. NULL is a real answer.");
 
                     b.HasKey("Id");
 
@@ -918,33 +928,39 @@ namespace FuelFlow.API.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
-                        .HasColumnName("account_ref");
+                        .HasColumnName("account_ref")
+                        .HasComment("The account number at the bank.");
 
                     b.Property<string>("BankCode")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
-                        .HasColumnName("bank_code");
+                        .HasColumnName("bank_code")
+                        .HasComment("The bank's own code, as the bank writes it. Together with the account number it identifies theaccount, and the pair is unique.");
 
                     b.Property<string>("Currency")
                         .IsRequired()
                         .HasMaxLength(3)
                         .HasColumnType("character varying(3)")
-                        .HasColumnName("currency");
+                        .HasColumnName("currency")
+                        .HasComment("The currency of the account. UAH only - the database says so, because a second currency herewould be a second money inside one ledger.");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(true)
-                        .HasColumnName("is_active");
+                        .HasColumnName("is_active")
+                        .HasComment("Whether the account may still be used. A closed account stays in the table, because a fiscaldocument printed in the past still names it.");
 
                     b.Property<bool>("IsDefault")
                         .HasColumnType("boolean")
-                        .HasColumnName("is_default");
+                        .HasColumnName("is_default")
+                        .HasComment("Whether this is the account to use when no other is named. At most one per entity, and thedatabase says so too.");
 
                     b.Property<Guid>("OperatorLegalEntityId")
                         .HasColumnType("uuid")
-                        .HasColumnName("operator_legal_entity_id");
+                        .HasColumnName("operator_legal_entity_id")
+                        .HasComment("The operator entity that owns this account. An account belongs to one issuer, and an issuer'sfiscal documents print it.");
 
                     b.HasKey("Id");
 
@@ -1055,13 +1071,15 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<long>("LastValue")
                         .HasColumnType("bigint")
-                        .HasColumnName("last_value");
+                        .HasColumnName("last_value")
+                        .HasComment("The last number handed out. Starts at 0, so the first call returns 1.");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)")
-                        .HasColumnName("name");
+                        .HasColumnName("name")
+                        .HasComment("The identity of the sequence, e.g. journal:<period id>. Unique - two rows sharing it are twocounters racing for the same numbers, which is what this table exists to prevent.");
 
                     b.HasKey("Id");
 
@@ -1303,25 +1321,29 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<Guid>("AccountId")
                         .HasColumnType("uuid")
-                        .HasColumnName("account_id");
+                        .HasColumnName("account_id")
+                        .HasComment("The account the fact is posted to. One account per side per event, which is what makes themapping total rather than a preference.");
 
                     b.Property<string>("Side")
                         .IsRequired()
                         .HasMaxLength(6)
                         .HasColumnType("character varying(6)")
-                        .HasColumnName("side");
+                        .HasColumnName("side")
+                        .HasComment("Whether the fact debits or credits this account. A rule states one side; the other side is asecond rule, and the two together are what balance.");
 
                     b.Property<string>("SourceEvent")
                         .IsRequired()
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)")
-                        .HasColumnName("source_event");
+                        .HasColumnName("source_event")
+                        .HasComment("The domain event this rule answers to, e.g. order.fulfilled. It is the key the mapping hangson - a business fact without a rule is a fact that never reaches the books.");
 
                     b.Property<string>("SourceType")
                         .IsRequired()
                         .HasMaxLength(24)
                         .HasColumnType("character varying(24)")
-                        .HasColumnName("source_type");
+                        .HasColumnName("source_type")
+                        .HasComment("What kind of fact this rule maps: a payment, a refund, a fulfilment. The rule is matched onthis together with the event below.");
 
                     b.HasKey("Id");
 
@@ -1346,18 +1368,19 @@ namespace FuelFlow.API.Migrations
                 {
                     b.Property<Guid>("PartyId")
                         .HasColumnType("uuid")
-                        .HasColumnName("party_id");
+                        .HasColumnName("party_id")
+                        .HasComment("The party these details belong to. A natural person IS a party: the party is the person, andthis row is what we know about them.");
 
                     b.Property<DateOnly?>("Birthdate")
                         .HasColumnType("date")
                         .HasColumnName("birthdate")
-                        .HasComment("The person's date of birth, when they gave it.");
+                        .HasComment("The date of birth, if we were told it. Nullable - nobody is required to give it, and a guesseddate is worse than none.");
 
                     b.Property<string>("TaxId")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("tax_id")
-                        .HasComment("The person's tax id (РНОКПП), when they gave it. A company cannot be invoiced withoutone, which is why a natural person without one is a gap in the data and not a defect inthe column.");
+                        .HasComment("IПН - the personal tax number. Nullable: most users never provide one, and a guessed tax idis worse than none.");
 
                     b.HasKey("PartyId");
 
@@ -1378,55 +1401,65 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
+                        .HasColumnName("created_at_utc")
+                        .HasComment("When the row was written.");
 
                     b.Property<string>("Edrpou")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
-                        .HasColumnName("edrpou");
+                        .HasColumnName("edrpou")
+                        .HasComment("The EDDRPOU - the state registry number that identifies the company. It is the key, and thedatabase checks its shape.");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(false)
-                        .HasColumnName("is_active");
+                        .HasColumnName("is_active")
+                        .HasComment("Whether fiscal documents may name this entity as their issuer. Seeded false; the row becomesusable only once someone confirms its EDDRPOU and VAT number are real.");
 
                     b.Property<string>("LegalForm")
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)")
-                        .HasColumnName("legal_form");
+                        .HasColumnName("legal_form")
+                        .HasComment("The legal form, e.g. TOV. Free text here, but a fiscal document must print one.");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
-                        .HasColumnName("name");
+                        .HasColumnName("name")
+                        .HasComment("The company's name as it appears on its own documents.");
 
                     b.Property<string>("RegisteredAddress")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
-                        .HasColumnName("registered_address");
+                        .HasColumnName("registered_address")
+                        .HasComment("The legal address, as the registry has it. Not the address for delivery.");
 
                     b.Property<string>("Rnkrr")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
-                        .HasColumnName("rnkrr");
+                        .HasColumnName("rnkrr")
+                        .HasComment("The RNC RR - the record number in the unified state register - when it differs from theEDDRPOU. A sole trader has no EDDRPOU but does have an RNC RR.");
 
                     b.Property<string>("TaxRegime")
                         .IsRequired()
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)")
-                        .HasColumnName("tax_regime");
+                        .HasColumnName("tax_regime")
+                        .HasComment("Which tax regime the company is on: VAT or simplified. The document that follows from this isa different document.");
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
+                        .HasColumnName("updated_at_utc")
+                        .HasComment("When it was last changed.");
 
                     b.Property<string>("VatNumber")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
-                        .HasColumnName("vat_number");
+                        .HasColumnName("vat_number")
+                        .HasComment("The VAT number, if the company is a VAT payer. NULL is a real answer - most small companiesare not.");
 
                     b.HasKey("Id");
 
@@ -2443,54 +2476,66 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<Guid>("ActingUserId")
                         .HasColumnType("uuid")
-                        .HasColumnName("acting_user_id");
+                        .HasColumnName("acting_user_id")
+                        .HasComment("The admin who recorded the exchange.");
 
                     b.Property<string>("ActingUserName")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
-                        .HasColumnName("acting_user_name");
+                        .HasColumnName("acting_user_name")
+                        .HasComment("The admin's display name at the time, for the audit. The name is frozen, so it still readsright after the person is renamed or leaves.");
 
                     b.Property<string>("Brand")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
-                        .HasColumnName("brand");
+                        .HasColumnName("brand")
+                        .HasComment("The brand of the retired voucher (okko/wog/...), denormalized for audit.");
 
                     b.Property<Guid>("BrandId")
                         .HasColumnType("uuid")
-                        .HasColumnName("brand_id");
+                        .HasColumnName("brand_id")
+                        .HasComment("The brand's id - the key the text above is a copy of. The composite foreign key(fuel_type_id, brand_id) -> fuel_types(id, brand_id) is what refuses a row whose brand isnot its fuel's brand.");
 
                     b.Property<decimal?>("CostPerLiterApplied")
                         .HasColumnType("numeric(10,4)")
-                        .HasColumnName("cost_per_liter_applied");
+                        .HasColumnName("cost_per_liter_applied")
+                        .HasComment("The cost per litre set on the new fuel batch for this exchange (the old blended cost plus thesurcharge per litre), when there is one.");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
+                        .HasColumnName("created_at_utc")
+                        .HasComment("When the exchange was recorded.");
 
                     b.Property<Guid>("ExchangeBatchId")
                         .HasColumnType("uuid")
-                        .HasColumnName("exchange_batch_id");
+                        .HasColumnName("exchange_batch_id")
+                        .HasComment("Groups every old voucher retired in one confirm action. The batch's lifecycle lives inmovement_batches, which this points at.");
 
                     b.Property<Guid>("FuelTypeId")
                         .HasColumnType("uuid")
-                        .HasColumnName("fuel_type_id");
+                        .HasColumnName("fuel_type_id")
+                        .HasComment("The fuel of the retired voucher, and of its paired replacement - the same bucket.");
 
                     b.Property<Guid?>("NewVoucherId")
                         .HasColumnType("uuid")
-                        .HasColumnName("new_voucher_id");
+                        .HasColumnName("new_voucher_id")
+                        .HasComment("The new stock voucher this old one was replaced by, or NULL when the old voucher was notpaired - more old than new in its bucket.");
 
                     b.Property<Guid>("OldVoucherId")
                         .HasColumnType("uuid")
-                        .HasColumnName("old_voucher_id");
+                        .HasColumnName("old_voucher_id")
+                        .HasComment("The retired stock voucher.");
 
                     b.Property<Guid>("SupplierId")
                         .HasColumnType("uuid")
-                        .HasColumnName("supplier_id");
+                        .HasColumnName("supplier_id")
+                        .HasComment("The supplier the old vouchers were bought from and the new ones were obtained from. Oneexchange involves exactly one supplier, so every row of a batch carries the same value - butit is recorded per row because this table is also read one voucher at a time during supplierreconciliation, where the row alone has to answer 'who do we settle with for this voucher'.");
 
                     b.Property<decimal>("SurchargeUah")
                         .HasColumnType("numeric(10,2)")
-                        .HasColumnName("surcharge_uah");
+                        .HasColumnName("surcharge_uah")
+                        .HasComment("This row's OWN share of the batch surcharge - the brand charge spread pro-rata over thispair's litres, NOT the batch total repeated. Do not read one row and call it the batchcharge: a four-voucher exchange would report a quarter of what was actually paid. Sum therows of an ExchangeBatchId.");
 
                     b.Property<uint>("xmin")
                         .IsConcurrencyToken()
@@ -3052,47 +3097,57 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime?>("CompletedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("completed_at_utc");
+                        .HasColumnName("completed_at_utc")
+                        .HasComment("When the import finished - successfully or not. NULL while it is still running, and thedatabase ties this to the status below.");
 
                     b.Property<int>("DuplicateCount")
                         .HasColumnType("integer")
-                        .HasColumnName("duplicate_count");
+                        .HasColumnName("duplicate_count")
+                        .HasComment("How many rows were already there - the same voucher seen twice. Not an error: a supplier'sfile often overlaps the previous one.");
 
                     b.Property<int>("FailedCount")
                         .HasColumnType("integer")
-                        .HasColumnName("failed_count");
+                        .HasColumnName("failed_count")
+                        .HasComment("How many rows could not be read at all.");
 
                     b.Property<string>("FileName")
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
-                        .HasColumnName("file_name");
+                        .HasColumnName("file_name")
+                        .HasComment("The file as it arrived - the name the operator's machine gave it. What the operatorrecognises, not a key.");
 
                     b.Property<int>("ImportedCount")
                         .HasColumnType("integer")
-                        .HasColumnName("imported_count");
+                        .HasColumnName("imported_count")
+                        .HasComment("How many vouchers the import actually created.");
 
                     b.Property<int>("PageCount")
                         .HasColumnType("integer")
-                        .HasColumnName("page_count");
+                        .HasColumnName("page_count")
+                        .HasComment("How many pages the file had, as the importer counted them. The importer's own count, not thereader's.");
 
                     b.Property<DateTime>("StartedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("started_at_utc");
+                        .HasColumnName("started_at_utc")
+                        .HasComment("When the import began.");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)")
-                        .HasColumnName("status");
+                        .HasColumnName("status")
+                        .HasComment("Started, Completed or Failed - the three values the importer writes. This status gates thewhole intake, so it is pinned by a CHECK rather than left as free text.");
 
                     b.Property<int>("VerificationFailedCount")
                         .HasColumnType("integer")
-                        .HasColumnName("verification_failed_count");
+                        .HasColumnName("verification_failed_count")
+                        .HasComment("How many rows were read but did not verify - the code does not match the fuel, the litres donot match the code.");
 
                     b.Property<int>("VerifiedWithWarningsCount")
                         .HasColumnType("integer")
-                        .HasColumnName("verified_with_warnings_count");
+                        .HasColumnName("verified_with_warnings_count")
+                        .HasComment("How many rows verified but with a warning - read and checked, with something odd that did notstop them.");
 
                     b.HasKey("Id");
 

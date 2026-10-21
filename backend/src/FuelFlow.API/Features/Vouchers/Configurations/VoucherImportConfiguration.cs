@@ -18,43 +18,50 @@ internal sealed class VoucherImportConfiguration : IEntityTypeConfiguration<Vouc
         builder.Property(e => e.FileName)
             .HasColumnName("file_name")
             .HasMaxLength(500)
-            .IsRequired();
+            .IsRequired().HasComment("The file as it arrived - the name the operator's machine gave it. What the operator" +
+                    "recognises, not a key.");
 
         builder.Property(e => e.PageCount)
             .HasColumnName("page_count")
-            .IsRequired();
+            .IsRequired().HasComment("How many pages the file had, as the importer counted them. The importer's own count, not the" +
+                    "reader's.");
 
         builder.Property(e => e.StartedAtUtc)
             .HasColumnName("started_at_utc")
-            .IsRequired();
+            .IsRequired().HasComment("When the import began.");
 
         builder.Property(e => e.CompletedAtUtc)
-            .HasColumnName("completed_at_utc");
+            .HasColumnName("completed_at_utc").HasComment("When the import finished - successfully or not. NULL while it is still running, and the" +
+                    "database ties this to the status below.");
 
         builder.Property(e => e.Status)
             .HasColumnName("status")
             .HasMaxLength(32)
-            .IsRequired();
+            .IsRequired().HasComment("Started, Completed or Failed - the three values the importer writes. This status gates the" +
+                    "whole intake, so it is pinned by a CHECK rather than left as free text.");
 
         builder.Property(e => e.ImportedCount)
             .HasColumnName("imported_count")
-            .IsRequired();
+            .IsRequired().HasComment("How many vouchers the import actually created.");
 
         builder.Property(e => e.DuplicateCount)
             .HasColumnName("duplicate_count")
-            .IsRequired();
+            .IsRequired().HasComment("How many rows were already there - the same voucher seen twice. Not an error: a supplier's" +
+                    "file often overlaps the previous one.");
 
         builder.Property(e => e.FailedCount)
             .HasColumnName("failed_count")
-            .IsRequired();
+            .IsRequired().HasComment("How many rows could not be read at all.");
 
         builder.Property(e => e.VerificationFailedCount)
             .HasColumnName("verification_failed_count")
-            .IsRequired();
+            .IsRequired().HasComment("How many rows were read but did not verify - the code does not match the fuel, the litres do" +
+                    "not match the code.");
 
         builder.Property(e => e.VerifiedWithWarningsCount)
             .HasColumnName("verified_with_warnings_count")
-            .IsRequired();
+            .IsRequired().HasComment("How many rows verified but with a warning - read and checked, with something odd that did not" +
+                    "stop them.");
 
         builder.HasIndex(e => e.StartedAtUtc)
             .IsDescending();
