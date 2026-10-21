@@ -42,9 +42,12 @@ public sealed class FuelTypeEntity
     /// an external party can state: the brand's price sheet names every fuel it sells, in the brand's
     /// own spelling, and that is what an import of the catalogue matches on. It is not a name - "А-95"
     /// and "A-95" are the same fuel and two different strings, which no index on
-    /// <see cref="Name"/> can reconcile. The QR product codes the voucher side uses (9018, 45290)
-    /// are a <em>second</em> crosswalk to the same grades and are deliberately not stored here; one
-    /// grade has several product codes and several codes can name one grade.
+    /// <see cref="Name"/> can reconcile: the name is folded onto one spelling by
+    /// <see cref="FuelGrade"/>, and it is the folded name that <c>fuel_types.grade_key</c> holds and
+    /// that <c>ux_fuel_types_brand_grade_key</c> refuses a duplicate of. The QR product codes the
+    /// voucher side uses (9018, 45290) are a <em>second</em> crosswalk to the same grades and are
+    /// deliberately not stored here; one grade has several product codes and several codes can name
+    /// one grade.
     ///
     /// <para>
     /// Planning #349 settled on 2026-10-19 that <see cref="Id"/> is a generated uuid and carries no

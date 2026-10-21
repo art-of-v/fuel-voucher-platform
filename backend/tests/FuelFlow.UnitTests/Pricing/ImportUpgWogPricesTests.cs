@@ -179,6 +179,35 @@ public sealed class ImportUpgWogPricesTests : IDisposable
     }
 
     [Fact]
+    public async Task AGradeWeAlreadySellUnderOurOwnName_IsTheRowThatAlreadyExists()
+    {
+        // The operator typed "upg95" by hand and it carries no code; UPG publishes "upg95". That is
+        // one fuel, and the price belongs to the row that is already there - a second row would be a
+        // second price on the shelf and a place a voucher can be priced against.
+        SeedFuel("upg-95-typed", BrandIds.Upg, "upg95", null, cost: 86.90m, profit: 5m, pump: 91.90m);
+        await _context.SaveChangesAsync();
+
+        var result = await Handler().HandleAsync(
+            new ImportUpgWogPricesCommand(Sheet(("upg95", 91.90m)), "upg", DryRun: false), Guid.Empty, null);
+
+        _context.ChangeTracker.Clear();
+
+        result.Created.Should().BeEmpty("the grade is one row, and the row is already there");
+        result.Held.Should().ContainSingle("the operator is told which row the grade resolved to");
+        result.Held[0].FuelTypeId.Should().Be(ToUuid("upg-95-typed"));
+        result.Held[0].OurFuelName.Should().Be("upg95");
+        result.Held[0].Code.Should().Be("upg95");
+
+        (await _context.FuelTypes.CountAsync(f => f.BrandId == BrandIds.Upg)).Should().Be(1,
+            "the second spelling of a grade is resolved to the row that already exists");
+
+        var fuel = await _context.FuelTypes.SingleAsync(f => f.Id == ToUuid("upg-95-typed"));
+        fuel.BrandFuelCode.Should().Be("upg95",
+            "the sheet is the only thing that can say which grade a fuel an operator typed is");
+        fuel.PumpPricePerLiter.Should().Be(91.90m);
+    }
+
+    [Fact]
     public async Task AnExistingFuelKeepsItsNameAndMargin()
     {
         var fuel = SeedFuel("wog-dp", BrandIds.Wog, "ДП Євро5", "ДП Євро5", cost: 93.80m, profit: 5m, pump: 103.50m);

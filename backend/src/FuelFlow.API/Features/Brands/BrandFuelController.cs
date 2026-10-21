@@ -120,29 +120,57 @@ public sealed class BrandFuelController : ControllerBase
         var Brand = await _context.Brands.FirstOrDefaultAsync(s => s.Id == id, ct);
         if (Brand is null) return NotFound();
 
-        // One fuel type per name per Brand, refused rather than accepted as a second row. This fuel
+        // One fuel type per grade per Brand, refused rather than accepted as a second row. This fuel
         // id is generated here, so nothing about the write collides on a duplicate the way it did when
         // the id was the brand-encoded 'okko-95' - and a twin is not a cosmetic duplicate: it becomes a
         // second row in the catalogue, the storefront lists one fuel at two prices, and the voucher importer resolves
         // the fuel by name with FirstOrDefault (OkkoFuelClassifier/WogFuelClassifier), so the twin
         // without the imported pump price is the one a real voucher can land on. The database refuses
-        // the same thing with ux_fuel_types_Brand_name; this says which fuel already owns the name.
-        var duplicate = await _context.FuelTypes
-            .Where(f => f.BrandId == id && f.Name == request.Name)
-            .Select(f => f.Id)
-            .FirstOrDefaultAsync(ct);
+        // the same thing with ux_fuel_types_brand_name; this says which fuel already owns the name.
+        //
+        // What the brand already carries is read once, by name, because there are two questions to
+        // ask of it: the exact duplicate ("А-95" is already there) and the near-duplicate ("A-95" is
+        // the same grade as "А-95"). The second is the one an index on the name cannot answer, and
+        // it is answered here by the grade key - the same rule the database's
+        // ux_fuel_types_brand_grade_key enforces, so the operator is told which row won instead of
+        // meeting a 23505 that names neither fuel.
+        var carried = await _context.FuelTypes
+            .Where(f => f.BrandId == id)
+            .Select(f => new { f.Id, f.Name })
+            .ToListAsync(ct);
 
-        if (duplicate != Guid.Empty)
+        var duplicate = carried.FirstOrDefault(f => f.Name == request.Name);
+        if (duplicate is not null)
         {
             return Conflict(new
             {
                 message = $"'{request.Name}' already exists at {Brand.Name}. Price it with PUT "
-                          + $"fuels/{duplicate} instead of adding it twice: a second row for the same "
+                          + $"fuels/{duplicate.Id} instead of adding it twice: a second row for the same "
                           + "fuel is a second row in the catalogue, and a voucher can then be priced against whichever "
                           + "of the two the importer happens to pick.",
-                fuelTypeId = duplicate,
+                fuelTypeId = duplicate.Id,
                 field = nameof(request.Name)
             });
+        }
+
+        // The same grade, spelled another way: "А-95" and "A-95" are one fuel, and the operator is
+        // told which of the two the catalogue already has.
+        var gradeKey = FuelGrade.Key(request.Name);
+        if (gradeKey is not null)
+        {
+            var twin = carried.FirstOrDefault(f => FuelGrade.Key(f.Name) == gradeKey);
+            if (twin is not null)
+            {
+                return Conflict(new
+                {
+                    message = $"'{request.Name}' is the same grade as '{twin.Name}', which already exists at "
+                              + $"{Brand.Name}. Price it with PUT fuels/{twin.Id} instead of adding it twice: "
+                              + "one grade is one row, and a second row for it is a second row in the catalogue, "
+                              + "which the storefront lists at a second price and a voucher can be priced against.",
+                    fuelTypeId = twin.Id,
+                    field = nameof(request.Name)
+                });
+            }
         }
 
         // The same question asked of the code rather than the name, and refused in the same shape.

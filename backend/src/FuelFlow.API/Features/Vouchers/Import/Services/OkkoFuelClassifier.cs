@@ -137,11 +137,17 @@ public static class OkkoFuelClassifier
         // "ГАЗ" and its Latin spellings. "SPBT" is the brand's own code for LPG (сжижений пропан),
         // and "LPG" is how an operator writes it; neither contains "газ", so without them a fuel
         // named after the code classifies as no grade at all.
+        //
+        // "Пропан" is here for the same reason and is not a spelling of the others: it is the name
+        // THIS catalogue gives the gas grade (see CanonicalName), so without it the fuel the
+        // catalogue creates is a fuel the voucher importer cannot read - a gas voucher would
+        // resolve to no fuel at all and be refused, every time.
         if (lower.Contains("газ") || lower.Contains("gas") || lower.Contains("лпг")
-            || lower.Contains("lpg") || lower.Contains("spbt"))
+            || lower.Contains("lpg") || lower.Contains("spbt")
+            || lower.Contains("пропан") || lower.Contains("propan"))
             return OkkoFuelCategory.Gas;
 
-        var hasPulls = lower.Contains("pulls") || lower.Contains("пулс");
+        var hasPulls = lower.Contains("pulls") || lower.Contains("пулс") || lower.Contains("пульс");
         var hasDiesel = DieselToken.IsMatch(lower) || lower.Contains("дизель") || lower.Contains("diesel");
         var has95 = strict95 ? Petrol95InText.IsMatch(lower) : lower.Contains("95");
 

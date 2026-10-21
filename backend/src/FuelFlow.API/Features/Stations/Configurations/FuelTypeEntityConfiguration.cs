@@ -182,6 +182,35 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
             .HasFilter("brand_fuel_code IS NOT NULL AND NOT is_deleted")
             .HasDatabaseName("ux_fuel_types_brand_brand_fuel_code");
 
+        // And the same guarantee for the name, when the name is all a fuel has to say.
+        //
+        // "А-95" and "A-95" are one grade in two spellings, and the index on the name cannot tell
+        // them apart - it is on the name, and the name is what an operator typed in whatever
+        // language and with whatever punctuation. The grade KEY is the name folded onto one
+        // spelling ("a95" for all three), computed by the database from the same rule the
+        // application uses (SharedKernel.Domain.FuelGrade), so a second spelling of a grade we
+        // already sell is refused here rather than becoming a second row in the catalogue - a row
+        // the storefront lists at a second price and a voucher can be priced against.
+        //
+        // It is a GENERATED column, not a column the application writes, for one reason: a column
+        // an application can forget to write is a column the index does not cover. The database
+        // computes it from the name, so every row has one whatever wrote the row.
+        //
+        // A name that says no grade at all (a name of punctuation) has no key, and a row with no key
+        // is excluded from the index - the same shape as a fuel with no brand code.
+        builder.Property<string>("GradeKey")
+            .HasColumnName("grade_key")
+            .HasComputedColumnSql("fuelflow_fuel_grade_key(name)", stored: true)
+            .HasComment(
+                "The grade's key: the name folded onto one spelling, so that 'А-95' and 'A-95' are one "
+                + "grade. Computed by the database from fuelflow_fuel_grade_key(name), the same rule "
+                + "SharedKernel.Domain.FuelGrade applies; NULL when the name says no grade at all.");
+
+        builder.HasIndex("BrandId", "GradeKey")
+            .IsUnique()
+            .HasFilter("NOT is_deleted")
+            .HasDatabaseName("ux_fuel_types_brand_grade_key");
+
         // The id is a generated uuid, not a natural key - it is 'okko-95' ONLY in the rows
         // `20260618224553_AddStationCatalog` seeded, which is every row a freshly migrated
         // database has and none of the 28 on production, where every fuel an operator added has

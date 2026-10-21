@@ -4192,6 +4192,13 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("discount_price")
                         .HasComment("What the customer pays per litre. NULL means it is not set: the grade is in the catalogue and nobody has priced it yet. A price of zero is a price, and a price of zero means the customer takes the fuel for nothing - so the unset state is NULL and never 0.");
 
+                    b.Property<string>("GradeKey")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("text")
+                        .HasColumnName("grade_key")
+                        .HasComputedColumnSql("fuelflow_fuel_grade_key(name)", true)
+                        .HasComment("The grade's key: the name folded onto one spelling, so that 'А-95' and 'A-95' are one grade. Computed by the database from fuelflow_fuel_grade_key(name), the same rule SharedKernel.Domain.FuelGrade applies; NULL when the name says no grade at all.");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
@@ -4247,6 +4254,11 @@ namespace FuelFlow.API.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_fuel_types_brand_brand_fuel_code")
                         .HasFilter("brand_fuel_code IS NOT NULL AND NOT is_deleted");
+
+                    b.HasIndex("BrandId", "GradeKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_fuel_types_brand_grade_key")
+                        .HasFilter("NOT is_deleted");
 
                     b.HasIndex("BrandId", "Name")
                         .IsUnique()
