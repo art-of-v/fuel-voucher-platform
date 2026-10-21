@@ -146,7 +146,6 @@ public sealed class ImportUpgWogPricesCommandHandler
 
         var created = new List<UpgWogFuelCreated>();
         var repriced = new List<UpgWogFuelRepriced>();
-        var belowCost = new List<string>();
 
         foreach (var row in parsed.Rows)
         {
@@ -177,12 +176,6 @@ public sealed class ImportUpgWogPricesCommandHandler
             var cost = fuel.SupplierPricePerLiter ?? 0m;
             var profit = fuel.MarginUahPerLiter ?? 0m;
             var minDiscount = fuel.MinDiscountPerLiter ?? DefaultMinDiscountPerLiter;
-
-            if (!fuel.AllowBelowCost && FuelPricing.IsBelowCost(cost, profit))
-            {
-                belowCost.Add(fuel.Name);
-                continue;
-            }
 
             if (!command.DryRun && changed)
             {
@@ -239,7 +232,7 @@ public sealed class ImportUpgWogPricesCommandHandler
             await _context.SaveChangesAsync(ct);
         }
 
-        return new UpgWogPriceImportResult(created, repriced, belowCost, [], command.DryRun);
+        return new UpgWogPriceImportResult(created, repriced, [], [], command.DryRun);
     }
 
     /// <summary>

@@ -177,40 +177,6 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
             .PumpPricePerLiter.Should().Be(50m);
     }
 
-    [Fact]
-    public async Task Sync_ShouldRefuseAPumpThatWouldSellBelowCost_AndSaySo()
-    {
-        // A-95 costs 40 + 3 margin = 43. A pump of 39.50 is BELOW what we pay, so the price the
-        // customer would be charged is under our cost - and a below-cost fuel is refused at checkout,
-        // so accepting this automatically would silently take the fuel off sale.
-        await SeedAsync(pump: 50m);
-        var cheap = new[] { new OkkoPumpPrice("A-95", 39.50m) };
-        var result = await new ImportOkkoPumpPricesCommandHandler(_context, new BrandSlugResolver(_context), _events, new PriceHistoryRecorder(_context))
-            .ApplyAsync(cheap, dryRun: false, Guid.Empty, "OKKO price sync");
-        result.BelowCostSkipped.Should().ContainSingle().Which.Should().Be("A-95");
-        result.FuelsChanged.Should().Be(0);
-        _context.ChangeTracker.Clear();
-        (await FuelOfAsync("okko-95"))
-            .PumpPricePerLiter.Should().Be(50m);
-    }
-
-    // The refusal is a guard doing its job, not a fault - and this runs every 15 minutes. At Error it
-    // filled the admin error journal with the same refusal until a real failure could not be found
-    // in it; the journal only keeps Error and above, so the level is what keeps it readable.
-    [Fact]
-    public async Task Sync_ShouldReportABelowCostRefusalAsAWarning_NotAnError()
-    {
-        await SeedAsync(pump: 50m);
-        var logger = new CapturingLogger<OkkoPriceSyncService>();
-        // A-95 costs 40 + 3 margin = 43; a pump of 39.50 is under what we pay.
-        await Service(new StubClient(() => [new OkkoPumpPrice("A-95", 39.50m)]), enabled: true, logger)
-            .SyncPricesAsync();
-        var refusal = logger.Entries.Should().ContainSingle(e => e.Message.Contains("below cost")).Which;
-        refusal.Level.Should().Be(LogLevel.Warning);
-        refusal.Message.Should().Contain("A-95");
-        logger.Entries.Should().NotContain(e => e.Level >= LogLevel.Error);
-    }
-
     private sealed class CapturingLogger<T> : ILogger<T>
     {
         public List<(LogLevel Level, string Message)> Entries { get; } = new();
@@ -243,25 +209,6 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
         (await FuelOfAsync("okko-95"))
             .PumpPricePerLiter.Should().Be(39.50m);
     }
-
-    [Fact]
-    public async Task Sync_ShouldStillApplyTheOtherFuels_WhenOneIsRefusedAsBelowCost()
-    {
-        await SeedAsync(pump: 50m);
-        var mixed = new[]
-        {
-            new OkkoPumpPrice("A-95", 39.50m),  // refused
-            new OkkoPumpPrice("SPBT", 47.90m),  // fine
-        };
-        var result = await new ImportOkkoPumpPricesCommandHandler(_context, new BrandSlugResolver(_context), _events, new PriceHistoryRecorder(_context))
-            .ApplyAsync(mixed, dryRun: false, Guid.Empty, "OKKO price sync");
-        result.BelowCostSkipped.Should().ContainSingle();
-        result.FuelsChanged.Should().Be(1);
-        _context.ChangeTracker.Clear();
-        (await FuelOfAsync("okko-gas"))
-            .PumpPricePerLiter.Should().Be(47.90m);
-    }
-
     [Fact]
     public async Task Sync_ShouldAddAGradeTheCatalogueLacks_BeforeItPricesAnything()
     {

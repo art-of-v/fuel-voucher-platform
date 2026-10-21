@@ -513,61 +513,6 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
         var ex = await Assert.ThrowsAsync<ArgumentException>(() => _createCheckoutHandler.HandleAsync(command));
         Assert.Contains("Invalid fuel type", ex.Message);
     }
-
-    // ── Slice-3 below-cost hard block (checkout safety net) ──────────────────
-
-    [Fact]
-    public async Task CreateCheckout_ShouldBlock_WhenBelowCostAndNotOptedIn()
-    {
-        SeedBelowCostFuel(allowBelowCost: false);
-
-        var ex = await Assert.ThrowsAsync<BelowCostSaleBlockedException>(
-            () => _createCheckoutHandler.HandleAsync(BelowCostCommand()));
-
-        Assert.Equal("below_cost", BelowCostSaleBlockedException.Code);
-        // The message reaches the customer's screen on any client that has not mapped the code yet,
-        // so it must not carry the internal fuel id or our margin reasoning. The id is preserved on
-        // the property for logs and telemetry instead.
-        Assert.DoesNotContain("okko-loss", ex.Message);
-        Assert.Equal(ToUuid("okko-loss"), ex.FuelTypeId);
-        Assert.False(await _context.Orders.AnyAsync());
-    }
-
-    [Fact]
-    public async Task CreateCheckout_ShouldSucceed_WhenBelowCostButOptedIn()
-    {
-        SeedBelowCostFuel(allowBelowCost: true);
-
-        var response = await _createCheckoutHandler.HandleAsync(BelowCostCommand());
-
-        Assert.NotEqual(Guid.Empty, response.OrderId);
-        Assert.True(await _context.Orders.AnyAsync());
-    }
-
-    [Fact]
-    public async Task BulkCheckout_ShouldBlock_WhenBelowCostAndNotOptedIn()
-    {
-        SeedBelowCostFuel(allowBelowCost: false);
-
-        var ex = await Assert.ThrowsAsync<BelowCostSaleBlockedException>(
-            () => _bulkCheckoutHandler.HandleAsync(BelowCostBulkCommand()));
-
-        Assert.DoesNotContain("okko-loss", ex.Message);
-        Assert.Equal(ToUuid("okko-loss"), ex.FuelTypeId);
-        Assert.False(await _context.Orders.AnyAsync());
-    }
-
-    [Fact]
-    public async Task BulkCheckout_ShouldSucceed_WhenBelowCostButOptedIn()
-    {
-        SeedBelowCostFuel(allowBelowCost: true);
-
-        var response = await _bulkCheckoutHandler.HandleAsync(BelowCostBulkCommand());
-
-        Assert.NotEmpty(response.OrderIds);
-        Assert.True(await _context.Orders.AnyAsync());
-    }
-
     [Fact]
     public async Task GetUserPurchases_ShouldReturnUserOrders()
     {

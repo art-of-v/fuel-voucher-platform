@@ -107,38 +107,6 @@ public sealed class PricingFormulaTests
         FuelPricing.FinalPerLiter(49m, 2m).Should().Be(51m);
     }
 
-    // --- FuelPricing.IsBelowCost -------------------------------------------
-
-    [Fact]
-    public void IsBelowCost_CeilingForcesPriceUnderCost_IsTrue()
-    {
-        // cost 50, cost-plus 52, but the column price is 49 → final 49 < 50.
-        FuelPricing.IsBelowCost(50m, 2m).Should().BeTrue();
-    }
-
-    [Fact]
-    public void IsBelowCost_PriceAtOrAboveCost_IsFalse()
-    {
-        // cost-plus 51 ≥ cost 49, no ceiling binding.
-        FuelPricing.IsBelowCost(49m, 2m).Should().BeFalse();
-        // final exactly equals cost is not "below".
-        FuelPricing.IsBelowCost(50m, 0m).Should().BeFalse();
-    }
-
-    [Fact]
-    public void IsBelowCost_NullPump_NeverBelow()
-    {
-        // No ceiling → final = cost + profit ≥ cost, so it can never dip under.
-        FuelPricing.IsBelowCost(49m, 2m).Should().BeFalse();
-    }
-
-    [Fact]
-    public void IsBelowCost_ZeroOrUnknownCost_IsFalse()
-    {
-        // With no supplier cost recorded there is nothing to sell below.
-        FuelPricing.IsBelowCost(0m, 2m).Should().BeFalse();
-    }
-
     // --- FuelPricing.OriginalPackagePrice ----------------------------------
 
     [Fact]
@@ -252,17 +220,17 @@ public void TryPackagePrice_WithKnobs_IsTheSameNumberTheThrowingFormReturns()
             Liters = 50m,
             SupplierPricePerLiter = 60m,             // per-litre cost
             MarginUahPerLiter = 7m,                 // cost-plus would be 67
-            PumpPricePerLiter = 55m,                // ceiling 55, under the 60 cost
+            PumpPricePerLiter = 92.90m,              // the column price is a reference, not a term
         };
 
         // What the customer is actually charged, per litre:
-        (ServerPricing.PackagePrice(pkg, 50m) / 50m).Should().BeLessThan(60m);
+        (ServerPricing.PackagePrice(pkg, 50m, 10m) / 50m).Should().BeLessThan(60m);
 
         // 2750 for 50 L against a cost of 60/litre is a 5 UAH/litre loss and is refused. Per litre
         // against per litre — the mistake this test has always covered was comparing the total to
         // the rate.
-        ServerPricing.IsBelowCost(pkg, 0m).Should().BeTrue();
-        ServerPricing.TryGetBelowCostVerdict(pkg, 0m)
+        ServerPricing.IsBelowCost(pkg, 10m).Should().BeTrue();
+        ServerPricing.TryGetBelowCostVerdict(pkg, 10m)
             .Should().Be(ServerPricing.BelowCostVerdict.BelowCost);
     }
 
@@ -288,12 +256,14 @@ public void TryPackagePrice_WithKnobs_IsTheSameNumberTheThrowingFormReturns()
             Liters = 10m,
             SupplierPricePerLiter = 50m,
             MarginUahPerLiter = 2m,
-            PumpPricePerLiter = 40m,   // ceiling 40 < cost 50
+            PumpPricePerLiter = 92.90m,
         };
 
-        ServerPricing.TryGetBelowCostVerdict(pkg, 0m)
+        // Our price is 52 a litre against a cost of 50; a 5 a litre term discount takes the
+        // charge to 47, and that is what the guard has to catch.
+        ServerPricing.TryGetBelowCostVerdict(pkg, 5m)
             .Should().Be(ServerPricing.BelowCostVerdict.BelowCost);
-        ServerPricing.IsBelowCost(pkg, 0m).Should().BeTrue();
+        ServerPricing.IsBelowCost(pkg, 5m).Should().BeTrue();
     }
 
     [Theory]

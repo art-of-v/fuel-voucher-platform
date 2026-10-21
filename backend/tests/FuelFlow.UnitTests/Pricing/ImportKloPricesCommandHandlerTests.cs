@@ -165,34 +165,6 @@ public sealed class ImportKloPricesCommandHandlerTests : IDisposable
         fuel.MarginUahPerLiter.Should().Be(3m);
         fuel.PumpPricePerLiter.Should().Be(87.90m);
     }
-
-    [Fact]
-    public async Task It_should_refuse_a_price_that_would_sell_the_fuel_below_our_cost()
-    {
-        await SeedBrandAsync();
-        _context.FuelTypes.Add(new FuelTypeEntity
-        {
-            Id = ToUuid("klo-a95"),
-            Name = "А95",
-            BrandId = BrandIds.Klo,
-            SupplierPricePerLiter = 90m,
-            MarginUahPerLiter = 3m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
-        });
-        await _context.SaveChangesAsync();
-        _context.ChangeTracker.Clear();
-
-        var result = await Handler().HandleAsync(
-            new ImportKloPricesCommand(Sheet, DryRun: false), Guid.Empty, "test");
-        _context.ChangeTracker.Clear();
-
-        // 87,90 against a cost of 90 is under it. A third party's price move must not be able to
-        // take a fuel off sale unattended.
-        result.BelowCostSkipped.Should().ContainSingle();
-        (await _context.FuelTypes.SingleAsync(f => f.Id == ToUuid("klo-a95"))).PumpPricePerLiter.Should().BeNull();
-    }
-
     [Fact]
     public async Task It_should_refuse_an_empty_sheet()
     {

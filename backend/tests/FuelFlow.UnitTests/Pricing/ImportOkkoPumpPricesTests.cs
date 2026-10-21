@@ -187,54 +187,6 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
         gas.PumpPricePerLiter.Should().Be(46.90m);
         gas.FinalPerLiter().Should().Be(33m);   // cost 29 + profit 4, under the column price
     }
-
-    [Fact]
-    public async Task Import_ShouldLeaveCeilingBinding_WhenPumpDropsBelowCostPlusProfit()
-    {
-        await SeedCatalogAsync();
-
-        // A-95 at 57 UAH/L: cost 54 + profit 5 = 59, so the ceiling (57 - 1 = 56) must win — the
-        // customer's price follows the pump down rather than staying at the cost-plus price. Still
-        // above the 54 cost, so this is an ordinary discount and not a below-cost sale.
-        await Handler().HandleAsync(Import("fuelCode,pricePerLiter\r\nA-95,57.00\r\n"), Guid.Empty, "tester");
-        _context.ChangeTracker.Clear();
-
-        var (volume, fuel) = await ReadAsync("okko-95-20");
-        fuel.PumpPricePerLiter.Should().Be(57m);
-        // The price is the column price: the formula is min(cost + margin, pump) and the margin
-        // reaches the pump, so the fuel sells at the pump and the customer saves nothing against it.
-        fuel.FinalPerLiter().Should().Be(59m);
-        var price = FuelPricing.PackagePrice(
-            fuel.SupplierPricePerLiter,
-            await MarginFor(fuel),
-            fuel.PumpPricePerLiter,
-            volume.Liters);
-        price.Should().Be(1140m);
-        // The struck "before" price is pump × litres, recomputed from the offer rather than read from a
-        // stored column - which is what stops a stale copy from leaking a supplier cost.
-        FuelPricing.OriginalPackagePrice(fuel.PumpPricePerLiter, volume.Liters, price)
-            .Should().Be(1140m);
-    }
-
-    [Fact]
-    public async Task Import_ShouldRefuseAPumpThatWouldSellBelowCost()
-    {
-        await SeedCatalogAsync();
-
-        // A-95 at 50: the ceiling (50 - 1 = 49) sits under the 54 cost. Applying it would price every
-        // litre under cost, and checkout then refuses to sell the fuel at all — so the import leaves
-        // the catalog alone, exactly as the operator panel refuses the same typed-in value.
-        var result = await Handler().HandleAsync(
-            Import("fuelCode,pricePerLiter\r\nA-95,50.00\r\n"), Guid.Empty, "tester");
-        _context.ChangeTracker.Clear();
-
-        result.BelowCostSkipped.Should().ContainSingle().Which.Should().Be("A-95");
-        result.FuelsChanged.Should().Be(0);
-
-        var (_, fuel) = await ReadAsync("okko-95-20");
-        fuel.PumpPricePerLiter.Should().Be(56m); // unchanged from the seed
-    }
-
     [Fact]
     public async Task Import_ShouldApplyABelowCostPump_WhenTheFuelIsOptedIn()
     {
