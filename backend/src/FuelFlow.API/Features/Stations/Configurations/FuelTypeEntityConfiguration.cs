@@ -65,7 +65,10 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
         // now the single source of truth for it.
         builder.Property(e => e.MarginUahPerLiter)
             .HasColumnName("margin_uah_per_liter")
-            .HasColumnType("numeric(10,4)");
+            .HasColumnType("numeric(10,4)")
+            .HasComment("What we add per litre on top of what we pay. NULL means the margin is not "
+                + "stated, and a fuel with no stated cost OR no stated margin has no price of its "
+                + "own: it is shown at the column price, marked 'not in stock', and it cannot be sold.");
 
         // The four pricing knobs, moved off fuel_offers on 2026-10-19. Same naming discipline as
         // the margin above: one column, one spelling - and the same numeric(10,4) they had on the
@@ -74,19 +77,29 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
         // judgement call rather than an equality.
         builder.Property(e => e.SupplierPricePerLiter)
             .HasColumnName("supplier_price_per_liter")
-            .HasColumnType("numeric(10,4)");
+            .HasColumnType("numeric(10,4)")
+            .HasComment("What WE pay the network per litre. NULL means the cost is not stated: the "
+                + "fuel is unpriced, and the below-cost guard has nothing to compare against.");
 
         builder.Property(e => e.PumpPricePerLiter)
             .HasColumnName("pump_price_per_liter")
-            .HasColumnType("numeric(10,4)");
+            .HasColumnType("numeric(10,4)")
+            .HasComment("The COLUMN price - what the driver pays at the pump. It is the ceiling: "
+                + "our price is never above it, and it is the price the customer sees struck "
+                + "through when our price is below it.");
 
         builder.Property(e => e.MinDiscountPerLiter)
             .HasColumnName("min_discount_per_liter")
-            .HasColumnType("numeric(10,4)");
+            .HasColumnType("numeric(10,4)")
+            .HasComment("The smallest discount we give the customer per litre, so that our price "
+                + "always sits below the column price - we are never dearer than the pump.");
 
         builder.Property(e => e.MarginPercent)
             .HasColumnName("margin_percent")
-            .HasColumnType("numeric(10,4)");
+            .HasColumnType("numeric(10,4)")
+            .HasComment("The margin as a percentage, recorded for the operator's card. The price is "
+                + "computed from the ABSOLUTE margin (margin_uah_per_liter); this column does not "
+                + "feed the formula.");
 
         builder.Property(e => e.PriceUpdatedAt)
             .HasColumnName("price_updated_at")
@@ -103,17 +116,23 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
         builder.Property(e => e.BasePrice)
             .HasColumnName("base_price")
             .HasColumnType("numeric(12,2)")
-            .IsRequired();
+            .IsRequired()
+            .HasComment("The list price of the fuel per litre - the price before our discount. It "
+                + "is the reference the customer's saving is measured against.");
 
         builder.Property(e => e.DiscountPrice)
             .HasColumnName("discount_price")
             .HasColumnType("numeric(12,2)")
-            .IsRequired();
+            .IsRequired()
+            .HasComment("What the customer pays per litre. While the fuel is unpriced it equals the "
+                + "column price, because a fuel with no stated cost has no price of its own.");
 
         builder.Property(e => e.AllowBelowCost)
             .HasColumnName("allow_below_cost")
             .HasDefaultValue(false)
-            .IsRequired();
+            .IsRequired()
+            .HasComment("Whether this fuel may be sold below what we pay. A manager's opt-in, per "
+                + "fuel, for a deliberate loss leader - the write path refuses such a sale without it.");
 
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
