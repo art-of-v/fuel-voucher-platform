@@ -1,4 +1,5 @@
 using FuelFlow.Features.Settings;
+using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -68,10 +69,11 @@ public sealed class GetVoucherExchangeAttentionQueryHandler
 
     // Stock-only, already-expired OR (available/imported and lapsing within the threshold). Query
     // filters are ignored so soft-deleted stock is still excluded explicitly via !IsDeleted.
-    // Vouchers already retired through a confirmed exchange are excluded too: a voucher_exchanges row
-    // means the operator finished renewing it with the supplier, so it must drop off both the list and
-    // the badge (planning #183). Leaving it in only ever yields a dead-end row — re-confirming it is
-    // rejected by the idempotency guard as "already exchanged", so the badge never clears.
+    // Vouchers already retired through a confirmed exchange are excluded too: the ledger's
+    // exchange_out row means the operator finished renewing it with the supplier, so it must drop off
+    // both the list and the badge (planning #183). Leaving it in only ever yields a dead-end row —
+    // re-confirming it is rejected by the idempotency guard as "already exchanged", so the badge
+    // never clears.
     private IQueryable<FuelVoucher> Filter(DateOnly cutoff)
         => _context.FuelVouchers
             .IgnoreQueryFilters()
@@ -79,7 +81,8 @@ public sealed class GetVoucherExchangeAttentionQueryHandler
             .Where(v => !v.IsDeleted
                 && v.AssignedToUserId == null
                 && v.WorkerUserId == null
-                && !_context.VoucherExchanges.Any(e => e.OldVoucherId == v.Id)
+                && !_context.VoucherMovements.Any(m =>
+                    m.Kind == VoucherMovementKinds.ExchangeOut && m.VoucherId == v.Id)
                 && (v.Status == VoucherStatus.Expired
                     || ((v.Status == VoucherStatus.Available || v.Status == VoucherStatus.Imported)
                         && v.SupplierExpirationDate <= cutoff)));

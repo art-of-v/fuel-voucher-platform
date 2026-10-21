@@ -2690,110 +2690,6 @@ namespace FuelFlow.API.Migrations
                         });
                 });
 
-            modelBuilder.Entity("FuelFlow.Features.Vouchers.Exchange.VoucherExchange", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("ActingUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("acting_user_id")
-                        .HasComment("The admin who recorded the exchange.");
-
-                    b.Property<string>("ActingUserName")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("acting_user_name")
-                        .HasComment("The admin's display name at the time, for the audit. The name is frozen, so it still readsright after the person is renamed or leaves.");
-
-                    b.Property<string>("Brand")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("brand")
-                        .HasComment("The brand of the retired voucher (okko/wog/...), denormalized for audit.");
-
-                    b.Property<Guid>("BrandId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("brand_id")
-                        .HasComment("The brand's id - the key the text above is a copy of. The composite foreign key(fuel_type_id, brand_id) -> fuel_types(id, brand_id) is what refuses a row whose brand isnot its fuel's brand.");
-
-                    b.Property<decimal?>("CostPerLiterApplied")
-                        .HasColumnType("numeric(10,4)")
-                        .HasColumnName("cost_per_liter_applied")
-                        .HasComment("The cost per litre set on the new fuel batch for this exchange (the old blended cost plus thesurcharge per litre), when there is one.");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc")
-                        .HasComment("When the exchange was recorded.");
-
-                    b.Property<Guid>("ExchangeBatchId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("exchange_batch_id")
-                        .HasComment("Groups every old voucher retired in one confirm action. The batch's lifecycle lives inmovement_batches, which this points at.");
-
-                    b.Property<Guid>("FuelTypeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("fuel_type_id")
-                        .HasComment("The fuel of the retired voucher, and of its paired replacement - the same bucket.");
-
-                    b.Property<Guid?>("NewVoucherId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("new_voucher_id")
-                        .HasComment("The new stock voucher this old one was replaced by, or NULL when the old voucher was notpaired - more old than new in its bucket.");
-
-                    b.Property<Guid>("OldVoucherId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("old_voucher_id")
-                        .HasComment("The retired stock voucher.");
-
-                    b.Property<Guid>("SupplierId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("supplier_id")
-                        .HasComment("The supplier the old vouchers were bought from and the new ones were obtained from. Oneexchange involves exactly one supplier, so every row of a batch carries the same value - butit is recorded per row because this table is also read one voucher at a time during supplierreconciliation, where the row alone has to answer 'who do we settle with for this voucher'.");
-
-                    b.Property<decimal>("SurchargeUah")
-                        .HasColumnType("numeric(10,2)")
-                        .HasColumnName("surcharge_uah")
-                        .HasComment("This row's OWN share of the batch surcharge - the brand charge spread pro-rata over thispair's litres, NOT the batch total repeated. Do not read one row and call it the batchcharge: a four-voucher exchange would report a quarter of what was actually paid. Sum therows of an ExchangeBatchId.");
-
-                    b.Property<uint>("xmin")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ExchangeBatchId")
-                        .HasDatabaseName("ix_voucher_exchanges_exchange_batch_id");
-
-                    b.HasIndex("NewVoucherId")
-                        .HasDatabaseName("ix_voucher_exchanges_new_voucher_id");
-
-                    b.HasIndex("OldVoucherId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_voucher_exchanges_old_voucher_id");
-
-                    b.HasIndex("SupplierId")
-                        .HasDatabaseName("ix_voucher_exchanges_supplier_id");
-
-                    b.HasIndex("FuelTypeId", "BrandId")
-                        .HasDatabaseName("ix_voucher_exchanges_fuel_type_id_brand_id");
-
-                    b.ToTable("voucher_exchanges", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_voucher_exchange_cost_non_negative", "cost_per_liter_applied IS NULL OR cost_per_liter_applied >= 0");
-
-                            t.HasCheckConstraint("ck_voucher_exchange_not_self", "old_voucher_id IS DISTINCT FROM new_voucher_id");
-
-                            t.HasCheckConstraint("ck_voucher_exchange_surcharge_non_negative", "surcharge_uah >= 0");
-                        });
-                });
-
             modelBuilder.Entity("FuelFlow.Features.Vouchers.FuelVoucher", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3167,6 +3063,11 @@ namespace FuelFlow.API.Migrations
                     b.HasIndex("ReplacedByVoucherId")
                         .HasDatabaseName("ix_voucher_movements_replaced_by")
                         .HasFilter("replaced_by_voucher_id IS NOT NULL");
+
+                    b.HasIndex("VoucherId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_voucher_movements_exchange_out")
+                        .HasFilter("kind = 'exchange_out'");
 
                     b.HasIndex("VoucherId", "OccurredAtUtc")
                         .HasDatabaseName("ix_voucher_movements_voucher");
@@ -5465,47 +5366,6 @@ namespace FuelFlow.API.Migrations
                         .WithMany()
                         .HasForeignKey("SupplierId")
                         .OnDelete(DeleteBehavior.Restrict);
-                });
-
-            modelBuilder.Entity("FuelFlow.Features.Vouchers.Exchange.VoucherExchange", b =>
-                {
-                    b.HasOne("FuelFlow.Features.Vouchers.Exchange.MovementBatch", "MovementBatch")
-                        .WithMany()
-                        .HasForeignKey("ExchangeBatchId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", "NewVoucher")
-                        .WithMany()
-                        .HasForeignKey("NewVoucherId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", "OldVoucher")
-                        .WithMany()
-                        .HasForeignKey("OldVoucherId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("FuelFlow.SharedKernel.Domain.Supplier", "Supplier")
-                        .WithMany()
-                        .HasForeignKey("SupplierId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("FuelFlow.SharedKernel.Domain.FuelTypeEntity", null)
-                        .WithMany()
-                        .HasForeignKey("FuelTypeId", "BrandId")
-                        .HasPrincipalKey("Id", "BrandId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("MovementBatch");
-
-                    b.Navigation("NewVoucher");
-
-                    b.Navigation("OldVoucher");
-
-                    b.Navigation("Supplier");
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Vouchers.FuelVoucher", b =>

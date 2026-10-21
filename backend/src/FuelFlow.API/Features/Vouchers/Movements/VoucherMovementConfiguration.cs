@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 namespace FuelFlow.Features.Vouchers.Movements;
 
 /// <summary>
-/// D-13. The append-only custody log that <c>voucher_renewal_items</c>, <c>voucher_exchanges</c> and
+/// D-13. The append-only custody log that <c>voucher_renewal_items</c>, the exchange pairs and
 /// <c>operator_voucher_renewals</c> each kept their own fragment of.
 /// </summary>
 /// <remarks>
@@ -26,8 +26,8 @@ namespace FuelFlow.Features.Vouchers.Movements;
 /// </para>
 /// <para>
 /// <b>The voucher foreign key is RESTRICT</b>: paper that moved must not be deletable out from under
-/// the record that it moved, the same rule <c>voucher_exchanges</c> already follows on both its
-/// voucher sides. <b>order_id</b> and both actor columns carry none — an audit row must not block
+/// the record that it moved, the same rule the exchange's retired paper followed. <b>order_id</b> and
+/// both actor columns carry none — an audit row must not block
 /// deleting its own subject, which is exactly how <c>order_line_items.order_id</c> being RESTRICT
 /// wedged <c>DeletedUnpaidOrderCleanupService</c>. The actor rule is §G of TARGET_SCHEMA, as four
 /// tables in this schema already follow it.
@@ -68,8 +68,8 @@ internal sealed class VoucherMovementConfiguration : IEntityTypeConfiguration<Vo
             .IsRequired()
             .HasComment(                "The piece of paper that moved.");
 
-        // Restrict: paper that moved must not be deletable, exactly as voucher_exchanges restricts on
-        // old_voucher_id and new_voucher_id.
+        // Restrict: paper that moved must not be deletable, exactly as the exchange's retired paper
+        // was protected.
         builder.HasOne<FuelVoucher>()
             .WithMany()
             .HasForeignKey(e => e.VoucherId)
@@ -96,8 +96,7 @@ internal sealed class VoucherMovementConfiguration : IEntityTypeConfiguration<Vo
                     "key: an audit row must not be the thing that blocks deleting its own subject.");
 
         // Bare uuid, no FK: an audit row has to be writable whatever happened to the actor row, which is §G
-        // of TARGET_SCHEMA and what voucher_exchanges.acting_user_id and
-        // operator_voucher_renewals.acting_user_id are bare too.
+        // of TARGET_SCHEMA and what operator_voucher_renewals.acting_user_id is bare too.
         //
         // The DEFAULT is here so the migration can ADD this column to a table that already exists.
         // Every writer states the kind explicitly; an automatic action with no person behind it is
@@ -152,7 +151,7 @@ internal sealed class VoucherMovementConfiguration : IEntityTypeConfiguration<Vo
             .HasColumnName("line_item_id")
             .HasComment(                "The order line this movement settled, for the renewal paths.");
 
-        // D-13, planning #319: the pairing that voucher_exchanges kept as old_voucher_id ->
+        // D-13, planning #319: the pairing the exchange pairs kept as old_voucher_id ->
         // new_voucher_id, folded into the ledger. The row of the RETIRED paper carries it, so the
         // operator's question "what happened to THIS voucher" is answered by this voucher's own rows.
         builder.Property(e => e.ReplacedByVoucherId)
@@ -160,7 +159,7 @@ internal sealed class VoucherMovementConfiguration : IEntityTypeConfiguration<Vo
             .HasComment("The paper that took this voucher's place, when this paper was traded for another one. NULL for a movement that was not a trade - a sale, a return, an import. The row of the retired paper carries it, not the row of the successor.");
 
         // Restrict: the paper that replaced this one must not be deletable out from under the record
-        // of the trade - the same rule voucher_exchanges already follows on new_voucher_id.
+        // of the trade - the same rule the exchange's replacement side followed.
         builder.HasOne<FuelVoucher>()
             .WithMany()
             .HasForeignKey(e => e.ReplacedByVoucherId)
@@ -201,6 +200,17 @@ internal sealed class VoucherMovementConfiguration : IEntityTypeConfiguration<Vo
             .HasDatabaseName("ix_voucher_movements_replaced_by")
             .HasFilter("replaced_by_voucher_id IS NOT NULL");
 
+        // Planning #319: a piece of paper goes to the supplier at most once. This is the folded form
+        // of the UNIQUE index the exchange pairs used to carry on their retired voucher - the database
+        // half of "a voucher cannot be exchanged twice", which the confirm's own guard only checks.
+        //
+        // Partial, because the rule is about the trade and not about the paper: the same voucher has
+        // plenty of other movements (issued, returned, gift, recall) and those are not the trade.
+        builder.HasIndex(e => e.VoucherId)
+            .HasDatabaseName("ix_voucher_movements_exchange_out")
+            .IsUnique()
+            .HasFilter("kind = 'exchange_out'");
+
         builder.ToTable(t =>
         {
             t.HasCheckConstraint(
@@ -240,7 +250,7 @@ internal sealed class VoucherMovementConfiguration : IEntityTypeConfiguration<Vo
                 "actor_user_id IS NULL OR actor_user_id <> '00000000-0000-0000-0000-000000000000'");
 
             // A trade is between two pieces of paper. A voucher that replaced itself is not a trade,
-            // and the rule that says so is the same one voucher_exchanges follows on its own pair.
+            // and the rule that says so is the same one the exchange's own pair followed.
             t.HasCheckConstraint("ck_voucher_movements_not_self_replaced",
                 "replaced_by_voucher_id IS NULL OR replaced_by_voucher_id <> voucher_id");
 

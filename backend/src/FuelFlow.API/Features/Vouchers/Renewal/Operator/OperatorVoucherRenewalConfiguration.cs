@@ -102,9 +102,9 @@ internal sealed class OperatorVoucherRenewalConfiguration : IEntityTypeConfigura
             .HasForeignKey(e => e.VoucherId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // The replacement side carries the same RESTRICT as the source side (#217) - see
-        // VoucherExchangeConfiguration for why both are constrained together. Nullable, because an
-        // extend has no replacement.
+        // The replacement side carries the same RESTRICT as the source side (#217) - the ledger's
+        // movement on the replacement carries the same rule, so both sides are constrained together.
+        // Nullable, because an extend has no replacement.
         builder.HasOne(e => e.ReplacementVoucher)
             .WithMany()
             .HasForeignKey(e => e.ReplacementVoucherId)

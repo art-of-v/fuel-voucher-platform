@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 namespace FuelFlow.Features.Vouchers.Exchange;
 
 /// <summary>
-/// D-13 / #319. The parent <c>voucher_exchanges.exchange_batch_id</c> never had.
+/// D-13 / #319. The parent the exchange's ledger rows point at.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -16,7 +16,7 @@ namespace FuelFlow.Features.Vouchers.Exchange;
 /// <b>The foreign key is RESTRICT, not CASCADE.</b> A batch is the record of what was agreed with a
 /// supplier. Cascading would let deleting the last exchange row delete the settlement it belonged to,
 /// and with it the only statement that anything was agreed — the same reasoning that makes
-/// <c>voucher_exchanges</c> restrict on both voucher sides and that <c>refunds.order_id</c> restricts
+/// <c>voucher_movements</c> restricts on the paper it names and that <c>refunds.order_id</c> restricts
 /// on orders.
 /// </para>
 /// <para>
@@ -49,7 +49,7 @@ internal sealed class MovementBatchConfiguration : IEntityTypeConfiguration<Move
 
         // Null for a batch that is not a supplier settlement. Restrict rather than SetNull: the
         // counterparty of a settlement must stay nameable, and a supplier that is deactivated is not a
-        // supplier that has been erased - same rule as voucher_exchanges.supplier_id.
+        // supplier that has been erased - the same rule the exchange's retired vouchers followed.
         builder.HasOne<Supplier>()
             .WithMany()
             .HasForeignKey(e => e.SupplierId)
@@ -75,8 +75,8 @@ internal sealed class MovementBatchConfiguration : IEntityTypeConfiguration<Move
                     "number the brand charged is the authoritative one, so it is this.");
 
         // Bare uuid, no FK. A settlement record has to be writable whatever happened to the actor row,
-        // which is why voucher_exchanges.acting_user_id and operator_voucher_renewals.acting_user_id
-        // are bare too. §G of TARGET_SCHEMA says the same in general terms.
+        // which is why operator_voucher_renewals.acting_user_id is bare too. §G of TARGET_SCHEMA says
+        // the same in general terms.
         builder.Property(e => e.OpenedByUserId)
             .HasColumnName("opened_by_user_id")
             .IsRequired().HasComment("The operator who opened the settlement.");
@@ -123,7 +123,7 @@ internal sealed class MovementBatchConfiguration : IEntityTypeConfiguration<Move
                 "ck_movement_batches_status",
                 "status IN ('draft','confirmed','rejected','cancelled')");
 
-            // 0 legitimately means "free compensation" - the same reason voucher_exchanges uses >= 0
+            // 0 legitimately means "free compensation" - the same reason the exchange pairs used >= 0
             // and not > 0.
             t.HasCheckConstraint("ck_movement_batches_surcharge_non_negative", "surcharge_uah >= 0");
 

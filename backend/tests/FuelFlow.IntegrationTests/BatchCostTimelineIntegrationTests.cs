@@ -58,25 +58,15 @@ public sealed class BatchCostTimelineIntegrationTests : IClassFixture<TestDataba
             // voucher here was paired.
             MovementBatchSeeder.AddForExchange(seed, exchangeBatchId, SupplierId, 300m,
                 new DateTime(2026, 10, 1, 10, 0, 0, DateTimeKind.Utc));
-            // One row per retired voucher. Each row carries ONLY its own share of the batch
+            // One ledger row per retired voucher. Each row carries ONLY its own share of the batch
             // surcharge - 300 UAH split three ways over three equal pairs - so the rows sum to
             // the total. Reading one row instead would report 100 for a 300 UAH exchange.
             for (var i = 0; i < oldVouchers.Count; i++)
             {
-                seed.VoucherExchanges.Add(new VoucherExchange
-                {
-                    Id = Guid.NewGuid(),
-                    ExchangeBatchId = exchangeBatchId,
-                    OldVoucherId = oldVouchers[i].Id,
-                    NewVoucherId = newVouchers[i].Id,
-                    FuelTypeId = ToUuid("okko-dp"),
-                    BrandId = BrandIds.ForSlug("okko"),
-                    Brand = "okko",
-                    SupplierId = SupplierId,
-                    SurchargeUah = 100m,
-                    CostPerLiterApplied = 50m,
-                    CreatedAtUtc = new DateTime(2026, 10, 1, 10, 0, 0, DateTimeKind.Utc),
-                });
+                MovementBatchSeeder.AddExchangeOut(
+                    seed, exchangeBatchId, oldVouchers[i].Id, newVouchers[i].Id,
+                    surchargeShareUah: 100m, appliedCostPerLiter: 50m,
+                    atUtc: new DateTime(2026, 10, 1, 10, 0, 0, DateTimeKind.Utc));
             }
             await seed.SaveChangesAsync();
         }
@@ -110,19 +100,9 @@ public sealed class BatchCostTimelineIntegrationTests : IClassFixture<TestDataba
             var theirVoucher = NewVoucher(theirs, 10m, 40m);
             seed.FuelVouchers.AddRange(mineVoucher, theirVoucher);
             MovementBatchSeeder.AddForExchange(seed, exchangeBatchId, SupplierId, 300m, DateTime.UtcNow);
-            seed.VoucherExchanges.Add(new VoucherExchange
-            {
-                Id = Guid.NewGuid(),
-                ExchangeBatchId = exchangeBatchId,
-                OldVoucherId = theirVoucher.Id,
-                FuelTypeId = ToUuid("okko-dp"),
-                BrandId = BrandIds.ForSlug("okko"),
-                Brand = "okko",
-                    SupplierId = SupplierId,
-                SurchargeUah = 300m,
-                CostPerLiterApplied = 50m,
-                CreatedAtUtc = DateTime.UtcNow,
-            });
+            MovementBatchSeeder.AddExchangeOut(
+                seed, exchangeBatchId, theirVoucher.Id, newVoucherId: null,
+                surchargeShareUah: 300m, appliedCostPerLiter: 50m, atUtc: DateTime.UtcNow);
             await seed.SaveChangesAsync();
         }
 
@@ -147,32 +127,14 @@ public sealed class BatchCostTimelineIntegrationTests : IClassFixture<TestDataba
                 new DateTime(2026, 10, 5, 10, 0, 0, DateTimeKind.Utc));
             MovementBatchSeeder.AddForExchange(seed, first, SupplierId, 100m,
                 new DateTime(2026, 10, 1, 10, 0, 0, DateTimeKind.Utc));
-            seed.VoucherExchanges.Add(new VoucherExchange
-            {
-                Id = Guid.NewGuid(),
-                ExchangeBatchId = second,
-                OldVoucherId = b.Id,
-                FuelTypeId = ToUuid("okko-dp"),
-                BrandId = BrandIds.ForSlug("okko"),
-                Brand = "okko",
-                    SupplierId = SupplierId,
-                SurchargeUah = 200m,
-                CostPerLiterApplied = 45m,
-                CreatedAtUtc = new DateTime(2026, 10, 5, 10, 0, 0, DateTimeKind.Utc),
-            });
-            seed.VoucherExchanges.Add(new VoucherExchange
-            {
-                Id = Guid.NewGuid(),
-                ExchangeBatchId = first,
-                OldVoucherId = a.Id,
-                FuelTypeId = ToUuid("okko-dp"),
-                BrandId = BrandIds.ForSlug("okko"),
-                Brand = "okko",
-                    SupplierId = SupplierId,
-                SurchargeUah = 100m,
-                CostPerLiterApplied = 42m,
-                CreatedAtUtc = new DateTime(2026, 10, 1, 10, 0, 0, DateTimeKind.Utc),
-            });
+            MovementBatchSeeder.AddExchangeOut(
+                seed, second, b.Id, newVoucherId: null,
+                surchargeShareUah: 200m, appliedCostPerLiter: 45m,
+                atUtc: new DateTime(2026, 10, 5, 10, 0, 0, DateTimeKind.Utc));
+            MovementBatchSeeder.AddExchangeOut(
+                seed, first, a.Id, newVoucherId: null,
+                surchargeShareUah: 100m, appliedCostPerLiter: 42m,
+                atUtc: new DateTime(2026, 10, 1, 10, 0, 0, DateTimeKind.Utc));
             await seed.SaveChangesAsync();
         }
 
@@ -221,7 +183,7 @@ public sealed class BatchCostTimelineIntegrationTests : IClassFixture<TestDataba
 
     private static async Task ResetAsync(ApplicationDbContext context)
         => await context.Database.ExecuteSqlRawAsync(
-            """TRUNCATE TABLE "payments", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "voucher_exchanges", "movement_batches", "company_invitations", "company_members", "legal_entities", "verification_codes", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
+            """TRUNCATE TABLE "payments", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "movement_batches", "company_invitations", "company_members", "legal_entities", "verification_codes", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
 
     private static async Task SeedImportAndFuel(ApplicationDbContext seed, Guid importId)
     {

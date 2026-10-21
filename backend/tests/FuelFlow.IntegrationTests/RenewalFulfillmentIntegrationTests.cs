@@ -1125,8 +1125,9 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
     }
 
     /// <summary>
-    /// Once the operator confirms the supplier exchange, the retired voucher has a voucher_exchanges row,
-    /// so the renewal is done. It must then drop off BOTH the attention list and the badge count — not
+    /// Once the operator confirms the supplier exchange, the retired voucher has a ledger row saying
+    /// it went to the supplier, so the renewal is done. It must then drop off BOTH the attention list
+    /// and the badge count — not
     /// linger as a dead-end row whose only effect is that re-confirming it is rejected as "already
     /// exchanged", leaving the badge stuck (planning #183).
     /// </summary>
@@ -1157,23 +1158,13 @@ var exchangedId = Guid.NewGuid();
             seed.FuelVouchers.Add(StockVoucher(exchangedId, "okko", "okko-95", 40m, today.AddDays(-10)));
             seed.FuelVouchers.Add(StockVoucher(stillOwedId, "okko", "okko-95", 40m, today.AddDays(-10)));
 
-            // One of them has already been exchanged with the supplier - the confirm handler wrote this row,
-            // and it wrote the settlement the row belongs to as well (#319).
+            // One of them has already been exchanged with the supplier - the confirm handler wrote this
+            // row, and it wrote the settlement the row belongs to as well (#319).
             var exchangeBatchId = Guid.NewGuid();
             MovementBatchSeeder.AddForExchange(seed, exchangeBatchId, supplierId, 0m, DateTime.UtcNow);
-            seed.VoucherExchanges.Add(new VoucherExchange
-            {
-                Id = Guid.NewGuid(),
-                ExchangeBatchId = exchangeBatchId,
-                OldVoucherId = exchangedId,
-                FuelTypeId = ToUuid("okko-95"),
-                BrandId = BrandIds.ForSlug("okko"),
-                Brand = "okko",
-                SupplierId = supplierId,
-                SurchargeUah = 0m,
-                ActingUserId = Guid.NewGuid(),
-                CreatedAtUtc = DateTime.UtcNow
-            });
+            MovementBatchSeeder.AddExchangeOut(
+                seed, exchangeBatchId, exchangedId, newVoucherId: null,
+                surchargeShareUah: 0m, appliedCostPerLiter: null, atUtc: DateTime.UtcNow);
 
             await seed.SaveChangesAsync();
         }
@@ -1187,7 +1178,7 @@ var exchangedId = Guid.NewGuid();
         // Only the voucher still owed to the supplier remains; the exchanged one is gone.
         attention.Data.Should().ContainSingle().Which.Id.Should().Be(stillOwedId);
         attention.Data.Should().NotContain(i => i.Id == exchangedId,
-            "a voucher with a voucher_exchanges row has been renewed with the supplier — the job is done");
+            "a voucher that went to the supplier has been renewed with them — the job is done");
 
         // The nav badge must agree with the list, or it stays lit over nothing.
         (await handler.CountAsync(CancellationToken.None)).Should().Be(1);
@@ -1629,7 +1620,7 @@ var exchangedId = Guid.NewGuid();
     private static async Task ResetDataAsync(ApplicationDbContext context)
     {
         await context.Database.ExecuteSqlRawAsync(
-            """TRUNCATE TABLE "payments", "fulfillments", "voucher_exchanges", "movement_batches", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
+            """TRUNCATE TABLE "payments", "fulfillments", "movement_batches", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
     }
 
     private ApplicationDbContext CreateContext()

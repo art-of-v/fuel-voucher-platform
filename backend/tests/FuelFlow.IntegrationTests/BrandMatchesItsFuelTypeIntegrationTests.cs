@@ -16,7 +16,8 @@ namespace FuelFlow.IntegrationTests;
 /// <remarks>
 /// <para>
 /// Four tables carry a brand as a name - <c>fuel_vouchers</c>, <c>order_line_items</c>,
-/// <c>purchase_batches</c>, <c>voucher_exchanges</c> - and each of them also names the fuel the row
+/// <c>purchase_batches</c>, and the fourth was <c>voucher_exchanges</c> until the fold of #319 put the
+/// exchange's pairs in the ledger - and each of them also names the fuel the row
 /// is about. Until now only one of those two copies was constrained, and a disagreement was
 /// invisible rather than visibly wrong: the voucher simply stopped being sellable, with no error
 /// anywhere. <c>BrandFuelPairing.cs</c> says so in its own remarks.
@@ -211,13 +212,13 @@ public sealed class BrandMatchesItsFuelTypeIntegrationTests : IClassFixture<Test
                 SELECT con.conname AS "Value"
                 FROM pg_constraint con
                 JOIN pg_class rel ON rel.oid = con.conrelid
-                WHERE rel.relname IN ('fuel_vouchers', 'order_line_items', 'purchase_batches', 'voucher_exchanges')
+                WHERE rel.relname IN ('fuel_vouchers', 'order_line_items', 'purchase_batches')
                   AND con.contype = 'f'
                   AND con.conname LIKE '%fuel_type_id_brand_id'
                 """)
             .ToListAsync();
 
-        keys.Should().HaveCount(4, "every table that carries a brand is checked by the pair");
+        keys.Should().HaveCount(3, "every table that carries a brand is checked by the pair");
 
         var triggers = await context.Database
             .SqlQueryRaw<string>(
@@ -225,13 +226,13 @@ public sealed class BrandMatchesItsFuelTypeIntegrationTests : IClassFixture<Test
                 SELECT tg.tgname AS "Value"
                 FROM pg_trigger tg
                 JOIN pg_class rel ON rel.oid = tg.tgrelid
-                WHERE rel.relname IN ('fuel_vouchers', 'order_line_items', 'purchase_batches', 'voucher_exchanges')
+                WHERE rel.relname IN ('fuel_vouchers', 'order_line_items', 'purchase_batches')
                   AND NOT tg.tgisinternal
                   AND tg.tgname LIKE '%brand%'
                 """)
             .ToListAsync();
 
-        triggers.Should().HaveCount(4,
+        triggers.Should().HaveCount(3,
             "the trigger still guards the name - it goes with the name, in the step that moves the readers to the id");
     }
 

@@ -1,10 +1,13 @@
+using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Exchange;
+using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Persistence;
 
 namespace FuelFlow.IntegrationTests;
 
 /// <summary>
-/// Seeds the <see cref="MovementBatch"/> parent that a <see cref="VoucherExchange"/> row points at.
+/// Seeds the <see cref="MovementBatch"/> parent that an exchange's ledger rows point at, and the
+/// pair rows themselves.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -58,5 +61,39 @@ internal static class MovementBatchSeeder
         var batch = ForExchange(batchId, supplierId, surchargeUah, atUtc, operatorName);
         seed.MovementBatches.Add(batch);
         return batch;
+    }
+
+    /// <summary>
+    /// The ledger's row of a retired voucher: the paper went to the supplier, and this row carries the
+    /// pair's three facts - which paper replaced it, that pair's share of the doplata, and the cost
+    /// stamped on the replacement (planning #319).
+    /// </summary>
+    public static VoucherMovement AddExchangeOut(
+        ApplicationDbContext seed,
+        Guid batchId,
+        Guid oldVoucherId,
+        Guid? newVoucherId,
+        decimal surchargeShareUah,
+        decimal? appliedCostPerLiter,
+        DateTime atUtc)
+    {
+        var movement = new VoucherMovement
+        {
+            Id = Guid.NewGuid(),
+            BatchId = batchId,
+            Kind = VoucherMovementKinds.ExchangeOut,
+            VoucherId = oldVoucherId,
+            FromLocation = VoucherLocations.Pool,
+            ToLocation = VoucherLocations.Supplier,
+            ActorKind = VoucherActorKinds.User,
+            ActorUserId = Guid.NewGuid(),
+            OccurredAtUtc = atUtc,
+            ReplacedByVoucherId = newVoucherId,
+            SurchargeShareUah = surchargeShareUah,
+            AppliedCostPerLiter = appliedCostPerLiter
+        };
+
+        seed.VoucherMovements.Add(movement);
+        return movement;
     }
 }

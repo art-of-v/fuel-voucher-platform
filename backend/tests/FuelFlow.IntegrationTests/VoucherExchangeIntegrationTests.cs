@@ -103,16 +103,6 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
         news.Should().OnlyContain(v => v.CostPerLiter == 32m);   // carried over + this voucher's surcharge share
         news.Should().OnlyContain(v => v.SupplierId == supplierId);
 
-        var exchanges = await verify.VoucherExchanges.AsNoTracking().ToListAsync();
-        exchanges.Should().HaveCount(2);
-        exchanges.Should().OnlyContain(x => x.ExchangeBatchId == result.ExchangeBatchId);
-        exchanges.Should().OnlyContain(x => x.NewVoucherId != null);
-        exchanges.Should().OnlyContain(x => x.SupplierId == supplierId);
-        // Per row, not a batch copy: each old voucher carried 30 + its own 1.00/L share (200 over 100 L).
-        exchanges.Should().OnlyContain(x => x.CostPerLiterApplied == 32m);
-        exchanges.Should().OnlyContain(x => x.SurchargeUah == 100m);   // 50 L of the 100 new L
-        exchanges.Sum(x => x.SurchargeUah).Should().Be(200m);          // the whole surcharge, once
-
         // D-13. One movement per piece of paper that changed hands, all under the batch - so an
         // exchange is one settlement with a direction per voucher, rather than per-pair rows that have
         // to be re-joined to say which paper went where.
@@ -132,6 +122,14 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
         inMovements.Select(m => m.VoucherId).Should().BeEquivalentTo([new1, new2]);
         inMovements.Should().OnlyContain(m =>
             m.FromLocation == VoucherLocations.Supplier && m.ToLocation == VoucherLocations.Pool);
+
+        // The pair's facts live on the row of the RETIRED paper (#319): which paper replaced it, that
+        // pair's share of the surcharge, and the cost stamped on the replacement.
+        outMovements.Should().OnlyContain(m => m.ReplacedByVoucherId != null);
+        // Per row, not a batch copy: each old voucher carried 30 + its own 1.00/L share (200 over 100 L).
+        outMovements.Should().OnlyContain(m => m.AppliedCostPerLiter == 32m);
+        outMovements.Should().OnlyContain(m => m.SurchargeShareUah == 100m);   // 50 L of the 100 new L
+        outMovements.Sum(m => m.SurchargeShareUah ?? 0m).Should().Be(200m);    // the whole surcharge, once
 
         // The money is NOT copied per voucher: the settlement total is on the batch, and each voucher's
         // own cost is on the voucher. A third number would be a third thing to reconcile.
@@ -234,18 +232,21 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
 
         using var verify = CreateContext();
 
-        var exchanges = await verify.VoucherExchanges.AsNoTracking().ToListAsync();
-        exchanges.Should().HaveCount(5);
+        // Each pair's facts live on the ledger's row of the retired paper (#319).
+        var outMovements = await verify.VoucherMovements.AsNoTracking()
+            .Where(m => m.Kind == VoucherMovementKinds.ExchangeOut)
+            .ToListAsync();
+        outMovements.Should().HaveCount(5);
 
         // Each row's cost is its own old price + 2.00, matched through the pairing, not a copy.
-        var pairs = exchanges.ToDictionary(x => x.OldVoucherId, x => x.NewVoucherId!.Value);
+        var pairs = outMovements.ToDictionary(x => x.VoucherId, x => x.ReplacedByVoucherId!.Value);
         var oldCostById = oldIds.Zip(oldCosts).ToDictionary(p => p.First, p => p.Second);
 
         foreach (var (oldId, newId) in pairs)
         {
-            exchanges.Single(x => x.OldVoucherId == oldId).CostPerLiterApplied
+            outMovements.Single(x => x.VoucherId == oldId).AppliedCostPerLiter
                 .Should().Be(oldCostById[oldId] + surchargePerLiter);
-            exchanges.Single(x => x.OldVoucherId == oldId).SurchargeUah
+            outMovements.Single(x => x.VoucherId == oldId).SurchargeShareUah
                 .Should().Be(10m * surchargePerLiter);   // this voucher's share of the 100.00
         }
 
@@ -388,7 +389,7 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
         }
 
         using var verify = CreateContext();
-        (await verify.VoucherExchanges.CountAsync()).Should().Be(0);
+        (await verify.VoucherMovements.CountAsync()).Should().Be(0);
         var olds = await verify.FuelVouchers.AsNoTracking().Where(v => v.Id == oldA || v.Id == oldB).ToListAsync();
         olds.Should().OnlyContain(v => v.Status == VoucherStatus.Available);   // nothing retired
     }
@@ -468,8 +469,10 @@ public sealed class VoucherExchangeIntegrationTests : IClassFixture<TestDatabase
         result.BlendedCostPerLiter.Should().Be(30m); // no surcharge → cost unchanged
 
         using var verify = CreateContext();
-        var exchanges = await verify.VoucherExchanges.AsNoTracking().ToListAsync();
-        exchanges.Should().OnlyContain(x => x.SurchargeUah == 0m && x.CostPerLiterApplied == 30m);
+        var outMovements = await verify.VoucherMovements.AsNoTracking()
+            .Where(m => m.Kind == VoucherMovementKinds.ExchangeOut)
+            .ToListAsync();
+        outMovements.Should().OnlyContain(m => m.SurchargeShareUah == 0m && m.AppliedCostPerLiter == 30m);
         var replacement = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == new1);
         replacement.CostPerLiter.Should().Be(30m);
     }
@@ -515,7 +518,7 @@ public async Task MoreOldThanNew_IsRefused_BecausePaperWouldBeLost()
         }
 
         using var verify = CreateContext();
-        (await verify.VoucherExchanges.CountAsync()).Should().Be(0);
+        (await verify.VoucherMovements.CountAsync()).Should().Be(0);
 
         var olds = await verify.FuelVouchers.AsNoTracking().Where(v => v.Id == old1 || v.Id == old2).ToListAsync();
         olds.Should().OnlyContain(v => v.Status != VoucherStatus.Expired || v.Id == old1);  // the already-lapsed one stays lapsed
@@ -567,7 +570,7 @@ public async Task MoreNewThanOld_IsRefused_SoSurplusCannotEnterStockCheaply()
         using var verify = CreateContext();
 
         // Nothing moved: no retirement, no activation, no audit row.
-        (await verify.VoucherExchanges.CountAsync()).Should().Be(0);
+        (await verify.VoucherMovements.CountAsync()).Should().Be(0);
 
         var old = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == old1);
         old.Status.Should().Be(VoucherStatus.Available);
@@ -624,7 +627,7 @@ public async Task MoreNewThanOld_IsRefused_SoSurplusCannotEnterStockCheaply()
         old.Status.Should().Be(VoucherStatus.Assigned); // untouched
         var newV = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == new1);
         newV.Status.Should().Be(VoucherStatus.Imported); // never activated
-        (await verify.VoucherExchanges.AsNoTracking().AnyAsync()).Should().BeFalse();
+        (await verify.VoucherMovements.AsNoTracking().AnyAsync()).Should().BeFalse();
         (await verify.PurchaseBatches.AsNoTracking().AnyAsync(b => b.ImportJobId == importId)).Should().BeFalse();
 
         // D-13. A refused exchange must leave no custody history either. The movements are written in the
@@ -718,7 +721,8 @@ var actingUserId = Guid.NewGuid();
         second.Success.Should().BeFalse();
 
         using var verify = CreateContext();
-        (await verify.VoucherExchanges.AsNoTracking().CountAsync()).Should().Be(1); // only the first stuck
+        (await verify.VoucherMovements.AsNoTracking()
+            .CountAsync(m => m.Kind == VoucherMovementKinds.ExchangeOut)).Should().Be(1); // only the first stuck
         var leftoverNew = await verify.FuelVouchers.AsNoTracking().FirstAsync(v => v.Id == new2);
         leftoverNew.Status.Should().Be(VoucherStatus.Imported); // second batch never activated
     }
@@ -735,7 +739,7 @@ var actingUserId = Guid.NewGuid();
     /// </para>
     /// </summary>
     [Fact]
-    public async Task The_Ledger_Says_What_The_Exchange_Rows_Say()
+    public async Task The_Ledger_Carries_Every_Pair_And_Answers_What_Replaced_What()
     {
         var actingUserId = Guid.NewGuid();
         var supplierId = Guid.NewGuid();
@@ -780,33 +784,22 @@ var actingUserId = Guid.NewGuid();
 
         using var verify = CreateContext();
 
-        var exchanges = await verify.VoucherExchanges.AsNoTracking().ToListAsync();
-        exchanges.Should().HaveCount(2);
-
+        // One ledger row per retired paper, and it carries the pair's three facts.
         var outMovements = await verify.VoucherMovements.AsNoTracking()
             .Where(m => m.Kind == VoucherMovementKinds.ExchangeOut)
             .ToListAsync();
-        outMovements.Should().HaveCount(exchanges.Count);
+        outMovements.Should().HaveCount(2);
+        outMovements.Should().OnlyContain(m => m.BatchId == result.ExchangeBatchId);
+        outMovements.Should().OnlyContain(m => m.ReplacedByVoucherId != null);
+        outMovements.Select(m => m.ReplacedByVoucherId).Should().BeEquivalentTo([new1, new2]);
 
-        // The comparison itself: for every pair, the ledger row of the retired paper says the same
-        // three things the exchange row says.
-        foreach (var exchange in exchanges)
-        {
-            var movement = outMovements.Single(m => m.VoucherId == exchange.OldVoucherId);
-
-            movement.BatchId.Should().Be(exchange.ExchangeBatchId);
-            movement.ReplacedByVoucherId.Should().Be(exchange.NewVoucherId);
-            movement.SurchargeShareUah.Should().Be(exchange.SurchargeUah);
-            movement.AppliedCostPerLiter.Should().Be(exchange.CostPerLiterApplied);
-        }
-
-        // The ledger answers on its own, without the table beside it: which paper replaced this one.
+        // The ledger answers on its own: which paper replaced this one.
         var replacedBy = await verify.VoucherMovements.AsNoTracking()
             .Where(m => m.ReplacedByVoucherId != null)
             .ToListAsync();
         replacedBy.Should().HaveCount(2);
         replacedBy.Select(m => m.ReplacedByVoucherId)
-            .Should().BeEquivalentTo(exchanges.Select(x => x.NewVoucherId));
+            .Should().BeEquivalentTo([new1, new2]);
 
         // And the direction is the one the operator's screen reads: the RETIRED paper's row carries
         // the trade. The successor's own row is the start of its own story and says nothing about it.
@@ -906,7 +899,7 @@ var actingUserId = Guid.NewGuid();
     private static async Task ResetDataAsync(ApplicationDbContext context)
     {
         await context.Database.ExecuteSqlRawAsync(
-            """TRUNCATE TABLE "voucher_exchanges", "movement_batches", "purchase_batches", "voucher_imports", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "suppliers", "users", "provider_event_outbox" RESTART IDENTITY CASCADE""");
+            """TRUNCATE TABLE "movement_batches", "purchase_batches", "voucher_imports", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "suppliers", "users", "provider_event_outbox" RESTART IDENTITY CASCADE""");
     }
 
     private ApplicationDbContext CreateContext()

@@ -4,6 +4,7 @@ using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.BulkActionVouchers;
 using FuelFlow.Features.Vouchers.Exchange;
+using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Vouchers.PurchaseBatchCost;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
@@ -20,8 +21,9 @@ using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 namespace FuelFlow.IntegrationTests;
 
 /// <summary>
-/// #319 / D-13, stage 1: <c>voucher_exchanges.exchange_batch_id</c> pointed at nothing since
-/// 2026-10-01. These tests are the definition of done the issue wrote down, one per bullet.
+/// #319 / D-13: the settlement the exchange's pairs belong to. <c>voucher_exchanges.exchange_batch_id</c>
+/// pointed at nothing since 2026-10-01. These tests are the definition of done the issue wrote down,
+/// one per bullet.
 /// </summary>
 /// <remarks>
 /// The bug is not visible in a unit test because nothing was broken — the column held a real uuid, the
@@ -47,18 +49,19 @@ public sealed class MovementBatchIntegrationTests : IClassFixture<TestDatabaseFi
         var supplierId = await SeedSupplierAsync(seed);
         var oldVoucherId = await SeedVoucherAsync(seed, "OLD-" + Guid.NewGuid().ToString("N")[..8]);
 
-        seed.VoucherExchanges.Add(new VoucherExchange
+        // The ledger's row of a retired voucher points at its settlement the same way the pairs did.
+        seed.VoucherMovements.Add(new VoucherMovement
         {
             Id = Guid.NewGuid(),
-            ExchangeBatchId = Guid.NewGuid(),
-            OldVoucherId = oldVoucherId,
-            FuelTypeId = ToUuid("okko-95"),
-            BrandId = BrandIds.ForSlug("okko"),
-            Brand = "okko",
-            SupplierId = supplierId,
-            SurchargeUah = 10m,
-            ActingUserId = Guid.NewGuid(),
-            CreatedAtUtc = DateTime.UtcNow
+            BatchId = Guid.NewGuid(),
+            Kind = VoucherMovementKinds.ExchangeOut,
+            VoucherId = oldVoucherId,
+            FromLocation = VoucherLocations.Pool,
+            ToLocation = VoucherLocations.Supplier,
+            ActorKind = VoucherActorKinds.User,
+            ActorUserId = Guid.NewGuid(),
+            SurchargeShareUah = 10m,
+            OccurredAtUtc = DateTime.UtcNow
         });
 
         var act = async () => await seed.SaveChangesAsync();
@@ -110,12 +113,14 @@ public sealed class MovementBatchIntegrationTests : IClassFixture<TestDatabaseFi
         }
 
         await using var verify = CreateContext();
-        var pairs = await verify.VoucherExchanges.AsNoTracking().ToListAsync();
+        var pairs = await verify.VoucherMovements.AsNoTracking()
+            .Where(m => m.Kind == VoucherMovementKinds.ExchangeOut)
+            .ToListAsync();
         pairs.Should().HaveCount(2);
-        pairs.Should().OnlyContain(e => e.ExchangeBatchId != Guid.Empty);
+        pairs.Should().OnlyContain(e => e.BatchId != Guid.Empty);
 
         var batch = await verify.MovementBatches.AsNoTracking().SingleAsync();
-        batch.Id.Should().Be(pairs[0].ExchangeBatchId,
+        batch.Id.Should().Be(pairs[0].BatchId!.Value,
             "the settlement is the thing the pairs point at, not a separately invented id");
         batch.Kind.Should().Be(MovementBatchKinds.VoucherExchange);
         batch.Status.Should().Be(MovementBatchStatuses.Confirmed);
@@ -147,21 +152,10 @@ public sealed class MovementBatchIntegrationTests : IClassFixture<TestDatabaseFi
         {
             var voucherId = await SeedVoucherAsync(seed, $"OLD-{tag}-{batchId:N}"[..16],
                 liters: 10m, status: VoucherStatus.Available, supplierId: supplierId, costPerLiter: 30m);
-            seed.VoucherExchanges.Add(new VoucherExchange
-            {
-                Id = Guid.NewGuid(),
-                ExchangeBatchId = batchId,
-                OldVoucherId = voucherId,
-                FuelTypeId = ToUuid("okko-95"),
-                BrandId = BrandIds.ForSlug("okko"),
-                Brand = "okko",
-                SupplierId = supplierId,
-                // Shares that add up to 30, deliberately NOT the settlement's 777.77.
-                SurchargeUah = 15m,
-                ActingUserId = Guid.NewGuid(),
-                ActingUserName = "Pair Author",
-                CreatedAtUtc = pairAt
-            });
+            // Shares that add up to 30, deliberately NOT the settlement's 777.77.
+            MovementBatchSeeder.AddExchangeOut(
+                seed, batchId, voucherId, newVoucherId: null,
+                surchargeShareUah: 15m, appliedCostPerLiter: null, atUtc: pairAt);
         }
         await seed.SaveChangesAsync();
 
@@ -183,8 +177,8 @@ public sealed class MovementBatchIntegrationTests : IClassFixture<TestDatabaseFi
     {
         // RESTRICT, not CASCADE. A settlement is the record of what was agreed with a supplier, so a
         // cascade here would let an ordinary audit cleanup delete the only answer to "what did we
-        // agree". The delete itself succeeds - the voucher-side RESTRICT guards the voucher, not the
-        // exchange row - and the settlement has to still be there afterwards.
+        // agree". The members are the ledger's rows now, and the ledger is append-only - so what the
+        // constraint has to hold is that removing a member does not take the settlement with it.
         await using var seed = CreateContext();
         await seed.Database.MigrateAsync();
         await ResetAsync(seed);
@@ -194,26 +188,17 @@ public sealed class MovementBatchIntegrationTests : IClassFixture<TestDatabaseFi
         var oldVoucherId = await SeedVoucherAsync(seed, "OLD-" + Guid.NewGuid().ToString("N")[..8]);
 
         MovementBatchSeeder.AddForExchange(seed, batchId, supplierId, 50m, DateTime.UtcNow);
-        seed.VoucherExchanges.Add(new VoucherExchange
-        {
-            Id = Guid.NewGuid(),
-            ExchangeBatchId = batchId,
-            OldVoucherId = oldVoucherId,
-            FuelTypeId = ToUuid("okko-95"),
-            BrandId = BrandIds.ForSlug("okko"),
-            Brand = "okko",
-            SupplierId = supplierId,
-            SurchargeUah = 50m,
-            ActingUserId = Guid.NewGuid(),
-            CreatedAtUtc = DateTime.UtcNow
-        });
+        var pair = MovementBatchSeeder.AddExchangeOut(
+            seed, batchId, oldVoucherId, newVoucherId: null,
+            surchargeShareUah: 50m, appliedCostPerLiter: null, atUtc: DateTime.UtcNow);
         await seed.SaveChangesAsync();
 
-        seed.VoucherExchanges.RemoveRange(await seed.VoucherExchanges.ToListAsync());
+        seed.VoucherMovements.Remove(pair);
         await seed.SaveChangesAsync();
 
         await using var verify = CreateContext();
-        (await verify.VoucherExchanges.AsNoTracking().CountAsync()).Should().Be(0);
+        (await verify.VoucherMovements.AsNoTracking().AnyAsync(m => m.VoucherId == oldVoucherId))
+            .Should().BeFalse("the pair is gone");
         (await verify.MovementBatches.AsNoTracking().AnyAsync(b => b.Id == batchId))
             .Should().BeTrue("the settlement survives its members - nothing cascaded from it");
     }
@@ -371,7 +356,7 @@ public sealed class MovementBatchIntegrationTests : IClassFixture<TestDatabaseFi
     /// </summary>
     private static async Task ResetAsync(ApplicationDbContext ctx)
         => await ctx.Database.ExecuteSqlRawAsync(
-            """TRUNCATE TABLE "voucher_exchanges", "movement_batches", "purchase_batches", "voucher_imports", "fulfillments", "orders", "order_line_items", "outbox_events", "payments", "fuel_vouchers", "suppliers", "users", "provider_event_outbox" RESTART IDENTITY CASCADE""");
+            """TRUNCATE TABLE "movement_batches", "purchase_batches", "voucher_imports", "fulfillments", "orders", "order_line_items", "outbox_events", "payments", "fuel_vouchers", "suppliers", "users", "provider_event_outbox" RESTART IDENTITY CASCADE""");
 
     private ApplicationDbContext CreateContext()
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()

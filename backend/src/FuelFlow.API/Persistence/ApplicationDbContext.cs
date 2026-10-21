@@ -68,14 +68,13 @@ private readonly FuelFlow.Features.Vouchers.Security.IQrCipher _qrCipher;
     public DbSet<QrParameters> QrParameters => Set<QrParameters>();
     public DbSet<VoucherImport> VoucherImports => Set<VoucherImport>();
     public DbSet<VoucherImportError> VoucherImportErrors => Set<VoucherImportError>();
-    public DbSet<VoucherExchange> VoucherExchanges => Set<VoucherExchange>();
-    // D-13 / #319: the parent voucher_exchanges.exchange_batch_id never had. Still additive - the
-    // three movement tables are folded into one ledger in later stages of D-13.
+    // D-13 / #319: the settlement the exchange pairs belong to. The pairs themselves live in the
+    // ledger (voucher_movements), on the row of the retired paper.
     public DbSet<MovementBatch> MovementBatches => Set<MovementBatch>();
     // D-13: the state history voucher_movements deliberately does not carry - see VoucherEvent.
     public DbSet<VoucherEvent> VoucherEvents => Set<VoucherEvent>();
-    // D-13 / #319: the single ledger the three movement tables fold into. Also additive for now -
-    // nothing writes it until every writer is gated on its compare-and-swap actually changing a row.
+    // D-13 / #319: the single ledger. The exchange pairs live here now, on the row of the retired
+    // paper (see VoucherMovement.ReplacedByVoucherId).
     public DbSet<VoucherMovement> VoucherMovements => Set<VoucherMovement>();
     public DbSet<MonobankStatementEntry> MonobankStatementEntries => Set<MonobankStatementEntry>();
     public DbSet<OperatorVoucherRenewal> OperatorVoucherRenewals => Set<OperatorVoucherRenewal>();
