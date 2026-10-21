@@ -571,7 +571,7 @@ export const translations: Record<Language, Record<string, string>> = {
       "Marketing discount (UAH/L) shown against the pump price on the customer card. Does not change the chargeable price.",
     "brands.minDiscount": "Min. discount",
     "brands.minDiscountHint":
-      "Minimum guaranteed discount under the pump price (UAH/L). Caps the final price at pump − this. Default 0.50.",
+      "RETIRED: the price does not read the minimum discount any more - our price is the cost plus the margin, and the column price is a reference, not a cap. The column stays until the migration that drops it.",
     "brands.deleteConfirm": "Delete {0}?",
     "brands.nominalsCount": "{0} denominations",
     "history.providerCreated": "Created brand {0}",
@@ -1680,10 +1680,10 @@ export const translations: Record<Language, Record<string, string>> = {
       "Порядок показу в мобільному застосунку. Менше = вище. 999 = кінець списку.",
     "brands.discount": "Знижка",
     "brands.discountHint":
-      "Маркетингова знижка (грн/л) проти ціни на стелі — показується клієнту. Не змінює ціну списання.",
+      "Маркетингова знижка (грн/л) проти ціни на колонці — показується клієнту. Не змінює ціну списання.",
     "brands.minDiscount": "Мін. знижка",
     "brands.minDiscountHint":
-      "Мінімальна гарантована знижка від ціни на колонці (грн/л). Обмежує фінал до «колонка − це». За замовч. 0.50.",
+      "ЗНЕСЛЕНО: ціна більше не враховує мінімальну знижку — наша ціна = собівартість + маржа, а ціна на колонці це орієнтир, а не стеля. Колонка лишається до міграції, яка її видалить.",
     "brands.deleteConfirm": "Видалити {0}?",
     "brands.nominalsCount": "{0} номіналів",
     "history.providerCreated": "Створено постачальника {0}",
@@ -2703,7 +2703,7 @@ export const translations: Record<Language, Record<string, string>> = {
       "Marketing-Rabatt (UAH/l) gegenüber der Zapfsäulen-Preises - wird dem Kunden angezeigt. Ändert den Abrechnungspreis nicht.",
     "brands.minDiscount": "Min. Rabatt",
     "brands.minDiscountHint":
-      "Mindestrabatt garantiert unter dem Zapfsäulenpreis (UAH/L). Begrenzt den Endpreis auf Säule − dies. Standard 0,50.",
+      "EINGESTELLT: den Mindestrabatt liest der Preis nicht mehr - unser Preis ist Einkaufspreis + Marge, und der Zapfsäulenpreis ist ein Referenzpreis, keine Obergrenze. Die Spalte bleibt, bis die Migration sie löscht.",
     "brands.deleteConfirm": "{0} löschen?",
     "brands.nominalsCount": "{0} Nennwerte",
     "history.providerCreated": "Anbieter erstellt {0}",
@@ -3819,7 +3819,7 @@ export const translations: Record<Language, Record<string, string>> = {
       "Descuento de marketing (UAH/l) frente al precio de surtidor: se muestra al cliente. No cambia el precio facturado.",
     "brands.minDiscount": "Desc. mín.",
     "brands.minDiscountHint":
-      "Descuento mínimo garantizado bajo el precio de surtidor (UAH/L). Limita el final a surtidor − esto. Predet. 0.50.",
+      "RETIRADO: el precio ya no lee el descuento mínimo - nuestro precio es coste + margen, y el precio de surtidor es una referencia, no un techo. La columna se queda hasta que la migración la elimine.",
     "brands.deleteConfirm": "¿Eliminar {0}?",
     "brands.nominalsCount": "{0} nominales",
     "history.providerCreated": "Proveedor creado {0}",
