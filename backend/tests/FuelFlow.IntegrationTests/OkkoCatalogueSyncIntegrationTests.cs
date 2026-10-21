@@ -331,7 +331,7 @@ public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDataba
             var gas = await context.FuelTypes.SingleAsync(f => f.Id == ToUuid("prod-gas"));
             gas.BrandFuelCode.Should().Be(
                 "SPBT", "the backfill runs after the catalogue step and has a right to be unaffected by it");
-            gas.BasePrice.Should().Be(
+            gas.PumpPricePerLiter.Should().Be(
                 45.90m, "the pump price is the one thing a catalogue failure must not cost us");
 
             logged.Errors.Should().ContainSingle(

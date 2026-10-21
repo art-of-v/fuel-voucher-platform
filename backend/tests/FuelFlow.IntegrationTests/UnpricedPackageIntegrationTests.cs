@@ -71,7 +71,7 @@ public sealed class UnpricedPackageIntegrationTests : IClassFixture<TestDatabase
         var package = SellablePackage.From(fuel, DataKinds.Real, volume.Liters, "okko");
 
         package.ComputedFinalPricePerLiter.Should().BeNull();
-        FuelPricing.TryPackagePrice(50m, null, 92.90m, 1m, 10m).Should().BeNull();
+        FuelPricing.TryPackagePrice(50m, null, 92.90m, 10m).Should().BeNull();
 
         var act = () => ServerPricing.PackagePrice(package, 10m);
         act.Should().Throw<InvalidOperationException>(

@@ -164,9 +164,6 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
         // the whole column price is a discount the business is not giving.
         fuel.DiscountPerLiter.Should().Be(0m, "a stored price of zero is not set, not free");
 
-        // And the knob is the knob. An unset minimum discount is zero in the formula anyway, so
-        // zero is the honest report - and a display number must never reach a stored setting.
-        fuel.MinDiscountPerLiter.Should().Be(0m, "the card must not seed a knob from a display number");
     }
 
     // The card never carried the code, so every fuel serialised as null and the admin screen had
@@ -365,8 +362,8 @@ private FuelNominal Package(
         supplierPricePerLiter: cost,
         marginUahPerLiter: margin ?? (final - cost),
         finalPricePerLiter: final,
-        pumpPricePerLiter: pump,
-        minDiscountPerLiter: 0.5m);
+        pumpPricePerLiter: pump
+);
 
     // The size, keyed by fuel and litres. The offer supplies the price; the nominal says the size
     // is sold at all, and it is the same row whichever pool reads it.

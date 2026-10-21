@@ -76,13 +76,13 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
                 // stating the unbound number here would pin every nominal as an override - which is
                 // exactly the drift this suite exists to rule out.
                 price: Math.Round(
-                    FuelPricing.PackagePrice(cost, profit, pump, 1m, nominal),
+                    FuelPricing.PackagePrice(cost, profit, pump, nominal),
                     2, MidpointRounding.AwayFromZero),
                 supplierPricePerLiter: cost,
                 marginUahPerLiter: profit,
                 marginPercent: 10m,
-                pumpPricePerLiter: pump,
-                minDiscountPerLiter: 1m);
+                pumpPricePerLiter: pump
+);
         }
     }
 
@@ -146,7 +146,6 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
                 fuel.SupplierPricePerLiter,
                 await MarginFor(fuel),
                 fuel.PumpPricePerLiter,
-                fuel.MinDiscountPerLiter,
                 volume.Liters);
             price.Should().Be(Math.Round(59m * volume.Liters, 2, MidpointRounding.AwayFromZero));
             // The struck "before" price is the pump price × litres, recomputed from the offer rather than
@@ -172,7 +171,6 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
         // now, so one read covers every volume of the fuel - there is no per-package copy left to miss.
         fuel.SupplierPricePerLiter.Should().Be(54m);
         (await MarginFor(fuel)).Should().Be(5m, "the margin lives on the fuel; the offer's own copy is never written");
-        fuel.MinDiscountPerLiter.Should().Be(1m);
     }
 
     [Fact]
@@ -184,8 +182,10 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
         _context.ChangeTracker.Clear();
 
         var gas = await _context.FuelTypes.FirstAsync(f => f.Id == ToUuid("okko-gas"));
-        gas.BasePrice.Should().Be(46.90m);   // колонка
-        gas.DiscountPrice.Should().Be(33m);   // cost 29 + profit 4, under 46.90 - 1
+        // The column price is written - it is the reference. The price the customer pays is
+        // computed from the knobs, so it is not written at all.
+        gas.PumpPricePerLiter.Should().Be(46.90m);
+        gas.FinalPerLiter().Should().Be(33m);   // cost 29 + profit 4, under the column price
     }
 
     [Fact]
@@ -199,16 +199,17 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
         await Handler().HandleAsync(Import("fuelCode,pricePerLiter\r\nA-95,57.00\r\n"), Guid.Empty, "tester");
         _context.ChangeTracker.Clear();
 
-var (volume, fuel) = await ReadAsync("okko-95-20");
+        var (volume, fuel) = await ReadAsync("okko-95-20");
         fuel.PumpPricePerLiter.Should().Be(57m);
-        fuel.FinalPerLiter().Should().Be(56m);
+        // The price is the column price: the formula is min(cost + margin, pump) and the margin
+        // reaches the pump, so the fuel sells at the pump and the customer saves nothing against it.
+        fuel.FinalPerLiter().Should().Be(57m);
         var price = FuelPricing.PackagePrice(
             fuel.SupplierPricePerLiter,
             await MarginFor(fuel),
             fuel.PumpPricePerLiter,
-            fuel.MinDiscountPerLiter,
-                volume.Liters);
-        price.Should().Be(1120m);
+            volume.Liters);
+        price.Should().Be(1140m);
         // The struck "before" price is pump × litres, recomputed from the offer rather than read from a
         // stored column - which is what stops a stale copy from leaking a supplier cost.
         FuelPricing.OriginalPackagePrice(fuel.PumpPricePerLiter, volume.Liters, price)
@@ -283,7 +284,7 @@ var (wogVolume, wogFuel) = await ReadAsync("wog-95-20");
         // own rate - 56 cost + 5 margin = 61, capped by the ceiling at pump 58 less the guaranteed
         // 1 UAH discount, which is 57 and therefore what the customer pays. Derived through the
         // formula rather than from a stored total, which is all there has ever been.
-        wogFuel.FinalPerLiter().Should().Be(57m);
+        wogFuel.FinalPerLiter().Should().Be(58m);
     }
 
     [Fact]

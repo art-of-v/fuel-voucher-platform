@@ -5,10 +5,25 @@ using FuelFlow.SharedKernel.Domain;
 namespace FuelFlow.UnitTests.Orders;
 
 /// <summary>
-/// Pricing epic slice 1a: final/л = min(cost + profit, pump − minDiscount), with a
-/// null-pump fallback to cost + profit. Covers the shared <see cref="FuelPricing"/>
-/// formula and the checkout <see cref="ServerPricing"/> that recomputes from it.
+/// Pricing epic slice 1a: final/л = min(cost + profit, pump), with a null-pump fallback to
+/// cost + profit. Covers the shared <see cref="FuelPricing"/> formula and the checkout
+/// <see cref="ServerPricing"/> that recomputes from it.
 /// </summary>
+/// <remarks>
+/// <para>
+/// <b>There is no minimum-discount term any more.</b> The formula used to be
+/// <c>min(cost + profit, pump − minDiscount)</c>: the column price was the ceiling with a dial
+/// under it, and the dial was a second way of saying the same thing as the margin. It is gone by
+/// decision (planning D-23), and the price is now simply never above the column.
+/// </para>
+/// <para>
+/// The reason is not tidiness. The dial was maintained by four writers, and the admin card fell back
+/// to a <em>display</em> number when the dial was unset - so a fuel whose stored price was zero got
+/// "the price is at least the whole column price under the column" written into it, and the formula
+/// then produced zero. A price of zero is a price, and it says the customer takes the fuel for
+/// nothing.
+/// </para>
+/// </remarks>
 public sealed class PricingFormulaTests
 {
     // --- FuelPricing.FinalPerLiterOrNull -----------------------------------
@@ -26,8 +41,7 @@ public sealed class PricingFormulaTests
         var result = FuelPricing.FinalPerLiterOrNull(
             cost is null ? null : (decimal)cost.Value,
             margin is null ? null : (decimal)margin.Value,
-            pump is null ? null : (decimal)pump.Value,
-            0m);
+            pump is null ? null : (decimal)pump.Value);
 
         // Treating a missing margin as zero would publish a fuel for free; treating a missing cost as
         // zero would let the below-cost guard see a cost of zero and wave the sale through.
@@ -39,22 +53,18 @@ public sealed class PricingFormulaTests
     {
         // cost-plus, and the same inputs through the non-nullable overload: the wrapper decides whether
         // there is a price, it does not have its own arithmetic.
-        FuelPricing.FinalPerLiterOrNull(49m, 2m, 55m, 0.5m)
-            .Should().Be(FuelPricing.FinalPerLiter(49m, 2m, 55m, 0.5m));
+        FuelPricing.FinalPerLiterOrNull(49m, 2m, 55m)
+            .Should().Be(FuelPricing.FinalPerLiter(49m, 2m, 55m));
 
-        // Ceiling binding: 49 + 2 = 51 against 55 - 4 = 51 is equal here, so use a binding case.
-        FuelPricing.FinalPerLiterOrNull(49m, 2m, 50m, 0m)
+        // Ceiling binding: 49 + 2 = 51 against a column price of 50 → the column caps it.
+        FuelPricing.FinalPerLiterOrNull(49m, 2m, 50m)
             .Should().Be(50m);
     }
 
     [Fact]
     public void FinalPerLiterOrNull_WithoutAPump_FallsBackToCostPlus()
     {
-        FuelPricing.FinalPerLiterOrNull(49m, 2m, null, 0m).Should().Be(51m);
-
-        // And a missing min-discount is zero, not an error: the column is nullable and a fuel priced
-        // before discounts existed has none.
-        FuelPricing.FinalPerLiterOrNull(49m, 2m, null, null).Should().Be(51m);
+        FuelPricing.FinalPerLiterOrNull(49m, 2m, null).Should().Be(51m);
     }
 
     // --- FuelPricing.FinalPerLiter -----------------------------------------
@@ -62,33 +72,42 @@ public sealed class PricingFormulaTests
     [Fact]
     public void FinalPerLiter_CostPlusBelowCeiling_ReturnsCostPlus()
     {
-        // cost 49 + profit 2 = 51; ceiling 55 - 0.5 = 54.5 → cost-plus wins.
-        FuelPricing.FinalPerLiter(49m, 2m, 55m, 0.5m).Should().Be(51m);
+        // cost 49 + profit 2 = 51; ceiling 55 → cost-plus wins.
+        FuelPricing.FinalPerLiter(49m, 2m, 55m).Should().Be(51m);
     }
 
     [Fact]
     public void FinalPerLiter_CeilingBelowCostPlus_ReturnsCeiling()
     {
-        // cost 49 + profit 5 = 54; ceiling 55 - 0.5 = 54.5 → still cost-plus.
-        FuelPricing.FinalPerLiter(49m, 5m, 55m, 0.5m).Should().Be(54m);
-        // cost 49 + profit 7 = 56; ceiling 55 - 0.5 = 54.5 → ceiling caps it.
-        FuelPricing.FinalPerLiter(49m, 7m, 55m, 0.5m).Should().Be(54.5m);
+        // cost 49 + profit 5 = 54; ceiling 55 → still cost-plus.
+        FuelPricing.FinalPerLiter(49m, 5m, 55m).Should().Be(54m);
+        // cost 49 + profit 7 = 56; ceiling 55 → the column caps it.
+        FuelPricing.FinalPerLiter(49m, 7m, 55m).Should().Be(55m);
     }
 
     [Fact]
     public void FinalPerLiter_NullPump_FallsBackToCostPlus()
     {
-        FuelPricing.FinalPerLiter(49m, 2m, null, 0.5m).Should().Be(51m);
-        // minDiscount is irrelevant without a pump ceiling.
-        FuelPricing.FinalPerLiter(49m, 2m, null, 5m).Should().Be(51m);
+        FuelPricing.FinalPerLiter(49m, 2m, null).Should().Be(51m);
     }
 
     [Fact]
-    public void FinalPerLiter_PumpMinusDiscountBelowCost_ReturnsBelowCost()
+    public void FinalPerLiter_PumpBelowCostPlus_ReturnsBelowCost()
     {
         // Below-cost guarding is deferred to slice 3; the pure formula still returns
         // the ceiling even when it dips under cost so the math stays predictable.
-        FuelPricing.FinalPerLiter(50m, 2m, 49m, 0.5m).Should().Be(48.5m);
+        FuelPricing.FinalPerLiter(50m, 2m, 49m).Should().Be(49m);
+    }
+
+    [Fact]
+    public void FinalPerLiter_IsNeverAboveTheColumnPrice()
+    {
+        // The one property the model change was for: we are never dearer than the pump. The old
+        // formula could be, by a margin's width, whenever the minimum-discount dial was unset.
+        foreach (var pump in new[] { 40m, 50m, 60m })
+        {
+            FuelPricing.FinalPerLiter(1m, 100m, pump).Should().Be(pump);
+        }
     }
 
     // --- FuelPricing.IsBelowCost -------------------------------------------
@@ -96,31 +115,31 @@ public sealed class PricingFormulaTests
     [Fact]
     public void IsBelowCost_CeilingForcesPriceUnderCost_IsTrue()
     {
-        // cost 50, cost-plus 52, but pump 49 − 0.5 = 48.5 binds → final 48.5 < 50.
-        FuelPricing.IsBelowCost(50m, 2m, 49m, 0.5m).Should().BeTrue();
+        // cost 50, cost-plus 52, but the column price is 49 → final 49 < 50.
+        FuelPricing.IsBelowCost(50m, 2m, 49m).Should().BeTrue();
     }
 
     [Fact]
     public void IsBelowCost_PriceAtOrAboveCost_IsFalse()
     {
         // cost-plus 51 ≥ cost 49, no ceiling binding.
-        FuelPricing.IsBelowCost(49m, 2m, 55m, 0.5m).Should().BeFalse();
+        FuelPricing.IsBelowCost(49m, 2m, 55m).Should().BeFalse();
         // final exactly equals cost is not "below".
-        FuelPricing.IsBelowCost(50m, 0m, 55m, 0m).Should().BeFalse();
+        FuelPricing.IsBelowCost(50m, 0m, 55m).Should().BeFalse();
     }
 
     [Fact]
     public void IsBelowCost_NullPump_NeverBelow()
     {
         // No ceiling → final = cost + profit ≥ cost, so it can never dip under.
-        FuelPricing.IsBelowCost(49m, 2m, null, 5m).Should().BeFalse();
+        FuelPricing.IsBelowCost(49m, 2m, null).Should().BeFalse();
     }
 
     [Fact]
     public void IsBelowCost_ZeroOrUnknownCost_IsFalse()
     {
         // With no supplier cost recorded there is nothing to sell below.
-        FuelPricing.IsBelowCost(0m, 2m, 1m, 0m).Should().BeFalse();
+        FuelPricing.IsBelowCost(0m, 2m, 1m).Should().BeFalse();
     }
 
     // --- FuelPricing.OriginalPackagePrice ----------------------------------
@@ -154,14 +173,13 @@ public sealed class PricingFormulaTests
             Liters = 10m,
             SupplierPricePerLiter = 49m,     // cost
             MarginUahPerLiter = 7m,          // profit → cost-plus 56
-            PumpPricePerLiter = 55m,
-            MinDiscountPerLiter = 0.5m,      // ceiling 54.5 binds
+            PumpPricePerLiter = 55m,            // ceiling 55 binds
             // No stale stored final to ignore any more: the offer stopped carrying one on 2026-10-17.
             // What this pins is that the knobs, and only the knobs, decide the charge.
         };
 
-        // 54.5 * 10 = 545
-        ServerPricing.PackagePrice(pkg, 10m).Should().Be(545);
+        // 55 * 10 = 550
+        ServerPricing.PackagePrice(pkg, 10m).Should().Be(550);
     }
 
 [Fact]
@@ -209,7 +227,6 @@ public void TryPackagePrice_WithKnobs_IsTheSameNumberTheThrowingFormReturns()
         SupplierPricePerLiter = 49m,
         MarginUahPerLiter = 7m,
         PumpPricePerLiter = 55m,
-        MinDiscountPerLiter = 0.5m,
     };
 
     // 54.5 * 10 = 545, and with a 5 ₴/L term discount off the per-litre price: 49.5 * 10 = 495.
@@ -236,16 +253,15 @@ public void TryPackagePrice_WithKnobs_IsTheSameNumberTheThrowingFormReturns()
         var pkg = new SellablePackage
         {
             Liters = 50m,
-            SupplierPricePerLiter = 54m,             // per-litre cost
-            MarginUahPerLiter = 7m,                 // cost-plus would be 61
-            PumpPricePerLiter = 55m,                // ceiling 55 - 5 = 50, under the 54 cost
-            MinDiscountPerLiter = 5m,
+            SupplierPricePerLiter = 60m,             // per-litre cost
+            MarginUahPerLiter = 7m,                 // cost-plus would be 67
+            PumpPricePerLiter = 55m,                // ceiling 55, under the 60 cost
         };
 
         // What the customer is actually charged, per litre:
-        (ServerPricing.PackagePrice(pkg, 50m) / 50m).Should().BeLessThan(54m);
+        (ServerPricing.PackagePrice(pkg, 50m) / 50m).Should().BeLessThan(60m);
 
-        // 2500 for 50 L against a cost of 54/litre is a 4 UAH/litre loss and is refused. Per litre
+        // 2750 for 50 L against a cost of 60/litre is a 5 UAH/litre loss and is refused. Per litre
         // against per litre — the mistake this test has always covered was comparing the total to
         // the rate.
         ServerPricing.IsBelowCost(pkg, 0m).Should().BeTrue();
@@ -275,8 +291,7 @@ public void TryPackagePrice_WithKnobs_IsTheSameNumberTheThrowingFormReturns()
             Liters = 10m,
             SupplierPricePerLiter = 50m,
             MarginUahPerLiter = 2m,
-            PumpPricePerLiter = 40m,   // ceiling 39 < cost 50
-            MinDiscountPerLiter = 0m,
+            PumpPricePerLiter = 40m,   // ceiling 40 < cost 50
         };
 
         ServerPricing.TryGetBelowCostVerdict(pkg, 0m)
@@ -313,7 +328,6 @@ public void TryPackagePrice_WithKnobs_IsTheSameNumberTheThrowingFormReturns()
             SupplierPricePerLiter = 40m,
             MarginUahPerLiter = 5m,
             PumpPricePerLiter = 92.90m,
-            MinDiscountPerLiter = 1m,
         };
 
         ServerPricing.TryGetBelowCostVerdict(pkg, 0m)
@@ -331,7 +345,6 @@ public void TryPackagePrice_WithKnobs_IsTheSameNumberTheThrowingFormReturns()
             SupplierPricePerLiter = 50m,
             MarginUahPerLiter = 9m,
             PumpPricePerLiter = 92.90m,
-            MinDiscountPerLiter = 1m,
         };
 
         ServerPricing.TryGetBelowCostVerdict(pkg, 0m)

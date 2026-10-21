@@ -62,7 +62,7 @@ public sealed class PriceFieldsStayNullTests
         // There is no price to publish, and the model says so rather than inventing one: the
         // storefront shows the column beside it and "not in stock" next to that.
         FuelPricing.FinalPerLiterOrNull(
-            fuel.SupplierPricePerLiter, fuel.MarginUahPerLiter, fuel.PumpPricePerLiter, fuel.MinDiscountPerLiter)
+            fuel.SupplierPricePerLiter, fuel.MarginUahPerLiter, fuel.PumpPricePerLiter)
             .Should().BeNull();
     }
 
@@ -88,7 +88,6 @@ public sealed class PriceFieldsStayNullTests
             SupplierPricePerLiter = null,
             MarginUahPerLiter = null,
             PumpPricePerLiter = 92.90m,
-            MinDiscountPerLiter = 0m,
         };
 
         ServerPricing.TryGetBelowCostVerdict(package, 0m)

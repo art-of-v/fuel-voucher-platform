@@ -152,9 +152,13 @@ public sealed class PriceHistoryRecorder
             // the knobs instead of the number. Derived from the fuel's own margin, for the same reason
             // the row above is.
             FinalPricePerLiter = FuelPricing.FinalPerLiterOrNull(
-        fuel.SupplierPricePerLiter, margin, fuel.PumpPricePerLiter, fuel.MinDiscountPerLiter),
+        fuel.SupplierPricePerLiter, margin, fuel.PumpPricePerLiter),
             PumpPricePerLiter = fuel.PumpPricePerLiter,
-            MinDiscountPerLiter = fuel.MinDiscountPerLiter,
+                // The minimum discount is retired, so the history does not record one: the price is
+                // min(cost + margin, pump), and a column that nothing reads any more would be a
+                // claim about the fuel that is not true. The rows written before it went are left
+                // as they are - a history is a record of what was true then.
+                MinDiscountPerLiter = null,
             EffectiveFromUtc = at,
             RecordedAtUtc = DateTime.UtcNow,
             ChangedByUserId = actingUserId == Guid.Empty ? null : actingUserId,
@@ -180,7 +184,11 @@ public sealed class PriceHistoryRecorder
         && previous.MarginUahPerLiter == fuel.MarginUahPerLiter
         && previous.MarginPercent == fuel.MarginPercent
         && previous.FinalPricePerLiter == FuelPricing.FinalPerLiterOrNull(
-        fuel.SupplierPricePerLiter, fuel.MarginUahPerLiter, fuel.PumpPricePerLiter, fuel.MinDiscountPerLiter)
+        fuel.SupplierPricePerLiter, fuel.MarginUahPerLiter, fuel.PumpPricePerLiter)
         && previous.PumpPricePerLiter == fuel.PumpPricePerLiter
-        && previous.MinDiscountPerLiter == fuel.MinDiscountPerLiter;
+        // The retired knob: the rows this recorder writes carry a null, and a row written before it
+        // went carries the number it had then. Comparing against the fuel's column would open a
+        // new row for every reprice of a fuel whose stored knob never changes, so the comparison
+        // is against what this recorder writes.
+        && previous.MinDiscountPerLiter == null;
 }

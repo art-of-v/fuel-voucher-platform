@@ -108,7 +108,9 @@ var entry = (await _handler.HandleAsync(new GetFuelPriceHistoryQuery(ToUuid("fue
     entry.MarginUahPerLiter.Should().Be(2m);
     entry.FinalPricePerLiter.Should().Be(52m);
     entry.PumpPricePerLiter.Should().Be(55m);
-    entry.MinDiscountPerLiter.Should().Be(1m);
+    // The minimum discount is retired: the price is min(cost + margin, pump) and the column is not
+    // a knob any more, so the history does not claim the fuel had one.
+    entry.MinDiscountPerLiter.Should().BeNull();
 entry.Reason.Should().Be(PriceHistoryReasons.Operator);
 }
 
@@ -124,7 +126,6 @@ private async Task SeedAsync(string fuelTypeId, int at, decimal margin, string? 
             MarginUahPerLiter = margin,
             FinalPricePerLiter = 50m + margin,
             PumpPricePerLiter = 55m,
-            MinDiscountPerLiter = 1m,
             EffectiveFromUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddMinutes(at),
             RecordedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddMinutes(at),
             Reason = PriceHistoryReasons.Operator

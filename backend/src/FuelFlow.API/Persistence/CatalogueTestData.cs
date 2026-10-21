@@ -48,7 +48,6 @@ internal static class CatalogueTestData
         decimal? marginPercent = null,
         decimal? finalPricePerLiter = null,
         decimal? pumpPricePerLiter = null,
-        decimal? minDiscountPerLiter = null,
         DateTime? createdAtUtc = null,
         DateTime? updatedAtUtc = null)
     {
@@ -95,7 +94,6 @@ internal static class CatalogueTestData
         if (supplierPricePerLiter is not null) fuel.SupplierPricePerLiter = supplierPricePerLiter;
         if (marginPercent is not null) fuel.MarginPercent = marginPercent;
         if (pumpPricePerLiter is not null) fuel.PumpPricePerLiter = pumpPricePerLiter;
-        if (minDiscountPerLiter is not null) fuel.MinDiscountPerLiter = minDiscountPerLiter;
 
         // `finalPricePerLiter` no longer configures anything — nothing stores the derived
         // figure — so it is checked against the formula instead of being written. Every call site
@@ -107,8 +105,7 @@ internal static class CatalogueTestData
 var computed = FuelPricing.FinalPerLiterOrNull(
             fuel.SupplierPricePerLiter,
             margin,
-            fuel.PumpPricePerLiter,
-            fuel.MinDiscountPerLiter);
+            fuel.PumpPricePerLiter);
         if (computed != finalPricePerLiter)
         {
             throw new InvalidOperationException(
@@ -147,7 +144,6 @@ var computed = FuelPricing.FinalPerLiterOrNull(
         decimal? marginPercent = null,
         decimal? finalPricePerLiter = null,
         decimal? pumpPricePerLiter = null,
-        decimal? minDiscountPerLiter = null,
         DateTime? createdAtUtc = null,
         DateTime? updatedAtUtc = null)
     {
@@ -157,7 +153,7 @@ var computed = FuelPricing.FinalPerLiterOrNull(
         context.SeedOffer(
             BrandId, fuelTypeId, isTestData,
             supplierPricePerLiter, marginUahPerLiter, marginPercent,
-            finalPricePerLiter, pumpPricePerLiter, minDiscountPerLiter,
+            finalPricePerLiter, pumpPricePerLiter,
             createdAtUtc, updatedAtUtc);
 
         // `price` used to be written as the per-package override, so it was the one number a fixture

@@ -178,7 +178,7 @@ public sealed class ImportUpgWogPricesCommandHandler
             var profit = fuel.MarginUahPerLiter ?? 0m;
             var minDiscount = fuel.MinDiscountPerLiter ?? DefaultMinDiscountPerLiter;
 
-            if (!fuel.AllowBelowCost && FuelPricing.IsBelowCost(cost, profit, row.PricePerLiter, minDiscount))
+            if (!fuel.AllowBelowCost && FuelPricing.IsBelowCost(cost, profit, row.PricePerLiter))
             {
                 belowCost.Add(fuel.Name);
                 continue;
@@ -220,12 +220,13 @@ public sealed class ImportUpgWogPricesCommandHandler
                 // every fuel whose pump had moved - which, at a cron of every fifteen minutes, is
                 // up to ninety-six times a day.
                 var customerPrice = FuelPricing.FinalPerLiterOrNull(
-                    fuel.SupplierPricePerLiter, fuel.MarginUahPerLiter, row.PricePerLiter, minDiscount);
+                    fuel.SupplierPricePerLiter, fuel.MarginUahPerLiter, row.PricePerLiter);
 
-                fuel.BasePrice = Math.Round(row.PricePerLiter, 2, MidpointRounding.AwayFromZero);
-                fuel.DiscountPrice = customerPrice is { } price
-                    ? Math.Round(price, 2, MidpointRounding.AwayFromZero)
-                    : null;
+                // The price the customer pays is computed, so there is nothing to write for it: the
+                // fuel carries the cost, the margin and the column price, and every reader derives
+                // the customer price the same way. The column price is still written - it is the
+                // reference the customer's saving is measured against.
+                fuel.PumpPricePerLiter = row.PricePerLiter;
                 fuel.UpdatedAtUtc = now;
             }
 
@@ -271,15 +272,12 @@ public sealed class ImportUpgWogPricesCommandHandler
                 // derived, not normalised: `ДП Mustang+` and `upg95` are both already the name.
                 Name = code,
                 BrandFuelCode = code,
-                // The pump is the reference, and it belongs on BasePrice: that is the list price the
-                // customer's saving is measured against. The customer price is a different thing, and
-                // it is NULL: we know what the brand charges and nothing about what we pay, so
-                // nobody has priced this fuel yet - an operator sets the cost and the margin, and it
-                // becomes a real price. Zero here would claim we sell this fuel for nothing.
-                BasePrice = Math.Round(pump, 2, MidpointRounding.AwayFromZero),
-                DiscountPrice = null,
+                // The pump is the column price, and it is the reference the customer's saving is
+                // measured against. The customer price is a different thing and it is not written:
+                // we know what the brand charges and nothing about what we pay, so nobody has
+                // priced this fuel yet - an operator sets the cost and the margin, and every
+                // reader derives the price the same way.
                 PumpPricePerLiter = Math.Round(pump, 2, MidpointRounding.AwayFromZero),
-                MinDiscountPerLiter = DefaultMinDiscountPerLiter,
                 MarginUahPerLiter = null,
                 AllowBelowCost = false,
                 CreatedAtUtc = now,

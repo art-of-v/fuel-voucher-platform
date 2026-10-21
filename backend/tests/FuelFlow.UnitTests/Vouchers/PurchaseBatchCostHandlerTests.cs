@@ -193,9 +193,10 @@ private FuelNominal NewPackage(string fuelTypeId, decimal liters)
             .Where(v => v.FuelTypeId == ToUuid("okko-dp")).OrderBy(v => v.Liters).ToListAsync();
         // Nothing per size any more: the cost moved the fuel's rate, and every nominal follows it.
         sizes.Should().HaveCount(2);
-        fuel.DiscountPrice.Should().Be(27);   // final/L rounded
-        fuel.BasePrice.Should().Be(27);       // pump null -> final + minDiscount(0)
-
+        // The price the customer pays is COMPUTED from the knobs, so the recalculator writes the
+        // cost and the margin and leaves the stored copies alone - they are not what it reads.
+        fuel.SupplierPricePerLiter.Should().Be(25);
+        fuel.DiscountPrice.Should().Be(52, "the copy is not what the price is computed from any more");
         _context.AuditEventOutbox.Should().ContainSingle(e => e.EventType == "BatchCostEntered");
     }
 
@@ -399,7 +400,7 @@ private FuelNominal NewPackage(string fuelTypeId, decimal liters)
         _context.SeedPackage(
             id: Guid.NewGuid().ToString(), BrandId: BrandIds.Okko, fuelTypeId: "okko-loss",
             liters: 10m, price: 0m,
-            marginUahPerLiter: 2m, pumpPricePerLiter: 49m, minDiscountPerLiter: 0.5m);
+            marginUahPerLiter: 2m, pumpPricePerLiter: 49m);
         _context.SaveChanges();
 
         var import = SeedImport();

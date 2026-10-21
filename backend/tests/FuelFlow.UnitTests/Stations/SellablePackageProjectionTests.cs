@@ -56,7 +56,6 @@ MarginUahPerLiter = 2m,
         SupplierPricePerLiter = 49m,
             MarginPercent = 4m,
             PumpPricePerLiter = 55m,
-            MinDiscountPerLiter = 0.5m,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };
@@ -104,8 +103,7 @@ MarginUahPerLiter = 2m,
         {
             SupplierPricePerLiter = 49m,
             MarginUahPerLiter = 2m,
-            PumpPricePerLiter = 50m,
-            MinDiscountPerLiter = 0m
+            PumpPricePerLiter = 50m
         };
 
         // The ceiling binds, so the customer price is 50 and not the 51 a cost-plus reading would give.

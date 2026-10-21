@@ -99,7 +99,7 @@ var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
     // Our price when we can compute it; the column price when we cannot. The two are the same
     // number once a cost is known, because the formula caps our price at the pump price anyway.
     var ourPrice = FuelPricing.FinalPerLiterOrNull(
-        x.SupplierPricePerLiter, x.MarginUahPerLiter, x.PumpPricePerLiter, x.MinDiscountPerLiter);
+        x.SupplierPricePerLiter, x.MarginUahPerLiter, x.PumpPricePerLiter);
     var perLiter = ourPrice ?? x.PumpPricePerLiter ?? 0m;
     var price = Math.Round(perLiter * x.Liters, 2, MidpointRounding.AwayFromZero);
 

@@ -87,7 +87,6 @@ public sealed class BrandFuelControllerTests : IDisposable
             SupplierPricePerLiter = 50m,
             MarginUahPerLiter = 2m,
             PumpPricePerLiter = 49m,
-            MinDiscountPerLiter = 0.5m,
             AllowBelowCost = allowBelowCost,
             // Stated, not defaulted: the flag is required on both fuel write paths, and
             // these tests are about pricing rather than rehearsal data.
@@ -103,7 +102,6 @@ public sealed class BrandFuelControllerTests : IDisposable
             SupplierPricePerLiter = 50m,
             MarginUahPerLiter = 2m,
             PumpPricePerLiter = 49m,
-            MinDiscountPerLiter = 0.5m,
             AllowBelowCost = allowBelowCost,
             // Stated, not defaulted - see BelowCostCreate.
             IsTestData = false
@@ -261,8 +259,8 @@ public sealed class BrandFuelControllerTests : IDisposable
         result.Should().BeOfType<NotFoundResult>();
     }
 
-    // Regression for #113: the per-liter headline (base/discount) and the package total must carry
-    // kopecks, not round to whole UAH. supplier 95 + margin 2.86 ⇒ final 97.86 /L, 10 L ⇒ 978.60.
+    // Regression for #113: the per-liter price and the package total must carry kopecks, not round to
+    // whole UAH. supplier 95 + margin 2.86 ⇒ 97.86 /L, 10 L ⇒ 978.60.
     [Fact]
     public async Task AddFuel_FractionalPerLiterPrice_PreservesKopecksOnHeadlineAndPackage()
     {
@@ -276,8 +274,11 @@ public sealed class BrandFuelControllerTests : IDisposable
         result.Should().BeOfType<CreatedResult>();
 
         var fuel = await _context.FuelTypes.SingleAsync(f => f.BrandId == TestOkko);
-        fuel.BasePrice.Should().Be(97.86m);
-        fuel.DiscountPrice.Should().Be(97.86m);
+        // The price the customer pays is computed from the knobs, so the kopecks are in the
+        // computation and not in a stored copy of it.
+        fuel.FinalPerLiter().Should().Be(97.86m);
+        fuel.BasePrice.Should().BeNull("the reference is the column price, and it is not stored twice");
+        fuel.DiscountPrice.Should().BeNull("the price is computed, and it is not stored");
 
         var volume = await _context.FuelNominals.SingleAsync(n => n.FuelTypeId == fuel.Id);
     }
@@ -517,7 +518,7 @@ public sealed class BrandFuelControllerTests : IDisposable
 
         var fuel = await _context.FuelTypes.SingleAsync(f => f.BrandId == TestOkko);
         fuel.AllowBelowCost.Should().BeTrue();
-        fuel.FinalPerLiter().Should().Be(48.5m);   // min(cost 50 + margin 2, pump 49 - minDisc 0.5)
+        fuel.FinalPerLiter().Should().Be(49m);      // min(cost 50 + margin 2, pump 49)
 
         alerts.Verify(a => a.SendAsync(
             AlertSeverity.Warning, It.IsAny<string>(), It.IsAny<string>(),
@@ -562,7 +563,7 @@ public sealed class BrandFuelControllerTests : IDisposable
         result.Should().BeOfType<OkObjectResult>();
 
         var fuel = await _context.FuelTypes.SingleAsync(f => f.Id == ToUuid("test-fuel-a"));
-        fuel.FinalPerLiter().Should().Be(48.5m);
+        fuel.FinalPerLiter().Should().Be(49m);
         fuel.AllowBelowCost.Should().BeTrue();
 
         alerts.Verify(a => a.SendAsync(

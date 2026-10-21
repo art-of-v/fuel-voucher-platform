@@ -30,7 +30,6 @@ public static class OrderLinePricing
         decimal? SupplierPricePerLiter,
         decimal? MarginUahPerLiter,
         decimal? PumpPricePerLiter,
-        decimal? MinDiscountPerLiter,
         decimal? DiscountPerLiter,
         string? TermCode);
 
@@ -57,7 +56,6 @@ public static class OrderLinePricing
                 package.SupplierPricePerLiter,
                 package.MarginUahPerLiter,
                 package.PumpPricePerLiter,
-                package.MinDiscountPerLiter,
                 discountPerLiter,
                 termCode),
             Options);

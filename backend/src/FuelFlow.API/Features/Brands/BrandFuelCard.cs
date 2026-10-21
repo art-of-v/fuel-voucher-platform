@@ -45,18 +45,20 @@ internal static class BrandFuelCard
     /// </summary>
     /// <remarks>
     /// The column price is what the pump says; the customer price is what they pay; the saving is
-    /// the difference. A fuel with no customer price yet saves nothing, because nothing has been
-    /// promised - and the old code read a zero as the price and made the saving the whole pump
-    /// price, which is the "a price of zero is a price" trap showing up on a screen.
-    ///
-    /// A stored price of zero means "not set", not "free", so it is the same absence of a saving
-    /// as a missing price - and the difference the customer would be promised is the whole column
-    /// price, which is the number the card used to show.
+    /// the difference. **Both numbers are computed**: the column price is the fuel's pump price, and
+    /// the customer price is the formula's own answer. A fuel nobody has priced saves nothing,
+    /// because nothing has been promised - and a fuel whose price is unknown is not a fuel priced at
+    /// zero, which is the "a price of zero is a price" trap showing up on a screen.
     /// </remarks>
     private static decimal CustomerSavingPerLiter(FuelTypeEntity fuel)
-        => fuel.DiscountPrice is { } price && price > 0
-            ? Math.Max(0, fuel.BasePrice - price)
-            : 0m;
+    {
+        if (fuel.PumpPricePerLiter is not { } column || fuel.FinalPerLiter() is not { } price)
+        {
+            return 0m;
+        }
+
+        return Math.Max(0, column - price);
+    }
 
     public static BrandFuelDto Build(FuelTypeEntity fuel, IReadOnlyList<SellablePackage> packages)
     {
@@ -94,19 +96,9 @@ internal static class BrandFuelCard
             // operator is looking at anyway.
             FinalPricePerLiter = fuel.FinalPerLiter() ?? fuel.PumpPricePerLiter ?? 0m,
             PumpPricePerLiter = fuel.PumpPricePerLiter,
-            // The knob is the knob. It used to fall back to the displayed saving, which is how a
-            // DISPLAY number reached a stored setting: a fuel whose stored discount price is zero
-            // and whose knob is unset showed a saving of the whole column price, the knob was seeded
-            // with it, and an operator saving the card wrote "the price is at least 92.90 under the
-            // column" into the fuel - after which the price formula yields
-            // min(cost + margin, pump - 92.90) = 0 and the below-cost guard refuses every sale.
-            //
-            // An unset knob means zero in the formula anyway (`FinalPerLiterOrNull` reads a null
-            // minimum discount as 0), so reporting 0 says exactly what the price will be, and the
-            // card's own price above stays the price the server would charge.
-            MinDiscountPerLiter = fuel.MinDiscountPerLiter ?? 0m,
-            // base_price is the pump/reference price; the actual customer discount
-            // is base - final. Derived here (display only) so the admin UI can show it.
+            // The reference is the column price, and the discount is the difference between it and
+            // the price the customer pays. Both computed: the card no longer reads a stored copy of
+            // either, because the copies were four writers' opinions about one number.
             DiscountPerLiter = CustomerSavingPerLiter(fuel),
             AllowBelowCost = fuel.AllowBelowCost,
             // Read off the fuel, not derived from the packages. A code is how the catalogue import

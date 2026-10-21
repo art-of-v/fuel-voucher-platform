@@ -60,7 +60,18 @@ public sealed class FuelTypeEntity
     /// </para>
     /// </remarks>
     public string? BrandFuelCode { get; set; }
-    public decimal BasePrice { get; set; }
+
+    /// <summary>
+    /// The list price of the fuel per litre - the price before our discount. It is the reference
+    /// the customer's saving is measured against. NULL means it is not set: the reference is the
+    /// COLUMN price, and nobody has recorded a pump price for this fuel.
+    /// </summary>
+    /// <remarks>
+    /// A copy, and the copy is what this whole change is about: the reference is the pump price
+    /// next door, and the customer's price is computed from the knobs. Kept as a column until the
+    /// migration that drops it, and nothing writes it any more.
+    /// </remarks>
+    public decimal? BasePrice { get; set; }
 
     /// <summary>
     /// What the customer pays per litre. NULL means it is not set: the grade is in the
@@ -78,6 +89,12 @@ public sealed class FuelTypeEntity
     /// margin there is no customer price to quote. A grade with no price is not on the shelf -
     /// its computed price is null and the storefront does not list a package with no price - so
     /// nothing reaches a customer at 0.
+    /// </para>
+    /// <para>
+    /// A copy, and the copy is what this whole change is about: the price the customer pays is
+    /// computed from the knobs by <see cref="FinalPerLiter"/>, and four different writers kept
+    /// this column in step with it by hand. Kept as a column until the migration that drops it,
+    /// and nothing writes it any more.
     /// </para>
     /// </remarks>
     public decimal? DiscountPrice { get; set; }
@@ -159,7 +176,7 @@ public sealed class FuelTypeEntity
     /// </summary>
     public decimal? FinalPerLiter() =>
         FuelPricing.FinalPerLiterOrNull(
-            SupplierPricePerLiter, MarginUahPerLiter, PumpPricePerLiter, MinDiscountPerLiter);
+            SupplierPricePerLiter, MarginUahPerLiter, PumpPricePerLiter);
 
     /// <summary>
     /// When this fuel was last repriced, and by whom - stamped whether or not the number came out

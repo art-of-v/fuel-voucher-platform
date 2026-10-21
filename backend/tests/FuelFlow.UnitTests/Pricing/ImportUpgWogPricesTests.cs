@@ -73,7 +73,6 @@ public sealed class ImportUpgWogPricesTests : IDisposable
             MarginUahPerLiter = profit,
             SupplierPricePerLiter = cost,
             PumpPricePerLiter = pump,
-            MinDiscountPerLiter = 0m,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };
@@ -129,9 +128,12 @@ public sealed class ImportUpgWogPricesTests : IDisposable
             // call it that, and a name we invented here is a name an operator has to correct later.
             fuel.Name.Should().Be(created.Code);
             // The pump is the reference - the list price the customer's saving is measured against.
-            fuel.BasePrice.Should().Be(created.PumpPerLiter);
-            // And there is no customer price: we know what the brand charges and nothing about what
-            // we pay, so nobody has priced this fuel yet. A zero would claim we sell it for nothing.
+            // The column price is written - it is the reference, and it is the one figure the brand
+            // published. The customer price is not written: we know what the brand charges and
+            // nothing about what we pay, so nobody has priced this fuel yet. A zero would claim we
+            // sell it for nothing.
+            fuel.PumpPricePerLiter.Should().Be(created.PumpPerLiter);
+            fuel.BasePrice.Should().BeNull();
             fuel.DiscountPrice.Should().BeNull();
             fuel.MarginUahPerLiter.Should().BeNull("no acquisition cost is known yet, so there is no margin");
         }
@@ -262,8 +264,11 @@ public sealed class ImportUpgWogPricesTests : IDisposable
 
         // The pump is known, and it is written - it is the reference, not the customer price.
         fuel.PumpPricePerLiter.Should().Be(99.90m);
-        fuel.BasePrice.Should().Be(99.90m);
-        fuel.DiscountPrice.Should().BeNull("a price of zero is a price, and it is not this one");
+        // And the price the customer pays is not written at all any more: it is computed from the
+        // knobs, and the copies are not what it comes from. What matters here is that nothing writes
+        // a zero - a price of zero IS a price, and it says the customer takes the fuel for nothing.
+        fuel.BasePrice.Should().NotBe(0m);
+        fuel.DiscountPrice.Should().NotBe(0m);
 
         // And the other half of it: a fuel that IS priced keeps the price the formula gives it. The
         // fix must not turn every price into a null.
@@ -275,7 +280,9 @@ public sealed class ImportUpgWogPricesTests : IDisposable
 
         _context.ChangeTracker.Clear();
         var priced = await _context.FuelTypes.SingleAsync(f => f.Id == ToUuid("upg-95"));
-        priced.DiscountPrice.Should().Be(91.90m, "min(cost + margin, pump - min discount)");
+        priced.PumpPricePerLiter.Should().Be(95.00m);
+        // The price the customer pays is the formula's answer, not a stored number.
+        FuelPricing.FinalPerLiterOrNull(86.90m, 5m, 95.00m).Should().Be(91.90m, "min(cost + margin, pump)");
     }
 
     [Fact]

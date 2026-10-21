@@ -51,8 +51,23 @@ export interface FuelType {
   brandId: string;
   /** The network's code. A fuel's own id is an opaque uuid, so this is what says which network a fuel belongs to. */
   brandSlug: string;
-  basePrice: number;
-  discountPrice: number;
+  /**
+   * The reference the customer's saving is measured against: the COLUMN price, what the network
+   * charges at the pump. Null when it is not known.
+   *
+   * The server computes it - it used to be a stored column, kept in step with the pump price by
+   * four writers, and it is the column price next door now.
+   */
+  basePrice?: number;
+  /**
+   * What WE charge - the cost plus the margin, capped at the column price. Null when we have no
+   * cost or no margin set, which is the state an imported fuel is in until an operator prices it.
+   *
+   * The server computes it - it used to be a stored column, and it was a zero on fourteen of the
+   * twenty-three fuels on the catalogue. A price of zero is a price, and it says the customer takes
+   * the fuel for nothing.
+   */
+  discountPrice?: number;
   /**
    * What the network charges at the pump - the column price. Null when it is not known.
    *

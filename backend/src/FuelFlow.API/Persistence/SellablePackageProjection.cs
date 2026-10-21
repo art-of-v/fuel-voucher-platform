@@ -57,7 +57,6 @@ namespace FuelFlow.Persistence;
                // SellablePackage.From read the same columns, and neither has an offer to disagree
                // with the other.
                PumpPricePerLiter = fuel.PumpPricePerLiter,
-               MinDiscountPerLiter = fuel.MinDiscountPerLiter,
                SupplierPricePerLiter = fuel.SupplierPricePerLiter,
                MarginUahPerLiter = fuel.MarginUahPerLiter,
                MarginPercent = fuel.MarginPercent,

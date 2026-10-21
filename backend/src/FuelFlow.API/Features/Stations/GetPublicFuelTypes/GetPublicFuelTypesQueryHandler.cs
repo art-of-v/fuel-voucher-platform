@@ -49,12 +49,9 @@ public sealed class GetPublicFuelTypesQueryHandler
                 x.Id,
                 x.Name,
                 x.BrandId,
-                x.BasePrice,
-                x.DiscountPrice,
                 x.PumpPricePerLiter,
                 x.SupplierPricePerLiter,
                 x.MarginUahPerLiter,
-                x.MinDiscountPerLiter,
             })
             .ToListAsync(ct);
 
@@ -65,17 +62,28 @@ public sealed class GetPublicFuelTypesQueryHandler
         var available = await _stock.AvailableFuelIdsAsync(isTestAccount, ct);
 
         return fuels
-            .Select(f => new PublicFuelTypeResponse(
-                f.Id.ToString(),
-                f.BrandId,
-                slugs.TryGetValue(f.BrandId, out var slug) ? slug : string.Empty,
-                f.Name,
-                f.BasePrice,
-                f.DiscountPrice,
-                f.PumpPricePerLiter,
-                FuelPricing.FinalPerLiterOrNull(
-                    f.SupplierPricePerLiter, f.MarginUahPerLiter, f.PumpPricePerLiter, f.MinDiscountPerLiter),
-                available.Contains(f.Id)))
+            .Select(f =>
+            {
+                // The price the customer pays, computed. It used to be read from a stored copy that
+                // four writers kept in step by hand, and the copy was a zero on fourteen of the
+                // twenty-three fuels - a price of zero is a price, and it says the customer takes
+                // the fuel for nothing.
+                var ourPrice = FuelPricing.FinalPerLiterOrNull(
+                    f.SupplierPricePerLiter, f.MarginUahPerLiter, f.PumpPricePerLiter);
+
+                return new PublicFuelTypeResponse(
+                    f.Id.ToString(),
+                    f.BrandId,
+                    slugs.TryGetValue(f.BrandId, out var slug) ? slug : string.Empty,
+                    f.Name,
+                    // The reference the customer's saving is measured against: the COLUMN price.
+                    f.PumpPricePerLiter,
+                    // And the price they pay, which is null when nobody has priced the fuel yet.
+                    ourPrice,
+                    f.PumpPricePerLiter,
+                    ourPrice,
+                    available.Contains(f.Id));
+            })
             .ToList();
     }
 }
