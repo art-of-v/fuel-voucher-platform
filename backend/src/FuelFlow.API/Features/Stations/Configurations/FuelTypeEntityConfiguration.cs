@@ -85,9 +85,9 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
             .HasColumnName("pump_price_per_liter")
             .HasColumnType("numeric(10,4)")
             .HasComment("The COLUMN price - what the driver pays at the pump. It is a reference, not "
-                + "a term of our price: our price is the cost plus the margin, and it can sit below "
-                + "what we charge. It is the price the customer sees struck through when it sits "
-                + "above what we charge.");
+                + "a term of our price: our price is the cost plus the margin, and the column price "
+                + "can sit below what we charge. It is the price the customer sees struck through "
+                + "when the column price sits above what we charge.");
 
         builder.Property(e => e.MinDiscountPerLiter)
             .HasColumnName("min_discount_per_liter")
