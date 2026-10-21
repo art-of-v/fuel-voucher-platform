@@ -285,6 +285,11 @@ public sealed class BrandFuelController : ControllerBase
             _context.FuelNominals.Add(new FuelNominal
             {
                 FuelTypeId = fuel.Id,
+                // In the pool the request named. The pool is part of a size's identity and it is
+                // what the storefront filters on, so a size written in the wrong pool is a size in
+                // the wrong catalogue - which is how a rehearsal grade added here would be
+                // published on the public shelf (planning #460).
+                DataKind = pool,
                 Liters = liters,
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow,
@@ -322,8 +327,8 @@ public sealed class BrandFuelController : ControllerBase
         if (!request.IsTestData.HasValue)
             return BadRequest(new
             {
-                message = "isTestData is required. This edit rewrites the rehearsal flag on every "
-                          + "package of the fuel, so it cannot be left unstated.",
+                message = "isTestData is required. It names the pool the fuel is sold in, and a fuel "
+                          + "with no sizes yet is seeded in that pool - so it cannot be left unstated.",
                 field = nameof(request.IsTestData)
             });
 
@@ -332,9 +337,29 @@ public sealed class BrandFuelController : ControllerBase
 
         // Whether the fuel has any SIZES is what decides whether this edit seeds defaults - not
         // whether it has packages. The pool is read off the incoming request because that is the pool
-        // the fuel is moving INTO, and a fuel with no sizes in it must be seeded like one. (The seed
-        // below does not carry that pool - planning#460.)
+        // the fuel is moving INTO, and a fuel with no sizes in it must be seeded like one.
         var pool = DataKinds.ForPool(request.IsTestData.Value);
+
+        // The pool a fuel is sold in lives on its sizes, so a flag that disagrees with them is a
+        // request the price edit cannot carry out. Saying so is the point: a silent no-op here is how
+        // an operator comes to believe a live fuel was hidden, or a rehearsal one was published.
+        var sizes = await _context.FuelNominals
+            .Where(n => n.FuelTypeId == fuel.Id)
+            .ToListAsync(ct);
+        if (sizes.Count > 0)
+        {
+            var soldAsQa = sizes.All(n => n.DataKind == DataKinds.Qa);
+            if (soldAsQa != request.IsTestData.Value)
+            {
+                return Conflict(new
+                {
+                    message = $"This fuel is sold in the {(soldAsQa ? "QA" : "live")} pool, and its sizes "
+                              + "decide that. A price edit does not move them - change the size list to "
+                              + "change the pool.",
+                    field = nameof(request.IsTestData)
+                });
+            }
+        }
 
 // A fuel whose name reads as rehearsal cannot be flipped to live by an edit. The flag is the
         // real control - an operator may innocently name a grade "Test-A95" - but the silent case,
@@ -380,15 +405,17 @@ public sealed class BrandFuelController : ControllerBase
                                   : request.MinDiscountPerLiter);
 
         // There is no offer to find, create or flip: the price is the fuel's, and the SIZES are the
-        // fuel's too - the size list is what the two pools differ in. (This edit does not carry the
-        // pool it was handed over to the sizes - planning#460.)
-var seededNominals = await _context.FuelNominals
+        // fuel's too - the size list is what the two pools differ in.
+        var seededNominals = await _context.FuelNominals
     .AnyAsync(n => n.FuelTypeId == fuel.Id, ct);
     if (!seededNominals)
     {
     _context.FuelNominals.AddRange(DefaultNominals.Select(liters => new FuelNominal
     {
         FuelTypeId = fuel.Id,
+        // In the pool the request named: the pool is part of a size's identity, and a size in the
+        // wrong pool is a size in the wrong catalogue.
+        DataKind = pool,
         Liters = liters,
         CreatedAtUtc = DateTime.UtcNow,
         UpdatedAtUtc = DateTime.UtcNow,
