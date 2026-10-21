@@ -116,8 +116,15 @@ public static class FuelPricing
     /// </para>
     /// <para>
     /// The consequence to know: our price can now be <b>above</b> the column price, and the customer
-    /// sees that as it is. When the market falls below what we pay, the below-cost guard refuses the
-    /// sale unless a manager has opted the fuel in.
+    /// sees that as it is. A market that falls below what we pay refuses nothing - the column price
+    /// is a reference, not a term of our price.
+    /// </para>
+    /// <para>
+    /// The guard that can still lose us money is at checkout, and it judges the price the customer is
+    /// <b>actually charged</b> - our price minus the term discount - against our cost
+    /// (<c>ServerPricing.TryGetBelowCostVerdict</c>). A generous term on the ladder can take a sale
+    /// under what we paid; the market falling cannot. <c>allow_below_cost</c> is what disarms it for
+    /// a deliberate loss leader.
     /// </para>
     /// </remarks>
     public static decimal FinalPerLiter(
@@ -129,9 +136,10 @@ public static class FuelPricing
 
     /// <summary>
     /// The public "before" / struck-through reference price for a package: the pump
-    /// price (колонка) × liters — the ceiling the customer's price sits below, i.e. the
-    /// saving they get. Falls back to <paramref name="salePrice"/> when no pump price is
-    /// recorded, so the store-front never fabricates a saving.
+    /// price (колонка) × liters — the price the customer is shown <em>against</em>, i.e. the
+    /// saving they get when it sits above what we charge. Falls back to
+    /// <paramref name="salePrice"/> when no pump price is recorded, so the store-front never
+    /// fabricates a saving.
     ///
     /// This deliberately REPLACES the old <c>OriginalPrice = cost × liters</c>, which
     /// leaked the operator's supplier cost to anonymous callers and rendered the struck
@@ -161,8 +169,9 @@ public static class FuelPricing
     /// there is one expression and every caller uses it.
     /// </para>
     /// <para>
-    /// <b>The rate is the fuel's, and the size only multiplies it.</b> The three knobs - supplier cost,
-    /// margin and pump ceiling - live on the fuel, and every size of that fuel is priced by the same
+    /// <b>The rate is the fuel's, and the size only multiplies it.</b> The knobs that decide the
+    /// price - supplier cost and margin - live on the fuel, and the column price beside them is the
+    /// reference the customer is shown against; every size of that fuel is priced by the same
     /// rate. There is no per-nominal override any more: the one-off prices went with the offers on
     /// 2026-10-18 (<c>20261018190514_NoOneOffPrices</c>), and with them the question of what a
     /// deliberate price for one size would survive a repricing.
@@ -174,7 +183,8 @@ public static class FuelPricing
     /// </remarks>
     /// <param name="costPerLiter">The fuel's supplier cost, or null when the fuel is not priced yet.</param>
     /// <param name="profitPerLiter">The fuel's margin, or null when the fuel is not priced yet.</param>
-    /// <param name="pumpPricePerLiter">The pump ceiling (колонка), or null when none is recorded.</param>
+    /// <param name="pumpPricePerLiter">The column price (колонка) the caller has on file. It is not a
+    /// term of the price - the rate is the cost plus the margin - and the parameter is no longer read.</param>
     /// <param name="liters">The nominal being priced.</param>
     public static decimal PackagePrice(
         decimal? costPerLiter,
