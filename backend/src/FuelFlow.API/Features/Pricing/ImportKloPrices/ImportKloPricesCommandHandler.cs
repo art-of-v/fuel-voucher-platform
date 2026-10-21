@@ -154,7 +154,7 @@ public sealed class ImportKloPricesCommandHandler
             var profit = fuel.MarginUahPerLiter ?? 0m;
             var minDiscount = fuel.MinDiscountPerLiter ?? 0m;
 
-            if (!fuel.AllowBelowCost && FuelPricing.IsBelowCost(cost, profit, row.PricePerLiter))
+            if (!fuel.AllowBelowCost && FuelPricing.IsBelowCost(cost, profit))
             {
                 belowCost.Add(fuel.Name);
                 continue;

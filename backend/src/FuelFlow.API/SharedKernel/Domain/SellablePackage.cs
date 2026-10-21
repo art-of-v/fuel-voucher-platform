@@ -67,7 +67,7 @@ public sealed record SellablePackage
     /// </summary>
     public decimal? ComputedFinalPricePerLiter =>
         FuelPricing.FinalPerLiterOrNull(
-            SupplierPricePerLiter, MarginUahPerLiter, PumpPricePerLiter);
+            SupplierPricePerLiter, MarginUahPerLiter);
 
     /// <summary>
     /// What this nominal costs, through <see cref="FuelPricing.PackagePrice"/>: the rate × these

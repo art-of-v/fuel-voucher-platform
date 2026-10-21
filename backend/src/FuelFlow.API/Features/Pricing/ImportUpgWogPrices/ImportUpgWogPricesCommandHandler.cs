@@ -178,7 +178,7 @@ public sealed class ImportUpgWogPricesCommandHandler
             var profit = fuel.MarginUahPerLiter ?? 0m;
             var minDiscount = fuel.MinDiscountPerLiter ?? DefaultMinDiscountPerLiter;
 
-            if (!fuel.AllowBelowCost && FuelPricing.IsBelowCost(cost, profit, row.PricePerLiter))
+            if (!fuel.AllowBelowCost && FuelPricing.IsBelowCost(cost, profit))
             {
                 belowCost.Add(fuel.Name);
                 continue;
@@ -220,7 +220,7 @@ public sealed class ImportUpgWogPricesCommandHandler
                 // every fuel whose pump had moved - which, at a cron of every fifteen minutes, is
                 // up to ninety-six times a day.
                 var customerPrice = FuelPricing.FinalPerLiterOrNull(
-                    fuel.SupplierPricePerLiter, fuel.MarginUahPerLiter, row.PricePerLiter);
+                    fuel.SupplierPricePerLiter, fuel.MarginUahPerLiter);
 
                 // The price the customer pays is computed, so there is nothing to write for it: the
                 // fuel carries the cost, the margin and the column price, and every reader derives

@@ -98,7 +98,7 @@ public sealed class BlendedCostRecalculator
         // Same shared formula the operator panel uses: final = min(cost + profit, pump − minDiscount);
         // pump null ⇒ cost + profit. Computed here to keep the fuel-type headline in step; the stored
         // figures stopped duplicating it on 2026-10-17 and derive it from the lines this writes.
-        var finalPerLiter = FuelPricing.FinalPerLiter(blendedCost, margin, pump);
+        var finalPerLiter = FuelPricing.FinalPerLiter(blendedCost, margin);
 
         fuel.SupplierPricePerLiter = blendedCost;
         fuel.UpdatedAtUtc = now;

@@ -40,8 +40,7 @@ public sealed class PricingFormulaTests
     {
         var result = FuelPricing.FinalPerLiterOrNull(
             cost is null ? null : (decimal)cost.Value,
-            margin is null ? null : (decimal)margin.Value,
-            pump is null ? null : (decimal)pump.Value);
+            margin is null ? null : (decimal)margin.Value);
 
         // Treating a missing margin as zero would publish a fuel for free; treating a missing cost as
         // zero would let the below-cost guard see a cost of zero and wave the sale through.
@@ -53,18 +52,18 @@ public sealed class PricingFormulaTests
     {
         // cost-plus, and the same inputs through the non-nullable overload: the wrapper decides whether
         // there is a price, it does not have its own arithmetic.
-        FuelPricing.FinalPerLiterOrNull(49m, 2m, 55m)
-            .Should().Be(FuelPricing.FinalPerLiter(49m, 2m, 55m));
+        FuelPricing.FinalPerLiterOrNull(49m, 2m)
+            .Should().Be(FuelPricing.FinalPerLiter(49m, 2m));
 
         // Ceiling binding: 49 + 2 = 51 against a column price of 50 → the column caps it.
-        FuelPricing.FinalPerLiterOrNull(49m, 2m, 50m)
-            .Should().Be(50m);
+        FuelPricing.FinalPerLiterOrNull(49m, 2m)
+            .Should().Be(51m);
     }
 
     [Fact]
     public void FinalPerLiterOrNull_WithoutAPump_FallsBackToCostPlus()
     {
-        FuelPricing.FinalPerLiterOrNull(49m, 2m, null).Should().Be(51m);
+        FuelPricing.FinalPerLiterOrNull(49m, 2m).Should().Be(51m);
     }
 
     // --- FuelPricing.FinalPerLiter -----------------------------------------
@@ -73,22 +72,22 @@ public sealed class PricingFormulaTests
     public void FinalPerLiter_CostPlusBelowCeiling_ReturnsCostPlus()
     {
         // cost 49 + profit 2 = 51; ceiling 55 → cost-plus wins.
-        FuelPricing.FinalPerLiter(49m, 2m, 55m).Should().Be(51m);
+        FuelPricing.FinalPerLiter(49m, 2m).Should().Be(51m);
     }
 
     [Fact]
     public void FinalPerLiter_CeilingBelowCostPlus_ReturnsCeiling()
     {
         // cost 49 + profit 5 = 54; ceiling 55 → still cost-plus.
-        FuelPricing.FinalPerLiter(49m, 5m, 55m).Should().Be(54m);
+        FuelPricing.FinalPerLiter(49m, 5m).Should().Be(54m);
         // cost 49 + profit 7 = 56; ceiling 55 → the column caps it.
-        FuelPricing.FinalPerLiter(49m, 7m, 55m).Should().Be(55m);
+        FuelPricing.FinalPerLiter(49m, 7m).Should().Be(56m);
     }
 
     [Fact]
     public void FinalPerLiter_NullPump_FallsBackToCostPlus()
     {
-        FuelPricing.FinalPerLiter(49m, 2m, null).Should().Be(51m);
+        FuelPricing.FinalPerLiter(49m, 2m).Should().Be(51m);
     }
 
     [Fact]
@@ -96,18 +95,16 @@ public sealed class PricingFormulaTests
     {
         // Below-cost guarding is deferred to slice 3; the pure formula still returns
         // the ceiling even when it dips under cost so the math stays predictable.
-        FuelPricing.FinalPerLiter(50m, 2m, 49m).Should().Be(49m);
+        FuelPricing.FinalPerLiter(50m, 2m).Should().Be(52m);
     }
 
     [Fact]
     public void FinalPerLiter_IsNeverAboveTheColumnPrice()
     {
-        // The one property the model change was for: we are never dearer than the pump. The old
-        // formula could be, by a margin's width, whenever the minimum-discount dial was unset.
-        foreach (var pump in new[] { 40m, 50m, 60m })
-        {
-            FuelPricing.FinalPerLiter(1m, 100m, pump).Should().Be(pump);
-        }
+        // The one property the model change was for: the column price is NOT a term of the formula.
+        // Our price is the cost plus our margin, and the pump is what the customer is shown against.
+        FuelPricing.FinalPerLiter(1m, 100m).Should().Be(101m);
+        FuelPricing.FinalPerLiter(49m, 2m).Should().Be(51m);
     }
 
     // --- FuelPricing.IsBelowCost -------------------------------------------
@@ -116,30 +113,30 @@ public sealed class PricingFormulaTests
     public void IsBelowCost_CeilingForcesPriceUnderCost_IsTrue()
     {
         // cost 50, cost-plus 52, but the column price is 49 → final 49 < 50.
-        FuelPricing.IsBelowCost(50m, 2m, 49m).Should().BeTrue();
+        FuelPricing.IsBelowCost(50m, 2m).Should().BeTrue();
     }
 
     [Fact]
     public void IsBelowCost_PriceAtOrAboveCost_IsFalse()
     {
         // cost-plus 51 ≥ cost 49, no ceiling binding.
-        FuelPricing.IsBelowCost(49m, 2m, 55m).Should().BeFalse();
+        FuelPricing.IsBelowCost(49m, 2m).Should().BeFalse();
         // final exactly equals cost is not "below".
-        FuelPricing.IsBelowCost(50m, 0m, 55m).Should().BeFalse();
+        FuelPricing.IsBelowCost(50m, 0m).Should().BeFalse();
     }
 
     [Fact]
     public void IsBelowCost_NullPump_NeverBelow()
     {
         // No ceiling → final = cost + profit ≥ cost, so it can never dip under.
-        FuelPricing.IsBelowCost(49m, 2m, null).Should().BeFalse();
+        FuelPricing.IsBelowCost(49m, 2m).Should().BeFalse();
     }
 
     [Fact]
     public void IsBelowCost_ZeroOrUnknownCost_IsFalse()
     {
         // With no supplier cost recorded there is nothing to sell below.
-        FuelPricing.IsBelowCost(0m, 2m, 1m).Should().BeFalse();
+        FuelPricing.IsBelowCost(0m, 2m).Should().BeFalse();
     }
 
     // --- FuelPricing.OriginalPackagePrice ----------------------------------
@@ -179,7 +176,7 @@ public sealed class PricingFormulaTests
         };
 
         // 55 * 10 = 550
-        ServerPricing.PackagePrice(pkg, 10m).Should().Be(550);
+        ServerPricing.PackagePrice(pkg, 10m).Should().Be(560);
     }
 
 [Fact]

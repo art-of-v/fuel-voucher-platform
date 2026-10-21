@@ -96,11 +96,16 @@ var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
     // is no cost to charge against.
     .Select(x =>
     {
-    // Our price when we can compute it; the column price when we cannot. The two are the same
-    // number once a cost is known, because the formula caps our price at the pump price anyway.
-    var ourPrice = FuelPricing.FinalPerLiterOrNull(
-        x.SupplierPricePerLiter, x.MarginUahPerLiter, x.PumpPricePerLiter);
-    var perLiter = ourPrice ?? x.PumpPricePerLiter ?? 0m;
+    // Our price is the cost we bought it for plus our margin. The column price is not a term of
+    // that formula - it is the reference the customer is shown against.
+    var ourPrice = FuelPricing.FinalPerLiterOrNull(x.SupplierPricePerLiter, x.MarginUahPerLiter);
+    var inStock = available.Contains(StockKey.For(x.BrandSlug, x.FuelTypeId, x.Liters));
+    // The shelf shows the column price when the fuel is not in stock, and our price when it is.
+    // A customer is shown a saving only when we actually have the fuel; out of stock the
+    // column price IS the price, so there is nothing to cross out and nothing to save.
+    var perLiter = inStock
+        ? (ourPrice ?? x.PumpPricePerLiter ?? 0m)
+        : (x.PumpPricePerLiter ?? ourPrice ?? 0m);
     var price = Math.Round(perLiter * x.Liters, 2, MidpointRounding.AwayFromZero);
 
     return new PublicPackageResponse(
@@ -111,13 +116,15 @@ var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
                     x.FuelName,
                     x.Liters,
                     price,
-                    FuelPricing.OriginalPackagePrice(x.PumpPricePerLiter, x.Liters, price),
+                    // The crossed-out price is the column price, and only when there is a saving to
+                    // cross out: out of stock there is none.
+                    FuelPricing.OriginalPackagePrice(inStock ? x.PumpPricePerLiter : null, x.Liters, price),
                     perLiter,
                     // "Can this be bought" is not the same question as "is there stock". A fuel we
                     // cannot price cannot be charged - the checkout refuses it with a 400 - so it is
                     // marked unavailable even when vouchers are behind it, which is the only way the
                     // badge and the checkout agree.
-                    available.Contains(StockKey.For(x.BrandSlug, x.FuelTypeId, x.Liters)) && ourPrice is not null);
+                    inStock && ourPrice is not null);
             })
             .ToList();
     }

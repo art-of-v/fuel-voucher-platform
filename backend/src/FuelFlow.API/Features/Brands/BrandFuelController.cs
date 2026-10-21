@@ -187,8 +187,7 @@ public sealed class BrandFuelController : ControllerBase
         // model refuses to build a price out of a missing number, because "we do not know what we
         // paid" is not the same fact as "we paid nothing".
         var finalPerLiter = FuelPricing.FinalPerLiterOrNull(
-            request.SupplierPricePerLiter, request.MarginUahPerLiter,
-            request.PumpPricePerLiter);
+            request.SupplierPricePerLiter, request.MarginUahPerLiter);
 
         // Slice-3 hard block at the operator write path: refuse to persist a below-cost price
         // unless a manager has consciously opted this supplier+fuel in as a loss-leader.
@@ -200,7 +199,7 @@ public sealed class BrandFuelController : ControllerBase
         var belowCost = request.SupplierPricePerLiter is { } knownCost
                         && request.MarginUahPerLiter is { } knownMargin
                         && FuelPricing.IsBelowCost(
-                            knownCost, knownMargin, request.PumpPricePerLiter);
+                            knownCost, knownMargin);
         if (belowCost && !request.AllowBelowCost)
             return BadRequest(new { code = BelowCostSaleBlockedException.Code, message = "Price is below supplier cost; enable the below-cost opt-in to save it." });
 
@@ -375,15 +374,14 @@ public sealed class BrandFuelController : ControllerBase
 
         // The price, or null when we cannot know it - see the create path above.
         var finalPerLiter = FuelPricing.FinalPerLiterOrNull(
-            request.SupplierPricePerLiter, request.MarginUahPerLiter,
-            request.PumpPricePerLiter);
+            request.SupplierPricePerLiter, request.MarginUahPerLiter);
 
         // Slice-3 hard block: reject a below-cost price unless this supplier+fuel is opted in.
         // A cost that is not stated is not below cost; it is unpriced, and it is saved as it is.
         var belowCost = request.SupplierPricePerLiter is { } knownCost
                         && request.MarginUahPerLiter is { } knownMargin
                         && FuelPricing.IsBelowCost(
-                            knownCost, knownMargin, request.PumpPricePerLiter);
+                            knownCost, knownMargin);
         if (belowCost && !request.AllowBelowCost)
             return BadRequest(new { code = BelowCostSaleBlockedException.Code, message = "Price is below supplier cost; enable the below-cost opt-in to save it." });
 
@@ -420,8 +418,7 @@ public sealed class BrandFuelController : ControllerBase
         // though nothing stores it.
         var oldFinalPrice = FuelPricing.FinalPerLiterOrNull(
             oldSupplierPrice,
-            oldMarginPrice,
-            fuel.PumpPricePerLiter);
+            oldMarginPrice);
 
         var oldValue = JsonSerializer.Serialize(new
         {

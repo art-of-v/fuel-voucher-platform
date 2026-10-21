@@ -68,8 +68,7 @@ public sealed class GetPublicFuelTypesQueryHandler
                 // four writers kept in step by hand, and the copy was a zero on fourteen of the
                 // twenty-three fuels - a price of zero is a price, and it says the customer takes
                 // the fuel for nothing.
-                var ourPrice = FuelPricing.FinalPerLiterOrNull(
-                    f.SupplierPricePerLiter, f.MarginUahPerLiter, f.PumpPricePerLiter);
+                var ourPrice = FuelPricing.FinalPerLiterOrNull(f.SupplierPricePerLiter, f.MarginUahPerLiter);
 
                 return new PublicFuelTypeResponse(
                     f.Id.ToString(),

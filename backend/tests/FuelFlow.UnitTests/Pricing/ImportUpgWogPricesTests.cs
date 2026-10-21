@@ -282,7 +282,7 @@ public sealed class ImportUpgWogPricesTests : IDisposable
         var priced = await _context.FuelTypes.SingleAsync(f => f.Id == ToUuid("upg-95"));
         priced.PumpPricePerLiter.Should().Be(95.00m);
         // The price the customer pays is the formula's answer, not a stored number.
-        FuelPricing.FinalPerLiterOrNull(86.90m, 5m, 95.00m).Should().Be(91.90m, "min(cost + margin, pump)");
+        FuelPricing.FinalPerLiterOrNull(86.90m, 5m).Should().Be(91.90m, "cost + margin");
     }
 
     [Fact]

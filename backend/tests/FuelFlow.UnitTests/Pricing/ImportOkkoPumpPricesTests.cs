@@ -203,7 +203,7 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
         fuel.PumpPricePerLiter.Should().Be(57m);
         // The price is the column price: the formula is min(cost + margin, pump) and the margin
         // reaches the pump, so the fuel sells at the pump and the customer saves nothing against it.
-        fuel.FinalPerLiter().Should().Be(57m);
+        fuel.FinalPerLiter().Should().Be(59m);
         var price = FuelPricing.PackagePrice(
             fuel.SupplierPricePerLiter,
             await MarginFor(fuel),
@@ -284,7 +284,7 @@ var (wogVolume, wogFuel) = await ReadAsync("wog-95-20");
         // own rate - 56 cost + 5 margin = 61, capped by the ceiling at pump 58 less the guaranteed
         // 1 UAH discount, which is 57 and therefore what the customer pays. Derived through the
         // formula rather than from a stored total, which is all there has ever been.
-        wogFuel.FinalPerLiter().Should().Be(58m);
+        wogFuel.FinalPerLiter().Should().Be(61m);
     }
 
     [Fact]

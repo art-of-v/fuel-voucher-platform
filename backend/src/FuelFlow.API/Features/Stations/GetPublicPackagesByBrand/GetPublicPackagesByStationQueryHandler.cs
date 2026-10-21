@@ -73,10 +73,15 @@ var rows = await (
         return rows
             .Select(x =>
             {
-                // Our price when we can compute it; the column price when we cannot.
-                var ourPrice = FuelPricing.FinalPerLiterOrNull(
-                    x.SupplierPricePerLiter, x.MarginUahPerLiter, x.PumpPricePerLiter);
-                var perLiter = ourPrice ?? x.PumpPricePerLiter ?? 0m;
+                // Our price is the cost we bought it for plus our margin; the column price is the
+                // reference the customer is shown against, never a term of the formula.
+                var ourPrice = FuelPricing.FinalPerLiterOrNull(x.SupplierPricePerLiter, x.MarginUahPerLiter);
+                var inStock = available.Contains(StockKey.For(x.BrandSlug, x.FuelTypeId, x.Liters));
+                // The shelf shows the column price when the fuel is not in stock, and our price when
+                // it is - the same rule as GetPublicPackagesQueryHandler.
+                var perLiter = inStock
+                    ? (ourPrice ?? x.PumpPricePerLiter ?? 0m)
+                    : (x.PumpPricePerLiter ?? ourPrice ?? 0m);
                 var price = Math.Round(perLiter * x.Liters, 2, MidpointRounding.AwayFromZero);
 
                 return new PublicPackageResponse(
@@ -87,11 +92,13 @@ var rows = await (
                     x.FuelName,
                     x.Liters,
                     price,
-                    FuelPricing.OriginalPackagePrice(x.PumpPricePerLiter, x.Liters, price),
+                    // The crossed-out price is the column price, and only when there is a saving to
+                    // cross out: out of stock there is none.
+                    FuelPricing.OriginalPackagePrice(inStock ? x.PumpPricePerLiter : null, x.Liters, price),
                     perLiter,
                     // A fuel we cannot price cannot be charged, so it is unavailable even with stock
                     // behind it: see the same rule in GetPublicPackagesQueryHandler.
-                    available.Contains(StockKey.For(x.BrandSlug, x.FuelTypeId, x.Liters)) && ourPrice is not null);
+                    inStock && ourPrice is not null);
             })
             .ToList();
     }

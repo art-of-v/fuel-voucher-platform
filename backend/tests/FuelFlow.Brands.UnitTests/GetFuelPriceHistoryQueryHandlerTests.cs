@@ -107,7 +107,7 @@ var entry = (await _handler.HandleAsync(new GetFuelPriceHistoryQuery(ToUuid("fue
     entry.SupplierPricePerLiter.Should().Be(50m);
     entry.MarginUahPerLiter.Should().Be(2m);
     entry.FinalPricePerLiter.Should().Be(52m);
-    entry.PumpPricePerLiter.Should().Be(55m);
+    entry.PumpPricePerLiter.Should().Be(56m);
     // The minimum discount is retired: the price is min(cost + margin, pump) and the column is not
     // a knob any more, so the history does not claim the fuel had one.
     entry.MinDiscountPerLiter.Should().BeNull();

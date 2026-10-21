@@ -204,9 +204,9 @@ public sealed class SetBatchCostCommandHandler
             {
                 var profit = fuelType.MarginUahPerLiter ?? 0m;
                 var minDiscount = fuelType.MinDiscountPerLiter ?? 0m;
-                if (FuelPricing.IsBelowCost(b, profit, fuelType.PumpPricePerLiter))
+                if (FuelPricing.IsBelowCost(b, profit))
                 {
-                    var finalPerLiter = FuelPricing.FinalPerLiter(b, profit, fuelType.PumpPricePerLiter);
+                    var finalPerLiter = FuelPricing.FinalPerLiter(b, profit);
                     await _notifications.BelowCostAsync(brand, command.FuelTypeId.ToString(), b, finalPerLiter, deliberate: false, cancellationToken);
                 }
             }

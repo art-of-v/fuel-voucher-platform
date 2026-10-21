@@ -176,7 +176,7 @@ public sealed class FuelTypeEntity
     /// </summary>
     public decimal? FinalPerLiter() =>
         FuelPricing.FinalPerLiterOrNull(
-            SupplierPricePerLiter, MarginUahPerLiter, PumpPricePerLiter);
+            SupplierPricePerLiter, MarginUahPerLiter);
 
     /// <summary>
     /// When this fuel was last repriced, and by whom - stamped whether or not the number came out
