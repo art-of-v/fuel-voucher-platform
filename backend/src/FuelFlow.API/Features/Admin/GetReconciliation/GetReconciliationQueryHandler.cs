@@ -27,76 +27,84 @@ public sealed class GetReconciliationQueryHandler
         var paidUnfulfilled = await _context.Orders.CountAsync(o => o.Status == OrderStatus.PendingFulfillment, cancellationToken);
         var partiallyFulfilled = await _context.Orders.CountAsync(o => o.Status == OrderStatus.PartiallyFulfilled, cancellationToken);
 
-        // The margin lives on the FUEL TYPE, and the size is a row in fuel_nominals - whose key
-        // (fuel_type_id, data_kind, litres) is one row per fuel, pool and size - so this lookup
-        // cannot match twice and cannot silently pick one of two prices. A duplicate would now throw
-        // rather than resolve to one arbitrary price.
+        // THE REVENUE, SUMMED BY THE DATABASE.
         //
-        // Pinned to the real pool: these are operator counters over real business, and the old lookup
-        // had no pool filter, so a QA rehearsal row could shadow a real one by being newer.
+        // This used to load every closed order in the platform with its line items, its
+        // fulfillments and its vouchers, and add the margin up in C#. A read that grows with
+        // every sale, for numbers that are aggregates.
         //
-        // An explicit join rather than a navigation: relying on the navigation being materialised is
-        // a silent dependency on provider behaviour, and where it is not materialised the read throws
-        // on a null instead of returning a wrong number - which is exactly the kind of failure that
-        // looks like a data problem and gets debugged as one. It also reads the margin alone instead
-        // of every column of every fuel and every nominal in the catalogue.
-        var fpLookup = await (
-from f in _context.FuelTypes.AsNoTracking()
-            // Keyed the way the consumer keys it: an order line stores the network as its slug, so the
-            // lookup is built from the slug rather than from the fuel's uuid.
+        // WHAT THE NUMBERS MEAN. The margin is earned on DELIVERED liters: a group of lines
+        // (brand, fuel, litres) earns its margin on the lesser of what was ordered and what
+        // was delivered. A refunded order's undelivered liters therefore earn nothing, which
+        // is what "refunded liters drop out of revenue automatically" means.
+        //
+        // THE MARGIN LOOKUP, STILL A LOOKUP AND NOT A NAVIGATION. The margin lives on the
+        // FUEL TYPE, and the size is a row in fuel_nominals - whose key (fuel_type_id,
+        // data_kind, litres) is one row per fuel, pool and size - so this join cannot match
+        // twice and cannot silently pick one of two prices. Pinned to the real pool: these are
+        // operator counters over real business, and the old lookup had no pool filter, so a QA
+        // rehearsal row could shadow a real one by being newer. The line names the brand and
+        // the fuel type belongs to one, so a line whose brand and fuel type disagree has no
+        // margin - and the old lookup said the same, and answered zero.
+        //
+        // The groups are joined to the delivered ones, and a group with no delivery earns
+        // nothing, so it does not need to be in the result: joining it away changes no sum.
+        var revenueByMonth = await (
+            from o in _context.Orders.AsNoTracking()
+            join lg in _context.OrderLineItems.AsNoTracking()
+                .GroupBy(li => new { li.OrderId, li.Brand, li.FuelTypeId, li.Liters })
+                .Select(g => new
+                {
+                    g.Key.OrderId,
+                    g.Key.Brand,
+                    g.Key.FuelTypeId,
+                    g.Key.Liters,
+                    OrderedQty = g.Sum(li => li.Quantity)
+                })
+            on o.Id equals lg.OrderId
+            join d in _context.Fulfillments.AsNoTracking()
+                .Where(f => f.VoucherId != null && f.ReleasedAtUtc == null)
+                .Select(f => new { f.OrderId, f.Voucher!.Brand, f.Voucher.FuelTypeId, f.Voucher.Liters })
+                .GroupBy(x => new { x.OrderId, x.Brand, x.FuelTypeId, x.Liters })
+                .Select(g => new
+                {
+                    g.Key.OrderId,
+                    g.Key.Brand,
+                    g.Key.FuelTypeId,
+                    g.Key.Liters,
+                    DeliveredQty = g.Count()
+                })
+            on new { lg.OrderId, lg.Brand, lg.FuelTypeId, lg.Liters }
+                equals new { d.OrderId, d.Brand, d.FuelTypeId, d.Liters }
+            join f in _context.FuelTypes.AsNoTracking() on lg.FuelTypeId equals f.Id
             join b in _context.Brands.AsNoTracking() on f.BrandId equals b.Id
-            from n in _context.FuelNominals.AsNoTracking() where n.FuelTypeId == f.Id
-            where n.DataKind == DataKinds.Real
-            select new { BrandSlug = b.Slug, FuelTypeId = f.Id, Liters = n.Liters, MarginUahPerLiter = f.MarginUahPerLiter })
-            .ToDictionaryAsync(
-                x => (x.BrandSlug, x.FuelTypeId, x.Liters),
-                x => x.MarginUahPerLiter,
-                cancellationToken);
-
-        // Closed orders (incl. refunded) form the revenue set; margin is earned only on
-        // delivered liters, so refunded liters drop out of revenue automatically. A company
-        // handover is excluded here — it never earned us revenue — while the three-way-match
-        // list below still shows it, because an auditor must be able to see the handover.
-        var fulfilledOrders = await _context.Orders
-            .AsNoTracking()
-            // Two collections in one query (LineItems x Fulfillments) - without the split query the
-            // JOIN is their cross product and every order comes back multiplied.
-            .AsSplitQuery()
-            .Include(o => o.LineItems)
-            .Include(o => o.Fulfillments)
-                .ThenInclude(f => f.Voucher)
-            .Where(o => (o.Status == OrderStatus.Fulfilled
-                || o.Status == OrderStatus.PartiallyFulfilled
-                || o.Status == OrderStatus.PartiallyRefunded
-                || o.Status == OrderStatus.Refunded)
-                && o.Kind != OrderKind.ReceivedFromCompany)
+            join n in _context.FuelNominals.AsNoTracking()
+                on new { FuelTypeId = f.Id, Liters = lg.Liters } equals new { n.FuelTypeId, n.Liters }
+            where (o.Status == OrderStatus.Fulfilled
+                    || o.Status == OrderStatus.PartiallyFulfilled
+                    || o.Status == OrderStatus.PartiallyRefunded
+                    || o.Status == OrderStatus.Refunded)
+                // A company handover is excluded here - it never earned us revenue - while the
+                // three-way-match list below still shows it, because an auditor must be able to
+                // see the handover.
+                && o.Kind != OrderKind.ReceivedFromCompany
+                && n.DataKind == DataKinds.Real
+                && b.Slug == lg.Brand
+            group new { o, lg, d, f } by new { o.CreatedAtUtc.Year, o.CreatedAtUtc.Month } into g
+            select new
+            {
+                g.Key.Year,
+                g.Key.Month,
+                RevenueKopecks = g.Sum(x => (x.f.MarginUahPerLiter ?? 0m) * x.lg.Liters
+                    * Math.Min(x.lg.OrderedQty, x.d.DeliveredQty))
+            })
             .ToListAsync(cancellationToken);
 
-        decimal EarnedMarginKopecks(Order o)
-        {
-            decimal sum = 0m;
-            foreach (var g in o.LineItems.GroupBy(li => (li.Brand, li.FuelTypeId, li.Liters)))
-            {
-                if (!fpLookup.TryGetValue(g.Key, out var margin) || margin is null)
-                {
-                    continue;
-                }
+        // The total is the sum of the months, which is the same number as the sum over the
+        // orders: the margin is a decimal and the additions are exact, so the grouping does
+        // not change the figure - it only decides how many rows the database has to add up.
+        var revenue = revenueByMonth.Sum(m => m.RevenueKopecks);
 
-                var delivered = o.Fulfillments.Count(f => f.Voucher is not null
-                    && string.Equals(f.Voucher.Brand, g.Key.Brand, StringComparison.OrdinalIgnoreCase)
-                    && f.Voucher.FuelTypeId == g.Key.FuelTypeId
-                    && f.Voucher.Liters == g.Key.Liters);
-
-                // No cast: `sum` is decimal now, and this figure is kopecks. A `(long)` here would
-                // truncate the half-kopecks a fractional margin per litre produces - the cast existed
-                // only because the column this reads from was an integer type.
-                sum += margin.Value * (decimal)g.Key.Liters * Math.Min(g.Sum(li => li.Quantity), delivered);
-            }
-
-            return sum;
-        }
-
-        var revenue = fulfilledOrders.Sum(EarnedMarginKopecks);
 
         var orphanVouchers = await _context.FuelVouchers
             .CountAsync(v => v.Status == VoucherStatus.Assigned
@@ -219,31 +227,112 @@ from f in _context.FuelTypes.AsNoTracking()
                 x.Status.ToString(), x.Count, x.TotalLiters))
             .ToList();
 
-        var revenueRaw = fulfilledOrders
+        // The revenue summary: the same months, with the order count beside the money. The
+        // count is its own aggregate - the number of closed orders in the month, whether or
+        // not they earned a margin - because "how many orders" and "how much margin" are
+        // different questions, and a month with orders but no margin still belongs in the
+        // table.
+        var orderCountByMonth = await _context.Orders
+            .AsNoTracking()
+            .Where(o => (o.Status == OrderStatus.Fulfilled
+                         || o.Status == OrderStatus.PartiallyFulfilled
+                         || o.Status == OrderStatus.PartiallyRefunded
+                         || o.Status == OrderStatus.Refunded)
+                     && o.Kind != OrderKind.ReceivedFromCompany)
             .GroupBy(o => new { o.CreatedAtUtc.Year, o.CreatedAtUtc.Month })
-            .Select(g => new
-            {
-                g.Key.Year,
-                g.Key.Month,
-                OrderCount = g.Count(),
-                RevenueKopecks = g.Sum(EarnedMarginKopecks)
-            })
-            .ToList();
+            .Select(g => new { g.Key.Year, g.Key.Month, OrderCount = g.Count() })
+            .ToListAsync(cancellationToken);
 
-        var revenueSummary = revenueRaw
-            .OrderByDescending(m => m.Year)
-            .ThenByDescending(m => m.Month)
+        var revenueSummary = orderCountByMonth
+            .Select(m => new
+            {
+                m.Year,
+                m.Month,
+                m.OrderCount,
+                RevenueKopecks = revenueByMonth
+                    .Where(r => r.Year == m.Year && r.Month == m.Month)
+                    .Select(r => r.RevenueKopecks)
+                    .FirstOrDefault()
+            })
+            .OrderByDescending(x => x.Year)
+            .ThenByDescending(x => x.Month)
             .Select(x => new GetReconciliationResponse.RevenueSummaryItem(
                 x.Year, x.Month, x.OrderCount, x.RevenueKopecks))
             .ToList();
 
+        // THE MONEY LEDGER, SUMMED BY THE DATABASE.
+        //
+        // The three numbers the screen puts at the top - received, delivered, refunded - are
+        // aggregates over the whole history, and they are now the database's arithmetic
+        // rather than the process's. A number that describes the whole business must not be
+        // computed from the rows a screen happens to be holding.
+        //
+        // ROUNDING. `Money.ToKopecks` rounds a UAH figure to whole kopecks, half away from
+        // zero, and `floor(x * 100 + 0.5)` is that rule for a non-negative amount - the same
+        // rule PostgreSQL's own `round()` uses for a numeric, and the one the money path
+        // applies at checkout, so a domain amount and its stored image cannot disagree by a
+        // rounding step. It is applied PER ORDER, exactly as it was: the total is the sum of
+        // the rounded orders, not the rounding of the total.
+        var totalReceivedKopecks = await _context.Orders
+            .AsNoTracking()
+            .Where(o => o.MonobankStatus == MonobankStatus.Success)
+            .SumAsync(o => Math.Floor(o.Price * 100m + 0.5m), cancellationToken);
+
+        // The delivered value: what the order was worth, less what the customer never
+        // received and is owed back.
+        //
+        // The unfulfilled part is per (brand, fuel, litres) group, the same grouping the
+        // refund path uses: the ordered units minus the DELIVERED ones - a released delivery is
+        // not a delivery the customer received - priced at the group's highest unit price. A
+        // company handover never captured money, so it has no unfulfilled value to refund; and
+        // an order the brand never confirmed as paid is worth nothing here at all.
+        var deliveredValueKopecks = await _context.Orders
+            .AsNoTracking()
+            .Where(o => o.MonobankStatus == MonobankStatus.Success)
+            .SumAsync(o => Math.Floor(o.LineItems.Sum(li => li.UnitPrice * li.Quantity) * 100m + 0.5m)
+                - (o.Kind == OrderKind.ReceivedFromCompany
+                    ? 0m
+                    : Math.Floor(
+                        o.LineItems
+                            .GroupBy(li => new { li.Brand, li.FuelTypeId, li.Liters })
+                            .Select(g => new
+                            {
+                                g.Key,
+                                Ordered = g.Sum(li => li.Quantity),
+                                Delivered = _context.Fulfillments.Count(f =>
+                                    f.VoucherId != null
+                                    && f.OrderId == o.Id
+                                    && f.ReleasedAtUtc == null
+                                    && f.Voucher!.Brand == g.Key.Brand
+                                    && f.Voucher.FuelTypeId == g.Key.FuelTypeId
+                                    && f.Voucher.Liters == g.Key.Liters),
+                                UnitPrice = g.Max(li => li.UnitPrice)
+                            })
+                            .Sum(x => Math.Max(x.Ordered - x.Delivered, 0) * x.UnitPrice)
+                        * 100m + 0.5m)),
+                cancellationToken);
+
+        // The refunded total: the successful refunds that belong to an order. A refund with no
+        // order is money we hold, not money we gave back against a sale, and it is not part
+        // of what a customer was refunded.
+        var totalRefundedKopecks = await _context.Payments
+            .AsNoTracking()
+            .Where(p => p.Kind == PaymentKind.Refund
+                     && p.OrderId != null
+                     && p.Status == PaymentStatus.Succeeded)
+            .SumAsync(p => p.AmountKopecks, cancellationToken);
+
+        var refundedOrders = await _context.Orders
+            .CountAsync(o => o.Status == OrderStatus.PartiallyRefunded || o.Status == OrderStatus.Refunded,
+                cancellationToken);
+
         var summary = new GetReconciliationResponse.SummaryData(
             totalOrders, paidUnfulfilled, partiallyFulfilled, fulfilled,
             revenue, orphanVouchers, unprocessed, lowInventoryProviders, importErrors,
-            orders.Count(o => o.Status == OrderStatus.PartiallyRefunded || o.Status == OrderStatus.Refunded),
-            orders.Where(o => o.MonobankStatus == MonobankStatus.Success).Sum(o => Money.ToKopecks(o.Price)),
-            orders.Sum(o => RefundOrderCommandHandler.ComputeFulfilledValueKopecks(o)),
-            refundsByOrder.Values.Where(p => p.Status == PaymentStatus.Succeeded).Sum(p => p.AmountKopecks));
+            refundedOrders,
+            totalReceivedKopecks,
+            deliveredValueKopecks,
+            totalRefundedKopecks);
 
         return new GetReconciliationResponse(summary, threeWayMatch, exceptions, funnel, revenueSummary);
     }
