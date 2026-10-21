@@ -19,8 +19,8 @@ namespace FuelFlow.Brands.UnitTests;
 /// it. Two things followed from that, and both of them are money:
 /// </para>
 /// <list type="number">
-/// <item>the customer price became <c>min(0 + margin, column - discount)</c> - the MARGIN, not the
-/// price. A grade worth 92.90 became a 2.75 bargain, or 0.00 when the margin was blank too;</item>
+    /// <item>the customer price became <c>0 + margin</c> - the MARGIN, not the price. A grade worth
+    /// 92.90 became a 2.75 bargain, or 0.00 when the margin was blank too;</item>
 /// <item>the below-cost guard went blind, because it only fires when the cost is greater than
 /// zero: it reads "we paid nothing" as "nothing can be below what we paid".</item>
 /// </list>
@@ -39,8 +39,7 @@ public sealed class PriceFieldsStayNullTests
           "supplierPricePerLiter": null,
           "marginUahPerLiter": null,
           "finalPricePerLiter": null,
-          "pumpPricePerLiter": 92.90,
-          "minDiscountPerLiter": 0
+          "pumpPricePerLiter": 92.90
         }
         """;
 
@@ -70,7 +69,7 @@ public sealed class PriceFieldsStayNullTests
     public void A_stated_cost_and_margin_still_price_the_fuel()
     {
         // The change must not break the ordinary case: a priced fuel keeps its price.
-        FuelPricing.FinalPerLiterOrNull(40m, 3m, 92.90m, 0m).Should().Be(43m);
+        FuelPricing.FinalPerLiterOrNull(40m, 3m).Should().Be(43m);
     }
 
     [Fact]

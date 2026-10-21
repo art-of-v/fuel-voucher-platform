@@ -4189,11 +4189,6 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("margin_uah_per_liter")
                         .HasComment("What we add per litre on top of what we pay. NULL means the margin is not stated, and a fuel with no stated cost OR no stated margin has no price of its own: it is shown at the column price, marked 'not in stock', and it cannot be sold.");
 
-                    b.Property<decimal?>("MinDiscountPerLiter")
-                        .HasColumnType("numeric(10,4)")
-                        .HasColumnName("min_discount_per_liter")
-                        .HasComment("The smallest discount we give the customer per litre. RETIRED: the price is computed as cost + margin, and the column price beside it is a reference, so this column no longer takes part in it. It stays until the migration that drops it.");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -4253,7 +4248,7 @@ namespace FuelFlow.API.Migrations
 
                             t.HasCheckConstraint("ck_fuel_types_prices_non_negative", "base_price >= 0 AND (discount_price IS NULL OR discount_price > 0)");
 
-                            t.HasCheckConstraint("ck_fuel_types_pricing_knobs_non_negative", "(supplier_price_per_liter IS NULL OR supplier_price_per_liter >= 0) AND (pump_price_per_liter IS NULL OR pump_price_per_liter >= 0) AND (min_discount_per_liter IS NULL OR min_discount_per_liter >= 0)");
+                            t.HasCheckConstraint("ck_fuel_types_pricing_knobs_non_negative", "(supplier_price_per_liter IS NULL OR supplier_price_per_liter >= 0) AND (pump_price_per_liter IS NULL OR pump_price_per_liter >= 0)");
                         });
 
                     b.HasData(

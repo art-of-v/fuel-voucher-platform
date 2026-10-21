@@ -61,7 +61,6 @@ var rows = await (
             fuel.SupplierPricePerLiter,
             fuel.MarginUahPerLiter,
             fuel.PumpPricePerLiter,
-            fuel.MinDiscountPerLiter,
         })
         .ToListAsync(ct);
 

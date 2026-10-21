@@ -126,8 +126,7 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
             // Not "no price recorded" any more but "not priced at all": with no cost and no margin the
             // derived price is null, which is what makes the fuel unsellable.
             FuelPricing.FinalPerLiterOrNull(
-                fuel.SupplierPricePerLiter, fuel.MarginUahPerLiter,
-                fuel.PumpPricePerLiter, fuel.MinDiscountPerLiter).Should().BeNull();
+                fuel.SupplierPricePerLiter, fuel.MarginUahPerLiter).Should().BeNull();
         }
     }
 
@@ -169,9 +168,9 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
     [Fact]
     public async Task AnExistingFuel_IsLeftExactlyAsItWas()
     {
-        // Operator columns belong to the operator: our price, the margin, the discount floor, the
-        // below-cost opt-in, and the archive flag. An import that "helpfully" refreshed a price would
-        // be publishing a number no human approved.
+        // Operator columns belong to the operator: our cost, our margin, the below-cost opt-in and
+        // the archive flag. An import that "helpfully" refreshed a price would be publishing a
+        // number no human approved.
         await SeedBrandAsync();
         var existing = new FuelTypeEntity
         {
@@ -207,8 +206,7 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
         // and this import owns nothing here.
         reloaded.PumpPricePerLiter.Should().Be(60m);
         FuelPricing.FinalPerLiterOrNull(
-            reloaded.SupplierPricePerLiter, reloaded.MarginUahPerLiter,
-            reloaded.PumpPricePerLiter, reloaded.MinDiscountPerLiter).Should().Be(51m);
+            reloaded.SupplierPricePerLiter, reloaded.MarginUahPerLiter).Should().Be(51m);
     }
 
     [Fact]

@@ -89,14 +89,6 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
                 + "can sit below what we charge. It is the price the customer sees struck through "
                 + "when the column price sits above what we charge.");
 
-        builder.Property(e => e.MinDiscountPerLiter)
-            .HasColumnName("min_discount_per_liter")
-            .HasColumnType("numeric(10,4)")
-            .HasComment("The smallest discount we give the customer per litre. RETIRED: the price "
-                + "is computed as cost + margin, and the column price beside it is a reference, so "
-                + "this column no longer takes part in it. It stays until the migration that drops "
-                + "it.");
-
         builder.Property(e => e.MarginPercent)
             .HasColumnName("margin_percent")
             .HasColumnType("numeric(10,4)")
@@ -225,15 +217,14 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
             t.HasCheckConstraint("ck_fuel_types_prices_non_negative",
                 "base_price >= 0 AND (discount_price IS NULL OR discount_price > 0)");
 
-            // The four knobs the fuel took off the offer on 2026-10-19 keep the constraints the offer
+            // The knobs the fuel took off the offer on 2026-10-19 keep the constraints the offer
             // carried. A negative cost makes every price computed from it negative as well, and a
-            // negative discount is the customer being paid to take the fuel.
+            // negative margin is us paying the customer for the fuel.
             t.HasCheckConstraint("ck_fuel_types_margin_signs",
                 "margin_uah_per_liter IS NULL OR margin_uah_per_liter >= 0");
             t.HasCheckConstraint("ck_fuel_types_pricing_knobs_non_negative",
                 "(supplier_price_per_liter IS NULL OR supplier_price_per_liter >= 0) AND " +
-                "(pump_price_per_liter IS NULL OR pump_price_per_liter >= 0) AND " +
-                "(min_discount_per_liter IS NULL OR min_discount_per_liter >= 0)");
+                "(pump_price_per_liter IS NULL OR pump_price_per_liter >= 0)");
         });
     }
 }

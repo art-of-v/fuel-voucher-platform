@@ -154,14 +154,6 @@ public sealed class FuelTypeEntity
     public decimal? PumpPricePerLiter { get; set; }
 
     /// <summary>
-    /// The guaranteed gap under the column price - a discount the operator promises even if the
-    /// margin would not cover it. Not the same number as <see cref="DiscountPrice"/>, which is the
-    /// headline the customer sees. It is no longer a term of our price: the price is the cost plus
-    /// the margin, and the column price is a reference.
-    /// </summary>
-    public decimal? MinDiscountPerLiter { get; set; }
-
-    /// <summary>
     /// The margin as a percentage, kept beside the per-litre figure it is shown next to. Only ever
     /// read; the price is computed from <see cref="MarginUahPerLiter"/> because a percentage of a
     /// price that is itself a function of the margin is circular.

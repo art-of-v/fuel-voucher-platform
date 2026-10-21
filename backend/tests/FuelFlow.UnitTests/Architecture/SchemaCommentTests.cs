@@ -52,7 +52,6 @@ public sealed class SchemaCommentTests
         nameof(FuelTypeEntity.MarginUahPerLiter),
         nameof(FuelTypeEntity.MarginPercent),
         nameof(FuelTypeEntity.PumpPricePerLiter),
-        nameof(FuelTypeEntity.MinDiscountPerLiter),
         nameof(FuelTypeEntity.BasePrice),
         nameof(FuelTypeEntity.DiscountPrice),
         nameof(FuelTypeEntity.AllowBelowCost)
@@ -121,8 +120,8 @@ public sealed class SchemaCommentTests
             var comment = CommentOf(property);
             Assert.False(string.IsNullOrWhiteSpace(comment),
                 $"{column} carries no comment, and its name does not say what it is: the price "
-                + "model has a cost, a margin, a column price, a minimum customer discount and "
-                + "a list price, and a reader of the database cannot tell them apart.");
+                + "model has a cost, a margin, a column price, a list price and a loss-leader "
+                + "switch, and a reader of the database cannot tell them apart.");
         }
     }
 
