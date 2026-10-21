@@ -152,6 +152,30 @@ internal sealed class VoucherMovementConfiguration : IEntityTypeConfiguration<Vo
             .HasColumnName("line_item_id")
             .HasComment(                "The order line this movement settled, for the renewal paths.");
 
+        // D-13, planning #319: the pairing that voucher_exchanges kept as old_voucher_id ->
+        // new_voucher_id, folded into the ledger. The row of the RETIRED paper carries it, so the
+        // operator's question "what happened to THIS voucher" is answered by this voucher's own rows.
+        builder.Property(e => e.ReplacedByVoucherId)
+            .HasColumnName("replaced_by_voucher_id")
+            .HasComment("The paper that took this voucher's place, when this paper was traded for another one. NULL for a movement that was not a trade - a sale, a return, an import. The row of the retired paper carries it, not the row of the successor.");
+
+        // Restrict: the paper that replaced this one must not be deletable out from under the record
+        // of the trade - the same rule voucher_exchanges already follows on new_voucher_id.
+        builder.HasOne<FuelVoucher>()
+            .WithMany()
+            .HasForeignKey(e => e.ReplacedByVoucherId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Property(e => e.SurchargeShareUah)
+            .HasColumnName("surcharge_share_uah")
+            .HasColumnType("numeric(12,2)")
+            .HasComment("This movement's share of the money a settlement moved: the doplata the operator paid the supplier for this pair of paper. NOT the settlement total - that lives on movement_batches.surcharge_uah, and the shares can sum to less than it.");
+
+        builder.Property(e => e.AppliedCostPerLiter)
+            .HasColumnName("applied_cost_per_liter")
+            .HasColumnType("numeric(12,4)")
+            .HasComment("The cost per litre stamped on the replacement when it arrived. A level, not a delta. Recorded AT THE TIME because it cannot be derived afterwards: fuel_vouchers.cost_per_liter is mutable and gets restamped.");
+
         // The question the operator screen asks is "what happened to THIS voucher", and it reads
         // forwards through time, so the index carries occurred_at_utc with it.
         builder.HasIndex(e => new { e.VoucherId, e.OccurredAtUtc })
@@ -170,6 +194,12 @@ internal sealed class VoucherMovementConfiguration : IEntityTypeConfiguration<Vo
         builder.HasIndex(e => e.OrderId)
             .HasDatabaseName("ix_voucher_movements_order")
             .HasFilter("order_id IS NOT NULL");
+
+        // Which paper replaced this one, without reading the whole ledger. The question the operator
+        // asks about a retired voucher - "what did it become" - is asked per voucher, not per batch.
+        builder.HasIndex(e => e.ReplacedByVoucherId)
+            .HasDatabaseName("ix_voucher_movements_replaced_by")
+            .HasFilter("replaced_by_voucher_id IS NOT NULL");
 
         builder.ToTable(t =>
         {
@@ -208,6 +238,20 @@ internal sealed class VoucherMovementConfiguration : IEntityTypeConfiguration<Vo
             // this table claimed otherwise; this is what makes the claim true.
             t.HasCheckConstraint("ck_voucher_movements_actor_is_somebody",
                 "actor_user_id IS NULL OR actor_user_id <> '00000000-0000-0000-0000-000000000000'");
+
+            // A trade is between two pieces of paper. A voucher that replaced itself is not a trade,
+            // and the rule that says so is the same one voucher_exchanges follows on its own pair.
+            t.HasCheckConstraint("ck_voucher_movements_not_self_replaced",
+                "replaced_by_voucher_id IS NULL OR replaced_by_voucher_id <> voucher_id");
+
+            // The doplata is what the operator paid. A negative share is a sign error, and a refund
+            // of a doplata is a Payment row (D-10), not a negative movement.
+            t.HasCheckConstraint("ck_voucher_movements_surcharge_share_non_negative",
+                "surcharge_share_uah IS NULL OR surcharge_share_uah >= 0");
+
+            // Cost per litre is a price. A negative price is a sign error, not a discount.
+            t.HasCheckConstraint("ck_voucher_movements_applied_cost_non_negative",
+                "applied_cost_per_liter IS NULL OR applied_cost_per_liter >= 0");
         });
     }
 }

@@ -45,6 +45,15 @@ public sealed record ConfirmVoucherExchangeResult(
 
 public sealed class ConfirmVoucherExchangeCommandHandler
 {
+    /// <summary>
+    /// The three facts one pair of paper carries: which paper replaced the retired one, that pair's
+    /// share of the settlement's doplata, and the cost per litre stamped on the replacement.
+    /// </summary>
+    private sealed record ExchangePairFacts(
+        Guid? ReplacementVoucherId,
+        decimal SurchargeShareUah,
+        decimal? AppliedCostPerLiter);
+
     // Old stock we still allow retiring: anything that is unsold and not already deactivated/blocked.
     private static readonly VoucherStatus[] EligibleOldStatuses =
     {
@@ -295,6 +304,10 @@ public sealed class ConfirmVoucherExchangeCommandHandler
         // row but one during supplier reconciliation.
         var batchId = Guid.CreateVersion7();
 
+        // The same three facts per pair, for the ledger row of the retired paper. Kept beside the
+        // voucher_exchanges rows above so the two cannot drift: one loop, one source of truth.
+        var pairFacts = new Dictionary<Guid, ExchangePairFacts>();
+
         // The settlement itself, written before its members so the pair lands in one transaction with
         // its parent. Until #319 landed this header was reconstructed by every reader: MIN(created)
         // for the time, the first non-null name for the operator, SUM for the money. Stating it once
@@ -342,6 +355,15 @@ public sealed class ConfirmVoucherExchangeCommandHandler
                 ActingUserName = command.ActingUserName,
                 CreatedAtUtc = now
             });
+
+            // D-13, planning #319: the same three facts, on the ledger row of the RETIRED paper.
+            // The pairing, the pair's share of the doplata and the cost stamped on the replacement -
+            // all three are what voucher_exchanges holds, and the ledger is what has to answer for it
+            // once that table is folded in.
+            pairFacts[oldId] = new ExchangePairFacts(
+                newId,
+                pairSurcharge,
+                newId.HasValue ? newCostById.GetValueOrDefault(newId.Value) : null);
         }
 
         // D-13. The custody half of the same settlement: one movement per piece of paper that changed
@@ -358,6 +380,13 @@ public sealed class ConfirmVoucherExchangeCommandHandler
         // writers needed, and it is why nothing here is conditional.
         foreach (var old in olds)
         {
+            // The ledger row of the retired paper carries the pair's facts: which paper replaced it,
+            // the pair's share of the doplata, and the cost stamped on the replacement. That is the
+            // whole of what voucher_exchanges held, on the row that answers "what happened to THIS
+            // voucher" - so the fold does not have to keep a second table beside the ledger to say
+            // which old paper became which new one.
+            pairFacts.TryGetValue(old.Id, out var pair);
+
             _context.VoucherMovements.Add(new VoucherMovement
             {
                 Id = Guid.CreateVersion7(),
@@ -368,7 +397,10 @@ public sealed class ConfirmVoucherExchangeCommandHandler
                 ToLocation = VoucherLocations.Supplier,
                     ActorKind = VoucherActorKinds.User,
                 ActorUserId = command.ActingUserId,
-                OccurredAtUtc = now
+                OccurredAtUtc = now,
+                ReplacedByVoucherId = pair?.ReplacementVoucherId,
+                SurchargeShareUah = pair?.SurchargeShareUah,
+                AppliedCostPerLiter = pair?.AppliedCostPerLiter
             });
         }
 

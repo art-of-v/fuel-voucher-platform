@@ -306,7 +306,13 @@ public sealed class SchemaCommentTests
             nameof(VoucherMovement.CostDeltaUah),
             nameof(VoucherMovement.OccurredAtUtc),
             nameof(VoucherMovement.Reason),
-            nameof(VoucherMovement.LineItemId)
+            nameof(VoucherMovement.LineItemId),
+            // Planning #319: the fold of voucher_exchanges into the ledger. The pairing and the two
+            // money columns are the pair's facts, and a column that carries a fact nobody can read
+            // off the schema is a column the accountant will not trust.
+            nameof(VoucherMovement.ReplacedByVoucherId),
+            nameof(VoucherMovement.SurchargeShareUah),
+            nameof(VoucherMovement.AppliedCostPerLiter)
         ]),
         (typeof(ChartOfAccount),
         [

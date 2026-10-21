@@ -116,6 +116,53 @@ public sealed class VoucherMovement
 
     public DateTime OccurredAtUtc { get; set; }
 
+    /// <summary>
+    /// The paper that took this voucher's place, when this paper was traded for another one.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A movement says where a piece of paper went; this says which piece of paper it became. It is
+    /// the pairing <c>voucher_exchanges</c> kept as <c>old_voucher_id</c> → <c>new_voucher_id</c>, folded
+    /// into the ledger (planning #319) so the ledger can answer "what replaced this voucher" without
+    /// the old table beside it.
+    /// </para>
+    /// <para>
+    /// The row that carries it is the row of the <b>retired</b> paper — the one whose story ends here.
+    /// The successor's row is the beginning of its own story and carries nothing about the trade. So
+    /// the operator's question "what happened to THIS voucher" is answered by reading THAT voucher's
+    /// own movements, which is what the lifecycle drawer does.
+    /// </para>
+    /// <para>
+    /// NULL for every movement that was not a trade: a sale, a return, an import. It is not NULL for
+    /// every movement that means what it says — a movement without a counterpart is a movement that
+    /// moved no paper into another paper, and that is a fact about the world.
+    /// </para>
+    /// </remarks>
+    public Guid? ReplacedByVoucherId { get; set; }
+
+    /// <summary>
+    /// This movement's share of the money a settlement moved: the допlata the operator paid the
+    /// supplier for this pair of paper.
+    /// </summary>
+    /// <remarks>
+    /// The settlement's total lives on <c>movement_batches.surcharge_uah</c>, and the shares can sum to
+    /// less than it — so the total is not this column's value, and this column is not the total.
+    /// <c>voucher_exchanges.surcharge_uah</c> held exactly this per-pair share, and the three readers
+    /// that summed it per batch and per fuel still need it.
+    /// </remarks>
+    public decimal? SurchargeShareUah { get; set; }
+
+    /// <summary>
+    /// The cost per litre stamped on the replacement when it arrived, recorded at the time.
+    /// </summary>
+    /// <remarks>
+    /// A level, not a delta: what the new paper cost per litre. It cannot be read back later —
+    /// <c>fuel_vouchers.cost_per_liter</c> is mutable and <c>SetBatchCostCommandHandler</c> restamps
+    /// it, so "what did this paper cost when it arrived" stops existing the moment the column is
+    /// restamped. <c>voucher_exchanges.cost_per_liter_applied</c> held exactly this.
+    /// </remarks>
+    public decimal? AppliedCostPerLiter { get; set; }
+
     /// <summary>Why, in the operator's words.</summary>
     public string? Reason { get; set; }
 

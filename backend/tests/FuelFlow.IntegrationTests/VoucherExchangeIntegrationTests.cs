@@ -723,6 +723,100 @@ var actingUserId = Guid.NewGuid();
         leftoverNew.Status.Should().Be(VoucherStatus.Imported); // second batch never activated
     }
 
+    /// <summary>
+    /// Planning #319, the compare step of the fold. The ledger is written beside the table it will
+    /// replace, so the two can be compared row by row while both are still there - and the comparison
+    /// is the proof that the fold loses nothing.
+    /// <para>
+    /// The three facts a pair of paper carries are: which paper replaced the retired one, that pair's
+    /// share of the doplata, and the cost stamped on the replacement. They live on the ledger row of
+    /// the RETIRED paper, because that is the row the operator's "what happened to this voucher"
+    /// question reads.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task The_Ledger_Says_What_The_Exchange_Rows_Say()
+    {
+        var actingUserId = Guid.NewGuid();
+        var supplierId = Guid.NewGuid();
+        var importId = Guid.NewGuid();
+        var old1 = Guid.NewGuid();
+        var old2 = Guid.NewGuid();
+        var new1 = Guid.NewGuid();
+        var new2 = Guid.NewGuid();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        using (var seed = CreateContext())
+        {
+            await seed.Database.MigrateAsync();
+            await ResetDataAsync(seed);
+
+            SeedUser(seed, actingUserId);
+            SeedSupplier(seed, supplierId);
+            SeedImport(seed, importId);
+            // Two olds with DIFFERENT costs: the exchange carries each voucher's own cost over, so a
+            // batch-wide copy would misreport one of the two rows - which is what the pair facts are for.
+            seed.FuelVouchers.Add(Stock(old1, "okko", "okko-95", 50m, today.AddDays(3), VoucherStatus.Available, supplierId: supplierId, costPerLiter: 30m));
+            seed.FuelVouchers.Add(Stock(old2, "okko", "okko-95", 50m, today.AddDays(1), VoucherStatus.Available, supplierId: supplierId, costPerLiter: 28m));
+            seed.FuelVouchers.Add(Stock(new1, "okko", "okko-95", 50m, today.AddMonths(6), VoucherStatus.Imported, importId, supplierId: supplierId));
+            seed.FuelVouchers.Add(Stock(new2, "okko", "okko-95", 50m, today.AddMonths(6), VoucherStatus.Imported, importId, supplierId: supplierId));
+
+            await seed.SaveChangesAsync();
+        }
+
+        ConfirmVoucherExchangeResult result;
+        using (var ctx = CreateContext())
+        {
+            result = await BuildHandler(ctx).HandleAsync(new ConfirmVoucherExchangeCommand(
+                OldVoucherIds: new List<Guid> { old1, old2 },
+                NewImportId: importId,
+                Costs: new List<ExchangeFuelCost> { new(ToUuid("okko-95"), 30m) },
+                SurchargeUah: 200m,
+                ActingUserId: actingUserId,
+                ActingUserName: "Operator"));
+        }
+
+        result.Success.Should().BeTrue(result.Error);
+
+        using var verify = CreateContext();
+
+        var exchanges = await verify.VoucherExchanges.AsNoTracking().ToListAsync();
+        exchanges.Should().HaveCount(2);
+
+        var outMovements = await verify.VoucherMovements.AsNoTracking()
+            .Where(m => m.Kind == VoucherMovementKinds.ExchangeOut)
+            .ToListAsync();
+        outMovements.Should().HaveCount(exchanges.Count);
+
+        // The comparison itself: for every pair, the ledger row of the retired paper says the same
+        // three things the exchange row says.
+        foreach (var exchange in exchanges)
+        {
+            var movement = outMovements.Single(m => m.VoucherId == exchange.OldVoucherId);
+
+            movement.BatchId.Should().Be(exchange.ExchangeBatchId);
+            movement.ReplacedByVoucherId.Should().Be(exchange.NewVoucherId);
+            movement.SurchargeShareUah.Should().Be(exchange.SurchargeUah);
+            movement.AppliedCostPerLiter.Should().Be(exchange.CostPerLiterApplied);
+        }
+
+        // The ledger answers on its own, without the table beside it: which paper replaced this one.
+        var replacedBy = await verify.VoucherMovements.AsNoTracking()
+            .Where(m => m.ReplacedByVoucherId != null)
+            .ToListAsync();
+        replacedBy.Should().HaveCount(2);
+        replacedBy.Select(m => m.ReplacedByVoucherId)
+            .Should().BeEquivalentTo(exchanges.Select(x => x.NewVoucherId));
+
+        // And the direction is the one the operator's screen reads: the RETIRED paper's row carries
+        // the trade. The successor's own row is the start of its own story and says nothing about it.
+        var inMovements = await verify.VoucherMovements.AsNoTracking()
+            .Where(m => m.Kind == VoucherMovementKinds.ExchangeIn)
+            .ToListAsync();
+        inMovements.Should().OnlyContain(m =>
+            m.ReplacedByVoucherId == null && m.SurchargeShareUah == null && m.AppliedCostPerLiter == null);
+    }
+
     // ---- Helpers -------------------------------------------------------------------------------
 
     private static ConfirmVoucherExchangeCommandHandler BuildHandler(ApplicationDbContext ctx)

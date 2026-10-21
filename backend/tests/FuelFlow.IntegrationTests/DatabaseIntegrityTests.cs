@@ -997,6 +997,105 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
         await act.Should().NotThrowAsync();
     }
 
+    /// <summary>
+    /// Planning #319: the trade facts the ledger carries for the fold of <c>voucher_exchanges</c>. A
+    /// voucher that replaced itself is not a trade, and the rule that says so is the one the folded
+    /// table already follows on its own pair (<c>ck_voucher_exchange_not_self</c>).
+    /// </summary>
+    [Fact]
+    public async Task A_Trade_Cannot_Be_With_The_Same_Paper()
+    {
+        await using var context = CreateContext();
+        var voucher = NewVoucher(
+            "self-v-" + Guid.NewGuid().ToString("N")[..6],
+            "self-v-qr-" + Guid.NewGuid().ToString("N")[..6]);
+
+        context.FuelVouchers.Add(voucher);
+        context.VoucherMovements.Add(new VoucherMovement
+        {
+            Id = Guid.NewGuid(),
+            Kind = VoucherMovementKinds.ExchangeOut,
+            VoucherId = voucher.Id,
+            FromLocation = VoucherLocations.Pool,
+            ToLocation = VoucherLocations.Supplier,
+            ActorKind = VoucherActorKinds.User,
+            ActorUserId = Guid.NewGuid(),
+            OccurredAtUtc = DateTime.UtcNow,
+            ReplacedByVoucherId = voucher.Id
+        });
+
+        var act = async () => await context.SaveChangesAsync();
+
+        var violation = await act.Should().ThrowAsync<DbUpdateException>();
+        violation.Which.InnerException.Should().BeOfType<Npgsql.PostgresException>()
+            .Which.SqlState.Should().Be("23514");
+    }
+
+    /// <summary>
+    /// The money the ledger carries is money that moved, and money that moved is not negative. A
+    /// refund is a Payment row (D-10), not a negative movement.
+    /// </summary>
+    [Fact]
+    public async Task A_Negative_Surcharge_Share_Is_Refused()
+    {
+        await using var context = CreateContext();
+        var voucher = NewVoucher(
+            "share-v-" + Guid.NewGuid().ToString("N")[..6],
+            "share-v-qr-" + Guid.NewGuid().ToString("N")[..6]);
+
+        context.FuelVouchers.Add(voucher);
+        context.VoucherMovements.Add(new VoucherMovement
+        {
+            Id = Guid.NewGuid(),
+            Kind = VoucherMovementKinds.ExchangeOut,
+            VoucherId = voucher.Id,
+            FromLocation = VoucherLocations.Pool,
+            ToLocation = VoucherLocations.Supplier,
+            ActorKind = VoucherActorKinds.User,
+            ActorUserId = Guid.NewGuid(),
+            OccurredAtUtc = DateTime.UtcNow,
+            SurchargeShareUah = -1m
+        });
+
+        var act = async () => await context.SaveChangesAsync();
+
+        var violation = await act.Should().ThrowAsync<DbUpdateException>();
+        violation.Which.InnerException.Should().BeOfType<Npgsql.PostgresException>()
+            .Which.SqlState.Should().Be("23514");
+    }
+
+    /// <summary>
+    /// The same rule for the cost per litre: a price is not negative.
+    /// </summary>
+    [Fact]
+    public async Task A_Negative_Applied_Cost_Is_Refused()
+    {
+        await using var context = CreateContext();
+        var voucher = NewVoucher(
+            "cost-v-" + Guid.NewGuid().ToString("N")[..6],
+            "cost-v-qr-" + Guid.NewGuid().ToString("N")[..6]);
+
+        context.FuelVouchers.Add(voucher);
+        context.VoucherMovements.Add(new VoucherMovement
+        {
+            Id = Guid.NewGuid(),
+            Kind = VoucherMovementKinds.ExchangeOut,
+            VoucherId = voucher.Id,
+            FromLocation = VoucherLocations.Pool,
+            ToLocation = VoucherLocations.Supplier,
+            ActorKind = VoucherActorKinds.User,
+            ActorUserId = Guid.NewGuid(),
+            OccurredAtUtc = DateTime.UtcNow,
+            AppliedCostPerLiter = -1m
+        });
+
+        var act = async () => await context.SaveChangesAsync();
+
+        var violation = await act.Should().ThrowAsync<DbUpdateException>();
+        violation.Which.InnerException.Should().BeOfType<Npgsql.PostgresException>()
+            .Which.SqlState.Should().Be("23514");
+    }
+
     [Theory]
     [InlineData("user", true, false)]     // a person, named            - allowed
     [InlineData("system", false, false)] // the scheduler              - allowed
