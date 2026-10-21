@@ -13,6 +13,7 @@ using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Features.Vouchers.Renewal.Operator;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Features.Vouchers.UpdateVoucher;
+using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
@@ -56,7 +57,7 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
 
             SeedUser(seed, userId);
             seed.FuelVouchers.Add(StockVoucher(Guid.NewGuid(), "okko", "okko-95", 50m));
-            seed.Orders.Add(PurchaseOrder(orderId, userId, ("okko", "okko-95", 50m, 2500)));
+            AddPaidOrder(seed, PurchaseOrder(orderId, userId, ("okko", "okko-95", 50m, 2500)));
 
             await seed.SaveChangesAsync();
         }
@@ -99,7 +100,7 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
 
             SeedUser(seed, userId);
             seed.FuelVouchers.Add(StockVoucher(Guid.NewGuid(), "okko", "okko-95", 50m));
-            seed.Orders.Add(PurchaseOrder(orderId, userId, ("okko", "okko-95", 50m, 2500)));
+            AddPaidOrder(seed, PurchaseOrder(orderId, userId, ("okko", "okko-95", 50m, 2500)));
 
             await seed.SaveChangesAsync();
         }
@@ -157,7 +158,7 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
             seed.FuelVouchers.Add(StockVoucher(Guid.NewGuid(), "okko", "okko-95", 50m));
             seed.FuelVouchers.Add(StockVoucher(Guid.NewGuid(), "okko", "okko-95", 50m));
             seed.FuelVouchers.Add(StockVoucher(Guid.NewGuid(), "okko", "okko-95", 50m));
-            seed.Orders.Add(PurchaseOrder(
+            AddPaidOrder(seed, PurchaseOrder(
                 orderId,
                 userId,
                 ("okko", "okko-95", 50m, 2500),
@@ -220,11 +221,11 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
             SeedUser(seed, userId);
 
             // The lapsed voucher the customer is holding, bought under an earlier purchase.
-            seed.Orders.Add(PurchaseOrder(purchaseId, userId, ("wog", "wog-95", 40m, 2400)));
+            AddPaidOrder(seed, PurchaseOrder(purchaseId, userId, ("wog", "wog-95", 40m, 2400)));
             seed.FuelVouchers.Add(SourceVoucher(sourceId, userId, "wog", "wog-95", 40m, today.AddDays(-3), purchaseId));
             seed.FuelVouchers.Add(StockVoucher(Guid.NewGuid(), "wog", "wog-95", 40m, today.AddMonths(1)));
 
-            seed.Orders.Add(RenewalOrder(renewalId, userId, 480, sourceId));
+            AddPaidOrder(seed, RenewalOrder(renewalId, userId, 480, sourceId));
 
             await seed.SaveChangesAsync();
         }
@@ -270,7 +271,7 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
             await ResetDataAsync(seed);
 
             SeedUser(seed, userId);
-            seed.Orders.Add(PurchaseOrder(orderId, userId, ("okko", "okko-95", 50m, 2500)));
+            AddPaidOrder(seed, PurchaseOrder(orderId, userId, ("okko", "okko-95", 50m, 2500)));
             seed.FuelVouchers.Add(StockVoucher(voucherId, "okko", "okko-95", 50m));
             await seed.SaveChangesAsync();
 
@@ -313,7 +314,7 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
             await ResetDataAsync(seed);
 
             SeedUser(seed, userId);
-            seed.Orders.Add(PurchaseOrder(orderId, userId, ("okko", "okko-95", 50m, 2500)));
+            AddPaidOrder(seed, PurchaseOrder(orderId, userId, ("okko", "okko-95", 50m, 2500)));
             await seed.SaveChangesAsync();
         }
 
@@ -411,7 +412,7 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
 
             SeedUser(seed, userId);
 
-            seed.Orders.Add(PurchaseOrder(purchaseId, userId, ("okko", "okko-95", 50m, 2500)));
+            AddPaidOrder(seed, PurchaseOrder(purchaseId, userId, ("okko", "okko-95", 50m, 2500)));
             // The customer's voucher has lapsed, so the operator takes a fresh one out of the warehouse.
             seed.FuelVouchers.Add(SourceVoucher(customerVoucherId, userId, "okko", "okko-95", 50m, today.AddDays(-2), purchaseId));
             seed.FuelVouchers.Add(StockVoucher(stockId, "okko", "okko-95", 50m));
@@ -598,4 +599,28 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(_fixture.ConnectionString)
             .Options, TestQrCipher.Instance);
+    /// <summary>
+    /// Adds an order AND the money record of a paid order. Fulfilment asks the payment row
+    /// whether the money arrived before it hands out a voucher, so a fixture that expects
+    /// vouchers has to say the order was paid for.
+    /// </summary>
+    private static void AddPaidOrder(ApplicationDbContext seed, Order order)
+    {
+        seed.Orders.Add(order);
+        seed.Payments.Add(new Payment
+        {
+            Id = Guid.NewGuid(),
+            OrderId = order.Id,
+            Kind = PaymentKind.Capture,
+            Provider = "monobank",
+            ProviderInvoiceId = $"INV-{order.Id:N}",
+            AmountUah = order.Price,
+            AmountKopecks = (long)(order.Price * 100),
+            Currency = "UAH",
+            Status = PaymentStatus.Succeeded,
+            PaidAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+    }
 }

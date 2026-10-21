@@ -8,6 +8,7 @@ using FuelFlow.Features.Settings;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
+using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
@@ -96,7 +97,7 @@ public sealed class FulfillmentTransactionScopeTests : IClassFixture<TestDatabas
                 var order = Order(orderId, userId, brand, fuelTypeId, liters, quantity: 1, unitPrice: 2500);
                 order.Status = OrderStatus.Fulfilled;
                 order.FulfilledAtUtc = DateTime.UtcNow.AddHours(-2);
-                seed.Orders.Add(order);
+                AddPaidOrder(seed, order);
 
                 // Two delivery records for one line item: the mismatch. Both are left standing - the
                 // point of the grace window is that an old order's fuel is not taken back.
@@ -116,7 +117,7 @@ public sealed class FulfillmentTransactionScopeTests : IClassFixture<TestDatabas
             // The witness: an ordinary order waiting for its voucher, with stock behind it.
             var waiting = Order(waitingOrderId, userId, brand, fuelTypeId, liters, quantity: 1, unitPrice: 2500);
             waiting.Status = OrderStatus.PendingFulfillment;
-            seed.Orders.Add(waiting);
+            AddPaidOrder(seed, waiting);
 
             seed.FuelVouchers.Add(Available(Guid.NewGuid(), brand, fuelTypeId, liters, $"WAIT-{waitingOrderId:N}"));
 
@@ -195,7 +196,7 @@ public sealed class FulfillmentTransactionScopeTests : IClassFixture<TestDatabas
             var order = Order(leftAloneOrderId, userId, brand, fuelTypeId, liters, quantity: 1, unitPrice: 2500);
             order.Status = OrderStatus.Fulfilled;
             order.FulfilledAtUtc = DateTime.UtcNow.AddHours(-2);
-            seed.Orders.Add(order);
+            AddPaidOrder(seed, order);
 
             foreach (var tag in new[] { "TX-A", "TX-B" })
             {
@@ -308,5 +309,29 @@ public sealed class FulfillmentTransactionScopeTests : IClassFixture<TestDatabas
             new RuntimeSettingsService(context),
             NotificationDispatcher.Disabled,
             new ConfigurationBuilder().Build());
+    }
+    /// <summary>
+    /// Adds an order AND the money record of a paid order. Fulfilment asks the payment row
+    /// whether the money arrived before it hands out a voucher, so a fixture that expects
+    /// vouchers has to say the order was paid for.
+    /// </summary>
+    private static void AddPaidOrder(ApplicationDbContext seed, Order order)
+    {
+        seed.Orders.Add(order);
+        seed.Payments.Add(new Payment
+        {
+            Id = Guid.NewGuid(),
+            OrderId = order.Id,
+            Kind = PaymentKind.Capture,
+            Provider = "monobank",
+            ProviderInvoiceId = $"INV-{order.Id:N}",
+            AmountUah = order.Price,
+            AmountKopecks = (long)(order.Price * 100),
+            Currency = "UAH",
+            Status = PaymentStatus.Succeeded,
+            PaidAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
     }
 }

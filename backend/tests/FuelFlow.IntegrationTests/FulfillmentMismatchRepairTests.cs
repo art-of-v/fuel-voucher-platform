@@ -10,6 +10,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.Movements;
+using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
@@ -91,7 +92,7 @@ public sealed class FulfillmentMismatchRepairTests : IClassFixture<TestDatabaseF
             var order = Order(orderId, userId, quantity: 1, unitPrice: 2500);
             order.Status = OrderStatus.Fulfilled;
             order.FulfilledAtUtc = DateTime.UtcNow;
-            seed.Orders.Add(order);
+            AddPaidOrder(seed, order);
 
             seed.FuelVouchers.Add(Assigned(voucherA, brand, fuelTypeId, liters, "MR-A", userId, orderId));
             seed.FuelVouchers.Add(Assigned(voucherB, brand, fuelTypeId, liters, "MR-B", userId, orderId));
@@ -218,7 +219,7 @@ public sealed class FulfillmentMismatchRepairTests : IClassFixture<TestDatabaseF
             var order = Order(orderId, userId, quantity: 1, unitPrice: 2500);
             order.Status = OrderStatus.Fulfilled;
             order.FulfilledAtUtc = DateTime.UtcNow;
-            seed.Orders.Add(order);
+            AddPaidOrder(seed, order);
             await seed.SaveChangesAsync();
         }
 
@@ -307,5 +308,29 @@ public sealed class FulfillmentMismatchRepairTests : IClassFixture<TestDatabaseF
             new RuntimeSettingsService(context),
             NotificationDispatcher.Disabled,
             new ConfigurationBuilder().Build());
+    }
+    /// <summary>
+    /// Adds an order AND the money record of a paid order. Fulfilment asks the payment row
+    /// whether the money arrived before it hands out a voucher, so a fixture that expects
+    /// vouchers has to say the order was paid for.
+    /// </summary>
+    private static void AddPaidOrder(ApplicationDbContext seed, Order order)
+    {
+        seed.Orders.Add(order);
+        seed.Payments.Add(new Payment
+        {
+            Id = Guid.NewGuid(),
+            OrderId = order.Id,
+            Kind = PaymentKind.Capture,
+            Provider = "monobank",
+            ProviderInvoiceId = $"INV-{order.Id:N}",
+            AmountUah = order.Price,
+            AmountKopecks = (long)(order.Price * 100),
+            Currency = "UAH",
+            Status = PaymentStatus.Succeeded,
+            PaidAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
     }
 }
