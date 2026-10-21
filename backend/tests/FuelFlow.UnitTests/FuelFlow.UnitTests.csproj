@@ -2,8 +2,6 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
@@ -26,6 +24,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\FuelFlow.API\FuelFlow.API.csproj" />
+    <!-- The worker is referenced so that DuplicateTypeGuardTests can load its assembly and see
+         what it declares. The reference is the guard: without it the assembly is not on the
+         test output path, and the test would pass without checking anything. -->
     <ProjectReference Include="..\..\src\FuelFlow.JobsWorker\FuelFlow.JobsWorker.csproj" />
   </ItemGroup>
 
