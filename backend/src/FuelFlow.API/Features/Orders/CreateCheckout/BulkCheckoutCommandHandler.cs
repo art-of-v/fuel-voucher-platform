@@ -15,8 +15,7 @@ using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using System.Security.Cryptography;
-using System.Text;
+using System.Globalization;
 using FuelFlow.SharedKernel.Observability;
 
 namespace FuelFlow.Features.Orders.CreateCheckout;
@@ -244,80 +243,78 @@ private readonly RuntimeSettingsService _runtimeSettings;
                 ServerPricing.OriginalLineTotal(package, item.Liters, unitPrice, item.Quantity), termCode));
         }
 
-        // Idempotency (mirrors CreateCheckoutCommandHandler's single-item bucket dedup): while a
-        // previous attempt for the SAME cart is still awaiting payment, collapse repeats onto that
-        // one order + invoice instead of double-charging. This closes #16 — the mobile client's
-        // fetchWithRetry auto-resends the identical /bulk POST on timeout/5xx/network with no user
-        // action; those retries land in the same bucket and reuse the live invoice. Once an order
-        // settles (leaves PendingPayment), a legitimate repeat of the same cart gets a fresh invoice.
-        // Must run BEFORE invoice creation so a duplicate never mints a second Monobank invoice.
-        // The cart is hashed to a fixed-length digest so the key fits the 150-char column no matter
-        // how many lines the cart has, and item order is normalized so the same cart always keys alike.
-        // The clock is deliberately not in the key: a five-minute bucket rolls over mid-cart, and a
-        // retry on the far side of the boundary keys differently and charges the customer twice. The
-        // `CreatedAtUtc` filter below is the whole window.
-        var cartSignature = string.Join("|", command.Items
-            .Select(i => $"{i.BrandId}:{i.FuelTypeId}:{i.Liters}:{i.Quantity}:{i.TermCode ?? "full"}")
-            .OrderBy(s => s, StringComparer.Ordinal));
-        var cartDigest = Convert.ToHexString(
-            SHA256.HashData(Encoding.UTF8.GetBytes(cartSignature)))[..32];
-        var bucketKey = $"{command.UserId!.Value:N}:{cartDigest}";
+        // The basket: the whole cart, normalized so that the same cart always keys alike, and
+        // digested so that the key fits the column no matter how many lines the cart has.
+        //
+        // This is the path the mobile app actually uses, and the client's fetchWithRetry
+        // auto-resends the identical /bulk POST on a timeout, a 5xx or a network error with no user
+        // action at all - so two requests for one cart are a fact of life, not a corner case.
+        //
+        // The key names the cart and nothing else: no clock, no random suffix. A five-minute bucket
+        // used to roll over mid-cart, and a retry on the far side of the boundary keyed differently
+        // and charged the customer twice.
+        var cartSignature = CheckoutBasket.CartSignature(command.Items.Select(i =>
+            string.Join(
+                ":",
+                i.BrandId!.Value.ToString("N"),
+                i.FuelTypeId.ToString("N"),
+                i.Liters.ToString(CultureInfo.InvariantCulture),
+                i.Quantity.ToString(CultureInfo.InvariantCulture),
+                i.TermCode ?? "full")));
 
-        var existingOrder = await _context.Orders
-            .Where(o => o.Status == OrderStatus.PendingPayment
-                        && o.IdempotencyKey!.StartsWith(bucketKey)
-                        && o.CreatedAtUtc > DateTime.UtcNow.AddHours(-1))
-            .OrderByDescending(o => o.CreatedAtUtc)
-            .FirstOrDefaultAsync(cancellationToken);
+        var checkoutKey = CheckoutBasket.Key(CheckoutBasket.Cart, command.UserId!.Value, cartSignature);
 
-        if (existingOrder != null && !string.IsNullOrEmpty(existingOrder.MonobankPaymentUrl))
+        var now = DateTime.UtcNow;
+
+        // The order that already holds this cart, if there is one. A retry or a double tap finds it
+        // here and is given the same invoice. The read is an equality on an indexed column; it used
+        // to be a prefix match on a key that carried a random suffix, which no b-tree can serve and
+        // which two requests could both miss.
+        var existingOrder = await CheckoutGuard.FindPendingAsync(_context, checkoutKey, cancellationToken);
+
+        if (existingOrder != null)
         {
-            _logger.LogWarning(
-                "Duplicate bulk checkout; reusing pending order {OrderId} / invoice {InvoiceId}",
-                existingOrder.Id, existingOrder.MonobankInvoiceId);
-
-            return new BulkCheckoutResponse
+            if (CheckoutGuard.IsStale(existingOrder, now))
             {
-                OrderIds = [existingOrder.Id],
-                MonobankInvoiceId = existingOrder.MonobankInvoiceId,
-                PaymentUrl = existingOrder.MonobankPaymentUrl
-            };
+                // A checkout the customer walked away from. The order keeps everything it was, and
+                // gives the cart back, so that the next request for it is a new purchase.
+                CheckoutGuard.Release(existingOrder);
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+            else
+            {
+                // The attempt that holds this cart is the current one: a retry finds its invoice,
+                // and a request that arrived while it was still running waits for it. Either way it
+                // is the same order and the same invoice, and the acquirer is not asked twice.
+                var withInvoice = await CheckoutGuard.WaitForInvoiceAsync(
+                    _context, existingOrder.Id, cancellationToken);
+
+                if (withInvoice != null)
+                {
+                    _logger.LogWarning(
+                        "Duplicate bulk checkout; reusing pending order {OrderId} / invoice {InvoiceId}",
+                        withInvoice.Id, withInvoice.MonobankInvoiceId);
+
+                    return new BulkCheckoutResponse
+                    {
+                        OrderIds = [withInvoice.Id],
+                        MonobankInvoiceId = withInvoice.MonobankInvoiceId,
+                        PaymentUrl = withInvoice.MonobankPaymentUrl
+                    };
+                }
+
+                // The attempt is over and it produced no invoice: the acquirer refused it, or the
+                // request that owned it died. The cart is free, so this request makes a new
+                // attempt.
+                CheckoutGuard.Release(existingOrder);
+                await _context.SaveChangesAsync(cancellationToken);
+            }
         }
 
-        // Per-attempt suffix keeps the unique index (idempotency_key) satisfied when this bucket
-        // already holds settled orders, so a fresh purchase of the same cart never collides.
-        var idempotencyKey = $"{bucketKey}:{Guid.NewGuid():N}";
-
-// Resolve merchant for this account. Outside the try below on purpose: a QA account routed
+        // Resolve merchant for this account. Outside the try below on purpose: a QA account routed
         // to an unconfigured sandbox is refused outright rather than degraded into an order with
         // no invoice, and never quietly pointed at the live merchant.
         var merchant = _merchantResolver.Resolve(user.PhoneNumber, user.IsQaAccount);
-
-        MonobankInvoiceResponse invoiceResponse;
-        try
-        {
-            var monobankClient = _monobankClientFactory.ForMerchant(merchant);
-
-            invoiceResponse = await monobankClient.CreateInvoiceAsync(
-                new MonobankInvoiceRequest
-                {
-                    // Monobank is the one place amounts must be kopecks.
-                    Amount = Money.ForMonobank(totalPrice),
-                    MerchantPaymentInfo = $"FuelFlow Bundle",
-                    RedirectUrl = _monobankOptions.RedirectUrl,
-                    WebhookUrl = _monobankOptions.WebhookUrl
-                }, cancellationToken);
-
-            _logger.LogInformation(
-                "Monobank invoice created on {Merchant} merchant for bundle: {InvoiceId}",
-                merchant,
-                invoiceResponse.InvoiceId);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to create Monobank invoice for bundle");
-            throw;
-        }
 
         var order = new Order
         {
@@ -326,18 +323,16 @@ private readonly RuntimeSettingsService _runtimeSettings;
             LegalEntityId = command.LegalEntityId,
             Price = totalPrice,
             Status = OrderStatus.PendingPayment,
-            IdempotencyKey = idempotencyKey,
-            MonobankInvoiceId = invoiceResponse.InvoiceId,
-            MonobankPaymentUrl = invoiceResponse.PageUrl,
+            // The order's own key: unique per order, and the external reference the acquirer is
+            // given when this order is refunded. The random suffix is what keeps it that way - the
+            // cart's identity is checkout_key, and two orders may share a cart but may not share
+            // this.
+            IdempotencyKey = $"{checkoutKey}:{Guid.NewGuid():N}",
+            CheckoutKey = checkoutKey,
             MonobankMerchant = merchant,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         };
-
-        // See CreateCheckoutCommandHandler for why the payment is its own row. Same reason here: this
-        // is the only moment the invoice exists, so it is the only moment it can be recorded.
-        _context.Payments.Add(PaymentFactory.CreateCapture(
-            order, merchant, invoiceResponse.InvoiceId, DateTime.UtcNow));
 
         foreach (var (item, package, discountPerLiter, unitPrice, lineTotal, originalLineTotal, termCode) in itemPricing)
         {
@@ -363,6 +358,85 @@ private readonly RuntimeSettingsService _runtimeSettings;
 
         _context.Orders.Add(order);
 
+        // The order is written BEFORE the acquirer is asked for an invoice, and that order is what
+        // decides the race. The second request for this cart is refused by the unique index at this
+        // line and never reaches the acquirer - so the client's automatic resend cannot become a
+        // second invoice, and a second charge.
+        //
+        // It is also the order the money belongs to: from here on the invoice is attached to a row
+        // that exists, whatever happens to the call below.
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (CheckoutGuard.IsUniqueViolation(ex))
+        {
+            // Another request for this cart got there first. Its order is the answer to this one -
+            // and this request has not asked the acquirer for anything, so there is no second
+            // invoice to cancel.
+            _context.ChangeTracker.Clear();
+
+            var winner = await CheckoutGuard.FindPendingAsync(_context, checkoutKey, cancellationToken);
+            if (winner == null) throw;
+
+            _logger.LogWarning(
+                "Concurrent bulk checkout for basket {CheckoutKey} lost the race; reusing order {OrderId}",
+                checkoutKey, winner.Id);
+
+            var withInvoice = await CheckoutGuard.WaitForInvoiceAsync(_context, winner.Id, cancellationToken) ?? winner;
+
+            return new BulkCheckoutResponse
+            {
+                OrderIds = [withInvoice.Id],
+                MonobankInvoiceId = withInvoice.MonobankInvoiceId,
+                PaymentUrl = withInvoice.MonobankPaymentUrl
+            };
+        }
+
+        MonobankInvoiceResponse invoiceResponse;
+        try
+        {
+            var monobankClient = _monobankClientFactory.ForMerchant(merchant);
+
+            invoiceResponse = await monobankClient.CreateInvoiceAsync(
+                new MonobankInvoiceRequest
+                {
+                    // Monobank is the one place amounts must be kopecks.
+                    Amount = Money.ForMonobank(totalPrice),
+                    MerchantPaymentInfo = $"FuelFlow Bundle",
+                    RedirectUrl = _monobankOptions.RedirectUrl,
+                    WebhookUrl = _monobankOptions.WebhookUrl
+                }, cancellationToken);
+
+            _logger.LogInformation(
+                "Monobank invoice created on {Merchant} merchant for bundle: {InvoiceId}",
+                merchant,
+                invoiceResponse.InvoiceId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create Monobank invoice for bundle");
+
+            // The invoice never came, so this attempt is over - and an attempt that is over must
+            // not hold the cart against the customer's next try. The order itself stays: it is the
+            // record of what was attempted.
+            CheckoutGuard.Release(order);
+            await _context.SaveChangesAsync(cancellationToken);
+
+            throw;
+        }
+
+        order.MonobankInvoiceId = invoiceResponse.InvoiceId;
+        order.MonobankPaymentUrl = invoiceResponse.PageUrl;
+
+        // See CreateCheckoutCommandHandler for why the payment is its own row. Same reason here: this
+        // is the only moment the invoice exists, so it is the only moment it can be recorded.
+        _context.Payments.Add(PaymentFactory.CreateCapture(
+            order, merchant, invoiceResponse.InvoiceId, DateTime.UtcNow));
+
+        // The invoice, written onto the order that is already there. A second attempt for this cart
+        // is refused by the index above and never reaches this point, so this is the one and only
+        // invoice for this cart.
         await _context.SaveChangesAsync(cancellationToken);
 
             _logger.LogInformation(

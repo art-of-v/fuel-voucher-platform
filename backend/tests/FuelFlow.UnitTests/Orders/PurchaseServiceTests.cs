@@ -373,7 +373,7 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
     }
 
     [Fact]
-    public async Task CreateCheckout_ShouldReuseExistingOrder_WhenDuplicateIdempotencyKeyWithinHour()
+    public async Task CreateCheckout_ShouldReuseExistingOrder_WhenTheSameBasketIsOrderedTwice()
     {
         var user = await _context.Users.FirstAsync();
         var response1 = await _createCheckoutHandler.HandleAsync(CheckoutCommand());
@@ -388,12 +388,12 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
     }
 
     [Fact]
-    public async Task CreateCheckout_ShouldCreateNewOrder_WhenPreviousOrderInBucketIsAlreadyPaid()
+    public async Task CreateCheckout_ShouldCreateNewOrder_WhenThePreviousOneIsAlreadyPaid()
     {
         var user = await _context.Users.FirstAsync();
         var response1 = await _createCheckoutHandler.HandleAsync(CheckoutCommand());
 
-        // User pays immediately; the bucket window must not block a
+        // User pays immediately; a paid order must not block a
         // legitimate repeat purchase of the same fuel/quantity.
         var paidOrder = await _context.Orders.FindAsync(response1.OrderId);
         paidOrder!.Status = OrderStatus.PendingFulfillment;
@@ -406,6 +406,71 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
         var orders = await _context.Orders.Where(o => o.UserId == user.Id).ToListAsync();
         Assert.Equal(2, orders.Count);
         Assert.Equal(2, orders.Select(o => o.IdempotencyKey).Distinct().Count());
+    }
+
+    /// <summary>
+    /// The order carries the basket it is the attempt for - the value the database's index refuses
+    /// a second order for - and the order's own key stays unique per order, because that is the
+    /// external reference the acquirer is given when the order is refunded.
+    /// </summary>
+    [Fact]
+    public async Task CreateCheckout_ShouldWriteTheBasketKeyOnTheOrder()
+    {
+        var response = await _createCheckoutHandler.HandleAsync(CheckoutCommand());
+
+        var order = await _context.Orders.FindAsync(response.OrderId);
+        Assert.NotNull(order);
+        Assert.StartsWith("buy:", order!.CheckoutKey);
+        Assert.StartsWith(order.CheckoutKey!, order.IdempotencyKey);
+        Assert.NotEqual(order.CheckoutKey, order.IdempotencyKey);
+    }
+
+    /// <summary>
+    /// A failed attempt is over, and an attempt that is over must not hold the basket against the
+    /// customer's next try. The order stays - it is the record of what was attempted - and gives
+    /// the basket back.
+    /// </summary>
+    [Fact]
+    public async Task CreateCheckout_WhenTheAcquirerRefuses_GivesTheBasketBack()
+    {
+        var client = new Mock<IMonobankClient>();
+        client
+            .Setup(x => x.CreateInvoiceAsync(It.IsAny<MonobankInvoiceRequest>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("the acquirer is down"));
+
+        var handler = CheckoutHandlerWith(
+            new StubMonobankMerchantResolver(),
+            new StubMonobankClientFactory(client.Object));
+
+        var response = await handler.HandleAsync(CheckoutCommand());
+
+        var order = await _context.Orders.FindAsync(response.OrderId);
+        Assert.NotNull(order);
+        Assert.Null(order!.MonobankInvoiceId);
+        Assert.Null(order.CheckoutKey);
+    }
+
+    /// <summary>
+    /// A customer who abandons a checkout must be able to buy the same fuel again. The abandoned
+    /// order keeps everything it was - its price, its status, its invoice - and gives the basket
+    /// back, so the next attempt is a new order and a new invoice.
+    /// </summary>
+    [Fact]
+    public async Task CreateCheckout_ShouldGiveTheBasketBack_WhenThePreviousAttemptIsStale()
+    {
+        var response1 = await _createCheckoutHandler.HandleAsync(CheckoutCommand());
+
+        var abandoned = await _context.Orders.FindAsync(response1.OrderId);
+        abandoned!.CreatedAtUtc = DateTime.UtcNow.AddHours(-2);
+        await _context.SaveChangesAsync();
+
+        var response2 = await _createCheckoutHandler.HandleAsync(CheckoutCommand());
+
+        Assert.NotEqual(response1.OrderId, response2.OrderId);
+
+        // The abandoned order is untouched except for the claim on the basket.
+        Assert.Null(abandoned.CheckoutKey);
+        Assert.Equal(OrderStatus.PendingPayment, abandoned.Status);
     }
 
     [Fact]
@@ -421,7 +486,17 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
     }
 
     [Fact]
-    public async Task BulkCheckout_ShouldReuseExistingOrder_WhenDuplicateWithinBucket()
+    public async Task BulkCheckout_ShouldWriteTheBasketKeyOnTheOrder()
+    {
+        var response = await _bulkCheckoutHandler.HandleAsync(BulkCommand());
+
+        var order = await _context.Orders.FindAsync(response.OrderIds.Single());
+        Assert.NotNull(order);
+        Assert.StartsWith("bulk:", order!.CheckoutKey);
+    }
+
+    [Fact]
+    public async Task BulkCheckout_ShouldReuseExistingOrder_WhenTheSameCartIsOrderedTwice()
     {
         var user = await _context.Users.FirstAsync();
         var response1 = await _bulkCheckoutHandler.HandleAsync(BulkCommand());
@@ -438,7 +513,7 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
     }
 
     [Fact]
-    public async Task BulkCheckout_ShouldCreateNewOrder_WhenPreviousOrderInBucketIsAlreadyPaid()
+    public async Task BulkCheckout_ShouldCreateNewOrder_WhenThePreviousOneIsAlreadyPaid()
     {
         var user = await _context.Users.FirstAsync();
         var response1 = await _bulkCheckoutHandler.HandleAsync(BulkCommand());

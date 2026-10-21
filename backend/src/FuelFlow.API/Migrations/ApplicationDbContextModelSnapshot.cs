@@ -1840,6 +1840,12 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("CheckoutKey")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("checkout_key")
+                        .HasComment("The basket this order is the live attempt for: the customer, the brand, the fuel, the litres and the quantity (a digest of the whole cart for a bulk checkout). Two orders may not hold the same basket while both await payment, so a double tap and a retried request are one order and one invoice.");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc")
@@ -1865,7 +1871,7 @@ namespace FuelFlow.API.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)")
                         .HasColumnName("idempotency_key")
-                        .HasComment("The key the customer sent with the request. Two requests with the same key are one order,which is what makes a double-tap one order and not two.");
+                        .HasComment("This order's own key: unique per order, and the external reference the acquirer is given when the order is refunded. The checkout's identity is checkout_key - two requests for one basket are one order through that column, not through this one.");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
@@ -1962,6 +1968,11 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("xmin");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CheckoutKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_orders_checkout_key")
+                        .HasFilter("checkout_key IS NOT NULL AND status = 'PendingPayment' AND is_deleted = false");
 
                     b.HasIndex("CreatedAtUtc")
                         .HasDatabaseName("ix_orders_created_at_utc");

@@ -4,6 +4,18 @@ public sealed class MonobankOptions
 {
     public const string SectionName = "Monobank";
 
+    /// <summary>
+    /// How long a call to the acquirer may take before it is given up on.
+    /// </summary>
+    /// <remarks>
+    /// The default for an HTTP client is a hundred seconds, and the acquirer's invoice call used
+    /// to inherit it: a slow acquirer held a request thread for a minute and a half. The checkout
+    /// also depends on this number - the request that loses the race waits for the winner's
+    /// invoice, and that wait is bounded by what the acquirer can do to us - so it is stated here
+    /// rather than left to a default nobody chose.
+    /// </remarks>
+    public const int ClientTimeoutSeconds = 15;
+
     public string Token { get; set; } = string.Empty;
     public string WebhookUrl { get; set; } = string.Empty;
     public string BaseUrl { get; set; } = "https://api.monobank.ua";

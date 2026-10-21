@@ -90,10 +90,31 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
             .HasMaxLength(500).HasComment("The payment link the customer is given. It is handed out, not derived: a link that could" +
                     "be recomputed would not be a link the acquirer knows.");
 
+        // This order's own key, and the acquirer's external reference for its refund. The comment it
+        // used to carry said the key was "the key the customer sent with the request" and that "two
+        // requests with the same key are one order" - and no customer has ever sent one: the value is
+        // derived here, it carries a random suffix, and the customer cannot repeat it. The checkout's
+        // identity is checkout_key, below; this column stays the per-order token.
         builder.Property(e => e.IdempotencyKey)
             .HasColumnName("idempotency_key")
-            .HasMaxLength(150).HasComment("The key the customer sent with the request. Two requests with the same key are one order," +
-                    "which is what makes a double-tap one order and not two.");
+            .HasMaxLength(150).HasComment("This order's own key: unique per order, and the external reference the acquirer is given when the order is refunded. The checkout's identity is checkout_key - two requests for one basket are one order through that column, not through this one.");
+
+        // The basket this order is the live attempt for. The index below is what makes a double tap
+        // one order instead of two: the second insert for the same basket is refused by the database
+        // rather than by a read-then-write race in the handler.
+        //
+        // The key names WHAT was bought and by whom, and nothing else: no clock, no random suffix.
+        // The minute of the clock used to be in the key, rounded down to a five-minute bucket, which
+        // made the window discontinuous - a retry one millisecond before the bucket rolled over
+        // produced a different key, the dedupe missed, and the customer was charged twice for one
+        // tap.
+        //
+        // The filter is what makes a repeat purchase possible: only an order that still awaits
+        // payment holds the basket, so an order that has been paid (or cancelled, or deleted) gives
+        // the basket back and the customer can buy the same fuel again.
+        builder.Property(e => e.CheckoutKey)
+            .HasColumnName("checkout_key")
+            .HasMaxLength(150).HasComment("The basket this order is the live attempt for: the customer, the brand, the fuel, the litres and the quantity (a digest of the whole cart for a bulk checkout). Two orders may not hold the same basket while both await payment, so a double tap and a retried request are one order and one invoice.");
 
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
@@ -162,6 +183,23 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.HasIndex(e => e.IdempotencyKey)
             .IsUnique()
             .HasFilter("idempotency_key IS NOT NULL");
+
+        // The checkout's guard, and the only index in this schema that decides a MONEY question:
+        // one basket, one order awaiting payment. Everything else about an order is written by one
+        // writer; this one is written by two requests that may not know about each other - a double
+        // tap, or the client's automatic resend of the same POST while the first attempt is still
+        // running.
+        //
+        // Unique, so the second insert is refused by the database instead of by a read-then-write in
+        // the handler: the handler's read could pass for both requests, and then both would mint an
+        // invoice and the customer would be charged twice for one basket.
+        //
+        // Partial on the two states that end an attempt, so the basket is given back: an order that
+        // is no longer awaiting payment (paid, cancelled, fulfilled) and an order the customer
+        // deleted. Without that, a customer could buy the same fuel exactly once, ever.
+        builder.HasIndex(e => e.CheckoutKey)
+            .IsUnique()
+            .HasFilter("checkout_key IS NOT NULL AND status = 'PendingPayment' AND is_deleted = false");
 
         // Unique as well as indexed, and both halves matter:
         //
