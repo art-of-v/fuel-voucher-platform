@@ -108,6 +108,22 @@ public sealed class ContractSigningIntegrationTests : IClassFixture<TestDatabase
         row.GetProperty("contractId").GetGuid().Should().Be(contractId);
     }
 
+    [Fact]
+    public async Task The_Contracts_List_Answers_At_Its_Own_Path()
+    {
+        // The route was lost on 2026-10-01 and never restored: the action bound to the
+        // controller's own prefix, so the mobile app's GET /api/legal-entity/contracts was a 404 -
+        // and the list of contracts to sign was empty for every customer, for a reason no screen
+        // could show.
+        var client = await AuthenticatedClientAsync("+15550007009");
+
+        var response = await client.GetAsync("/api/legal-entity/contracts");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.ValueKind.Should().Be(JsonValueKind.Array);
+    }
+
     /// <summary>
     /// A brand, a legal entity and a contract the caller owns - the three rows a signature
     /// needs, none of which the platform creates on its own (nothing writes a

@@ -21,6 +21,13 @@ public sealed record GetRealizedMarginQuery(DateTime? FromDate = null, DateTime?
 /// therefore the thing that actually backs a claim of "we do not lose money", rather than the guards,
 /// which only assert that a particular route was not taken.
 /// </para>
+/// <para>
+/// <b>This report has no endpoint today.</b> The action that served it was disabled on 2026-10-12 by
+/// commenting its attribute out, which left it answering every HTTP method at the controller's own
+/// path — and it was deleted on 2026-10-21 (planning #289) rather than left in that state. The query
+/// stayed, with its tests: the report is the only view that can prove a loss, and it returns when it
+/// gets a screen. Nothing calls it in the meantime.
+/// </para>
 /// </summary>
 public sealed class GetRealizedMarginQueryHandler
 {
