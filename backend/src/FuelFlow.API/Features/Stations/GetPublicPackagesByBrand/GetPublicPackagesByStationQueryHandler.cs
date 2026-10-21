@@ -75,7 +75,7 @@ var rows = await (
             {
                 // Our price when we can compute it; the column price when we cannot.
                 var ourPrice = FuelPricing.FinalPerLiterOrNull(
-                    x.SupplierPricePerLiter, x.MarginUahPerLiter, x.PumpPricePerLiter, x.MinDiscountPerLiter);
+                    x.SupplierPricePerLiter, x.MarginUahPerLiter, x.PumpPricePerLiter);
                 var perLiter = ourPrice ?? x.PumpPricePerLiter ?? 0m;
                 var price = Math.Round(perLiter * x.Liters, 2, MidpointRounding.AwayFromZero);
 

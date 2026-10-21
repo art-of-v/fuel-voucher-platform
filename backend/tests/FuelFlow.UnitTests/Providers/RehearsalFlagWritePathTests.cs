@@ -98,7 +98,6 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
                 SupplierPricePerLiter = 60m,
                 MarginUahPerLiter = 12.34m,
                 PumpPricePerLiter = 92.90m,
-                MinDiscountPerLiter = 4m,
                 AllowBelowCost = false,
                 // IsTestData deliberately absent.
                 IsTestData = null
@@ -124,7 +123,6 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
                 SupplierPricePerLiter = 60m,
                 MarginUahPerLiter = 12.34m,
                 PumpPricePerLiter = 92.90m,
-                MinDiscountPerLiter = 4m,
                 IsTestData = null
             },
             CancellationToken.None);
@@ -156,7 +154,6 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
                 SupplierPricePerLiter = 60m,
                 MarginUahPerLiter = 12.34m,
                 PumpPricePerLiter = 92.90m,
-                MinDiscountPerLiter = 4m,
                 IsTestData = false
             },
             CancellationToken.None);
@@ -177,7 +174,6 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
                 SupplierPricePerLiter = 60m,
                 MarginUahPerLiter = 12.34m,
                 PumpPricePerLiter = 92.90m,
-                MinDiscountPerLiter = 4m,
                 IsTestData = true
             },
             CancellationToken.None);
@@ -197,7 +193,6 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
                 SupplierPricePerLiter = 60m,
                 MarginUahPerLiter = 12.34m,
                 PumpPricePerLiter = 92.90m,
-                MinDiscountPerLiter = 4m,
                 IsTestData = false
             },
             CancellationToken.None);
@@ -230,7 +225,6 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
                 SupplierPricePerLiter = 60m,
                 MarginUahPerLiter = 12.34m,
                 PumpPricePerLiter = 92.90m,
-                MinDiscountPerLiter = 4m,
                 IsTestData = false
             },
             CancellationToken.None);
@@ -266,7 +260,6 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
                 SupplierPricePerLiter = 60m,
                 MarginUahPerLiter = 12.34m,
                 PumpPricePerLiter = 92.90m,
-                MinDiscountPerLiter = 4m,
                 IsTestData = true
             },
             CancellationToken.None);
@@ -302,7 +295,6 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
                 SupplierPricePerLiter = 60m,
                 MarginUahPerLiter = 12.34m,
                 PumpPricePerLiter = 92.90m,
-                MinDiscountPerLiter = 4m,
                 IsTestData = true
             },
             CancellationToken.None);
@@ -331,7 +323,6 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
                 SupplierPricePerLiter = 60m,
                 MarginUahPerLiter = 12.34m,
                 PumpPricePerLiter = 92.90m,
-                MinDiscountPerLiter = 4m,
                 IsTestData = true
             },
             CancellationToken.None);
@@ -360,7 +351,6 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
                 SupplierPricePerLiter = 60m,
                 MarginUahPerLiter = 12.34m,
                 PumpPricePerLiter = 92.90m,
-                MinDiscountPerLiter = 4m,
                 IsTestData = true,
                 BrandFuelCode = "9018"
             },
@@ -405,7 +395,6 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
                 SupplierPricePerLiter = 60m,
                 MarginUahPerLiter = 12.34m,
                 PumpPricePerLiter = 92.90m,
-                MinDiscountPerLiter = 4m,
                 AllowBelowCost = false,
                 IsTestData = true
                 // BrandFuelCode deliberately absent.
@@ -435,7 +424,6 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
                 SupplierPricePerLiter = 60m,
                 MarginUahPerLiter = 12.34m,
                 PumpPricePerLiter = 92.90m,
-                MinDiscountPerLiter = 4m,
                 AllowBelowCost = false,
                 IsTestData = true,
                 BrandFuelCode = ""
@@ -463,7 +451,6 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
                 SupplierPricePerLiter = 60m,
                 MarginUahPerLiter = 12.34m,
                 PumpPricePerLiter = 92.90m,
-                MinDiscountPerLiter = 4m,
                 IsTestData = true
             },
             CancellationToken.None);
@@ -489,7 +476,6 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
                 SupplierPricePerLiter = 60m,
                 MarginUahPerLiter = 12.34m,
                 PumpPricePerLiter = 92.90m,
-                MinDiscountPerLiter = 4m,
                 IsTestData = false
             },
             CancellationToken.None);
@@ -523,7 +509,6 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
                 SupplierPricePerLiter = 60m,
                 MarginUahPerLiter = 12.34m,
                 PumpPricePerLiter = 92.90m,
-                MinDiscountPerLiter = 4m,
                 AllowBelowCost = false,
                 IsTestData = true
             },
@@ -556,7 +541,6 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
                 SupplierPricePerLiter = 60m,
                 MarginUahPerLiter = 12.34m,
                 PumpPricePerLiter = 92.90m,
-                MinDiscountPerLiter = 4m,
                 AllowBelowCost = false,
                 IsTestData = true
             },

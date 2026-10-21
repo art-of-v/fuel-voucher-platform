@@ -269,16 +269,10 @@ if (knownCodes.Contains(code))
                 BrandId = okkoId.Value,
                 Name = name,
                 BrandFuelCode = code,
-                // No customer price yet: the headline is the customer's price, and there is none until
-                // an operator sets a margin. The pump sync owns BasePrice/DiscountPrice from here on.
-                //
-                // NULL, not zero. A price of zero is a price, and a price of zero means the customer
-                // takes the fuel for nothing - so the unset state is an empty column, exactly like the
-                // cost beside it.
-                BasePrice = 0m,
-                DiscountPrice = null,
-                // The one supplier-owned figure. Cost, margin and discount stay null, and the fuel
-                // is not sellable until an operator sets a margin.
+                // The column price is the only figure we know, and it is the reference the customer's
+                // saving is measured against. The customer price is not written: it is computed from
+                // the cost and the margin, and there is no margin until an operator sets one - so
+                // the fuel is unpriced, which is not the same thing as free.
                 PumpPricePerLiter = row.PricePerLiter,
                 CreatedAtUtc = now,
                 UpdatedAtUtc = now

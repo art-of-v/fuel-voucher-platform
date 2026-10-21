@@ -92,7 +92,9 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
             .HasColumnName("min_discount_per_liter")
             .HasColumnType("numeric(10,4)")
             .HasComment("The smallest discount we give the customer per litre, so that our price "
-                + "always sits below the column price - we are never dearer than the pump.");
+                + "always sits below the column price - we are never dearer than the pump. "
+                + "RETIRED: the price is computed as min(cost + margin, pump), and this column no "
+                + "longer takes part in it. It stays until the migration that drops it.");
 
         builder.Property(e => e.MarginPercent)
             .HasColumnName("margin_percent")
@@ -116,9 +118,11 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
         builder.Property(e => e.BasePrice)
             .HasColumnName("base_price")
             .HasColumnType("numeric(12,2)")
-            .IsRequired()
+            .IsRequired(false)
             .HasComment("The list price of the fuel per litre - the price before our discount. It "
-                + "is the reference the customer's saving is measured against.");
+                + "is the reference the customer's saving is measured against. RETIRED: the "
+                + "reference is the COLUMN price next door, and the saving is computed from it. "
+                + "The column stays until the migration that drops it.");
 
         builder.Property(e => e.DiscountPrice)
             .HasColumnName("discount_price")

@@ -4170,10 +4170,10 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("allow_below_cost")
                         .HasComment("Whether this fuel may be sold below what we pay. A manager's opt-in, per fuel, for a deliberate loss leader - the write path refuses such a sale without it.");
 
-                    b.Property<decimal>("BasePrice")
+                    b.Property<decimal?>("BasePrice")
                         .HasColumnType("numeric(12,2)")
                         .HasColumnName("base_price")
-                        .HasComment("The list price of the fuel per litre - the price before our discount. It is the reference the customer's saving is measured against.");
+                        .HasComment("The list price of the fuel per litre - the price before our discount. It is the reference the customer's saving is measured against. RETIRED: the reference is the COLUMN price next door, and the saving is computed from it. The column stays until the migration that drops it.");
 
                     b.Property<string>("BrandFuelCode")
                         .HasMaxLength(50)
@@ -4214,7 +4214,7 @@ namespace FuelFlow.API.Migrations
                     b.Property<decimal?>("MinDiscountPerLiter")
                         .HasColumnType("numeric(10,4)")
                         .HasColumnName("min_discount_per_liter")
-                        .HasComment("The smallest discount we give the customer per litre, so that our price always sits below the column price - we are never dearer than the pump.");
+                        .HasComment("The smallest discount we give the customer per litre, so that our price always sits below the column price - we are never dearer than the pump. RETIRED: the price is computed as min(cost + margin, pump), and this column no longer takes part in it. It stays until the migration that drops it.");
 
                     b.Property<string>("Name")
                         .IsRequired()

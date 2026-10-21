@@ -230,7 +230,7 @@ public sealed class ImportOkkoPumpPricesCommandHandler
             var cost = ft.SupplierPricePerLiter ?? 0m; // held constant: a pump change is not a cost event
             var profit = ft.MarginUahPerLiter ?? 0m;
             var minDiscount = ft.MinDiscountPerLiter ?? 0m;
-            var finalPerLiter = FuelPricing.FinalPerLiter(cost, profit, pump, minDiscount);
+            var finalPerLiter = FuelPricing.FinalPerLiter(cost, profit, pump);
 
             // What the CUSTOMER pays, which is a different question from what the knobs add up
             // to. A fuel with no cost or no margin has no customer price at all, and the column
@@ -246,7 +246,7 @@ public sealed class ImportOkkoPumpPricesCommandHandler
             // The manual path refuses the same write unless the fuel is opted in via AllowBelowCost
             // (BrandsController.UpdateFuel); the automatic path must behave identically, or a
             // third party's price move could take a fuel off sale unattended.
-            if (!ft.AllowBelowCost && FuelPricing.IsBelowCost(cost, profit, pump, minDiscount))
+            if (!ft.AllowBelowCost && FuelPricing.IsBelowCost(cost, profit, pump))
             {
                 belowCostSkipped.Add(ft.Name);
                 continue;
@@ -260,12 +260,10 @@ public sealed class ImportOkkoPumpPricesCommandHandler
             if (!dryRun)
             {
                 ft.PumpPricePerLiter = pump;
-
-                // Keep the fuel-type base/discount headline in step, as the operator write path does.
-                ft.BasePrice = Math.Round(pump, 2, MidpointRounding.AwayFromZero);
-                ft.DiscountPrice = customerPrice is { } price
-                    ? Math.Round(price, 2, MidpointRounding.AwayFromZero)
-                    : null;
+                // The headline is NOT written: the price the customer pays is computed from the
+                // knobs, and the reference is the column price next door. What used to be written
+                // here was a copy of a number three other writers also kept, and one of them wrote
+                // a zero.
                 ft.UpdatedAtUtc = now;
 
                 // Nothing per nominal is restated, and that is the change: a nominal's price is the

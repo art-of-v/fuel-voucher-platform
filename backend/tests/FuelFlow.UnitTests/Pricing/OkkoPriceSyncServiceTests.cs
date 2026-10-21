@@ -108,7 +108,6 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
                 SupplierPricePerLiter = 40m,
                 MarginUahPerLiter = 3m,
                 PumpPricePerLiter = pump,
-                MinDiscountPerLiter = 1m,
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow
             });
@@ -181,11 +180,11 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
     [Fact]
     public async Task Sync_ShouldRefuseAPumpThatWouldSellBelowCost_AndSaySo()
     {
-        // A-95 costs 40 + 3 margin = 43. A pump of 41 gives a ceiling of 40, which is at cost and
-        // below the moment minDiscount pushes under it - and a below-cost fuel is refused at checkout,
+        // A-95 costs 40 + 3 margin = 43. A pump of 39.50 is BELOW what we pay, so the price the
+        // customer would be charged is under our cost - and a below-cost fuel is refused at checkout,
         // so accepting this automatically would silently take the fuel off sale.
         await SeedAsync(pump: 50m);
-        var cheap = new[] { new OkkoPumpPrice("A-95", 40.50m) };
+        var cheap = new[] { new OkkoPumpPrice("A-95", 39.50m) };
         var result = await new ImportOkkoPumpPricesCommandHandler(_context, new BrandSlugResolver(_context), _events, new PriceHistoryRecorder(_context))
             .ApplyAsync(cheap, dryRun: false, Guid.Empty, "OKKO price sync");
         result.BelowCostSkipped.Should().ContainSingle().Which.Should().Be("A-95");
@@ -203,8 +202,8 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
     {
         await SeedAsync(pump: 50m);
         var logger = new CapturingLogger<OkkoPriceSyncService>();
-        // A-95 costs 40 + 3 margin = 43; a pump of 40.50 puts the ceiling under cost.
-        await Service(new StubClient(() => [new OkkoPumpPrice("A-95", 40.50m)]), enabled: true, logger)
+        // A-95 costs 40 + 3 margin = 43; a pump of 39.50 is under what we pay.
+        await Service(new StubClient(() => [new OkkoPumpPrice("A-95", 39.50m)]), enabled: true, logger)
             .SyncPricesAsync();
         var refusal = logger.Entries.Should().ContainSingle(e => e.Message.Contains("below cost")).Which;
         refusal.Level.Should().Be(LogLevel.Warning);
@@ -237,12 +236,12 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
         await _context.SaveChangesAsync();
         _context.ChangeTracker.Clear();
         var result = await new ImportOkkoPumpPricesCommandHandler(_context, new BrandSlugResolver(_context), _events, new PriceHistoryRecorder(_context))
-            .ApplyAsync([new OkkoPumpPrice("A-95", 40.50m)], dryRun: false, Guid.Empty, "OKKO price sync");
+            .ApplyAsync([new OkkoPumpPrice("A-95", 39.50m)], dryRun: false, Guid.Empty, "OKKO price sync");
         result.BelowCostSkipped.Should().BeEmpty();
         result.FuelsChanged.Should().Be(1);
         _context.ChangeTracker.Clear();
         (await FuelOfAsync("okko-95"))
-            .PumpPricePerLiter.Should().Be(40.50m);
+            .PumpPricePerLiter.Should().Be(39.50m);
     }
 
     [Fact]
@@ -251,7 +250,7 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
         await SeedAsync(pump: 50m);
         var mixed = new[]
         {
-            new OkkoPumpPrice("A-95", 40.50m),  // refused
+            new OkkoPumpPrice("A-95", 39.50m),  // refused
             new OkkoPumpPrice("SPBT", 47.90m),  // fine
         };
         var result = await new ImportOkkoPumpPricesCommandHandler(_context, new BrandSlugResolver(_context), _events, new PriceHistoryRecorder(_context))

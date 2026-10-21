@@ -64,12 +64,10 @@ public sealed record BrandFuelDto
     /// operator records it; while null the price is the legacy cost + profit. Manual in MVP.</summary>
     public decimal? PumpPricePerLiter { get; init; }
 
-    /// <summary>Minimum guaranteed discount under the pump price (UAH/liter): the floor
-    /// of pump − final. Operator knob; default ≈ 0.50. Stored per package.</summary>
-    public decimal MinDiscountPerLiter { get; init; }
-
-    /// <summary>Actual customer discount vs pump (UAH/liter), derived for display:
-    /// max(0, BasePrice − DiscountPrice). Read-only output; not an input knob.</summary>
+    /// <summary>Actual customer discount vs the column price (UAH/liter), derived for display:
+    /// max(0, pump − the price we charge). Read-only output; not an input knob — the price is
+    /// computed from the cost and the margin, and the column price is the reference it is measured
+    /// against.</summary>
     public decimal DiscountPerLiter { get; init; }
 
     /// <summary>Manager standing opt-in: allow this supplier+fuel to be priced/sold BELOW blended
@@ -131,7 +129,6 @@ public sealed record CreateFuelRequest
     public decimal? MarginPercent { get; init; }
     public decimal FinalPricePerLiter { get; init; }
     public decimal? PumpPricePerLiter { get; init; }
-    public decimal MinDiscountPerLiter { get; init; }
     public decimal DiscountPerLiter { get; init; }
 
     /// <summary>Manager standing opt-in to allow below-cost pricing/sale for this supplier+fuel.</summary>

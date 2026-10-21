@@ -186,7 +186,7 @@ public OrderCommandHandlersTests()
         });
         _context.SeedPackage("pkg-okko-loss-50", BrandIds.Okko, "okko-loss", 50m, 2425m,
             supplierPricePerLiter: 50m, marginUahPerLiter: 2m,
-            pumpPricePerLiter: 49m, minDiscountPerLiter: 0.5m, finalPricePerLiter: 48.5m);
+            pumpPricePerLiter: 49m, finalPricePerLiter: 49m);
         _context.SaveChanges();
         // Stock behind it, so these tests reach the PRICING guard they are about. The stock gate runs
         // first on purpose: without stock here they would all fail as out-of-stock and assert nothing

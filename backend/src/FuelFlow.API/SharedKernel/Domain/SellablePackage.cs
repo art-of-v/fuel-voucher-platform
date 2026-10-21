@@ -53,8 +53,6 @@ public sealed record SellablePackage
 
     public decimal? PumpPricePerLiter { get; init; }
 
-    public decimal? MinDiscountPerLiter { get; init; }
-
     public decimal? SupplierPricePerLiter { get; init; }
 
     public decimal? MarginUahPerLiter { get; init; }
@@ -69,7 +67,7 @@ public sealed record SellablePackage
     /// </summary>
     public decimal? ComputedFinalPricePerLiter =>
         FuelPricing.FinalPerLiterOrNull(
-            SupplierPricePerLiter, MarginUahPerLiter, PumpPricePerLiter, MinDiscountPerLiter);
+            SupplierPricePerLiter, MarginUahPerLiter, PumpPricePerLiter);
 
     /// <summary>
     /// What this nominal costs, through <see cref="FuelPricing.PackagePrice"/>: the rate × these
@@ -86,7 +84,6 @@ public sealed record SellablePackage
             SupplierPricePerLiter,
             MarginUahPerLiter,
             PumpPricePerLiter,
-            MinDiscountPerLiter,
             Liters);
 
     /// <summary>Which pool this came from. Carried so a caller can assert it matched what it asked for.</summary>
@@ -119,7 +116,6 @@ FuelTypeEntity fuel,
         FuelTypeId = fuel.Id,
         Liters = liters,
         PumpPricePerLiter = fuel.PumpPricePerLiter,
-        MinDiscountPerLiter = fuel.MinDiscountPerLiter,
         SupplierPricePerLiter = fuel.SupplierPricePerLiter,
         MarginUahPerLiter = fuel.MarginUahPerLiter,
         MarginPercent = fuel.MarginPercent,

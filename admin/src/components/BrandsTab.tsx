@@ -38,7 +38,6 @@ interface BrandFuelDto {
   marginPercent: number | null;
   finalPricePerLiter: number;
   pumpPricePerLiter: number | null;
-  minDiscountPerLiter: number;
   discountPerLiter: number;
   allowBelowCost: boolean;
   /**
@@ -87,24 +86,22 @@ interface AuditEventDto {
 }
 
 const DEFAULT_PROVIDER_COLOR = "#00ff80";
-const DEFAULT_MIN_DISCOUNT = 0.5;
 
 // Live preview mirror of the backend FuelPricing.FinalPerLiter formula:
-// final/л = min(cost + profit, pump − minDiscount); a null/≤0 pump falls back to
+// final/л = min(cost + profit, pump); a null/≤0 pump falls back to
 // cost + profit (legacy cost-plus). The server is authoritative and recomputes on
 // write — this only keeps the operator's Фінал column honest while editing.
 function computeFinal(
   cost: number | null,
   profit: number | null,
   pump: number | null,
-  minDiscount: number,
 ): number {
   // No cost means no price of ours: the column is the only figure we honestly have, and the
   // storefront shows that with "not in stock" next to it. Before this, a blank cost was a
   // ZERO here and in the payload, which priced the fuel at its margin.
   if (cost === null || profit === null) return pump ?? 0;
   const costPlus = cost + profit;
-  if (pump && pump > 0) return Math.min(costPlus, pump - minDiscount);
+  if (pump && pump > 0) return Math.min(costPlus, pump);
   return costPlus;
 }
 
@@ -129,7 +126,6 @@ export default function BrandsTab({
   const [newFuelSupplierPrice, setNewFuelSupplierPrice] = useState("");
   const [newFuelMargin, setNewFuelMargin] = useState("");
   const [newFuelPump, setNewFuelPump] = useState("");
-  const [newFuelMinDiscount, setNewFuelMinDiscount] = useState("0.50");
   const [newFuelAllowBelowCost, setNewFuelAllowBelowCost] = useState(false);
   const [newFuelBrandFuelCode, setNewFuelBrandFuelCode] = useState("");
   const [newFuelIsTestData, setNewFuelIsTestData] = useState(false);
@@ -173,7 +169,6 @@ export default function BrandsTab({
     newFuelCost,
     newFuelMargin.trim() === "" ? null : parseFloat(newFuelMargin),
     newFuelPumpNum,
-    parseFloat(newFuelMinDiscount) || 0,
   );
   const newFuelBelowCost = newFuelCost !== null && newFuelCost > 0 && newFuelFinalPrice < newFuelCost;
 
@@ -362,7 +357,6 @@ export default function BrandsTab({
       setNewFuelSupplierPrice("");
       setNewFuelMargin("");
       setNewFuelPump("");
-      setNewFuelMinDiscount("0.50");
       setNewFuelAllowBelowCost(false);
       setNewFuelIsTestData(false);
       setNewFuelBrandFuelCode("");
@@ -402,7 +396,6 @@ export default function BrandsTab({
         marginUahPerLiter: fuel.marginUahPerLiter,
         marginPercent: fuel.marginPercent ?? undefined,
         pumpPricePerLiter: fuel.pumpPricePerLiter ?? null,
-        minDiscountPerLiter: fuel.minDiscountPerLiter ?? DEFAULT_MIN_DISCOUNT,
         allowBelowCost: fuel.allowBelowCost ?? false,
         isTestData: fuel.isTestData ?? false,
         // Seeded from the saved value so the field reads as what it is. The save below always
@@ -424,12 +417,8 @@ export default function BrandsTab({
       vals.pumpPricePerLiter !== undefined
         ? vals.pumpPricePerLiter
         : (fuel.pumpPricePerLiter ?? null);
-    const minDiscount =
-      vals.minDiscountPerLiter ??
-      fuel.minDiscountPerLiter ??
-      DEFAULT_MIN_DISCOUNT;
     // Server is authoritative and recomputes; send the previewed final for parity only.
-    const finalPrice = computeFinal(supplier, margin, pump, minDiscount);
+    const finalPrice = computeFinal(supplier, margin, pump);
     updateFuelMutation.mutate({
       fuelId: fuel.id,
       data: {
@@ -440,7 +429,6 @@ export default function BrandsTab({
         finalPricePerLiter: finalPrice,
         marginPercent: vals.marginPercent ?? fuel.marginPercent,
         pumpPricePerLiter: pump,
-        minDiscountPerLiter: minDiscount,
         allowBelowCost: vals.allowBelowCost ?? fuel.allowBelowCost ?? false,
         isTestData: vals.isTestData ?? fuel.isTestData ?? false,
         // Always a string, never undefined: the API reads an omitted field as "leave it alone"
@@ -463,7 +451,6 @@ export default function BrandsTab({
         marginUahPerLiter: newFuelMargin.trim() === "" ? null : parseFloat(newFuelMargin),
         finalPricePerLiter: newFuelFinalPrice,
         pumpPricePerLiter: newFuelPumpNum,
-        minDiscountPerLiter: parseFloat(newFuelMinDiscount) || 0,
         allowBelowCost: newFuelAllowBelowCost,
         isTestData: newFuelIsTestData,
         brandFuelCode: newFuelBrandFuelCode.trim() || null,
@@ -903,14 +890,6 @@ export default function BrandsTab({
                             </div>
                           </th>
                           <th className="text-right p-3 whitespace-nowrap">
-                            <div title={t("brands.minDiscountHint")}>
-                              {t("brands.minDiscount")}
-                            </div>
-                            <div className="text-[10px] text-muted-foreground font-normal">
-                              {t("price.unit")}
-                            </div>
-                          </th>
-                          <th className="text-right p-3 whitespace-nowrap">
                             <div>{t("price.final")}</div>
                             <div className="text-[10px] text-muted-foreground font-normal">
                               {t("price.unit")}
@@ -941,15 +920,10 @@ export default function BrandsTab({
                             vals && vals.pumpPricePerLiter !== undefined
                               ? vals.pumpPricePerLiter
                               : (fuel.pumpPricePerLiter ?? null);
-                          const editMinDiscount =
-                            vals?.minDiscountPerLiter ??
-                            fuel.minDiscountPerLiter ??
-                            DEFAULT_MIN_DISCOUNT;
                           const computedFinal = computeFinal(
                             editCost,
                             editProfit,
                             editPump,
-                            editMinDiscount,
                           );
                           const shownFinal = isEditing
                             ? computedFinal
@@ -1107,38 +1081,6 @@ className="w-24 h-8 text-right text-xs"
                                     {fuel.pumpPricePerLiter != null
                                       ? fuel.pumpPricePerLiter.toFixed(2)
                                       : "—"}
-                                  </span>
-                                )}
-                              </td>
-                              <td className="p-3">
-                                {isEditing ? (
-                                  <DecimalSettingInput
-                                    type="number"
-                                    inputMode="decimal"
-                                    step="0.01"
-                                    min={0}
-                                    value={
-                                      vals?.minDiscountPerLiter ??
-                                      DEFAULT_MIN_DISCOUNT
-                                    }
-                                    onCommit={(value) =>
-                                      setEditValues((prev) => ({
-                                        ...prev,
-                                        [fuel.id]: {
-                                          ...prev[fuel.id],
-                                          minDiscountPerLiter: Math.max(
-                                            0,
-                                            value ?? 0,
-                                          ),
-                                        },
-                                      }))
-                                    }
-                                    className="w-24 h-8 text-right text-xs"
-                                    aria-label={`${t("brands.minDiscount")} — ${fuel.name}`}
-                                  />
-                                ) : (
-                                  <span className="block text-right tabular-nums text-muted-foreground">
-                                    {(fuel.minDiscountPerLiter ?? 0).toFixed(2)}
                                   </span>
                                 )}
                               </td>
@@ -1455,26 +1397,6 @@ className="w-24 h-8 text-right text-xs"
                                     value={newFuelPump}
                                     onChange={(e) =>
                                       setNewFuelPump(e.target.value)
-                                    }
-                                    className="h-8 w-28 text-right"
-                                  />
-                                </div>
-                                <div className="flex flex-col gap-1">
-                                  <label
-                                    className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider"
-                                    title={t("brands.minDiscountHint")}
-                                  >
-                                    {t("brands.minDiscount")},{" "}
-                                    {t("price.unit")}
-                                  </label>
-                                  <Input
-                                    type="number"
-                                    step="0.01"
-                                    min={0}
-                                    placeholder="0.50"
-                                    value={newFuelMinDiscount}
-                                    onChange={(e) =>
-                                      setNewFuelMinDiscount(e.target.value)
                                     }
                                     className="h-8 w-28 text-right"
                                   />

@@ -69,7 +69,6 @@ public sealed class PublicFuelTypesIntegrationTests : IClassFixture<TestDatabase
             SupplierPricePerLiter = cost,
             MarginUahPerLiter = margin,
             PumpPricePerLiter = 92.90m,
-            MinDiscountPerLiter = 0m,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         });

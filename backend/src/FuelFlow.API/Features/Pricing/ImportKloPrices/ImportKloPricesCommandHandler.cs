@@ -154,7 +154,7 @@ public sealed class ImportKloPricesCommandHandler
             var profit = fuel.MarginUahPerLiter ?? 0m;
             var minDiscount = fuel.MinDiscountPerLiter ?? 0m;
 
-            if (!fuel.AllowBelowCost && FuelPricing.IsBelowCost(cost, profit, row.PricePerLiter, minDiscount))
+            if (!fuel.AllowBelowCost && FuelPricing.IsBelowCost(cost, profit, row.PricePerLiter))
             {
                 belowCost.Add(fuel.Name);
                 continue;
@@ -163,8 +163,6 @@ public sealed class ImportKloPricesCommandHandler
             if (!command.DryRun)
             {
                 fuel.PumpPricePerLiter = row.PricePerLiter;
-                fuel.BasePrice = row.PricePerLiter;
-                fuel.DiscountPrice = row.PricePerLiter;
                 // A fuel with no code cannot resolve by code, and this is the only source that can
                 // say which grade it is. The code is the column's name, which is the same string the
                 // operator would have typed.
@@ -224,8 +222,6 @@ public sealed class ImportKloPricesCommandHandler
                 // Priced at the pump on purpose. We know what the driver pays and nothing about what
                 // we pay, so the pump is the only figure we can honestly show; an operator sets the
                 // margin and it becomes a real price.
-                BasePrice = row.PricePerLiter,
-                DiscountPrice = row.PricePerLiter,
                 PumpPricePerLiter = row.PricePerLiter,
                 SupplierPricePerLiter = null,
                 MarginUahPerLiter = null,
