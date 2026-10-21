@@ -616,6 +616,7 @@ export const de: Record<string, string> = {
   'notifications.expand': 'Volltext anzeigen',
   'notifications.collapse': 'Einklappen',
   'notifications.openOrder': 'Bestellung öffnen',
+  'notifications.openFuel': 'Kraftstoff öffnen',
   'notifications.time.justNow': 'gerade eben',
   'notifications.time.minutes': 'vor {0} Min.',
   'notifications.time.hours': 'vor {0} Std.',

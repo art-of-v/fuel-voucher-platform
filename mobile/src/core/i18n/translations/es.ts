@@ -604,6 +604,7 @@ export const es: Record<string, string> = {
   'notifications.expand': 'Mostrar texto completo',
   'notifications.collapse': 'Contraer',
   'notifications.openOrder': 'Abrir pedido',
+  'notifications.openFuel': 'Abrir combustible',
   'notifications.time.justNow': 'ahora mismo',
   'notifications.time.minutes': 'hace {0} min',
   'notifications.time.hours': 'hace {0} h',

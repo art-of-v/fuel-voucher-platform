@@ -19,6 +19,7 @@ const mockMarkAllAsRead = jest.fn();
 const mockRefetch = jest.fn();
 const mockImpact = jest.fn();
 const mockPush = jest.fn();
+const mockSetCurrentContext = jest.fn();
 
 let mockState: ReturnType<typeof baseState>;
 let mockStoreAuth = true;
@@ -64,7 +65,7 @@ jest.mock('../src/features/auth/hooks/useAuth', () => ({
 
 jest.mock('../src/core/state/appStore', () => ({
   useStore: (selector?: (s: any) => unknown) => {
-    const state = { isAuthenticated: mockStoreAuth };
+    const state = { isAuthenticated: mockStoreAuth, setCurrentContext: mockSetCurrentContext };
     return selector ? selector(state) : state;
   },
 }));
@@ -144,6 +145,9 @@ const note = (id: string, title: string, isRead: boolean) => ({
   message: `${title} body`,
   isRead,
   createdAt: `2026-01-0${id}`,
+  type: 'generic',
+  legalEntityId: null,
+  orderId: null,
 });
 
 // A real order-fulfilled notification: the full order id rides inside the copy.
@@ -154,6 +158,23 @@ const orderNote = (id: string, isRead: boolean) => ({
   message: `Ваше замовлення #${ORDER_ID} виконано. Ваучери призначені та готові до використання.`,
   isRead,
   createdAt: `2026-01-0${id}`,
+  type: 'order_fulfilled',
+  legalEntityId: null,
+  orderId: ORDER_ID,
+});
+
+// A worker notification: fuel was issued to them by a company. The company id is what makes
+// it openable - a worker may work for several companies (W1).
+const COMPANY_ID = '6f2b7d1e-2b48-4d3a-9f0e-7c1b2a3d4e5f';
+const workerNote = (id: string, isRead: boolean, legalEntityId: string | null) => ({
+  id,
+  title: 'Вам видано паливо',
+  message: 'QA company name видав вам 3 талони. Це паливо для роботи — його не потрібно купувати.',
+  isRead,
+  createdAt: `2026-01-0${id}`,
+  type: 'voucher_issued',
+  legalEntityId,
+  orderId: null,
 });
 
 beforeEach(() => {
@@ -166,6 +187,7 @@ beforeEach(() => {
   mockRefetch.mockClear();
   mockImpact.mockClear();
   mockPush.mockClear();
+  mockSetCurrentContext.mockClear();
 });
 
 describe('Notifications - getting in', () => {
@@ -296,6 +318,52 @@ describe('Notifications - reading a row', () => {
     expect(screen.getByText(new RegExp(ORDER_ID))).toBeTruthy();
     // Reading a read notification must not re-mark it.
     expect(mockMarkAsRead).not.toHaveBeenCalled();
+  });
+});
+
+describe('Notifications - a worker is told when fuel is issued', () => {
+  it('opens the company the notification names, not the context that was open', () => {
+    mockState.notifications = [workerNote('1', false, COMPANY_ID)];
+    render(<NotificationsScreen />);
+
+    fireEvent.press(screen.getByTestId('row-Вам видано паливо'));
+    fireEvent.press(screen.getByText('notifications.openFuel'));
+
+    expect(mockSetCurrentContext).toHaveBeenCalledWith(COMPANY_ID);
+    expect(mockPush).toHaveBeenCalledWith('/my-codes');
+  });
+
+  it('switches the context before it navigates', () => {
+    mockState.notifications = [workerNote('1', false, COMPANY_ID)];
+    render(<NotificationsScreen />);
+
+    fireEvent.press(screen.getByTestId('row-Вам видано паливо'));
+    fireEvent.press(screen.getByText('notifications.openFuel'));
+
+    // The wallet reads the context when it renders, so navigating first would open the
+    // context that was active before - a worker's own fuel, or somebody else's.
+    expect(mockSetCurrentContext.mock.invocationCallOrder[0]).toBeLessThan(
+      mockPush.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('offers nothing to open when the row names no company', () => {
+    mockState.notifications = [workerNote('1', false, null)];
+    render(<NotificationsScreen />);
+
+    fireEvent.press(screen.getByTestId('row-Вам видано паливо'));
+
+    // Guessing a company would show a worker somebody else's fuel.
+    expect(screen.queryByText('notifications.openFuel')).toBeNull();
+  });
+
+  it('offers no worker target on an ordinary row', () => {
+    mockState.notifications = [note('1', 'Order ready', false)];
+    render(<NotificationsScreen />);
+
+    fireEvent.press(screen.getByTestId('row-Order ready'));
+
+    expect(screen.queryByText('notifications.openFuel')).toBeNull();
   });
 });
 

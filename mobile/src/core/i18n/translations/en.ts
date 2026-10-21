@@ -599,6 +599,7 @@ export const en: Record<string, string> = {
   'notifications.expand': 'Show full text',
   'notifications.collapse': 'Collapse',
   'notifications.openOrder': 'Open order',
+  'notifications.openFuel': 'Open fuel',
   'notifications.time.justNow': 'just now',
   'notifications.time.minutes': '{0}m ago',
   'notifications.time.hours': '{0}h ago',
