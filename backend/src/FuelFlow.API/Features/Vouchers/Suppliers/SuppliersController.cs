@@ -18,7 +18,6 @@ namespace FuelFlow.Features.Vouchers.Suppliers;
 /// </summary>
 [ApiController]
 [Route("api/admin/suppliers")]
-[Authorize(Policy = "Staff")]
 public sealed class SuppliersController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
@@ -63,6 +62,7 @@ public sealed class SuppliersController : ControllerBase
         ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation };
 
     [HttpGet]
+    [Authorize(Policy = AuthPolicies.Staff)]
     public async Task<ActionResult<List<SupplierDto>>> List(
         [FromQuery] bool includeInactive = false,
         CancellationToken ct = default)
@@ -81,6 +81,7 @@ public sealed class SuppliersController : ControllerBase
 
     /// <summary>The accepted legal forms, so the UI never invents one we cannot validate.</summary>
     [HttpGet("legal-forms")]
+    [Authorize(Policy = AuthPolicies.Staff)]
     public ActionResult<IReadOnlyList<string>> LegalFormOptions() => Ok(LegalForms);
 
     /// <summary>
@@ -88,9 +89,11 @@ public sealed class SuppliersController : ControllerBase
     /// from what the server validates against rather than hardcoding a second list that can drift.
     /// </summary>
     [HttpGet("acquisition-sources")]
+    [Authorize(Policy = AuthPolicies.Staff)]
     public ActionResult<IReadOnlyList<string>> AcquisitionSourceOptions() => Ok(AcquisitionSources.All);
 
     [HttpPost]
+    [Authorize(Policy = AuthPolicies.CatalogueWrite)]
     public async Task<ActionResult<SupplierDto>> Create(CreateSupplierRequest request, CancellationToken ct = default)
     {
         if (Validate(request) is { } error)
@@ -142,6 +145,7 @@ public sealed class SuppliersController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = AuthPolicies.CatalogueWrite)]
     public async Task<ActionResult<SupplierDto>> Update(Guid id, UpdateSupplierRequest request, CancellationToken ct = default)
     {
         if (Validate(request) is { } error)
@@ -211,6 +215,7 @@ public sealed class SuppliersController : ControllerBase
     /// FK or silently orphan the history.
     /// </summary>
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = AuthPolicies.CatalogueWrite)]
     public async Task<IActionResult> Deactivate(Guid id, CancellationToken ct = default)
     {
         var supplier = await _context.Suppliers.AsTracking().FirstOrDefaultAsync(s => s.Id == id, ct);
@@ -227,6 +232,7 @@ public sealed class SuppliersController : ControllerBase
     }
 
     [HttpPost("{id:guid}/reactivate")]
+    [Authorize(Policy = AuthPolicies.CatalogueWrite)]
     public async Task<ActionResult<SupplierDto>> Reactivate(Guid id, CancellationToken ct = default)
     {
         var supplier = await _context.Suppliers.AsTracking().FirstOrDefaultAsync(s => s.Id == id, ct);

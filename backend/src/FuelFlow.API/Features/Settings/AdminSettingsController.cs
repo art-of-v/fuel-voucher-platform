@@ -17,7 +17,6 @@ namespace FuelFlow.Features.Settings;
 
 [ApiController]
 [Route("api/admin/settings")]
-[Authorize(Policy = "Staff")]
 public sealed class AdminSettingsController : ControllerBase
 {
     private readonly RuntimeSettingsService _settings;
@@ -38,6 +37,7 @@ public sealed class AdminSettingsController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Policy = AuthPolicies.Staff)]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
     {
         var enabled = await _settings.IsAutoRefundEnabledAsync(cancellationToken);
@@ -177,6 +177,7 @@ FuelTypeId = row.FuelTypeId,
     }
 
     [HttpPut]
+    [Authorize(Policy = AuthPolicies.SettingsWrite)]
     public async Task<IActionResult> Update(
         [FromBody] UpdateSettingsRequest request,
         CancellationToken cancellationToken)
@@ -446,6 +447,7 @@ FuelTypeId = row.FuelTypeId,
     /// misconfigured value would point Telegram at a host that answers 404 for every update.
     /// </summary>
     [HttpPost("feedback/webhook")]
+    [Authorize(Policy = AuthPolicies.SettingsWrite)]
     public async Task<IActionResult> RegisterFeedbackWebhook(CancellationToken cancellationToken)
     {
         if (!_feedbackOptions.IsConfigured)

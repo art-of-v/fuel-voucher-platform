@@ -13,7 +13,6 @@ namespace FuelFlow.Features.Brands;
 
 [ApiController]
 [Route("api/admin/brand-stations")]
-[Authorize(Policy = "Staff")]
 public sealed class AdminBrandStationController : ControllerBase
 {
     private readonly GetAdminBrandStationsQueryHandler _getAll;
@@ -40,6 +39,7 @@ public sealed class AdminBrandStationController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Policy = AuthPolicies.Staff)]
     public async Task<IActionResult> GetAll(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 50,
@@ -48,6 +48,7 @@ public sealed class AdminBrandStationController : ControllerBase
         Ok(await _getAll.HandleAsync(new GetAdminBrandStationsQuery(page, pageSize, BrandId), ct));
 
     [HttpGet("{id}")]
+    [Authorize(Policy = AuthPolicies.Staff)]
     public async Task<IActionResult> GetById([FromRoute] Guid id, CancellationToken ct)
     {
         var result = await _getById.HandleAsync(new GetAdminBrandStationByIdQuery(id), ct);
@@ -55,6 +56,7 @@ public sealed class AdminBrandStationController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = AuthPolicies.CatalogueWrite)]
     public async Task<IActionResult> Create([FromBody] BrandStation request, CancellationToken ct)
     {
         var result = await _create.HandleAsync(new CreateBrandStationCommand(request), ct);
@@ -66,6 +68,7 @@ public sealed class AdminBrandStationController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize(Policy = AuthPolicies.CatalogueWrite)]
     public async Task<IActionResult> Update([FromRoute] Guid id, [FromBody] BrandStation request, CancellationToken ct)
     {
         var result = await _update.HandleAsync(new UpdateBrandStationCommand(id, request), ct);
@@ -75,6 +78,7 @@ public sealed class AdminBrandStationController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Policy = AuthPolicies.CatalogueWrite)]
     public async Task<IActionResult> Delete([FromRoute] Guid id, CancellationToken ct)
     {
         var success = await _delete.HandleAsync(new DeleteBrandStationCommand(id), ct);
@@ -82,6 +86,7 @@ public sealed class AdminBrandStationController : ControllerBase
     }
 
     [HttpPost("import")]
+    [Authorize(Policy = AuthPolicies.CatalogueWrite)]
     [RequestSizeLimit(20 * 1024 * 1024)]
     public async Task<IActionResult> Import(IFormFile file, CancellationToken ct)
     {

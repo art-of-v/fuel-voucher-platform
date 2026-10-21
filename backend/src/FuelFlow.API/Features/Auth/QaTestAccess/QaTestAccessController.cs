@@ -1,5 +1,6 @@
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Settings.SharedModels;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -8,13 +9,12 @@ namespace FuelFlow.Features.Auth.QaTestAccess;
 
 /// <summary>
 /// Admin-panel control for QA App-Store test-access. Status is readable by any Staff member;
-/// changing the switch requires the stricter <c>QaTestAccessAdmin</c> policy (Admin/ProductOwner),
+/// changing the switch requires the stricter <c>QaTestAccess</c> capability (Admin/ProductOwner),
 /// because it turns an authentication mechanism on and off. The QA verification code is never
 /// exposed by any action here — only whether a code is configured and whether access is on.
 /// </summary>
 [ApiController]
 [Route("api/admin/qa-test-access")]
-[Authorize(Policy = "Staff")]
 public sealed class QaTestAccessController : ControllerBase
 {
     private readonly RuntimeSettingsService _settings;
@@ -32,6 +32,7 @@ public sealed class QaTestAccessController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Policy = AuthPolicies.Staff)]
     [ProducesResponseType(typeof(QaTestAccessStatusDto), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetStatus(CancellationToken cancellationToken)
     {
@@ -51,7 +52,7 @@ public sealed class QaTestAccessController : ControllerBase
     }
 
     [HttpPut]
-    [Authorize(Policy = "QaTestAccessAdmin")]
+    [Authorize(Policy = AuthPolicies.QaTestAccess)]
     [ProducesResponseType(typeof(QaTestAccessStatusDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Update(

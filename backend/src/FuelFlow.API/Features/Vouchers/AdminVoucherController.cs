@@ -8,6 +8,7 @@ using FuelFlow.Features.Vouchers.GetVoucherVerification;
 using FuelFlow.Features.Vouchers.UnblockVoucher;
 using FuelFlow.Features.Vouchers.UnarchiveVoucher;
 using FuelFlow.Features.Vouchers.UpdateVoucher;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,7 +16,6 @@ namespace FuelFlow.Features.Vouchers;
 
 [ApiController]
 [Route("api/admin/vouchers")]
-[Authorize(Policy = "Staff")]
 public sealed class AdminVoucherController : ControllerBase
 {
     private readonly GetAdminVouchersQueryHandler _getAllHandler;
@@ -50,6 +50,7 @@ public sealed class AdminVoucherController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Policy = AuthPolicies.Staff)]
     public async Task<IActionResult> GetAll(
         CancellationToken cancellationToken,
         [FromQuery] int page = 1,
@@ -73,6 +74,7 @@ public sealed class AdminVoucherController : ControllerBase
     }
 
     [HttpGet("{id}")]
+    [Authorize(Policy = AuthPolicies.Staff)]
     public async Task<IActionResult> GetById([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         var result = await _getByIdHandler.HandleAsync(new GetAdminVoucherByIdQuery(id), cancellationToken);
@@ -81,6 +83,7 @@ public sealed class AdminVoucherController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize(Policy = AuthPolicies.VoucherWrite)]
     public async Task<IActionResult> Update([FromRoute] Guid id, [FromBody] UpdateVoucherRequest request, CancellationToken cancellationToken)
     {
         var userId = GetUserId();
@@ -95,6 +98,7 @@ public sealed class AdminVoucherController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Policy = AuthPolicies.VoucherWrite)]
     public async Task<IActionResult> Delete([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         var userId = GetUserId();
@@ -108,6 +112,7 @@ public sealed class AdminVoucherController : ControllerBase
     }
 
     [HttpPost("bulk-action")]
+    [Authorize(Policy = AuthPolicies.VoucherWrite)]
     public async Task<IActionResult> BulkAction([FromBody] BulkActionRequest request, CancellationToken cancellationToken)
     {
         var userId = GetUserId();
@@ -123,6 +128,7 @@ public sealed class AdminVoucherController : ControllerBase
     }
 
     [HttpPost("{id:guid}/unblock")]
+    [Authorize(Policy = AuthPolicies.VoucherWrite)]
     public async Task<IActionResult> Unblock(Guid id, CancellationToken cancellationToken)
     {
         var userId = GetUserId();
@@ -145,6 +151,7 @@ public sealed class AdminVoucherController : ControllerBase
     /// <c>delete_all</c> archives every voucher in the system.
     /// </summary>
     [HttpPost("{id:guid}/unarchive")]
+    [Authorize(Policy = AuthPolicies.VoucherWrite)]
     public async Task<IActionResult> Unarchive(Guid id, CancellationToken cancellationToken)
     {
         var userId = GetUserId();
@@ -162,6 +169,7 @@ public sealed class AdminVoucherController : ControllerBase
     }
 
     [HttpGet("{id:guid}/verification")]
+    [Authorize(Policy = AuthPolicies.Staff)]
     [ProducesResponseType(typeof(GetVoucherVerificationResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetVoucherVerification(Guid id, CancellationToken cancellationToken)
@@ -188,6 +196,7 @@ public sealed class AdminVoucherController : ControllerBase
     /// </para>
     /// </remarks>
     [HttpGet("{id:guid}/lifecycle")]
+    [Authorize(Policy = AuthPolicies.Staff)]
     [ProducesResponseType(typeof(VoucherLifecycleResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetLifecycle(Guid id, CancellationToken cancellationToken)

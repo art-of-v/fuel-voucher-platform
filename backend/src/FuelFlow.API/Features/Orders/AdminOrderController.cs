@@ -4,15 +4,24 @@ using FuelFlow.Features.Orders.GetAdminOrderById;
 using FuelFlow.Features.Orders.GetAdminOrders;
 using FuelFlow.Features.Orders.UpdateOrderStatus;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 
 namespace FuelFlow.Features.Orders;
 
+/// <summary>
+/// The admin view of the orders.
+/// <para>
+/// The three writes here move money or destroy the record of it: a refund, a status that hands
+/// out fuel, and a deletion. They carry the <c>MoneyMovement</c> capability for that reason, and
+/// the two reads carry the plain staff one - so the attribute on each action says what the action
+/// does, which is what a reader of this file is looking for.
+/// </para>
+/// </summary>
 [ApiController]
 [Route("api/admin/orders")]
-[Authorize(Policy = "Staff")]
 public sealed class AdminOrderController : ControllerBase
 {
     private readonly GetAdminOrdersQueryHandler _getAllHandler;
@@ -36,6 +45,7 @@ public sealed class AdminOrderController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Policy = AuthPolicies.Staff)]
     [ProducesResponseType(typeof(PagedResult<OrderDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll(
         [FromQuery] int page = 1,
@@ -48,6 +58,7 @@ public sealed class AdminOrderController : ControllerBase
     }
 
     [HttpGet("{id}")]
+    [Authorize(Policy = AuthPolicies.Staff)]
     public async Task<IActionResult> GetById([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         var result = await _getByIdHandler.HandleAsync(new GetAdminOrderByIdQuery(id), cancellationToken);
@@ -55,6 +66,7 @@ public sealed class AdminOrderController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize(Policy = AuthPolicies.MoneyMovement)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -69,6 +81,7 @@ public sealed class AdminOrderController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Policy = AuthPolicies.MoneyMovement)]
     public async Task<IActionResult> Delete([FromRoute] Guid id, CancellationToken cancellationToken)
     {
         var success = await _deleteHandler.HandleAsync(new DeleteOrderCommand(id), cancellationToken);
@@ -77,6 +90,7 @@ public sealed class AdminOrderController : ControllerBase
     }
 
     [HttpPost("{id}/refund")]
+    [Authorize(Policy = AuthPolicies.MoneyMovement)]
     public async Task<IActionResult> Refund([FromRoute] Guid id, [FromBody] RefundOrderRequest? request, CancellationToken cancellationToken)
     {
         var command = new RefundOrderCommand

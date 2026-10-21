@@ -21,7 +21,6 @@ namespace FuelFlow.Features.Brands;
 
 [ApiController]
 [Route("api/admin/brands")]
-[Authorize(Policy = "Staff")]
 public sealed class BrandsController : ControllerBase
 {
 private readonly GetBrandsQueryHandler _getAll;
@@ -65,10 +64,12 @@ private readonly GetBrandsQueryHandler _getAll;
     private static readonly List<int> DefaultNominals = new() { 2, 3, 5, 10, 20, 50 };
 
     [HttpGet]
+    [Authorize(Policy = AuthPolicies.Staff)]
     public async Task<IActionResult> GetAll(CancellationToken ct) =>
         Ok(await _getAll.HandleAsync(new GetBrandsQuery(), ct));
 
     [HttpGet("{id}")]
+    [Authorize(Policy = AuthPolicies.Staff)]
     public async Task<IActionResult> GetById([FromRoute] Guid id, CancellationToken ct)
     {
         var result = await _getById.HandleAsync(new GetBrandByIdQuery(id), ct);
@@ -86,6 +87,7 @@ private readonly GetBrandsQueryHandler _getAll;
     /// to be rewritten to keep this endpoint working.
     /// </remarks>
     [HttpGet("{id}/history")]
+    [Authorize(Policy = AuthPolicies.Staff)]
     public async Task<IActionResult> GetHistory(
         [FromRoute] Guid id,
         [FromQuery] int limit = 50,
@@ -98,6 +100,7 @@ private readonly GetBrandsQueryHandler _getAll;
     }
 
     [HttpPost]
+    [Authorize(Policy = AuthPolicies.CatalogueWrite)]
     public async Task<IActionResult> Create([FromBody] BrandDto request, CancellationToken ct)
     {
         var slug = (request.Slug ?? string.Empty).Trim();
@@ -138,6 +141,7 @@ private readonly GetBrandsQueryHandler _getAll;
     }
 
     [HttpPut("{id}")]
+    [Authorize(Policy = AuthPolicies.CatalogueWrite)]
     public async Task<IActionResult> Update([FromRoute] Guid id, [FromBody] BrandDto request, CancellationToken ct)
     {
         var Brand = await _context.Brands.FirstOrDefaultAsync(s => s.Id == id, ct);
@@ -187,6 +191,7 @@ private readonly GetBrandsQueryHandler _getAll;
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Policy = AuthPolicies.CatalogueWrite)]
     public async Task<IActionResult> Delete([FromRoute] Guid id, CancellationToken ct)
     {
         var Brand = await _context.Brands.FirstOrDefaultAsync(s => s.Id == id, ct);

@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text;
 using FuelFlow.Features.Pricing.ImportUpgWogPrices;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -24,7 +25,7 @@ namespace FuelFlow.Features.Pricing;
 /// </remarks>
 [ApiController]
 [Route("api/admin/brand-prices")]
-[Authorize(Policy = "Staff")]
+[Authorize(Policy = AuthPolicies.CatalogueWrite)]
 public sealed class AdminUpgWogPriceController : ControllerBase
 {
     private readonly ImportUpgWogPricesCommandHandler _import;

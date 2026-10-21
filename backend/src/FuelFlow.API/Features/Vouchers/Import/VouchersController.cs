@@ -1,5 +1,6 @@
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers.SharedModels;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -35,7 +36,7 @@ public sealed class VouchersController : ControllerBase
     }
 
     [HttpPost("import")]
-    [Authorize(Policy = "Staff")]
+    [Authorize(Policy = AuthPolicies.VoucherWrite)]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(25_000_000)]
     [ProducesResponseType(typeof(ImportVouchersResponse), StatusCodes.Status200OK)]

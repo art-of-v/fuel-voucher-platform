@@ -2,6 +2,7 @@ using System.Security.Claims;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Vouchers.Renewal.Checkout;
 using FuelFlow.Features.Vouchers.Renewal.Quote;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,7 +16,6 @@ namespace FuelFlow.Features.Vouchers.Renewal.Operator;
 /// </summary>
 [ApiController]
 [Route("api/admin/voucher-renewal")]
-[Authorize(Policy = "Staff")]
 public sealed class OperatorVoucherRenewalController : ControllerBase
 {
     private readonly GetRenewableCustomerVouchersQueryHandler _searchHandler;
@@ -37,6 +37,7 @@ public sealed class OperatorVoucherRenewalController : ControllerBase
 
     /// <summary>Customer-owned renewable vouchers (search by number / owner, filter by brand + status).</summary>
     [HttpGet("vouchers")]
+    [Authorize(Policy = AuthPolicies.Staff)]
     [ProducesResponseType(typeof(List<RenewableCustomerVoucherDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> SearchVouchers(
         [FromQuery] string? query,
@@ -54,6 +55,7 @@ public sealed class OperatorVoucherRenewalController : ControllerBase
     /// admin picker matches it (codes + labels; the operator enters the surcharge manually, no pricing).
     /// </summary>
     [HttpGet("terms")]
+    [Authorize(Policy = AuthPolicies.Staff)]
     [ProducesResponseType(typeof(RenewalConfigResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetTerms(CancellationToken cancellationToken)
     {
@@ -67,6 +69,7 @@ public sealed class OperatorVoucherRenewalController : ControllerBase
     /// not renewable), 404 (voucher not found) or 409 (no replacement stock) with a stable code.
     /// </summary>
     [HttpPost("confirm")]
+    [Authorize(Policy = AuthPolicies.VoucherWrite)]
     [ProducesResponseType(typeof(ConfirmOperatorRenewalResult), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

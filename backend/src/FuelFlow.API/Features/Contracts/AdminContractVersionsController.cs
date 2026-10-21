@@ -1,5 +1,6 @@
 using FuelFlow.Features.Contracts.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -27,7 +28,6 @@ namespace FuelFlow.Features.Contracts;
 /// </remarks>
 [ApiController]
 [Route("api/admin/contract-versions")]
-[Authorize(Policy = "Staff")]
 public sealed class AdminContractVersionsController : ControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
@@ -48,6 +48,7 @@ public sealed class AdminContractVersionsController : ControllerBase
     /// The versions of one provider's text, newest first.
     /// </summary>
     [HttpGet]
+    [Authorize(Policy = AuthPolicies.Staff)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetVersions([FromQuery] Guid brandId, CancellationToken cancellationToken)
     {
@@ -79,6 +80,7 @@ public sealed class AdminContractVersionsController : ControllerBase
     /// rather than quietly produce two texts with the same name.
     /// </remarks>
     [HttpPost]
+    [Authorize(Policy = AuthPolicies.CatalogueWrite)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -153,6 +155,7 @@ public sealed class AdminContractVersionsController : ControllerBase
     /// </para>
     /// </remarks>
     [HttpPost("upload")]
+    [Authorize(Policy = AuthPolicies.CatalogueWrite)]
     [RequestSizeLimit(20 * 1024 * 1024)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]

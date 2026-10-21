@@ -46,7 +46,6 @@ namespace FuelFlow.Features.Brands;
 /// </summary>
 [ApiController]
 [Route("api/admin/brand-fuels")]
-[Authorize(Policy = "Staff")]
 public sealed class BrandFuelController : ControllerBase
 {
     private readonly GetFuelPriceHistoryQueryHandler _getPriceHistory;
@@ -82,6 +81,7 @@ public sealed class BrandFuelController : ControllerBase
     /// <see cref="GetFuelPriceHistoryQueryHandler"/>.
     /// </summary>
     [HttpGet("{fuelId}/price-history")]
+    [Authorize(Policy = AuthPolicies.Staff)]
     public async Task<IActionResult> GetFuelPriceHistory(
         [FromRoute] Guid fuelId,
         [FromQuery] int limit = 50,
@@ -97,12 +97,14 @@ public sealed class BrandFuelController : ControllerBase
     /// </para>
     /// </summary>
     [HttpGet("{fuelId}/price-at")]
+    [Authorize(Policy = AuthPolicies.Staff)]
     public async Task<IActionResult> GetFuelPriceAt(
         [FromRoute] Guid fuelId,
         [FromQuery] DateTime asOf,
         CancellationToken ct = default) =>
         Ok(await _getPriceAt.HandleAsync(new GetFuelPriceAtQuery(fuelId, asOf), ct));
     [HttpPost("brands/{id}/fuels")]
+    [Authorize(Policy = AuthPolicies.CatalogueWrite)]
     public async Task<IActionResult> AddFuel([FromRoute] Guid id, [FromBody] CreateFuelRequest request, CancellationToken ct)
     {
         // Required for the same reason as on UpdateFuel: every package created below inherits it,
@@ -284,7 +286,8 @@ public sealed class BrandFuelController : ControllerBase
         return Created($"/api/admin/brand-fuels/{fuel.Id}", new { id = fuel.Id });
     }
 
-[HttpPut("{fuelId}")]
+    [HttpPut("{fuelId}")]
+    [Authorize(Policy = AuthPolicies.CatalogueWrite)]
     public async Task<IActionResult> UpdateFuel([FromRoute] Guid fuelId, [FromBody] BrandFuelDto request, CancellationToken ct)
     {
         // Required, because the flag is written to every package of this fuel below. Answering with
@@ -499,6 +502,7 @@ public sealed class BrandFuelController : ControllerBase
     }
 
     [HttpDelete("{fuelId}")]
+    [Authorize(Policy = AuthPolicies.CatalogueWrite)]
     public async Task<IActionResult> DeleteFuel([FromRoute] Guid fuelId, CancellationToken ct)
     {
         var fuel = await _context.FuelTypes.FirstOrDefaultAsync(f => f.Id == fuelId, ct);
@@ -563,6 +567,7 @@ public sealed class BrandFuelController : ControllerBase
     }
 
     [HttpPut("brands/{id}/nominals")]
+    [Authorize(Policy = AuthPolicies.CatalogueWrite)]
     public async Task<IActionResult> UpdateNominals([FromRoute] Guid id, [FromBody] List<int> nominals, CancellationToken ct)
     {
         // Rejected here rather than left to ck_fuel_packages_liters_positive. The request body binds
