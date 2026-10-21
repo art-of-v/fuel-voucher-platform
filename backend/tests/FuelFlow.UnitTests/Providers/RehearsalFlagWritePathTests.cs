@@ -446,6 +446,148 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
         reloaded.BrandFuelCode.Should().BeNull();
     }
 
+    /// <summary>
+    /// The flag decides the pool the sizes are written in, and the pool is what the storefront
+    /// filters on. A rehearsal grade added through this screen used to be created in the LIVE pool:
+    /// the flag was read, the pool was computed, and the sizes were written without it — so the
+    /// rehearsal fuel was listed on the public shelf (planning #460).
+    /// </summary>
+    [Fact]
+    public async Task ARehearsalFuel_IsCreatedInTheQaPool()
+    {
+        var result = await _controller.AddFuel(
+            BrandIds.Okko,
+            new CreateFuelRequest
+            {
+                Name = "А95 ЄВРО (QA)",
+                SupplierPricePerLiter = 60m,
+                MarginUahPerLiter = 12.34m,
+                PumpPricePerLiter = 92.90m,
+                MinDiscountPerLiter = 4m,
+                IsTestData = true
+            },
+            CancellationToken.None);
+
+        result.Should().BeOfType<CreatedResult>();
+
+        var fuel = await _context.FuelTypes.SingleAsync(f => f.Name == "А95 ЄВРО (QA)");
+        var sizes = await _context.FuelNominals.Where(n => n.FuelTypeId == fuel.Id).ToListAsync();
+
+        sizes.Should().NotBeEmpty("a fuel with no sizes is not a fuel the storefront can sell");
+        sizes.Should().OnlyContain(n => n.DataKind == DataKinds.Qa,
+            "the pool is part of a size's identity, and it is what the storefront filters on");
+    }
+
+    [Fact]
+    public async Task ALiveFuel_IsCreatedInTheLivePool()
+    {
+        var result = await _controller.AddFuel(
+            BrandIds.Okko,
+            new CreateFuelRequest
+            {
+                Name = "ДП ЄВРО",
+                SupplierPricePerLiter = 60m,
+                MarginUahPerLiter = 12.34m,
+                PumpPricePerLiter = 92.90m,
+                MinDiscountPerLiter = 4m,
+                IsTestData = false
+            },
+            CancellationToken.None);
+
+        result.Should().BeOfType<CreatedResult>();
+
+        var fuel = await _context.FuelTypes.SingleAsync(f => f.Name == "ДП ЄВРО");
+        var sizes = await _context.FuelNominals.Where(n => n.FuelTypeId == fuel.Id).ToListAsync();
+
+        sizes.Should().NotBeEmpty();
+        sizes.Should().OnlyContain(n => n.DataKind == DataKinds.Real);
+    }
+
+    /// <summary>
+    /// The pool of a fuel that already has sizes is not a price edit's to change. The screen sends
+    /// the flag the fuel reads back with, so an ordinary edit agrees; an operator who flips it is
+    /// asking for the pool to change, and the answer says so rather than quietly doing nothing —
+    /// a silent no-op here is how somebody comes to believe a live fuel was hidden.
+    /// </summary>
+    [Fact]
+    public async Task ARepricing_ThatFlipsThePool_IsRefused_AndTheSizesKeepTheirPool()
+    {
+        await SeedLiveFuelAsync();
+
+        var result = await _controller.UpdateFuel(
+            ToUuid("live-dp"),
+            new BrandFuelDto
+            {
+                Id = "live-dp",
+                Name = "ДП ЄВРО",
+                SupplierPricePerLiter = 60m,
+                MarginUahPerLiter = 12.34m,
+                PumpPricePerLiter = 92.90m,
+                MinDiscountPerLiter = 4m,
+                AllowBelowCost = false,
+                IsTestData = true
+            },
+            CancellationToken.None);
+
+        result.Should().BeOfType<ConflictObjectResult>(
+            "the sizes decide the pool, and a price edit does not move them");
+
+        var sizes = await _context.FuelNominals.Where(n => n.FuelTypeId == ToUuid("live-dp")).ToListAsync();
+        sizes.Should().OnlyContain(n => n.DataKind == DataKinds.Real);
+    }
+
+    [Fact]
+    public async Task AFuelWithNoSizes_IsSeededInThePoolTheFlagNames()
+    {
+        _context.FuelTypes.Add(new FuelTypeEntity
+        {
+            Id = ToUuid("empty-dp"), BrandId = BrandIds.Okko, Name = "ДП ЄВРО (empty)",
+            BasePrice = 50m, DiscountPrice = 50m,
+            CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
+        });
+        await _context.SaveChangesAsync();
+
+        var result = await _controller.UpdateFuel(
+            ToUuid("empty-dp"),
+            new BrandFuelDto
+            {
+                Id = "empty-dp",
+                Name = "ДП ЄВРО (empty)",
+                SupplierPricePerLiter = 60m,
+                MarginUahPerLiter = 12.34m,
+                PumpPricePerLiter = 92.90m,
+                MinDiscountPerLiter = 4m,
+                AllowBelowCost = false,
+                IsTestData = true
+            },
+            CancellationToken.None);
+
+        result.Should().NotBeOfType<ConflictObjectResult>("a fuel with no sizes has no pool to disagree with");
+
+        var sizes = await _context.FuelNominals.Where(n => n.FuelTypeId == ToUuid("empty-dp")).ToListAsync();
+        sizes.Should().NotBeEmpty("the defaults are seeded");
+        sizes.Should().OnlyContain(n => n.DataKind == DataKinds.Qa);
+    }
+
+    /// <summary>
+    /// A live fuel with a live size - the mirror image of the rehearsal one above.
+    /// </summary>
+    private async Task SeedLiveFuelAsync()
+    {
+        _context.FuelTypes.Add(new FuelTypeEntity
+        {
+            Id = ToUuid("live-dp"), BrandId = BrandIds.Okko, Name = "ДП ЄВРО",
+            BasePrice = 92.90m, DiscountPrice = 72.34m,
+            CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
+        });
+        _context.FuelNominals.Add(new FuelNominal
+        {
+            FuelTypeId = ToUuid("live-dp"), Liters = 10m, DataKind = DataKinds.Real,
+            CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
+        });
+        await _context.SaveChangesAsync();
+    }
+
     private async Task SeedQaFuelAsync()
     {
         _context.FuelTypes.Add(new FuelTypeEntity
