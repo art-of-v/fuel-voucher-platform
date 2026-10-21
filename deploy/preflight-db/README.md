@@ -75,7 +75,7 @@ what to write.
 | `014-fuel-type-references-are-all-uuids.sql` | Does any reference to a fuel type still hold a TEXT-shaped id rather than a uuid | blocks the deploy |
 | `015-roles-columns-match-the-model.sql` | Are the columns of `roles` exactly the set the EF model maps | blocks the deploy |
 | `016-migration-ids-are-well-formed.sql` | Is every `MigrationId` `^<14 digits>_<name>$`, and recorded once | blocks the deploy |
-| `017-fuels-without-a-supplier-cost.sql` | Which fuels have no supplier cost, or a cost and no margin | blocks the deploy |
+| `017-fuels-without-a-supplier-cost.sql` | Which fuels **that are in stock** have no supplier cost, or a cost and no margin | blocks the deploy |
 
 **Every file in this directory is the same instrument**: a warning by default, a failed
 deploy when `PREFLIGHT_DB_STRICT` is on. The distinction between the files is what they
@@ -102,6 +102,22 @@ questions about the same change, asked two ways, because a type change and a val
 `roles` and one space-prefixed row in the migration history, and neither the CI gate nor the model could
 see either. `017` names the fuels whose below-cost guard is switched off because the inputs are missing -
 and it is the file that makes the catalogue's missing cost visible on every deploy.
+
+**`017` asks about the fuel that is IN STOCK, and about nothing else.** The catalogue is not the
+warehouse: a fuel with a price in the columns and no vouchers behind it cannot be sold, so nothing about
+its cost can cost us money, and a guard that fires on it is a guard that fires on nothing. This is the
+rule the application already follows - `CreateCheckoutCommandHandler` checks the stock and throws
+`PackageOutOfStockException` BEFORE the below-cost verdict is asked, and `UnknownCostSaleBlockedException`
+says in its own words that a fuel *that is in stock* and has no recorded cost cannot be sold.
+
+The difference was not academic. Measured on production 2026-10-21: the catalogue holds 23 fuels and the
+warehouse holds **zero** vouchers, so all 23 were a false positive - 46 reported rows naming fuel that
+cannot be sold. With `PREFLIGHT_DB_STRICT=1` that blocked every deploy, and it did so on a table with
+nothing to say: five consecutive production deploys failed on this file alone, from 07:43 to 09:20, while
+production served 200s throughout. The file now joins the stock the same way the storefront counts it
+(`PackageStockAvailability.SellableKeys`: `Available`, in the `real` pool, not deleted, not past its
+supplier expiry), so a gate that used a different definition than the shop would report fuels the shop
+never offers - the same class of bug as the one the file had.
 
 
 ## A check that cannot run is a warning, never a pass
