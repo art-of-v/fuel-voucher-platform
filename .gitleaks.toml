@@ -38,6 +38,11 @@ useDefault = true
 # Shared placeholder exclusions: every committed *.example / template value that
 # is meant to be replaced at deploy time. Kept in one list so the rules below
 # stay in sync with each other.
+#
+# The test-only JWT secret constant that used to be exempted here is gone (2026-10-21,
+# planning #526): AuthSetup.cs no longer carries a committed fallback key - a development
+# process generates one per start. The exemption is deleted with it, so a hardcoded key
+# in the source is a finding again instead of a silent pass.
 [[rules]]
 id = "fuelflow-config-secret"
 description = "FuelFlow appsettings secret/token value (Jwt:Secret, Session:Secret, Monobank:Token, ...)"
@@ -48,8 +53,6 @@ entropy = 3.3
 regexTarget = "match"
 regexes = [
   '''(?i)(change[_-]?me|changethis|your[_-]|[_-]here|placeholder|replace[_-]?me|example|sample|dummy|fake|todo|xxxx+|<[^>]+>|\$\{|\$\(|%[A-Z_]+%)''',
-  # Test-only JWT secret constant (AuthSetup.cs) - never used in production.
-  '''test-secret-key-that-is-at-least-32-characters-long''',
 ]
 
 [[rules]]
@@ -151,8 +154,8 @@ description = "Known-safe test/dev values and third-party checksums"
 #   3cb50dc  appsettings.Production.json - a committed TEMPLATE, not a deployed config:
 #            Monobank:PublicKey is the literal "PRODUCTION_PUBLIC_KEY_HERE", Twilio
 #            PhoneNumber is "+1234567890", and Jwt:Secret is the exact 71-character value
-#            AuthSetup.cs:13 names PlaceholderSecret and refuses to boot with in Production
-#            (AuthSetup.cs:31-42). That JWT value is therefore burned, not usable.
+#            that AuthSetup.cs names PlaceholderSecret and refuses to boot with in Production.
+#            That JWT value is therefore burned, not usable.
 #            The one value that cannot be dismissed as a placeholder is Monobank:Token
 #            (34 chars, no placeholder marker) - treat as exposed and confirm it was rotated.
 #   3cb50dc  appsettings.Development.json - localhost-only dev key, superseded.
@@ -163,8 +166,6 @@ commits = [
   "72492dcf4955b1314d765ff11e110fa0ceaf7a00",
 ]
 regexes = [
-  # Test-only JWT secret constant (AuthSetup.cs) - never used in production.
-  '''test-secret-key-that-is-at-least-32-characters-long''',
   # CocoaPods checksum in mobile-app-native/ios/Podfile.lock (historical).
   '''8a31808565da7af926dd9b595e98594d8b1553b6''',
   # Hardcoded test user UUID in historical admin-panel code.

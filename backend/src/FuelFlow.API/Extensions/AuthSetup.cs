@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.SharedKernel.Domain;
@@ -6,12 +7,12 @@ using FuelFlow.SharedKernel.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
+using Serilog;
 
 namespace FuelFlow.API.Extensions;
 
 internal static class AuthSetup
 {
-    private const string DevSecret = "test-secret-key-that-is-at-least-32-characters-long";
     private const string PlaceholderSecret = "CHANGE_THIS_TO_A_SECURE_RANDOM_KEY_IN_PRODUCTION_AT_LEAST_32_CHARACTERS";
     private const int MinSecretLength = 32;
 
@@ -26,21 +27,30 @@ internal static class AuthSetup
 
         services.AddScoped<IJwtTokenService, JwtTokenService>();
 
-        var isTesting = config.GetValue<bool>("Testing");
         var jwtOptions = config.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
 
         var secret = jwtOptions.Secret;
         if (string.IsNullOrWhiteSpace(secret) || secret == PlaceholderSecret)
         {
-            if (environment.IsDevelopment() || isTesting)
-            {
-                secret = DevSecret;
-            }
-            else
+            // There is no committed fallback key any more. It used to be one constant - the same
+            // string in every checkout, on every machine, forever - and it was reachable from
+            // Production through a configuration switch named "Testing" that turned the issuer and
+            // audience checks off as well. Both are gone: a key that is in the repository is a key
+            // that is in everybody's repository, and a switch that opens the door in Production is
+            // one environment variable away from being live. The development answer is a key that
+            // is generated per process, so there is nothing to leak and nothing to share.
+            if (!environment.IsDevelopment())
             {
                 throw new InvalidOperationException(
                     "Jwt:Secret is not configured. Set the 'Jwt:Secret' configuration value to a secure random key of at least 32 characters.");
             }
+
+            secret = GenerateEphemeralSecret();
+
+            Log.Warning(
+                "SECURITY: Jwt:Secret is not configured, so a temporary signing key was generated for this "
+                + "process. Every restart invalidates the tokens that were out, and no other machine can "
+                + "forge one for this one. Set Jwt__Secret to keep sessions across restarts.");
         }
 
         if (secret.Length < MinSecretLength)
@@ -60,8 +70,11 @@ internal static class AuthSetup
         {
             options.TokenValidationParameters = new TokenValidationParameters
             {
-                ValidateIssuer = !isTesting,
-                ValidateAudience = !isTesting,
+                // Issuer and audience are always checked. They used to be switchable off by a
+                // configuration key, which meant a token minted for another audience - or by
+                // another service sharing the key - was accepted here. There is no switch.
+                ValidateIssuer = true,
+                ValidateAudience = true,
                 ValidateLifetime = true,
                 ValidateIssuerSigningKey = true,
                 ValidIssuer = jwtOptions.Issuer,
@@ -72,6 +85,16 @@ internal static class AuthSetup
         });
 
         return services;
+    }
+
+    /// <summary>
+    /// A signing key for a development process that has none configured: 32 random bytes, base64.
+    /// Generated per process rather than committed, so there is no key in the repository to copy,
+    /// leak or share, and no key two machines have in common.
+    /// </summary>
+    private static string GenerateEphemeralSecret()
+    {
+        return Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
     }
 
     /// <summary>
