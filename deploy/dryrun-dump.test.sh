@@ -74,6 +74,9 @@ case " $* " in
 COMMENT ON COLUMN fuel_vouchers.qr_payload IS 'the signed voucher payload';
 SCHEMA
   ;;
+  # The dump step asks the catalog which columns a COPY can write before it copies the table, so
+  # the CSV never carries a GENERATED column. The stub answers the way a real database would.
+  *string_agg*)   echo "id,name" ;;
   *COPY*__EFMigrationsHistory*) echo "MigrationId,ProductVersion"; echo "20240101_Initial,1.0.0" ;;
   *COPY*fuel_types*)            echo "id,name"; echo "1,A-95" ;;
   *COPY*brands*)                echo "id,name"; echo "okko,OKKO" ;;
@@ -117,6 +120,28 @@ printf '%s\n' "$argv" | grep -q -- '--no-privileges' \
 argv="$(run_dump)"
 printf '%s\n' "$argv" | grep -q '^psql$' \
   && ok "the COPY queries still go through psql" || bad "the COPY queries still go through psql" "no psql call" "a psql call"
+
+# The dump must never copy a table with SELECT *.
+#
+# A GENERATED column is the database's own, and COPY cannot write one: the restore copies the
+# file back with `\copy $table FROM`, and a row carrying a field for the generated column is
+# rejected with "extra data after last expected column". `fuel_types.grade_key` became generated
+# on 2026-10-21, and from that moment the dry run was red for every pull request that tripped it
+# - including ones that touch no backend file at all.
+argv="$(run_dump)"
+if printf '%s\n' "$argv" | grep -q 'SELECT \* FROM'; then
+  bad "the dump never copies a table with SELECT *" "a COPY still uses SELECT *" "an explicit column list"
+else
+  ok "the dump never copies a table with SELECT *"
+fi
+# And the column list is read from the catalog, so the next generated column needs nobody to
+# remember it: the query has to name the catalog's own marker for a generated column.
+if printf '%s\n' "$argv" | grep -q 'attgenerated'; then
+  ok "the dump skips the generated columns it reads from the catalog"
+else
+  bad "the dump skips the generated columns it reads from the catalog" \
+      "no attgenerated in the query" "a query that names attgenerated"
+fi
 
 # Both invocations name the same database explicitly, so the restore side connects to the same one.
 argv="$(run_dump)"

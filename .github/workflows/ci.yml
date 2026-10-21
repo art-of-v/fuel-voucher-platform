@@ -670,14 +670,37 @@ jobs:
             --schema-only --no-owner --no-privileges > "$out/schema.sql"
           echo "schema.sql $(wc -c < "$out/schema.sql") bytes"
 
+          # A GENERATED column is the database's own, and COPY cannot write one: the restore copies
+          # the file back with `\copy $table FROM`, and a row with a field for a generated column
+          # is rejected with "extra data after last expected column".
+          #
+          # `fuel_types.grade_key` became generated on 2026-10-21, so from that moment the dump
+          # carried a value the restore could not put back, and the gate failed for every pull
+          # request that tripped it - including ones that touch no backend file at all.
+          #
+          # The list of columns a COPY can write is every column except the generated ones, and it
+          # is read from the catalog rather than written out by hand, so the next generated column
+          # needs nobody to remember it. `attgenerated = ''` is the empty "char" that says "not
+          # generated".
+          cols_of() {
+            pg -q -t -A -c "SELECT string_agg(quote_ident(attname), ',' ORDER BY attnum) FROM pg_attribute WHERE attrelid = '\"$1\"'::regclass AND attnum > 0 AND attgenerated = '' AND attisdropped = false;" 2>/dev/null || true
+          }
+
           # The history is what makes this a dry run of the PENDING migration rather than a replay of
           # all 105. Without it EF would run everything from zero and prove nothing about the change.
-          pg -q -t -A -c 'COPY (SELECT * FROM "__EFMigrationsHistory") TO STDOUT WITH (FORMAT csv, HEADER true)' \
+          hist_cols="$(cols_of '__EFMigrationsHistory')"
+          pg -q -t -A -c "COPY (SELECT $hist_cols FROM \"__EFMigrationsHistory\") TO STDOUT WITH (FORMAT csv, HEADER true)" \
             > "$out/history.csv"
           echo "history.csv $(wc -l < "$out/history.csv") lines"
 
           for t in $TABLES; do
-            pg -q -t -A -c "COPY (SELECT * FROM \"$t\") TO STDOUT WITH (FORMAT csv, HEADER true)" \
+            cols="$(cols_of "$t")"
+            if [ -z "$cols" ]; then
+              echo "::warning::table $t not present in production"
+              rm -f "$out/$t.csv"
+              continue
+            fi
+            pg -q -t -A -c "COPY (SELECT $cols FROM \"$t\") TO STDOUT WITH (FORMAT csv, HEADER true)" \
               > "$out/$t.csv" || { echo "::warning::table $t not present in production"; rm -f "$out/$t.csv"; continue; }
             echo "$t.csv $(( $(wc -l < "$out/$t.csv") - 1 )) rows"
           done
