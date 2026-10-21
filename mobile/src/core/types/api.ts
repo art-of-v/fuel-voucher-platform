@@ -230,8 +230,10 @@ export interface Company {
 }
 
 // A contract is a row in the `contracts` table: this user, this company, this brand, with a
-// term. It carries no document text - the schema has no column for it - so the client must
-// not invent one. `GET /api/legal-entity/contracts`.
+// term. The text the customer reads before signing lives once per provider and is versioned,
+// so the contract carries the VERSION it is against and the server sends the text of that
+// version with it - `termsText` is null when that version has no text yet.
+// `GET /api/legal-entity/contracts`.
 export interface Contract {
   id: string;
   legalEntityId: string;
@@ -241,6 +243,12 @@ export interface Contract {
   createdAt: string;
   expiresAt: string;
   expired: boolean;
+  /** The version of the provider's text this contract is against. */
+  termsVersion: number;
+  /** The text the customer reads before signing, or null when it has not been published. */
+  termsText?: string | null;
+  /** Whether there is a text to read at all. */
+  hasText: boolean;
 }
 
 // What `POST /api/legal-entity/sign` answers: the signature that was recorded.

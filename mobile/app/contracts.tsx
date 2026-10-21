@@ -24,13 +24,18 @@ type Tab = 'AVAILABLE' | 'SIGNED';
 /**
  * What the reader shows about a contract.
  *
- * The schema has no document text - a contract is a row of ids and dates - so "the contract"
- * on this screen is its facts: which brand, which company, and the term it runs for. The
- * reader is where the user looks before they sign, so what it shows has to be true.
+ * The reader is where the user looks before they sign, so what it shows has to be true: the
+ * facts (which brand, which company, which version of the terms, the term it runs for) AND
+ * the text of the terms itself. The text lives once per provider and is versioned, so the
+ * server sends the version's text with the contract - `text` is null when that version has no
+ * text yet, and absent when the card is about something else (a signature, which carries no
+ * text of its own).
  */
 type ContractCard = {
   title: string;
   facts: { label: string; value: string }[];
+  /** The text the customer reads before signing. Null: the version has no text. */
+  text?: string | null;
 };
 
 /** The name the network is shown under when a contract's brand does not resolve. */
@@ -125,6 +130,13 @@ export default function ContractsScreen() {
         },
         contractTextScroll: {
           marginBottom: tokens.spacing['2xl'],
+        },
+        // The terms themselves: a document, so it is set as one - readable line height, not
+        // the label-sized type the facts use.
+        contractText: {
+          fontFamily: 'Rajdhani-SemiBold',
+          fontSize: tokens.type.caption.fontSize,
+          lineHeight: tokens.type.caption.fontSize * 1.6,
         },
         modalCloseBtn: {
           paddingVertical: tokens.spacing.lg,
@@ -308,7 +320,12 @@ export default function ContractsScreen() {
       { label: t('contracts.company'), value: c.legalEntityName ?? '-' },
       { label: t('contracts.createdAt'), value: formatExpirationDate(c.createdAt) },
       { label: t('contracts.expiresAt'), value: formatExpirationDate(c.expiresAt) },
+      { label: t('contracts.termsVersion'), value: String(c.termsVersion ?? 1) },
     ],
+    // The text the customer is asked to read before signing. It is the provider's text,
+    // versioned, and the contract says which version it is against - so this is the words
+    // that will be signed, not a summary of them.
+    text: c.termsText ?? null,
   });
 
   const cardOfSignature = (sc: UserContract): ContractCard => ({
@@ -533,6 +550,38 @@ export default function ContractsScreen() {
               </Pressable>
             </View>
             <ScrollView style={styles.contractTextScroll}>
+              {/* The text of the terms, when the card has one. This is what the customer
+                  signs, so it is shown in full and above the facts: the facts say which
+                  agreement this is, the text says what it says. */}
+              {readingCard?.text !== undefined && (
+                readingCard.text ? (
+                  <Text
+                    testID="contract-text"
+                    style={[
+                      styles.contractText,
+                      {
+                        color: tokens.colors.text.primary,
+                        marginBottom: tokens.spacing.lg,
+                      },
+                    ]}
+                  >
+                    {readingCard.text}
+                  </Text>
+                ) : (
+                  <Text
+                    testID="contract-text-missing"
+                    style={[
+                      styles.contractText,
+                      {
+                        color: tokens.colors.text.dim,
+                        marginBottom: tokens.spacing.lg,
+                      },
+                    ]}
+                  >
+                    {t('contracts.noTextPublished')}
+                  </Text>
+                )
+              )}
               {readingCard?.facts.map((fact) => (
                 <View
                   key={fact.label}

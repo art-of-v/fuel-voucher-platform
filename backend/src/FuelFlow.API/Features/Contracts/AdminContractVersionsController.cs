@@ -32,13 +32,16 @@ public sealed class AdminContractVersionsController : ControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
     private readonly ContractTextExtractor _textExtractor;
+    private readonly ContractWriter _contractWriter;
 
     public AdminContractVersionsController(
         ApplicationDbContext dbContext,
-        ContractTextExtractor textExtractor)
+        ContractTextExtractor textExtractor,
+        ContractWriter contractWriter)
     {
         _dbContext = dbContext;
         _textExtractor = textExtractor;
+        _contractWriter = contractWriter;
     }
 
     /// <summary>
@@ -117,13 +120,22 @@ public sealed class AdminContractVersionsController : ControllerBase
         _dbContext.ContractVersions.Add(version);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
+        // The backfill: a company that was created before this provider published any text has
+        // no contract for it, and without this it never would - the writer only runs when a
+        // company is created. This is the owner's answer to "do the companies that already
+        // existed get contracts too?".
+        var contractsCreated = await _contractWriter.EnsureContractsForAllAsync(cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
         return Ok(new
         {
             version.Id,
             version.BrandId,
             version.Version,
             version.TermDays,
-            version.CreatedAtUtc
+            version.CreatedAtUtc,
+            // How many companies were given a contract for this provider by this publish.
+            contractsCreated
         });
     }
 
@@ -202,6 +214,12 @@ public sealed class AdminContractVersionsController : ControllerBase
         _dbContext.ContractVersions.Add(version);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
+        // The backfill, for the same reason as in Publish: a company created before this
+        // provider published any text has no contract for it, and only the writer can give
+        // it one.
+        var contractsCreated = await _contractWriter.EnsureContractsForAllAsync(cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
         return Ok(new
         {
             version.Id,
@@ -211,7 +229,9 @@ public sealed class AdminContractVersionsController : ControllerBase
             version.CreatedAtUtc,
             // How much text was read out of the document, so the operator can see that the
             // upload was read and not stored as an empty page.
-            characters = version.Body.Length
+            characters = version.Body.Length,
+            // How many companies were given a contract for this provider by this publish.
+            contractsCreated
         });
     }
 
