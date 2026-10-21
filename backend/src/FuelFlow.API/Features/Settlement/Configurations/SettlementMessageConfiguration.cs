@@ -19,11 +19,13 @@ internal sealed class SettlementMessageConfiguration : IEntityTypeConfiguration<
         // Storing them as text would make every lookup a cast and buy nothing.
         builder.Property(e => e.ChatId)
             .HasColumnName("chat_id")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "Telegram's chat id. Part of the idempotency key, because message ids are per-chat.");
 
         builder.Property(e => e.MessageId)
             .HasColumnName("message_id")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "Telegram's per-chat message id. Part of the idempotency key.");
 
         // telegram_user_id is a TELEGRAM id, not users.id: the settlement channel is a chat, and its
         // sender is whoever is in it. It is a bigint for that reason, and it can never carry a
@@ -32,45 +34,56 @@ internal sealed class SettlementMessageConfiguration : IEntityTypeConfiguration<
         // is a different id space: it IS a users.id, and it stays FK-free by the audit rule.)
         builder.Property(e => e.TelegramUserId)
             .HasColumnName("telegram_user_id")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "Who sent it. Kept even for a refused message: the refusal is only meaningful with the" +
+                    "sender, and an authorisation row that cannot name who was refused names nothing.");
 
         builder.Property(e => e.TelegramDisplayName)
             .HasColumnName("telegram_display_name")
-            .HasMaxLength(200);
+            .HasMaxLength(200)
+            .HasComment(                "The display name at the time, so the record survives the person renaming themselves.");
 
         // 1000 is Telegram's own message ceiling, and this column only ever holds a one-line
         // declaration. Bounded so a hostile paste cannot become an unbounded row.
         builder.Property(e => e.Text)
             .HasColumnName("text")
-            .HasMaxLength(1000);
+            .HasMaxLength(1000)
+            .HasComment(                "The message as written, trimmed. NULL only for a message that carried no text at all.");
 
         builder.Property(e => e.SentAtUtc)
             .HasColumnName("sent_at_utc")
             .HasColumnType("timestamp with time zone")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "Telegram's own timestamp for the message, not our receive time.");
 
         builder.Property(e => e.Outcome)
             .HasColumnName("outcome")
             .HasMaxLength(20)
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "What the message turned out to be: accepted, or a refusal.");
 
         builder.Property(e => e.RejectionReason)
             .HasColumnName("rejection_reason")
-            .HasMaxLength(500);
+            .HasMaxLength(500)
+            .HasComment(                "Why, when the outcome is not Accepted.");
 
         builder.Property(e => e.AmountUah)
             .HasColumnName("amount_uah")
-            .HasColumnType("numeric(12,2)");
+            .HasColumnType("numeric(12,2)")
+            .HasComment(                "What the parser read, kept even when nothing matched.");
 
         builder.Property(e => e.Code)
             .HasColumnName("code")
-            .HasMaxLength(8);
+            .HasMaxLength(8)
+            .HasComment(                "The code as read, upper-cased. Kept for the same reason as the amount.");
 
         builder.Property(e => e.ResolvedUserId)
-            .HasColumnName("resolved_user_id");
+            .HasColumnName("resolved_user_id")
+            .HasComment(                "The customer the code resolved to, when it resolved to one.");
 
         builder.Property(e => e.PaymentId)
-            .HasColumnName("payment_id");
+            .HasColumnName("payment_id")
+            .HasComment(                "The payment this produced, when it produced one.");
 
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")

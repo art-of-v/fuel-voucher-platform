@@ -29,32 +29,49 @@ internal sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
         // Nullable: money can arrive before the order it is for. See Payment.OrderId for why a NULL here is
         // an advance rather than a defect - and for why it must never reach a sales account.
         builder.Property(e => e.OrderId)
-            .HasColumnName("order_id");
+            .HasColumnName("order_id")
+            .HasComment(                "The order this payment settles, or NULL when it is not yet attached to one. NULL is not" +
+                    "an error and not a pending payment: it is money we hold that is not yet against a sale -" +
+                    "an advance, which is a liability, not revenue. Revenue is recognised when the fuel is" +
+                    "delivered, never on receipt.");
 
         builder.Property(e => e.UserId)
-            .HasColumnName("user_id");
+            .HasColumnName("user_id")
+            .HasComment(                "The customer this money belongs to, when we know who paid. NULL together with a NULL" +
+                    "order_id means the payment is UNALLOCATED: the money is real and belongs to nobody yet," +
+                    "and an operator decides whose it is.");
 
         builder.Property(e => e.Kind)
             .HasColumnName("kind")
             .HasConversion<string>()
             .HasMaxLength(16)
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "What this row is: a capture, or a refund.");
 
         builder.Property(e => e.ParentPaymentId)
-            .HasColumnName("parent_payment_id");
+            .HasColumnName("parent_payment_id")
+            .HasComment(                "The capture this refund reverses. NULL on a capture - a refund is always answerable as" +
+                    "'money back against this exact charge'.");
 
         builder.Property(e => e.Provider)
             .HasColumnName("provider")
             .HasMaxLength(20)
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "The acquiring brand, lowercase, matching the Monobank vendor token.");
 
         builder.Property(e => e.ProviderInvoiceId)
             .HasColumnName("provider_invoice_id")
-            .HasMaxLength(100);
+            .HasMaxLength(100)
+            .HasComment(                "The acquirer's invoice id - the identity that survives a re-issued payment link, and" +
+                    "unique per provider and per kind, so two attempts at paying the same order coexist" +
+                    "instead of overwriting one another.");
 
         builder.Property(e => e.ProviderPaymentId)
             .HasColumnName("provider_payment_id")
-            .HasMaxLength(100);
+            .HasMaxLength(100)
+            .HasComment(                "The acquirer's own payment-system id, where it provides one. Distinct from the invoice" +
+                    "id: several payments can be attempted against one invoice, and the statement rows carry" +
+                    "this value as rrn/approvalCode.");
 
         builder.Property(e => e.Merchant)
             .HasColumnName("merchant")
@@ -64,53 +81,74 @@ internal sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
         builder.Property(e => e.AmountUah)
             .HasColumnName("amount_uah")
             .HasColumnType("numeric(12,2)")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "What WE billed, in UAH. The same type as orders.price.");
 
         builder.Property(e => e.AmountKopecks)
             .HasColumnName("amount_kopecks")
             .HasColumnType("numeric(14,0)")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "What the wire said, in kopecks. A second representation of the same number - and a CHECK" +
+                    "holds the two in agreement.");
 
 builder.Property(e => e.ProviderAmountKopecks)
             .HasColumnName("provider_amount_kopecks")
-            .HasColumnType("numeric(14,0)");
+            .HasColumnType("numeric(14,0)")
+    .HasComment(        "What the ACQUIRER reported charging, once a callback or a statement row says so. NULL" +
+            "until one arrives, and deliberately NOT constrained against amount_kopecks: the two" +
+            "disagreeing is the entire point of the column, because it makes an amount mismatch a" +
+            "queryable fact on the money row instead of a log line that is gone by the morning.");
 
         builder.Property(e => e.Currency)
             .HasColumnName("currency")
             .HasMaxLength(3)
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "The currency the amounts are in.");
 
         builder.Property(e => e.Status)
             .HasColumnName("status")
             .HasConversion<string>()
             .HasMaxLength(16)
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "Where this payment stands.");
 
         builder.Property(e => e.PaidAtUtc)
-            .HasColumnName("paid_at_utc");
+            .HasColumnName("paid_at_utc")
+            .HasComment(                "When the money moved - written from the acquirer's statement when one arrives, because" +
+                    "the statement is the authority on time as well as on amount.");
 
         builder.Property(e => e.WebhookEventId)
-            .HasColumnName("webhook_event_id");
+            .HasColumnName("webhook_event_id")
+            .HasComment(                "The delivery that proved this payment, when the proof was a webhook. NULL when the" +
+                    "payment was settled from the statement instead - which is itself the answer to 'did the" +
+                    "acquirer tell us, or did we find out on our own?'");
 
         builder.Property(e => e.ProviderPayload)
-            .HasColumnName("provider_payload");
+            .HasColumnName("provider_payload")
+            .HasComment(                "The acquirer's row verbatim, when we have one.");
 
         builder.Property(e => e.CreatedByUserId)
-            .HasColumnName("created_by_user_id");
+            .HasColumnName("created_by_user_id")
+            .HasComment(                "Who approved the refund, and whether it was automatic. Audit of the decision, not of the" +
+                    "money - only a refund has one, and the database refuses these on a capture.");
 
         // 200 to match refunds.created_by_user_name, which this value replaced.
         builder.Property(e => e.CreatedByUserName)
             .HasColumnName("created_by_user_name")
-            .HasMaxLength(200);
+            .HasMaxLength(200)
+            .HasComment(                "The approver's name as it read at approval time. A denormalised copy, never a join" +
+                    "target.");
 
         builder.Property(e => e.IsAutomatic)
             .HasColumnName("is_automatic")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "The refund was raised by a system rule rather than by a person.");
 
         // 500 to match refunds.error_message, which this value replaced.
         builder.Property(e => e.ErrorMessage)
             .HasColumnName("error_message")
-            .HasMaxLength(500);
+            .HasMaxLength(500)
+            .HasComment(                "Why the refund could not be completed, when it could not.");
 
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
