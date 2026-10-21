@@ -22,6 +22,9 @@ public sealed class SetUserActiveCommandHandlerTests
     [InlineData("QA", "Admin")]
     [InlineData("QA", "ProductOwner")]
     [InlineData("QA", "QA")]
+    // The retired QA staff role is not staff any more (2026-10-21), so it reaches nothing - not
+    // even the User accounts it could activate before.
+    [InlineData("QA", "User")]
     public async Task HandleAsync_ShouldRejectTargetsOutsideHierarchy(string actorRole, string targetRole)
     {
         await using var context = CreateContext();
@@ -43,12 +46,8 @@ public sealed class SetUserActiveCommandHandlerTests
     [InlineData("Manager", "User", true)]
     [InlineData("Admin", "Manager", false)]
     [InlineData("ProductOwner", "Admin", false)]
-    // A QA tester gets the same reach as a Manager over User accounts - enough to exercise an
-    // activation/deactivation flow end to end, and nothing wider.
-    [InlineData("QA", "User", false)]
-    [InlineData("QA", "User", true)]
     public async Task HandleAsync_ShouldChangeEligibilityWithoutInvalidatingSession(
-        string actorRole, string targetRole, bool activate)
+    string actorRole, string targetRole, bool activate)
     {
         await using var context = CreateContext();
         var target = await AddUserAsync(context, targetRole);
