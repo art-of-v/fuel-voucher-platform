@@ -42,10 +42,10 @@ internal sealed class MovementBatchConfiguration : IEntityTypeConfiguration<Move
         builder.Property(e => e.Kind)
             .HasColumnName("kind")
             .HasMaxLength(20)
-            .IsRequired();
+            .IsRequired().HasComment("What kind of settlement this is - an exchange, a return, a write-off.");
 
         builder.Property(e => e.SupplierId)
-            .HasColumnName("supplier_id");
+            .HasColumnName("supplier_id").HasComment("The counterparty. NULL for a batch that is not a supplier settlement.");
 
         // Null for a batch that is not a supplier settlement. Restrict rather than SetNull: the
         // counterparty of a settlement must stay nameable, and a supplier that is deactivated is not a
@@ -58,41 +58,53 @@ internal sealed class MovementBatchConfiguration : IEntityTypeConfiguration<Move
         builder.Property(e => e.Status)
             .HasColumnName("status")
             .HasMaxLength(12)
-            .IsRequired();
+            .IsRequired().HasComment("The lifecycle state. A batch is created already confirmed, because that is the only way" +
+                    "the application makes one: the operator confirms the exchange and the batch records it in" +
+                    "the same transaction. The rest of the set is the forward shape - a draft that is opened and" +
+                    "later settled is the obvious next workflow - and the CHECK is what stops an unrecognised" +
+                    "word arriving as a status later.");
 
         builder.Property(e => e.SurchargeUah)
             .HasColumnName("surcharge_uah")
             .HasColumnType("numeric(14,2)")
-            .IsRequired();
+            .IsRequired().HasComment("What the brand charged for the settlement AS A WHOLE. This is the amount on the command," +
+                    "not the sum of the rows' shares: each exchange row carries only its own share, and those" +
+                    "shares sum back to the total only when every retired voucher was paired with a" +
+                    "replacement. An exchange that returns vouchers without reissuing them contributes retired" +
+                    "litres to the numerators and nothing to the denominator, so the shares over-count. The" +
+                    "number the brand charged is the authoritative one, so it is this.");
 
         // Bare uuid, no FK. A settlement record has to be writable whatever happened to the actor row,
         // which is why voucher_exchanges.acting_user_id and operator_voucher_renewals.acting_user_id
         // are bare too. §G of TARGET_SCHEMA says the same in general terms.
         builder.Property(e => e.OpenedByUserId)
             .HasColumnName("opened_by_user_id")
-            .IsRequired();
+            .IsRequired().HasComment("The operator who opened the settlement.");
 
         builder.Property(e => e.OpenedByUserName)
             .HasColumnName("opened_by_user_name")
-            .HasMaxLength(200);
+            .HasMaxLength(200).HasComment("That operator's name as it read at the time. A copy, so the record stays readable after a" +
+                    "rename - never a join target.");
 
         builder.Property(e => e.OpenedAtUtc)
             .HasColumnName("opened_at_utc")
             .HasColumnType("timestamp with time zone")
-            .IsRequired();
+            .IsRequired().HasComment("When the settlement was opened.");
 
         builder.Property(e => e.ConfirmedAtUtc)
             .HasColumnName("confirmed_at_utc")
-            .HasColumnType("timestamp with time zone");
+            .HasColumnType("timestamp with time zone").HasComment("When the settlement was confirmed. Non-null exactly when the status is confirmed, which" +
+                    "is a database CHECK rather than a convention: a batch that says confirmed and carries no" +
+                    "timestamp cannot answer 'when'.");
 
         builder.Property(e => e.RejectionReason)
             .HasColumnName("rejection_reason")
-            .HasMaxLength(500);
+            .HasMaxLength(500).HasComment("Why a batch was rejected, when it was.");
 
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
             .HasColumnType("timestamp with time zone")
-            .IsRequired();
+            .IsRequired().HasComment("When the row was written.");
 
         // The batch list is ordered newest-first and filtered by supplier; neither should scan.
         builder.HasIndex(e => e.OpenedAtUtc)

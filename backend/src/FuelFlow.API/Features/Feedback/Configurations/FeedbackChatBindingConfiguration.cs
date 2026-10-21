@@ -13,14 +13,14 @@ internal sealed class FeedbackChatBindingConfiguration : IEntityTypeConfiguratio
 
         builder.HasKey(e => e.TelegramChatId);
 
-        builder.Property(e => e.TelegramChatId).HasColumnName("telegram_chat_id");
+        builder.Property(e => e.TelegramChatId).HasColumnName("telegram_chat_id").HasComment("The Telegram chat id of the customer's private chat.");
 
         // No FK to users, matching feedback_messages: the binding is written by an anonymous
         // webhook and must outlive an account being soft-deleted, because the feedback that
         // customer left is still worth reading afterwards.
-        builder.Property(e => e.UserId).HasColumnName("user_id").IsRequired();
+        builder.Property(e => e.UserId).HasColumnName("user_id").IsRequired().HasComment("The user whose chat it is.");
 
-        builder.Property(e => e.BoundAtUtc).HasColumnName("bound_at_utc").IsRequired();
+        builder.Property(e => e.BoundAtUtc).HasColumnName("bound_at_utc").IsRequired().HasComment("When the chat was bound.");
 
         builder.HasIndex(e => e.UserId);
 

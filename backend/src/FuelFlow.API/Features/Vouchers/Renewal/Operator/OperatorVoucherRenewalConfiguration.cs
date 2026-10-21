@@ -41,58 +41,61 @@ internal sealed class OperatorVoucherRenewalConfiguration : IEntityTypeConfigura
 
         builder.Property(e => e.VoucherId)
             .HasColumnName("voucher_id")
-            .IsRequired();
+            .IsRequired().HasComment("The customer's voucher that was renewed (extended) or retired (replace).");
 
         // Nullable audit link to the stock voucher on the replace branch, null on extend. Constrained
         // below, like the source side (#217).
         builder.Property(e => e.ReplacementVoucherId)
-            .HasColumnName("replacement_voucher_id");
+            .HasColumnName("replacement_voucher_id").HasComment("The fresh stock voucher handed to the customer on the replace branch, or NULL on the" +
+                    "extend branch (the same voucher was kept).");
 
         builder.Property(e => e.CustomerUserId)
             .HasColumnName("customer_user_id")
-            .IsRequired();
+            .IsRequired().HasComment("The customer who owns the voucher at the time of the renewal.");
 
         builder.Property(e => e.Branch)
             .HasColumnName("branch")
             .HasMaxLength(16)
-            .IsRequired();
+            .IsRequired().HasComment("Which branch ran: extend or replace.");
 
         builder.Property(e => e.TermCode)
             .HasColumnName("term_code")
             .HasMaxLength(8)
-            .IsRequired();
+            .IsRequired().HasComment("The chosen term as a stable code (1w/2w/1m...6m).");
 
         builder.Property(e => e.OldExpiration)
             .HasColumnName("old_expiration")
-            .IsRequired();
+            .IsRequired().HasComment("The expiry of the customer's voucher before the renewal.");
 
         builder.Property(e => e.NewExpiration)
             .HasColumnName("new_expiration")
-            .IsRequired();
+            .IsRequired().HasComment("The expiry the customer ends up with - the extended voucher's new expiry, or the stock" +
+                    "voucher's expiry.");
 
         builder.Property(e => e.SurchargeUah)
             .HasColumnName("surcharge_uah")
             .HasColumnType("numeric(10,2)")
-            .IsRequired();
+            .IsRequired().HasComment("The доплата the customer paid off-platform; 0 means a free compensation. Audit only - it" +
+                    "never reprices the stock.");
 
         builder.Property(e => e.InvoiceNumber)
             .HasColumnName("invoice_number")
-            .HasMaxLength(100);
+            .HasMaxLength(100).HasComment("The brand's накладна / invoice number, when there is one.");
 
         builder.Property(e => e.InvoiceDate)
-            .HasColumnName("invoice_date");
+            .HasColumnName("invoice_date").HasComment("The brand's накладна / invoice date, when there is one.");
 
         builder.Property(e => e.ActingUserId)
             .HasColumnName("acting_user_id")
-            .IsRequired();
+            .IsRequired().HasComment("The admin who recorded the renewal.");
 
         builder.Property(e => e.ActingUserName)
             .HasColumnName("acting_user_name")
-            .HasMaxLength(200);
+            .HasMaxLength(200).HasComment("Their display name at the time, for the audit.");
 
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
-            .IsRequired();
+            .IsRequired().HasComment("When the renewal was recorded.");
 
         builder.HasOne(e => e.Voucher)
             .WithMany()

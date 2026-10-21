@@ -16,7 +16,7 @@ internal sealed class FeedbackMessageReplyConfiguration : IEntityTypeConfigurati
 
         builder.Property(e => e.FeedbackMessageId)
             .HasColumnName("feedback_message_id")
-            .IsRequired();
+            .IsRequired().HasComment("The message this replies to.");
 
         // No cascade: replies are the audit trail of a conversation, and a row that can be deleted
         // by deleting its parent is not an audit trail. DataRetentionService removes them on the
@@ -32,26 +32,27 @@ internal sealed class FeedbackMessageReplyConfiguration : IEntityTypeConfigurati
         // captured beside it, because a Telegram id is not a readable audit trail.
         builder.Property(e => e.StaffUserId)
             .HasColumnName("staff_user_id")
-            .IsRequired();
+            .IsRequired().HasComment("The Telegram id of the staff member who wrote it.");
 
         builder.Property(e => e.StaffUserName)
             .HasColumnName("staff_user_name")
-            .HasMaxLength(200);
+            .HasMaxLength(200).HasComment("Their display name as it was at the moment of sending - Telegram ids are not a readable" +
+                    "audit trail.");
 
         builder.Property(e => e.Text)
             .HasColumnName("text")
             .HasMaxLength(2000)
-            .IsRequired();
+            .IsRequired().HasComment("What was written.");
 
-        builder.Property(e => e.DeliveredMessageId).HasColumnName("delivered_message_id");
+        builder.Property(e => e.DeliveredMessageId).HasColumnName("delivered_message_id").HasComment("The id the reply got in the customer's chat, or NULL when the delivery failed.");
 
         builder.Property(e => e.DeliveryError)
             .HasColumnName("delivery_error")
-            .HasMaxLength(1000);
+            .HasMaxLength(1000).HasComment("The last delivery failure reason, truncated. NULL on success.");
 
         builder.Property(e => e.SentAtUtc)
             .HasColumnName("sent_at_utc")
-            .IsRequired();
+            .IsRequired().HasComment("When it was sent.");
 
         builder.HasIndex(e => e.FeedbackMessageId);
         builder.HasIndex(e => e.SentAtUtc);

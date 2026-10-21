@@ -18,14 +18,17 @@ internal sealed class FulfillmentConfiguration : IEntityTypeConfiguration<Fulfil
 
         builder.Property(e => e.OrderId)
             .HasColumnName("order_id")
-            .IsRequired();
+            .IsRequired().HasComment("The order that delivered this voucher.");
 
         builder.Property(e => e.VoucherId)
             .HasColumnName("voucher_id")
-            .IsRequired();
+            .IsRequired().HasComment("The voucher that was handed over.");
 
         builder.Property(e => e.LineItemId)
-            .HasColumnName("line_item_id");
+            .HasColumnName("line_item_id").HasComment("Which line of the order this voucher satisfied. NULL is the honest state of the data: a" +
+                    "fulfilment without it says only that the order delivered a voucher, and the" +
+                    "reconciliation cannot tell two lines of the same volume apart - which is how an order for" +
+                    "'OKKO A95 10 L x2' and 'WOG A95 10 L x1' can pass while the customer is short a line.");
 
         // The reconciliation compares what each line asked for against what it got, so it reads by
         // line. Partial on the live rows for the same reason order_id is: a released fulfillment is
@@ -36,14 +39,16 @@ internal sealed class FulfillmentConfiguration : IEntityTypeConfiguration<Fulfil
 
         builder.Property(e => e.FulfilledAtUtc)
             .HasColumnName("fulfilled_at_utc")
-            .IsRequired();
+            .IsRequired().HasComment("When the voucher was handed over.");
 
         builder.Property(e => e.ReleasedAtUtc)
-            .HasColumnName("released_at_utc");
+            .HasColumnName("released_at_utc").HasComment("Set when the reconciliation takes the voucher back off this order, NULL while the delivery" +
+                    "stands. The row is kept either way: the fulfilment records that a delivery happened, and" +
+                    "the correction is the fact that it was undone - not a reason to erase the first part.");
 
         builder.Property(e => e.ReleaseReason)
             .HasColumnName("release_reason")
-            .HasMaxLength(64);
+            .HasMaxLength(64).HasComment("Why the voucher was returned to stock. NULL while the delivery stands.");
 
         // The reconciler queries by order and counts what it finds; released rows must drop out of
         // that count or it would "correct" the same order forever. A global filter rather than a
