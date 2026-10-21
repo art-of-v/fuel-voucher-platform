@@ -1,0 +1,66 @@
+#!/bin/sh
+# Two guardrails for this repository. Both of them fail OPEN where they can: a guard that
+# blocks work because a network call failed is worse than the orphan it prevents.
+#
+# 1. Direct pushes to main are forbidden by policy. Work happens on branches -> Pull Request ->
+#    human merges.
+#
+# 2. A branch whose pull request is MERGED must not be pushed again. GitHub deletes the head
+#    branch when the pull request is merged, and a push that lands afterwards recreates it: an
+#    orphan branch whose work is already in main, and nothing deletes it again. Measured on
+#    2026-10-21: 8 of the 10 branches on the remote were exactly that, one second to three
+#    minutes after their merge, with the auto-delete setting on the whole time.
+#
+# Install it on a new machine with:  git config core.hooksPath .githooks
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    refs/heads/main)
+      echo ""
+      echo "POLICY BLOCKED: pushing directly to main is forbidden."
+      echo "Push a feature branch instead:"
+      echo "  git push -u origin <branch>     then open a Pull Request."
+      exit 1
+      ;;
+  esac
+
+  # Guardrail 2 applies to a branch push: a tag is not a branch, and a deletion is not a push.
+  # A deletion is the local sha that is all zeros - the ref does not exist locally - and
+  # deleting a branch is the cleanup this guardrail exists for, so it is always allowed.
+  case "$remote_ref" in
+    refs/heads/*) branch="${remote_ref#refs/heads/}" ;;
+    *) continue ;;
+  esac
+  if [ "$local_sha" = "0000000000000000000000000000000000000000" ]; then
+    continue
+  fi
+
+  remote_url="$(git remote get-url origin 2>/dev/null || true)"
+  case "$remote_url" in
+    *github.com*) ;;
+    *) continue ;;
+  esac
+  owner_repo="$(printf '%s' "$remote_url" | sed -e 's#^https://github.com/##' -e 's#^git@github.com:##' -e 's#^ssh://git@github.com/##' -e 's#\.git$##')"
+  owner="${owner_repo%%/*}"
+  if [ -z "$owner_repo" ] || [ -z "$owner" ]; then
+    continue
+  fi
+
+  # The newest pull request that used this branch as its head, and whether it is merged. A
+  # branch with no pull request at all is left alone: the work may not have been offered yet.
+  verdict="$(gh api -X GET "repos/$owner_repo/pulls" \
+    -f state=all \
+    -f "head=$owner:$branch" \
+    --jq 'sort_by(.number) | last | if . == null then "no-pr" elif .merged_at != null then "merged" else "open" end' 2>/dev/null || true)"
+
+  if [ "$verdict" = "merged" ]; then
+    echo ""
+    echo "POLICY BLOCKED: the pull request for '$branch' is already merged."
+    echo "GitHub deleted the branch when it merged; pushing it again recreates an orphan branch"
+    echo "whose work is already in main. Start a new branch for new work:"
+    echo "  git switch -c docs/what-you-are-doing-now"
+    exit 1
+  fi
+done
+
+exit 0
