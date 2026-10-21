@@ -88,8 +88,8 @@ interface AuditEventDto {
 const DEFAULT_PROVIDER_COLOR = "#00ff80";
 
 // Live preview mirror of the backend FuelPricing.FinalPerLiter formula:
-// final/л = min(cost + profit, pump); a null/≤0 pump falls back to
-// cost + profit (legacy cost-plus). The server is authoritative and recomputes on
+// final/л = cost + profit; with no cost or no margin there is no price of ours and the
+// column price is what the customer is shown. The server is authoritative and recomputes on
 // write — this only keeps the operator's Фінал column honest while editing.
 function computeFinal(
   cost: number | null,
@@ -100,9 +100,9 @@ function computeFinal(
   // storefront shows that with "not in stock" next to it. Before this, a blank cost was a
   // ZERO here and in the payload, which priced the fuel at its margin.
   if (cost === null || profit === null) return pump ?? 0;
-  const costPlus = cost + profit;
-  if (pump && pump > 0) return Math.min(costPlus, pump);
-  return costPlus;
+  // The column price is a reference, not a term of the price: our price is the cost plus the
+  // margin, and it can sit above what the pump charges. The server charges this number.
+  return cost + profit;
 }
 
 interface BrandsTabProps {

@@ -10,7 +10,8 @@ import { formatMoney } from "@/lib/money";
  *
  * `finalPricePerLiter` is what a customer paid per litre at that instant, so it is the column that
  * answers "what did this cost them". The three numbers behind it - what we paid, what we added and the
- * pump we were capped by - are there because a price nobody can explain is a price nobody trusts.
+ * column price the customer was shown against - are there because a price nobody can explain is a
+ * price nobody trusts.
  */
 export interface FuelPriceHistoryEntry {
   id: string;

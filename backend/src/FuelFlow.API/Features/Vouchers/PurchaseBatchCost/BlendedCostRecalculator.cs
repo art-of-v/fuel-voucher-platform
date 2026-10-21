@@ -92,12 +92,10 @@ public sealed class BlendedCostRecalculator
     var now = DateTime.UtcNow;
         var actingUser = actingUserId == Guid.Empty ? (Guid?)null : actingUserId;
 
-        var pump = fuel.PumpPricePerLiter;
-        var minDiscount = fuel.MinDiscountPerLiter ?? 0m;
-
-        // Same shared formula the operator panel uses: final = min(cost + profit, pump − minDiscount);
-        // pump null ⇒ cost + profit. Computed here to keep the fuel-type headline in step; the stored
-        // figures stopped duplicating it on 2026-10-17 and derive it from the lines this writes.
+        // Same shared formula the operator panel uses: final = cost + profit. The column price is the
+        // reference the customer is shown against, not a term of the price, so a new cost moves the
+        // price and a pump move does not. Computed here to keep the fuel-type headline in step; the
+        // stored figures stopped duplicating it on 2026-10-17 and derive it from the lines this writes.
         var finalPerLiter = FuelPricing.FinalPerLiter(blendedCost, margin);
 
         fuel.SupplierPricePerLiter = blendedCost;

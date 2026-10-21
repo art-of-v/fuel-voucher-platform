@@ -37,8 +37,9 @@ export function fuelSaving(fuel: Pick<FuelType, 'basePrice' | 'discountPrice'>):
  * <p>WHICH price depends on whether the shop can sell it:
  *
  * <ul>
- *   <li><b>available</b> — our own price: the cost plus the margin, capped at the pump. That is what
- *       the customer pays, so it is what the row has to say.</li>
+ *   <li><b>available</b> — our own price: the cost plus the margin. The column price is the
+ *       reference it is shown against, not a term of it, so our price can sit above it. That is
+ *       what the customer pays, so it is what the row has to say.</li>
  *   <li><b>not available</b> — the column price: what the network charges. We have no price of our
  *       own to quote (an imported fuel has no margin until an operator sets one), and showing a zero
  *       or a market price presented as ours is a lie the customer pays for.</li>

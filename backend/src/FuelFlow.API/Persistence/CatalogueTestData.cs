@@ -156,8 +156,8 @@ var computed = FuelPricing.FinalPerLiterOrNull(
             createdAtUtc, updatedAtUtc);
 
         // `price` used to be written as the per-package override, so it was the one number a fixture
-        // had to state. There is no override any more: the charge is always cost + margin, capped by
-        // the ceiling, so a fixture that wants a package to sell for something must say what the
+        // had to state. There is no override any more: the charge is always cost + margin, so a
+        // fixture that wants a package to sell for something must say what the
         // fuel COSTS and what its MARGIN is. `price` is kept only to name what the test is about,
         // and is not written anywhere - a package seeded without knobs is unpriced, which the
         // storefront skips and checkout refuses, exactly as it would in production.

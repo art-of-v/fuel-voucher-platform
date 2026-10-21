@@ -155,7 +155,7 @@ public sealed class PriceHistoryRecorder
         fuel.SupplierPricePerLiter, margin),
             PumpPricePerLiter = fuel.PumpPricePerLiter,
                 // The minimum discount is retired, so the history does not record one: the price is
-                // min(cost + margin, pump), and a column that nothing reads any more would be a
+                // cost + margin, and a column that nothing reads any more would be a
                 // claim about the fuel that is not true. The rows written before it went are left
                 // as they are - a history is a record of what was true then.
                 MinDiscountPerLiter = null,

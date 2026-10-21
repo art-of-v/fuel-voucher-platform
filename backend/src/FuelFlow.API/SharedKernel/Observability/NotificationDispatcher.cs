@@ -295,7 +295,7 @@ public sealed class NotificationDispatcher
 
     /// <summary>
     /// Raised when a supplier+fuel's customer price/л has been forced BELOW its blended supplier
-    /// cost/л by the pump ceiling (pricing epic slice 3). Two shapes:
+    /// cost/л by the discount the customer is granted (a term, pricing epic slice 3). Two shapes:
     /// <list type="bullet">
     /// <item><b>deliberate</b> — a manager has opted this supplier+fuel in (loss-leader); the sale
     /// is allowed but the standing decision is worth recording (Warning).</item>
