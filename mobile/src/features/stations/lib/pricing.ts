@@ -4,19 +4,35 @@ export interface FuelSaving {
   /** Per-litre saving in UAH. Always ≥ 0 — zero when there is no real discount. */
   amount: number;
   /**
-   * True only when the list/pump "before" price (`basePrice`, planning #73) sits
-   * above the sale price. The catalog must then show the struck price and the
-   * savings pill; otherwise it must hide both, so we never render a meaningless
-   * "0 ₴/L" badge or a negative saving for a fuel priced at its headline.
+   * True only when the fuel is IN STOCK and the list/pump "before" price
+   * (`basePrice`, planning #73) sits above the price we sell it for. The catalog
+   * must then show the struck price and the savings pill; otherwise it must hide
+   * both, so we never render a meaningless "0 ₴/L" badge, a negative saving for a
+   * fuel priced at its headline, or a saving on a shelf the customer cannot buy
+   * from (planning #552).
    */
   hasSaving: boolean;
+}
+
+/**
+ * Whether the shop can sell this fuel right now.
+ *
+ * <p>A payload that does not carry the flag counts as "no". The shelf shows the COLUMN price in
+ * that case, and a saving measured against a price the customer is not paying is exactly the lie
+ * the pricing model forbids. The price and the saving answer the same question, so they ask it in
+ * the same place — one predicate, so they cannot drift apart.
+ */
+function canSell(fuel: Pick<FuelType, 'isAvailable'>): boolean {
+  return fuel.isAvailable === true;
 }
 
 /**
  * Decide whether a fuel row has a real per-litre discount, and by how much.
  * Mirrors the package-level rule in `PackageCard` (originalPrice > price).
  */
-export function fuelSaving(fuel: Pick<FuelType, 'basePrice' | 'discountPrice'>): FuelSaving {
+export function fuelSaving(
+  fuel: Pick<FuelType, 'basePrice' | 'discountPrice' | 'isAvailable'>,
+): FuelSaving {
   const base = fuel.basePrice || 0;
   const discount = fuel.discountPrice || 0;
   // A discount price of ZERO is not a discount, it is a price: it says the customer takes the
@@ -27,7 +43,13 @@ export function fuelSaving(fuel: Pick<FuelType, 'basePrice' | 'discountPrice'>):
   //
   // A saving needs a real price on both sides. The zero here is "not set", and "not set" is
   // shown as no saving at all.
-  const hasSaving = discount > 0 && base > discount;
+  //
+  // And a saving needs the fuel to be IN STOCK. A fuel we cannot sell is shown at the COLUMN
+  // price, so the column price IS the price on that shelf: there is nothing to cross out and
+  // nothing to save, and a badge would measure the saving against a price the customer is not
+  // paying. A priced fuel whose stock ran out used to show the column price struck through
+  // against itself, with a badge for a discount nobody would get (planning #552).
+  const hasSaving = canSell(fuel) && discount > 0 && base > discount;
   return { amount: hasSaving ? base - discount : 0, hasSaving };
 }
 
@@ -58,7 +80,7 @@ export function fuelHeadlinePrice(
   const column = fuel.pumpPricePerLiter ?? undefined;
   const legacy = fuel.discountPrice || undefined;
 
-  const price = fuel.isAvailable ? (ours ?? column ?? legacy) : (column ?? ours ?? legacy);
+  const price = canSell(fuel) ? (ours ?? column ?? legacy) : (column ?? ours ?? legacy);
 
   // Zero is not a price. It is what an unpriced fuel carries in the column, and rendering it would
   // put "0 ₴" on the shelf.
