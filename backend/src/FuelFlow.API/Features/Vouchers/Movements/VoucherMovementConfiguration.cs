@@ -45,7 +45,9 @@ internal sealed class VoucherMovementConfiguration : IEntityTypeConfiguration<Vo
             .HasColumnName("id");
 
         builder.Property(e => e.BatchId)
-            .HasColumnName("batch_id");
+            .HasColumnName("batch_id")
+            .HasComment(                "The settlement this movement is part of, when there was one. NULL for a movement an" +
+                    "operator or a customer performed on its own.");
 
         // A movement may be part of a settlement or stand alone; RESTRICT rather than SetNull because a
         // movement must stay attributable to the agreement it belonged to.
@@ -57,11 +59,14 @@ internal sealed class VoucherMovementConfiguration : IEntityTypeConfiguration<Vo
         builder.Property(e => e.Kind)
             .HasColumnName("kind")
             .HasMaxLength(24)
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "What happened - issued, redeemed, blocked, released, and the rest. See" +
+                    "VoucherMovementKinds.");
 
         builder.Property(e => e.VoucherId)
             .HasColumnName("voucher_id")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "The piece of paper that moved.");
 
         // Restrict: paper that moved must not be deletable, exactly as voucher_exchanges restricts on
         // old_voucher_id and new_voucher_id.
@@ -73,16 +78,22 @@ internal sealed class VoucherMovementConfiguration : IEntityTypeConfiguration<Vo
         builder.Property(e => e.FromLocation)
             .HasColumnName("from_location")
             .HasMaxLength(16)
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "Where it was. See VoucherLocations.");
 
         builder.Property(e => e.ToLocation)
             .HasColumnName("to_location")
             .HasMaxLength(16)
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "Where it is now. Never equal to from_location - that is" +
+                    "ck_voucher_movements_distinct_locations, and a row that says a paper moved from the" +
+                    "shelf to the shelf is not a movement.");
 
         // No FK on order_id, and no navigations to users or parties. See the remarks.
         builder.Property(e => e.OrderId)
-            .HasColumnName("order_id");
+            .HasColumnName("order_id")
+            .HasComment(                "The order this movement settled, when a customer paid for it. A bare uuid, no foreign" +
+                    "key: an audit row must not be the thing that blocks deleting its own subject.");
 
         // Bare uuid, no FK: an audit row has to be writable whatever happened to the actor row, which is §G
         // of TARGET_SCHEMA and what voucher_exchanges.acting_user_id and
@@ -95,36 +106,51 @@ internal sealed class VoucherMovementConfiguration : IEntityTypeConfiguration<Vo
             .HasColumnName("actor_kind")
             .HasMaxLength(12)
             .HasDefaultValue(VoucherActorKinds.System)
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "Who caused it: a person, or the scheduler. See VoucherActorKinds.");
 
         // Bare uuid, no FK: a movement has to be writable whatever happened to the actor row, and the
         // movement must not be the thing that blocks deleting that account (planning #307,
         // TARGET_SCHEMA §G). The pairing constraint below is what says a 'user' actor is named.
         builder.Property(e => e.ActorUserId)
-            .HasColumnName("actor_user_id");
+            .HasColumnName("actor_user_id")
+            .HasComment(                "The person who caused it, required when actor_kind is 'user'. A bare uuid, no foreign" +
+                    "key - the reason every other audit record in this schema gives.");
 
         builder.Property(e => e.ActorPartyId)
-            .HasColumnName("actor_party_id");
+            .HasColumnName("actor_party_id")
+            .HasComment(                "The company that caused the movement, when it was a company rather than a user. A bare" +
+                    "uuid.");
 
         builder.Property(e => e.AmountUah)
             .HasColumnName("amount_uah")
-            .HasColumnType("numeric(12,2)");
+            .HasColumnType("numeric(12,2)")
+            .HasComment(                "What the customer paid for this movement, in UAH. NULL when money did not move - most" +
+                    "movements are the operator's own housekeeping. NOT the batch total: a settlement's total" +
+                    "lives on movement_batches.surcharge_uah.");
 
         builder.Property(e => e.CostDeltaUah)
             .HasColumnName("cost_delta_uah")
-            .HasColumnType("numeric(14,2)");
+            .HasColumnType("numeric(14,2)")
+            .HasComment(                "What this movement did to supplier-side cost, in UAH. NULL when cost did not move." +
+                    "Recorded AT THE TIME, from the values written in the same transaction, because it cannot" +
+                    "be derived afterwards: fuel_vouchers.cost_per_liter is mutable and gets overwritten, so" +
+                    "'what did this voucher cost before' stops existing the moment the column is restamped.");
 
         builder.Property(e => e.OccurredAtUtc)
             .HasColumnName("occurred_at_utc")
             .HasColumnType("timestamp with time zone")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "When it happened.");
 
         builder.Property(e => e.Reason)
             .HasColumnName("reason")
-            .HasMaxLength(500);
+            .HasMaxLength(500)
+            .HasComment(                "Why, in the operator's words.");
 
         builder.Property(e => e.LineItemId)
-            .HasColumnName("line_item_id");
+            .HasColumnName("line_item_id")
+            .HasComment(                "The order line this movement settled, for the renewal paths.");
 
         // The question the operator screen asks is "what happened to THIS voucher", and it reads
         // forwards through time, so the index carries occurred_at_utc with it.
