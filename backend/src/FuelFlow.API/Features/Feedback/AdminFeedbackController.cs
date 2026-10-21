@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text.Json;
 using FuelFlow.SharedKernel;
+using FuelFlow.SharedKernel.Domain;
 using FuelFlow.Persistence;
 using FuelFlow.Features.Feedback.SharedModels;
 using FuelFlow.Features.Brands;
@@ -17,7 +18,6 @@ namespace FuelFlow.Features.Feedback;
 /// </summary>
 [ApiController]
 [Route("api/admin/feedback")]
-[Authorize(Policy = "Staff")]
 public sealed class AdminFeedbackController : ControllerBase
 {
     /// <summary>Same reasoning as <c>ErrorLogsController.MaxIdsPerResolveCall</c>: one crafted
@@ -36,6 +36,7 @@ public sealed class AdminFeedbackController : ControllerBase
     /// <summary>Distinct values present in the table, so the admin's filter dropdowns list what
     /// actually exists rather than every enum member the code knows about.</summary>
     [HttpGet("facets")]
+    [Authorize(Policy = AuthPolicies.Staff)]
     public async Task<IActionResult> GetFacets(CancellationToken ct = default)
     {
         var categories = await _context.FeedbackMessages
@@ -82,6 +83,7 @@ public sealed class AdminFeedbackController : ControllerBase
     /// top of the page.
     /// </summary>
     [HttpGet]
+    [Authorize(Policy = AuthPolicies.Staff)]
     public async Task<IActionResult> GetAll(
         [FromQuery] int offset = 0,
         [FromQuery] int limit = 50,
@@ -196,6 +198,7 @@ public sealed class AdminFeedbackController : ControllerBase
 
     /// <summary>One message plus every answer the team gave it.</summary>
     [HttpGet("{id:guid}")]
+    [Authorize(Policy = AuthPolicies.Staff)]
     public async Task<IActionResult> GetById(Guid id, CancellationToken ct = default)
     {
         var item = await _context.FeedbackMessages
@@ -249,6 +252,7 @@ public sealed class AdminFeedbackController : ControllerBase
     /// requested state is a no-op rather than an error, so a double-click cannot rewrite who
     /// handled a message.</summary>
     [HttpPost("status")]
+    [Authorize(Policy = AuthPolicies.StaffOperations)]
     public async Task<IActionResult> UpdateStatus(
         [FromBody] UpdateFeedbackStatusRequest request,
         CancellationToken ct = default)
@@ -296,6 +300,7 @@ public sealed class AdminFeedbackController : ControllerBase
     /// messages so a drifting classifier stays visible, and someone has to be able to act on that.
     /// </summary>
     [HttpDelete]
+    [Authorize(Policy = AuthPolicies.StaffOperations)]
     public async Task<IActionResult> Delete(
         [FromQuery] Guid? id = null,
         [FromQuery] FeedbackVerdict? verdict = null,

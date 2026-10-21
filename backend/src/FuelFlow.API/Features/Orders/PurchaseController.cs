@@ -469,7 +469,7 @@ RenewalQuoteCommandHandler renewalQuoteHandler,
     /// Admin token. Answers 404 outside Development so its existence is not confirmed either.
     /// </summary>
     [HttpPost("simulate")]
-    [Authorize(Policy = "Staff")]
+    [Authorize(Policy = AuthPolicies.MoneyMovement)]
     [ProducesResponseType(typeof(SimulatePaymentResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

@@ -1,3 +1,4 @@
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,7 +12,6 @@ namespace FuelFlow.Features.Vouchers.Exchange;
 /// </summary>
 [ApiController]
 [Route("api/admin/voucher-exchange")]
-[Authorize(Policy = "Staff")]
 public sealed class VoucherExchangeController : ControllerBase
 {
     private readonly GetVoucherExchangeAttentionQueryHandler _attentionHandler;
@@ -36,6 +36,7 @@ public sealed class VoucherExchangeController : ControllerBase
 
     /// <summary>The recorded exchanges, newest first. The audit read the operator had no way to do.</summary>
     [HttpGet("batches")]
+    [Authorize(Policy = AuthPolicies.Staff)]
     public async Task<IActionResult> GetBatches(
         CancellationToken cancellationToken,
         [FromQuery] int page = 1,
@@ -50,6 +51,7 @@ public sealed class VoucherExchangeController : ControllerBase
 
     /// <summary>One exchange batch, pair by pair: every retired voucher, its replacement, and its own cost.</summary>
     [HttpGet("batches/{exchangeBatchId:guid}")]
+    [Authorize(Policy = AuthPolicies.Staff)]
     public async Task<IActionResult> GetBatch(Guid exchangeBatchId, CancellationToken cancellationToken)
     {
         var result = await _batchHandler.HandleAsync(
@@ -59,16 +61,19 @@ public sealed class VoucherExchangeController : ControllerBase
 
     /// <summary>Stock vouchers already expired or lapsing within the renewal threshold.</summary>
     [HttpGet("attention")]
+    [Authorize(Policy = AuthPolicies.Staff)]
     public async Task<IActionResult> GetAttention(CancellationToken cancellationToken)
         => Ok(await _attentionHandler.HandleAsync(cancellationToken));
 
     /// <summary>Cheap count behind the nav badge.</summary>
     [HttpGet("attention/count")]
+    [Authorize(Policy = AuthPolicies.Staff)]
     public async Task<IActionResult> GetAttentionCount(CancellationToken cancellationToken)
         => Ok(new { count = await _attentionHandler.CountAsync(cancellationToken) });
 
     /// <summary>Per-fuel cost context for a freshly-imported batch, to pre-fill the exchange cost/liter.</summary>
     [HttpGet("cost-context")]
+    [Authorize(Policy = AuthPolicies.Staff)]
     public async Task<IActionResult> GetCostContext([FromQuery] Guid importId, CancellationToken cancellationToken)
     {
         if (importId == Guid.Empty)
@@ -78,6 +83,7 @@ public sealed class VoucherExchangeController : ControllerBase
 
     /// <summary>Confirm the exchange: expire the olds, cost + activate the news, pair, and audit.</summary>
     [HttpPost("confirm")]
+    [Authorize(Policy = AuthPolicies.VoucherWrite)]
     public async Task<IActionResult> Confirm([FromBody] ConfirmVoucherExchangeRequest request, CancellationToken cancellationToken)
     {
         // Refused rather than performed anonymously. An exchange is settlement: it retires vouchers,

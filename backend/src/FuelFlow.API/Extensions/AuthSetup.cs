@@ -104,17 +104,38 @@ internal static class AuthSetup
             .SetFallbackPolicy(new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
                 .Build())
+            // The staff surface is split into CAPABILITIES, one policy per capability, and an
+            // endpoint declares the capability it exercises rather than the fact that it is for
+            // staff. Until 2026-10-21 every one of them carried the same "Staff" policy, so
+            // "[Authorize(Policy = "Staff")]" on a refund and on a report said exactly the same
+            // thing - and a policy that admits every staff role admits every staff role into
+            // moving money. The finding is planning #521 (S-1).
+            //
             // Role membership comes from SeedRoles (single source of truth) rather than repeated
             // string literals, so a new staff role is added in one place, not scattered here and
             // across every [Authorize(Roles = "...")] attribute.
-            .AddPolicy("Staff", policy =>
+            //
+            // The read policy admits the staff list, so a role that joins the staff surface can
+            // see it. The write capabilities carry their own member lists, so that same role
+            // cannot write, move money, or administer accounts until somebody says so.
+            .AddPolicy(AuthPolicies.Staff, policy =>
                 policy.RequireRole(SeedRoles.StaffRoleNames))
-            // Ban/unban/delete and toggling an authentication mechanism are higher-privilege than
-            // routine staff work, so Managers are excluded: only Admin and ProductOwner qualify.
-            .AddPolicy("AdminOrOwner", policy =>
+            .AddPolicy(AuthPolicies.CatalogueWrite, policy =>
+                policy.RequireRole(SeedRoles.CatalogueWriteRoleNames))
+            .AddPolicy(AuthPolicies.VoucherWrite, policy =>
+                policy.RequireRole(SeedRoles.VoucherWriteRoleNames))
+            .AddPolicy(AuthPolicies.MoneyMovement, policy =>
+                policy.RequireRole(SeedRoles.MoneyMovementRoleNames))
+            .AddPolicy(AuthPolicies.SettingsWrite, policy =>
+                policy.RequireRole(SeedRoles.SettingsWriteRoleNames))
+            .AddPolicy(AuthPolicies.StaffOperations, policy =>
+                policy.RequireRole(SeedRoles.StaffOperationsRoleNames))
+            // Ban/unban/delete, the assignment of a role and the QA test-access switch are
+            // higher-privilege than routine staff work, so Managers are excluded: only Admin and
+            // ProductOwner qualify.
+            .AddPolicy(AuthPolicies.UserAdministration, policy =>
                 policy.RequireRole(SeedRoles.AdminAndOwnerRoleNames))
-            // Kept as a distinct name for the QA test-access switch; same membership as AdminOrOwner.
-            .AddPolicy("QaTestAccessAdmin", policy =>
+            .AddPolicy(AuthPolicies.QaTestAccess, policy =>
                 policy.RequireRole(SeedRoles.AdminAndOwnerRoleNames));
 
         return services;

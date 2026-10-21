@@ -41,6 +41,11 @@ internal static class SeedRoles
     /// IsStaff, the "Staff" authorization policy, and the admin SPA gate. Add a future staff
     /// role here once and it flows everywhere, instead of editing scattered role-name literals.
     /// <para>
+    /// This list is the READ surface. A role added here may look at the staff surface and nothing
+    /// more: the write capabilities are listed separately, each with its own members, so granting
+    /// a role the ability to see the money is a second, deliberate step.
+    /// </para>
+    /// <para>
     /// Queries that need "is this user staff" answered by the DATABASE must reference this array
     /// rather than spelling the names out again: EF Core cannot translate the <see cref="IsStaff"/>
     /// method call into SQL, which is why earlier versions of those queries kept private copies of
@@ -56,10 +61,52 @@ internal static class SeedRoles
     public static readonly string[] StaffRoleNames = { ProductOwnerName, AdminName, ManagerName };
 
     /// <summary>
-    /// Staff roles that may ban/unban/delete and toggle authentication switches (Manager excluded).
-    /// Backs the "AdminOrOwner" authorization policy.
+    /// Staff roles that may ban/unban/delete and assign a role (Manager excluded). Backs the
+    /// <see cref="AuthPolicies.UserAdministration"/> and <see cref="AuthPolicies.QaTestAccess"/>
+    /// policies.
     /// </summary>
     public static readonly string[] AdminAndOwnerRoleNames = { ProductOwnerName, AdminName };
+
+    /// <summary>
+    /// The roles that may write the product catalogue: the brands, their fuels, their stations,
+    /// the fuel types, the prices, the suppliers and the contract texts.
+    /// <para>
+    /// <b>Why a list of its own.</b> Every write capability below carries the same three names
+    /// today, and that is a decision, not a coincidence: the owner ruled on 2026-10-21 that a
+    /// Manager's boundary is the catalogue, the voucher import, the settings and the money. They
+    /// are still separate lists, because they are separate decisions — narrowing one capability
+    /// (say, the settings) must not silently narrow the others, and a role that joins the staff
+    /// surface to read must not thereby be able to move money.
+    /// </para>
+    /// </summary>
+    public static readonly string[] CatalogueWriteRoleNames = { ProductOwnerName, AdminName, ManagerName };
+
+    /// <summary>
+    /// The roles that may write the voucher stock: the import and its batches, the operator's
+    /// exchange and renewal, and the state of a voucher.
+    /// </summary>
+    public static readonly string[] VoucherWriteRoleNames = { ProductOwnerName, AdminName, ManagerName };
+
+    /// <summary>
+    /// The roles that may move money: a refund, a payment placed for a customer, an order's status.
+    /// <para>
+    /// A Manager has these, by the owner's decision of 2026-10-21. What no role has is the power
+    /// to hand out fuel that was not paid for: that is an invariant of the order, and it lives with
+    /// the order, not with the role.
+    /// </para>
+    /// </summary>
+    public static readonly string[] MoneyMovementRoleNames = { ProductOwnerName, AdminName, ManagerName };
+
+    /// <summary>
+    /// The roles that may write the runtime settings.
+    /// </summary>
+    public static readonly string[] SettingsWriteRoleNames = { ProductOwnerName, AdminName, ManagerName };
+
+    /// <summary>
+    /// The roles that may run the staff operations that are none of the named capabilities: the
+    /// error log, the feedback desk, an account's activation and its email address.
+    /// </summary>
+    public static readonly string[] StaffOperationsRoleNames = { ProductOwnerName, AdminName, ManagerName };
 
     // Fixed, deterministic GUIDs matching the seeded database rows.
     // Admin and User IDs must match existing seeded data (migrations 20260619000001, 20260915121550).

@@ -2,6 +2,7 @@ using System.Security.Claims;
 using FuelFlow.Features.Vouchers.GetImportBatches;
 using FuelFlow.Features.Vouchers.ParseInvoice;
 using FuelFlow.Features.Vouchers.PurchaseBatchCost;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -14,7 +15,6 @@ public sealed record ImportBatchBulkActionRequest(
 
 [ApiController]
 [Route("api/admin/voucher-imports")]
-[Authorize(Policy = "Staff")]
 public sealed class AdminVoucherImportController : ControllerBase
 {
     private readonly GetImportBatchesQueryHandler _getAllHandler;
@@ -50,6 +50,7 @@ public sealed class AdminVoucherImportController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Policy = AuthPolicies.Staff)]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
     {
         var result = await _getAllHandler.HandleAsync(new GetImportBatchesQuery(), cancellationToken);
@@ -57,6 +58,7 @@ public sealed class AdminVoucherImportController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
+    [Authorize(Policy = AuthPolicies.Staff)]
     public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken)
     {
         var result = await _getByIdHandler.HandleAsync(new GetImportBatchByIdQuery(id), cancellationToken);
@@ -68,6 +70,7 @@ public sealed class AdminVoucherImportController : ControllerBase
     /// The batch's vouchers, a page at a time, with the count of the whole batch.
     /// </summary>
     [HttpGet("{id:guid}/vouchers")]
+    [Authorize(Policy = AuthPolicies.Staff)]
     public async Task<IActionResult> GetVouchers(
         Guid id,
         [FromQuery] int page = 1,
@@ -89,6 +92,7 @@ public sealed class AdminVoucherImportController : ControllerBase
     /// server's: it names the import, and the database decides which rows that is.
     /// </remarks>
     [HttpPost("{id:guid}/bulk-action")]
+    [Authorize(Policy = AuthPolicies.VoucherWrite)]
     public async Task<IActionResult> BulkAction(
         Guid id,
         [FromBody] ImportBatchBulkActionRequest request,
@@ -111,6 +115,7 @@ public sealed class AdminVoucherImportController : ControllerBase
     }
 
     [HttpGet("{id:guid}/batch-costs")]
+    [Authorize(Policy = AuthPolicies.Staff)]
     public async Task<IActionResult> GetBatchCosts(Guid id, CancellationToken cancellationToken)
     {
         var result = await _getBatchCostsHandler.HandleAsync(new GetImportBatchCostsQuery(id), cancellationToken);
@@ -118,6 +123,7 @@ public sealed class AdminVoucherImportController : ControllerBase
     }
 
     [HttpGet("{id:guid}/batch-pnl")]
+    [Authorize(Policy = AuthPolicies.Staff)]
     public async Task<IActionResult> GetBatchPnl(Guid id, CancellationToken cancellationToken)
     {
         var result = await _getBatchPnlHandler.HandleAsync(new GetImportBatchPnlQuery(id), cancellationToken);
@@ -129,6 +135,7 @@ public sealed class AdminVoucherImportController : ControllerBase
     /// that cost, and where the batch stands now (#178).
     /// </summary>
     [HttpGet("{id:guid}/cost-timeline")]
+    [Authorize(Policy = AuthPolicies.Staff)]
     public async Task<IActionResult> GetCostTimeline(Guid id, CancellationToken cancellationToken)
     {
         var result = await _getCostTimelineHandler.HandleAsync(
@@ -138,6 +145,7 @@ public sealed class AdminVoucherImportController : ControllerBase
     }
 
     [HttpPut("{id:guid}/batch-costs/{fuelTypeId}")]
+    [Authorize(Policy = AuthPolicies.VoucherWrite)]
     public async Task<IActionResult> SetBatchCost(
         Guid id,
         [FromRoute] Guid fuelTypeId,
@@ -159,6 +167,7 @@ public sealed class AdminVoucherImportController : ControllerBase
     /// reviews the result and commits each line through <see cref="SetBatchCost"/>.
     /// </summary>
     [HttpPost("{id:guid}/parse-invoice")]
+    [Authorize(Policy = AuthPolicies.VoucherWrite)]
     [RequestSizeLimit(20 * 1024 * 1024)]
     public async Task<IActionResult> ParseInvoice(Guid id, IFormFile file, CancellationToken cancellationToken)
     {

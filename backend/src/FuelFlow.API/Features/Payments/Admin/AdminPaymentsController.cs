@@ -4,6 +4,7 @@ using FuelFlow.Features.Brands;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -29,7 +30,6 @@ namespace FuelFlow.Features.Payments.Admin;
 /// </remarks>
 [ApiController]
 [Route("api/admin/payments")]
-[Authorize(Policy = "Staff")]
 public sealed class AdminPaymentsController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
@@ -46,6 +46,7 @@ public sealed class AdminPaymentsController : ControllerBase
     /// nobody" is the hardest case and the one an operator arrives to solve.
     /// </summary>
     [HttpGet("unallocated")]
+    [Authorize(Policy = AuthPolicies.Staff)]
     public async Task<ActionResult<UnallocatedPaymentsResponse>> Unallocated(
         [FromQuery] int page = 1,
         [FromQuery] int limit = 50,
@@ -108,6 +109,7 @@ public sealed class AdminPaymentsController : ControllerBase
     /// </para>
     /// </remarks>
     [HttpGet("customers")]
+    [Authorize(Policy = AuthPolicies.Staff)]
     public async Task<ActionResult<IReadOnlyList<CustomerSearchHit>>> Customers(
         [FromQuery] string search,
         [FromQuery] int limit = 20,
@@ -158,6 +160,7 @@ public sealed class AdminPaymentsController : ControllerBase
     /// and a partial version of it here would be a worse version of one that already exists.
     /// </remarks>
     [HttpGet("customers/by-code")]
+    [Authorize(Policy = AuthPolicies.Staff)]
     public async Task<ActionResult> CustomerByCode([FromQuery] string code, CancellationToken ct)
     {
         var normalised = (code ?? string.Empty).Trim().ToUpperInvariant();
@@ -195,6 +198,7 @@ public sealed class AdminPaymentsController : ControllerBase
     /// waiting on an order needs the second, and most prepayments need both eventually.
     /// </summary>
     [HttpPost("{id:guid}/attach")]
+    [Authorize(Policy = AuthPolicies.MoneyMovement)]
     public async Task<ActionResult> Attach(Guid id, AttachPaymentRequest request, CancellationToken ct)
     {
         if (request.OrderId is null && request.UserId is null)

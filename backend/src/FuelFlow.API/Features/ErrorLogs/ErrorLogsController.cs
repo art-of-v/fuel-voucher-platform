@@ -16,7 +16,6 @@ namespace FuelFlow.Features.ErrorLogs;
 /// </summary>
 [ApiController]
 [Route("api/admin/errors")]
-[Authorize(Policy = "Staff")]
 public sealed class ErrorLogsController : ControllerBase
 {
     /// <summary>Which side of the resolved flag the journal should show. An unrecognised value
@@ -42,6 +41,7 @@ public sealed class ErrorLogsController : ControllerBase
     }
 
     [HttpGet("facets")]
+    [Authorize(Policy = AuthPolicies.Staff)]
     public async Task<IActionResult> GetFacets(CancellationToken ct = default)
     {
         var levels = await _context.ErrorLogs
@@ -64,6 +64,7 @@ public sealed class ErrorLogsController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Policy = AuthPolicies.Staff)]
     public async Task<IActionResult> GetAll(
         [FromQuery] int offset = 0,
         [FromQuery] int limit = 100,
@@ -148,6 +149,7 @@ public sealed class ErrorLogsController : ControllerBase
     /// double-click cannot rewrite who closed an incident.
     /// </summary>
     [HttpPost("resolve")]
+    [Authorize(Policy = AuthPolicies.StaffOperations)]
     public async Task<IActionResult> Resolve([FromBody] ResolveErrorLogsRequest request, CancellationToken ct)
     {
         if (request.Ids is not { Count: > 0 })
@@ -199,6 +201,7 @@ public sealed class ErrorLogsController : ControllerBase
     }
 
     [HttpDelete]
+    [Authorize(Policy = AuthPolicies.StaffOperations)]
     public async Task<IActionResult> Clear([FromQuery] DateTime? before = null, CancellationToken ct = default)
     {
         IQueryable<ErrorLog> query = _context.ErrorLogs;

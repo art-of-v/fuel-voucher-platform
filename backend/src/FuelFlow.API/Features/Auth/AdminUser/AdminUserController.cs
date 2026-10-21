@@ -6,6 +6,7 @@ using FuelFlow.Features.Auth.AdminUser.SetUserEmail;
 using FuelFlow.Features.Auth.AdminUser.SetUserRole;
 using FuelFlow.Features.Auth.DeleteUser;
 using FuelFlow.Features.Auth.EmailChange;
+using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.Persistence;
 using Microsoft.AspNetCore.Authorization;
@@ -17,7 +18,6 @@ namespace FuelFlow.Features.Auth.AdminUser;
 
 [ApiController]
 [Route("api/admin/users")]
-[Authorize(Policy = "Staff")]
 public sealed class AdminUserController : ControllerBase
 {
     private readonly GetAdminUsersQueryHandler _handler;
@@ -50,6 +50,7 @@ public sealed class AdminUserController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Policy = AuthPolicies.Staff)]
     [ProducesResponseType(typeof(PagedResult<AdminUserDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll(
         [FromQuery] string? role,
@@ -61,11 +62,13 @@ public sealed class AdminUserController : ControllerBase
         Ok(await _handler.HandleAsync(new GetAdminUsersQuery(role, isActive, q, page, limit), ct));
 
     [HttpGet("options")]
+    [Authorize(Policy = AuthPolicies.Staff)]
     [ProducesResponseType(typeof(List<AdminUserOptionDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetOptions(CancellationToken ct = default) =>
         Ok(await _optionsHandler.HandleAsync(ct));
 
     [HttpPost("{id}/activate")]
+    [Authorize(Policy = AuthPolicies.StaffOperations)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -73,6 +76,7 @@ public sealed class AdminUserController : ControllerBase
         await SetActiveInternal(id, true, cancellationToken);
 
     [HttpPost("{id}/deactivate")]
+    [Authorize(Policy = AuthPolicies.StaffOperations)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -80,6 +84,7 @@ public sealed class AdminUserController : ControllerBase
         await SetActiveInternal(id, false, cancellationToken);
 
     [HttpPost("{id}/role")]
+    [Authorize(Policy = AuthPolicies.UserAdministration)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -106,6 +111,7 @@ public sealed class AdminUserController : ControllerBase
     }
 
     [HttpPost("{id}/email")]
+    [Authorize(Policy = AuthPolicies.StaffOperations)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -139,7 +145,7 @@ public sealed class AdminUserController : ControllerBase
     }
 
     [HttpPost("{id}/ban")]
-    [Authorize(Policy = "AdminOrOwner")]
+    [Authorize(Policy = AuthPolicies.UserAdministration)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -148,7 +154,7 @@ public sealed class AdminUserController : ControllerBase
         await SetBannedInternal(id, true, cancellationToken);
 
     [HttpPost("{id}/unban")]
-    [Authorize(Policy = "AdminOrOwner")]
+    [Authorize(Policy = AuthPolicies.UserAdministration)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -157,7 +163,7 @@ public sealed class AdminUserController : ControllerBase
         await SetBannedInternal(id, false, cancellationToken);
 
     [HttpDelete("{id}")]
-    [Authorize(Policy = "AdminOrOwner")]
+    [Authorize(Policy = AuthPolicies.UserAdministration)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

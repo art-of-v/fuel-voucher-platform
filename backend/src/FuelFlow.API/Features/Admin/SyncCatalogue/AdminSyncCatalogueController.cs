@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using FuelFlow.BackgroundJobs;
+using FuelFlow.SharedKernel.Domain;
 using Hangfire;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -22,14 +23,14 @@ namespace FuelFlow.Features.Admin.SyncCatalogue;
 /// would hold an HTTP connection open for as long as the slowest vendor takes to answer.
 /// </para>
 /// <para>
-/// Staff policy, matching the rest of the admin surface. The jobs do what the schedule already does
-/// unattended - fetch, and write what the vendor says - so this grants no new power; it only chooses
-/// the moment.
+/// The catalogue capability, matching the rest of the admin surface. The jobs do what the schedule
+/// already does unattended - fetch, and write what the vendor says - so this grants no new power; it
+/// only chooses the moment.
 /// </para>
 /// </remarks>
 [ApiController]
 [Route("api/admin/catalogue/sync")]
-[Authorize(Policy = "Staff")]
+[Authorize(Policy = AuthPolicies.CatalogueWrite)]
 public sealed class AdminSyncCatalogueController : ControllerBase
 {
     private readonly IBackgroundJobClient _jobs;
