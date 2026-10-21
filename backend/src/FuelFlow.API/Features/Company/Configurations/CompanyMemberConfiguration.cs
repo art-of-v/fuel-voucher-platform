@@ -17,22 +17,30 @@ internal sealed class CompanyMemberConfiguration : IEntityTypeConfiguration<Comp
 
         builder.Property(e => e.LegalEntityId)
             .HasColumnName("legal_entity_id")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "The company.");
 
         builder.Property(e => e.WorkerUserId)
             .HasColumnName("worker_user_id")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "The person.");
 
         builder.Property(e => e.JoinedAtUtc)
             .HasColumnName("joined_at_utc")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "When they joined.");
 
         builder.Property(e => e.IsDeleted)
             .HasColumnName("is_deleted")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "Firing a worker sets this rather than removing the row. Employment history IS history:" +
+                    "the owner policy keeps anything that affects it forever, and 'this person worked here" +
+                    "until March' is a fact about the company, not garbage a cleanup job may collect. The" +
+                    "!IsDeleted query filter keeps it out of every membership read.");
 
         builder.Property(e => e.DeletedAtUtc)
-            .HasColumnName("deleted_at_utc");
+            .HasColumnName("deleted_at_utc")
+            .HasComment(                "When the membership was soft-deleted, or NULL while it stands.");
 
         builder.HasIndex(e => e.LegalEntityId);
 

@@ -17,25 +17,30 @@ internal sealed class NotificationConfiguration : IEntityTypeConfiguration<Notif
 
         builder.Property(e => e.UserId)
             .HasColumnName("user_id")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "The account this notification is for.");
 
         builder.Property(e => e.Title)
             .HasColumnName("title")
             .HasMaxLength(200)
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "The notification's headline.");
 
         builder.Property(e => e.Message)
             .HasColumnName("message")
             .HasMaxLength(1000)
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "The notification's body.");
 
         builder.Property(e => e.IsRead)
             .HasColumnName("is_read")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "Whether the customer has read it.");
 
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "When it was created.");
 
         // The default used to be '-infinity', and it was not chosen: it is what Npgsql writes for
         // DateTime.MinValue, which is what EF's convention put into the migrations that created this
@@ -50,7 +55,8 @@ internal sealed class NotificationConfiguration : IEntityTypeConfiguration<Notif
             .HasColumnName("updated_at_utc")
             .HasDefaultValueSql("now()")
             .ValueGeneratedNever()
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "When it last changed.");
 
         builder.HasOne(e => e.User)
             .WithMany()
