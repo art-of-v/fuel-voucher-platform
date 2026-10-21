@@ -31,10 +31,14 @@ namespace FuelFlow.Features.Contracts;
 public sealed class AdminContractVersionsController : ControllerBase
 {
     private readonly ApplicationDbContext _dbContext;
+    private readonly ContractTextExtractor _textExtractor;
 
-    public AdminContractVersionsController(ApplicationDbContext dbContext)
+    public AdminContractVersionsController(
+        ApplicationDbContext dbContext,
+        ContractTextExtractor textExtractor)
     {
         _dbContext = dbContext;
+        _textExtractor = textExtractor;
     }
 
     /// <summary>
@@ -120,6 +124,94 @@ public sealed class AdminContractVersionsController : ControllerBase
             version.Version,
             version.TermDays,
             version.CreatedAtUtc
+        });
+    }
+
+    /// <summary>
+    /// Publishes a new version of a provider's text from a document the operator uploaded.
+    /// </summary>
+    /// <remarks>
+    /// <b>The text comes from a file, not from a text box.</b> The owner decided on 2026-10-21
+    /// that the contract text is a ready-made Word or PDF document the operator hands over, and
+    /// the platform reads it. The document is read for its text, and the text is what the
+    /// customer reviews before signing and what the version points at.
+    /// <para>
+    /// A document with no text in it is refused rather than stored: a scanned PDF is a picture
+    /// of a document, and a contract whose text is empty is a document nobody can review.
+    /// </para>
+    /// </remarks>
+    [HttpPost("upload")]
+    [RequestSizeLimit(20 * 1024 * 1024)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Upload(
+        [FromForm] Guid brandId,
+        [FromForm] int termDays,
+        IFormFile file,
+        CancellationToken cancellationToken)
+    {
+        if (brandId == Guid.Empty)
+            return BadRequest("BrandId is required");
+
+        if (termDays <= 0)
+            return BadRequest("The term must be at least one day - a contract that expires the moment it is made is not a contract");
+
+        if (file is null || file.Length == 0)
+            return BadRequest("A document is required - the contract text is a Word or PDF file");
+
+        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (!ContractTextExtractor.SupportedExtensions.Contains(extension))
+            return BadRequest($"Only {string.Join(" and ", ContractTextExtractor.SupportedExtensions)} documents are read");
+
+        var brand = await _dbContext.Brands
+            .AsNoTracking()
+            .FirstOrDefaultAsync(b => b.Id == brandId, cancellationToken);
+
+        if (brand is null)
+            return NotFound("Provider not found");
+
+        string? body;
+        await using (var content = file.OpenReadStream())
+        {
+            body = await _textExtractor.ExtractAsync(content, file.FileName, cancellationToken);
+        }
+
+        if (string.IsNullOrWhiteSpace(body))
+            return BadRequest(
+                "The document has no text in it. A scanned document is a picture of a contract, "
+                + "and a contract the customer cannot read is not a contract.");
+
+        var current = await _dbContext.ContractVersions
+            .Where(v => v.BrandId == brandId)
+            .OrderByDescending(v => v.Version)
+            .Select(v => (short?)v.Version)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var version = new ContractVersion
+        {
+            Id = Guid.CreateVersion7(),
+            BrandId = brandId,
+            Version = (short)((current ?? 0) + 1),
+            Body = body.Trim(),
+            TermDays = termDays,
+            CreatedAtUtc = DateTime.UtcNow,
+            CreatedByUserId = null
+        };
+
+        _dbContext.ContractVersions.Add(version);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(new
+        {
+            version.Id,
+            version.BrandId,
+            version.Version,
+            version.TermDays,
+            version.CreatedAtUtc,
+            // How much text was read out of the document, so the operator can see that the
+            // upload was read and not stored as an empty page.
+            characters = version.Body.Length
         });
     }
 

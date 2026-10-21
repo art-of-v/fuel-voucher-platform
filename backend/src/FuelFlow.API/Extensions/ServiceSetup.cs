@@ -188,6 +188,8 @@ internal static class ServiceSetup
         // because the contracts feature had no writer at all: the table existed with a term and
         // a foreign key to a brand, and nothing in the platform ever created a row in it.
         services.AddScoped<FuelFlow.Features.Contracts.ContractWriter>();
+        // The reader that takes the text out of the uploaded Word or PDF document.
+        services.AddSingleton<FuelFlow.Features.Contracts.ContractTextExtractor>();
         services.AddScoped<ImportVouchersCommandHandler>();
         // Singleton: one slot process-wide is the whole point.
         services.AddSingleton<ImportConcurrencyGuard>();
