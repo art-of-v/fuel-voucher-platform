@@ -166,12 +166,14 @@ public sealed class AdminUserController : ControllerBase
         if (!Guid.TryParse(id, out var userId))
             return BadRequest(new { message = "Invalid user id" });
 
-        var (actingId, _, actingName) = GetActor();
+        var (actingId, actingRole, actingName) = GetActor();
 
         var result = await _deleteUserHandler.HandleAsync(
-            new DeleteUserCommand(userId, actingId, actingName),
+            new DeleteUserCommand(userId, actingId, actingName, actingRole),
             cancellationToken);
 
+        if (result.Forbidden)
+            return Forbidden(result.Error);
         if (!result.Success)
             return NotFound(new { message = result.Error });
 

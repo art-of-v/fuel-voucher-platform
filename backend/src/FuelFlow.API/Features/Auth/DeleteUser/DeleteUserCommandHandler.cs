@@ -1,6 +1,8 @@
+using FuelFlow.Features.Auth.AdminUser;
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
@@ -9,7 +11,8 @@ namespace FuelFlow.Features.Auth.DeleteUser;
 public sealed record DeleteUserCommand(
     Guid UserId,
     Guid? ActingAdminUserId = null,
-    string? ActingAdminName = null);
+    string? ActingAdminName = null,
+    string? ActingRole = null);
 
 public sealed class DeleteUserCommandHandler
 {
@@ -30,11 +33,54 @@ public sealed class DeleteUserCommandHandler
     public async Task<DeleteUserResult> HandleAsync(DeleteUserCommand command, CancellationToken cancellationToken)
     {
         var user = await _context.Users
+            .Include(u => u.Role)
             .FirstOrDefaultAsync(u => u.Id == command.UserId, cancellationToken);
 
         if (user is null || user.IsDeleted)
         {
             return new DeleteUserResult { Success = false, Error = "User not found" };
+        }
+
+        // The hierarchy, like every other staff action. It was missing here and nowhere else:
+        // the endpoint was gated on the AdminOrOwner policy, so an Admin could delete another
+        // Admin and a Manager could not delete anything but could try.
+        //
+        // A user deleting their OWN account is not a staff action and is not the hierarchy's
+        // business: the account is theirs to close.
+        var isSelf = command.ActingAdminUserId == user.Id;
+
+        if (!isSelf && !RoleHierarchy.CanDelete(command.ActingRole, user.Role?.Name))
+        {
+            _logger.LogWarning(
+                "Delete of {TargetId} rejected: actor role {ActingRole} cannot delete target role {TargetRole}",
+                command.UserId, command.ActingRole, user.Role?.Name);
+            return new DeleteUserResult
+            {
+                Forbidden = true,
+                Error = command.ActingRole is null
+                    ? "Only staff can delete an account."
+                    : $"A {command.ActingRole} cannot delete a {user.Role?.Name ?? "roleless"} account."
+            };
+        }
+
+        // Never delete the last active ProductOwner — that would leave the platform with nobody
+        // able to manage staff. The two neighbouring paths say the same thing about demoting and
+        // banning the last one; deleting them was the way around both.
+        if (AuthorizationHelpers.RoleEquals(user.Role?.Name, SeedRoles.ProductOwnerName))
+        {
+            var otherOwners = await _context.Users
+                .AsNoTracking()
+                .CountAsync(u => u.Id != user.Id && !u.IsDeleted && !u.IsBanned && u.IsActive
+                                 && u.RoleId == SeedRoles.ProductOwnerId, cancellationToken);
+
+            if (otherOwners == 0)
+            {
+                return new DeleteUserResult
+                {
+                    Forbidden = true,
+                    Error = "Cannot delete the last active ProductOwner — assign another first."
+                };
+            }
         }
 
         user.IsDeleted = true;
@@ -88,5 +134,9 @@ public sealed class DeleteUserCommandHandler
 public sealed class DeleteUserResult
 {
     public bool Success { get; set; }
+
+    /// <summary>Refused, with the reason - an empty 403 told the operator nothing (planning #455).</summary>
+    public bool Forbidden { get; set; }
+
     public string? Error { get; set; }
 }
