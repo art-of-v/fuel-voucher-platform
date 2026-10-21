@@ -1,4 +1,5 @@
 using FuelFlow.Features.Auth.SharedModels;
+using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Settings;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -200,11 +201,20 @@ public class DataRetentionService
                     (t.IsRevoked || t.ExpiresAtUtc < now) && t.CreatedAtUtc < refreshTokenCutoff),
                 dryRun, cancellationToken)),
 
-            // Only already-processed outbox events, aged by when they were processed. Unprocessed
-            // work is never touched.
-            ("outbox_events", await PurgeAsync("outbox_events", 
+            // Already-processed outbox events, aged by when they were processed, PLUS the events
+            // that have no consumer at all, aged by when they happened.
+            //
+            // "Unprocessed work is never touched" is the right rule for work, and it stays: the
+            // three event types that something reads are still work while they are unprocessed,
+            // and they are kept. The five types that nothing reads are not work - they are the
+            // record of something that happened, and no consumer will ever pick them up, so
+            // keeping them as "unprocessed" meant the retention never touched them and the table
+            // grew without bound: every order, every expiry and every payment left a row behind
+            // for good, and the safety net that reads this table had to walk all of them.
+            ("outbox_events", await PurgeAsync("outbox_events",
                 _context.OutboxEvents.Where(o =>
-                    o.Processed && o.ProcessedAtUtc != null && o.ProcessedAtUtc < outboxCutoff),
+                    (o.Processed && o.ProcessedAtUtc != null && o.ProcessedAtUtc < outboxCutoff)
+                    || (o.CreatedAtUtc < outboxCutoff && !ConsumedOutboxEventTypes.All.Contains(o.EventType))),
                 dryRun, cancellationToken)),
 
             // Read notifications only; unread ones are kept indefinitely so a user never loses an
