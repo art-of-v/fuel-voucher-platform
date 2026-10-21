@@ -35,7 +35,7 @@ public sealed class DatabaseTransportGuardTests
         ["SmsClub:SenderName"] = "FuelFlow",
         ["DeviceAuth:Enabled"] = "true",
         ["Database:ConnectionString"] =
-            "Host=postgres;Port=5432;Database=fuelflow;Username=fuelflow;Password=secret;SSL Mode=Verify Full;Root Certificate=/certs/ca.crt",
+            "Host=postgres;Port=5432;Database=fuelflow;Username=fuelflow;Password=secret;SSL Mode=VerifyFull;Root Certificate=/certs/ca.crt",
     };
 
     private static IConfiguration Config(Dictionary<string, string?> settings) =>
@@ -67,7 +67,7 @@ public sealed class DatabaseTransportGuardTests
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*does not verify the server's certificate*")
-            .WithMessage("*Verify Full*");
+            .WithMessage("*VerifyFull*");
     }
 
     [Fact]
@@ -81,7 +81,7 @@ public sealed class DatabaseTransportGuardTests
 
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*does not verify the server's certificate*")
-            .WithMessage("*Verify Full*");
+            .WithMessage("*VerifyFull*");
     }
 
     [Fact]

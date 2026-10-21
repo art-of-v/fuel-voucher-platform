@@ -208,18 +208,18 @@ var monobankEnabled = configuration.GetValue<bool?>("Monobank:Enabled") ?? false
         // rather than a warning: the connection carries money and personal data, and the operator
         // has to say which transport they meant.
         //
-        // "Verify Full" is the only mode that checks WHO is on the other end, so it is the only
+        // "VerifyFull" is the only mode that checks WHO is on the other end, so it is the only
         // one that passes. A string with no SSL Mode at all also fails: the code would then
         // append "SSL Mode=Require;Trust Server Certificate=true" to it, which is the old default
         // wearing a different name.
         var connectionString = configuration["Database:ConnectionString"] ?? "";
         if (connectionString.Length > 0
-            && !connectionString.Contains("SSL Mode=Verify Full", StringComparison.OrdinalIgnoreCase))
+            && !connectionString.Contains("SSL Mode=VerifyFull", StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
                 "Refusing to start: the database connection string does not verify the server's "
                 + "certificate. In Production the connection must be "
-                + "'SSL Mode=Verify Full' with the CA ('Root Certificate=<path to ca.crt>'): "
+                + "'SSL Mode=VerifyFull' with the CA ('Root Certificate=<path to ca.crt>'): "
                 + "'Require' and 'Trust Server Certificate=true' encrypt the session against anyone, "
                 + "and 'Disable' does not encrypt it at all - and this connection carries the money and "
                 + "the personal data.");
