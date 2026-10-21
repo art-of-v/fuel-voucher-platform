@@ -12,9 +12,17 @@ namespace FuelFlow.Features.Auth.Refresh;
 
 public sealed record RefreshTokenCommand(string RefreshToken);
 
+/// <summary>
+/// What a rotation hands back.
+/// </summary>
+/// <remarks>
+/// The refresh token is nullable because it is not for every caller: it travels in the body only
+/// for the native mobile app, which has no cookie jar to keep it in. A browser gets the
+/// <c>HttpOnly</c> cookie and no token in the body — see <c>ClientPlatform</c>.
+/// </remarks>
 public sealed record RefreshTokenResponse(
     string AccessToken,
-    string RefreshToken,
+    string? RefreshToken,
     int ExpiresIn
 );
 

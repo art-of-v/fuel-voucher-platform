@@ -6,6 +6,7 @@ using FuelFlow.Features.Auth.Logout;
 using FuelFlow.Features.Auth.RegisterDevice;
 using FuelFlow.Features.Auth.VerifyChallenge;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -111,6 +112,12 @@ public sealed class DeviceAuthController : ControllerBase
 
         if (!result.IsValid)
             return Unauthorized(new { error = new { message = result.Error } });
+
+        // The device flow is the native app's, but the rule is the rule everywhere: the refresh
+        // token travels in the body only for a client that says it is native and has no cookie
+        // jar to keep it in. See ClientPlatform.
+        if (!ClientPlatform.IsNative(Request.Headers))
+            result.RefreshToken = null;
 
         return Ok(result);
     }
