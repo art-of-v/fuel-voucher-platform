@@ -253,6 +253,13 @@ public sealed class LegalEntityController : ControllerBase
 
         return Ok(MapToDto(entity));
     }
+    // The route was lost on 2026-10-01: 934e3793 moved the method and dropped the attribute with
+    // it, and the revert that put the body back (b52f1359, 2026-10-12) did not put the attribute
+    // back. An action with no HTTP attribute does not disappear - it binds to the controller's
+    // prefix and answers EVERY method at /api/legal-entity. So the mobile app's
+    // GET /api/legal-entity/contracts was a 404, and the list of contracts to sign was empty for
+    // every customer. The guard is EndpointMethodContractTests.
+    [HttpGet("contracts")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetContracts(CancellationToken cancellationToken)
     {

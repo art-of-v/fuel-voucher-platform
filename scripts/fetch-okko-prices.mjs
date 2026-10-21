@@ -24,11 +24,12 @@
 // (ImportOkkoCatalogueCommandHandler). A CSV produced by this script therefore carries codes without
 // labels, and the catalogue import cannot create anything from it; run the scheduled job, not this.
 //
-// Output is the CSV shape the admin importer accepts:
+// Output is the CSV shape the retired manual upload endpoint accepted:
 //
 //   fuelCode, pricePerLiter
 //
-// (POST /api/admin/providers/okko/pump-prices/import — see OkkoPriceSheetParser.)
+// (POST /api/admin/brands/okko/pump-prices/import - deleted 2026-10-21, planning #289. The
+// scheduled job does this now; see OkkoPriceSyncService.)
 //
 // Usage:
 //   node scripts/fetch-okko-prices.mjs                        # fetch live, write ./okko-prices.csv
@@ -127,7 +128,8 @@ async function main() {
   console.error("  " + rows.map(([code, price]) => `${code}=${price}`).join("  "));
   for (const { code, reason } of skipped) console.error(`skipped ${code}: ${reason}`);
   console.error(
-    "preview with: POST /api/admin/providers/okko/pump-prices/import?dryRun=true (file above)",
+    "the manual upload endpoint is gone (planning #289, deleted 2026-10-21): the scheduled " +
+      "OkkoPriceSyncService does this every 15 minutes - run the job, not this file",
   );
 }
 
