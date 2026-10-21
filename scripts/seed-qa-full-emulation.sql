@@ -187,23 +187,21 @@ SELECT
     lower(brand.slug)                               AS brand,
     brand.id                                        AS brand_id,
     nominal.liters                                  AS liters,
-    -- The effective price of the package: the fuel's rate x litres, capped by the ceiling. There is
-    -- no per-nominal override left to prefer, and no stored total to read, so both numbers below are
-    -- computed here the way FuelPricing.PackagePrice does.
-    round(least(coalesce(fuel.supplier_price_per_liter, 0) + coalesce(fuel.margin_uah_per_liter, 0),
-                   coalesce(fuel.pump_price_per_liter, 1000000000) - coalesce(fuel.min_discount_per_liter, 0))
-              * nominal.liters, 2)                  AS price,
+    -- The effective price of the package: the fuel's rate x litres. The rate is the cost plus the
+    -- margin - the column price is a reference, not a term of it. There is no per-nominal override
+    -- left to prefer, and no stored total to read, so both numbers below are computed here the way
+    -- FuelPricing.PackagePrice does.
+    round((coalesce(fuel.supplier_price_per_liter, 0) + coalesce(fuel.margin_uah_per_liter, 0))
+          * nominal.liters, 2)                    AS price,
     fuel.supplier_price_per_liter,
     fuel.pump_price_per_liter,
     fuel.min_discount_per_liter,
     -- The customer price per litre, derived the way FuelPricing.FinalPerLiterOrNull does: null
     -- unless the fuel has both a cost and a margin, because treating a missing margin as zero would
-    -- publish a free fuel. least over a value no real pump reaches stands in for a missing ceiling,
-    -- which is what the formula's pump-null branch means.
+    -- publish a free fuel.
     CASE WHEN fuel.supplier_price_per_liter IS NULL OR fuel.margin_uah_per_liter IS NULL THEN NULL
-         ELSE least(fuel.supplier_price_per_liter + fuel.margin_uah_per_liter,
-                    coalesce(fuel.pump_price_per_liter, 1000000000) - coalesce(fuel.min_discount_per_liter, 0))
-    END                                             AS final_price_per_liter
+         ELSE fuel.supplier_price_per_liter + fuel.margin_uah_per_liter
+    END                                           AS final_price_per_liter
 FROM fuel_nominals nominal
 JOIN fuel_types fuel ON fuel.id = nominal.fuel_type_id
 JOIN brands brand ON brand.id = fuel.brand_id
