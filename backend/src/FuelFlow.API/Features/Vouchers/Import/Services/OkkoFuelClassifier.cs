@@ -74,7 +74,7 @@ public static class OkkoFuelClassifier
     /// <para>
     /// The product code is a fuel-SKU indicator shared across many vouchers, not the redeemable
     /// bearer material, so it is safe to surface in logs and error rows — unlike the full payload,
-    /// which <see cref="ImportVouchersCommandHandler.DescribeQrPayload"/> deliberately fingerprints.
+    /// which <see cref="QrPayloadFingerprint"/> deliberately fingerprints.
     /// </para>
     /// </summary>
     public static string? TryGetProductCode(string? qrPayload)

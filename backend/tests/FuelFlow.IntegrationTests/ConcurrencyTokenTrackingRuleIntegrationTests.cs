@@ -1,5 +1,6 @@
 using FluentAssertions;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -84,7 +85,7 @@ public sealed class ConcurrencyTokenTrackingRuleIntegrationTests : IClassFixture
             UpdatedAtUtc = DateTime.UtcNow
         });
 
-        seed.Orders.Add(new Order
+        AddPaidOrder(seed, new Order
         {
             Id = orderId,
             UserId = userId,
@@ -103,4 +104,28 @@ public sealed class ConcurrencyTokenTrackingRuleIntegrationTests : IClassFixture
         => new(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(_fixture.ConnectionString)
             .Options, TestQrCipher.Instance);
+    /// <summary>
+    /// Adds an order AND the money record of a paid order. Fulfilment asks the payment row
+    /// whether the money arrived before it hands out a voucher, so a fixture that expects
+    /// vouchers has to say the order was paid for.
+    /// </summary>
+    private static void AddPaidOrder(ApplicationDbContext seed, Order order)
+    {
+        seed.Orders.Add(order);
+        seed.Payments.Add(new Payment
+        {
+            Id = Guid.NewGuid(),
+            OrderId = order.Id,
+            Kind = PaymentKind.Capture,
+            Provider = "monobank",
+            ProviderInvoiceId = $"INV-{order.Id:N}",
+            AmountUah = order.Price,
+            AmountKopecks = (long)(order.Price * 100),
+            Currency = "UAH",
+            Status = PaymentStatus.Succeeded,
+            PaidAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+    }
 }

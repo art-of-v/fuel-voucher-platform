@@ -40,6 +40,12 @@ public sealed class QrDecoder : IQrDecoder
         var result = reader.Decode(imageRgba32);
         if (result == null) return new QrDecodeResult();
 
+        // The payload is the redeemable instrument - whoever holds it can have the voucher
+        // spent at the pump, and nobody can revoke it afterwards. So it never reaches the
+        // log: the fingerprint is what an operator gets, which is enough to tell two
+        // vouchers apart and not enough to spend one.
+        var payloadFingerprint = QrPayloadFingerprint.Describe(result.Text);
+
         string? eccLevel = null;
         if (result.ResultMetadata.TryGetValue(ResultMetadataType.ERROR_CORRECTION_LEVEL, out var eccObj))
             eccLevel = eccObj?.ToString();
@@ -71,21 +77,21 @@ public sealed class QrDecoder : IQrDecoder
                     maskPattern = TryReadMaskPattern(bits);
                     originalMatrix = ConvertBitMatrix(bits);
                     _logger.LogInformation(
-                        "QrDecoder: payload='{Payload}' dim={Dim} mask={Mask}",
-                        result.Text, dim, maskPattern);
+                        "QrDecoder: payload={Payload} dim={Dim} mask={Mask}",
+                        payloadFingerprint, dim, maskPattern);
                 }
                 else
                 {
                     _logger.LogInformation(
-                        "QrDecoder: Detector returned no bits for payload '{Payload}' (image {W}x{H}px).",
-                        result.Text, imageRgba32.Width, imageRgba32.Height);
+                        "QrDecoder: Detector returned no bits for payload {Payload} (image {W}x{H}px).",
+                        payloadFingerprint, imageRgba32.Width, imageRgba32.Height);
                 }
             }
         }
         catch (Exception ex)
         {
             // Detector threw – fall back to geometry-based version below.
-            _logger.LogWarning(ex, "QrDecoder: Detector/BitMatrix path failed for payload '{Payload}'.", result.Text);
+            _logger.LogWarning(ex, "QrDecoder: Detector/BitMatrix path failed for payload {Payload}.", payloadFingerprint);
         }
 
         // Geometry-based fallback for version when BitMatrix path fails.

@@ -2,7 +2,9 @@ using FuelFlow.API.BackgroundJobs;
 using FuelFlow.Features.Monobank.ProcessWebhook;
 using FuelFlow.Features.Orders.GetUserPurchases;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Options;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
 
@@ -99,6 +101,13 @@ public sealed class SimulatePaymentCommandHandler
             order.UpdatedAtUtc = DateTime.UtcNow;
             _context.Orders.Update(order);
 
+            // The money row follows the order, exactly as the real webhook does it: the acquirer
+            // says the money moved, and the payment record says so too. It used to be left at
+            // Pending, which left the simulation claiming a payment that the ledger said had not
+            // happened - and, now that fulfilment asks the money row whether the order was paid
+            // for, it would have refused the order the simulation had just paid for.
+            await MarkCaptureAsSucceededAsync(order, cancellationToken);
+
             // A renewal order fulfils on its own path (extend/replace existing vouchers). It must not
             // write an ORDER_CREATED event (that drives the buy-fuel handler, which mints fresh stock),
             // and it is handed to ProcessRenewalOrderAsync — mirrors the real webhook handler so a
@@ -166,5 +175,41 @@ public sealed class SimulatePaymentCommandHandler
             Status = "success",
             Purchase = purchase
         };
+    }
+
+    /// <summary>
+    /// Marks the order's capture payment as succeeded - the state a real payment leaves behind.
+    /// Creates the row when checkout never wrote one (the invoice creation is the thing that
+    /// writes it, and a simulated payment can arrive for an order whose invoice failed).
+    /// </summary>
+    private async Task MarkCaptureAsSucceededAsync(Order order, CancellationToken cancellationToken)
+    {
+        var payment = await _context.Payments
+            .FirstOrDefaultAsync(p => p.OrderId == order.Id && p.Kind == PaymentKind.Capture, cancellationToken);
+
+        var isNew = payment is null;
+        if (payment is null)
+        {
+            // A zero-price order has no money to record, and the database refuses a zero-amount
+            // capture - so there is nothing to write, and the order stays unpaid (which is the
+            // safe direction: no money recorded, no fuel handed over).
+            if (order.Price <= 0)
+                return;
+
+            payment = PaymentFactory.CreateCapture(
+                order,
+                order.MonobankMerchant ?? MonobankMerchant.Sandbox,
+                order.MonobankInvoiceId ?? $"simulated-{order.Id:N}",
+                DateTime.UtcNow);
+            _context.Payments.Add(payment);
+        }
+
+        PaymentFactory.ApplyStatus(payment, PaymentStatus.Succeeded, DateTime.UtcNow, DateTime.UtcNow);
+
+        // Only a row that was already in the store is marked as updated: Update() on a row that
+        // was just Added turns the insert into an update of a row that does not exist yet, and
+        // the context does not track by default, so a loaded row has to be marked explicitly.
+        if (!isNew)
+            _context.Payments.Update(payment);
     }
 }

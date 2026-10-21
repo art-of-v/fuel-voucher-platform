@@ -81,33 +81,10 @@ public sealed class ImportVouchersCommandHandler
     }
 
     /// <summary>
-    /// Renders a QR payload as a non-reversible fingerprint for logs and stored error rows.
-    /// <para>
-    /// The payload is the bearer instrument: whoever holds it can have the voucher redeemed at
-    /// the pump, and FuelFlow cannot revoke it because redemption happens on the brand's side.
-    /// Writing it into <c>voucher_import_errors</c> and into the log stream copies redeemable
-    /// material into two stores with a wider audience and a longer retention than the voucher
-    /// table itself. Length plus a short digest is enough for an operator to tell two failing
-    /// rows apart and to confirm a re-import produced the same payload, without carrying the
-    /// payload anywhere.
-    /// </para>
-    /// </summary>
-    internal static string DescribeQrPayload(string? payload)
-    {
-        if (string.IsNullOrEmpty(payload))
-            return "<empty>";
-
-        var digest = System.Security.Cryptography.SHA256.HashData(
-            System.Text.Encoding.UTF8.GetBytes(payload));
-
-        return $"<{payload.Length} chars, sha256:{Convert.ToHexString(digest)[..10].ToLowerInvariant()}>";
-    }
-
-    /// <summary>
     /// Prepares a rejected voucher's raw region text for storage.
     /// <para>
     /// The region text is the parsed block a voucher was rejected from, and it embeds the QR
-    /// payload - the same bearer instrument <see cref="DescribeQrPayload"/> exists to keep out of
+    /// payload - the same bearer instrument <see cref="QrPayloadFingerprint"/> exists to keep out of
     /// stores. Writing it verbatim copied redeemable material into
     /// <c>voucher_import_errors</c>, which the admin UI surfaces to a wider audience than the
     /// voucher table and which no retention job prunes.
@@ -123,7 +100,7 @@ public sealed class ImportVouchersCommandHandler
         var text = rawText ?? string.Empty;
 
         if (!string.IsNullOrEmpty(qrPayload) && text.Contains(qrPayload, StringComparison.Ordinal))
-            text = text.Replace(qrPayload, DescribeQrPayload(qrPayload), StringComparison.Ordinal);
+            text = text.Replace(qrPayload, QrPayloadFingerprint.Describe(qrPayload), StringComparison.Ordinal);
 
         return text.Length <= MaxStoredRawTextLength
             ? text
@@ -304,7 +281,7 @@ public sealed class ImportVouchersCommandHandler
                             }
                             else
                             {
-                                reason = $"Confidence: {parsed.Confidence}. FuelTypeId: {parsed.FuelTypeId}, Liters: {parsed.Liters}, Expiry: {parsed.ExpirationDate}, Number: {parsed.VoucherNumber}, QR: {DescribeQrPayload(parsed.QrPayload)}";
+                                reason = $"Confidence: {parsed.Confidence}. FuelTypeId: {parsed.FuelTypeId}, Liters: {parsed.Liters}, Expiry: {parsed.ExpirationDate}, Number: {parsed.VoucherNumber}, QR: {QrPayloadFingerprint.Describe(parsed.QrPayload)}";
                             }
                             var errMsg = $"Voucher failed validation. {reason}";
                             _logger.LogWarning("Page {PageNumber}: {ErrorMessage}", page.PageNumber, errMsg);
@@ -362,7 +339,7 @@ public sealed class ImportVouchersCommandHandler
                         if (!integrityPassed)
                         {
                             var errMsg = $"QR payload does not contain voucher number '{parsed.VoucherNumber}'. " +
-                                         $"Likely decoded from wrong region (payload {DescribeQrPayload(parsed.QrPayload)}). Re-import required.";
+                                         $"Likely decoded from wrong region (payload {QrPayloadFingerprint.Describe(parsed.QrPayload)}). Re-import required.";
                             _logger.LogWarning("Page {PageNumber}: {ErrorMessage}", page.PageNumber, errMsg);
 
                             _context.VoucherImportErrors.Add(new VoucherImportError
