@@ -10,22 +10,6 @@ namespace FuelFlow.API.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            // The rows that said "not priced yet" with a zero say it with an empty column now.
-            //
-            // Eleven of the twenty-three fuels carried discount_price = 0.00, which is not a price
-            // of zero - it is the absence of one, and the column now says so the way its neighbour
-            // (the cost) has always said it. The zero was a placeholder the catalogue import left
-            // behind, and a placeholder that reads as a number is the thing this column is for:
-            // a price of zero is a price, and a price of zero means the customer takes the fuel
-            // for nothing.
-            //
-            // Nothing reaches a customer at 0 either way - a grade with no cost and no margin
-            // computes to no price, and the storefront does not list a package with no price - but
-            // the column has to mean one thing.
-            migrationBuilder.Sql("""
-                UPDATE fuel_types SET discount_price = NULL WHERE discount_price = 0;
-                """);
-
             migrationBuilder.DropCheckConstraint(
                 name: "ck_fuel_types_prices_non_negative",
                 table: "fuel_types");
@@ -39,6 +23,26 @@ namespace FuelFlow.API.Migrations
                 oldClrType: typeof(decimal),
                 oldType: "numeric(12,2)",
                 oldComment: "What the customer pays per litre. While the fuel is unpriced it equals the column price, because a fuel with no stated cost has no price of its own.");
+
+            // The rows that said "not priced yet" with a zero say it with an empty column now.
+            //
+            // Eleven of the twenty-three fuels carried discount_price = 0.00, which is not a price
+            // of zero - it is the absence of one, and the column now says so the way its neighbour
+            // (the cost) has always said it. The zero was a placeholder the catalogue import left
+            // behind, and a placeholder that reads as a number is the thing this column is for:
+            // a price of zero is a price, and a price of zero means the customer takes the fuel
+            // for nothing.
+            //
+            // Nothing reaches a customer at 0 either way - a grade with no cost and no margin
+            // computes to no price, and the storefront does not list a package with no price - but
+            // the column has to mean one thing.
+            //
+            // AFTER the column has been made nullable, and that is not a detail: an UPDATE that
+            // writes NULL into a column that is still NOT NULL fails, and the failure is the
+            // migration's, not the data's.
+            migrationBuilder.Sql("""
+                UPDATE fuel_types SET discount_price = NULL WHERE discount_price = 0;
+                """);
 
             migrationBuilder.AddCheckConstraint(
                 name: "ck_fuel_types_prices_non_negative",
