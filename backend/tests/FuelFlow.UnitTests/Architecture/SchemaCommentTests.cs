@@ -4,6 +4,7 @@ using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Acquiring;
 using FuelFlow.Features.Company.SharedModels;
 using FuelFlow.Features.Auth.SharedModels;
+using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Feedback.SharedModels;
 using FuelFlow.Features.Notifications.SharedModels;
 using FuelFlow.Features.Support.SharedModels;
@@ -674,6 +675,99 @@ public sealed class SchemaCommentTests
         Assert.Contains("transcribed", comment, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("immutable", comment, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("mistyped", comment, StringComparison.OrdinalIgnoreCase);
+    }
+
+
+    /// <summary>
+    /// The order line and the voucher - the two rows the business is actually made of.
+    /// </summary>
+    private static readonly (Type Entity, string[] Columns)[] TheOrderTables =
+    [
+        (typeof(OrderLineItem),
+        [
+            nameof(OrderLineItem.Brand),
+            nameof(OrderLineItem.BrandId),
+            nameof(OrderLineItem.Liters),
+            nameof(OrderLineItem.Quantity),
+            nameof(OrderLineItem.UnitPrice),
+            nameof(OrderLineItem.LineTotal),
+            nameof(OrderLineItem.OriginalLineTotal),
+            nameof(OrderLineItem.TermCode),
+            nameof(OrderLineItem.SourceVoucherId),
+            nameof(OrderLineItem.RenewalBranch),
+            nameof(OrderLineItem.PreviousCustomerExpiration),
+            nameof(OrderLineItem.NewCustomerExpiration),
+            nameof(OrderLineItem.PricingBasis)
+        ]),
+        (typeof(FuelVoucher),
+        [
+            nameof(FuelVoucher.Brand),
+            nameof(FuelVoucher.BrandId),
+            nameof(FuelVoucher.Liters),
+            nameof(FuelVoucher.SupplierExpirationDate),
+            nameof(FuelVoucher.CustomerExpirationDate),
+            nameof(FuelVoucher.VoucherNumber),
+            nameof(FuelVoucher.QrPayload),
+            nameof(FuelVoucher.QrPayloadSha256),
+            nameof(FuelVoucher.IssuedAtUtc),
+            nameof(FuelVoucher.UsedAtUtc),
+            nameof(FuelVoucher.Status),
+            nameof(FuelVoucher.AssignedToUserId),
+            nameof(FuelVoucher.WorkerUserId),
+            nameof(FuelVoucher.ImportJobId),
+            nameof(FuelVoucher.OrderId),
+            nameof(FuelVoucher.SupplierId),
+            nameof(FuelVoucher.CostPerLiter),
+            nameof(FuelVoucher.DataKind),
+            nameof(FuelVoucher.HolderKind),
+            nameof(FuelVoucher.IsDeleted),
+            nameof(FuelVoucher.VerificationMismatchPercent),
+            nameof(FuelVoucher.VerificationMismatchedModules),
+            nameof(FuelVoucher.VerificationTotalModules)
+        ])
+    ];
+
+
+    [Fact]
+    public void The_Order_Line_And_The_Voucher_Should_Say_What_They_Are()
+    {
+        var context = BuildContext();
+
+        foreach (var (entityType, columns) in TheOrderTables)
+        {
+            var entity = context.Model.FindEntityType(entityType);
+            Assert.NotNull(entity);
+
+            foreach (var column in columns)
+            {
+                var property = entity.FindProperty(column);
+                Assert.NotNull(property);
+
+                var comment = CommentOf(property);
+                Assert.False(string.IsNullOrWhiteSpace(comment),
+                    $"{entityType.Name}.{column} carries no comment. These are the two rows the "
+                    + "business is made of, and on them two similar numbers mean different "
+                    + "things: the list price and the price paid, the supplier's term and the "
+                    + "customer's, the cost and the selling price.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// The pricing basis is WHY the line cost what it cost, and it is frozen - which is the
+    /// whole point of it.
+    /// </summary>
+    [Fact]
+    public void The_Pricing_Basis_Should_Say_That_It_Is_Frozen()
+    {
+        var context = BuildContext();
+        var line = context.Model.FindEntityType(typeof(OrderLineItem));
+        Assert.NotNull(line);
+
+        var comment = CommentOf(line.FindProperty(nameof(OrderLineItem.PricingBasis))!);
+
+        Assert.Contains("frozen at checkout", comment, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("not backfilled", comment, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
