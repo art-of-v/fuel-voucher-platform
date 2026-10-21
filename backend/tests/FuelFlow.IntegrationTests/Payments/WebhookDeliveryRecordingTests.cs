@@ -255,14 +255,22 @@ public sealed class WebhookDeliveryRecordingTests : IClassFixture<TestDatabaseFi
     }
 
     [Theory]
-    [InlineData("INV-1", "success", 0)]
     [InlineData("INV-1", "reversed", 0)]
     [InlineData("INV-2", "success", 0)]
-    public void TheDerivedEventId_SeparatesGenuinelyDifferentEvents(string invoice, string status, int _)
+    [InlineData("INV-1", "success", 60)]
+    public void TheDerivedEventId_SeparatesGenuinelyDifferentEvents(string invoice, string status, int secondsLater)
     {
+        // The identity is (provider, invoice, status, instant), so a different invoice, a
+        // different status and a different instant are three different events - and the same
+        // three at the same instant are the same event, which is what
+        // TheDerivedEventId_IsStableAcrossEquivalentDeliveries pins.
+        //
+        // The case that used to sit in this list with a zero offset - the same invoice and the
+        // same status at the same instant - was the baseline itself, and it passed only because
+        // the two derivations read the wall clock a few microseconds apart.
         var baseline = WebhookEventIdentity.Derive("monobank", "INV-1", "success", TestClock.UtcNow);
 
-        WebhookEventIdentity.Derive("monobank", invoice, status, TestClock.UtcNow)
+        WebhookEventIdentity.Derive("monobank", invoice, status, TestClock.UtcNow.AddSeconds(secondsLater))
             .Should().NotBe(baseline);
     }
 
