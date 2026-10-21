@@ -1,16 +1,20 @@
 name: CodeQL
 
-# Static security analysis (SAST) — MANUAL-ONLY (workflow_dispatch).
+# Static security analysis (SAST) — MANUAL-ONLY (workflow_dispatch), deliberately.
 #
-# The repo goes PRIVATE on 2026-10-01. On a personal-account private repo, code scanning cannot
-# upload SARIF to the Security tab (that needs org-level GitHub Advanced Security), and every
-# hosted job-minute is billed — so running CodeQL automatically on each push/PR would both fail
-# at the upload step AND burn billable minutes. The two `Analyze (...)` contexts have also been
-# dropped from main's required checks (planning #37), so this no longer needs to run per-PR.
+# **The repository is public until it is not.** It goes PRIVATE on 2026-11-01. On a
+# personal-account private repository, code scanning cannot upload SARIF to the Security tab (that
+# needs org-level GitHub Advanced Security), and every hosted job-minute is billed — so running
+# CodeQL automatically on each push/PR would both fail at the upload step AND burn billable
+# minutes. That is the reason this is manual, and the reason the two `Analyze (...)` contexts are
+# not on main's required checks (planning #37).
 #
-# It is kept as a manual full scan you can trigger from the Actions tab while the repo is still
-# public (results reach the Security tab until the privacy flip). For ongoing coverage once
-# private, use the local CodeQL CLI runbook (planning #39) — that runs off GitHub, zero minutes.
+# **Until the flip, a manual scan still reaches the Security tab** — the analysis is free while
+# the repository is public — so the full scan is worth triggering before the flip, and again
+# whenever something is worth knowing about.
+#
+# For ongoing coverage once private, use the local CodeQL CLI (planning #39) — that runs off
+# GitHub, zero minutes.
 on:
   workflow_dispatch:
 
