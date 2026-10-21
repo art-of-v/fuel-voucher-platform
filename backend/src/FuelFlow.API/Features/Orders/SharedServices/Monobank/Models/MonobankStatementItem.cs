@@ -28,15 +28,17 @@ namespace FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 /// arithmetic, and an act that quoted it beside ours would be quoting two different numbers for
 /// the same money.
 /// </para>
-/// <para>
-/// <b>The reversals are modelled, and not imported.</b> <c>cancelList</c> is the list Monobank
-/// nests under the payment it reverses. The shape is documented and the model is here so that it
-/// can be read, tested and reasoned about instead of hiding in the raw blob - what the act DOES
-/// with a reversal is a separate question, and it is still open (planning #297). Filing a reversal
-/// as a row of its own would put money out in a document an accountant signs with nothing to
-/// point at, which is worse than reporting the payment and leaving the reversal to
-/// <see cref="RawJson"/>.
-/// </para>
+    /// <para>
+    /// <b>The reversals are modelled, and not imported.</b> <c>cancelList</c> is the list Monobank
+    /// nests under the payment it reverses. The shape is documented and the model is here so that it
+    /// can be read, tested and reasoned about instead of hiding in the raw blob - what the act DOES
+    /// with a reversal is a separate question, and it was decided on 2026-10-21 (planning #297): the
+    /// act reconciles the refunds from our side, so the refunds we issued in the period stand beside
+    /// the statement with a figure of their own, and the acquirer's statement stays the authority on
+    /// what arrived. Filing a reversal as a row of its own would put money out in a document an
+    /// accountant signs with nothing to point at, which is worse than reporting the payment and
+    /// leaving the reversal to <see cref="RawJson"/>.
+    /// </para>
 /// </remarks>
 public sealed class MonobankStatementItem
 {
@@ -93,9 +95,10 @@ public sealed class MonobankStatementItem
     /// <remarks>
     /// <para>
     /// Modelled, and not imported. The shape is documented, so it can be read and tested instead of
-    /// hiding in the raw blob; what the reconciliation act DOES with a reversal is a question that is
-    /// still open (planning #297), and the two are separate: modelling a field changes nothing about
-    /// what the act reports.
+    /// hiding in the raw blob; what the reconciliation act DOES with a reversal is a separate
+    /// question, and it was decided on 2026-10-21 (planning #297) - the act reconciles the refunds
+    /// from our side - and the two are separate: modelling a field changes nothing about what the
+    /// act reports.
     /// </para>
     /// <para>
     /// <b>The link to the payment a reversal reverses is the nesting itself</b> - the parent row's

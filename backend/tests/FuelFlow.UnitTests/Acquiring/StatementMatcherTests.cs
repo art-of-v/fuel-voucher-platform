@@ -24,25 +24,27 @@ public class StatementMatcherTests
         };
 
     /// <summary>
-    /// The note on a matched reversal names the order's own idempotency key.
+    /// The note on a row that only a refund of ours carries names the order's own idempotency key.
     /// </summary>
-/// <remarks>
-/// It used to name <c>refunds.ext_ref</c>, a copy of that key taken when the refund was written.
+    /// <remarks>
+    /// It used to name <c>refunds.ext_ref</c>, a copy of that key taken when the refund was written.
     /// The copy could drift from the order - nothing kept them equal - and nothing asserted on the
-/// text, so a stale or wrong reference would have reached an operator reading the reconciliation
-/// report without any test noticing. Reading the order closes both gaps at once.
-/// </remarks>
-[Fact]
-    public void A_Refund_Match_Names_The_Orders_Own_Reference()
+    /// text, so a stale or wrong reference would have reached an operator reading the reconciliation
+    /// report without any test noticing. Reading the order closes both gaps at once.
+    /// </remarks>
+    [Fact]
+    public void A_Row_Only_A_Refund_Carries_Names_The_Orders_Own_Reference()
     {
-        var order = Order("INV1", 978.57m);
+        // The order moved on to a re-issued payment link, so no order of ours carries this invoice
+        // any more - but the refund that gave the invoice back still names the order.
+        var order = Order("INV-NEW", 978.57m);
         order.IdempotencyKey = "checkout-abc-123";
 
-        var refund = RefundFor("INV1", 97857);
+        var refund = RefundFor("INV-OLD", 97857);
         refund.OrderId = order.Id;
 
         var rows = StatementMatcher.Match(
-            new[] { Entry("ST1", "INV1", 97857) },
+            new[] { Entry("ST1", "INV-OLD", 97857) },
             new[] { order },
             new[] { refund });
 
@@ -61,9 +63,8 @@ public class StatementMatcherTests
     };
 
     /// <summary>
-    /// A completed refund payment - the shape <c>StatementMatcher</c> now matches on. The note it
-    /// writes names the refund's order, so the order's idempotency key is the reference the
-    /// assertion below expects rather than a copy of it on the refund.
+    /// A completed refund payment - the shape <c>StatementMatcher</c> matches on. A refund names
+    /// the invoice it gives back, which is the same invoice the order carries.
     /// </summary>
     private static Payment RefundFor(string invoiceId, int amountKopecks) => new()
     {
@@ -186,32 +187,72 @@ public class StatementMatcherTests
         rows[0].OrderId.Should().Be(live.Id);
     }
 
+    // The acquirer files the payment and nests a reversal under it, so the row that carries our
+    // invoice is the capture - money in - even after we refunded it. It is matched against the
+    // order, like any other capture.
     [Fact]
-    public void A_Refund_We_Issued_Is_Reported_As_A_Refund_Match()
+    public void A_Capture_We_Refunded_Is_Still_A_Capture()
     {
         var refund = RefundFor("INV1", 50000);
 
         var rows = StatementMatcher.Match(
-            new[] { Entry("ST1", "INV1", -50000) },
+            new[] { Entry("ST1", "INV1", 50000) },
             new[] { Order("INV1", 500m) },
+            new[] { refund });
+
+        rows.Should().ContainSingle();
+        rows[0].Status.Should().Be(StatementMatchStatus.Matched);
+        rows[0].LocalAmount.Should().Be(500m);
+    }
+
+    // The order wins over the refund it reverses: the same invoice id legitimately appears on both
+    // sides, and the acquirer row is describing the capture, not the reversal.
+    [Fact]
+    public void The_Order_Wins_Over_The_Refund_It_Reverses()
+    {
+        var rows = StatementMatcher.Match(
+            new[] { Entry("ST1", "INV1", 50000) },
+            new[] { Order("INV1", 500m) },
+            new[] { RefundFor("INV1", 50000) });
+
+        rows[0].Status.Should().Be(StatementMatchStatus.Matched);
+        rows[0].LocalAmount.Should().Be(500m);
+    }
+
+    // The gross of a capture we refunded is money the acquirer took, so it belongs in the matched
+    // total. Before this, the row was read as a reversal and its gross was in no total at all.
+    [Fact]
+    public void The_Gross_Of_A_Refunded_Capture_Is_In_The_Matched_Total()
+    {
+        var rows = StatementMatcher.Match(
+            new[] { Entry("ST1", "INV1", 50000) },
+            new[] { Order("INV1", 500m) },
+            new[] { RefundFor("INV1", 50000) });
+
+        var summary = StatementMatcher.Summarise(rows);
+
+        summary.MatchedCount.Should().Be(1);
+        summary.MatchedTotalUah.Should().Be(500m);
+        summary.UnmatchedTotalUah.Should().Be(0m);
+        summary.RefundMatchCount.Should().Be(0);
+    }
+
+    // A row whose invoice only a refund of ours carries - the order is gone - is reported against
+    // the refund rather than dropped: real money with nothing on our side to point at is reported,
+    // never dropped.
+    [Fact]
+    public void A_Row_Only_A_Refund_Carries_Is_Reported_Against_The_Refund()
+    {
+        var refund = RefundFor("INV-OLD", 50000);
+
+        var rows = StatementMatcher.Match(
+            new[] { Entry("ST1", "INV-OLD", 50000) },
+            new[] { Order("INV-NEW", 700m) },
             new[] { refund });
 
         rows.Should().ContainSingle();
         rows[0].Status.Should().Be(StatementMatchStatus.RefundMatch);
         rows[0].OrderId.Should().Be(refund.OrderId);
-    }
-
-    // A refund takes precedence over the order it reverses: the same invoice id legitimately appears
-    // on both sides, and the acquirer row is describing the reversal.
-    [Fact]
-    public void A_Refund_Wins_Over_The_Order_It_Reverses()
-    {
-        var rows = StatementMatcher.Match(
-            new[] { Entry("ST1", "INV1", -50000) },
-            new[] { Order("INV1", 500m) },
-            new[] { RefundFor("INV1", 50000) });
-
-        rows[0].Status.Should().Be(StatementMatchStatus.RefundMatch);
     }
 
     [Fact]

@@ -19,20 +19,22 @@ public enum StatementMatchStatus
     /// with nothing on our side to point at. Reported, never dropped.</summary>
     Unmatched,
 
-    /// <summary>The acquirer tagged this row against a refund we issued.</summary>
+    /// <summary>The row is against a refund of ours, and no order of ours carries its invoice.</summary>
     /// <remarks>
     /// <para>
-    /// <b>This cannot fire against a real Monobank statement.</b> Monobank does not file a reversal
+    /// <b>A row whose invoice we refunded is not one of these.</b> Monobank does not file a reversal
     /// as a row of its own: it nests the reversal under the payment it reverses, in a
-    /// <c>cancelList</c>, and the entry carries no invoice id - so there is never a statement row
-    /// with our refund's invoice on it for this to match.
+    /// <c>cancelList</c>, and the entry carries no invoice id - so the row that carries our invoice
+    /// is the <em>capture</em>, money in. It is matched against the order that carries the invoice,
+    /// like any other capture, and its gross is part of the matched total. The refund we issued is
+    /// reported beside the statement instead, in the act's own refunds section. See
+    /// <see cref="StatementRefunds"/>.
     /// </para>
     /// <para>
-    /// The category stays because the match is correct when a row does carry that invoice - a
-    /// statement row for an invoice we refunded is a reversal, whatever the acquirer calls it - and
-    /// because removing it would change the verdicts of rows that already exist. What the act shows
-    /// for real reversals is the refunds section: the refunds we issued in the period, reconciled
-    /// from our side. See <see cref="StatementRefunds"/>.
+    /// What is left is the row whose invoice only a refund of ours carries: the order is gone - it
+    /// was deleted, or its invoice id moved on to a re-issued payment link - so the capture has no
+    /// order to be matched against. The row is reported against the refund rather than dropped,
+    /// because real money with nothing on our side to point at is reported, never dropped.
     /// </para>
     /// </remarks>
     RefundMatch,
@@ -83,15 +85,15 @@ public static class StatementMatcher
             .GroupBy(o => o.MonobankInvoiceId!)
             .ToDictionary(g => g.Key, g => g.First());
 
-        // Same reasoning: a refund is identified by the invoice it reverses.
+        // A refund is identified by the invoice it reverses - the same invoice the order carries.
         var refundsByInvoice = refunds
             .Where(r => r.Kind == PaymentKind.Refund && !string.IsNullOrEmpty(r.ProviderInvoiceId))
             .GroupBy(r => r.ProviderInvoiceId)
             .ToDictionary(g => g.Key, g => g.First());
 
-        // For the human-readable note on a matched reversal. refunds.ext_ref was a copy of the
-        // order's idempotency key that could drift from it; reading the order directly is both the
-        // truth and one fewer place to fall out of sync.
+        // For the human-readable note on a row that only a refund of ours carries.
+        // refunds.ext_ref was a copy of the order's idempotency key that could drift from it;
+        // reading the order directly is both the truth and one fewer place to fall out of sync.
         var referenceByOrderId = orders
             .ToDictionary(o => o.Id, o => o.IdempotencyKey ?? o.Id.ToString());
 
@@ -103,26 +105,15 @@ public static class StatementMatcher
 
             var invoiceId = entry.InvoiceId;
 
-            if (invoiceId is not null && refundsByInvoice.TryGetValue(invoiceId, out var refund))
-            {
-                // A refund reverses a capture, and a capture always has an order. Said here so the
-                // null-forgiving reads below are a stated invariant rather than a silenced null: an
-                // orderless refund would mean the domain broke, and a reconciliation row with a null
-                // order id would hide it behind a tidy "Reversal of refund …" message.
-                var refundOrderId = refund.OrderId!.Value;
-                var reference = referenceByOrderId.TryGetValue(refundOrderId, out var known)
-                    ? known
-                    : refundOrderId.ToString();
-
-                rows.Add(new StatementMatchRow(
-                    entry.StatementId, StatementMatchStatus.RefundMatch, invoiceId, entry.Reference,
-                    entry.Destination,
-                    entry.AmountKopecks, amount, refundOrderId, refund.AmountKopecks / 100m,
-                    refund.ProviderInvoiceId, null, entry.AcquirerCreatedAtUtc,
-                    $"Reversal of refund {refund.Id:N} on {reference}"));
-                continue;
-            }
-
+            // The capture. The ORDER is looked up first, and that order is what the row is: the
+            // acquirer files the payment and nests a reversal under it, so a row whose invoice we
+            // refunded is still the capture - money in - and it is matched against the order that
+            // carries the invoice like any other capture. Its gross is part of the matched total.
+            //
+            // The refund we issued is reported beside the statement, in the act's own refunds
+            // section, where it can be seen for what it is. Relabelling the capture as a reversal
+            // would put the acquirer's gross in no total at all, and would read as money leaving
+            // in a row that says money arrived.
             if (invoiceId is not null && ordersByInvoice.TryGetValue(invoiceId, out var order))
             {
                 // The amount check. Kopecks become UAH by decimal division rather than the order's
@@ -151,6 +142,30 @@ public static class StatementMatcher
                 continue;
             }
 
+            // No order of ours carries this invoice, but a refund of ours does: the order is gone -
+            // deleted, or its invoice id moved on to a re-issued payment link - so the capture has
+            // no order to be matched against and the row is reported against the refund instead.
+            //
+            // The refund's own order is nullable in the database (`ck_payments_refund_shape` asks
+            // for a parent capture, not for an order), so this reads it as it is rather than
+            // asserting an order that may not be there: a reconciliation row with a null order id
+            // says "we cannot place this", which is the truth in that case.
+            if (invoiceId is not null && refundsByInvoice.TryGetValue(invoiceId, out var refund))
+            {
+                var refundOrderId = refund.OrderId;
+                var reference = refundOrderId is { } orderId
+                    ? (referenceByOrderId.TryGetValue(orderId, out var known) ? known : orderId.ToString())
+                    : invoiceId;
+
+                rows.Add(new StatementMatchRow(
+                    entry.StatementId, StatementMatchStatus.RefundMatch, invoiceId, entry.Reference,
+                    entry.Destination,
+                    entry.AmountKopecks, amount, refundOrderId, refund.AmountKopecks / 100m,
+                    refund.ProviderInvoiceId, null, entry.AcquirerCreatedAtUtc,
+                    $"Refund {refund.Id:N} gave this invoice back on {reference} - no order of ours carries it"));
+                continue;
+            }
+
             rows.Add(new StatementMatchRow(
                 entry.StatementId, StatementMatchStatus.Unmatched, invoiceId, entry.Reference,
                 entry.Destination,
@@ -169,7 +184,9 @@ public static class StatementMatcher
     /// <param name="refundsIssued">The refunds we issued in the period. They carry their own
     /// figure and are never netted into the matched total: the matched total is about matching, not
     /// about net money, and a refund issued in the period can reverse a payment from an earlier one
-    /// - so subtracting the two would mix the periods in a document someone signs.</param>
+    /// - so subtracting the two would mix the periods in a document someone signs. The capture the
+    /// refund gave back is in the matched total, because that is money the acquirer took; the refund
+    /// is the money that came back, and it has its own figure.</param>
     public static StatementMatchSummary Summarise(
         IReadOnlyList<StatementMatchRow> rows,
         IReadOnlyList<IssuedRefundRow>? refundsIssued = null)
@@ -194,7 +211,9 @@ public static class StatementMatcher
 }
 
 /// <param name="MatchedTotalUah">What the acquirer says it took, over the rows we can explain.
-/// Gross of any refund: it is about matching, not about net money.</param>
+/// Gross: it is about matching, not about net money. A capture whose order we later refunded is
+/// still a capture the acquirer took, so its gross is in here - the refund we gave back is
+/// reported beside this figure, never subtracted from it.</param>
 /// <param name="MismatchDeltaUah">Signed difference on the rows where the two disagree.</param>
 /// <param name="UnmatchedTotalUah">Money the acquirer reports that we cannot account for at all.</param>
 /// <param name="IssuedRefundCount">How many refunds we issued in the period.</param>
