@@ -60,6 +60,7 @@ import { type CurrentUser } from "@/lib/admin-auth";
 import { STAFF_ROLES, assignableRoles } from "@/lib/roles";
 import { formatMoney } from "@/lib/money";
 import BrandsTab from "@/components/BrandsTab";
+import ContractsTab from "@/components/ContractsTab";
 import { BatchCostTimeline } from "@/components/BatchCostTimeline";
 import { StatementReconciliationPanel } from "@/components/StatementReconciliationPanel";
 import StationNodesTab from "@/components/StationNodesTab";
@@ -331,9 +332,6 @@ export default function AdminScreen() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
   const [refundTarget, setRefundTarget] = useState<PurchaseType | null>(null);
-  const [selectedSignature, setSelectedSignature] = useState<string | null>(
-    null,
-  );
   const [userConfirm, setUserConfirm] = useState<{
     id: string;
     action: "ban" | "delete";
@@ -405,24 +403,6 @@ export default function AdminScreen() {
       unitPrice: number;
       lineTotal: number;
     }[];
-  }
-
-  interface ContractType {
-    id: string;
-    title: string;
-    content: string;
-    version: string;
-    status: string;
-    createdAt: string;
-  }
-
-  interface UserContractType {
-    id: string;
-    userName: string;
-    companyName: string;
-    contractTitle: string;
-    signedAt: string;
-    signatureData: string;
   }
 
   /** A customer's name, and nothing else - what the screens that NAME a customer need. */
@@ -816,16 +796,6 @@ export default function AdminScreen() {
   const dropdownProviders = vouchersResponse?.brands || [];
   const dropdownStatuses = vouchersResponse?.statuses || [];
   const dropdownAmounts = vouchersResponse?.amounts || [];
-
-  const { data: contractsList = [] } = useQuery<ContractType[]>({
-    queryKey: ["/api/admin/legal-entity/contracts"],
-    enabled: !!user && activeTab === "contracts",
-  });
-
-  const { data: signedContractsList = [] } = useQuery<UserContractType[]>({
-    queryKey: ["/api/admin/legal-entity/contracts/signed-contracts"],
-    enabled: !!user && activeTab === "contracts",
-  });
 
   const { data: importsList = [] } = useQuery<any[]>({
     queryKey: ["/api/admin/voucher-imports"],
@@ -4373,116 +4343,7 @@ export default function AdminScreen() {
         {/* Contracts Tab */}
         {activeTab === "contracts" && (
           <div className="space-y-6 animate-in fade-in duration-300">
-            <div className="glass-panel p-6">
-              <h2 className="text-xl font-bold mb-4">
-                {t("contracts.availableTitle")}
-              </h2>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-muted">
-                    <tr>
-                      <th className="text-left p-4">{t("contracts.name")}</th>
-                      <th className="text-left p-4">
-                        {t("contracts.version")}
-                      </th>
-                      <th className="text-left p-4">{t("common.status")}</th>
-                      <th className="text-left p-4">
-                        {t("contracts.createdAt")}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {contractsList.map((contract: ContractType) => (
-                      <tr key={contract.id} className="border-border">
-                        <td className="p-4 font-bold">{contract.title}</td>
-                        <td className="p-4 font-mono">{contract.version}</td>
-                        <td className="p-4">
-                          <span
-                            className={`px-2 py-1 rounded text-xs ${contract.status === "ACTIVE" ? "bg-success/20 text-success" : "bg-muted text-muted-foreground"}`}
-                          >
-                            {t("status." + contract.status.toLowerCase())}
-                          </span>
-                        </td>
-                        <td className="p-4 text-muted-foreground">
-                          {formatDate(contract.createdAt)}
-                        </td>
-                      </tr>
-                    ))}
-                    {contractsList.length === 0 && (
-                      <tr>
-                        <td
-                          colSpan={4}
-                          className="p-8 text-center text-muted-foreground"
-                        >
-                          {t("contracts.noneAvailable")}
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div className="glass-panel p-6">
-              <h2 className="text-xl font-bold mb-4">
-                {t("contracts.signedTitle")}
-              </h2>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-muted">
-                    <tr>
-                      <th className="text-left p-4">{t("contracts.user")}</th>
-                      <th className="text-left p-4">
-                        {t("contracts.company")}
-                      </th>
-                      <th className="text-left p-4">
-                        {t("contracts.contract")}
-                      </th>
-                      <th className="text-left p-4">
-                        {t("contracts.signedAt")}
-                      </th>
-                      <th className="text-left p-4">
-                        {t("contracts.signature")}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {signedContractsList.map((sc: UserContractType) => (
-                      <tr key={sc.id} className="border-border">
-                        <td className="p-4">{sc.userName}</td>
-                        <td className="p-4">{sc.companyName}</td>
-                        <td className="p-4">{sc.contractTitle}</td>
-                        <td className="p-4 text-muted-foreground">
-                          {formatDateTime(sc.signedAt)}
-                        </td>
-                        <td className="p-4">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              setSelectedSignature(sc.signatureData)
-                            }
-                          >
-                            <FileSignature className="w-4 h-4 mr-2" />
-                            {t("contracts.view")}
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                    {signedContractsList.length === 0 && (
-                      <tr>
-                        <td
-                          colSpan={5}
-                          className="p-8 text-center text-muted-foreground"
-                        >
-                          {t("contracts.noneSigned")}
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <ContractsTab />
           </div>
         )}
       </div>
@@ -4528,42 +4389,6 @@ export default function AdminScreen() {
               onClick={() => setSelectedQrId(null)}
             >
               {t("common.close")}
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {selectedSignature && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4"
-          onClick={() => setSelectedSignature(null)}
-        >
-          <div
-            className="glass-panel p-6 max-w-lg w-full animate-in zoom-in-50 duration-200"
-            onClick={(e: React.MouseEvent) => e.stopPropagation()}
-          >
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-foreground">
-                ╨ƒ╨ò╨á╨ò╨ô╨¢╨»╨ö ╨ƒ╨å╨ö╨ƒ╨ÿ╨í╨ú
-              </h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSelectedSignature(null)}
-              >
-                <X className="w-5 h-5" />
-              </Button>
-            </div>
-
-            <div className="bg-white rounded-lg p-4 mb-6">
-              <SignatureViewer data={selectedSignature} />
-            </div>
-
-            <Button
-              className="w-full font-bold"
-              onClick={() => setSelectedSignature(null)}
-            >
-              ╨ù╨É╨Ü╨á╨ÿ╨ó╨ÿ
             </Button>
           </div>
         </div>
@@ -5050,37 +4875,3 @@ export default function AdminScreen() {
     </Layout>
   );
 }
-
-const SignatureViewer = ({ data }: { data: string }) => {
-  try {
-    const paths = JSON.parse(data);
-    if (!Array.isArray(paths))
-      return <div className="text-red-500">Invalid signature data</div>;
-
-    return (
-      <svg
-        viewBox="0 0 400 200"
-        className="w-full h-auto"
-        style={{ maxHeight: "300px" }}
-      >
-        {paths.map((d: string, i: number) => (
-          <path
-            key={i}
-            d={d}
-            fill="none"
-            stroke="#22c55e"
-            strokeWidth="4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        ))}
-      </svg>
-    );
-  } catch (e) {
-    return (
-      <div className="p-4 text-red-500 text-center">
-        ╨ƒ╨╛╨╝╨╕╨╗╨║╨░ ╨╖╨░╨▓╨░╨╜╤é╨░╨╢╨╡╨╜╨╜╤Å ╨┐╤û╨┤╨┐╨╕╤ü╤â
-      </div>
-    );
-  }
-};

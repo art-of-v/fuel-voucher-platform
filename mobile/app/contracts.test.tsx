@@ -180,6 +180,7 @@ const contract = (
   brandName: string,
   expiresAt = '2026-12-31T00:00:00Z',
   expired = false,
+  termsText: string | null = 'The terms the customer reads before signing.',
 ) => ({
   id,
   legalEntityId: 'le-1',
@@ -189,6 +190,9 @@ const contract = (
   createdAt: '2026-01-01T00:00:00Z',
   expiresAt,
   expired,
+  termsVersion: 1,
+  termsText,
+  hasText: termsText !== null,
 });
 
 /** A signature, as `GET /api/legal-entity/contracts/signed` returns it. */
@@ -366,11 +370,27 @@ describe('Contracts — which document gets signed', () => {
 
     fireEvent.press(screen.getByText('contracts.readFull'));
 
-    // The reader shows what the contract IS: a company, a term, and a brand. It has no
-    // text to show, because the schema has no column for one.
+    // The reader shows the facts - a company, a term, a version - AND the text of the terms,
+    // which is what the customer is signing. The text used to have nothing behind it: the
+    // schema had no column for it, and the button said "REVIEW THE CONTRACT" over facts.
     expect(screen.getByText('contracts.company')).toBeTruthy();
     expect(screen.getByText('Romashka')).toBeTruthy();
     expect(screen.getByText('contracts.expiresAt')).toBeTruthy();
+    expect(screen.getByTestId('contract-text')).toBeTruthy();
+    expect(screen.getByText('The terms the customer reads before signing.')).toBeTruthy();
+  });
+
+  it('says so when the provider has published no text for this version', () => {
+    mockContracts = [contract('c-1', 'st-1', 'Shell', '2026-12-31T00:00:00Z', false, null)];
+    render(<ContractsScreen />);
+    fireEvent.press(screen.getAllByTestId('icon-PenTool')[0]);
+
+    fireEvent.press(screen.getByText('contracts.readFull'));
+
+    // An empty page where the text should be would read as "there is nothing to read" -
+    // and the customer would sign a document they never saw.
+    expect(screen.getByTestId('contract-text-missing')).toBeTruthy();
+    expect(screen.getByText('contracts.noTextPublished')).toBeTruthy();
   });
 });
 

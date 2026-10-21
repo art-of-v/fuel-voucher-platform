@@ -49,18 +49,7 @@ public sealed class ContractWriter(ApplicationDbContext db)
     {
         ArgumentNullException.ThrowIfNull(entity);
 
-        // The current version of every provider. The table holds one row per provider per
-        // version, so it is small - four providers and a handful of versions each - and reading
-        // it whole is simpler than a query that has to say "the highest version" in SQL.
-        var versions = await db.ContractVersions
-            .AsNoTracking()
-            .ToListAsync(cancellationToken);
-
-        var current = versions
-            .GroupBy(v => v.BrandId)
-            .Select(g => g.OrderByDescending(v => v.Version).First())
-            .ToList();
-
+        var current = await CurrentVersionsAsync(cancellationToken);
         if (current.Count == 0)
         {
             // No provider has published a text yet, so there is nothing to sign. This is not an
@@ -73,6 +62,92 @@ public sealed class ContractWriter(ApplicationDbContext db)
             .Select(c => c.BrandId)
             .ToListAsync(cancellationToken);
 
+        return AddMissing(entity, userId, current, existing.ToHashSet(), cancellationToken);
+    }
+
+    /// <summary>
+    /// Makes sure EVERY company has a contract for every provider whose text exists.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is the backfill. A company that was created before a provider published its text
+    /// has no contract for that provider, and without this it never would: the writer only runs
+    /// when a company is created. The owner's answer to "do the companies that already existed
+    /// get contracts too?" was yes - this is where yes happens.
+    /// </para>
+    /// <para>
+    /// A company that already has a contract for a provider keeps it: a contract is per
+    /// provider, not per version of the terms, and a new version of the text does not rewrite an
+    /// agreement the customer may already have signed.
+    /// </para>
+    /// <para>
+    /// The versions and the contracts are read once, not once per company: this runs over every
+    /// company in the platform, and a query per company is a query per company.
+    /// </para>
+    /// </remarks>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>How many contracts were added.</returns>
+    public async Task<int> EnsureContractsForAllAsync(CancellationToken cancellationToken)
+    {
+        var current = await CurrentVersionsAsync(cancellationToken);
+        if (current.Count == 0)
+        {
+            return 0;
+        }
+
+        var companies = await db.LegalEntities
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
+        var existing = await db.Contracts
+            .Select(c => new { c.LegalEntityId, c.BrandId })
+            .ToListAsync(cancellationToken);
+
+        var added = 0;
+
+        foreach (var company in companies)
+        {
+            var have = existing
+                .Where(e => e.LegalEntityId == company.Id)
+                .Select(e => e.BrandId)
+                .ToHashSet();
+
+            added += AddMissing(company, company.UserId, current, have, cancellationToken);
+        }
+
+        return added;
+    }
+
+    /// <summary>
+    /// The current version of every provider - the one a new contract is made against.
+    /// </summary>
+    /// <remarks>
+    /// The table holds one row per provider per version, so it is small - four providers and a
+    /// handful of versions each - and reading it whole is simpler than a query that has to say
+    /// "the highest version" in SQL.
+    /// </remarks>
+    private async Task<List<ContractVersion>> CurrentVersionsAsync(CancellationToken cancellationToken)
+    {
+        var versions = await db.ContractVersions
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
+        return versions
+            .GroupBy(v => v.BrandId)
+            .Select(g => g.OrderByDescending(v => v.Version).First())
+            .ToList();
+    }
+
+    /// <summary>
+    /// Adds a contract for every provider the company does not have one for yet.
+    /// </summary>
+    private int AddMissing(
+        LegalEntity entity,
+        Guid userId,
+        List<ContractVersion> current,
+        HashSet<Guid> existing,
+        CancellationToken cancellationToken)
+    {
         var now = DateTime.UtcNow;
         var added = 0;
 
