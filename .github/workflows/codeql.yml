@@ -1,17 +1,30 @@
 name: CodeQL
 
-# Static security analysis (SAST) — MANUAL-ONLY (workflow_dispatch).
+# Static security analysis (SAST) — on every push and every pull request, plus a weekly scan.
 #
-# The repo goes PRIVATE on 2026-10-01. On a personal-account private repo, code scanning cannot
-# upload SARIF to the Security tab (that needs org-level GitHub Advanced Security), and every
-# hosted job-minute is billed — so running CodeQL automatically on each push/PR would both fail
-# at the upload step AND burn billable minutes. The two `Analyze (...)` contexts have also been
-# dropped from main's required checks (planning #37), so this no longer needs to run per-PR.
+# **This used to run only when you asked it to, and the reason was wrong.** The comment above
+# said the repository goes PRIVATE on 2026-10-01, and that on a private repository code scanning
+# cannot upload SARIF and every hosted job-minute is billed. Neither half of that is true of this
+# repository: `art-of-v/fuel-voucher-platform` is **public** (checked 2026-10-19, and again on
+# 2026-10-21 while this was being fixed), and code scanning is free on a public repository and
+# its results reach the Security tab. The premise never started, so the analysis it switched off
+# was never needed to be switched off.
 #
-# It is kept as a manual full scan you can trigger from the Actions tab while the repo is still
-# public (results reach the Security tab until the privacy flip). For ongoing coverage once
-# private, use the local CodeQL CLI runbook (planning #39) — that runs off GitHub, zero minutes.
+# So it runs automatically now, and the "Analyze (csharp)" and "Analyze (javascript-typescript)"
+# contexts are required checks on main: a finding is a finding whether anybody asked for the scan
+# or not, and a scan that only runs when somebody remembers to ask for it is a scan that finds
+# things the week after the code was written.
+#
+# If the repository does go private later, this file is what has to change with it - and the
+# change is a decision, not a drift. The local CodeQL CLI (planning #39) is the fallback for a
+# repository that cannot host the analysis.
 on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # A weekly scan, so a dependency that turns vulnerable between pushes is still noticed.
+    - cron: '23 5 * * 1'
   workflow_dispatch:
 
 permissions:
