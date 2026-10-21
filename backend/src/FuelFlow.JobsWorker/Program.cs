@@ -1,17 +1,20 @@
-using FuelFlow.JobsWorker.Services;
-// Aliased rather than imported: the API defines its own NotificationService, so a plain
-// using would make that name ambiguous here.
-// FulfillmentService, RefundStatusSyncService and VoucherStockMonitor live ONLY in the API and
-// are referenced via alias so this worker schedules the same implementations against the shared
-// Hangfire storage. A local copy used to live here and had silently diverged (its expiry filter
-// was commented out, it had no renewal or auto-refund handling), and because both processes
-// registered the recurring job under the same id, whichever started last silently won.
+// Every background-job type this worker runs lives in the API, and it is referenced through an
+// alias so this worker schedules the SAME implementations against the shared Hangfire storage.
+// A local copy used to live here and had silently diverged (its expiry filter was commented out,
+// it had no renewal or auto-refund handling), and because both processes registered the recurring
+// job under the same id, whichever started last silently won.
+//
+// NotificationService was the last of them: the copy that sat here had no push sender, no
+// safety-net claim window and no voucher-issued path, so this worker wrote notifications the
+// API did not - and skipped the ones the API did. One home per type is the rule; the API is it.
 using FulfillmentService = FuelFlow.API.BackgroundJobs.FulfillmentService;
+using NotificationService = FuelFlow.API.BackgroundJobs.NotificationService;
 using RefundStatusSyncService = FuelFlow.API.BackgroundJobs.RefundStatusSyncService;
 using VoucherStockMonitor = FuelFlow.API.BackgroundJobs.VoucherStockMonitor;
 using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.Features.Brands;
+using FuelFlow.Features.Notifications.Push;
 using FuelFlow.Features.Settings;
 using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Observability;
@@ -90,6 +93,14 @@ try
 
     builder.Services.AddScoped<NotificationService>();
     builder.Services.AddScoped<VoucherStockMonitor>();
+
+    // The notification service this worker runs is the API's, and it sends the push as well as
+    // writing the in-app row - so the sender the API registers has to be registered here too.
+    // The push is best-effort by contract: a failure is logged and swallowed, and the master
+    // switch (ExpoPush:Enabled) turns it off without a code change.
+    builder.Services.Configure<ExpoPushOptions>(
+        builder.Configuration.GetSection(ExpoPushOptions.SectionName));
+    builder.Services.AddHttpClient<IExpoPushSender, ExpoPushClient>();
 
     // The API and this worker share one Hangfire storage and both listen on the
     // "default" queue, so the worker can pick up jobs the API enqueued. That includes
