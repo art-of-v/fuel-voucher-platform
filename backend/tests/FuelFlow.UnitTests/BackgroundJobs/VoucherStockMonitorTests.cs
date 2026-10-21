@@ -6,6 +6,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -43,8 +44,8 @@ public sealed class VoucherStockMonitorTests : IDisposable
             BrandId = BrandIds.Okko,
             BasePrice = 100,
             DiscountPrice = 95,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         _context.SaveChanges();
     }
@@ -70,13 +71,13 @@ public sealed class VoucherStockMonitorTests : IDisposable
             Brand = brand ?? _provider,
             FuelTypeId = ToUuid("test-expiring-dp"),
             Liters = 10,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(daysUntilExpiry)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(daysUntilExpiry)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddDays(daysUntilExpiry)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddDays(daysUntilExpiry)),
             VoucherNumber = $"{brand}-{Guid.NewGuid().ToString()[..8]}",
             QrPayload = Guid.NewGuid().ToString(),
             Status = status,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
     private Task RunAsync(Action<TelegramOptions.VoucherNotificationOptions> configure)

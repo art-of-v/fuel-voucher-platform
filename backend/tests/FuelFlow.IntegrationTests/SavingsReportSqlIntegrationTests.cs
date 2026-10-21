@@ -5,6 +5,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -50,8 +51,8 @@ public sealed class SavingsReportSqlIntegrationTests : IClassFixture<TestDatabas
                 Id = userId,
                 PhoneNumber = $"+38{Guid.NewGuid():N}"[..20],
                 IsActive = true,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
 
             context.FuelTypes.Add(new FuelTypeEntity
@@ -60,8 +61,8 @@ public sealed class SavingsReportSqlIntegrationTests : IClassFixture<TestDatabas
                 Name = "Savings " + Guid.NewGuid().ToString("N")[..8],
                 BrandId = brandId,
                 BasePrice = 50m,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
 
             // Bought 100 L for 2200, the pump would have been 2500 -> 300 saved.
@@ -71,8 +72,8 @@ public sealed class SavingsReportSqlIntegrationTests : IClassFixture<TestDatabas
                 UserId = userId,
                 Price = 2200m,
                 Status = OrderStatus.Fulfilled,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             };
 
             order.LineItems.Add(new OrderLineItem
@@ -103,17 +104,17 @@ public sealed class SavingsReportSqlIntegrationTests : IClassFixture<TestDatabas
                 Status = VoucherStatus.Assigned,
                 // An assigned voucher is held against an order - the schema refuses one without it.
                 OrderId = order.Id,
-                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
-                CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
+                CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             };
             context.FuelVouchers.Add(voucher);
             context.Fulfillments.Add(new Fulfillment
             {
                 OrderId = order.Id,
                 VoucherId = voucher.Id,
-                FulfilledAtUtc = DateTime.UtcNow
+                FulfilledAtUtc = TestClock.UtcNow
             });
 
             await context.SaveChangesAsync();

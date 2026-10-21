@@ -1,5 +1,6 @@
 using FuelFlow.Features.Company.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Company.DeclineInvitation;
@@ -33,7 +34,7 @@ public sealed class DeclineInvitationCommandHandler
         }
 
         invitation.Status = InvitationStatus.Declined;
-        invitation.UpdatedAtUtc = DateTime.UtcNow;
+        invitation.UpdatedAtUtc = SystemClock.UtcNow;
 
         _context.CompanyInvitations.Update(invitation);
         await _context.SaveChangesAsync(cancellationToken);

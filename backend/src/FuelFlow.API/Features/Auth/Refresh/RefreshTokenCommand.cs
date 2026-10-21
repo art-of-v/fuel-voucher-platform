@@ -4,6 +4,7 @@ using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.SharedKernel.Time;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -66,7 +67,7 @@ public sealed class RefreshTokenCommandHandler
             .Where(rt => rt.Token == tokenHash)
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (refreshToken == null || refreshToken.ExpiresAtUtc <= DateTime.UtcNow)
+        if (refreshToken == null || refreshToken.ExpiresAtUtc <= SystemClock.UtcNow)
         {
             _logger.LogWarning("Invalid or expired refresh token");
             throw new UnauthorizedAccessException("Invalid or expired refresh token");
@@ -84,7 +85,7 @@ public sealed class RefreshTokenCommandHandler
 
         if (refreshToken.IsRevoked)
         {
-            var now = DateTime.UtcNow;
+            var now = SystemClock.UtcNow;
 
             // Lost-rotation recovery (#26). A token that was rotated but whose response never
             // reached the client - dropped connection, app suspended or killed mid-flight - is
@@ -157,7 +158,7 @@ public sealed class RefreshTokenCommandHandler
 
         // Inactive users (is_active=false) can refresh tokens - they have access to all
         // features except payments. Only payment endpoints enforce IsActive.
-        var response = await RotateAsync(refreshToken, refreshToken, DateTime.UtcNow, cancellationToken);
+        var response = await RotateAsync(refreshToken, refreshToken, SystemClock.UtcNow, cancellationToken);
         _metrics?.AuthRefresh("rotated");
         _logger.LogInformation("Refresh token rotated for user {UserId}", refreshToken.UserId);
         return response;

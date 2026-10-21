@@ -1,6 +1,7 @@
 using FluentAssertions;
 using FuelFlow.Features.Contracts.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -33,7 +34,7 @@ public sealed class ContractValidityIntegrationTests : IClassFixture<TestDatabas
         UserId = Guid.NewGuid(),
         LegalEntityId = Guid.NewGuid(),
         BrandId = Guid.NewGuid(),
-        CreatedAtUtc = DateTime.UtcNow.AddDays(-1),
+        CreatedAtUtc = TestClock.UtcNow.AddDays(-1),
         ExpiresAtUtc = expiresAtUtc ?? default
     };
 
@@ -65,7 +66,7 @@ public sealed class ContractValidityIntegrationTests : IClassFixture<TestDatabas
         // The term is not a term: it is before the contract was even created. The column is NOT
         // NULL as well - checked above - but a model that always sends a value cannot show
         // that, and this is the refusal a caller can actually cause.
-        var contract = NewContract(DateTime.UtcNow.AddDays(-2));
+        var contract = NewContract(TestClock.UtcNow.AddDays(-2));
         context.Contracts.Add(contract);
 
         var act = () => context.SaveChangesAsync();

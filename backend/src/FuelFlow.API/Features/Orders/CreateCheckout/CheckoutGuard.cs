@@ -1,5 +1,6 @@
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -127,7 +128,7 @@ public static class CheckoutGuard
         Guid orderId,
         CancellationToken cancellationToken)
     {
-        var deadline = DateTime.UtcNow + InvoiceWait;
+        var deadline = SystemClock.UtcNow + InvoiceWait;
 
         while (true)
         {
@@ -146,7 +147,7 @@ public static class CheckoutGuard
             if (order.CheckoutKey is null)
                 return null;
 
-            if (DateTime.UtcNow >= deadline)
+            if (SystemClock.UtcNow >= deadline)
                 return null;
 
             await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);

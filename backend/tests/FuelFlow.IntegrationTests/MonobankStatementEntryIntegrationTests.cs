@@ -2,6 +2,7 @@ using FluentAssertions;
 using FuelFlow.Features.Acquiring;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -52,8 +53,8 @@ public sealed class MonobankStatementEntryIntegrationTests : IClassFixture<TestD
             Status = "settled",
             AcquirerCreatedAtUtc = new DateTime(2026, 10, 5, 9, 0, 0, DateTimeKind.Utc),
             RawPayload = """{"statementId":"ST1","amount":1000}""",
-            FirstSeenAtUtc = DateTime.UtcNow,
-            LastSeenAtUtc = DateTime.UtcNow
+            FirstSeenAtUtc = TestClock.UtcNow,
+            LastSeenAtUtc = TestClock.UtcNow
         };
 
     [Fact]

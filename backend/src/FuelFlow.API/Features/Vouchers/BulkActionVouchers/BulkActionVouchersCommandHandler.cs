@@ -4,6 +4,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
@@ -92,7 +93,7 @@ public sealed class BulkActionVouchersCommandHandler
                     ? await _context.Database.BeginTransactionAsync(cancellationToken)
                     : null;
 
-                var archivedAtUtc = DateTime.UtcNow;
+                var archivedAtUtc = SystemClock.UtcNow;
                 await _context.FuelVouchers
                     .Where(v => batchIds.Contains(v.Id))
                     .ExecuteUpdateAsync(
@@ -173,7 +174,7 @@ public sealed class BulkActionVouchersCommandHandler
 
         var actor = TryGetActor(command);
         var preImages = entities.ToDictionary(e => e.Id, e => e.Status);
-        var now = DateTime.UtcNow;
+        var now = SystemClock.UtcNow;
 
         switch (command.Action)
         {

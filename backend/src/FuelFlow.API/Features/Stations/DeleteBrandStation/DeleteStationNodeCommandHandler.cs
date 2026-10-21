@@ -1,4 +1,5 @@
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Brands.DeleteBrandStation;
@@ -20,7 +21,7 @@ public sealed class DeleteBrandStationCommandHandler
         // history rather than garbage (#217). AsTracking matters - the context defaults to
         // NoTracking and the flag would not persist without it.
         entity.IsDeleted = true;
-        entity.DeletedAtUtc = DateTime.UtcNow;
+        entity.DeletedAtUtc = SystemClock.UtcNow;
         await _context.SaveChangesAsync(ct);
         return true;
     }

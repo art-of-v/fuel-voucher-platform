@@ -4,6 +4,7 @@ using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Vouchers.PurchaseBatchCost;
@@ -95,7 +96,7 @@ public sealed class SetBatchCostCommandHandler
         if (brand is null)
             return new SetBatchCostResult(false, true, "No vouchers for this fuel in the import", null, 0);
 
-        var now = DateTime.UtcNow;
+        var now = SystemClock.UtcNow;
         var actingUser = command.ActingUserId == Guid.Empty ? (Guid?)null : command.ActingUserId;
 
         // Stamp the vouchers. Without ForceOverwrite this only fills vouchers that have no cost yet, because

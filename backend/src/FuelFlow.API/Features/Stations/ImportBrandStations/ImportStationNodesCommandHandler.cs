@@ -1,5 +1,6 @@
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Brands.ImportBrandStations;
@@ -81,7 +82,7 @@ public sealed class ImportBrandStationsCommandHandler
             .ToListAsync(ct);
         var existingByKey = existing.ToDictionary(n => (n.BrandId, n.ExternalId));
 
-        var now = DateTime.UtcNow;
+        var now = SystemClock.UtcNow;
         foreach (var (key, incoming) in pending)
         {
             if (existingByKey.TryGetValue(key, out var entity))

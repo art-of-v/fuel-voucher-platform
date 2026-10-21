@@ -8,6 +8,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -103,14 +104,14 @@ public sealed class ExpiredVoucherLossServiceTests : IDisposable
             Brand = "okko",
             FuelTypeId = ToUuid("okko-dp"),
             Liters = 10m,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-expiredDaysAgo)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-expiredDaysAgo)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddDays(-expiredDaysAgo)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddDays(-expiredDaysAgo)),
             VoucherNumber = number,
             QrPayload = Guid.NewGuid().ToString(),
             Status = VoucherStatus.Available,
             ImportJobId = Guid.NewGuid(),
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
     /// <summary>
@@ -125,7 +126,7 @@ public sealed class ExpiredVoucherLossServiceTests : IDisposable
         {
             Key = key,
             Value = value,
-            UpdatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
             UpdatedByUserId = _operatorId,
             UpdatedByUserName = "Test Operator"
         });

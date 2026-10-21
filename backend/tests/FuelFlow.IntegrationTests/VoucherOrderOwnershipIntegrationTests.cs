@@ -17,6 +17,7 @@ using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -211,7 +212,7 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
         var purchaseId = Guid.NewGuid();
         var renewalId = Guid.NewGuid();
         var sourceId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
 
         using (var seed = CreateContext())
         {
@@ -403,7 +404,7 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
         var customerVoucherId = Guid.NewGuid();
         var stockId = Guid.NewGuid();
         const decimal surcharge = 250m;
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
 
         using (var seed = CreateContext())
         {
@@ -481,8 +482,8 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
             Id = userId,
             PhoneNumber = $"+38{userId:N}"[..20],
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
     private static FuelVoucher StockVoucher(Guid id, string brand, string fuelTypeId, decimal liters, DateOnly? expiry = null)
@@ -493,13 +494,13 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
             Brand = brand,
             FuelTypeId =   ToUuid(fuelTypeId),
             Liters = liters,
-            SupplierExpirationDate = expiry ?? DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
-            CustomerExpirationDate = expiry ?? DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+            SupplierExpirationDate = expiry ?? DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
+            CustomerExpirationDate = expiry ?? DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
             VoucherNumber = $"STK-{id:N}"[..16],
             QrPayload = $"qr-{id:N}",
             Status = VoucherStatus.Available,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
     private static FuelVoucher SourceVoucher(Guid id, Guid userId, string brand, string fuelTypeId, decimal liters, DateOnly expiry, Guid? orderId = null)
@@ -517,8 +518,8 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
             Status = VoucherStatus.Assigned,
             AssignedToUserId = userId,
             OrderId = orderId,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
     private static Order PurchaseOrder(Guid orderId, Guid userId, params (string Brand, string FuelTypeId, decimal Liters, decimal Amount)[] lines)
@@ -529,8 +530,8 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
             UserId = userId,
             Price = lines.Sum(l => l.Amount),
             Status = OrderStatus.PendingFulfillment,
-            CreatedAtUtc = DateTime.UtcNow.AddDays(-1),
-            UpdatedAtUtc = DateTime.UtcNow.AddDays(-1)
+            CreatedAtUtc = TestClock.UtcNow.AddDays(-1),
+            UpdatedAtUtc = TestClock.UtcNow.AddDays(-1)
         };
 
         foreach (var (brand, fuelTypeId, liters, amount) in lines)
@@ -567,8 +568,8 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
             Kind = OrderKind.Renewal,
             Status = OrderStatus.PendingFulfillment,
             MonobankInvoiceId = $"test-invoice-{orderId:N}",
-            CreatedAtUtc = DateTime.UtcNow.AddMinutes(-5),
-            UpdatedAtUtc = DateTime.UtcNow.AddMinutes(-5),
+            CreatedAtUtc = TestClock.UtcNow.AddMinutes(-5),
+            UpdatedAtUtc = TestClock.UtcNow.AddMinutes(-5),
             LineItems =
             [
                 new OrderLineItem
@@ -618,9 +619,9 @@ public sealed class VoucherOrderOwnershipIntegrationTests : IClassFixture<TestDa
             AmountKopecks = (long)(order.Price * 100),
             Currency = "UAH",
             Status = PaymentStatus.Succeeded,
-            PaidAtUtc = DateTime.UtcNow,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            PaidAtUtc = TestClock.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
     }
 }

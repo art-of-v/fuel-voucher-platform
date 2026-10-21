@@ -3,6 +3,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
@@ -44,13 +45,13 @@ public sealed class TestDataFlagIntegrationTests : IClassFixture<TestDatabaseFix
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 10m,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(3)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(3)),
             VoucherNumber = $"flag-default-{Guid.NewGuid():N}",
             QrPayload = $"flag-qr-{Guid.NewGuid():N}",
             Status = VoucherStatus.Available,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         ctx.FuelVouchers.Add(voucher);
@@ -95,14 +96,14 @@ public sealed class TestDataFlagIntegrationTests : IClassFixture<TestDatabaseFix
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 10m,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(3)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(3)),
             VoucherNumber = $"{tag}-{id:N}",
             QrPayload = $"{tag}-qr-{id:N}",
             Status = VoucherStatus.Available,
             IsTestData = isTestData,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
     private ApplicationDbContext CreateContext()

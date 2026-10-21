@@ -4,6 +4,7 @@ using FuelFlow.Features.Vouchers.GetAdminVouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
@@ -96,8 +97,8 @@ public sealed class VoucherListSortingIntegrationTests : IClassFixture<TestDatab
         await ctx.Database.MigrateAsync();
 
         ctx.Suppliers.AddRange(
-            new Supplier { Id = supplierA, Name = $"SORT-{tag}-Альфа", EdrIpn = TestEdrIpns.Next(), CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new Supplier { Id = supplierB, Name = $"SORT-{tag}-Бета", EdrIpn = TestEdrIpns.Next(), CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
+            new Supplier { Id = supplierA, Name = $"SORT-{tag}-Альфа", EdrIpn = TestEdrIpns.Next(), CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow },
+            new Supplier { Id = supplierB, Name = $"SORT-{tag}-Бета", EdrIpn = TestEdrIpns.Next(), CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow });
 
         // A network of its own, so the brand on the vouchers is a brand that EXISTS and is the brand
         // of the fuel they claim. The database refuses a voucher whose brand is not its fuel's
@@ -110,8 +111,8 @@ public sealed class VoucherListSortingIntegrationTests : IClassFixture<TestDatab
             Slug = brand,
             Name = $"SORT-{tag}",
             LogoText = "SORT",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         ctx.FuelTypes.Add(new FuelTypeEntity
@@ -121,8 +122,8 @@ public sealed class VoucherListSortingIntegrationTests : IClassFixture<TestDatab
             BrandId = brandId,
             BasePrice = 55,
             DiscountPrice = 52,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         foreach (var cost in costs)
@@ -142,8 +143,8 @@ public sealed class VoucherListSortingIntegrationTests : IClassFixture<TestDatab
                 Brand = brand,
                 FuelTypeId =   ToUuid(fuelTypeId),
                 Liters = 5m,
-                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
-                CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
+                SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(3)),
+                CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(3)),
                 Status = VoucherStatus.Available,
                 CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
                 UpdatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),

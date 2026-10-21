@@ -2,6 +2,7 @@ using FuelFlow.Features.Auth.QaTestAccess;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Vouchers.Availability;
@@ -278,7 +279,7 @@ var key = StockKey.For(row.BrandSlug, row.Fuel.Id, row.Liters);
         decimal liters,
         CancellationToken cancellationToken = default)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(SystemClock.UtcNow);
         // Vouchers still carry the network by text, so this gate - unlike the fuel lookups above -
         // is matched on the slug rather than on a uuid.
         var brand = brandSlug.ToLower();
@@ -324,7 +325,7 @@ var key = StockKey.For(row.BrandSlug, row.Fuel.Id, row.Liters);
         Guid[]? fuelTypeIds = null,
         decimal[]? literSizes = null)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(SystemClock.UtcNow);
         var pool = DataKinds.ForPool(isTestAccount);
 
         var query = _context.StockSummary

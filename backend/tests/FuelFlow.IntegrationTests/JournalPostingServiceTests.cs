@@ -2,6 +2,7 @@ using FluentAssertions;
 using FuelFlow.Features.Ledger;
 using FuelFlow.Features.Ledger.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
@@ -357,7 +358,7 @@ public sealed class JournalPostingServiceTests : IClassFixture<TestDatabaseFixtu
                 PeriodStart = new DateOnly(date.Year, date.Month, 1),
                 PeriodEnd = new DateOnly(date.Year, date.Month, 1).AddMonths(1).AddDays(-1),
                 Status = PeriodStatus.Closed,
-                ClosedAtUtc = DateTime.UtcNow,
+                ClosedAtUtc = TestClock.UtcNow,
                 // ck_accounting_periods_closed_shape requires a person as well as a moment: a period
                 // nobody closed cannot be reopened with a straight face.
                 ClosedByUserId = closer,

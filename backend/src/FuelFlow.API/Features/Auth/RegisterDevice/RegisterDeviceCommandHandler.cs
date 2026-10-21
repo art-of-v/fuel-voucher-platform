@@ -1,6 +1,7 @@
 using FuelFlow.API.Features.Auth.RegisterDevice;
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 using StackExchange.Redis;
 using System.Security.Cryptography;
@@ -109,7 +110,7 @@ public sealed class RegisterDeviceCommandHandler
             existingDevice.OsVersion = command.OsVersion;
             existingDevice.AppVersion = command.AppVersion;
             existingDevice.Status = DeviceStatus.Active;
-            existingDevice.LastSeenAt = DateTime.UtcNow;
+            existingDevice.LastSeenAt = SystemClock.UtcNow;
 
             _context.Devices.Update(existingDevice);
             await _context.SaveChangesAsync(cancellationToken);
@@ -137,8 +138,8 @@ public sealed class RegisterDeviceCommandHandler
             OsVersion = command.OsVersion,
             AppVersion = command.AppVersion,
             Status = DeviceStatus.Active,
-            CreatedAt = DateTime.UtcNow,
-            LastSeenAt = DateTime.UtcNow
+            CreatedAt = SystemClock.UtcNow,
+            LastSeenAt = SystemClock.UtcNow
         };
 
         _context.Devices.Add(device);

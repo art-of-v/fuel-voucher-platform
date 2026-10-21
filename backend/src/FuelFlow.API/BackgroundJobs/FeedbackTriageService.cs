@@ -3,6 +3,7 @@ using FuelFlow.Features.Feedback;
 using FuelFlow.Features.Feedback.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -86,7 +87,7 @@ public sealed class FeedbackTriageService
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             row.ClassifierError = Truncate(ex.Message, 1000);
-            row.ClassifiedAtUtc = DateTime.UtcNow;
+            row.ClassifiedAtUtc = SystemClock.UtcNow;
             await _context.SaveChangesAsync(cancellationToken);
 
             _logger.LogWarning(ex, "Classification failed for feedback message {MessageId}", messageId);
@@ -116,7 +117,7 @@ public sealed class FeedbackTriageService
         // rounded to two places, and the decimal is the one the column keeps.
         row.Confidence = Math.Round((decimal)classification.Confidence, 2);
         row.ClassifierError = null;
-        row.ClassifiedAtUtc = DateTime.UtcNow;
+        row.ClassifiedAtUtc = SystemClock.UtcNow;
 
         if (row.Verdict == FeedbackVerdict.Junk)
         {

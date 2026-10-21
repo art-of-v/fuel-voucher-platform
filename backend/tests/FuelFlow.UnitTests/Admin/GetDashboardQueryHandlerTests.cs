@@ -3,6 +3,7 @@ using FuelFlow.Features.Admin.GetDashboard;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.UnitTests.Admin;
@@ -102,8 +103,8 @@ public sealed class GetDashboardQueryHandlerTests : IDisposable
             Slug = "okko",
             Name = "OKKO",
             LogoText = "OK",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         _context.FuelTypes.Add(new FuelTypeEntity
@@ -113,8 +114,8 @@ public sealed class GetDashboardQueryHandlerTests : IDisposable
             BrandId = brandId,
             BasePrice = 50m,
             MarginUahPerLiter = marginPerLiter,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         _context.FuelNominals.Add(new FuelNominal
@@ -122,8 +123,8 @@ public sealed class GetDashboardQueryHandlerTests : IDisposable
             FuelTypeId = fuelTypeId,
             DataKind = DataKinds.Real,
             Liters = 50,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         await _context.SaveChangesAsync();
@@ -144,8 +145,8 @@ public sealed class GetDashboardQueryHandlerTests : IDisposable
             Price = 100m,
             Status = status,
             Kind = kind,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         order.LineItems.Add(new OrderLineItem

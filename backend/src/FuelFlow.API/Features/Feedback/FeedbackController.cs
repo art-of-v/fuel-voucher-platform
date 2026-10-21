@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using FuelFlow.Features.Settings;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -64,7 +65,7 @@ public sealed class FeedbackController : ControllerBase
             userId.Value,
             _options.SigningKey,
             TimeSpan.FromDays(_options.DeepLinkTtlDays),
-            DateTime.UtcNow);
+            SystemClock.UtcNow);
 
         var url = FeedbackDeepLink.BuildDeepLink(_options.BotUsername, payload);
 

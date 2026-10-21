@@ -6,6 +6,7 @@ using FuelFlow.Persistence;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.SharedKernel;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.SharedKernel.Time;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using FuelFlow.API.Features.Monobank.ProcessWebhook;
@@ -165,7 +166,7 @@ public sealed partial class ProcessMonobankWebhookCommandHandler
         // The provider's modified date is the best available approximation of when the money moved
         // and is what the order already trusts for replay ordering. The statement import replaces it
         // with the acquirer's financial operation time when one arrives, which is the authority.
-        PaymentFactory.ApplyStatus(payment, status.Value, command.ModifiedDate, DateTime.UtcNow);
+        PaymentFactory.ApplyStatus(payment, status.Value, command.ModifiedDate, SystemClock.UtcNow);
 
         // The acquirer's own figure, kept beside ours rather than only in the delivery. This is what
         // makes an amount mismatch answerable from the money row: two numbers on one row, and a
@@ -327,13 +328,13 @@ public sealed partial class ProcessMonobankWebhookCommandHandler
 
         var previousStatus = order.Status;
         order.Status = targetStatus.Value;
-        order.UpdatedAtUtc = DateTime.UtcNow;
-        order.LastWebhookProcessedAtUtc = DateTime.UtcNow;
+        order.UpdatedAtUtc = SystemClock.UtcNow;
+        order.LastWebhookProcessedAtUtc = SystemClock.UtcNow;
         order.LastWebhookModifiedDateUtc = command.ModifiedDate;
 
         // Time from checkout to a real payment outcome. A rising p95 means customers
         // are waiting longer for confirmation, usually before failures become visible.
-        _metrics.RecordWebhookLag((DateTime.UtcNow - order.CreatedAtUtc).TotalSeconds);
+        _metrics.RecordWebhookLag((SystemClock.UtcNow - order.CreatedAtUtc).TotalSeconds);
 
         // A renewal order (its lines name the vouchers they renew) fulfils on a different path than a
         // buy-fuel order: it must NOT write an ORDER_CREATED event (that event drives the buy-fuel
@@ -389,7 +390,7 @@ var isRenewalOrder = targetStatus == OrderStatus.PendingFulfillment
                             quantity = firstLi?.Quantity ?? 0
                         }),
                         Processed = false,
-                        CreatedAtUtc = DateTime.UtcNow
+                        CreatedAtUtc = SystemClock.UtcNow
                     };
 
                     _context.OutboxEvents.Add(outboxEvent);
@@ -495,8 +496,8 @@ if (targetStatus == OrderStatus.PendingFulfillment)
         }
 
         order.MonobankStatus = observed;
-        order.UpdatedAtUtc = DateTime.UtcNow;
-        order.LastWebhookProcessedAtUtc = DateTime.UtcNow;
+        order.UpdatedAtUtc = SystemClock.UtcNow;
+        order.LastWebhookProcessedAtUtc = SystemClock.UtcNow;
         // The brand's own modified date, not UtcNow: the stale-replay guard compares against
         // it, and stamping "now" here would make a legitimately older-but-relevant retry look
         // already-handled.

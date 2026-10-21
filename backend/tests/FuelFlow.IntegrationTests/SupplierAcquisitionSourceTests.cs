@@ -1,6 +1,7 @@
 using FluentAssertions;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -62,8 +63,8 @@ public class SupplierAcquisitionSourceTests : WebApplicationFactory<Program>, IC
             Id = Guid.NewGuid(),
             Name = $"acq-test-{Guid.NewGuid():N}",
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
             AcquisitionSource = statedSource ?? AcquisitionSources.Default,
         };
 
@@ -116,8 +117,8 @@ public class SupplierAcquisitionSourceTests : WebApplicationFactory<Program>, IC
             Id = Guid.NewGuid(),
             Name = $"acq-bad-{Guid.NewGuid():N}",
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
             AcquisitionSource = "Partner",
         });
 
@@ -163,7 +164,7 @@ public class SupplierAcquisitionSourceTests : WebApplicationFactory<Program>, IC
         {
             var supplier = await context.Suppliers.FirstAsync(s => s.Id == supplierId);
             supplier.Phone = "+380501234567";
-            supplier.UpdatedAtUtc = DateTime.UtcNow;
+            supplier.UpdatedAtUtc = TestClock.UtcNow;
             await context.SaveChangesAsync();
         };
 

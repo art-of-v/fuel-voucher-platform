@@ -4,6 +4,7 @@ using FuelFlow.Features.Vouchers.GetImportBatches;
 using FuelFlow.Persistence;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -171,8 +172,8 @@ public sealed class ImportBatchPagingIntegrationTests : IClassFixture<TestDataba
             Id = userId,
             PhoneNumber = $"+38{Guid.NewGuid():N}"[..20],
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         // The seeded network, used as it is: the slug is unique, so a second brand with the same
@@ -186,8 +187,8 @@ public sealed class ImportBatchPagingIntegrationTests : IClassFixture<TestDataba
             Name = "Batch fuel " + Guid.NewGuid().ToString("N")[..8],
             BrandId = brandId,
             BasePrice = 50m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         context.VoucherImports.Add(new VoucherImport
@@ -195,8 +196,8 @@ public sealed class ImportBatchPagingIntegrationTests : IClassFixture<TestDataba
             Id = importId,
             FileName = $"batch-{Guid.NewGuid():N}.pdf",
             PageCount = count,
-            StartedAtUtc = DateTime.UtcNow,
-            CompletedAtUtc = DateTime.UtcNow,
+            StartedAtUtc = TestClock.UtcNow,
+            CompletedAtUtc = TestClock.UtcNow,
             Status = "Completed",
             ImportedCount = count
         });
@@ -217,8 +218,8 @@ public sealed class ImportBatchPagingIntegrationTests : IClassFixture<TestDataba
                 ImportJobId = importId,
                 SupplierExpirationDate = new DateOnly(2027, 1, 1),
                 CustomerExpirationDate = new DateOnly(2027, 1, 1),
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
         }
 

@@ -3,6 +3,7 @@ using FuelFlow.Features.Notifications.Push;
 using FuelFlow.Features.Notifications.SharedModels;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.API.BackgroundJobs;
@@ -37,7 +38,7 @@ public sealed class NotificationService
         // was written, and it claims the event within seconds. This waits longer than that, so the
         // two never race for the same row - which for a notification means the customer gets it
         // twice.
-        var claimCutoff = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow;
+        var claimCutoff = SystemClock.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow;
 
         var events = await _context.OutboxEvents
             .Where(e => !e.Processed && e.EventType == OutboxEventType.OrderFulfilled && e.CreatedAtUtc < claimCutoff)
@@ -78,7 +79,7 @@ public sealed class NotificationService
     public async Task ProcessVoucherIssuedEventsAsync(CancellationToken cancellationToken = default)
     {
         // The safety net - see ProcessOrderFulfilledEventsAsync.
-        var claimCutoff = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow;
+        var claimCutoff = SystemClock.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow;
 
         var events = await _context.OutboxEvents
             .Where(e => !e.Processed && e.EventType == OutboxEventType.VoucherIssued && e.CreatedAtUtc < claimCutoff)
@@ -116,7 +117,7 @@ public sealed class NotificationService
         {
             _logger.LogWarning("Invalid VOUCHER_ISSUED payload for event {EventId}", outboxEvent.Id);
             outboxEvent.Processed = true;
-            outboxEvent.ProcessedAtUtc = DateTime.UtcNow;
+            outboxEvent.ProcessedAtUtc = SystemClock.UtcNow;
             _context.OutboxEvents.Update(outboxEvent);
             await _context.SaveChangesAsync(cancellationToken);
             return;
@@ -142,13 +143,13 @@ public sealed class NotificationService
                 VoucherCount = payload.VoucherCount,
             }),
             IsRead = false,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = SystemClock.UtcNow
         };
 
         _context.Notifications.Add(notification);
 
         outboxEvent.Processed = true;
-        outboxEvent.ProcessedAtUtc = DateTime.UtcNow;
+        outboxEvent.ProcessedAtUtc = SystemClock.UtcNow;
         _context.OutboxEvents.Update(outboxEvent);
 
         await _context.SaveChangesAsync(cancellationToken);
@@ -202,7 +203,7 @@ public sealed class NotificationService
         {
             _logger.LogWarning("Invalid ORDER_FULFILLED payload for event {EventId}", outboxEvent.Id);
             outboxEvent.Processed = true;
-            outboxEvent.ProcessedAtUtc = DateTime.UtcNow;
+            outboxEvent.ProcessedAtUtc = SystemClock.UtcNow;
             _context.OutboxEvents.Update(outboxEvent);
             await _context.SaveChangesAsync(cancellationToken);
             return;
@@ -212,7 +213,7 @@ public sealed class NotificationService
         {
             _logger.LogWarning("Invalid UserId in ORDER_FULFILLED payload for event {EventId}", outboxEvent.Id);
             outboxEvent.Processed = true;
-            outboxEvent.ProcessedAtUtc = DateTime.UtcNow;
+            outboxEvent.ProcessedAtUtc = SystemClock.UtcNow;
             _context.OutboxEvents.Update(outboxEvent);
             await _context.SaveChangesAsync(cancellationToken);
             return;
@@ -233,13 +234,13 @@ public sealed class NotificationService
                 OrderId = payload.OrderId.ToString(),
             }),
             IsRead = false,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = SystemClock.UtcNow
         };
 
         _context.Notifications.Add(notification);
 
         outboxEvent.Processed = true;
-        outboxEvent.ProcessedAtUtc = DateTime.UtcNow;
+        outboxEvent.ProcessedAtUtc = SystemClock.UtcNow;
         _context.OutboxEvents.Update(outboxEvent);
 
         await _context.SaveChangesAsync(cancellationToken);
@@ -308,7 +309,7 @@ public sealed class NotificationService
             if (dead.Count == 0)
                 return;
 
-            var now = DateTime.UtcNow;
+            var now = SystemClock.UtcNow;
             foreach (var token in tokens.Where(t => dead.Contains(t.Token)))
             {
                 token.IsActive = false;

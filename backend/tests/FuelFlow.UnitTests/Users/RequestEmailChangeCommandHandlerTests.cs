@@ -7,6 +7,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Notifications.Email;
 using FuelFlow.SharedKernel.Security;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -53,8 +54,8 @@ public sealed class RequestEmailChangeCommandHandlerTests : IDisposable
             Id = UserId,
             PhoneNumber = Phone,
             Email = email,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         await _context.SaveChangesAsync();
     }
@@ -67,8 +68,8 @@ public sealed class RequestEmailChangeCommandHandlerTests : IDisposable
             PhoneNumber = phone,
             Code = SecretsHasher.Hash(code),
             IsUsed = false,
-            ExpiresAtUtc = DateTime.UtcNow.AddMinutes(5),
-            CreatedAtUtc = DateTime.UtcNow
+            ExpiresAtUtc = TestClock.UtcNow.AddMinutes(5),
+            CreatedAtUtc = TestClock.UtcNow
         };
         _context.VerificationCodes.Add(vc);
         await _context.SaveChangesAsync();

@@ -4,6 +4,7 @@ using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -57,8 +58,8 @@ public sealed class PublicFuelTypesIntegrationTests : IClassFixture<TestDatabase
             Name = "TEST",
             LogoText = "TEST",
             Color = "#000",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         context.FuelTypes.Add(new FuelTypeEntity
@@ -69,8 +70,8 @@ public sealed class PublicFuelTypesIntegrationTests : IClassFixture<TestDatabase
             SupplierPricePerLiter = cost,
             MarginUahPerLiter = margin,
             PumpPricePerLiter = 92.90m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         context.FuelTypes.Add(new FuelTypeEntity
@@ -80,8 +81,8 @@ public sealed class PublicFuelTypesIntegrationTests : IClassFixture<TestDatabase
             Name = "ДП",
             // No cost, no margin: the state an imported fuel is in until an operator prices it.
             PumpPricePerLiter = 101.90m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         if (withStock)
@@ -92,8 +93,8 @@ public sealed class PublicFuelTypesIntegrationTests : IClassFixture<TestDatabase
             {
                 FuelTypeId =   fuelId,
                 Liters = 10m,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
 
             context.FuelVouchers.Add(new FuelVoucher
@@ -108,11 +109,11 @@ public sealed class PublicFuelTypesIntegrationTests : IClassFixture<TestDatabase
                 Status = VoucherStatus.Available,
                 DataKind = DataKinds.Real,
                 // The stock query skips expired vouchers, and an unset date reads as the year one.
-                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+                SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
                 VoucherNumber = $"V-{Guid.NewGuid():N}",
                 QrPayload = $"9018$500$;{Guid.NewGuid():N}",
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
         }
 

@@ -2,6 +2,7 @@ using FuelFlow.Features.Pricing;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Vouchers.PurchaseBatchCost;
@@ -89,7 +90,7 @@ public sealed class BlendedCostRecalculator
     .AsNoTracking()
     .CountAsync(n => n.FuelTypeId == fuelTypeId, ct);
 
-    var now = DateTime.UtcNow;
+    var now = SystemClock.UtcNow;
         var actingUser = actingUserId == Guid.Empty ? (Guid?)null : actingUserId;
 
         // Same shared formula the operator panel uses: final = cost + profit. The column price is the

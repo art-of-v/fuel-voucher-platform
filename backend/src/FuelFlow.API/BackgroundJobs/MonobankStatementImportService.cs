@@ -4,6 +4,7 @@ using FuelFlow.Features.Acquiring;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -65,7 +66,7 @@ public class MonobankStatementImportService
             return;
         }
 
-        var toUtc = DateTime.UtcNow;
+        var toUtc = SystemClock.UtcNow;
         var fromUtc = toUtc.AddDays(-_options.StatementImportWindowDays);
         var slices = MonobankStatementWindow.Split(fromUtc, toUtc);
 
@@ -149,7 +150,7 @@ public class MonobankStatementImportService
             return;
         }
 
-        var now = DateTime.UtcNow;
+        var now = SystemClock.UtcNow;
 
         var statementIds = nameable.Select(i => i.StatementId).Distinct().ToList();
 

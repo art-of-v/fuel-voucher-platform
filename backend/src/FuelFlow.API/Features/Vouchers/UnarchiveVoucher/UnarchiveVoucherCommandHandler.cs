@@ -2,6 +2,7 @@ using System.Text.Json;
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Vouchers.UnarchiveVoucher;
@@ -74,7 +75,7 @@ public sealed class UnarchiveVoucherCommandHandler
             .ExecuteUpdateAsync(
                 s => s
                     .SetProperty(v => v.IsDeleted, false)
-                    .SetProperty(v => v.UpdatedAtUtc, DateTime.UtcNow),
+                    .SetProperty(v => v.UpdatedAtUtc, SystemClock.UtcNow),
                 cancellationToken);
 
         if (affected == 0)
@@ -104,7 +105,7 @@ public sealed class UnarchiveVoucherCommandHandler
                 EventType = VoucherEventTypes.Unarchived,
                 ActorKind = VoucherActorKinds.User,
                 ActorUserId = unarchiveActor,
-                OccurredAtUtc = DateTime.UtcNow
+                OccurredAtUtc = SystemClock.UtcNow
             });
 
             await _context.SaveChangesAsync(cancellationToken);

@@ -4,6 +4,7 @@ using FluentAssertions;
 using FuelFlow.Features.Feedback;
 using FuelFlow.Features.Feedback.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.Testing;
 using Hangfire;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -176,7 +177,7 @@ public sealed class FeedbackBotIntegrationTests : IClassFixture<TestDatabaseFixt
         var jobs = new RecordingJobClient();
 
         var payload = FeedbackDeepLink.CreatePayload(
-            userId, FeedbackTestFactory.SigningKey, TimeSpan.FromDays(30), DateTime.UtcNow);
+            userId, FeedbackTestFactory.SigningKey, TimeSpan.FromDays(30), TestClock.UtcNow);
 
         await using (var context = CreateContext())
         {
@@ -211,7 +212,7 @@ public sealed class FeedbackBotIntegrationTests : IClassFixture<TestDatabaseFixt
         var jobs = new RecordingJobClient();
 
         var forged = FeedbackDeepLink.CreatePayload(
-            Guid.CreateVersion7(), FeedbackTestFactory.SigningKey, TimeSpan.FromDays(30), DateTime.UtcNow);
+            Guid.CreateVersion7(), FeedbackTestFactory.SigningKey, TimeSpan.FromDays(30), TestClock.UtcNow);
 
         await using var context = CreateContext();
         await FeedbackTestFactory.Router(context, client, jobs)
@@ -248,7 +249,7 @@ public sealed class FeedbackBotIntegrationTests : IClassFixture<TestDatabaseFixt
         var client = new RecordingTelegramFeedbackClient();
         var jobs = new RecordingJobClient();
         var payload = FeedbackDeepLink.CreatePayload(
-            userId, FeedbackTestFactory.SigningKey, TimeSpan.FromDays(30), DateTime.UtcNow);
+            userId, FeedbackTestFactory.SigningKey, TimeSpan.FromDays(30), TestClock.UtcNow);
 
         await using var context = CreateContext();
         var router = FeedbackTestFactory.Router(context, client, jobs);
@@ -493,7 +494,7 @@ public sealed class FeedbackBotIntegrationTests : IClassFixture<TestDatabaseFixt
         var jobs = new RecordingJobClient();
 
         var payload = FeedbackDeepLink.CreatePayload(
-            userId, FeedbackTestFactory.SigningKey, TimeSpan.FromDays(30), DateTime.UtcNow);
+            userId, FeedbackTestFactory.SigningKey, TimeSpan.FromDays(30), TestClock.UtcNow);
 
         await using (var context = CreateContext())
         {
@@ -526,7 +527,7 @@ public sealed class FeedbackBotIntegrationTests : IClassFixture<TestDatabaseFixt
         var jobs = new RecordingJobClient();
 
         var payload = FeedbackDeepLink.CreatePayload(
-            userId, FeedbackTestFactory.SigningKey, TimeSpan.FromDays(30), DateTime.UtcNow);
+            userId, FeedbackTestFactory.SigningKey, TimeSpan.FromDays(30), TestClock.UtcNow);
 
         await using (var context = CreateContext())
         {
@@ -557,7 +558,7 @@ public sealed class FeedbackBotIntegrationTests : IClassFixture<TestDatabaseFixt
         var jobs = new RecordingJobClient();
 
         var firstPayload = FeedbackDeepLink.CreatePayload(
-            firstUser, FeedbackTestFactory.SigningKey, TimeSpan.FromDays(30), DateTime.UtcNow);
+            firstUser, FeedbackTestFactory.SigningKey, TimeSpan.FromDays(30), TestClock.UtcNow);
 
         await using (var context = CreateContext())
         {
@@ -567,7 +568,7 @@ public sealed class FeedbackBotIntegrationTests : IClassFixture<TestDatabaseFixt
 
         var secondUser = await SeedUserAsync();
         var secondPayload = FeedbackDeepLink.CreatePayload(
-            secondUser, FeedbackTestFactory.SigningKey, TimeSpan.FromDays(30), DateTime.UtcNow);
+            secondUser, FeedbackTestFactory.SigningKey, TimeSpan.FromDays(30), TestClock.UtcNow);
 
         client.Sent.Clear();
 
@@ -963,7 +964,7 @@ public sealed class FeedbackBotIntegrationTests : IClassFixture<TestDatabaseFixt
             Id = id,
             PhoneNumber = $"+38099{Interlocked.Increment(ref _nextPhoneSuffix):D8}",
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow
         });
         await context.SaveChangesAsync();
         return id;

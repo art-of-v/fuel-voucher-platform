@@ -23,6 +23,8 @@ using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Domain;
 
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.Testing;
+using FuelFlow.Testing;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 namespace FuelFlow.UnitTests.Orders;
 
@@ -86,11 +88,11 @@ public OrderCommandHandlersTests()
     {
         var fuelTypes = new[]
         {
-            new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = ToUuid("okko-95"), Name = "A-95", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = ToUuid("okko-p95"), Name = "Pulls 95", BrandId = BrandIds.Okko, BasePrice = 62, DiscountPrice = 58, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = ToUuid("wog-dp"), Name = "ДП Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = ToUuid("wog-95"), Name = "A-95 Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow }
+            new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("okko-95"), Name = "A-95", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("okko-p95"), Name = "Pulls 95", BrandId = BrandIds.Okko, BasePrice = 62, DiscountPrice = 58, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("wog-dp"), Name = "ДП Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("wog-95"), Name = "A-95 Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow }
         };
         _context.FuelTypes.AddRange(fuelTypes);
         _context.SaveChanges();
@@ -113,7 +115,7 @@ public OrderCommandHandlersTests()
     /// </summary>
     private void SeedSellableStock(string fuelTypeId = "okko-95", decimal liters = 50m)
     {
-        var expiry = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1));
+        var expiry = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1));
         var voucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
@@ -126,8 +128,8 @@ public OrderCommandHandlersTests()
             VoucherNumber = $"STOCK-{Guid.NewGuid().ToString()[..8]}",
             QrPayload = Guid.NewGuid().ToString(),
             Status = VoucherStatus.Available,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
         _context.FuelVouchers.Add(voucher);
         // The stock queries read the summary, not the vouchers, and the in-memory provider has no
@@ -182,8 +184,8 @@ public OrderCommandHandlersTests()
         Price = 2500,
         Status = status,
         MonobankPaymentUrl = monobankPaymentUrl,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow,
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow,
         LineItems =
         {
             new OrderLineItem
@@ -332,7 +334,7 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
         {
             Id = ToUuid("okko-frac"), Name = "ДП дробові", BrandId = BrandIds.Okko,
             BasePrice = 50, DiscountPrice = 48,
-            CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow
         });
         // 45.67/litre × 10 = 456.70 — the price the offer's own knobs produce, stated so the fixture agrees
         // with the formula. It said 4567 here before, which the old stored total made harmless; under an
@@ -461,7 +463,7 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
         var response1 = await _createCheckoutHandler.HandleAsync(CheckoutCommand());
 
         var abandoned = await _context.Orders.FindAsync(response1.OrderId);
-        abandoned!.CreatedAtUtc = DateTime.UtcNow.AddHours(-2);
+        abandoned!.CreatedAtUtc = TestClock.UtcNow.AddHours(-2);
         await _context.SaveChangesAsync();
 
         var response2 = await _createCheckoutHandler.HandleAsync(CheckoutCommand());
@@ -557,7 +559,7 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
         var user = await _context.Users.FirstAsync();
         var order1 = BuildOrder(OrderStatus.PendingFulfillment);
         var order2 = BuildOrder(OrderStatus.Fulfilled);
-        order2.FulfilledAtUtc = DateTime.UtcNow;
+        order2.FulfilledAtUtc = TestClock.UtcNow;
 
         _context.Orders.AddRange(order1, order2);
         await _context.SaveChangesAsync();
@@ -664,7 +666,7 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
 
     private void SeedDefaultUser()
     {
-        var role = new Role { Id = SeedRoles.UserRoleId, Name = SeedRoles.UserName, CreatedAtUtc = DateTime.UtcNow };
+        var role = new Role { Id = SeedRoles.UserRoleId, Name = SeedRoles.UserName, CreatedAtUtc = TestClock.UtcNow };
         _context.Roles.Add(role);
         _context.Users.Add(new User
         {
@@ -675,8 +677,8 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
             IsActive = true,
             IsDeleted = false,
             TokenVersion = 1,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         _context.SaveChanges();
     }

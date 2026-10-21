@@ -4,6 +4,7 @@ using FuelFlow.Features.Pricing.ImportOkkoPumpPrices;
 using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Pricing.BackfillBrandFuelCodes;
@@ -124,7 +125,7 @@ public sealed class BackfillBrandFuelCodesCommandHandler
 
         var fills = new List<BrandFuelCodeFill>();
         var skipped = new List<BrandFuelCodeSkipped>();
-        var now = DateTime.UtcNow;
+        var now = SystemClock.UtcNow;
 
         foreach (var fuel in uncoded)
         {

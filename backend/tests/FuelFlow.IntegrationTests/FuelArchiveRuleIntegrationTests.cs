@@ -9,6 +9,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
@@ -65,7 +66,7 @@ public sealed class FuelArchiveRuleIntegrationTests : IClassFixture<TestDatabase
         string name,
         VoucherStatus status)
     {
-        var now = DateTime.UtcNow;
+        var now = TestClock.UtcNow;
 // Under the real OKKO brand: the catalogue import only ever looks at that one, so a fuel parked
         // elsewhere would be invisible to it and the test would pass for the wrong reason.
         var brandId = BrandIds.Okko;

@@ -6,6 +6,7 @@ using FuelFlow.Features.Vouchers.PurchaseBatchCost;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
@@ -144,7 +145,7 @@ var afterCosts = (await CostsAsync(context, importId)).Single(c => c.FuelTypeId 
             Liters = 10m,
             CostPerLiter = 40m,
             Status = VoucherStatus.Available,
-            CreatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
             IsDeleted = softDeletedLiters > 0m
         });
         context.FuelVouchers.Add(new FuelVoucher
@@ -160,7 +161,7 @@ var afterCosts = (await CostsAsync(context, importId)).Single(c => c.FuelTypeId 
             Liters = 10m,
             CostPerLiter = 60m,
             Status = VoucherStatus.Available,
-            CreatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
             IsDeleted = false
         });
 
@@ -191,14 +192,14 @@ var afterCosts = (await CostsAsync(context, importId)).Single(c => c.FuelTypeId 
         {
             Id = importId,
             FileName = "divergence.pdf",
-            CompletedAtUtc = DateTime.UtcNow,
+            CompletedAtUtc = TestClock.UtcNow,
             Status = "Completed",
-            StartedAtUtc = DateTime.UtcNow
+            StartedAtUtc = TestClock.UtcNow
         });
 
         if (!await seed.Suppliers.AnyAsync())
         {
-            seed.Suppliers.Add(new Supplier { Id = Guid.NewGuid(), Name = "S", EdrIpn = TestEdrIpns.Next(), IsActive = true, CreatedAtUtc = DateTime.UtcNow });
+            seed.Suppliers.Add(new Supplier { Id = Guid.NewGuid(), Name = "S", EdrIpn = TestEdrIpns.Next(), IsActive = true, CreatedAtUtc = TestClock.UtcNow });
         }
         if (!await seed.FuelTypes.AnyAsync())
         {
@@ -209,8 +210,8 @@ seed.FuelTypes.Add(new FuelTypeEntity
                 BrandId = BrandIds.Okko,
                 BasePrice = 60m,
                 DiscountPrice = 60m,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
         }
 

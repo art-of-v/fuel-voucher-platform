@@ -6,6 +6,7 @@ using System.Text.Json;
 using FluentAssertions;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -411,7 +412,7 @@ public sealed class AuthorizePolicySurfaceTests : IClassFixture<TestDatabaseFixt
         using var scope = _fixture.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var role = await context.Roles.FirstAsync(r => r.Name == roleName);
-        var now = DateTime.UtcNow;
+        var now = TestClock.UtcNow;
 
         var user = new User
         {

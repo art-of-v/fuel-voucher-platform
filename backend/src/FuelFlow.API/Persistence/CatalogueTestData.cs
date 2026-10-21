@@ -1,4 +1,5 @@
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Time;
 
 namespace FuelFlow.Persistence;
 
@@ -52,7 +53,7 @@ internal static class CatalogueTestData
         DateTime? updatedAtUtc = null)
     {
         var pool = DataKinds.ForPool(isTestData);
-        var now = DateTime.UtcNow;
+        var now = SystemClock.UtcNow;
         // The fuel's id is a uuid, but a fixture still says which fuel it means by the name it has
         // always used. The mapping is the same one the migration used, so a fixture that means
         // "okko-95" means the row the production database actually holds.
@@ -71,8 +72,8 @@ internal static class CatalogueTestData
                     Id = fuelId,
                     Name = fuelTypeId,
                     BrandId = BrandId,
-                    CreatedAtUtc = createdAtUtc ?? DateTime.UtcNow,
-                    UpdatedAtUtc = updatedAtUtc ?? DateTime.UtcNow
+                    CreatedAtUtc = createdAtUtc ?? SystemClock.UtcNow,
+                    UpdatedAtUtc = updatedAtUtc ?? SystemClock.UtcNow
                 };
                 context.FuelTypes.Add(fuel);
             }
@@ -170,8 +171,8 @@ var computed = FuelPricing.FinalPerLiterOrNull(
             // a live size is not a rehearsal one. The caller says which by isTestData.
             DataKind = DataKinds.ForPool(isTestData),
             Liters = liters,
-            CreatedAtUtc = createdAtUtc ?? DateTime.UtcNow,
-            UpdatedAtUtc = updatedAtUtc ?? DateTime.UtcNow,
+            CreatedAtUtc = createdAtUtc ?? SystemClock.UtcNow,
+            UpdatedAtUtc = updatedAtUtc ?? SystemClock.UtcNow,
         };
 
         // `HasData` seeds the same (fuel, size) pairs into a fresh database, so adding one blindly

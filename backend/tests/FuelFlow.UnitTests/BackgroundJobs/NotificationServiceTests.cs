@@ -8,6 +8,7 @@ using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
+using FuelFlow.Testing;
 
 namespace FuelFlow.UnitTests.BackgroundJobs;
 
@@ -55,10 +56,10 @@ public sealed class ApiNotificationServiceTests : IDisposable
             {
                 orderId,
                 userId,
-                fulfilledAt = DateTime.UtcNow
+                fulfilledAt = TestClock.UtcNow
             }),
             Processed = processed,
-            CreatedAtUtc = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1)
+            CreatedAtUtc = TestClock.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1)
         };
     }
 
@@ -117,10 +118,10 @@ public sealed class ApiNotificationServiceTests : IDisposable
             {
                 OrderId = Guid.NewGuid(),
                 UserId = null!,
-                FulfilledAt = DateTime.UtcNow
+                FulfilledAt = TestClock.UtcNow
             }),
             Processed = false,
-            CreatedAtUtc = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1)
+            CreatedAtUtc = TestClock.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1)
         };
         _context.OutboxEvents.Add(outboxEvent);
         await _context.SaveChangesAsync();
@@ -250,7 +251,7 @@ public sealed class ApiNotificationServiceTests : IDisposable
     }
     private async Task SeedPushTokenAsync(Guid userId, string token, bool isActive)
     {
-        var now = DateTime.UtcNow;
+        var now = TestClock.UtcNow;
         _context.PushTokens.Add(new UserPushToken
         {
             Id = Guid.NewGuid(),

@@ -4,6 +4,7 @@ using FuelFlow.Features.Vouchers.Availability;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Xunit;
@@ -150,7 +151,7 @@ public sealed class StockSummaryFollowsTheVouchersTests : IClassFixture<TestData
         await context.Database.MigrateAsync();
         await ResetAsync(context);
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
 
         await SeedVoucherAsync(context, brand: "okko", fuelTypeId: "okko-95", liters: 50m, status: VoucherStatus.Available, expiresOn: today.AddMonths(6));
         await SeedVoucherAsync(context, brand: "okko", fuelTypeId: "okko-dp", liters: 10m, status: VoucherStatus.Available, expiresOn: today.AddDays(-1));
@@ -198,13 +199,13 @@ public sealed class StockSummaryFollowsTheVouchersTests : IClassFixture<TestData
             Liters = liters,
             Status = status,
             DataKind = dataKind,
-            SupplierExpirationDate = expiresOn ?? DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6)),
-            CustomerExpirationDate = expiresOn ?? DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6)),
+            SupplierExpirationDate = expiresOn ?? DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(6)),
+            CustomerExpirationDate = expiresOn ?? DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(6)),
             VoucherNumber = $"SUM-{id:N}"[..20],
             QrPayload = $"sum-{id:N}",
             QrPayloadSha256 = System.Text.Encoding.UTF8.GetBytes(id.ToString()),
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         await context.SaveChangesAsync();

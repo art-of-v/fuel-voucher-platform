@@ -2,6 +2,7 @@ using FluentAssertions;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -84,8 +85,8 @@ public sealed class OrderInvoiceUniquenessTests : IClassFixture<TestDatabaseFixt
         Status = OrderStatus.PendingPayment,
         Kind = OrderKind.Purchase,
         MonobankInvoiceId = invoiceId,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 
     private async Task<Guid> SeedUserAsync()
@@ -95,9 +96,9 @@ public sealed class OrderInvoiceUniquenessTests : IClassFixture<TestDatabaseFixt
         context.Users.Add(new User
         {
             Id = id,
-            PhoneNumber = $"+38051{DateTime.UtcNow.Ticks % 10_000_000:0000000}",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            PhoneNumber = $"+38051{TestClock.UniqueDigits(7)}",
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         await context.SaveChangesAsync();
         return id;

@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using FuelFlow.Features.Ledger.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using NpgsqlTypes;
@@ -63,7 +64,7 @@ public sealed class JournalPostingService
         var (debit, credit) = await ResolveAccountsAsync(request.SourceEvent, cancellationToken);
         var period = await ResolvePeriodAsync(request.EntryDate, cancellationToken);
         var entryNo = await NextEntryNoAsync(period.Id, cancellationToken);
-        var now = DateTime.UtcNow;
+        var now = SystemClock.UtcNow;
 
         var entry = new JournalEntry
         {
@@ -297,7 +298,7 @@ public sealed class JournalPostingService
         var period = await ResolvePeriodAsync(first.EntryDate, cancellationToken);
 
         var firstNo = await NextEntryNosAsync(period.Id, pending.Count, cancellationToken);
-        var now = DateTime.UtcNow;
+        var now = SystemClock.UtcNow;
 
         var entries = new List<JournalEntry>(pending.Count);
         for (var index = 0; index < pending.Count; index++)

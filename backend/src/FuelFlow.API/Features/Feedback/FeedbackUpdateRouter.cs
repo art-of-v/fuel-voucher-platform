@@ -2,6 +2,7 @@ using FuelFlow.API.BackgroundJobs;
 using FuelFlow.Features.Feedback.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Time;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -184,7 +185,7 @@ public class FeedbackUpdateRouter
             StaffUserId = sender.Id,
             StaffUserName = Truncate(sender.DisplayName, 200),
             Text = Clip(text, _options.MaxMessageLength),
-            SentAtUtc = DateTime.UtcNow
+            SentAtUtc = SystemClock.UtcNow
         };
 
         // Plain text on purpose: a staff member's reply is prose they typed, and "Ціна & доставка"
@@ -207,7 +208,7 @@ public class FeedbackUpdateRouter
 
         if (stored is not null && deliveredId is not null)
         {
-            stored.StaffRepliedAtUtc = DateTime.UtcNow;
+            stored.StaffRepliedAtUtc = SystemClock.UtcNow;
             if (stored.Status == FeedbackStatus.New)
                 stored.Status = FeedbackStatus.Triaged;
         }
@@ -231,7 +232,7 @@ public class FeedbackUpdateRouter
             payload,
             _options.SigningKey,
             TimeSpan.FromDays(_options.DeepLinkTtlDays),
-            DateTime.UtcNow);
+            SystemClock.UtcNow);
 
         if (userId is not null)
         {
@@ -288,13 +289,13 @@ public class FeedbackUpdateRouter
             {
                 TelegramChatId = chatId,
                 UserId = userId,
-                BoundAtUtc = DateTime.UtcNow
+                BoundAtUtc = SystemClock.UtcNow
             });
         }
         else
         {
             existing.UserId = userId;
-            existing.BoundAtUtc = DateTime.UtcNow;
+            existing.BoundAtUtc = SystemClock.UtcNow;
         }
 
         await _context.SaveChangesAsync(ct);
@@ -338,7 +339,7 @@ public class FeedbackUpdateRouter
             TelegramMessageId = message.MessageId,
             Text = Clip(text, _options.MaxMessageLength),
             Status = FeedbackStatus.New,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = SystemClock.UtcNow
         };
 
         _context.FeedbackMessages.Add(row);
@@ -368,7 +369,7 @@ public class FeedbackUpdateRouter
     /// </summary>
     private async Task<bool> WithinRateLimitAsync(long chatId, CancellationToken ct)
     {
-        var since = DateTime.UtcNow.AddHours(-1);
+        var since = SystemClock.UtcNow.AddHours(-1);
         var recent = await _context.FeedbackMessages
             .AsNoTracking()
             .CountAsync(m => m.TelegramChatId == chatId && m.CreatedAtUtc >= since, ct);

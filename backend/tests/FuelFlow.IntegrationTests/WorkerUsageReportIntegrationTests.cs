@@ -6,6 +6,7 @@ using FuelFlow.Features.Vouchers.GetWorkerUsageReport;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -287,8 +288,8 @@ public sealed class WorkerUsageReportIntegrationTests : IClassFixture<TestDataba
             Id = id,
             PhoneNumber = $"+38{id:N}"[..20],
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
     private static void SeedCompany(ApplicationDbContext seed, Guid id, Guid ownerId)
@@ -300,8 +301,8 @@ public sealed class WorkerUsageReportIntegrationTests : IClassFixture<TestDataba
             // edrpou is globally unique (see #128), so a shared literal would collide the moment a
             // test seeds two companies.
             Edrpou = $"{id:N}"[..8],
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
     /// <summary>
@@ -326,7 +327,7 @@ public sealed class WorkerUsageReportIntegrationTests : IClassFixture<TestDataba
             UserId = workerId,
             Price = 0,
             Status = OrderStatus.Fulfilled,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow
         });
 
         var voucher = NewUnheldVoucher(companyId, liters, number ?? $"V-{Guid.NewGuid():N}");
@@ -334,7 +335,7 @@ public sealed class WorkerUsageReportIntegrationTests : IClassFixture<TestDataba
         voucher.WorkerUserId = workerId;
         voucher.AssignedToUserId = workerId;
         voucher.OrderId = orderId;
-        voucher.IssuedAtUtc = DateTime.UtcNow;
+        voucher.IssuedAtUtc = TestClock.UtcNow;
 
         seed.FuelVouchers.Add(voucher);
         return voucher;
@@ -349,13 +350,13 @@ public sealed class WorkerUsageReportIntegrationTests : IClassFixture<TestDataba
             Brand = "okko",
             FuelTypeId = ToUuid("okko-dp"),
             Liters = liters,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(6)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(6)),
             VoucherNumber = number,
             QrPayload = Guid.NewGuid().ToString(),
             Status = VoucherStatus.Available,
             LegalEntityId = companyId,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 }

@@ -8,6 +8,7 @@ using FuelFlow.Features.Ledger.SharedModels;
 using FuelFlow.Features.Monobank.ProcessWebhook;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.Testing;
 using Hangfire;
 using Hangfire.Common;
 using Hangfire.States;
@@ -77,8 +78,8 @@ public sealed class ProcessMonobankWebhookCommandHandlerTests : IClassFixture<Te
     {
         Id = Guid.NewGuid(),
         PhoneNumber = $"+38050{Interlocked.Increment(ref _userSeq):D7}",
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow,
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow,
         SettlementCode = string.Empty,
     };
 
@@ -94,8 +95,8 @@ return new Order
             Price = 2500,
             Status = status,
             MonobankInvoiceId = invoiceId,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
 LineItems =
             {
                 new OrderLineItem
@@ -118,8 +119,8 @@ LineItems =
         InvoiceId = invoiceId,
         Status = status,
         Amount = 250000,
-        CreatedDate = DateTime.UtcNow,
-        ModifiedDate = DateTime.UtcNow
+        CreatedDate = TestClock.UtcNow,
+        ModifiedDate = TestClock.UtcNow
     };
 
     [Fact]

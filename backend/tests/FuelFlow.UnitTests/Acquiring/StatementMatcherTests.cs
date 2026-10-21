@@ -4,6 +4,7 @@ using FuelFlow.Features.Acquiring.Reconciliation;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.Testing;
 using Xunit;
 
 namespace FuelFlow.UnitTests.Acquiring;
@@ -77,9 +78,9 @@ public class StatementMatcherTests
         AmountKopecks = amountKopecks,
         Currency = "UAH",
         Status = PaymentStatus.Succeeded,
-        PaidAtUtc = DateTime.UtcNow,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        PaidAtUtc = TestClock.UtcNow,
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 
     [Fact]

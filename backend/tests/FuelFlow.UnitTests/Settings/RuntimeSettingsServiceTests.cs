@@ -4,6 +4,7 @@ using FuelFlow.Features.Settings;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Persistence;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -219,9 +220,9 @@ public sealed class RuntimeSettingsServiceTests : IDisposable
             TermCode = term.Code(),
             Enabled = enabled,
             RatePerLiter = rate,
-            ValidFrom = DateTime.UtcNow.AddDays(-1),
+            ValidFrom = TestClock.UtcNow.AddDays(-1),
             ValidTo = null,
-            CreatedAtUtc = DateTime.UtcNow.AddDays(-1)
+            CreatedAtUtc = TestClock.UtcNow.AddDays(-1)
         };
         _context.VoucherTermPricings.Add(row);
         return row;

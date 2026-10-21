@@ -7,6 +7,7 @@ using FuelFlow.Features.Settings;
 using FuelFlow.Features.Vouchers.Terms;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -67,8 +68,8 @@ public sealed class UnpricedTermQuoteIntegrationTests : IClassFixture<TestDataba
                 // What the catalogue import leaves behind: the pump is published, nobody has set a
                 // cost or a margin, so there is no price to quote.
                 PumpPricePerLiter = 92.90m,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
 
             seed.FuelNominals.Add(new FuelNominal
@@ -76,8 +77,8 @@ public sealed class UnpricedTermQuoteIntegrationTests : IClassFixture<TestDataba
                 FuelTypeId =   ToUuid(fuelId),
                 Liters = 10m,
                 DataKind = DataKinds.Real,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
 
             // A ladder, so the quote has something to say - and cannot say. The migration seeds one

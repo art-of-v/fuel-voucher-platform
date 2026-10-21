@@ -5,6 +5,7 @@ using FuelFlow.Features.Vouchers.Availability;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -77,8 +78,8 @@ public sealed class TermStockCoverageIntegrationTests : IClassFixture<TestDataba
         Name = name,
         BrandId = brandId,
         BasePrice = 50m,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 
     private static FuelVoucher Voucher(string brand, Guid fuelTypeId, decimal liters, DateOnly supplierExpiration) => new()
@@ -93,7 +94,7 @@ public sealed class TermStockCoverageIntegrationTests : IClassFixture<TestDataba
         SupplierExpirationDate = supplierExpiration,
         CustomerExpirationDate = supplierExpiration,
         Status = VoucherStatus.Available,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 }

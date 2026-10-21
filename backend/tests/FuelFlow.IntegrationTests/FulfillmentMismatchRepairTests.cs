@@ -14,6 +14,7 @@ using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -81,8 +82,8 @@ public sealed class FulfillmentMismatchRepairTests : IClassFixture<TestDatabaseF
                 Id = userId,
                 PhoneNumber = $"+38{userId:N}"[..20],
                 IsActive = true,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
 
             // One line item for one voucher, two delivery records: the quantity mismatch the repair
@@ -91,7 +92,7 @@ public sealed class FulfillmentMismatchRepairTests : IClassFixture<TestDatabaseF
             // than leaving a count wrong, so a day-old seed would test nothing at all.
             var order = Order(orderId, userId, quantity: 1, unitPrice: 2500);
             order.Status = OrderStatus.Fulfilled;
-            order.FulfilledAtUtc = DateTime.UtcNow;
+            order.FulfilledAtUtc = TestClock.UtcNow;
             AddPaidOrder(seed, order);
 
             seed.FuelVouchers.Add(Assigned(voucherA, brand, fuelTypeId, liters, "MR-A", userId, orderId));
@@ -101,13 +102,13 @@ public sealed class FulfillmentMismatchRepairTests : IClassFixture<TestDatabaseF
             {
                 OrderId = orderId,
                 VoucherId = voucherA,
-                FulfilledAtUtc = DateTime.UtcNow.AddMinutes(-1)
+                FulfilledAtUtc = TestClock.UtcNow.AddMinutes(-1)
             });
             seed.Fulfillments.Add(new Fulfillment
             {
                 OrderId = orderId,
                 VoucherId = voucherB,
-                FulfilledAtUtc = DateTime.UtcNow
+                FulfilledAtUtc = TestClock.UtcNow
             });
 
             await seed.SaveChangesAsync();
@@ -212,13 +213,13 @@ public sealed class FulfillmentMismatchRepairTests : IClassFixture<TestDatabaseF
                 Id = userId,
                 PhoneNumber = $"+38{userId:N}"[..20],
                 IsActive = true,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
 
             var order = Order(orderId, userId, quantity: 1, unitPrice: 2500);
             order.Status = OrderStatus.Fulfilled;
-            order.FulfilledAtUtc = DateTime.UtcNow;
+            order.FulfilledAtUtc = TestClock.UtcNow;
             AddPaidOrder(seed, order);
             await seed.SaveChangesAsync();
         }
@@ -242,8 +243,8 @@ public sealed class FulfillmentMismatchRepairTests : IClassFixture<TestDatabaseF
         UserId = userId,
         Price = quantity * unitPrice,
         Status = OrderStatus.PendingFulfillment,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow,
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow,
         LineItems = new List<OrderLineItem>
         {
             new OrderLineItem
@@ -269,15 +270,15 @@ public sealed class FulfillmentMismatchRepairTests : IClassFixture<TestDatabaseF
         Brand = brand,
         FuelTypeId =   ToUuid(fuelTypeId),
         Liters = liters,
-        SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
-        CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+        SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
+        CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
         VoucherNumber = $"{tag}-{id:N}",
         QrPayload = $"{tag}-{id:N}",
         Status = VoucherStatus.Assigned,
         AssignedToUserId = userId,
         OrderId = orderId,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 
     private static async Task ResetDataAsync(ApplicationDbContext context)
@@ -328,9 +329,9 @@ public sealed class FulfillmentMismatchRepairTests : IClassFixture<TestDatabaseF
             AmountKopecks = (long)(order.Price * 100),
             Currency = "UAH",
             Status = PaymentStatus.Succeeded,
-            PaidAtUtc = DateTime.UtcNow,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            PaidAtUtc = TestClock.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
     }
 }

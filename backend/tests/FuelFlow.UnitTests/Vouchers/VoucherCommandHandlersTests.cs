@@ -9,6 +9,7 @@ using FuelFlow.Features.Vouchers.RestoreVoucher;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -48,11 +49,11 @@ public sealed class VoucherCommandHandlersTests : IDisposable
     {
         var fuelTypes = new[]
         {
-            new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = ToUuid("okko-95"), Name = "A-95", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = ToUuid("okko-p95"), Name = "Pulls 95", BrandId = BrandIds.Okko, BasePrice = 62, DiscountPrice = 58, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = ToUuid("wog-dp"), Name = "ДП Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = ToUuid("wog-95"), Name = "A-95 Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow }
+            new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("okko-95"), Name = "A-95", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("okko-p95"), Name = "Pulls 95", BrandId = BrandIds.Okko, BasePrice = 62, DiscountPrice = 58, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("wog-dp"), Name = "ДП Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("wog-95"), Name = "A-95 Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow }
         };
         _context.FuelTypes.AddRange(fuelTypes);
         _context.SaveChanges();
@@ -74,14 +75,14 @@ public sealed class VoucherCommandHandlersTests : IDisposable
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
             VoucherNumber = "OKKO-1",
             QrPayload = "payload-1",
             Status = VoucherStatus.Assigned,
             AssignedToUserId = UserId,
-            CreatedAtUtc = DateTime.UtcNow.AddDays(-5),
-            UpdatedAtUtc = DateTime.UtcNow.AddDays(-5)
+            CreatedAtUtc = TestClock.UtcNow.AddDays(-5),
+            UpdatedAtUtc = TestClock.UtcNow.AddDays(-5)
         };
 
         var usedVoucher = new FuelVoucher
@@ -91,14 +92,14 @@ public sealed class VoucherCommandHandlersTests : IDisposable
             Brand = "okko",
             FuelTypeId = ToUuid("okko-dp"),
             Liters = 50,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(2)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(2)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(2)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(2)),
             VoucherNumber = "OKKO-2",
             QrPayload = "payload-2",
             Status = VoucherStatus.Used,
             AssignedToUserId = UserId,
-            CreatedAtUtc = DateTime.UtcNow.AddDays(-3),
-            UpdatedAtUtc = DateTime.UtcNow.AddDays(-1)
+            CreatedAtUtc = TestClock.UtcNow.AddDays(-3),
+            UpdatedAtUtc = TestClock.UtcNow.AddDays(-1)
         };
 
         var availableVoucher = new FuelVoucher
@@ -108,14 +109,14 @@ public sealed class VoucherCommandHandlersTests : IDisposable
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(3)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(3)),
             VoucherNumber = "OKKO-3",
             QrPayload = "payload-3",
             Status = VoucherStatus.Available,
             AssignedToUserId = null,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         _context.FuelVouchers.AddRange(assignedVoucher, usedVoucher, availableVoucher);
@@ -149,7 +150,7 @@ public sealed class VoucherCommandHandlersTests : IDisposable
     {
         // Three vouchers that share ONE creation timestamp, so the page boundary falls
         // between rows the database cannot order on its own.
-        var created = DateTime.UtcNow.AddDays(-1);
+        var created = TestClock.UtcNow.AddDays(-1);
         for (var i = 0; i < 3; i++)
         {
             _context.FuelVouchers.Add(new FuelVoucher
@@ -159,8 +160,8 @@ public sealed class VoucherCommandHandlersTests : IDisposable
                 Brand = "okko",
                 FuelTypeId = ToUuid("okko-95"),
                 Liters = 10,
-                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
-                CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+                SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+                CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
                 VoucherNumber = $"OKKO-PAGE-{i}",
                 QrPayload = $"payload-{i}",
                 Status = VoucherStatus.Assigned,
@@ -202,8 +203,8 @@ public sealed class VoucherCommandHandlersTests : IDisposable
             PhoneNumber = "+10000000001",
             FirstName = "Ivan",
             LastName = "Petrenko",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         var giftedVoucher = new FuelVoucher
@@ -213,15 +214,15 @@ public sealed class VoucherCommandHandlersTests : IDisposable
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 20,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
             VoucherNumber = "OKKO-GIFT-1",
             QrPayload = "gift-payload-1",
             Status = VoucherStatus.Assigned,
             AssignedToUserId = OtherUserId,
             WorkerUserId = UserId,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         _context.Users.Add(worker);
@@ -294,14 +295,14 @@ public sealed class VoucherCommandHandlersTests : IDisposable
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
             VoucherNumber = "OKKO-1",
             QrPayload = "payload-1",
             Status = VoucherStatus.Used,
             AssignedToUserId = UserId,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         _context.FuelVouchers.Add(voucher);
@@ -328,14 +329,14 @@ public sealed class VoucherCommandHandlersTests : IDisposable
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
             VoucherNumber = "OKKO-1",
             QrPayload = "payload-1",
             Status = VoucherStatus.Assigned,
             AssignedToUserId = OtherUserId,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         _context.FuelVouchers.Add(voucher);
@@ -363,15 +364,15 @@ public sealed class VoucherCommandHandlersTests : IDisposable
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
             VoucherNumber = "OKKO-GIFT-OWNER",
             QrPayload = "payload-gift-owner",
             Status = VoucherStatus.Assigned,
             AssignedToUserId = UserId,
             WorkerUserId = OtherUserId,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         _context.FuelVouchers.Add(voucher);
@@ -405,16 +406,16 @@ public sealed class VoucherCommandHandlersTests : IDisposable
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
             VoucherNumber = "OKKO-1",
             QrPayload = "payload-1",
             Status = VoucherStatus.Used,
             // Somebody else's redeemed voucher. Before the ownership check existed, only the
             // endpoint's Staff policy kept this from un-redeeming another customer's voucher.
             AssignedToUserId = OtherUserId,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         _context.FuelVouchers.Add(voucher);
@@ -442,14 +443,14 @@ public sealed class VoucherCommandHandlersTests : IDisposable
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
             VoucherNumber = "OKKO-1",
             QrPayload = "payload-1",
             Status = VoucherStatus.Assigned,
             AssignedToUserId = UserId,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         _context.FuelVouchers.Add(voucher);
@@ -476,8 +477,8 @@ public sealed class VoucherCommandHandlersTests : IDisposable
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
             VoucherNumber = "OKKO-1",
             QrPayload = "payload-1",
             Status = VoucherStatus.Available,
@@ -485,8 +486,8 @@ public sealed class VoucherCommandHandlersTests : IDisposable
             // rejects this - which is what the test is about. An unowned voucher would be turned
             // away earlier with "not assigned to this user", proving nothing about the status gate.
             AssignedToUserId = UserId,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         _context.FuelVouchers.Add(voucher);
@@ -510,14 +511,14 @@ public sealed class VoucherCommandHandlersTests : IDisposable
             Brand = brand,
             FuelTypeId = ToUuid(fuelTypeId),
             Liters = liters,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
             VoucherNumber = $"{brand}-{Guid.NewGuid().ToString()[..8]}",
             QrPayload = Guid.NewGuid().ToString(),
             Status = status,
             AssignedToUserId = status == VoucherStatus.Assigned || status == VoucherStatus.Used ? UserId : null,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
     }
 }

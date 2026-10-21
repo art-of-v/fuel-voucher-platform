@@ -2,6 +2,7 @@ using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
@@ -74,7 +75,7 @@ public sealed class SetUserBannedCommandHandler
         if (target.IsBanned == command.IsBanned)
             return SetUserBannedResult.CreateSuccess(); // idempotent
 
-        var now = DateTime.UtcNow;
+        var now = SystemClock.UtcNow;
         target.IsBanned = command.IsBanned;
         target.UpdatedAtUtc = now;
 

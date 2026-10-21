@@ -2,6 +2,7 @@ using System.Data;
 using FluentAssertions;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Xunit;
@@ -259,8 +260,8 @@ public sealed class CatalogueReferentialIntegrityTests : IClassFixture<TestDatab
         Name = id,
         BasePrice = 50m,
         DiscountPrice = 50m,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow,
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow,
     };
 
     private static FuelPriceHistory NewPriceHistoryRow(Guid brandId, string fuelTypeId) => new()
@@ -269,8 +270,8 @@ public sealed class CatalogueReferentialIntegrityTests : IClassFixture<TestDatab
         BrandId = brandId,
         FuelTypeId =   ToUuid(fuelTypeId),
         DataKind = "real",
-        EffectiveFromUtc = DateTime.UtcNow,
-        RecordedAtUtc = DateTime.UtcNow,
+        EffectiveFromUtc = TestClock.UtcNow,
+        RecordedAtUtc = TestClock.UtcNow,
         Reason = "operator",
     };
 

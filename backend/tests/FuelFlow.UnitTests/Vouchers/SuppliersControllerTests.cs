@@ -4,6 +4,7 @@ using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers.Suppliers;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -61,7 +62,7 @@ public sealed class SuppliersControllerTests : IDisposable
 
     private Supplier Seed(string name, bool isActive = true, string? edrIpn = null)
     {
-        var now = DateTime.UtcNow;
+        var now = TestClock.UtcNow;
         var supplier = new Supplier
         {
             Id = Guid.NewGuid(),

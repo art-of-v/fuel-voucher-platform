@@ -9,6 +9,7 @@ using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -188,8 +189,8 @@ public sealed class OrderReceiptIntegrationTests : IClassFixture<TestDatabaseFix
             Status = OrderStatus.Fulfilled,
             MonobankInvoiceId = "INV-" + Guid.NewGuid().ToString("N")[..8],
             MonobankStatus = MonobankStatus.Success,
-            CreatedAtUtc = DateTime.UtcNow.AddDays(-1),
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow.AddDays(-1),
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         order.LineItems.Add(new OrderLineItem
@@ -228,7 +229,7 @@ public sealed class OrderReceiptIntegrationTests : IClassFixture<TestDatabaseFix
         if (brandId is null)
         {
             brandId = Guid.NewGuid();
-            var now = DateTime.UtcNow;
+            var now = TestClock.UtcNow;
             context.Brands.Add(new Brand
             {
                 Id = brandId.Value,
@@ -239,7 +240,7 @@ public sealed class OrderReceiptIntegrationTests : IClassFixture<TestDatabaseFix
             });
         }
 
-        var stamp = DateTime.UtcNow;
+        var stamp = TestClock.UtcNow;
         context.FuelTypes.Add(new FuelTypeEntity
         {
             Id = fuelTypeId,

@@ -8,6 +8,7 @@ using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
@@ -49,8 +50,8 @@ public sealed class CostEntryAuditIntegrationTests : IClassFixture<TestDatabaseF
             Id = Guid.NewGuid(),
             FileName = $"cost-audit-{suffix}.pdf",
             PageCount = 1,
-            StartedAtUtc = DateTime.UtcNow,
-            CompletedAtUtc = DateTime.UtcNow,
+            StartedAtUtc = TestClock.UtcNow,
+            CompletedAtUtc = TestClock.UtcNow,
             Status = "Completed",
             ImportedCount = 1,
         };
@@ -60,8 +61,8 @@ public sealed class CostEntryAuditIntegrationTests : IClassFixture<TestDatabaseF
             Id = Guid.NewGuid(),
             Name = $"Audit supplier {suffix}",
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
         };
         context.VoucherImports.Add(import);
         context.Suppliers.Add(supplier);
@@ -77,10 +78,10 @@ public sealed class CostEntryAuditIntegrationTests : IClassFixture<TestDatabaseF
             VoucherNumber = $"audit-{suffix}",
             QrPayload = $"9015$2000$;{suffix}=x?",
             Status = VoucherStatus.Imported,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(180),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(180),
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddDays(180),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddDays(180),
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
         });
 
         await context.SaveChangesAsync();

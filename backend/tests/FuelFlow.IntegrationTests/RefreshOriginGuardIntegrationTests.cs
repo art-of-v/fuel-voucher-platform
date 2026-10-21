@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using FluentAssertions;
 using FuelFlow.Features.Auth.SendCode;
 using FuelFlow.Features.Auth.Verify;
+using FuelFlow.Testing;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
@@ -63,7 +64,7 @@ public sealed class RefreshOriginGuardIntegrationTests : IClassFixture<TestDatab
     /// <summary>Signs in through the OTP flow and returns a genuinely valid refresh token.</summary>
     private async Task<string> MintRefreshTokenAsync(HttpClient client)
     {
-        var phone = $"+1555{DateTime.UtcNow.Ticks % 10_000_000:0000000}";
+        var phone = $"+1555{TestClock.UniqueDigits(7)}";
         await client.PostAsJsonAsync("/api/auth/send-code", new SendCodeCommand(phone));
 
         // As the native client: the refresh token is in the body only for it (ClientPlatform).

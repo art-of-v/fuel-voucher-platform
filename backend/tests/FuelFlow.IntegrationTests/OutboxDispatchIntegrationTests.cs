@@ -3,6 +3,7 @@ using FuelFlow.API.BackgroundJobs;
 using FuelFlow.Features.Notifications.Push;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.Testing;
 using Hangfire;
 using Hangfire.Common;
 using Hangfire.States;
@@ -63,7 +64,7 @@ public sealed class OutboxDispatchIntegrationTests : IClassFixture<TestDatabaseF
             {
                 EventType = OutboxEventType.OrderFulfilled,
                 Payload = "{}",
-                CreatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow
             });
             await context.SaveChangesAsync();
         }
@@ -77,7 +78,7 @@ public sealed class OutboxDispatchIntegrationTests : IClassFixture<TestDatabaseF
         // wrote the row had committed, on any caller that manages its own transaction.
         queued.Should().BeOfType<ScheduledState>(
             "the dispatch is scheduled a few seconds out, not queued for now");
-        ((ScheduledState)queued!).EnqueueAt.Should().BeAfter(DateTime.UtcNow.AddSeconds(3));
+        ((ScheduledState)queued!).EnqueueAt.Should().BeAfter(TestClock.UtcNow.AddSeconds(3));
     }
 
     [Fact]
@@ -100,13 +101,13 @@ public sealed class OutboxDispatchIntegrationTests : IClassFixture<TestDatabaseF
         {
             EventType = OutboxEventType.OrderFulfilled,
             Payload = marker,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow
         };
         var old = new OutboxEvent
         {
             EventType = OutboxEventType.OrderFulfilled,
             Payload = marker,
-            CreatedAtUtc = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(5)
+            CreatedAtUtc = TestClock.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(5)
         };
 
         context.OutboxEvents.Add(justWritten);

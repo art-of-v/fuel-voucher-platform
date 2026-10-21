@@ -2,6 +2,7 @@ using FuelFlow.Features.Settings;
 using FuelFlow.Features.Vouchers.Renewal.Checkout;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Vouchers.Renewal.Quote;
@@ -58,7 +59,7 @@ public sealed class RenewalQuoteCommandHandler
             .Where(v => distinctIds.Contains(v.Id))
             .ToListAsync(cancellationToken);
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(SystemClock.UtcNow);
 
         // Resolve fuel display names for every fuel type in one query.
         var fuelTypeIds = sources.Select(v => v.FuelTypeId).Distinct().ToList();

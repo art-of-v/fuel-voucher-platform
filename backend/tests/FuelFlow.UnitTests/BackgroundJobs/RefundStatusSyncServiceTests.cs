@@ -8,6 +8,7 @@ using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -66,9 +67,9 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
             AmountKopecks = 52000,
             Currency = "UAH",
             Status = PaymentStatus.Succeeded,
-            PaidAtUtc = DateTime.UtcNow,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            PaidAtUtc = TestClock.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         ctx.Payments.Add(capture);
@@ -96,8 +97,8 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
         Currency = "UAH",
         Status = status,
         IsAutomatic = false,
-        CreatedAtUtc = createdAtUtc ?? DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = createdAtUtc ?? TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 
     private static Order BuildOrder(
@@ -110,8 +111,8 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
         MonobankInvoiceId = "INV-REFUND-1",
         MonobankMerchant = merchant,
         IdempotencyKey = "idem-key-1",
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 
     private static FuelVoucher BuildVoucher() => new()
@@ -123,10 +124,10 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
         Liters = 50,
         VoucherNumber = $"V-{Guid.NewGuid():N}",
         QrPayload = "q",
-        SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
-        CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddDays(30)),
+        CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddDays(30)),
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 
     private static Fulfillment BuildFulfillment(Guid orderId) => new()
@@ -134,7 +135,7 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
         Id = Guid.NewGuid(),
         OrderId = orderId,
         VoucherId = Guid.NewGuid(),
-        FulfilledAtUtc = DateTime.UtcNow,
+        FulfilledAtUtc = TestClock.UtcNow,
         Voucher = BuildVoucher()
     };
 
@@ -201,7 +202,7 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
                         Amount = 52000,
                         Ccy = 980,
                         ExtRef = "idem-key-1",
-                        ModifiedDate = DateTime.UtcNow
+                        ModifiedDate = TestClock.UtcNow
                     }
                 }
             });
@@ -236,7 +237,7 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
                         Amount = 52000,
                         Ccy = 980,
                         ExtRef = "idem-key-1",
-                        ModifiedDate = DateTime.UtcNow
+                        ModifiedDate = TestClock.UtcNow
                     }
                 }
             });
@@ -271,7 +272,7 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
                         Amount = 52000,
                         Ccy = 980,
                         ExtRef = "idem-key-1",
-                        ModifiedDate = DateTime.UtcNow
+                        ModifiedDate = TestClock.UtcNow
                     }
                 }
             });
@@ -307,7 +308,7 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
                         Amount = 52000,
                         Ccy = 980,
                         ExtRef = "idem-key-1",
-                        ModifiedDate = DateTime.UtcNow
+                        ModifiedDate = TestClock.UtcNow
                     }
                 }
             });
@@ -343,7 +344,7 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
                         Amount = 52000,
                         Ccy = 980,
                         ExtRef = "idem-key-1",
-                        ModifiedDate = DateTime.UtcNow
+                        ModifiedDate = TestClock.UtcNow
                     }
                 }
             });
@@ -385,7 +386,7 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
                         Amount = 52000,
                         Ccy = 980,
                         ExtRef = "idem-key-1",
-                        ModifiedDate = DateTime.UtcNow
+                        ModifiedDate = TestClock.UtcNow
                     }
                 }
             });
@@ -407,7 +408,7 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
         order.Fulfillments.Add(BuildFulfillment(orderId));
         _context.Orders.Add(order);
         var capture = SeedCapture(_context, orderId);
-        _context.Payments.Add(BuildRefund(orderId, capture.Id, createdAtUtc: DateTime.UtcNow.AddHours(-25)));
+        _context.Payments.Add(BuildRefund(orderId, capture.Id, createdAtUtc: TestClock.UtcNow.AddHours(-25)));
         await _context.SaveChangesAsync();
 
         await _service.SyncPendingRefundsAsync();
@@ -439,7 +440,7 @@ public sealed class RefundStatusSyncServiceTests : IDisposable
                     Amount = 52000,
                     Ccy = 980,
                     ExtRef = "idem-key-1",
-                    ModifiedDate = DateTime.UtcNow
+                    ModifiedDate = TestClock.UtcNow
                 }
             });
 

@@ -6,6 +6,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.API.BackgroundJobs;
@@ -101,7 +102,7 @@ public class ExpiredVoucherLossService
         // Strictly-before "today" so a voucher stays valid through the whole of its expiration date;
         // one clock read shared by the summary aggregate and the batched flip so they can't drift.
         // The grace window means we only retire vouchers whose expiry is older than (today - graceDays).
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(SystemClock.UtcNow);
         var cutoff = today.AddDays(-graceDays);
 
         // One GROUP BY over the candidate stock: per (import × fuel) how many lapsed and their litres —
@@ -176,7 +177,7 @@ public class ExpiredVoucherLossService
                 break;
             }
 
-            var now = DateTime.UtcNow;
+            var now = SystemClock.UtcNow;
             var writeOffs = new List<PostJournalEntryRequest>();
             foreach (var v in batch)
             {

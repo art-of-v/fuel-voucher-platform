@@ -19,6 +19,7 @@ using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -53,7 +54,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         var orderId = Guid.NewGuid();
         var sourceId = Guid.NewGuid();
         var itemId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
         var sourceExpiry = today.AddDays(5); // still valid → Extend
 
         using (var seed = CreateContext())
@@ -88,7 +89,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
 
         var (extendLine, extendDelivered) = await LoadRenewalAsync(verify, orderId, sourceId);
         extendDelivered.Should().NotBeNull("an extend delivers the source voucher itself");
-        extendDelivered!.FulfilledAtUtc.Should().BeOnOrBefore(DateTime.UtcNow, "a delivered line says when it was delivered");
+        extendDelivered!.FulfilledAtUtc.Should().BeOnOrBefore(TestClock.UtcNow, "a delivered line says when it was delivered");
         // History snapshot: the exact "valid from -> to" range this extend bought.
         extendLine.PreviousCustomerExpiration.Should().Be(sourceExpiry);
         extendLine.NewCustomerExpiration.Should().Be(sourceExpiry.AddMonths(1));
@@ -138,7 +139,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         var userId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
         var sourceId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
         var sourceExpiry = today.AddDays(5);
 
         using (var seed = CreateContext())
@@ -198,7 +199,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         var orderId = Guid.NewGuid();
         var sourceId = Guid.NewGuid();
         var stockId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
         // providerExpiry equal to the customer expiry is what makes this a REPLACE and not an extend:
         // CanExtend needs room under the supplier term, and without it the source has a year of room.
         var sourceExpiry = today.AddDays(2);
@@ -316,7 +317,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         var sourceId = Guid.NewGuid();
         var stockId = Guid.NewGuid();
         var itemId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
         var sourceExpiry = today.AddDays(5);
         var providerExpiry = today.AddDays(5); // customer term == supplier term: no room to grow at all
 
@@ -419,7 +420,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         var orderId = Guid.NewGuid();
         var sourceId = Guid.NewGuid();
         var itemId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
         var sourceExpiry = today.AddDays(5);
         var providerExpiry = today.AddDays(6); // one day of real life left - a 1-month term cannot fit
 
@@ -474,7 +475,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         var orderId = Guid.NewGuid();
         var sourceId = Guid.NewGuid();
         var itemId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
         var sourceExpiry = today.AddDays(10);
         var providerExpiry = sourceExpiry.AddMonths(1); // exactly one month of room
 
@@ -516,7 +517,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         var sourceId = Guid.NewGuid();
         var stockId = Guid.NewGuid();
         var itemId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
         var originPurchaseId = Guid.NewGuid();
 
         using (var seed = CreateContext())
@@ -585,7 +586,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         var sourceId = Guid.NewGuid();
         var stockId = Guid.NewGuid();
         var itemId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
 
         using (var seed = CreateContext())
         {
@@ -657,7 +658,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         var fourteenDayId = Guid.NewGuid();
         var eightDayId = Guid.NewGuid();
         var itemId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
         var sourceExpiry = today.AddDays(2);
         var promise = sourceExpiry.AddDays(7); // today + 9 days
 
@@ -719,7 +720,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         var sourceId = Guid.NewGuid();
         var firstItemId = Guid.NewGuid();
         var secondItemId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
         var boughtFor = today.AddDays(7);      // bought with a 1-week term
         var providerTerm = today.AddMonths(3); // the paper is good for 3 months
 
@@ -807,7 +808,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         var threeMonthsId = Guid.NewGuid();
         var sixMonthsId = Guid.NewGuid();
         var itemId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
         var sourceExpiry = today.AddDays(14); // 27.03 in the owner's example
         var promise = sourceExpiry.AddMonths(2);
 
@@ -873,7 +874,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         var orderId = Guid.NewGuid();
         var sourceId = Guid.NewGuid();
         var itemId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
         var sourceExpiry = today.AddDays(10);
 
         using (var seed = CreateContext())
@@ -934,7 +935,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         var sourceId = Guid.NewGuid();
         var stockId = Guid.NewGuid();
         var itemId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
         var sourceExpiry = today.AddDays(10);
 
         using (var seed = CreateContext())
@@ -978,8 +979,8 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
                 UserId = secondUserId,
                 Price = 500,
                 Status = OrderStatus.PendingFulfillment,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow,
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow,
                 LineItems = new List<OrderLineItem>
                 {
                     new()
@@ -1035,7 +1036,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
         var sourceId = Guid.NewGuid();
         var stockId = Guid.NewGuid();
         var itemId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
         var sourceExpiry = today.AddDays(10);
 
         using (var seed = CreateContext())
@@ -1055,7 +1056,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
             {
                 OrderId = purchaseOrderId,
                 VoucherId = sourceId,
-                FulfilledAtUtc = DateTime.UtcNow.AddDays(-10)
+                FulfilledAtUtc = TestClock.UtcNow.AddDays(-10)
             });
             seed.FuelVouchers.Add(StockVoucher(stockId, "okko", "okko-95", 50m, today.AddMonths(6)));
             AddPaidOrder(seed, RenewalOrder(orderId, userId, price: 500, monobankInvoiceId: null,
@@ -1102,7 +1103,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
     public async Task StockThatLapsed_IsNotFlaggedAsReleasedFromCustomer()
     {
         var lapsedStockId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
 
         using (var seed = CreateContext())
         {
@@ -1137,7 +1138,7 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
 var exchangedId = Guid.NewGuid();
         var stillOwedId = Guid.NewGuid();
         var supplierId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
 
         using (var seed = CreateContext())
         {
@@ -1150,8 +1151,8 @@ var exchangedId = Guid.NewGuid();
                 Id = supplierId,
                 Name = "Seed Supplier",
                 IsActive = true,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
 
             // Two lapsed stock vouchers the operator would normally have to renew with the supplier.
@@ -1161,10 +1162,10 @@ var exchangedId = Guid.NewGuid();
             // One of them has already been exchanged with the supplier - the confirm handler wrote this
             // row, and it wrote the settlement the row belongs to as well (#319).
             var exchangeBatchId = Guid.NewGuid();
-            MovementBatchSeeder.AddForExchange(seed, exchangeBatchId, supplierId, 0m, DateTime.UtcNow);
+            MovementBatchSeeder.AddForExchange(seed, exchangeBatchId, supplierId, 0m, TestClock.UtcNow);
             MovementBatchSeeder.AddExchangeOut(
                 seed, exchangeBatchId, exchangedId, newVoucherId: null,
-                surchargeShareUah: 0m, appliedCostPerLiter: null, atUtc: DateTime.UtcNow);
+                surchargeShareUah: 0m, appliedCostPerLiter: null, atUtc: TestClock.UtcNow);
 
             await seed.SaveChangesAsync();
         }
@@ -1193,7 +1194,7 @@ var exchangedId = Guid.NewGuid();
         var replaceSourceId = Guid.NewGuid();
         var extendItemId = Guid.NewGuid();
         var replaceItemId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
 
         using (var seed = CreateContext())
         {
@@ -1201,8 +1202,8 @@ var exchangedId = Guid.NewGuid();
             await ResetDataAsync(seed);
 
             // Auto-refund on with a zero-day grace so the partial fires the refund immediately.
-            seed.AppSettings.Add(new AppSetting { Key = AppSettingKeys.AutoRefundEnabled, Value = "true", UpdatedAtUtc = DateTime.UtcNow });
-            seed.AppSettings.Add(new AppSetting { Key = AppSettingKeys.AutoRefundDelayDays, Value = "0", UpdatedAtUtc = DateTime.UtcNow });
+            seed.AppSettings.Add(new AppSetting { Key = AppSettingKeys.AutoRefundEnabled, Value = "true", UpdatedAtUtc = TestClock.UtcNow });
+            seed.AppSettings.Add(new AppSetting { Key = AppSettingKeys.AutoRefundDelayDays, Value = "0", UpdatedAtUtc = TestClock.UtcNow });
 
             SeedUser(seed, userId);
 
@@ -1269,8 +1270,8 @@ var exchangedId = Guid.NewGuid();
             Id = userId,
             PhoneNumber = $"+38{userId:N}"[..20],
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
     /// <summary>
@@ -1288,8 +1289,8 @@ var exchangedId = Guid.NewGuid();
             UserId = userId,
             Price = 0,
             Status = OrderStatus.Fulfilled,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         return orderId;
     }
@@ -1316,7 +1317,7 @@ var exchangedId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
         var sourceId = Guid.NewGuid();
         var itemId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
         var sourceExpiry = today.AddDays(5);
 
         const decimal liters = 10m;
@@ -1366,7 +1367,7 @@ var exchangedId = Guid.NewGuid();
         var sourceId = Guid.NewGuid();
         var stockId = Guid.NewGuid();
         var itemId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
 
         const decimal liters = 10m;
         const decimal sourceCost = 90m;
@@ -1427,8 +1428,8 @@ var exchangedId = Guid.NewGuid();
             Status = VoucherStatus.Assigned,
             AssignedToUserId = userId,
             OrderId = orderId,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
     private static FuelVoucher StockVoucher(Guid id, string brand, string fuelTypeId, decimal liters, DateOnly expiry)
@@ -1444,8 +1445,8 @@ var exchangedId = Guid.NewGuid();
             VoucherNumber = $"STK-{id:N}"[..16],
             QrPayload = $"qr-{id:N}",
             Status = VoucherStatus.Available,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
     /// <summary>
@@ -1489,8 +1490,8 @@ var exchangedId = Guid.NewGuid();
             // value is now gated on the brand having confirmed the payment - without it an
             // auto-refund silently becomes a no-op and the test passes for the wrong reason.
             MonobankStatus = MonobankStatus.Success,
-            CreatedAtUtc = DateTime.UtcNow.AddMinutes(-5),
-            UpdatedAtUtc = DateTime.UtcNow.AddMinutes(-5),
+            CreatedAtUtc = TestClock.UtcNow.AddMinutes(-5),
+            UpdatedAtUtc = TestClock.UtcNow.AddMinutes(-5),
             LineItems = new List<OrderLineItem>()
         };
 
@@ -1554,7 +1555,7 @@ var exchangedId = Guid.NewGuid();
         var userId = Guid.NewGuid();
         var orderId = Guid.NewGuid();
         var sourceId = Guid.NewGuid();
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
         var originalExpiry = today.AddDays(5);
         var onceRenewed = originalExpiry.AddMonths(1); // what the first, already-applied extend wrote
 
@@ -1581,8 +1582,8 @@ var exchangedId = Guid.NewGuid();
                 OrderId = orderId,
                 VoucherId = sourceId,
                 LineItemId = line.Id,
-                FulfilledAtUtc = DateTime.UtcNow.AddMinutes(-10),
-                ReleasedAtUtc = DateTime.UtcNow.AddMinutes(-5),
+                FulfilledAtUtc = TestClock.UtcNow.AddMinutes(-10),
+                ReleasedAtUtc = TestClock.UtcNow.AddMinutes(-5),
                 ReleaseReason = "quantity_mismatch"
             });
 
@@ -1646,9 +1647,9 @@ var exchangedId = Guid.NewGuid();
             AmountKopecks = (long)(order.Price * 100),
             Currency = "UAH",
             Status = PaymentStatus.Succeeded,
-            PaidAtUtc = DateTime.UtcNow,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            PaidAtUtc = TestClock.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
     }
 }

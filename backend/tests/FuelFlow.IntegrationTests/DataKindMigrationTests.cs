@@ -3,6 +3,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -217,8 +218,8 @@ public sealed class DataKindMigrationTests : IClassFixture<TestDatabaseFixture>
             Name = slug,
             Color = "#000",
             LogoText = slug,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
         context.Brands.Add(brand);
 
@@ -229,8 +230,8 @@ public sealed class DataKindMigrationTests : IClassFixture<TestDatabaseFixture>
             Name = slug + " fuel",
             BasePrice = 50m,
             DiscountPrice = 50m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
         context.FuelTypes.Add(fuel);
 
@@ -248,8 +249,8 @@ public sealed class DataKindMigrationTests : IClassFixture<TestDatabaseFixture>
         {
             FuelTypeId = fuelTypeId,
             Liters = 10m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         if (isTestData) size.DataKind = DataKinds.Qa;
@@ -260,7 +261,7 @@ public sealed class DataKindMigrationTests : IClassFixture<TestDatabaseFixture>
 
     private static FuelVoucher NewVoucher(Guid fuelTypeId, string brandSlug, Guid brandId, bool isTestData = false, string? dataKind = null)
     {
-        var expiry = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3));
+        var expiry = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(3));
 
             var voucher = new FuelVoucher
             {
@@ -279,8 +280,8 @@ public sealed class DataKindMigrationTests : IClassFixture<TestDatabaseFixture>
             QrPayload = $"dk-qr-{Guid.NewGuid():N}",
             Status = VoucherStatus.Available,
             IsTestData = isTestData,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         if (dataKind is not null)

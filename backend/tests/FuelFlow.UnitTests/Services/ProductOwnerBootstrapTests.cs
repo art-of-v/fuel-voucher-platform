@@ -3,6 +3,7 @@ using FuelFlow.API.Services;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -103,8 +104,8 @@ public sealed class ProductOwnerBootstrapTests
     private static async Task SeedRolesAsync(ApplicationDbContext context)
     {
         context.Roles.AddRange(
-            new Role { Id = SeedRoles.ProductOwnerId, Name = SeedRoles.ProductOwnerName, CreatedAtUtc = DateTime.UtcNow },
-            new Role { Id = SeedRoles.UserRoleId, Name = SeedRoles.UserName, CreatedAtUtc = DateTime.UtcNow });
+            new Role { Id = SeedRoles.ProductOwnerId, Name = SeedRoles.ProductOwnerName, CreatedAtUtc = TestClock.UtcNow },
+            new Role { Id = SeedRoles.UserRoleId, Name = SeedRoles.UserName, CreatedAtUtc = TestClock.UtcNow });
         await context.SaveChangesAsync();
     }
 
@@ -117,8 +118,8 @@ public sealed class ProductOwnerBootstrapTests
             RoleId = roleId,
             IsActive = true,
             TokenVersion = 1,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
         });
         await context.SaveChangesAsync();
     }

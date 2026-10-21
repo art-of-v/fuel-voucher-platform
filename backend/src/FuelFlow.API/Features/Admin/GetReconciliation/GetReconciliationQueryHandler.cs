@@ -5,6 +5,7 @@ using FuelFlow.Persistence;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.SharedKernel;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Admin.GetReconciliation;
@@ -124,7 +125,7 @@ public sealed class GetReconciliationQueryHandler
             cancellationToken);
 
         var importErrors = await _context.VoucherImportErrors
-            .CountAsync(e => e.CreatedAtUtc >= DateTime.UtcNow.AddDays(-7), cancellationToken);
+            .CountAsync(e => e.CreatedAtUtc >= SystemClock.UtcNow.AddDays(-7), cancellationToken);
 
         var lowInventoryProviders = await _context.Orders
             .Where(o => o.Status == OrderStatus.PendingFulfillment || o.Status == OrderStatus.PartiallyFulfilled)
@@ -202,7 +203,7 @@ public sealed class GetReconciliationQueryHandler
                 expected,
                 delivered,
                 matchStatus,
-                (DateTime.UtcNow - o.CreatedAtUtc).Days,
+                (SystemClock.UtcNow - o.CreatedAtUtc).Days,
                 o.CreatedAtUtc,
                 refund is null ? null : RefundStatusWord(refund.Status),
                 refund is { Status: PaymentStatus.Succeeded } ? refund.AmountKopecks : 0L);
@@ -284,7 +285,7 @@ public sealed class GetReconciliationQueryHandler
         {
             var lineItems = c.LineItems.ToList();
             var firstLi = lineItems.FirstOrDefault();
-            var days = (DateTime.UtcNow - c.CreatedAtUtc).Days;
+            var days = (SystemClock.UtcNow - c.CreatedAtUtc).Days;
 
             // The brand confirmed it took the money and the customer got nothing - the one
             // exception on this screen that is critical.
@@ -313,7 +314,7 @@ public sealed class GetReconciliationQueryHandler
             exceptions.Add(new GetReconciliationResponse.ExceptionItem(
                 s.Id,
                 "PARTIAL",
-                $"Only {s.Delivered}/{s.Expected} units delivered for {s.Brand} ({(DateTime.UtcNow - s.CreatedAtUtc).Days}d waiting)",
+                $"Only {s.Delivered}/{s.Expected} units delivered for {s.Brand} ({(SystemClock.UtcNow - s.CreatedAtUtc).Days}d waiting)",
                 "warning",
                 s.CreatedAtUtc));
         }
@@ -321,12 +322,12 @@ public sealed class GetReconciliationQueryHandler
         if (orphanVouchers > 0)
             exceptions.Add(new(Guid.Empty, "ORPHAN",
                 $"{orphanVouchers} voucher(s) marked Assigned but linked to no fulfillment record",
-                "critical", DateTime.UtcNow));
+                "critical", SystemClock.UtcNow));
 
         if (unprocessed > 10)
             exceptions.Add(new(Guid.Empty, "OUTBOX",
                 $"{unprocessed} unprocessed outbox events — fulfillment jobs may be stalled",
-                "critical", DateTime.UtcNow));
+                "critical", SystemClock.UtcNow));
 
         var funnelRaw = await _context.FuelVouchers
             .AsNoTracking()

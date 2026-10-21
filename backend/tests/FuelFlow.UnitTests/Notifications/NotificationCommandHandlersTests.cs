@@ -3,6 +3,7 @@ using FuelFlow.Features.Notifications.GetNotifications;
 using FuelFlow.Features.Notifications.MarkNotificationRead;
 using FuelFlow.Features.Notifications.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.UnitTests.Notifications;
@@ -46,9 +47,9 @@ public sealed class NotificationCommandHandlersTests : IDisposable
     [Fact]
     public async Task GetNotifications_ShouldReturnNotificationsForUserOnly()
     {
-        var first = CreateNotification(Guid.NewGuid(), UserId, "First", false, DateTime.UtcNow.AddHours(-2));
-        var second = CreateNotification(Guid.NewGuid(), UserId, "Second", true, DateTime.UtcNow.AddHours(-1));
-        var other = CreateNotification(Guid.NewGuid(), OtherUserId, "Other", false, DateTime.UtcNow);
+        var first = CreateNotification(Guid.NewGuid(), UserId, "First", false, TestClock.UtcNow.AddHours(-2));
+        var second = CreateNotification(Guid.NewGuid(), UserId, "Second", true, TestClock.UtcNow.AddHours(-1));
+        var other = CreateNotification(Guid.NewGuid(), OtherUserId, "Other", false, TestClock.UtcNow);
         _context.Notifications.AddRange(first, second, other);
         await _context.SaveChangesAsync();
 
@@ -83,7 +84,7 @@ public sealed class NotificationCommandHandlersTests : IDisposable
     public async Task GetNotifications_ShouldCarryTheTypeAndTheTarget()
     {
         var companyId = Guid.NewGuid();
-        var notification = CreateNotification(Guid.NewGuid(), UserId, "Вам видано паливо", false, DateTime.UtcNow);
+        var notification = CreateNotification(Guid.NewGuid(), UserId, "Вам видано паливо", false, TestClock.UtcNow);
         notification.Type = NotificationTypes.VoucherIssued;
         notification.Payload = NotificationPayload.Serialize(new NotificationPayload
         {
@@ -110,7 +111,7 @@ public sealed class NotificationCommandHandlersTests : IDisposable
     [Fact]
     public async Task GetNotifications_ShouldReadAnOldRowAsAPlainRow()
     {
-        var notification = CreateNotification(Guid.NewGuid(), UserId, "Замовлення виконано", true, DateTime.UtcNow);
+        var notification = CreateNotification(Guid.NewGuid(), UserId, "Замовлення виконано", true, TestClock.UtcNow);
         _context.Notifications.Add(notification);
         await _context.SaveChangesAsync();
 
@@ -129,7 +130,7 @@ public sealed class NotificationCommandHandlersTests : IDisposable
     [Fact]
     public async Task GetNotifications_ShouldSurviveABrokenPayload()
     {
-        var notification = CreateNotification(Guid.NewGuid(), UserId, "Вам видано паливо", false, DateTime.UtcNow);
+        var notification = CreateNotification(Guid.NewGuid(), UserId, "Вам видано паливо", false, TestClock.UtcNow);
         notification.Type = NotificationTypes.VoucherIssued;
         notification.Payload = "{not json";
         _context.Notifications.Add(notification);
@@ -147,7 +148,7 @@ public sealed class NotificationCommandHandlersTests : IDisposable
     [Fact]
     public async Task MarkNotificationRead_ShouldMarkRead()
     {
-        var notification = CreateNotification(Guid.NewGuid(), UserId, "Title", false, DateTime.UtcNow);
+        var notification = CreateNotification(Guid.NewGuid(), UserId, "Title", false, TestClock.UtcNow);
         _context.Notifications.Add(notification);
         await _context.SaveChangesAsync();
 
@@ -178,7 +179,7 @@ public sealed class NotificationCommandHandlersTests : IDisposable
     [Fact]
     public async Task MarkNotificationRead_ShouldReturnNull_WhenNotificationBelongsToAnotherUser()
     {
-        var notification = CreateNotification(Guid.NewGuid(), OtherUserId, "Title", false, DateTime.UtcNow);
+        var notification = CreateNotification(Guid.NewGuid(), OtherUserId, "Title", false, TestClock.UtcNow);
         _context.Notifications.Add(notification);
         await _context.SaveChangesAsync();
 

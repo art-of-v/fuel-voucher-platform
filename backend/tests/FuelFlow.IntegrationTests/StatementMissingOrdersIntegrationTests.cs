@@ -5,6 +5,7 @@ using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -68,8 +69,8 @@ public sealed class StatementMissingOrdersIntegrationTests : IClassFixture<TestD
             Id = id,
             PhoneNumber = $"+38{id:N}"[..20],
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
         });
         await context.SaveChangesAsync();
         return id;
@@ -104,8 +105,8 @@ public sealed class StatementMissingOrdersIntegrationTests : IClassFixture<TestD
             Ccy = 980,
             Status = "settled",
             AcquirerCreatedAtUtc = new DateTime(2026, 10, 10, 12, 0, 0, DateTimeKind.Utc),
-            FirstSeenAtUtc = DateTime.UtcNow,
-            LastSeenAtUtc = DateTime.UtcNow,
+            FirstSeenAtUtc = TestClock.UtcNow,
+            LastSeenAtUtc = TestClock.UtcNow,
         };
     }
 

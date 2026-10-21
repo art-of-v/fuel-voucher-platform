@@ -2,6 +2,7 @@ using FluentAssertions;
 using FuelFlow.Features.Auth.AdminUser.GetAdminUsers;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -64,7 +65,7 @@ public class SettlementCodeTests : WebApplicationFactory<Program>, IClassFixture
             .Where(r => r.Name == SeedRoles.UserName)
             .Select(r => r.Id)
             .FirstAsync();
-        var now = DateTime.UtcNow;
+        var now = TestClock.UtcNow;
 
         var user = new User
         {
@@ -200,7 +201,7 @@ public class SettlementCodeTests : WebApplicationFactory<Program>, IClassFixture
             .Where(r => r.Name == SeedRoles.UserName)
             .Select(r => r.Id)
             .FirstAsync();
-        var now = DateTime.UtcNow;
+        var now = TestClock.UtcNow;
 
         second.Users.Add(new User
         {

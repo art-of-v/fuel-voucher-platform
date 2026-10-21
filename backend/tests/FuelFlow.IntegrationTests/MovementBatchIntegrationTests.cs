@@ -9,6 +9,7 @@ using FuelFlow.Features.Vouchers.PurchaseBatchCost;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Hangfire;
 using Hangfire.Common;
 using Hangfire.States;
@@ -61,7 +62,7 @@ public sealed class MovementBatchIntegrationTests : IClassFixture<TestDatabaseFi
             ActorKind = VoucherActorKinds.User,
             ActorUserId = Guid.NewGuid(),
             SurchargeShareUah = 10m,
-            OccurredAtUtc = DateTime.UtcNow
+            OccurredAtUtc = TestClock.UtcNow
         });
 
         var act = async () => await seed.SaveChangesAsync();
@@ -82,15 +83,15 @@ public sealed class MovementBatchIntegrationTests : IClassFixture<TestDatabaseFi
         var actingUserId = Guid.NewGuid();
         var supplierId = await SeedSupplierAsync(seed);
         var importId = await SeedImportAsync(seed);
-        var expiry = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(6);
+        var expiry = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(6);
 
         // The ids come back from the seeder: a voucher seeded under an id the command does not name is
         // a voucher the handler never finds.
         var old1 = await SeedVoucherAsync(seed, "OLD-" + Guid.NewGuid().ToString("N")[..8],
-            liters: 50m, expiry: DateOnly.FromDateTime(DateTime.UtcNow).AddDays(2),
+            liters: 50m, expiry: DateOnly.FromDateTime(TestClock.UtcNow).AddDays(2),
             status: VoucherStatus.Available, supplierId: supplierId, costPerLiter: 30m);
         var old2 = await SeedVoucherAsync(seed, "OLD-" + Guid.NewGuid().ToString("N")[..8],
-            liters: 50m, expiry: DateOnly.FromDateTime(DateTime.UtcNow).AddDays(2),
+            liters: 50m, expiry: DateOnly.FromDateTime(TestClock.UtcNow).AddDays(2),
             status: VoucherStatus.Available, supplierId: supplierId, costPerLiter: 30m);
         var new1 = await SeedVoucherAsync(seed, "NEW-" + Guid.NewGuid().ToString("N")[..8],
             liters: 50m, expiry: expiry, status: VoucherStatus.Imported,
@@ -187,10 +188,10 @@ public sealed class MovementBatchIntegrationTests : IClassFixture<TestDatabaseFi
         var batchId = Guid.NewGuid();
         var oldVoucherId = await SeedVoucherAsync(seed, "OLD-" + Guid.NewGuid().ToString("N")[..8]);
 
-        MovementBatchSeeder.AddForExchange(seed, batchId, supplierId, 50m, DateTime.UtcNow);
+        MovementBatchSeeder.AddForExchange(seed, batchId, supplierId, 50m, TestClock.UtcNow);
         var pair = MovementBatchSeeder.AddExchangeOut(
             seed, batchId, oldVoucherId, newVoucherId: null,
-            surchargeShareUah: 50m, appliedCostPerLiter: null, atUtc: DateTime.UtcNow);
+            surchargeShareUah: 50m, appliedCostPerLiter: null, atUtc: TestClock.UtcNow);
         await seed.SaveChangesAsync();
 
         seed.VoucherMovements.Remove(pair);
@@ -221,7 +222,7 @@ public sealed class MovementBatchIntegrationTests : IClassFixture<TestDatabaseFi
         await AssertRefused(NegativeSurcharge(supplierId));
 
         // And the shape the application actually writes is accepted.
-        MovementBatchSeeder.AddForExchange(seed, Guid.NewGuid(), supplierId, 0m, DateTime.UtcNow,
+        MovementBatchSeeder.AddForExchange(seed, Guid.NewGuid(), supplierId, 0m, TestClock.UtcNow,
             "Zero Is A Real Answer");
         var ok = async () => await seed.SaveChangesAsync();
         await ok.Should().NotThrowAsync("0 UAH is free compensation, not an invalid amount");
@@ -233,7 +234,7 @@ public sealed class MovementBatchIntegrationTests : IClassFixture<TestDatabaseFi
     {
         Id = Guid.NewGuid(), Kind = MovementBatchKinds.VoucherExchange, SupplierId = supplierId,
         Status = MovementBatchStatuses.Confirmed, SurchargeUah = 10m, OpenedByUserId = Guid.NewGuid(),
-        OpenedAtUtc = DateTime.UtcNow, CreatedAtUtc = DateTime.UtcNow
+        OpenedAtUtc = TestClock.UtcNow, CreatedAtUtc = TestClock.UtcNow
         // ConfirmedAtUtc deliberately null.
     };
 
@@ -241,7 +242,7 @@ public sealed class MovementBatchIntegrationTests : IClassFixture<TestDatabaseFi
     {
         Id = Guid.NewGuid(), Kind = MovementBatchKinds.VoucherExchange, SupplierId = supplierId,
         Status = MovementBatchStatuses.Rejected, SurchargeUah = 10m, OpenedByUserId = Guid.NewGuid(),
-        OpenedAtUtc = DateTime.UtcNow, CreatedAtUtc = DateTime.UtcNow
+        OpenedAtUtc = TestClock.UtcNow, CreatedAtUtc = TestClock.UtcNow
         // RejectionReason deliberately null.
     };
 
@@ -249,8 +250,8 @@ public sealed class MovementBatchIntegrationTests : IClassFixture<TestDatabaseFi
     {
         Id = Guid.NewGuid(), Kind = MovementBatchKinds.VoucherExchange,
         Status = MovementBatchStatuses.Confirmed, SurchargeUah = 10m, OpenedByUserId = Guid.NewGuid(),
-        OpenedAtUtc = DateTime.UtcNow, ConfirmedAtUtc = DateTime.UtcNow,
-        CreatedAtUtc = DateTime.UtcNow
+        OpenedAtUtc = TestClock.UtcNow, ConfirmedAtUtc = TestClock.UtcNow,
+        CreatedAtUtc = TestClock.UtcNow
         // SupplierId deliberately null on a voucher_exchange kind.
     };
 
@@ -258,14 +259,14 @@ public sealed class MovementBatchIntegrationTests : IClassFixture<TestDatabaseFi
     {
         Id = Guid.NewGuid(), Kind = "voucher_reissue", SupplierId = supplierId,
         Status = MovementBatchStatuses.Confirmed, SurchargeUah = 10m, OpenedByUserId = Guid.NewGuid(),
-        OpenedAtUtc = DateTime.UtcNow, ConfirmedAtUtc = DateTime.UtcNow, CreatedAtUtc = DateTime.UtcNow
+        OpenedAtUtc = TestClock.UtcNow, ConfirmedAtUtc = TestClock.UtcNow, CreatedAtUtc = TestClock.UtcNow
     };
 
     private static MovementBatch NegativeSurcharge(Guid supplierId) => new()
     {
         Id = Guid.NewGuid(), Kind = MovementBatchKinds.VoucherExchange, SupplierId = supplierId,
         Status = MovementBatchStatuses.Confirmed, SurchargeUah = -1m, OpenedByUserId = Guid.NewGuid(),
-        OpenedAtUtc = DateTime.UtcNow, ConfirmedAtUtc = DateTime.UtcNow, CreatedAtUtc = DateTime.UtcNow
+        OpenedAtUtc = TestClock.UtcNow, ConfirmedAtUtc = TestClock.UtcNow, CreatedAtUtc = TestClock.UtcNow
     };
 
     private async Task AssertRefused(MovementBatch batch)
@@ -297,7 +298,7 @@ public sealed class MovementBatchIntegrationTests : IClassFixture<TestDatabaseFi
         {
             EdrIpn = TestEdrIpns.Next(),
             Id = id, Name = $"Seed {id:N}"[..20], IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow
         });
         await ctx.SaveChangesAsync();
         return id;
@@ -309,7 +310,7 @@ public sealed class MovementBatchIntegrationTests : IClassFixture<TestDatabaseFi
         ctx.VoucherImports.Add(new VoucherImport
         {
             Id = id, FileName = $"import-{id:N}.pdf", Status = "Completed",
-            StartedAtUtc = DateTime.UtcNow, CompletedAtUtc = DateTime.UtcNow
+            StartedAtUtc = TestClock.UtcNow, CompletedAtUtc = TestClock.UtcNow
         });
         await ctx.SaveChangesAsync();
         return id;
@@ -327,7 +328,7 @@ public sealed class MovementBatchIntegrationTests : IClassFixture<TestDatabaseFi
         decimal? costPerLiter = null)
     {
         var id = Guid.NewGuid();
-        var when = expiry ?? DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1);
+        var when = expiry ?? DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1);
         ctx.FuelVouchers.Add(new FuelVoucher
         {
             Id = id,
@@ -343,8 +344,8 @@ public sealed class MovementBatchIntegrationTests : IClassFixture<TestDatabaseFi
             ImportJobId = importId,
             SupplierId = supplierId,
             CostPerLiter = costPerLiter,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         await ctx.SaveChangesAsync();
         return id;

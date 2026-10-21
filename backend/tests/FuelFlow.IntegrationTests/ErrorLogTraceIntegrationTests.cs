@@ -6,6 +6,7 @@ using FuelFlow.Features.ErrorLogs.Logging;
 using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -110,7 +111,7 @@ public sealed class ErrorLogTraceIntegrationTests : IClassFixture<TestDatabaseFi
     private static ErrorLog NewRow(string message, string? traceId) => new()
     {
         Id = Guid.NewGuid(),
-        LoggedAtUtc = DateTime.UtcNow,
+        LoggedAtUtc = TestClock.UtcNow,
         Level = "Error",
         Message = message,
         Source = "FuelFlow.Middleware.GlobalExceptionHandler",

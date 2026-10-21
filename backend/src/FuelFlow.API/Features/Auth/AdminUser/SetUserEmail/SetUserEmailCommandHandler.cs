@@ -3,6 +3,7 @@ using FuelFlow.Features.Auth.EmailChange;
 using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Notifications.Email;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -61,7 +62,7 @@ public sealed class SetUserEmailCommandHandler
             target.PendingEmail = null;
             target.PendingEmailTokenHash = null;
             target.PendingEmailExpiresAtUtc = null;
-            target.UpdatedAtUtc = DateTime.UtcNow;
+            target.UpdatedAtUtc = SystemClock.UtcNow;
             await _context.SaveChangesAsync(cancellationToken);
 
             await _eventService.RecordEventAsync(

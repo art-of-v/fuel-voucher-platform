@@ -5,6 +5,7 @@ using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Features.Vouchers.UnarchiveVoucher;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
@@ -59,7 +60,7 @@ public sealed class UnarchiveVoucherIntegrationTests : IClassFixture<TestDatabas
             .SingleAsync();
 
         stored.IsDeleted.Should().BeFalse();
-        stored.UpdatedAtUtc.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(10));
+        stored.UpdatedAtUtc.Should().BeCloseTo(TestClock.UtcNow, TimeSpan.FromSeconds(10));
     }
 
     /// <summary>
@@ -152,14 +153,14 @@ public sealed class UnarchiveVoucherIntegrationTests : IClassFixture<TestDatabas
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
             VoucherNumber = $"OKKO-{voucherId:N}"[..20],
             QrPayload = $"payload-{voucherId:N}",
             Status = status,
             IsDeleted = archived,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         await seed.SaveChangesAsync();

@@ -1,4 +1,5 @@
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Orders.DeleteOrder;
@@ -51,7 +52,7 @@ namespace FuelFlow.Features.Orders.DeleteOrder;
         // fulfillments cascade from their order, so hard-deleting quietly took the delivery
         // records with it.
         entity.IsDeleted = true;
-        entity.UpdatedAtUtc = DateTime.UtcNow;
+        entity.UpdatedAtUtc = SystemClock.UtcNow;
         await _context.SaveChangesAsync(cancellationToken);
         return true;
     }

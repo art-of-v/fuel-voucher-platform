@@ -5,6 +5,7 @@ using FuelFlow.Features.Brands.DeleteBrand;
 using FuelFlow.Features.Brands.UpdateBrand;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
@@ -56,7 +57,7 @@ public sealed class BrandsCommandHandlersTests : IDisposable
 
         var persisted = await _context.Brands.FindAsync(result.Brand.Id);
         persisted.Should().NotBeNull();
-        persisted!.CreatedAtUtc.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+        persisted!.CreatedAtUtc.Should().BeCloseTo(TestClock.UtcNow, TimeSpan.FromSeconds(5));
     }
 
     [Fact]

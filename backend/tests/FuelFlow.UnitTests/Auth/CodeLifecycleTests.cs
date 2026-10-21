@@ -10,6 +10,7 @@ using FuelFlow.SharedKernel.Notifications.Email;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -138,7 +139,7 @@ public sealed class CodeLifecycleTests : IDisposable
         // prod. It now fires for any staff role via SeedRoles.IsStaff, carrying the actual
         // role. A successful PO login must leave a StaffLoggedIn record naming ProductOwner.
         const string phone = "+380991110009";
-        var role = new Role { Id = SeedRoles.ProductOwnerId, Name = SeedRoles.ProductOwnerName, CreatedAtUtc = DateTime.UtcNow };
+        var role = new Role { Id = SeedRoles.ProductOwnerId, Name = SeedRoles.ProductOwnerName, CreatedAtUtc = TestClock.UtcNow };
         _context.Roles.Add(role);
         _context.Users.Add(new User
         {
@@ -146,7 +147,7 @@ public sealed class CodeLifecycleTests : IDisposable
             PhoneNumber = phone,
             RoleId = role.Id,
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow
         });
         SeedCode(phone, "111111", createdMinutesAgo: 0);
         await _context.SaveChangesAsync();
@@ -169,8 +170,8 @@ public sealed class CodeLifecycleTests : IDisposable
             Id = Guid.NewGuid(),
             PhoneNumber = phone,
             Code = SecretsHasher.Hash(plainCode),
-            ExpiresAtUtc = DateTime.UtcNow.AddMinutes(5),
-            CreatedAtUtc = DateTime.UtcNow.AddMinutes(-createdMinutesAgo),
+            ExpiresAtUtc = TestClock.UtcNow.AddMinutes(5),
+            CreatedAtUtc = TestClock.UtcNow.AddMinutes(-createdMinutesAgo),
             IsUsed = false,
             FailedAttempts = 0
         });

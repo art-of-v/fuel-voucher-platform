@@ -1,6 +1,7 @@
 using FluentAssertions;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
@@ -47,8 +48,8 @@ public sealed class FuelTypeGradeKeyTests : IClassFixture<TestDatabaseFixture>
             Name = name,
             BasePrice = 50m,
             DiscountPrice = 48m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
     [Fact]

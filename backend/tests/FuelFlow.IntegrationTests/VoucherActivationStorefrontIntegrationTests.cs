@@ -7,6 +7,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -68,7 +69,7 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
             var role = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Admin", CancellationToken.None);
             if (role is null)
             {
-                role = new Role { Id = Guid.NewGuid(), Name = "Admin", CreatedAtUtc = DateTime.UtcNow };
+                role = new Role { Id = Guid.NewGuid(), Name = "Admin", CreatedAtUtc = TestClock.UtcNow };
                 context.Roles.Add(role);
                 await context.SaveChangesAsync();
             }
@@ -77,7 +78,7 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
             user.RoleId = role.Id;
             // OTP verify registers a user as inactive; payment and staff routes both refuse those.
             user.IsActive = true;
-            user.UpdatedAtUtc = DateTime.UtcNow;
+            user.UpdatedAtUtc = TestClock.UtcNow;
             await context.SaveChangesAsync();
         }
 
@@ -100,7 +101,7 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
     {
         using var scope = _fixture.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var now = DateTime.UtcNow;
+        var now = TestClock.UtcNow;
 
         if (!await context.FuelTypes.AnyAsync(f => f.Id ==  ToUuid(fuelTypeId), CancellationToken.None))
         {
@@ -149,13 +150,13 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
             FuelTypeId =   ToUuid(fuelTypeId),
             Liters = liters,
             CostPerLiter = costPerLiter,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(6)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(6)),
             VoucherNumber = $"IMPORT-{Guid.NewGuid().ToString()[..10]}",
             QrPayload = Guid.NewGuid().ToString(),
             Status = VoucherStatus.Imported,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
     private async Task<bool> IsPackageAvailableAsync(Guid BrandId, string fuelTypeId, decimal liters)

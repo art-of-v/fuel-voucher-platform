@@ -5,6 +5,7 @@ using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
@@ -62,8 +63,8 @@ private async Task<Order> SeedAsync(
             Status = status,
             Kind = OrderKind.Purchase,
             Price = lineTotal,
-            CreatedAtUtc = DateTime.UtcNow.AddDays(-2),
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow.AddDays(-2),
+            UpdatedAtUtc = TestClock.UtcNow,
         };
         order.LineItems.Add(new OrderLineItem
         {
@@ -92,10 +93,10 @@ private async Task<Order> SeedAsync(
                 VoucherNumber = Guid.NewGuid().ToString("N"),
                 QrPayload = $"9015$2000$;{fuelTypeId}={vouchers}?",
                 Status = VoucherStatus.Assigned,
-                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(90),
-                CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(90),
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow,
+                SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddDays(90),
+                CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddDays(90),
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow,
             };
             _context.FuelVouchers.Add(voucher);
             order.Fulfillments.Add(new Fulfillment
@@ -104,7 +105,7 @@ private async Task<Order> SeedAsync(
                 OrderId = order.Id,
                 VoucherId = voucher.Id,
                 Voucher = voucher,
-                FulfilledAtUtc = DateTime.UtcNow.AddDays(-2),
+                FulfilledAtUtc = TestClock.UtcNow.AddDays(-2),
             });
         }
 
@@ -186,8 +187,8 @@ private async Task<Order> SeedAsync(
             Status = OrderStatus.Paid,
             Kind = OrderKind.Purchase,
             Price = 1000m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
         };
         order.LineItems.Add(new OrderLineItem
         {
@@ -258,12 +259,12 @@ private async Task<Order> SeedAsync(
     {
 var old = await SeedAsync(lineTotal: 1000m, deliveredCostPerLiter: 60m);
         _context.Orders.Attach(old);
-        old.CreatedAtUtc = DateTime.UtcNow.AddDays(-90);
+        old.CreatedAtUtc = TestClock.UtcNow.AddDays(-90);
         _context.Orders.Update(old);
         await _context.SaveChangesAsync();
         _context.ChangeTracker.Clear();
 
-        var recent = await Handler().HandleAsync(new GetRealizedMarginQuery(DateTime.UtcNow.AddDays(-7)));
+        var recent = await Handler().HandleAsync(new GetRealizedMarginQuery(TestClock.UtcNow.AddDays(-7)));
         var all = await Handler().HandleAsync(new GetRealizedMarginQuery());
 
         recent.Lines.Should().Be(0);

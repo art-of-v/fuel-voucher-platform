@@ -7,6 +7,7 @@ using FuelFlow.Persistence;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Security;
+using FuelFlow.Testing;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -57,7 +58,7 @@ public class AdminPaymentsControllerTests : IClassFixture<TestDatabaseFixture>
         ApplicationDbContext context, string code, string? firstName = null, string? lastName = null)
     {
         var roleId = await context.Roles.Where(r => r.Name == SeedRoles.UserName).Select(r => r.Id).FirstAsync();
-        var now = DateTime.UtcNow;
+        var now = TestClock.UtcNow;
 
         var user = new User
         {
@@ -93,8 +94,8 @@ public class AdminPaymentsControllerTests : IClassFixture<TestDatabaseFixture>
             UserId = userId,
             Price = price,
             Status = status,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
         };
 
         context.Orders.Add(order);
@@ -104,7 +105,7 @@ public class AdminPaymentsControllerTests : IClassFixture<TestDatabaseFixture>
 
     private async Task<Guid> SeedHeldPaymentAsync(ApplicationDbContext context, Guid? userId, decimal amount)
     {
-        var now = DateTime.UtcNow;
+        var now = TestClock.UtcNow;
         var payment = new Payment
         {
             Id = Guid.CreateVersion7(),
@@ -401,7 +402,7 @@ public class AdminPaymentsControllerTests : IClassFixture<TestDatabaseFixture>
         var roleId = await context.Roles.Where(r => r.Name == SeedRoles.UserName).Select(r => r.Id).FirstAsync();
         var exactCode = NewCode();
         var substringHolder = "ZZ" + exactCode.Substring(2, 6);
-        var now = DateTime.UtcNow;
+        var now = TestClock.UtcNow;
 
         context.Users.Add(new User
         {

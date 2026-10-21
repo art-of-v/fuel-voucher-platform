@@ -5,6 +5,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -125,8 +126,8 @@ public sealed class RealizedMarginSqlIntegrationTests : IClassFixture<TestDataba
             Id = userId,
             PhoneNumber = $"+38{Guid.NewGuid():N}"[..20],
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         context.FuelTypes.Add(new FuelTypeEntity
@@ -135,8 +136,8 @@ public sealed class RealizedMarginSqlIntegrationTests : IClassFixture<TestDataba
             Name = "Margin " + Guid.NewGuid().ToString("N")[..8],
             BrandId = brandId,
             BasePrice = 50m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         var order = new Order
@@ -146,9 +147,9 @@ public sealed class RealizedMarginSqlIntegrationTests : IClassFixture<TestDataba
             Price = lineTotal,
             Status = OrderStatus.Fulfilled,
             Kind = OrderKind.Purchase,
-            FulfilledAtUtc = DateTime.UtcNow.AddDays(-2),
+            FulfilledAtUtc = TestClock.UtcNow.AddDays(-2),
             CreatedAtUtc = createdAtUtc,
-            UpdatedAtUtc = DateTime.UtcNow
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         order.LineItems.Add(new OrderLineItem
@@ -181,10 +182,10 @@ public sealed class RealizedMarginSqlIntegrationTests : IClassFixture<TestDataba
                 Status = VoucherStatus.Assigned,
                 // An assigned voucher is held against an order - the schema refuses one without it.
                 OrderId = orderId,
-                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(90),
-                CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(90),
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddDays(90),
+                CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddDays(90),
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             };
             context.FuelVouchers.Add(voucher);
 
@@ -194,7 +195,7 @@ public sealed class RealizedMarginSqlIntegrationTests : IClassFixture<TestDataba
                 // has to set one, because the in-memory provider has no identity to ask.
                 OrderId = orderId,
                 VoucherId = voucher.Id,
-                FulfilledAtUtc = DateTime.UtcNow.AddDays(-2)
+                FulfilledAtUtc = TestClock.UtcNow.AddDays(-2)
             });
         }
 

@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -119,7 +120,7 @@ public sealed class TelegramAlertNotifier : IAlertNotifier
         }
 
         sb.AppendLine();
-        sb.Append("<i>").Append(DateTimeOffset.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")).Append(" UTC</i>");
+        sb.Append("<i>").Append(SystemClock.Now.ToString("yyyy-MM-dd HH:mm:ss")).Append(" UTC</i>");
 
         var text = sb.ToString();
 

@@ -3,6 +3,7 @@ using FuelFlow.Features.Support;
 using FuelFlow.Features.Support.CreateSupportMessage;
 using FuelFlow.Features.Support.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -58,7 +59,7 @@ public sealed class SupportMessageHandlerTests : IDisposable
         stored.Message.Should().Contain("Оплата пройшла");
         stored.UserAgent.Should().Be("Mozilla/5.0");
         stored.IpAddress.Should().Be("203.0.113.10");
-        stored.CreatedAtUtc.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
+        stored.CreatedAtUtc.Should().BeCloseTo(TestClock.UtcNow, TimeSpan.FromMinutes(1));
     }
 
     [Fact]

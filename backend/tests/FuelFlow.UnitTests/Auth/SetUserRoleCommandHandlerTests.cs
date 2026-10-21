@@ -5,6 +5,7 @@ using FuelFlow.Features.Brands;
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -120,7 +121,7 @@ public sealed class SetUserRoleCommandHandlerTests
             var user = new User
             {
                 Id = Guid.NewGuid(), PhoneNumber = "+380991234567", RoleId = SeedRoles.UserRoleId,
-                IsActive = true, TokenVersion = 7, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
+                IsActive = true, TokenVersion = 7, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow
             };
             seed.Users.Add(user);
             await seed.SaveChangesAsync();
@@ -171,11 +172,11 @@ public sealed class SetUserRoleCommandHandlerTests
         // ProductOwner 100 / Admin 50 / Manager 10 / User 0, and AddQaRole writes QA 5.
         // AdminRoleDemotionIntegrationTests proves the same rule against real seeded rows.
         context.Roles.AddRange(
-            new Role { Id = SeedRoles.ProductOwnerId, Name = SeedRoles.ProductOwnerName, Level = 100, CreatedAtUtc = DateTime.UtcNow },
-            new Role { Id = SeedRoles.AdminRoleId, Name = SeedRoles.AdminName, Level = 50, CreatedAtUtc = DateTime.UtcNow },
-            new Role { Id = SeedRoles.ManagerRoleId, Name = SeedRoles.ManagerName, Level = 10, CreatedAtUtc = DateTime.UtcNow },
-            new Role { Id = SeedRoles.QaRoleId, Name = SeedRoles.QaName, Level = 5, CreatedAtUtc = DateTime.UtcNow },
-            new Role { Id = SeedRoles.UserRoleId, Name = SeedRoles.UserName, Level = 0, CreatedAtUtc = DateTime.UtcNow });
+            new Role { Id = SeedRoles.ProductOwnerId, Name = SeedRoles.ProductOwnerName, Level = 100, CreatedAtUtc = TestClock.UtcNow },
+            new Role { Id = SeedRoles.AdminRoleId, Name = SeedRoles.AdminName, Level = 50, CreatedAtUtc = TestClock.UtcNow },
+            new Role { Id = SeedRoles.ManagerRoleId, Name = SeedRoles.ManagerName, Level = 10, CreatedAtUtc = TestClock.UtcNow },
+            new Role { Id = SeedRoles.QaRoleId, Name = SeedRoles.QaName, Level = 5, CreatedAtUtc = TestClock.UtcNow },
+            new Role { Id = SeedRoles.UserRoleId, Name = SeedRoles.UserName, Level = 0, CreatedAtUtc = TestClock.UtcNow });
         await context.SaveChangesAsync();
     }
 
@@ -185,7 +186,7 @@ public sealed class SetUserRoleCommandHandlerTests
         var user = new User
         {
             Id = Guid.NewGuid(), PhoneNumber = "+380991234567", RoleId = rid,
-            IsActive = true, TokenVersion = 7, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
+            IsActive = true, TokenVersion = 7, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow
         };
         context.Users.Add(user);
         await context.SaveChangesAsync();
@@ -213,12 +214,12 @@ public sealed class SetUserRoleCommandHandlerTests
         var a = new RefreshToken
         {
             Id = Guid.NewGuid(), UserId = userId, FamilyId = Guid.NewGuid(), Token = Guid.NewGuid().ToString("N"),
-            ExpiresAtUtc = DateTime.UtcNow.AddDays(7), CreatedAtUtc = DateTime.UtcNow, IsRevoked = false
+            ExpiresAtUtc = TestClock.UtcNow.AddDays(7), CreatedAtUtc = TestClock.UtcNow, IsRevoked = false
         };
         var b = new RefreshToken
         {
             Id = Guid.NewGuid(), UserId = userId, FamilyId = Guid.NewGuid(), Token = Guid.NewGuid().ToString("N"),
-            ExpiresAtUtc = DateTime.UtcNow.AddDays(7), CreatedAtUtc = DateTime.UtcNow, IsRevoked = false
+            ExpiresAtUtc = TestClock.UtcNow.AddDays(7), CreatedAtUtc = TestClock.UtcNow, IsRevoked = false
         };
         context.RefreshTokens.AddRange(a, b);
         await context.SaveChangesAsync();
@@ -231,7 +232,7 @@ public sealed class SetUserRoleCommandHandlerTests
         {
             Id = Guid.NewGuid(), UserId = userId, DeviceId = "device-" + Guid.NewGuid().ToString("N"),
             PublicKey = "pk", Status = DeviceStatus.Active,
-            CreatedAt = DateTime.UtcNow, LastSeenAt = DateTime.UtcNow
+            CreatedAt = TestClock.UtcNow, LastSeenAt = TestClock.UtcNow
         };
         context.Devices.Add(device);
         await context.SaveChangesAsync();

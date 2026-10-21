@@ -5,6 +5,7 @@ using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Pricing.ImportOkkoCatalogue;
@@ -140,7 +141,7 @@ public sealed class ImportOkkoCatalogueCommandHandler
                 + "failed to read the page, not a catalogue that should be emptied.");
         }
 
-        var now = DateTime.UtcNow;
+        var now = SystemClock.UtcNow;
         var created = new List<OkkoCatalogueCreated>();
         var alreadyKnown = 0;
         var unclassified = new List<string>();
@@ -422,15 +423,15 @@ if (knownCodes.Contains(code))
                 var fuelRow = await _context.FuelTypes.IgnoreQueryFilters()
                     .FirstAsync(f => f.Id == fuel.Id, ct);
                 fuelRow.IsDeleted = true;
-                fuelRow.DeletedAtUtc = DateTime.UtcNow;
-                fuelRow.UpdatedAtUtc = DateTime.UtcNow;
+                fuelRow.DeletedAtUtc = SystemClock.UtcNow;
+                fuelRow.UpdatedAtUtc = SystemClock.UtcNow;
 
                 // Tracked writes rather than ExecuteUpdateAsync: the latter is a relational-only
                 // operator, and this handler is unit-tested on the in-memory provider where it throws
                 // at translation time. One fuel per fifteen minutes is not a volume problem.
                 // There is no offer left to archive: it existed to carry the pump, and the fuel
                 // carries it.
-                fuelRow.UpdatedAtUtc = DateTime.UtcNow;
+                fuelRow.UpdatedAtUtc = SystemClock.UtcNow;
 
                 await _context.SaveChangesAsync(ct);
 

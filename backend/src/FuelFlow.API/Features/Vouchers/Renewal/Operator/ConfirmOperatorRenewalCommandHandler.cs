@@ -6,6 +6,7 @@ using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -110,7 +111,7 @@ public sealed class ConfirmOperatorRenewalCommandHandler
         if (!VoucherRenewalEligibility.IsRenewableStatus(voucher.Status))
             throw new VoucherRenewalException("not_renewable", $"A voucher in status '{voucher.Status}' cannot be renewed.");
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(SystemClock.UtcNow);
         var branch = voucher.CustomerExpirationDate >= today
             ? VoucherRenewalBranch.Extend
             : VoucherRenewalBranch.Replace;
@@ -138,7 +139,7 @@ public sealed class ConfirmOperatorRenewalCommandHandler
                 $"(valid to {voucher.SupplierExpirationDate:yyyy-MM-dd}). Renew it as a replacement, or pick a shorter term.");
 
         var oldExpiration = voucher.CustomerExpirationDate;
-        var now = DateTime.UtcNow;
+        var now = SystemClock.UtcNow;
 
         // Captured before any mutation: the replace branch releases the voucher's ownership below, and
         // the audit row, the summary and the customer's name all still need to know whose it was.

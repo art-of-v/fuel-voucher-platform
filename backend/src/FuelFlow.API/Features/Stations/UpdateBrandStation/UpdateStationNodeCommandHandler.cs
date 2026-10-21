@@ -1,4 +1,5 @@
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Brands.UpdateBrandStation;
@@ -36,7 +37,7 @@ public sealed class UpdateBrandStationCommandHandler
         entity.StationType = updated.StationType;
         entity.Lat = updated.Lat;
         entity.Lng = updated.Lng;
-        entity.UpdatedAtUtc = DateTime.UtcNow;
+        entity.UpdatedAtUtc = SystemClock.UtcNow;
         _context.BrandStations.Update(entity);
 
         await _context.SaveChangesAsync(ct);

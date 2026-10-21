@@ -1,4 +1,5 @@
 using FuelFlow.Features.Settings;
+using FuelFlow.SharedKernel.Time;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -94,7 +95,7 @@ public class HangfireHistoryCleanupService
         }
 
         var retentionDays = Math.Max(1, await _settings.GetHangfireCleanupRetentionDaysAsync(cancellationToken));
-        var now = DateTime.UtcNow;
+        var now = SystemClock.UtcNow;
         var missedBefore = now.AddHours(-ReaperGraceHours);
         var cutoff = now.AddDays(-retentionDays);
 

@@ -6,6 +6,7 @@ using FuelFlow.Features.Vouchers.MarkVoucherAsUsed;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -44,8 +45,8 @@ public sealed class VoucherQrScopeTests : IDisposable
             BrandId = BrandIds.Okko,
             BasePrice = 55,
             DiscountPrice = 52,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         _context.SaveChanges();
     }
@@ -66,15 +67,15 @@ public sealed class VoucherQrScopeTests : IDisposable
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
             VoucherNumber = "OKKO-ISSUE-1",
             QrPayload = "9018$1000$redeemable-instrument",
             Status = VoucherStatus.Assigned,
             AssignedToUserId = OwnerId,
             WorkerUserId = workerId,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         _context.FuelVouchers.Add(voucher);

@@ -6,6 +6,7 @@ using FuelFlow.Features.Pricing.ScrapeUpgWogPrices;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.Testing;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -71,8 +72,8 @@ public sealed class UpgWogPriceSyncServiceTests : IDisposable
             Name = slug.ToUpperInvariant(),
             LogoText = slug.ToUpperInvariant(),
             Color = "#000",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         await _context.SaveChangesAsync();
         _context.ChangeTracker.Clear();

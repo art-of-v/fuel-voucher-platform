@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
@@ -46,7 +47,7 @@ public sealed class JwtTokenService : IJwtTokenService
             issuer: _options.Issuer,
             audience: _options.Audience,
             claims: claims,
-            expires: DateTime.UtcNow.AddMinutes(_options.AccessTokenExpirationMinutes),
+            expires: SystemClock.UtcNow.AddMinutes(_options.AccessTokenExpirationMinutes),
             signingCredentials: credentials
         );
 

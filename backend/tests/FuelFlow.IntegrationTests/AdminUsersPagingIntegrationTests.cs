@@ -3,6 +3,7 @@ using FuelFlow.Features.Auth.AdminUser.GetAdminUserOptions;
 using FuelFlow.Features.Auth.AdminUser.GetAdminUsers;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -139,7 +140,7 @@ public sealed class AdminUsersPagingIntegrationTests : IClassFixture<TestDatabas
                 FirstName = $"customer-{i}",
                 IsActive = true,
                 CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddMinutes(i),
-                UpdatedAtUtc = DateTime.UtcNow
+                UpdatedAtUtc = TestClock.UtcNow
             });
         }
 

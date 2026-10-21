@@ -2,6 +2,7 @@ using FuelFlow.Features.Brands;
 using FuelFlow.Features.Pricing.ScrapeMinfinPrices;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Time;
 using FuelFlow.Features.Vouchers.SharedModels;
 using Microsoft.EntityFrameworkCore;
 
@@ -108,7 +109,7 @@ public sealed class ImportKloPricesCommandHandler
         }
 
         var klo = brandId.Value;
-        var now = DateTime.UtcNow;
+        var now = SystemClock.UtcNow;
         var actor = actingUserId == Guid.Empty ? (Guid?)null : actingUserId;
 
         var ours = await _context.FuelTypes

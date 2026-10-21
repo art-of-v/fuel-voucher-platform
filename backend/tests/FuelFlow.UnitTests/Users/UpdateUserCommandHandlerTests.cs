@@ -2,6 +2,7 @@ using FluentAssertions;
 using FuelFlow.Features.Users.UpdateUser;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.UnitTests.Users;
@@ -35,8 +36,8 @@ public sealed class UpdateUserCommandHandlerTests : IDisposable
         {
             Id = UserId,
             PhoneNumber = "+380991111111",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         await _context.SaveChangesAsync();
 
@@ -77,8 +78,8 @@ public sealed class UpdateUserCommandHandlerTests : IDisposable
             Id = UserId,
             PhoneNumber = "+380991111111",
             Email = "same@example.com",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         await _context.SaveChangesAsync();
 

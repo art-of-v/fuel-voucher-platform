@@ -5,6 +5,7 @@ using FuelFlow.Features.Pricing;
 using FuelFlow.Features.Pricing.ImportUpgWogPrices;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
@@ -73,8 +74,8 @@ public sealed class ImportUpgWogPricesTests : IDisposable
             MarginUahPerLiter = profit,
             SupplierPricePerLiter = cost,
             PumpPricePerLiter = pump,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
         _context.FuelTypes.Add(fuel);
 
@@ -85,8 +86,8 @@ public sealed class ImportUpgWogPricesTests : IDisposable
             {
         FuelTypeId = ToUuid(id),
                 Liters = liters,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
         }
 

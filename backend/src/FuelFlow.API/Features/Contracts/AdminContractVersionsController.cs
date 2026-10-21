@@ -1,6 +1,7 @@
 using FuelFlow.Features.Contracts.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -115,7 +116,7 @@ public sealed class AdminContractVersionsController : ControllerBase
             Version = (short)((current ?? 0) + 1),
             Body = request.Body.Trim(),
             TermDays = request.TermDays,
-            CreatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = SystemClock.UtcNow,
             CreatedByUserId = null
         };
 
@@ -210,7 +211,7 @@ public sealed class AdminContractVersionsController : ControllerBase
             Version = (short)((current ?? 0) + 1),
             Body = body.Trim(),
             TermDays = termDays,
-            CreatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = SystemClock.UtcNow,
             CreatedByUserId = null
         };
 

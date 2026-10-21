@@ -3,6 +3,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Security;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Xunit;
@@ -42,8 +43,8 @@ public sealed class QrPayloadEncryptionIntegrationTests : IClassFixture<TestData
         CustomerExpirationDate = new DateOnly(2027, 1, 1),
         VoucherNumber = Guid.NewGuid().ToString("N")[..12],
         QrPayload = qr,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 
     [Fact]

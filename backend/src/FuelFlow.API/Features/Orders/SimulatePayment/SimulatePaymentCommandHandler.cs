@@ -5,6 +5,7 @@ using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Time;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
 
@@ -69,7 +70,7 @@ public sealed class SimulatePaymentCommandHandler
 
             order.Status = OrderStatus.Cancelled;
             order.MonobankStatus = MonobankStatus.Failure;
-            order.UpdatedAtUtc = DateTime.UtcNow;
+            order.UpdatedAtUtc = SystemClock.UtcNow;
             _context.Orders.Update(order);
             await _context.SaveChangesAsync(cancellationToken);
 
@@ -98,7 +99,7 @@ public sealed class SimulatePaymentCommandHandler
 
             order.Status = OrderStatus.PendingFulfillment;
             order.MonobankStatus = MonobankStatus.Success;
-            order.UpdatedAtUtc = DateTime.UtcNow;
+            order.UpdatedAtUtc = SystemClock.UtcNow;
             _context.Orders.Update(order);
 
             // The money row follows the order, exactly as the real webhook does it: the acquirer
@@ -141,7 +142,7 @@ public sealed class SimulatePaymentCommandHandler
                             quantity = firstLi?.Quantity ?? 0
                         }),
                         Processed = false,
-                        CreatedAtUtc = DateTime.UtcNow
+                        CreatedAtUtc = SystemClock.UtcNow
                     };
 
                     _context.OutboxEvents.Add(outboxEvent);
@@ -200,11 +201,11 @@ public sealed class SimulatePaymentCommandHandler
                 order,
                 order.MonobankMerchant ?? MonobankMerchant.Sandbox,
                 order.MonobankInvoiceId ?? $"simulated-{order.Id:N}",
-                DateTime.UtcNow);
+                SystemClock.UtcNow);
             _context.Payments.Add(payment);
         }
 
-        PaymentFactory.ApplyStatus(payment, PaymentStatus.Succeeded, DateTime.UtcNow, DateTime.UtcNow);
+        PaymentFactory.ApplyStatus(payment, PaymentStatus.Succeeded, SystemClock.UtcNow, SystemClock.UtcNow);
 
         // Only a row that was already in the store is marked as updated: Update() on a row that
         // was just Added turns the insert into an update of a row that does not exist yet, and

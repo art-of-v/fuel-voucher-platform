@@ -1,5 +1,6 @@
 using FuelFlow.Features.Support.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 
@@ -59,7 +60,7 @@ public sealed class CreateSupportMessageCommandHandler
             Message = command.Message.Trim(),
             UserAgent = Truncate(userAgent, 300),
             IpAddress = ipAddress,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = SystemClock.UtcNow
         };
 
         _context.SupportMessages.Add(message);
@@ -73,7 +74,7 @@ public sealed class CreateSupportMessageCommandHandler
             // success may stamp EmailSentAtUtc - otherwise the row would claim
             // delivery that never happened.
             if (_mailSender.IsConfigured)
-                message.EmailSentAtUtc = DateTime.UtcNow;
+                message.EmailSentAtUtc = SystemClock.UtcNow;
         }
         catch (Exception ex)
         {

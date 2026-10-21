@@ -15,6 +15,7 @@ using Microsoft.Extensions.Configuration;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
@@ -163,15 +164,15 @@ CreateBrandStation(StationId(1), BrandId(1), "Node A"),
             Name = "А-95",
             BrandId = BrandId(1),
             PumpPricePerLiter = 92.90m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
         });
         _context.FuelNominals.Add(new FuelNominal
         {
             FuelTypeId = ToUuid("ft-imported"),
             Liters = 10m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
         });
         await _context.SaveChangesAsync();
 
@@ -406,7 +407,7 @@ result.Should().HaveCount(2, "an empty shelf is greyed out, not removed from the
     {
         _context.FuelNominals.Add(CreatePackage("pkg-1", BrandId(1), "ft-a", "A-95", 10m));
         _context.FuelVouchers.Add(CreateVoucher(
-            BrandId(1), "ft-a", 10m, providerExpiration: DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1))));
+            BrandId(1), "ft-a", 10m, providerExpiration: DateOnly.FromDateTime(TestClock.UtcNow.AddDays(-1))));
         await _context.SaveChangesAsync();
 
         var handler = new GetPublicPackagesQueryHandler(_context, Stock());
@@ -426,7 +427,7 @@ result.Should().HaveCount(2, "an empty shelf is greyed out, not removed from the
     {
         _context.FuelNominals.Add(CreatePackage("pkg-1", BrandId(1), "ft-a", "A-95", 10m));
         _context.FuelVouchers.Add(CreateVoucher(
-            BrandId(1), "ft-a", 10m, providerExpiration: DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1))));
+            BrandId(1), "ft-a", 10m, providerExpiration: DateOnly.FromDateTime(TestClock.UtcNow.AddDays(-1))));
         await _context.SaveChangesAsync();
 
         var handler = new GetPublicPackagesQueryHandler(_context, Stock(
@@ -668,8 +669,8 @@ result.Should().HaveCount(2);
                 Id = ToUuid(fuelTypeId),
                 Name = fuelName,
                 BrandId = BrandId,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow,
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow,
             });
         }
 
@@ -686,8 +687,8 @@ result.Should().HaveCount(2);
 FuelTypeId = ToUuid(fuelTypeId),
         DataKind = DataKinds.ForPool(isTestData),
         Liters = liters,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow,
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow,
     };
     _context.FuelNominals.Add(nominal);
     return nominal;
@@ -702,7 +703,7 @@ FuelTypeId = ToUuid(fuelTypeId),
         DateOnly? providerExpiration = null,
         string? brandText = null)
     {
-        var expiry = providerExpiration ?? DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1));
+        var expiry = providerExpiration ?? DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1));
         var voucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
@@ -719,8 +720,8 @@ Brand = brandText ?? EnsureBrand(brandId).Slug,
             QrPayload = Guid.NewGuid().ToString(),
             Status = status,
             IsTestData = isTestData,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         // The stock queries read the summary, not the vouchers - the storefront's package list and

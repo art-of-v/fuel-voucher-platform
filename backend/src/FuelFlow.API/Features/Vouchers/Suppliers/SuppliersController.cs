@@ -4,6 +4,7 @@ using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -108,7 +109,7 @@ public sealed class SuppliersController : ControllerBase
         if (await _context.Suppliers.AnyAsync(s => s.Name == name, ct))
             return Conflict(NameTaken(name));
 
-        var now = DateTime.UtcNow;
+        var now = SystemClock.UtcNow;
         var supplier = new Supplier
         {
             Id = Guid.CreateVersion7(),
@@ -189,7 +190,7 @@ public sealed class SuppliersController : ControllerBase
         supplier.Address = request.Address?.Trim();
         supplier.Notes = request.Notes?.Trim();
         if (request.IsActive.HasValue) supplier.IsActive = request.IsActive.Value;
-        supplier.UpdatedAtUtc = DateTime.UtcNow;
+        supplier.UpdatedAtUtc = SystemClock.UtcNow;
 
         // AsTracking is load-bearing, not decoration. The context's default is TrackAll, so without it
         // these property changes reach no change tracker, SaveChanges writes nothing for the row, and the
@@ -224,7 +225,7 @@ public sealed class SuppliersController : ControllerBase
         if (!supplier.IsActive) return NoContent();
 
         supplier.IsActive = false;
-        supplier.UpdatedAtUtc = DateTime.UtcNow;
+        supplier.UpdatedAtUtc = SystemClock.UtcNow;
         await _context.SaveChangesAsync(ct);
 
         await RecordAsync("SupplierDeactivated", supplier, ct);
@@ -239,7 +240,7 @@ public sealed class SuppliersController : ControllerBase
         if (supplier is null) return NotFound();
 
         supplier.IsActive = true;
-        supplier.UpdatedAtUtc = DateTime.UtcNow;
+        supplier.UpdatedAtUtc = SystemClock.UtcNow;
         await _context.SaveChangesAsync(ct);
 
         await RecordAsync("SupplierReactivated", supplier, ct);

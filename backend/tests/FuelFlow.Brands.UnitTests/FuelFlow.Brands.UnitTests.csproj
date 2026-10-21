@@ -23,4 +23,11 @@
     <ProjectReference Include="..\..\src\FuelFlow.API\FuelFlow.API.csproj" />
   </ItemGroup>
 
+  <!-- The fixed clock the suite runs on. One copy, shared with the other two test projects, so
+       the three suites cannot drift apart on what "now" means. See the file for why the clock
+       exists at all (planning finding C-10). -->
+  <ItemGroup>
+    <Compile Include="..\Shared\TestClock.cs" Link="Shared\TestClock.cs" />
+  </ItemGroup>
+
 </Project>

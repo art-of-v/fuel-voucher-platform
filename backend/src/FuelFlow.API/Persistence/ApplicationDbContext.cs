@@ -11,6 +11,7 @@ using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Settlement.SharedModels;
 using FuelFlow.Features.Support.SharedModels;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Time;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Availability;
 using FuelFlow.Features.Vouchers.Events;
@@ -349,7 +350,7 @@ var cipher = _qrCipher;
                 // The invoice id the order carries is the external reference a webhook delivering
                 // twice would repeat, so it is what makes a duplicate findable later.
                 ExternalRef = invoiceIds.GetValueOrDefault(transition.OrderId),
-                OccurredAtUtc = DateTime.UtcNow
+                OccurredAtUtc = SystemClock.UtcNow
             });
         }
 

@@ -1,4 +1,5 @@
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Referral.RedeemReferralCode;
@@ -38,7 +39,7 @@ public sealed class RedeemReferralCodeCommandHandler
             throw new InvalidOperationException("Referral code not found");
 
         redeemer.ReferredBy = code;
-        redeemer.UpdatedAtUtc = DateTime.UtcNow;
+        redeemer.UpdatedAtUtc = SystemClock.UtcNow;
         _context.Users.Update(redeemer);
 
         await _context.SaveChangesAsync(cancellationToken);

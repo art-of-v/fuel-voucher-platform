@@ -3,6 +3,7 @@ using FluentAssertions;
 using FuelFlow.Features.Brands.GetProviders;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
@@ -45,8 +46,8 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
             Name = "okko",
             LogoText = "okko",
             Color = "#fff",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         // Exactly what the catalogue import leaves behind: a fuel with the published pump price, no
@@ -57,8 +58,8 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
             Name = "А-95",
             BrandId = TestOkko,
             PumpPricePerLiter = 92.90m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         await _context.SaveChangesAsync();
 
@@ -84,12 +85,12 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
             Name = "okko",
             LogoText = "okko",
             Color = "#fff",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         _context.FuelTypes.AddRange(
-            new FuelTypeEntity { Id = ToUuid("test-fuel-a"), Name = "A-95", BrandId = TestOkko, BasePrice = 5100, DiscountPrice = 5100, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = ToUuid("test-fuel-b"), Name = "ДП", BrandId = TestOkko, BasePrice = 5200, DiscountPrice = 5200, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
+            new FuelTypeEntity { Id = ToUuid("test-fuel-a"), Name = "A-95", BrandId = TestOkko, BasePrice = 5100, DiscountPrice = 5100, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("test-fuel-b"), Name = "ДП", BrandId = TestOkko, BasePrice = 5200, DiscountPrice = 5200, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow });
         _context.SeedPackage("test-fuel-a-10", TestOkko, "test-fuel-a", 10m, 510m,
             supplierPricePerLiter: 49m, marginUahPerLiter: 2m, finalPricePerLiter: 51m);
         _context.SeedPackage("test-fuel-a-20", TestOkko, "test-fuel-a", 20m, 1020m,
@@ -135,8 +136,8 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
             Name = "okko",
             LogoText = "okko",
             Color = "#fff",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         // Exactly the state the catalogue import leaves behind on a fuel nobody has priced: the
@@ -149,8 +150,8 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
             BasePrice = 92.90m,
             DiscountPrice = 0m,
             PumpPricePerLiter = 92.90m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         await _context.SaveChangesAsync();
 
@@ -180,12 +181,12 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
             Name = "okko",
             LogoText = "okko",
             Color = "#fff",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         _context.FuelTypes.AddRange(
-            new FuelTypeEntity { Id = ToUuid("test-coded"), Name = "А-95", BrandId = TestOkko, BrandFuelCode = "A-95", BasePrice = 92.9m, DiscountPrice = 89.06m, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = ToUuid("test-uncoded"), Name = "А 92", BrandId = TestOkko, BrandFuelCode = null, BasePrice = 85m, DiscountPrice = 84.5m, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
+            new FuelTypeEntity { Id = ToUuid("test-coded"), Name = "А-95", BrandId = TestOkko, BrandFuelCode = "A-95", BasePrice = 92.9m, DiscountPrice = 89.06m, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("test-uncoded"), Name = "А 92", BrandId = TestOkko, BrandFuelCode = null, BasePrice = 85m, DiscountPrice = 84.5m, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow });
         await _context.SaveChangesAsync();
 
         var providers = await _handler.HandleAsync(new GetBrandsQuery());
@@ -211,8 +212,8 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
             Name = "okko",
             LogoText = "okko",
             Color = "#fff",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         _context.FuelTypes.Add(new FuelTypeEntity
         {
@@ -221,8 +222,8 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
             BrandId = TestOkko,
             BasePrice = 110,
             DiscountPrice = 100,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         _context.FuelNominals.AddRange(
             // The QA leftover, inserted first so an unordered read would pick it.
@@ -271,8 +272,8 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
             Name = "okko",
             LogoText = "okko",
             Color = "#fff",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         _context.FuelTypes.Add(new FuelTypeEntity
         {
@@ -281,8 +282,8 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
             BrandId = TestOkko,
             BasePrice = 110,
             DiscountPrice = 100,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         // Two sizes of ONE offer. The offer carries the price; the sizes are the fuel's, so the card
         // reports one price per fuel and lists both sizes.
@@ -316,8 +317,8 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
             Name = "okko",
             LogoText = "okko",
             Color = "#fff",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         _context.FuelTypes.Add(new FuelTypeEntity
         {
@@ -326,8 +327,8 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
             BrandId = TestOkko,
             BasePrice = 110,
             DiscountPrice = 100,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         // cost 100 + margin 1 = 101, and the ceiling (pump 105 - 0.5) does not bind, so the customer price
         // is 101. This fixture used to state 99.90, which its own cost and margin did not produce - a
@@ -371,8 +372,8 @@ private FuelNominal Package(
     {
         FuelTypeId = ToUuid("test-dp"),
         Liters = liters,
-        CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+        CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
         };
     }
 
@@ -386,8 +387,8 @@ private FuelNominal Package(
             Name = "klo",
             LogoText = "klo",
             Color = "#fff",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         await _context.SaveChangesAsync();
 

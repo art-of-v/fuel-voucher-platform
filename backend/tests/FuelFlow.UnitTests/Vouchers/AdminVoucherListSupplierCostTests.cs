@@ -4,6 +4,7 @@ using FuelFlow.Features.Vouchers.GetAdminVouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
@@ -38,8 +39,8 @@ public sealed class AdminVoucherListSupplierCostTests : IDisposable
             EdrIpn = "9000000104",
             Id = SupplierId,
             Name = SupplierName,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         _context.FuelTypes.Add(new FuelTypeEntity
@@ -49,8 +50,8 @@ public sealed class AdminVoucherListSupplierCostTests : IDisposable
             BrandId = BrandIds.Okko,
             BasePrice = 55,
             DiscountPrice = 52,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         _context.SaveChanges();
@@ -74,7 +75,7 @@ public sealed class AdminVoucherListSupplierCostTests : IDisposable
         CustomerExpirationDate = new DateOnly(2027, 1, 31),
         VoucherNumber = number,
         Status = VoucherStatus.Available,
-        CreatedAtUtc = DateTime.UtcNow,
+        CreatedAtUtc = TestClock.UtcNow,
         SupplierId = supplierId,
         CostPerLiter = costPerLiter
     };

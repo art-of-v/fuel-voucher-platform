@@ -4,6 +4,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Xunit;
@@ -67,8 +68,8 @@ public sealed class OrderEventAndFulfilmentVocabularyTests : IClassFixture<TestD
                 Id = userId,
                 PhoneNumber = "+380500000001",
                 SettlementCode = "SET-0001",
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
             seed.Orders.Add(new Order
             {
@@ -76,8 +77,8 @@ public sealed class OrderEventAndFulfilmentVocabularyTests : IClassFixture<TestD
                 UserId = userId,
                 Price = 500m,
                 Status = OrderStatus.PendingPayment,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
             await seed.SaveChangesAsync();
         }
@@ -116,8 +117,8 @@ public sealed class OrderEventAndFulfilmentVocabularyTests : IClassFixture<TestD
                 Id = userId,
                 PhoneNumber = "+380500000002",
                 SettlementCode = "SET-0002",
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
             seed.Orders.Add(new Order
             {
@@ -125,8 +126,8 @@ public sealed class OrderEventAndFulfilmentVocabularyTests : IClassFixture<TestD
                 UserId = userId,
                 Price = 500m,
                 Status = OrderStatus.PendingPayment,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
             await seed.SaveChangesAsync();
         }
@@ -233,8 +234,8 @@ public sealed class OrderEventAndFulfilmentVocabularyTests : IClassFixture<TestD
                 UserId = context.Orders.Select(o => o.UserId).First(),
                 Price = 500m,
                 Status = OrderStatus.PendingPayment,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
             await seed.SaveChangesAsync();
         }
@@ -324,8 +325,8 @@ public sealed class OrderEventAndFulfilmentVocabularyTests : IClassFixture<TestD
             Id = userId,
             PhoneNumber = "+380500000003",
             SettlementCode = "SET-0003",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         context.Orders.Add(new Order
         {
@@ -333,8 +334,8 @@ public sealed class OrderEventAndFulfilmentVocabularyTests : IClassFixture<TestD
             UserId = userId,
             Price = 500m,
             Status = OrderStatus.PendingPayment,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         context.FuelVouchers.Add(new FuelVoucher
         {
@@ -343,14 +344,14 @@ public sealed class OrderEventAndFulfilmentVocabularyTests : IClassFixture<TestD
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(6)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(6)),
             VoucherNumber = "GUARD-0001",
             QrPayload = "guard-0001",
             Status = VoucherStatus.Available,
             CostPerLiter = 30m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         await context.SaveChangesAsync();

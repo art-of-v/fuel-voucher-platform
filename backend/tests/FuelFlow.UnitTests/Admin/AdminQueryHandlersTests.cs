@@ -7,6 +7,7 @@ using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
@@ -56,14 +57,14 @@ public sealed class AdminQueryHandlersTests : IDisposable
             Brand = brand,
             FuelTypeId = ToUuid(fuelTypeId),
             Liters = 50,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
             VoucherNumber = $"{brand}-{Guid.NewGuid().ToString()[..8]}",
             QrPayload = Guid.NewGuid().ToString(),
             Status = status,
             AssignedToUserId = status == VoucherStatus.Assigned || status == VoucherStatus.Used ? UserId : null,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
     }
 
@@ -77,7 +78,7 @@ public sealed class AdminQueryHandlersTests : IDisposable
             Status = status,
             MonobankStatus = monobankStatus,
             CreatedAtUtc = createdAtUtc,
-            UpdatedAtUtc = DateTime.UtcNow
+            UpdatedAtUtc = TestClock.UtcNow
         };
     }
 
@@ -112,17 +113,17 @@ public sealed class AdminQueryHandlersTests : IDisposable
         AmountKopecks = amountKopecks,
         Currency = "UAH",
         Status = PaymentStatus.Succeeded,
-        PaidAtUtc = DateTime.UtcNow,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        PaidAtUtc = TestClock.UtcNow,
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 
     [Fact]
     public async Task GetDashboard_ShouldReturnCounts()
     {
         _context.Users.AddRange(
-            new User { Id = UserId, PhoneNumber = "+380991111111", CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new User { Id = OtherUserId, PhoneNumber = "+380992222222", CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow });
+            new User { Id = UserId, PhoneNumber = "+380991111111", CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow },
+            new User { Id = OtherUserId, PhoneNumber = "+380992222222", CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow });
         _context.SaveChanges();
 
         _context.FuelVouchers.AddRange(
@@ -135,13 +136,13 @@ public sealed class AdminQueryHandlersTests : IDisposable
             CreateVoucher("okko", "okko-95", VoucherStatus.Expired));
         _context.SaveChanges();
 
-        var fulfilledOrder = CreateOrder(Guid.NewGuid(), UserId, OrderStatus.Fulfilled, MonobankStatus.Success, DateTime.UtcNow.AddDays(-3));
+        var fulfilledOrder = CreateOrder(Guid.NewGuid(), UserId, OrderStatus.Fulfilled, MonobankStatus.Success, TestClock.UtcNow.AddDays(-3));
         AddLineItem(fulfilledOrder, "okko", "okko-95", 50m, 1, 1000);
 
-        var partialOrder = CreateOrder(Guid.NewGuid(), UserId, OrderStatus.PartiallyFulfilled, MonobankStatus.Success, DateTime.UtcNow.AddDays(-2));
+        var partialOrder = CreateOrder(Guid.NewGuid(), UserId, OrderStatus.PartiallyFulfilled, MonobankStatus.Success, TestClock.UtcNow.AddDays(-2));
         AddLineItem(partialOrder, "wog", "wog-dp", 20m, 2, 1000);
 
-        var pendingOrder = CreateOrder(Guid.NewGuid(), UserId, OrderStatus.PendingFulfillment, MonobankStatus.Pending, DateTime.UtcNow.AddDays(-1));
+        var pendingOrder = CreateOrder(Guid.NewGuid(), UserId, OrderStatus.PendingFulfillment, MonobankStatus.Pending, TestClock.UtcNow.AddDays(-1));
 
         _context.Orders.AddRange(fulfilledOrder, partialOrder, pendingOrder);
         _context.SaveChanges();
@@ -196,15 +197,15 @@ public sealed class AdminQueryHandlersTests : IDisposable
         var availableVoucher = CreateVoucher("okko", "okko-95", VoucherStatus.Available);
         _context.FuelVouchers.AddRange(voucher, availableVoucher);
 
-        var fulfilledOrder = CreateOrder(Guid.NewGuid(), UserId, OrderStatus.Fulfilled, MonobankStatus.Success, DateTime.UtcNow.AddDays(-2));
+        var fulfilledOrder = CreateOrder(Guid.NewGuid(), UserId, OrderStatus.Fulfilled, MonobankStatus.Success, TestClock.UtcNow.AddDays(-2));
         AddLineItem(fulfilledOrder, "okko", "okko-95", 50m, 1, 1000);
         fulfilledOrder.Fulfillments.Add(new Fulfillment
         {
             VoucherId = voucher.Id,
-            FulfilledAtUtc = DateTime.UtcNow
+            FulfilledAtUtc = TestClock.UtcNow
         });
 
-        var pendingOrder = CreateOrder(Guid.NewGuid(), UserId, OrderStatus.PendingFulfillment, null, DateTime.UtcNow.AddDays(-1));
+        var pendingOrder = CreateOrder(Guid.NewGuid(), UserId, OrderStatus.PendingFulfillment, null, TestClock.UtcNow.AddDays(-1));
         AddLineItem(pendingOrder, "wog", "wog-dp", 20m, 1, 1000);
 
         _context.Orders.AddRange(fulfilledOrder, pendingOrder);
@@ -213,7 +214,7 @@ public sealed class AdminQueryHandlersTests : IDisposable
             EventType = OutboxEventType.OrderCreated,
             Payload = "{}",
             Processed = false,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow
         });
         _context.SaveChanges();
 
@@ -273,7 +274,7 @@ public sealed class AdminQueryHandlersTests : IDisposable
         partialOrder.Fulfillments.Add(new Fulfillment
         {
             VoucherId = voucher.Id,
-            FulfilledAtUtc = DateTime.UtcNow
+            FulfilledAtUtc = TestClock.UtcNow
         });
 
         _context.Orders.AddRange(refundedOrder, partialOrder);

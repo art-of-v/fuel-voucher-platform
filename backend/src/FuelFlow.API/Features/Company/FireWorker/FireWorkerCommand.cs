@@ -6,6 +6,7 @@ using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Company.FireWorker;
@@ -75,7 +76,7 @@ var member = await _context.CompanyMembers
             // consequence of the handover that put this voucher in the worker's hands, not of the
             // purchase it now goes back to.
             var issuanceOrderId = voucher.OrderId;
-            var firedAtUtc = DateTime.UtcNow;
+            var firedAtUtc = SystemClock.UtcNow;
 
             voucher.WorkerUserId = null;
             voucher.Status = VoucherStatus.Blocked;
@@ -125,7 +126,7 @@ var member = await _context.CompanyMembers
         // membership read, and the unique index on worker_user_id is filtered the same way, so the
         // person can be invited again later.
         member.IsDeleted = true;
-        member.DeletedAtUtc = DateTime.UtcNow;
+        member.DeletedAtUtc = SystemClock.UtcNow;
         await _context.SaveChangesAsync(cancellationToken);
         await tx.CommitAsync(cancellationToken);
 

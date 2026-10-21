@@ -13,6 +13,7 @@ using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -84,8 +85,8 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             if (order != null && (order.Status == OrderStatus.PendingFulfillment || order.Status == OrderStatus.PartiallyFulfilled))
             {
                 order.Status = OrderStatus.Fulfilled;
-                order.FulfilledAtUtc = DateTime.UtcNow;
-                order.UpdatedAtUtc = DateTime.UtcNow;
+                order.FulfilledAtUtc = TestClock.UtcNow;
+                order.UpdatedAtUtc = TestClock.UtcNow;
                 return await _db.SaveChangesAsync(cancellationToken);
             }
             return 0;
@@ -102,7 +103,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
                 voucher.LegalEntityId = legalEntityId;
                 voucher.WorkerUserId = null;
                 voucher.OrderId = orderId;
-                voucher.UpdatedAtUtc = DateTime.UtcNow;
+                voucher.UpdatedAtUtc = TestClock.UtcNow;
                 return await _db.SaveChangesAsync(cancellationToken);
             }
             return 0;
@@ -119,8 +120,8 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             UserId = userId,
             Price = 2500,
             Status = OrderStatus.PendingFulfillment,
-            CreatedAtUtc = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1),
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1),
+            UpdatedAtUtc = TestClock.UtcNow,
             LineItems = new List<OrderLineItem>
             {
                 new OrderLineItem
@@ -143,13 +144,13 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
             VoucherNumber = "OKKO-12345",
             QrPayload = "test-payload",
             Status = VoucherStatus.Available,
-            CreatedAtUtc = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1),
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1),
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         var outboxEvent = new OutboxEvent
@@ -161,7 +162,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
                 UserId = userId.ToString()
             }),
             Processed = false,
-            CreatedAtUtc = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1)
+            CreatedAtUtc = TestClock.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1)
         };
 
         _context.Orders.Add(order);
@@ -212,8 +213,8 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             UserId = userId,
             Price = 7500,
             Status = OrderStatus.PendingFulfillment,
-            CreatedAtUtc = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1),
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1),
+            UpdatedAtUtc = TestClock.UtcNow,
             LineItems = new List<OrderLineItem>
             {
                 new OrderLineItem
@@ -236,13 +237,13 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
             VoucherNumber = "OKKO-1",
             QrPayload = "payload-1",
             Status = VoucherStatus.Available,
-            CreatedAtUtc = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1),
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1),
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         var outboxEvent = new OutboxEvent
@@ -254,7 +255,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
                 UserId = userId.ToString()
             }),
             Processed = false,
-            CreatedAtUtc = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1)
+            CreatedAtUtc = TestClock.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1)
         };
 
         _context.Orders.Add(order);
@@ -291,8 +292,8 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             UserId = userId,
             Price = 2500,
             Status = OrderStatus.PendingFulfillment,
-            CreatedAtUtc = DateTime.UtcNow.AddDays(-2) - OutboxDispatchJob.SafetyNetClaimWindow,
-            UpdatedAtUtc = DateTime.UtcNow.AddDays(-2),
+            CreatedAtUtc = TestClock.UtcNow.AddDays(-2) - OutboxDispatchJob.SafetyNetClaimWindow,
+            UpdatedAtUtc = TestClock.UtcNow.AddDays(-2),
             LineItems = new List<OrderLineItem>
             {
                 new OrderLineItem
@@ -315,13 +316,13 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
             VoucherNumber = "OKKO-BACKFILL",
             QrPayload = "backfill",
             Status = VoucherStatus.Available,
-            CreatedAtUtc = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1),
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1),
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         _context.Orders.Add(order);
@@ -364,8 +365,8 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
     public async Task ProcessPendingOrdersAsync_ShouldAutoRefund_WhenEnabledAndGracePeriodElapsed()
     {
         var userId = Guid.NewGuid();
-        _context.AppSettings.Add(new AppSetting { Key = AppSettingKeys.AutoRefundEnabled, Value = "true", UpdatedAtUtc = DateTime.UtcNow });
-        _context.AppSettings.Add(new AppSetting { Key = AppSettingKeys.AutoRefundDelayDays, Value = "0", UpdatedAtUtc = DateTime.UtcNow });
+        _context.AppSettings.Add(new AppSetting { Key = AppSettingKeys.AutoRefundEnabled, Value = "true", UpdatedAtUtc = TestClock.UtcNow });
+        _context.AppSettings.Add(new AppSetting { Key = AppSettingKeys.AutoRefundDelayDays, Value = "0", UpdatedAtUtc = TestClock.UtcNow });
         var order = await SeedPartialOrderAsync(userId, "INV-ENABLED");
 
         await _service.ProcessPendingOrdersAsync();
@@ -384,8 +385,8 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
     public async Task ProcessPendingOrdersAsync_ShouldNotAutoRefund_WhenGracePeriodNotElapsed()
     {
         var userId = Guid.NewGuid();
-        _context.AppSettings.Add(new AppSetting { Key = AppSettingKeys.AutoRefundEnabled, Value = "true", UpdatedAtUtc = DateTime.UtcNow });
-        _context.AppSettings.Add(new AppSetting { Key = AppSettingKeys.AutoRefundDelayDays, Value = "30", UpdatedAtUtc = DateTime.UtcNow });
+        _context.AppSettings.Add(new AppSetting { Key = AppSettingKeys.AutoRefundEnabled, Value = "true", UpdatedAtUtc = TestClock.UtcNow });
+        _context.AppSettings.Add(new AppSetting { Key = AppSettingKeys.AutoRefundDelayDays, Value = "30", UpdatedAtUtc = TestClock.UtcNow });
         var order = await SeedPartialOrderAsync(userId, "INV-GRACE");
 
         await _service.ProcessPendingOrdersAsync();
@@ -409,8 +410,8 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
             // auto-refund is asked to return money for is one the customer paid for. Stated
             // explicitly because the refund amount is now gated on the brand saying so.
             MonobankStatus = MonobankStatus.Success,
-            CreatedAtUtc = DateTime.UtcNow.AddDays(-2) - OutboxDispatchJob.SafetyNetClaimWindow,
-            UpdatedAtUtc = DateTime.UtcNow.AddDays(-2),
+            CreatedAtUtc = TestClock.UtcNow.AddDays(-2) - OutboxDispatchJob.SafetyNetClaimWindow,
+            UpdatedAtUtc = TestClock.UtcNow.AddDays(-2),
             LineItems = new List<OrderLineItem>
             {
                 new OrderLineItem
@@ -435,13 +436,13 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
                 Brand = "okko",
                 FuelTypeId = ToUuid("okko-95"),
                 Liters = 50,
-                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
-                CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
+                CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
                 VoucherNumber = $"AR-{order.Id:N}-{i:D3}",
                 QrPayload = $"payload-{order.Id:N}-{i:D3}",
                 Status = VoucherStatus.Available,
-                CreatedAtUtc = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1),
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1),
+                UpdatedAtUtc = TestClock.UtcNow
             });
         }
 
@@ -466,7 +467,7 @@ public sealed class ApiFulfillmentServiceTests : IDisposable
         AmountKopecks = (long)(order.Price * 100),
         Currency = "UAH",
         Status = PaymentStatus.Succeeded,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 }

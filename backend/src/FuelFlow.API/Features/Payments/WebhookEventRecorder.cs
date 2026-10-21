@@ -1,6 +1,7 @@
 using FuelFlow.Features.Monobank.ProcessWebhook;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -81,7 +82,7 @@ internal static class WebhookEventRecorder
             Signature = command.Signature,
             KeyId = command.KeyId,
             Status = WebhookReceiptStatus.Received,
-            ReceivedAtUtc = DateTime.UtcNow,
+            ReceivedAtUtc = SystemClock.UtcNow,
             Attempts = 1
         };
 
@@ -127,7 +128,7 @@ internal static class WebhookEventRecorder
         CancellationToken cancellationToken)
     {
         stored.Status = status;
-        stored.ProcessedAtUtc = DateTime.UtcNow;
+        stored.ProcessedAtUtc = SystemClock.UtcNow;
         stored.Error = error is null ? null : error[..Math.Min(error.Length, 1000)];
 
         try

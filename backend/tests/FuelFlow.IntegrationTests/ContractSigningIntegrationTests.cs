@@ -6,6 +6,7 @@ using FluentAssertions;
 using FuelFlow.Features.Contracts.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -58,7 +59,7 @@ public sealed class ContractSigningIntegrationTests : IClassFixture<TestDatabase
         var signature = await context.UserContracts.SingleAsync(uc => uc.UserId == userId);
         signature.ContractId.Should().Be(contractId);
         signature.SignatureData.Should().Be("data:image/png;base64,SIG");
-        signature.SignedAtUtc.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
+        signature.SignedAtUtc.Should().BeCloseTo(TestClock.UtcNow, TimeSpan.FromMinutes(1));
     }
 
     [Fact]
@@ -156,7 +157,7 @@ public sealed class ContractSigningIntegrationTests : IClassFixture<TestDatabase
                 Name = brandSlug.ToUpperInvariant(),
                 Color = "#00ff80",
                 LogoText = brandSlug.ToUpperInvariant(),
-                CreatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow
             };
             context.Brands.Add(brand);
         }
@@ -167,8 +168,8 @@ public sealed class ContractSigningIntegrationTests : IClassFixture<TestDatabase
             UserId = userId,
             LegalEntityId = legalEntityId,
             BrandId = brand.Id,
-            CreatedAtUtc = DateTime.UtcNow,
-            ExpiresAtUtc = DateTime.UtcNow.AddDays(30)
+            CreatedAtUtc = TestClock.UtcNow,
+            ExpiresAtUtc = TestClock.UtcNow.AddDays(30)
         };
         context.Contracts.Add(contract);
         await context.SaveChangesAsync();

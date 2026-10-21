@@ -13,6 +13,7 @@ using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -67,7 +68,7 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
         // the only processed-and-aged row (the eligible one) is gone; recent + unprocessed remain.
         (await verify.OutboxEvents.AnyAsync(o =>
             o.Processed && o.ProcessedAtUtc != null
-            && o.ProcessedAtUtc < DateTime.UtcNow.AddDays(-DataRetentionService.OutboxEventRetentionDays)))
+            && o.ProcessedAtUtc < TestClock.UtcNow.AddDays(-DataRetentionService.OutboxEventRetentionDays)))
             .Should().BeFalse();
         (await verify.Notifications.AllAsync(n => n.Title != "eligible")).Should().BeTrue();
         (await verify.ErrorLogs.AllAsync(e => e.Message != "eligible")).Should().BeTrue();
@@ -151,7 +152,7 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
             SeedFixture(seed);
         });
 
-        var now = DateTime.UtcNow;
+        var now = TestClock.UtcNow;
         var cutoff = now.AddDays(-DataRetentionService.DeviceRetentionDays);
 
         using var readContext = CreateContext();
@@ -223,7 +224,7 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
     public async Task Cleanup_Never_Purges_The_D13_Audit_Tables_However_Old()
     {
         var voucherId = Guid.NewGuid();
-        var ancient = DateTime.UtcNow.AddYears(-5);
+        var ancient = TestClock.UtcNow.AddYears(-5);
 
         await SeedAsync(seed =>
         {
@@ -354,7 +355,7 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
             && e.Message.Contains("feedback_messages=1", StringComparison.Ordinal));
     }
 
-    private static DateTime Old() => DateTime.UtcNow.AddDays(-400);
+    private static DateTime Old() => TestClock.UtcNow.AddDays(-400);
 
     /// <summary>
     /// Two finished imports past the window, one of them held by a purchase batch. Also clears the
@@ -428,7 +429,7 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
     {
         Key = AppSettingKeys.DataRetentionEnabled,
         Value = "true",
-        UpdatedAtUtc = DateTime.UtcNow
+        UpdatedAtUtc = TestClock.UtcNow
     });
 
     private async Task RunAsync()
@@ -444,7 +445,7 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
     // it applies "live"/"unprocessed"/"unread" = not dead at all (kept regardless of age).
     private static void SeedFixture(ApplicationDbContext seed)
     {
-        var now = DateTime.UtcNow;
+        var now = TestClock.UtcNow;
 
         seed.VerificationCodes.Add(NewCode("eligible", isUsed: true, expiresAtUtc: now.AddDays(-9), createdAtUtc: now.AddDays(-10)));
         seed.VerificationCodes.Add(NewCode("recent", isUsed: true, expiresAtUtc: now.AddDays(-1), createdAtUtc: now.AddDays(-2)));
@@ -585,8 +586,8 @@ public sealed class DataRetentionIntegrationTests : IClassFixture<TestDatabaseFi
         Id = userId,
         PhoneNumber = "+380995550203",
         IsActive = true,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 
     private async Task SeedAsync(Action<ApplicationDbContext> seed)

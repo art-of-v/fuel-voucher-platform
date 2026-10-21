@@ -15,6 +15,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using FuelFlow.API.Features.Orders.CreateCheckout.Models;
+using FuelFlow.Testing;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 
 namespace FuelFlow.IntegrationTests;
@@ -71,7 +72,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
             {
                 Id = Guid.NewGuid(),
                 Name = "Admin",
-                CreatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow
             };
             roleContext.Roles.Add(adminRole);
             await roleContext.SaveChangesAsync();
@@ -84,7 +85,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
         // purchase test has to perform that staff activation step explicitly, exactly as
         // SetUserActiveCommandHandler would, before the account can check out.
         user.IsActive = true;
-        user.UpdatedAtUtc = DateTime.UtcNow;
+        user.UpdatedAtUtc = TestClock.UtcNow;
         roleContext.Update(user);
         await roleContext.SaveChangesAsync();
 
@@ -118,7 +119,7 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
     {
         using var scope = _fixture.Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var expiry = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6));
+        var expiry = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(6));
 
         for (var i = 0; i < count; i++)
         {
@@ -134,8 +135,8 @@ public class PurchaseIntegrationTests : IClassFixture<TestDatabaseFixture>
                 VoucherNumber = $"STOCK-{brandId}-{fuelTypeId}-{liters}-{Guid.NewGuid().ToString()[..8]}",
                 QrPayload = Guid.NewGuid().ToString(),
                 Status = VoucherStatus.Available,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
         }
 

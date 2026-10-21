@@ -4,6 +4,7 @@ using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Xunit;
@@ -175,7 +176,7 @@ public sealed class PaymentLedgerIntegrationTests : IClassFixture<TestDatabaseFi
 
         await using var context = CreateContext();
 
-        var capture = NewPayment(orderId, status: PaymentStatus.Succeeded, paidAtUtc: DateTime.UtcNow);
+        var capture = NewPayment(orderId, status: PaymentStatus.Succeeded, paidAtUtc: TestClock.UtcNow);
         context.Payments.Add(capture);
         await context.SaveChangesAsync();
 
@@ -184,7 +185,7 @@ public sealed class PaymentLedgerIntegrationTests : IClassFixture<TestDatabaseFi
             amountUah: 2500.00m,
             amountKopecks: 250000m,
             status: PaymentStatus.Succeeded,
-            paidAtUtc: DateTime.UtcNow,
+            paidAtUtc: TestClock.UtcNow,
             kind: PaymentKind.Refund,
             parentPaymentId: capture.Id,
             providerInvoiceId: capture.ProviderInvoiceId,
@@ -216,7 +217,7 @@ public sealed class PaymentLedgerIntegrationTests : IClassFixture<TestDatabaseFi
 
         await using var context = CreateContext();
 
-        var capture = NewPayment(orderId, status: PaymentStatus.Succeeded, paidAtUtc: DateTime.UtcNow);
+        var capture = NewPayment(orderId, status: PaymentStatus.Succeeded, paidAtUtc: TestClock.UtcNow);
         context.Payments.Add(capture);
         await context.SaveChangesAsync();
 
@@ -296,7 +297,7 @@ public sealed class PaymentLedgerIntegrationTests : IClassFixture<TestDatabaseFi
         var orderId = await SeedOrderAsync();
 
         await using var context = CreateContext();
-        context.Payments.Add(NewPayment(orderId, status: PaymentStatus.Cancelled, paidAtUtc: DateTime.UtcNow));
+        context.Payments.Add(NewPayment(orderId, status: PaymentStatus.Cancelled, paidAtUtc: TestClock.UtcNow));
 
         var act = async () => await context.SaveChangesAsync();
         await act.Should().NotThrowAsync("the money really was received before it was returned");
@@ -349,11 +350,11 @@ public sealed class PaymentLedgerIntegrationTests : IClassFixture<TestDatabaseFi
         ProviderStatus = providerStatus,
         InvoiceId = $"INV-{Guid.NewGuid():N}"[..24],
         AmountKopecks = 250000m,
-        ProviderCreatedAtUtc = DateTime.UtcNow,
-        ProviderModifiedAtUtc = DateTime.UtcNow,
+        ProviderCreatedAtUtc = TestClock.UtcNow,
+        ProviderModifiedAtUtc = TestClock.UtcNow,
         Payload = payload ?? @"{ ""status"": ""success"", ""amount"": 250000 }",
         Status = WebhookReceiptStatus.Received,
-        ReceivedAtUtc = DateTime.UtcNow,
+        ReceivedAtUtc = TestClock.UtcNow,
         Attempts = 1
     };
 
@@ -389,8 +390,8 @@ public sealed class PaymentLedgerIntegrationTests : IClassFixture<TestDatabaseFi
         CreatedByUserName = createdByUserName,
         IsAutomatic = isAutomatic,
         ErrorMessage = errorMessage,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 
     private async Task<Guid> SeedOrderAsync()
@@ -408,9 +409,9 @@ public sealed class PaymentLedgerIntegrationTests : IClassFixture<TestDatabaseFi
             seed.Users.Add(new User
             {
                 Id = userId,
-                PhoneNumber = $"+38051{DateTime.UtcNow.Ticks % 10_000_000:0000000}",
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                PhoneNumber = $"+38051{TestClock.UniqueDigits(7)}",
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
             await seed.SaveChangesAsync();
         }
@@ -425,8 +426,8 @@ public sealed class PaymentLedgerIntegrationTests : IClassFixture<TestDatabaseFi
             Status = OrderStatus.PendingPayment,
             Kind = OrderKind.Purchase,
             MonobankInvoiceId = $"INV-{Guid.NewGuid():N}"[..24],
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         await context.SaveChangesAsync();
 

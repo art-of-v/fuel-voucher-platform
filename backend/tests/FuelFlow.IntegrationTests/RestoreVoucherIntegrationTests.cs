@@ -6,6 +6,7 @@ using FuelFlow.Features.Vouchers.RestoreVoucher;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
@@ -62,7 +63,7 @@ public sealed class RestoreVoucherIntegrationTests : IClassFixture<TestDatabaseF
 
         stored.Status.Should().Be(VoucherStatus.Assigned);
         stored.UsedAtUtc.Should().BeNull("a restored voucher was not redeemed, so it has no redemption time");
-        stored.UpdatedAtUtc.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(10));
+        stored.UpdatedAtUtc.Should().BeCloseTo(TestClock.UtcNow, TimeSpan.FromSeconds(10));
     }
 
     /// <summary>
@@ -176,8 +177,8 @@ public sealed class RestoreVoucherIntegrationTests : IClassFixture<TestDatabaseF
             Id = userId,
             PhoneNumber = $"+38{userId:N}"[..20],
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         seed.FuelVouchers.Add(new FuelVoucher
@@ -187,17 +188,17 @@ public sealed class RestoreVoucherIntegrationTests : IClassFixture<TestDatabaseF
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
             VoucherNumber = $"OKKO-{voucherId:N}"[..20],
             QrPayload = $"payload-{voucherId:N}",
             Status = VoucherStatus.Used,
             AssignedToUserId = userId,
             OrderId = SeedPurchaseOrder(seed, userId),
-            UsedAtUtc = DateTime.UtcNow.AddMinutes(-5),
+            UsedAtUtc = TestClock.UtcNow.AddMinutes(-5),
             IsDeleted = archived,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         await seed.SaveChangesAsync();
@@ -216,8 +217,8 @@ public sealed class RestoreVoucherIntegrationTests : IClassFixture<TestDatabaseF
             UserId = userId,
             Price = 0,
             Status = OrderStatus.Fulfilled,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         return orderId;
     }

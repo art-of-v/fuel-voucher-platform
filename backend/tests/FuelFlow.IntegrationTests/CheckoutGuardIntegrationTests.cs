@@ -12,6 +12,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -218,7 +219,7 @@ public sealed class CheckoutGuardIntegrationTests : IClassFixture<TestDatabaseFi
             // attempt is a new purchase rather than a retry.
             using var abandon = CreateContext();
             var order = await abandon.Orders.FirstAsync(o => o.Id == response.OrderId);
-            order.CreatedAtUtc = DateTime.UtcNow.AddHours(-2);
+            order.CreatedAtUtc = TestClock.UtcNow.AddHours(-2);
             await abandon.SaveChangesAsync();
         }
 
@@ -282,7 +283,7 @@ public sealed class CheckoutGuardIntegrationTests : IClassFixture<TestDatabaseFi
         using var context = CreateContext();
 
         var role = await context.Roles.FirstOrDefaultAsync(r => r.Name == SeedRoles.UserName);
-        role ??= new Role { Id = SeedRoles.UserRoleId, Name = SeedRoles.UserName, CreatedAtUtc = DateTime.UtcNow };
+        role ??= new Role { Id = SeedRoles.UserRoleId, Name = SeedRoles.UserName, CreatedAtUtc = TestClock.UtcNow };
         if (context.Entry(role).State == EntityState.Detached)
             context.Roles.Add(role);
 
@@ -295,8 +296,8 @@ public sealed class CheckoutGuardIntegrationTests : IClassFixture<TestDatabaseFi
             IsActive = true,
             IsDeleted = false,
             TokenVersion = 1,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         // The fuel names the price, so a cost and a margin are what make it sellable: without a
@@ -304,7 +305,7 @@ public sealed class CheckoutGuardIntegrationTests : IClassFixture<TestDatabaseFi
         var fuel = await context.FuelTypes.FirstAsync(f => f.Id == ToUuid("okko-95"));
         fuel.SupplierPricePerLiter = CostPerLiter;
         fuel.MarginUahPerLiter = PricePerLiter - CostPerLiter;
-        fuel.UpdatedAtUtc = DateTime.UtcNow;
+        fuel.UpdatedAtUtc = TestClock.UtcNow;
 
         // The size has to exist in the seller's pool, or the package cannot be resolved.
         var pool = DataKinds.ForPool(isTestAccount: false);
@@ -330,14 +331,14 @@ public sealed class CheckoutGuardIntegrationTests : IClassFixture<TestDatabaseFi
             FuelTypeId = fuel.Id,
             Liters = Liters,
             DataKind = DataKinds.Real,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
             VoucherNumber = $"GUARD-{Guid.NewGuid():N}"[..16],
             QrPayload = $"qr-{Guid.NewGuid():N}",
             Status = VoucherStatus.Available,
             CostPerLiter = CostPerLiter,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         await context.SaveChangesAsync();

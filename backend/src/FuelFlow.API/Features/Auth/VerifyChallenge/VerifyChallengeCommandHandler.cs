@@ -5,6 +5,7 @@ using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
+using FuelFlow.SharedKernel.Time;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -108,7 +109,7 @@ public sealed class VerifyChallengeCommandHandler
 
         await _cacheService.RemoveAsync(cacheKey, cancellationToken);
 
-        device.LastSeenAt = DateTime.UtcNow;
+        device.LastSeenAt = SystemClock.UtcNow;
         _context.Devices.Update(device);
         await _context.SaveChangesAsync(cancellationToken);
 
@@ -152,8 +153,8 @@ public sealed class VerifyChallengeCommandHandler
             // looks tokens up by SHA-256, so a raw value here is silently unfetchable and every
             // device session dies at first refresh with "Invalid or expired refresh token".
             Token = SecretsHasher.Hash(refreshToken),
-            ExpiresAtUtc = DateTime.UtcNow.AddDays(_jwtOptions.RefreshTokenExpirationDays),
-            CreatedAtUtc = DateTime.UtcNow,
+            ExpiresAtUtc = SystemClock.UtcNow.AddDays(_jwtOptions.RefreshTokenExpirationDays),
+            CreatedAtUtc = SystemClock.UtcNow,
             IsRevoked = false
         };
 

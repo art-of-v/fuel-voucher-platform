@@ -2,6 +2,7 @@ using FluentAssertions;
 using FuelFlow.Features.Auth.RegisterDevice;
 using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -34,20 +35,20 @@ public sealed class DeviceRebindTests : IDisposable
             DeviceId = SharedDeviceId,
             PublicKey = "old-public-key",
             Status = DeviceStatus.Revoked,
-            CreatedAt = DateTime.UtcNow.AddDays(-1),
-            LastSeenAt = DateTime.UtcNow.AddDays(-1)
+            CreatedAt = TestClock.UtcNow.AddDays(-1),
+            LastSeenAt = TestClock.UtcNow.AddDays(-1)
         });
         _context.Users.Add(new FuelFlow.SharedKernel.Domain.User
         {
             Id = OriginalOwner,
             PhoneNumber = "+380000000001",
-            CreatedAtUtc = DateTime.UtcNow.AddDays(-1)
+            CreatedAtUtc = TestClock.UtcNow.AddDays(-1)
         });
         _context.Users.Add(new FuelFlow.SharedKernel.Domain.User
         {
             Id = NewOwner,
             PhoneNumber = "+380000000002",
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow
         });
         _context.SaveChanges();
 

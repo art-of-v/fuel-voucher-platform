@@ -1,5 +1,6 @@
 using FluentAssertions;
 using FuelFlow.Persistence;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using Xunit.Abstractions;
@@ -118,7 +119,7 @@ public sealed class TheSafetyNetHasItsOwnIndex : IClassFixture<TestDatabaseFixtu
         var sql = context.OutboxEvents
             .Where(e => !e.Processed
                      && e.EventType == Features.Orders.SharedModels.OutboxEventType.OrderFulfilled
-                     && e.CreatedAtUtc < DateTime.UtcNow.AddMinutes(-10))
+                     && e.CreatedAtUtc < TestClock.UtcNow.AddMinutes(-10))
             .OrderBy(e => e.CreatedAtUtc)
             .Take(50)
             .ToQueryString();
@@ -140,7 +141,7 @@ public sealed class TheSafetyNetHasItsOwnIndex : IClassFixture<TestDatabaseFixtu
 
         var cutoff = command.CreateParameter();
         cutoff.ParameterName = "AddMinutes";
-        cutoff.Value = DateTime.UtcNow.AddMinutes(-10);
+        cutoff.Value = TestClock.UtcNow.AddMinutes(-10);
         command.Parameters.Add(cutoff);
 
         var limit = command.CreateParameter();

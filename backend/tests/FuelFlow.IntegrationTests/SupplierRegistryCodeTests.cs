@@ -1,6 +1,7 @@
 using FluentAssertions;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
@@ -42,8 +43,8 @@ public sealed class SupplierRegistryCodeTests : IClassFixture<TestDatabaseFixtur
         Name = "Постачальник " + Guid.NewGuid().ToString("N")[..8],
         EdrIpn = edrIpn!,
         IsActive = true,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 
     [Fact]

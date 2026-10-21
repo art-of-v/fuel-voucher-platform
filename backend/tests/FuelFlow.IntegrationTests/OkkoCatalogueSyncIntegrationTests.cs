@@ -9,6 +9,7 @@ using FuelFlow.Features.Pricing.ScrapeOkkoPrices;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -107,7 +108,7 @@ public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDataba
             context.ChangeTracker.Clear();
         }
 
-        var now = DateTime.UtcNow;
+        var now = TestClock.UtcNow;
         if (!await context.Brands.AnyAsync(s => s.Id == OkkoBrandId))
         {
             context.Brands.Add(new Brand
@@ -200,7 +201,7 @@ public sealed class OkkoCatalogueSyncIntegrationTests : IClassFixture<TestDataba
         {
             Id = ToUuid("prod-pulls-diesel"), Name = "ДП PULLS", BrandId =  OkkoBrandId,
             BasePrice = 105.90m, DiscountPrice = 102.90m,
-            CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow,
         });
         await context.SaveChangesAsync();
         ForgetTrackedEntities(context);

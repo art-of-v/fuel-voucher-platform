@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Notifications.Email;
 using FuelFlow.SharedKernel.Security;
+using FuelFlow.SharedKernel.Time;
 
 namespace FuelFlow.Features.Auth.EmailChange;
 
@@ -39,8 +40,8 @@ public static class PendingEmailChange
         var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
         user.PendingEmail = newEmail;
         user.PendingEmailTokenHash = SecretsHasher.Hash(token);
-        user.PendingEmailExpiresAtUtc = DateTime.UtcNow.Add(Ttl);
-        user.UpdatedAtUtc = DateTime.UtcNow;
+        user.PendingEmailExpiresAtUtc = SystemClock.UtcNow.Add(Ttl);
+        user.UpdatedAtUtc = SystemClock.UtcNow;
         return token;
     }
 

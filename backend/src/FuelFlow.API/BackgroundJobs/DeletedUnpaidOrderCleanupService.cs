@@ -2,6 +2,7 @@ using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Settings;
 using FuelFlow.Persistence;
 using FuelFlow.Payments.SharedModels;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.API.BackgroundJobs;
@@ -51,7 +52,7 @@ public class DeletedUnpaidOrderCleanupService
         }
 
         var retentionDays = Math.Max(1, await _settings.GetDeletedUnpaidOrderCleanupRetentionDaysAsync(cancellationToken));
-        var cutoff = DateTime.UtcNow.AddDays(-retentionDays);
+        var cutoff = SystemClock.UtcNow.AddDays(-retentionDays);
 
         // AsTracking + Include so EF itself cascades the delete to the loaded line items (robust
         // regardless of the brand's DB-level FK behaviour); IgnoreQueryFilters because every

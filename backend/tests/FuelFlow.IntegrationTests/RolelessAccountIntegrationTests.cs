@@ -5,6 +5,7 @@ using System.Text.Json;
 using FluentAssertions;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -111,7 +112,7 @@ public sealed class RolelessAccountIntegrationTests : WebApplicationFactory<Prog
     {
         using var scope = Services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var now = DateTime.UtcNow;
+        var now = TestClock.UtcNow;
 
         var user = new User
         {
@@ -138,7 +139,7 @@ public sealed class RolelessAccountIntegrationTests : WebApplicationFactory<Prog
         {
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var role = await context.Roles.FirstAsync(r => r.Name == roleName);
-            var now = DateTime.UtcNow;
+            var now = TestClock.UtcNow;
 
             context.Users.Add(new User
             {

@@ -11,6 +11,7 @@ using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -88,8 +89,8 @@ public sealed class ApiFulfillmentServicePartialBackfillTests : IDisposable
             if (order != null && (order.Status == OrderStatus.PendingFulfillment || order.Status == OrderStatus.PartiallyFulfilled))
             {
                 order.Status = OrderStatus.Fulfilled;
-                order.FulfilledAtUtc = DateTime.UtcNow;
-                order.UpdatedAtUtc = DateTime.UtcNow;
+                order.FulfilledAtUtc = TestClock.UtcNow;
+                order.UpdatedAtUtc = TestClock.UtcNow;
                 return await _db.SaveChangesAsync(cancellationToken);
             }
             return 0;
@@ -105,7 +106,7 @@ public sealed class ApiFulfillmentServicePartialBackfillTests : IDisposable
                 voucher.LegalEntityId = legalEntityId;
                 voucher.WorkerUserId = null;
                 voucher.OrderId = orderId;
-                voucher.UpdatedAtUtc = DateTime.UtcNow;
+                voucher.UpdatedAtUtc = TestClock.UtcNow;
                 return await _db.SaveChangesAsync(cancellationToken);
             }
             return 0;
@@ -124,7 +125,7 @@ public sealed class ApiFulfillmentServicePartialBackfillTests : IDisposable
             UserId = userId,
             Price = 2000,
             Status = OrderStatus.PartiallyFulfilled,
-            CreatedAtUtc = DateTime.UtcNow.AddMinutes(-10),
+            CreatedAtUtc = TestClock.UtcNow.AddMinutes(-10),
             LineItems = new List<OrderLineItem>
             {
                 new OrderLineItem
@@ -147,21 +148,21 @@ public sealed class ApiFulfillmentServicePartialBackfillTests : IDisposable
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 20,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
             VoucherNumber = "OKKO-ASSIGNED-1",
             QrPayload = "assigned-1",
             Status = VoucherStatus.Assigned,
             AssignedToUserId = userId,
-            CreatedAtUtc = DateTime.UtcNow.AddDays(-1),
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow.AddDays(-1),
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         var existingFulfillment = new Fulfillment
         {
             OrderId = orderId,
             VoucherId = existingAssignedVoucher.Id,
-            FulfilledAtUtc = DateTime.UtcNow.AddMinutes(-5)
+            FulfilledAtUtc = TestClock.UtcNow.AddMinutes(-5)
         };
 
         var newAvailableVoucher = new FuelVoucher
@@ -171,13 +172,13 @@ public sealed class ApiFulfillmentServicePartialBackfillTests : IDisposable
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 20,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(2),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(2),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(2),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(2),
             VoucherNumber = "OKKO-AVAILABLE-2",
             QrPayload = "available-2",
             Status = VoucherStatus.Available,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         _context.Orders.Add(order);
@@ -196,8 +197,8 @@ public sealed class ApiFulfillmentServicePartialBackfillTests : IDisposable
             AmountKopecks = (long)(order.Price * 100),
             Currency = "UAH",
             Status = PaymentStatus.Succeeded,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         await _context.SaveChangesAsync();
 

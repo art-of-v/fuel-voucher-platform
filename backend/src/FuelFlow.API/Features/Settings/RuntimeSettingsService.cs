@@ -4,6 +4,7 @@ using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Features.Vouchers.Terms;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Settings;
@@ -321,7 +322,7 @@ public sealed class RuntimeSettingsService
             return false;
         }
 
-        var now = DateTime.UtcNow;
+        var now = SystemClock.UtcNow;
 
         if (open is not null)
         {
@@ -370,7 +371,7 @@ public sealed class RuntimeSettingsService
             {
                 Key = key,
                 Value = value,
-                UpdatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = SystemClock.UtcNow,
                 UpdatedByUserId = updatedByUserId,
                 UpdatedByUserName = updatedByUserName
             });
@@ -378,7 +379,7 @@ public sealed class RuntimeSettingsService
         else
         {
             setting.Value = value;
-            setting.UpdatedAtUtc = DateTime.UtcNow;
+            setting.UpdatedAtUtc = SystemClock.UtcNow;
             setting.UpdatedByUserId = updatedByUserId;
             setting.UpdatedByUserName = updatedByUserName;
         }

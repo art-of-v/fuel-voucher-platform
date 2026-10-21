@@ -13,6 +13,7 @@ using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
@@ -229,9 +230,9 @@ public sealed class CompanyMembershipIntegrationTests : IClassFixture<TestDataba
                 NewLegalEntity(legalEntityId, ownerId, edrpou: "11111111"),
                 NewLegalEntity(otherEntityId, ownerId, name: "OTHER LLC", edrpou: "22222222"));
             seed.CompanyInvitations.AddRange(
-                NewInvitation(Guid.NewGuid(), legalEntityId, ownerId, workerA, InvitationStatus.Pending, "+380000000001", DateTime.UtcNow.AddMinutes(-10)),
-                NewInvitation(Guid.NewGuid(), legalEntityId, ownerId, workerB, InvitationStatus.Accepted, "+380000000002", DateTime.UtcNow.AddMinutes(-5)),
-                NewInvitation(Guid.NewGuid(), otherEntityId, ownerId, workerA, InvitationStatus.Pending, "+380000000003", DateTime.UtcNow));
+                NewInvitation(Guid.NewGuid(), legalEntityId, ownerId, workerA, InvitationStatus.Pending, "+380000000001", TestClock.UtcNow.AddMinutes(-10)),
+                NewInvitation(Guid.NewGuid(), legalEntityId, ownerId, workerB, InvitationStatus.Accepted, "+380000000002", TestClock.UtcNow.AddMinutes(-5)),
+                NewInvitation(Guid.NewGuid(), otherEntityId, ownerId, workerA, InvitationStatus.Pending, "+380000000003", TestClock.UtcNow));
             await seed.SaveChangesAsync();
         }
 
@@ -261,8 +262,8 @@ public sealed class CompanyMembershipIntegrationTests : IClassFixture<TestDataba
             Id = id,
             PhoneNumber = $"+38{id:N}"[..20],
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
     private static LegalEntity NewLegalEntity(Guid id, Guid ownerUserId, string name = "ACME LLC", string edrpou = "12345678")
@@ -272,8 +273,8 @@ public sealed class CompanyMembershipIntegrationTests : IClassFixture<TestDataba
             UserId = ownerUserId,
             Name = name,
             Edrpou = edrpou,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
     private static CompanyMember NewMember(Guid id, Guid legalEntityId, Guid workerUserId)
@@ -282,7 +283,7 @@ public sealed class CompanyMembershipIntegrationTests : IClassFixture<TestDataba
             Id = id,
             LegalEntityId = legalEntityId,
             WorkerUserId = workerUserId,
-            JoinedAtUtc = DateTime.UtcNow
+            JoinedAtUtc = TestClock.UtcNow
         };
 
     private static CompanyInvitation NewInvitation(
@@ -319,8 +320,8 @@ public sealed class CompanyMembershipIntegrationTests : IClassFixture<TestDataba
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
             VoucherNumber = $"OKKO-{id:N}"[..20],
             QrPayload = $"payload-{id:N}",
             Status = status,
@@ -328,8 +329,8 @@ public sealed class CompanyMembershipIntegrationTests : IClassFixture<TestDataba
             AssignedToUserId = assignedToUserId,
             WorkerUserId = workerUserId,
             OrderId = orderId,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
     /// <summary>
@@ -625,8 +626,8 @@ public sealed class CompanyMembershipIntegrationTests : IClassFixture<TestDataba
             UserId = userId,
             Price = 0,
             Status = OrderStatus.Fulfilled,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         return orderId;
     }

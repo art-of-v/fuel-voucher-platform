@@ -13,6 +13,7 @@ using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Notifications.Email;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -117,7 +118,7 @@ public sealed class QaTestAccessTests : IDisposable
     {
         if (!await _context.Roles.AnyAsync(r => r.Id == SeedRoles.UserRoleId))
         {
-            _context.Roles.Add(new Role { Id = SeedRoles.UserRoleId, Name = SeedRoles.UserName, CreatedAtUtc = DateTime.UtcNow });
+            _context.Roles.Add(new Role { Id = SeedRoles.UserRoleId, Name = SeedRoles.UserName, CreatedAtUtc = TestClock.UtcNow });
         }
         _context.Users.Add(new User
         {
@@ -127,8 +128,8 @@ public sealed class QaTestAccessTests : IDisposable
             IsActive = active,
             IsQaAccount = true,
             TokenVersion = 1,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         await _context.SaveChangesAsync();
     }
@@ -356,8 +357,8 @@ public sealed class QaTestAccessTests : IDisposable
             UserId = AuthOptions.QaTestAccountUserId,
             FamilyId = Guid.NewGuid(),
             Token = SecretsHasher.Hash("live-refresh"),
-            ExpiresAtUtc = DateTime.UtcNow.AddDays(14),
-            CreatedAtUtc = DateTime.UtcNow,
+            ExpiresAtUtc = TestClock.UtcNow.AddDays(14),
+            CreatedAtUtc = TestClock.UtcNow,
             IsRevoked = false
         });
         _context.VerificationCodes.Add(new VerificationCode
@@ -365,8 +366,8 @@ public sealed class QaTestAccessTests : IDisposable
             Id = Guid.NewGuid(),
             PhoneNumber = QaPhone,
             Code = TestQaCodeHash,
-            ExpiresAtUtc = DateTime.UtcNow.AddMinutes(5),
-            CreatedAtUtc = DateTime.UtcNow,
+            ExpiresAtUtc = TestClock.UtcNow.AddMinutes(5),
+            CreatedAtUtc = TestClock.UtcNow,
             IsUsed = false
         });
         await _context.SaveChangesAsync();
@@ -404,7 +405,7 @@ public sealed class QaTestAccessTests : IDisposable
     {
         // A normal customer authenticating is untouched by QA being on.
         const string normalPhone = "+380671230000";
-        var role = new Role { Id = SeedRoles.UserRoleId, Name = SeedRoles.UserName, CreatedAtUtc = DateTime.UtcNow };
+        var role = new Role { Id = SeedRoles.UserRoleId, Name = SeedRoles.UserName, CreatedAtUtc = TestClock.UtcNow };
         _context.Roles.Add(role);
         _context.Users.Add(new User
         {
@@ -412,8 +413,8 @@ public sealed class QaTestAccessTests : IDisposable
             PhoneNumber = normalPhone,
             RoleId = role.Id,
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         await _context.SaveChangesAsync();
         await SetSwitchAsync(true);

@@ -3,24 +3,11 @@ using System.Text.Json;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.SharedKernel.Time;
 using FuelFlow.Features.Pricing;
 using FuelFlow.Features.Brands.GetFuelPriceHistory;
 using FuelFlow.Features.Brands.GetFuelPriceAt;
 using FuelFlow.Features.Orders.CreateCheckout;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using FuelFlow.Features.Brands;
-using FuelFlow.Features.Vouchers.SharedModels;
-
-using System.Security.Claims;
-using System.Text.Json;
-using FuelFlow.Features.Brands.GetFuelPriceHistory;
-using FuelFlow.Features.Brands.GetFuelPriceAt;
-using FuelFlow.Persistence;
-using FuelFlow.SharedKernel.Domain;
-using FuelFlow.SharedKernel.Observability;
-using FuelFlow.Features.Pricing;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -237,8 +224,8 @@ public sealed class BrandFuelController : ControllerBase
             // correctly by the formula.
             MarginUahPerLiter = request.MarginUahPerLiter,
             AllowBelowCost = request.AllowBelowCost,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = SystemClock.UtcNow,
+            UpdatedAtUtc = SystemClock.UtcNow
         };
         _context.FuelTypes.Add(fuel);
         await _context.SaveChangesAsync(ct);
@@ -295,8 +282,8 @@ public sealed class BrandFuelController : ControllerBase
                 // published on the public shelf (planning #460).
                 DataKind = pool,
                 Liters = liters,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow,
+                CreatedAtUtc = SystemClock.UtcNow,
+                UpdatedAtUtc = SystemClock.UtcNow,
             });
         }
 
@@ -404,8 +391,8 @@ public sealed class BrandFuelController : ControllerBase
         // wrong pool is a size in the wrong catalogue.
         DataKind = pool,
         Liters = liters,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow,
+        CreatedAtUtc = SystemClock.UtcNow,
+        UpdatedAtUtc = SystemClock.UtcNow,
     }));
     }
 
@@ -438,7 +425,7 @@ public sealed class BrandFuelController : ControllerBase
         fuel.MarginUahPerLiter = request.MarginUahPerLiter;
         fuel.MarginPercent = request.MarginPercent;
         fuel.PumpPricePerLiter = request.PumpPricePerLiter;
-        fuel.UpdatedAtUtc = DateTime.UtcNow;
+        fuel.UpdatedAtUtc = SystemClock.UtcNow;
         // The loop that restated every volume's total after a reprice is gone, and its absence is the
         // improvement rather than a gap: a volume's price is now the fuel's rate x its litres, so there
         // is nothing to restate - and there is no per-size override left for the next pump import to
@@ -456,7 +443,7 @@ public sealed class BrandFuelController : ControllerBase
         // for it here: the fuel carries the cost, the margin and the column price, and every reader
         // derives the rest the same way.
         fuel.AllowBelowCost = request.AllowBelowCost;
-        fuel.UpdatedAtUtc = DateTime.UtcNow;
+        fuel.UpdatedAtUtc = SystemClock.UtcNow;
 
         // Omitted leaves the code alone; an empty string clears it. An edit is a repricing, and a
         // repricing that silently dropped the code would leave a fuel that a catalogue import can no
@@ -576,7 +563,7 @@ public sealed class BrandFuelController : ControllerBase
         // fuel_types reaches fuel_vouchers (#217). The sizes are not archived either: they belong to
         // the fuel, and this row is the one that says no. It used to be a second row doing that job,
         // and a live price row put the fuel back on the shelf the moment a nominals edit touched it.
-        var archivedAt = DateTime.UtcNow;
+        var archivedAt = SystemClock.UtcNow;
 
         fuel.IsDeleted = true;
         fuel.DeletedAtUtc = archivedAt;
@@ -641,7 +628,7 @@ var BrandFuels = await _context.FuelTypes.Where(f => f.BrandId == id).ToListAsyn
         // Pricing is unchanged: the cost, the column price and the margin are all the fuel's, and only
         // the derived package total is rewritten on each volume.
         var wanted = nominals.Distinct().ToHashSet();
-        var now = DateTime.UtcNow;
+        var now = SystemClock.UtcNow;
 
 // The sizes a fuel is sold in are the operator's answer, written once per fuel and pool. The
         // per-volume loops that used to follow are gone: `fuel_offer_volumes` was a second copy of this

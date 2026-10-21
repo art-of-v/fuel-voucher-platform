@@ -4,6 +4,8 @@ using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Services;
+using FuelFlow.SharedKernel.Security;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
@@ -81,6 +83,12 @@ internal static class AuthSetup
                 ValidAudience = jwtOptions.Audience,
                 IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret)),
                 ClockSkew = TimeSpan.Zero,
+                // The lifetime is judged by the application's clock, not by the machine's. The
+                // framework's own check reads the system clock, which is exactly what the test
+                // suite cannot control: a token minted on the suite's fixed instant would be
+                // judged against the real date and every authentication test would fail. In
+                // production the two clocks are the same clock.
+                LifetimeValidator = (notBefore, expires, _, _) => TokenLifetime.IsValid(notBefore, expires),
             };
         });
 

@@ -2,6 +2,7 @@ using FluentAssertions;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -150,7 +151,7 @@ public sealed class QrParametersAndImportStatusIntegrityTests : IClassFixture<Te
     {
         await using var context = CreateContext();
         var import = Import("Started");
-        import.CompletedAtUtc = DateTime.UtcNow;
+        import.CompletedAtUtc = TestClock.UtcNow;
         context.VoucherImports.Add(import);
 
         var act = async () => await context.SaveChangesAsync();
@@ -203,7 +204,7 @@ public sealed class QrParametersAndImportStatusIntegrityTests : IClassFixture<Te
         EccLevel = ecc,
         Version = version,
         MaskPattern = maskPattern,
-        CreatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow
     };
 
     private static VoucherImport Import(string status) => new()
@@ -212,7 +213,7 @@ public sealed class QrParametersAndImportStatusIntegrityTests : IClassFixture<Te
         FileName = $"{Guid.NewGuid():N}.pdf",
         PageCount = 1,
         Status = status,
-        StartedAtUtc = DateTime.UtcNow,
-        CompletedAtUtc = status == "Started" ? null : DateTime.UtcNow
+        StartedAtUtc = TestClock.UtcNow,
+        CompletedAtUtc = status == "Started" ? null : TestClock.UtcNow
     };
 }

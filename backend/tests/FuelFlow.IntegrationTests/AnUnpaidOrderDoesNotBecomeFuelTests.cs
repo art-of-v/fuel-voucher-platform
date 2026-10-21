@@ -12,6 +12,7 @@ using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -92,8 +93,8 @@ public sealed class AnUnpaidOrderDoesNotBecomeFuelTests : IClassFixture<TestData
             Id = userId,
             PhoneNumber = $"+38{userId:N}"[..20],
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         seed.Orders.Add(new Order
@@ -103,8 +104,8 @@ public sealed class AnUnpaidOrderDoesNotBecomeFuelTests : IClassFixture<TestData
             Price = 2500,
             // The status written directly - the shape the exploit had.
             Status = OrderStatus.PendingFulfillment,
-            CreatedAtUtc = DateTime.UtcNow.AddDays(-1),
-            UpdatedAtUtc = DateTime.UtcNow.AddDays(-1),
+            CreatedAtUtc = TestClock.UtcNow.AddDays(-1),
+            UpdatedAtUtc = TestClock.UtcNow.AddDays(-1),
             LineItems = new List<OrderLineItem>
             {
                 new OrderLineItem
@@ -135,9 +136,9 @@ public sealed class AnUnpaidOrderDoesNotBecomeFuelTests : IClassFixture<TestData
                 AmountKopecks = 250000,
                 Currency = "UAH",
                 Status = PaymentStatus.Succeeded,
-                PaidAtUtc = DateTime.UtcNow,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                PaidAtUtc = TestClock.UtcNow,
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
         }
 
@@ -151,13 +152,13 @@ public sealed class AnUnpaidOrderDoesNotBecomeFuelTests : IClassFixture<TestData
                 Brand = "okko",
                 FuelTypeId = ToUuid("okko-95"),
                 Liters = 50,
-                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
-                CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+                SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
+                CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow).AddMonths(1),
                 VoucherNumber = $"OKKO-{orderId:N}-{i:D3}",
                 QrPayload = $"payload-{orderId:N}-{i:D3}",
                 Status = VoucherStatus.Available,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
         }
 

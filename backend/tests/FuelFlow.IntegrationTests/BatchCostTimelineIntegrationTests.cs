@@ -8,6 +8,7 @@ using FuelFlow.Features.Vouchers.PurchaseBatchCost;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
@@ -99,10 +100,10 @@ public sealed class BatchCostTimelineIntegrationTests : IClassFixture<TestDataba
             var mineVoucher = NewVoucher(mine, 10m, 40m);
             var theirVoucher = NewVoucher(theirs, 10m, 40m);
             seed.FuelVouchers.AddRange(mineVoucher, theirVoucher);
-            MovementBatchSeeder.AddForExchange(seed, exchangeBatchId, SupplierId, 300m, DateTime.UtcNow);
+            MovementBatchSeeder.AddForExchange(seed, exchangeBatchId, SupplierId, 300m, TestClock.UtcNow);
             MovementBatchSeeder.AddExchangeOut(
                 seed, exchangeBatchId, theirVoucher.Id, newVoucherId: null,
-                surchargeShareUah: 300m, appliedCostPerLiter: 50m, atUtc: DateTime.UtcNow);
+                surchargeShareUah: 300m, appliedCostPerLiter: 50m, atUtc: TestClock.UtcNow);
             await seed.SaveChangesAsync();
         }
 
@@ -193,9 +194,9 @@ public sealed class BatchCostTimelineIntegrationTests : IClassFixture<TestDataba
         {
             Id = importId,
             FileName = "timeline.pdf",
-            CompletedAtUtc = DateTime.UtcNow,
+            CompletedAtUtc = TestClock.UtcNow,
             Status = "Completed",
-            StartedAtUtc = DateTime.UtcNow
+            StartedAtUtc = TestClock.UtcNow
         });
 
         if (!await seed.Suppliers.AnyAsync(s => s.Id == SupplierId))
@@ -206,8 +207,8 @@ public sealed class BatchCostTimelineIntegrationTests : IClassFixture<TestDataba
                 Id = SupplierId,
                 Name = "Timeline Supplier",
                 IsActive = true,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
         }
 
@@ -222,8 +223,8 @@ public sealed class BatchCostTimelineIntegrationTests : IClassFixture<TestDataba
                 BrandId = BrandIds.Okko,
                 BasePrice = 60m,
                 DiscountPrice = 60m,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
         }
     }
@@ -235,9 +236,9 @@ public sealed class BatchCostTimelineIntegrationTests : IClassFixture<TestDataba
         {
             Id = importId,
             FileName = "other.pdf",
-            CompletedAtUtc = DateTime.UtcNow,
+            CompletedAtUtc = TestClock.UtcNow,
             Status = "Completed",
-            StartedAtUtc = DateTime.UtcNow
+            StartedAtUtc = TestClock.UtcNow
         });
         return Task.CompletedTask;
     }
@@ -251,12 +252,12 @@ public sealed class BatchCostTimelineIntegrationTests : IClassFixture<TestDataba
             Liters = liters,
             CostPerLiter = costPerLiter,
             SupplierId = SupplierId,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(6)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(6)),
             VoucherNumber = $"V-{Guid.NewGuid():N}",
             QrPayload = Guid.NewGuid().ToString(),
             Status = VoucherStatus.Available,
             ImportJobId = importId,
-            CreatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
         };
 }

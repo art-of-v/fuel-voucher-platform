@@ -6,6 +6,7 @@ using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -77,8 +78,8 @@ public sealed class WebhookDeliveryRecordingTests : IClassFixture<TestDatabaseFi
     {
         Id = Guid.NewGuid(),
         PhoneNumber = $"+38050{Interlocked.Increment(ref _userSeq):D7}",
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow,
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow,
         SettlementCode = string.Empty,
     };
 
@@ -150,7 +151,7 @@ public sealed class WebhookDeliveryRecordingTests : IClassFixture<TestDatabaseFi
 
         // A second, older delivery. Same invoice, a status the acquirer no longer reports.
         var replay = Webhook("INV-STALE", "failure", amountKopecks: 250_000m);
-        replay.ModifiedDate = DateTime.UtcNow.AddMinutes(-10);
+        replay.ModifiedDate = TestClock.UtcNow.AddMinutes(-10);
 
         var response = await _handler.HandleAsync(replay);
 
@@ -259,9 +260,9 @@ public sealed class WebhookDeliveryRecordingTests : IClassFixture<TestDatabaseFi
     [InlineData("INV-2", "success", 0)]
     public void TheDerivedEventId_SeparatesGenuinelyDifferentEvents(string invoice, string status, int _)
     {
-        var baseline = WebhookEventIdentity.Derive("monobank", "INV-1", "success", DateTime.UtcNow);
+        var baseline = WebhookEventIdentity.Derive("monobank", "INV-1", "success", TestClock.UtcNow);
 
-        WebhookEventIdentity.Derive("monobank", invoice, status, DateTime.UtcNow)
+        WebhookEventIdentity.Derive("monobank", invoice, status, TestClock.UtcNow)
             .Should().NotBe(baseline);
     }
 
@@ -282,8 +283,8 @@ public sealed class WebhookDeliveryRecordingTests : IClassFixture<TestDatabaseFi
         InvoiceId = invoiceId,
         Status = status,
         Amount = MoneyForMonobank(amountKopecks),
-        CreatedDate = DateTime.UtcNow,
-        ModifiedDate = DateTime.UtcNow,
+        CreatedDate = TestClock.UtcNow,
+        ModifiedDate = TestClock.UtcNow,
         RawBody = $"{{ \"invoiceId\": \"{invoiceId}\", \"status\": \"{status}\", \"amount\": {(long)amountKopecks} }}"
     };
 
@@ -302,8 +303,8 @@ private async Task<Order> SeedOrderAsync(string invoiceId, OrderStatus status)
             Status = status,
             Kind = OrderKind.Purchase,
             MonobankInvoiceId = invoiceId,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         _context.Orders.Add(order);
@@ -326,8 +327,8 @@ private async Task<Order> SeedOrderAsync(string invoiceId, OrderStatus status)
             AmountKopecks = FuelFlow.SharedKernel.Money.ToKopecks(order.Price),
             Currency = "UAH",
             Status = PaymentStatus.Pending,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         _context.Payments.Add(payment);

@@ -360,9 +360,10 @@ public sealed class MonobankClient : IMonobankClient
     /// </summary>
     /// <remarks>
     /// <see cref="DateTime.SpecifyKind(DateTime, DateTimeKind)"/> rather than trusting
-    /// <see cref="DateTime.Kind"/>: both bounds are built from <c>DateTime.UtcNow</c>, so they are
-    /// already UTC, and constructing a <see cref="DateTimeOffset"/> from a Utc DateTime is a
-    /// no-op rather than a conversion through the server's local zone.
+    /// <see cref="DateTime.Kind"/>: both bounds are built from the application's clock
+    /// (<c>SystemClock.UtcNow</c>), so they are already UTC, and constructing a
+    /// <see cref="DateTimeOffset"/> from a Utc DateTime is a no-op rather than a conversion through
+    /// the server's local zone.
     /// </remarks>
     private static long ToUnixSeconds(DateTime utc)
         => new DateTimeOffset(DateTime.SpecifyKind(utc, DateTimeKind.Utc)).ToUnixTimeSeconds();

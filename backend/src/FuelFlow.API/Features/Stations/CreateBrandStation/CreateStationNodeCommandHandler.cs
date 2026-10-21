@@ -1,5 +1,6 @@
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Brands.CreateBrandStation;
@@ -45,7 +46,7 @@ public sealed class CreateBrandStationCommandHandler
             return new CreateBrandStationResult { Conflict = true, Error = $"Brand node with external id '{node.ExternalId}' already exists at this brand" };
 
         node.Id = Guid.CreateVersion7();
-        node.CreatedAtUtc = DateTime.UtcNow;
+        node.CreatedAtUtc = SystemClock.UtcNow;
         node.UpdatedAtUtc = node.CreatedAtUtc;
         _context.BrandStations.Add(node);
         await _context.SaveChangesAsync(ct);

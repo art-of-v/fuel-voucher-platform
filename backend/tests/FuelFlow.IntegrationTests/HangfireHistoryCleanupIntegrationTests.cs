@@ -3,6 +3,7 @@ using FuelFlow.API.BackgroundJobs;
 using FuelFlow.Features.Settings;
 using FuelFlow.Features.Settings.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.Testing;
 using Hangfire.PostgreSql;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -39,7 +40,7 @@ public sealed class HangfireHistoryCleanupIntegrationTests : IClassFixture<TestD
     {
         await EnsureHangfireSchemaAsync();
 
-        var now = DateTime.UtcNow;
+        var now = TestClock.UtcNow;
         long missed, missedState, missedParameter;
         long expiredButInGrace, recent, oldWithoutExpiry;
         long oldFailed, oldScheduled, oldEnqueued, oldProcessing;
@@ -113,7 +114,7 @@ public sealed class HangfireHistoryCleanupIntegrationTests : IClassFixture<TestD
         await EnsureHangfireSchemaAsync();
 
         long deletedJob, keptJob, keptQueueRow, orphanQueueRow;
-        var now = DateTime.UtcNow;
+        var now = TestClock.UtcNow;
 
         await using (var connection = await OpenAsync())
         await using (var transaction = await connection.BeginTransactionAsync())
@@ -153,7 +154,7 @@ public sealed class HangfireHistoryCleanupIntegrationTests : IClassFixture<TestD
         {
             (job, _, _) = await SeedJobAsync(
                 connection, transaction, "Succeeded",
-                createdAt: DateTime.UtcNow.AddDays(-3), stateCreatedAt: DateTime.UtcNow.AddDays(-3), expireAt: DateTime.UtcNow.AddDays(-2));
+                createdAt: TestClock.UtcNow.AddDays(-3), stateCreatedAt: TestClock.UtcNow.AddDays(-3), expireAt: TestClock.UtcNow.AddDays(-2));
             await transaction.CommitAsync();
         }
 
@@ -176,10 +177,10 @@ public sealed class HangfireHistoryCleanupIntegrationTests : IClassFixture<TestD
         {
             (tenDaysOld, _, _) = await SeedJobAsync(
                 connection, transaction, "Succeeded",
-                createdAt: DateTime.UtcNow.AddDays(-10), stateCreatedAt: DateTime.UtcNow.AddDays(-10), expireAt: null);
+                createdAt: TestClock.UtcNow.AddDays(-10), stateCreatedAt: TestClock.UtcNow.AddDays(-10), expireAt: null);
             (fortyDaysOld, _, _) = await SeedJobAsync(
                 connection, transaction, "Succeeded",
-                createdAt: DateTime.UtcNow.AddDays(-40), stateCreatedAt: DateTime.UtcNow.AddDays(-40), expireAt: null);
+                createdAt: TestClock.UtcNow.AddDays(-40), stateCreatedAt: TestClock.UtcNow.AddDays(-40), expireAt: null);
             await transaction.CommitAsync();
         }
 
@@ -206,7 +207,7 @@ public sealed class HangfireHistoryCleanupIntegrationTests : IClassFixture<TestD
         {
             (job, _, _) = await SeedJobAsync(
                 connection, transaction, "Succeeded",
-                createdAt: DateTime.UtcNow.AddDays(-2), stateCreatedAt: DateTime.UtcNow.AddDays(-2), expireAt: DateTime.UtcNow.AddDays(1));
+                createdAt: TestClock.UtcNow.AddDays(-2), stateCreatedAt: TestClock.UtcNow.AddDays(-2), expireAt: TestClock.UtcNow.AddDays(1));
             await transaction.CommitAsync();
         }
 

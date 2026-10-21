@@ -1,5 +1,6 @@
 using FuelFlow.Features.Company.SharedModels;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Company.AcceptInvitation;
@@ -49,11 +50,11 @@ public sealed class AcceptInvitationCommandHandler
             Id = Guid.CreateVersion7(),
             LegalEntityId = invitation.LegalEntityId,
             WorkerUserId = command.WorkerUserId,
-            JoinedAtUtc = DateTime.UtcNow
+            JoinedAtUtc = SystemClock.UtcNow
         };
 
         invitation.Status = InvitationStatus.Accepted;
-        invitation.UpdatedAtUtc = DateTime.UtcNow;
+        invitation.UpdatedAtUtc = SystemClock.UtcNow;
 
         _context.CompanyMembers.Add(member);
         _context.CompanyInvitations.Update(invitation);

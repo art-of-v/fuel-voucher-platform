@@ -1,5 +1,6 @@
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.UnitTests;
@@ -32,7 +33,7 @@ internal static class SeededBrands
     {
         var wanted = brandIds.Length > 0 ? brandIds : new[] { BrandIds.Okko, BrandIds.Wog, BrandIds.Upg, BrandIds.Klo };
         var present = context.Brands.IgnoreQueryFilters().Select(b => b.Id).ToList();
-        var now = DateTime.UtcNow;
+        var now = TestClock.UtcNow;
         var added = 0;
 
         foreach (var id in wanted.Distinct().Except(present))

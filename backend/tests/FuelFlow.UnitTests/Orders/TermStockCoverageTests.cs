@@ -5,6 +5,7 @@ using FuelFlow.Features.Vouchers.Availability;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -132,7 +133,7 @@ public sealed class TermStockCoverageTests : IDisposable
         SupplierExpirationDate = supplierExpiration,
         CustomerExpirationDate = supplierExpiration,
         Status = status,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 }

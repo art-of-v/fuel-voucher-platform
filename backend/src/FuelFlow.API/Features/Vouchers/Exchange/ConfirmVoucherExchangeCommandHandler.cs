@@ -7,6 +7,7 @@ using FuelFlow.Features.Vouchers.PurchaseBatchCost;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -161,7 +162,7 @@ public sealed class ConfirmVoucherExchangeCommandHandler
         var totalNewLiters = news.Sum(n => n.Liters);
 
         var newIds = news.Select(n => n.Id).ToList();
-        var now = DateTime.UtcNow;
+        var now = SystemClock.UtcNow;
 
 // Pair first: the pairing is what decides which old voucher each new one replaces, and therefore
         // whose cost carries over to it. Bucketing is by (brand, fuel, liters), so within a pair the two

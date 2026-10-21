@@ -8,6 +8,7 @@ using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.Testing;
 using Hangfire;
 using Hangfire.Common;
 using Hangfire.States;
@@ -96,7 +97,7 @@ public sealed class MonobankReconciliationServiceTests : IClassFixture<TestDatab
             new Mock<ILogger<MonobankReconciliationService>>().Object);
 
     // Old enough to have passed the 3-minute grace window, young enough to be inside the 24h window.
-    private static DateTime Aged() => DateTime.UtcNow.AddMinutes(-10);
+    private static DateTime Aged() => TestClock.UtcNow.AddMinutes(-10);
 
     private void SetupInvoice(string invoiceId, string status, long amount = 250000) =>
         _monobankClientMock
@@ -106,8 +107,8 @@ public sealed class MonobankReconciliationServiceTests : IClassFixture<TestDatab
                 InvoiceId = invoiceId,
                 Status = status,
                 Amount = amount,
-                CreatedDate = DateTime.UtcNow,
-                ModifiedDate = DateTime.UtcNow
+                CreatedDate = TestClock.UtcNow,
+                ModifiedDate = TestClock.UtcNow
             });
 
 /// <summary>
@@ -259,7 +260,7 @@ public sealed class MonobankReconciliationServiceTests : IClassFixture<TestDatab
     public async Task Reconcile_WhenOrderInsideGraceWindow_IsNotPolled()
     {
         // Younger than ReconciliationMinAgeMinutes: the webhook is still given time to arrive first.
-        await AddOrderAsync("INV-NEW", OrderStatus.PendingPayment, DateTime.UtcNow);
+        await AddOrderAsync("INV-NEW", OrderStatus.PendingPayment, TestClock.UtcNow);
         SetupInvoice("INV-NEW", "success");
 
         await CreateService().ReconcilePendingPaymentsAsync();
@@ -273,7 +274,7 @@ public sealed class MonobankReconciliationServiceTests : IClassFixture<TestDatab
     public async Task Reconcile_WhenOrderOlderThanMaxAge_IsNotPolled()
     {
         // Past the 24h window: the Monobank invoice has long since expired, so stop chasing it.
-        await AddOrderAsync("INV-OLD", OrderStatus.PendingPayment, DateTime.UtcNow.AddHours(-25));
+        await AddOrderAsync("INV-OLD", OrderStatus.PendingPayment, TestClock.UtcNow.AddHours(-25));
         SetupInvoice("INV-OLD", "success");
 
         await CreateService().ReconcilePendingPaymentsAsync();
@@ -328,8 +329,8 @@ public sealed class MonobankReconciliationServiceTests : IClassFixture<TestDatab
     public async Task Reconcile_WhenOneInvoiceThrows_ContinuesWithTheRest()
     {
         // A network blip or a 404 on one purged invoice must not abort the whole batch.
-        var failing = await AddOrderAsync("INV-ERR", OrderStatus.PendingPayment, DateTime.UtcNow.AddMinutes(-15));
-        var healthy = await AddOrderAsync("INV-OK2", OrderStatus.PendingPayment, DateTime.UtcNow.AddMinutes(-10));
+        var failing = await AddOrderAsync("INV-ERR", OrderStatus.PendingPayment, TestClock.UtcNow.AddMinutes(-15));
+        var healthy = await AddOrderAsync("INV-OK2", OrderStatus.PendingPayment, TestClock.UtcNow.AddMinutes(-10));
 
         _monobankClientMock
             .Setup(x => x.GetInvoiceStatusAsync("INV-ERR", It.IsAny<CancellationToken>()))

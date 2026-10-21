@@ -5,6 +5,7 @@ using FuelFlow.Features.Notifications.Push;
 using FuelFlow.Features.Notifications.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -64,7 +65,7 @@ public sealed class VoucherIssuedNotificationTests : IDisposable
                 legalEntityId,
             }),
             Processed = processed,
-            CreatedAtUtc = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1),
+            CreatedAtUtc = TestClock.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1),
         };
 
     private void Seed(OutboxEvent evt) => _context.OutboxEvents.Add(evt);
@@ -144,8 +145,8 @@ public sealed class VoucherIssuedNotificationTests : IDisposable
             Platform = "android",
             DeviceId = null,
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1),
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1),
+            UpdatedAtUtc = TestClock.UtcNow,
         });
         Seed(CreateEvent(workerId, "ACME LLC", 1, companyId.ToString()));
         await _context.SaveChangesAsync();
@@ -216,7 +217,7 @@ public sealed class VoucherIssuedNotificationTests : IDisposable
             EventType = OutboxEventType.VoucherIssued,
             Payload = """{"workerUserId":"not-a-guid"}""",
             Processed = false,
-            CreatedAtUtc = DateTime.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1),
+            CreatedAtUtc = TestClock.UtcNow - OutboxDispatchJob.SafetyNetClaimWindow - TimeSpan.FromMinutes(1),
         });
         await _context.SaveChangesAsync();
 

@@ -4,6 +4,7 @@ using FuelFlow.Features.Vouchers.GetAdminVouchers;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -62,8 +63,8 @@ public class VoucherAcquisitionSourceTests : WebApplicationFactory<Program>, ICl
             Id = importId,
             FileName = "acquisition-source-test.csv",
             Status = "Completed",
-            StartedAtUtc = DateTime.UtcNow,
-            CompletedAtUtc = DateTime.UtcNow,
+            StartedAtUtc = TestClock.UtcNow,
+            CompletedAtUtc = TestClock.UtcNow,
         });
 
         // A voucher cannot exist without a supplier and a fuel type, and this fixture has neither by
@@ -77,7 +78,7 @@ public class VoucherAcquisitionSourceTests : WebApplicationFactory<Program>, ICl
                 Id = Guid.NewGuid(),
                 Name = "acquisition-source-test-supplier",
                 IsActive = true,
-                CreatedAtUtc = DateTime.UtcNow,
+                CreatedAtUtc = TestClock.UtcNow,
             });
         }
 
@@ -90,8 +91,8 @@ public class VoucherAcquisitionSourceTests : WebApplicationFactory<Program>, ICl
                 BrandId = BrandIds.Okko,
                 BasePrice = 60m,
                 DiscountPrice = 60m,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow,
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow,
             });
         }
 
@@ -123,7 +124,7 @@ public class VoucherAcquisitionSourceTests : WebApplicationFactory<Program>, ICl
             QrPayload = Guid.NewGuid().ToString(),
             Liters = 10m,
             Status = VoucherStatus.Available,
-            CreatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
             AcquisitionSource = statedSource ?? AcquisitionSources.Default,
         };
 
@@ -191,7 +192,7 @@ public class VoucherAcquisitionSourceTests : WebApplicationFactory<Program>, ICl
             QrPayload = Guid.NewGuid().ToString(),
             Liters = 10m,
             Status = VoucherStatus.Available,
-            CreatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
             AcquisitionSource = "directt",
         };
 
@@ -242,7 +243,7 @@ public class VoucherAcquisitionSourceTests : WebApplicationFactory<Program>, ICl
         {
             var voucher = await context.FuelVouchers.FirstAsync(v => v.Id == voucherId);
             voucher.CostPerLiter = 41.5m;
-            voucher.UpdatedAtUtc = DateTime.UtcNow;
+            voucher.UpdatedAtUtc = TestClock.UtcNow;
             await context.SaveChangesAsync();
         };
 

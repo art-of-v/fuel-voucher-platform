@@ -1,4 +1,5 @@
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Notifications.DeregisterPushToken;
@@ -36,7 +37,7 @@ public sealed class DeregisterPushTokenCommandHandler
         if (matches.Count == 0)
             return new DeregisterPushTokenResponse(0);
 
-        var now = DateTime.UtcNow;
+        var now = SystemClock.UtcNow;
         foreach (var token in matches)
         {
             token.IsActive = false;

@@ -5,6 +5,7 @@ using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Vouchers.UnblockVoucher;
@@ -63,7 +64,7 @@ public sealed class UnblockVoucherCommandHandler
             [voucher.Id],
             cancellationToken);
 
-        var unblockedAtUtc = DateTime.UtcNow;
+        var unblockedAtUtc = SystemClock.UtcNow;
         voucher.Status = VoucherStatus.Assigned;
         voucher.WorkerUserId = null;
         if (restored.TryGetValue(voucher.Id, out var orderId))

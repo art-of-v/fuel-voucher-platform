@@ -6,6 +6,7 @@ using FuelFlow.Features.Vouchers.Import;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -52,8 +53,8 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
             Id = _supplierId,
             Name = "Seed Supplier",
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         await context.SaveChangesAsync();
     }
@@ -107,7 +108,7 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
             {
                 Id = Guid.NewGuid(),
                 Name = "Admin",
-                CreatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow
             };
             context.Roles.Add(adminRole);
             await context.SaveChangesAsync();
@@ -115,7 +116,7 @@ public class VoucherImportIntegrationTests : WebApplicationFactory<Program>, ICl
 
         var user = await context.Users.FirstAsync(u => u.PhoneNumber == phoneNumber, CancellationToken.None);
         user.RoleId = adminRole.Id;
-        user.UpdatedAtUtc = DateTime.UtcNow;
+        user.UpdatedAtUtc = TestClock.UtcNow;
         context.Update(user);
         await context.SaveChangesAsync();
 

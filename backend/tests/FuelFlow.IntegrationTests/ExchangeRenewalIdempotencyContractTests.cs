@@ -8,6 +8,7 @@ using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Xunit;
@@ -64,9 +65,9 @@ public sealed class ExchangeRenewalIdempotencyContractTests : IClassFixture<Test
                 SupplierId = supplierId,
                 SurchargeUah = 0m,
                 OpenedByUserId = Guid.NewGuid(),
-                OpenedAtUtc = DateTime.UtcNow,
-                ConfirmedAtUtc = DateTime.UtcNow,
-                CreatedAtUtc = DateTime.UtcNow
+                OpenedAtUtc = TestClock.UtcNow,
+                ConfirmedAtUtc = TestClock.UtcNow,
+                CreatedAtUtc = TestClock.UtcNow
             });
             await seed.SaveChangesAsync();
         }
@@ -109,7 +110,7 @@ public sealed class ExchangeRenewalIdempotencyContractTests : IClassFixture<Test
             await seed.SaveChangesAsync();
         }
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
 
         await using (var first = CreateContext())
         {
@@ -147,7 +148,7 @@ public sealed class ExchangeRenewalIdempotencyContractTests : IClassFixture<Test
             await seed.SaveChangesAsync();
         }
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(TestClock.UtcNow);
 
         await using (var first = CreateContext())
         {
@@ -176,8 +177,8 @@ public sealed class ExchangeRenewalIdempotencyContractTests : IClassFixture<Test
             Id = userId,
             PhoneNumber = $"+38{userId:N}"[..20],
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
     private static Supplier SeedSupplier(Guid supplierId)
@@ -187,8 +188,8 @@ public sealed class ExchangeRenewalIdempotencyContractTests : IClassFixture<Test
             Name = $"Idempotency supplier {supplierId:N}"[..40],
             EdrIpn = TestEdrIpns.Next(),
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
     private static FuelVoucher Stock(Guid id, Guid supplierId)
@@ -199,15 +200,15 @@ public sealed class ExchangeRenewalIdempotencyContractTests : IClassFixture<Test
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(6)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(6)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(6)),
             VoucherNumber = $"IDEM-{id:N}"[..16],
             QrPayload = $"idem-{id:N}",
             Status = VoucherStatus.Available,
             SupplierId = supplierId,
             CostPerLiter = 30m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
     private static VoucherMovement ExchangeOutMovement(Guid batchId, Guid oldVoucherId)
@@ -222,7 +223,7 @@ public sealed class ExchangeRenewalIdempotencyContractTests : IClassFixture<Test
             ActorKind = VoucherActorKinds.User,
             ActorUserId = Guid.NewGuid(),
             SurchargeShareUah = 0m,
-            OccurredAtUtc = DateTime.UtcNow
+            OccurredAtUtc = TestClock.UtcNow
         };
 
     /// <summary>
@@ -243,8 +244,8 @@ public sealed class ExchangeRenewalIdempotencyContractTests : IClassFixture<Test
             Price = 10m,
             Kind = OrderKind.Renewal,
             Status = OrderStatus.Fulfilled,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow,
             LineItems = new List<OrderLineItem>
             {
                 new()

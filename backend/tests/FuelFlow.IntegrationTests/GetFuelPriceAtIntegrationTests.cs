@@ -2,6 +2,7 @@ using FluentAssertions;
 using FuelFlow.Features.Brands.GetFuelPriceAt;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
@@ -53,7 +54,7 @@ public sealed class GetFuelPriceAtIntegrationTests : IClassFixture<TestDatabaseF
         var slug = $"at-{suffix}";
         var fuelTypeId = $"at-fuel-{suffix}";
 
-        var now = DateTime.UtcNow;
+        var now = TestClock.UtcNow;
         context.Brands.Add(new Brand
         {
             Id = brandId, Slug = slug, Name = $"AT {suffix}", Color = "#000", LogoText = "AT",
@@ -90,7 +91,7 @@ public sealed class GetFuelPriceAtIntegrationTests : IClassFixture<TestDatabaseF
             PumpPricePerLiter = pump,
             FinalPricePerLiter = pump,
             EffectiveFromUtc = from,
-            RecordedAtUtc = DateTime.UtcNow,
+            RecordedAtUtc = TestClock.UtcNow,
             Reason = reason,
         };
 
@@ -147,7 +148,7 @@ public sealed class GetFuelPriceAtIntegrationTests : IClassFixture<TestDatabaseF
         context.FuelPriceHistory.Add(Row(fuelTypeId, new DateTime(2026, 3, 1, 8, 0, 0, DateTimeKind.Utc), 50m));
         await context.SaveChangesAsync();
 
-        var answer = await handler.HandleAsync(new GetFuelPriceAtQuery(ToUuid(fuelTypeId), DateTime.UtcNow.AddYears(5)));
+        var answer = await handler.HandleAsync(new GetFuelPriceAtQuery(ToUuid(fuelTypeId), TestClock.UtcNow.AddYears(5)));
 
         answer!.PumpPricePerLiter.Should().Be(50m);
         answer.SupersededAtUtc.Should().BeNull("nothing displaced it, so it is the price in effect now");
@@ -165,7 +166,7 @@ public sealed class GetFuelPriceAtIntegrationTests : IClassFixture<TestDatabaseF
 
         var lastTuesday = new DateTime(2026, 3, 3, 8, 0, 0, DateTimeKind.Utc);
         var backdated = Row(fuelTypeId, lastTuesday, 47.25m);
-        backdated.RecordedAtUtc = DateTime.UtcNow;
+        backdated.RecordedAtUtc = TestClock.UtcNow;
         context.FuelPriceHistory.Add(backdated);
         await context.SaveChangesAsync();
 
@@ -229,7 +230,7 @@ public sealed class GetFuelPriceAtIntegrationTests : IClassFixture<TestDatabaseF
         var handler = new GetFuelPriceAtQueryHandler(context);
         var fuelTypeId = await SeedFuelAsync(context, "empty");
 
-        var answer = await handler.HandleAsync(new GetFuelPriceAtQuery(ToUuid(fuelTypeId), DateTime.UtcNow));
+        var answer = await handler.HandleAsync(new GetFuelPriceAtQuery(ToUuid(fuelTypeId), TestClock.UtcNow));
 
         answer.Should().BeNull();
     }

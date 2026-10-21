@@ -2,6 +2,7 @@ using FluentAssertions;
 using FuelFlow.Features.Pricing.Terms.SharedModels;
 using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Persistence;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -44,9 +45,9 @@ public sealed class VoucherTermPricingTests : IClassFixture<TestDatabaseFixture>
             TermCode = termCode,
             Enabled = enabled,
             RatePerLiter = rate,
-            ValidFrom = DateTime.UtcNow.AddDays(-1),
+            ValidFrom = TestClock.UtcNow.AddDays(-1),
             ValidTo = validTo,
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow
         };
 
     private static async Task CleanAsync(ApplicationDbContext db)
@@ -82,7 +83,7 @@ public sealed class VoucherTermPricingTests : IClassFixture<TestDatabaseFixture>
         // The two windows must NOT overlap. A closed window that reaches into the open one leaves
         // the lookup with two candidates for the same date - which is what the exclusion
         // constraint refuses, and what this test's neighbour refuses.
-        var boundary = DateTime.UtcNow.AddHours(-1);
+        var boundary = TestClock.UtcNow.AddHours(-1);
 
         var past = Tier(VoucherTermPricingSchemes.RenewalRate, "2w", true, 24.5m, validTo: boundary);
         past.ValidFrom = boundary.AddDays(-1);
@@ -166,8 +167,8 @@ public sealed class VoucherTermPricingTests : IClassFixture<TestDatabaseFixture>
         await CleanAsync(db);
 
         var row = Tier(VoucherTermPricingSchemes.RenewalRate, "3m", true, 10m);
-        row.ValidFrom = DateTime.UtcNow;
-        row.ValidTo = DateTime.UtcNow.AddDays(-2);
+        row.ValidFrom = TestClock.UtcNow;
+        row.ValidTo = TestClock.UtcNow.AddDays(-2);
         db.VoucherTermPricings.Add(row);
 
         var act = async () => await db.SaveChangesAsync();

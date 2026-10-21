@@ -9,6 +9,7 @@ using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.Testing;
 using Moq;
 
 namespace FuelFlow.UnitTests.Company;
@@ -42,9 +43,9 @@ public sealed class CompanyMultiCompanyScopingTests : IDisposable
     private async Task SeedTwoOwnedCompaniesAsync()
     {
         var first = CompanyTestFactory.NewLegalEntity(FirstEntityId, OwnerId, name: "First LLC", edrpou: "10000001");
-        first.CreatedAtUtc = DateTime.UtcNow.AddDays(-10);
+        first.CreatedAtUtc = TestClock.UtcNow.AddDays(-10);
         var second = CompanyTestFactory.NewLegalEntity(SecondEntityId, OwnerId, name: "Second LLC", edrpou: "10000002");
-        second.CreatedAtUtc = DateTime.UtcNow.AddDays(-1);
+        second.CreatedAtUtc = TestClock.UtcNow.AddDays(-1);
         var stranger = CompanyTestFactory.NewLegalEntity(StrangerEntityId, Guid.NewGuid(), name: "Stranger LLC", edrpou: "20000003");
 
         _context.LegalEntities.AddRange(first, second, stranger);

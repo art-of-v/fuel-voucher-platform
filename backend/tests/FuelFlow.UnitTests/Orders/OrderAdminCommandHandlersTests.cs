@@ -23,6 +23,7 @@ using Microsoft.Extensions.Options;
 using Moq;
 
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.Testing;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
 namespace FuelFlow.UnitTests.Orders;
 
@@ -85,11 +86,11 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
     {
         var fuelTypes = new[]
         {
-            new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = ToUuid("okko-95"), Name = "A-95", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = ToUuid("okko-p95"), Name = "Pulls 95", BrandId = BrandIds.Okko, BasePrice = 62, DiscountPrice = 58, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = ToUuid("wog-dp"), Name = "ДП Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow },
-            new FuelTypeEntity { Id = ToUuid("wog-95"), Name = "A-95 Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow }
+            new FuelTypeEntity { Id = ToUuid("okko-dp"), Name = "ДП ЄВРО", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("okko-95"), Name = "A-95", BrandId = BrandIds.Okko, BasePrice = 55, DiscountPrice = 52, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("okko-p95"), Name = "Pulls 95", BrandId = BrandIds.Okko, BasePrice = 62, DiscountPrice = 58, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("wog-dp"), Name = "ДП Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow },
+            new FuelTypeEntity { Id = ToUuid("wog-95"), Name = "A-95 Mustang", BrandId = BrandIds.Wog, BasePrice = 56, DiscountPrice = 53, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow }
         };
         _context.FuelTypes.AddRange(fuelTypes);
         _context.SaveChanges();
@@ -117,7 +118,7 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
     /// </summary>
     private void SeedSellableStock(string fuelTypeId, decimal liters = 50m)
     {
-        var expiry = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1));
+        var expiry = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1));
         var voucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
@@ -130,8 +131,8 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
             VoucherNumber = $"STOCK-{Guid.NewGuid().ToString()[..8]}",
             QrPayload = Guid.NewGuid().ToString(),
             Status = VoucherStatus.Available,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
         _context.FuelVouchers.Add(voucher);
         // The stock queries read the summary, not the vouchers, and the in-memory provider has no
@@ -147,8 +148,8 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
         UserId = userId,
         Price = 2500,
         Status = status,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow,
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow,
         LineItems =
         {
             new OrderLineItem
@@ -185,8 +186,8 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
             AmountKopecks = 250000,
             Currency = "UAH",
             Status = status,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         _context.SaveChanges();
     }
@@ -247,7 +248,7 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
         result.Success.Should().BeTrue();
         var updated = await _context.Orders.FindAsync(order.Id);
         updated!.Status.Should().Be(OrderStatus.PendingFulfillment);
-        updated.UpdatedAtUtc.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(2));
+        updated.UpdatedAtUtc.Should().BeCloseTo(TestClock.UtcNow, TimeSpan.FromSeconds(2));
     }
 
     [Fact]
@@ -417,7 +418,7 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
     public async Task GetAdminOrders_ShouldReturnOrders_IncludingSoftDeleted()
     {
         var active = BuildOrder(Guid.NewGuid(), OrderStatus.Fulfilled);
-        active.FulfilledAtUtc = DateTime.UtcNow;
+        active.FulfilledAtUtc = TestClock.UtcNow;
         var softDeleted = BuildOrder(Guid.NewGuid(), OrderStatus.Cancelled);
         softDeleted.IsDeleted = true;
 
@@ -461,13 +462,13 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
     public async Task GetAdminPurchases_ShouldReturnOrders_WithVoucherCount()
     {
         var order = BuildOrder(Guid.NewGuid(), OrderStatus.Fulfilled);
-        order.FulfilledAtUtc = DateTime.UtcNow;
+        order.FulfilledAtUtc = TestClock.UtcNow;
         order.Fulfillments.Add(new Fulfillment
         {
             Id = Guid.NewGuid(),
             OrderId = order.Id,
             VoucherId = Guid.NewGuid(),
-            FulfilledAtUtc = DateTime.UtcNow,
+            FulfilledAtUtc = TestClock.UtcNow,
             Voucher = new FuelVoucher
             {
                 Id = Guid.NewGuid(),
@@ -477,10 +478,10 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
                 Liters = 50,
                 VoucherNumber = "V-test",
                 QrPayload = "q",
-                SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
-                CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)),
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddDays(30)),
+                CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddDays(30)),
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             }
         });
 
@@ -497,7 +498,7 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
 
     private void SeedDefaultUser()
     {
-        var role = new Role { Id = SeedRoles.UserRoleId, Name = SeedRoles.UserName, CreatedAtUtc = DateTime.UtcNow };
+        var role = new Role { Id = SeedRoles.UserRoleId, Name = SeedRoles.UserName, CreatedAtUtc = TestClock.UtcNow };
         _context.Roles.Add(role);
         _context.Users.Add(new User
         {
@@ -508,8 +509,8 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
             IsActive = true,
             IsDeleted = false,
             TokenVersion = 1,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         _context.SaveChanges();
     }

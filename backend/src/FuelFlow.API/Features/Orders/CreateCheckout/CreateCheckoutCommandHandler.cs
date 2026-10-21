@@ -9,6 +9,7 @@ using FuelFlow.SharedKernel;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Time;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -185,7 +186,7 @@ public sealed class CreateCheckoutCommandHandler
             CheckoutBasket.PurchaseSignature(
                 command.BrandId.Value, command.FuelTypeId, command.Liters, command.Quantity));
 
-        var now = DateTime.UtcNow;
+        var now = SystemClock.UtcNow;
 
         // The order that already holds this basket, if there is one. A retry or a double tap finds
         // it here and is given the same invoice. The read is an equality on an indexed column; it
@@ -248,8 +249,8 @@ public sealed class CreateCheckoutCommandHandler
             // share this.
             IdempotencyKey = $"{checkoutKey}:{Guid.NewGuid():N}",
             CheckoutKey = checkoutKey,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = SystemClock.UtcNow,
+            UpdatedAtUtc = SystemClock.UtcNow
         };
 
         order.LineItems.Add(new OrderLineItem
@@ -361,7 +362,7 @@ public sealed class CreateCheckoutCommandHandler
             // down that it exists - and until a Payment row exists, a payment link re-issued later
             // would have nowhere to put a second attempt.
             _context.Payments.Add(PaymentFactory.CreateCapture(
-                order, merchant, invoiceResponse.InvoiceId, DateTime.UtcNow));
+                order, merchant, invoiceResponse.InvoiceId, SystemClock.UtcNow));
 
             _logger.LogInformation(
                 "Monobank invoice created on {Merchant} merchant for order {OrderId}: {InvoiceId}, payment URL: {PaymentUrl}",

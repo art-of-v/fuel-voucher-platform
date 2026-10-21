@@ -9,6 +9,7 @@ using FuelFlow.Features.Brands.GetFuelPriceAt;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.SharedKernel.Time;
 using FuelFlow.Features.Pricing;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -122,8 +123,8 @@ private readonly GetBrandsQueryHandler _getAll;
             LogoText = request.LogoText,
             Color = request.Color,
             SortOrder = request.SortOrder,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = SystemClock.UtcNow,
+            UpdatedAtUtc = SystemClock.UtcNow
         };
         _context.Brands.Add(Brand);
         await _context.SaveChangesAsync(ct);
@@ -161,7 +162,7 @@ private readonly GetBrandsQueryHandler _getAll;
         Brand.LogoText = request.LogoText;
         Brand.Color = request.Color;
         Brand.SortOrder = request.SortOrder;
-        Brand.UpdatedAtUtc = DateTime.UtcNow;
+        Brand.UpdatedAtUtc = SystemClock.UtcNow;
         _context.Brands.Update(Brand);
         await _context.SaveChangesAsync(ct);
 
@@ -204,7 +205,7 @@ private readonly GetBrandsQueryHandler _getAll;
         // Archive the whole branch instead of removing it. fuel_vouchers.fuel_type_id CASCADEs from
         // here, so the old RemoveRange cascade could take paid-for vouchers with it; #217 keeps
         // anything that affects history. The !IsDeleted filters keep both out of the catalog.
-        var archivedAt = DateTime.UtcNow;
+        var archivedAt = SystemClock.UtcNow;
 
         foreach (var fuelType in fuelTypes)
         {

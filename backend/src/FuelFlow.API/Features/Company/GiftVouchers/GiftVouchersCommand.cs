@@ -7,6 +7,7 @@ using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Company.GiftVouchers;
@@ -92,7 +93,7 @@ public sealed class GiftVouchersCommandHandler
         // than a flat list, and the batch the owner actually handed over is the batch that shows up.
         await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
-        var now = DateTime.UtcNow;
+        var now = SystemClock.UtcNow;
 
         // The vouchers may have been bought across several orders. One issuance order can only name
         // one parent, so SourceOrderId is set only when they all came from the same purchase.
@@ -163,7 +164,7 @@ public sealed class GiftVouchersCommandHandler
             // When the fuel changed hands. Its own column rather than UpdatedAtUtc, because a later
             // block or recall would move that one and the worker's report would claim a different
             // receipt date (#150).
-            voucher.IssuedAtUtc = DateTime.UtcNow;
+            voucher.IssuedAtUtc = SystemClock.UtcNow;
             // The voucher now belongs to the handover, not to the purchase. It is still Assigned, and
             // ck_voucher_held_has_order forbids an orderless one.
             voucher.OrderId = issuanceOrder.Id;

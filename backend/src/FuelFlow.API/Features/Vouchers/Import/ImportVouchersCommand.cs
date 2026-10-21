@@ -3,6 +3,7 @@ using FuelFlow.API.BackgroundJobs;
 using FuelFlow.Features.Vouchers;
 using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.SharedKernel.Time;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -170,7 +171,7 @@ public sealed class ImportVouchersCommandHandler
             Id = Guid.CreateVersion7(),
             FileName = request.FileName,
             PageCount = 0,
-            StartedAtUtc = DateTime.UtcNow,
+            StartedAtUtc = SystemClock.UtcNow,
             Status = "Started",
             ImportedCount = 0,
             DuplicateCount = 0,
@@ -221,7 +222,7 @@ public sealed class ImportVouchersCommandHandler
                             ImportId = import.Id,
                             PageNumber = page.PageNumber,
                             ErrorMessage = errMsg,
-                            CreatedAtUtc = DateTime.UtcNow
+                            CreatedAtUtc = SystemClock.UtcNow
                         });
                         import.FailedCount += regions.Count;
                         continue;
@@ -250,7 +251,7 @@ public sealed class ImportVouchersCommandHandler
                             ImportId = import.Id,
                             PageNumber = page.PageNumber,
                             ErrorMessage = errMsg,
-                            CreatedAtUtc = DateTime.UtcNow
+                            CreatedAtUtc = SystemClock.UtcNow
                         });
                         import.FailedCount += regions.Count;
                         continue;
@@ -294,7 +295,7 @@ public sealed class ImportVouchersCommandHandler
                                 VoucherNumber = string.IsNullOrEmpty(parsed.VoucherNumber) ? null : parsed.VoucherNumber,
                                 ErrorMessage = errMsg,
                                 RawText = PrepareRawTextForStorage(parsed.RawText, parsed.QrPayload),
-                                CreatedAtUtc = DateTime.UtcNow
+                                CreatedAtUtc = SystemClock.UtcNow
                             });
                             import.FailedCount++;
                             continue;
@@ -326,7 +327,7 @@ public sealed class ImportVouchersCommandHandler
                                 VoucherNumber = string.IsNullOrEmpty(parsed.VoucherNumber) ? null : parsed.VoucherNumber,
                                 ErrorMessage = errMsg,
                                 RawText = PrepareRawTextForStorage(parsed.RawText, parsed.QrPayload),
-                                CreatedAtUtc = DateTime.UtcNow
+                                CreatedAtUtc = SystemClock.UtcNow
                             });
                             import.FailedCount++;
                             continue;
@@ -350,7 +351,7 @@ public sealed class ImportVouchersCommandHandler
                                 VoucherNumber = parsed.VoucherNumber,
                                 ErrorMessage = errMsg,
                                 RawText = PrepareRawTextForStorage(parsed.RawText, parsed.QrPayload),
-                                CreatedAtUtc = DateTime.UtcNow
+                                CreatedAtUtc = SystemClock.UtcNow
                             });
                             import.FailedCount++;
                             continue;
@@ -408,7 +409,7 @@ public sealed class ImportVouchersCommandHandler
                                     Version = parsed.QrVersion,
                                     MaskPattern = parsed.QrMaskPattern,
                                     EncodingMode = parsed.QrEncodingMode,
-                                    CreatedAtUtc = DateTime.UtcNow
+                                    CreatedAtUtc = SystemClock.UtcNow
                                 };
                                 _context.QrParameters.Add(qrParams);
                                 _logger.LogInformation(
@@ -441,7 +442,7 @@ public sealed class ImportVouchersCommandHandler
                             // same value the duplicate check above matched on, so the two cannot
                             // disagree about what this voucher is.
                             QrPayloadSha256 = payloadHash,
-                            CreatedAtUtc = DateTime.UtcNow,
+                            CreatedAtUtc = SystemClock.UtcNow,
                             ImportJobId = import.Id,
                             // Who issued this paper. One PDF is one supplier's delivery, so it is decided
                             // once by the operator before upload rather than guessed per voucher.
@@ -451,7 +452,7 @@ public sealed class ImportVouchersCommandHandler
                             // afterwards means replacing the vouchers, not editing them.
                             AcquisitionSource = acquisitionSource,
                             QrParametersId = qrParams.Id,
-                            UpdatedAtUtc = DateTime.UtcNow
+                            UpdatedAtUtc = SystemClock.UtcNow
                         };
 
                         var verification = QrMatrixVerifier.Verify(
@@ -556,13 +557,13 @@ public sealed class ImportVouchersCommandHandler
             _logger.LogError(ex, "Failed to render or process PDF pages");
             import.PageCount = pagesProcessed;
             import.Status = "Failed";
-            import.CompletedAtUtc = DateTime.UtcNow;
+            import.CompletedAtUtc = SystemClock.UtcNow;
             await _context.SaveChangesAsync(cancellationToken);
             throw;
         }
 
         import.Status = "Completed";
-        import.CompletedAtUtc = DateTime.UtcNow;
+        import.CompletedAtUtc = SystemClock.UtcNow;
         await _context.SaveChangesAsync(cancellationToken);
 
         stopwatch.Stop();

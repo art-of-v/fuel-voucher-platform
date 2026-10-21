@@ -1,6 +1,7 @@
 using FluentAssertions;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.UnitTests.Persistence;
@@ -127,8 +128,8 @@ public sealed class PaginationTests : IDisposable
             {
                 Id = Guid.NewGuid(),
                 PhoneNumber = $"+38099{i:0000000}",
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
         }
 

@@ -5,6 +5,7 @@ using FuelFlow.Features.Acquiring;
 using FuelFlow.Features.Acquiring.Reconciliation;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.Testing;
 using Xunit;
 
 namespace FuelFlow.UnitTests.Acquiring;
@@ -38,7 +39,7 @@ public class StatementReconciliationDocumentTests
             3,
             StatementMatcher.Summarise(rows, Refunds()),
             rows,
-            [new MissingFromStatementRow(Guid.NewGuid(), "INV9", 100m, OrderStatus.PendingFulfillment, DateTime.UtcNow)],
+            [new MissingFromStatementRow(Guid.NewGuid(), "INV9", 100m, OrderStatus.PendingFulfillment, TestClock.UtcNow)],
             Refunds());
     }
 

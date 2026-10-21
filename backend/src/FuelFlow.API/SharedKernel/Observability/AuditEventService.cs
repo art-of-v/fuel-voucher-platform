@@ -1,5 +1,6 @@
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Time;
 
 namespace FuelFlow.Features.Brands;
 
@@ -32,7 +33,7 @@ public sealed class AuditEventService
             ChangedByUserId = changedByUserId == Guid.Empty ? null : changedByUserId,
             ChangedByUserName = changedByUserName,
             Summary = summary,
-            ChangedAtUtc = DateTime.UtcNow,
+            ChangedAtUtc = SystemClock.UtcNow,
             ScopeId = providerId
         });
 

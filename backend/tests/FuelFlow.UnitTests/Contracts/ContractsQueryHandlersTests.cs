@@ -4,6 +4,7 @@ using FuelFlow.Features.Contracts.GetSignedContracts;
 using FuelFlow.Features.Contracts.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.UnitTests.Contracts;
@@ -45,8 +46,8 @@ public sealed class ContractsQueryHandlersTests : IDisposable
         {
             Id = id,
             PhoneNumber = phone,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
     }
 
@@ -58,8 +59,8 @@ public sealed class ContractsQueryHandlersTests : IDisposable
             UserId = userId,
             Name = "ТОВ Тест",
             Edrpou = "12345678",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
     }
 
@@ -71,8 +72,8 @@ public sealed class ContractsQueryHandlersTests : IDisposable
             Name = "okko",
             LogoText = "okko",
             Color = "#22c55e",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
     }
 
@@ -93,8 +94,8 @@ public sealed class ContractsQueryHandlersTests : IDisposable
             UserId = user.Id,
             LegalEntityId = legalEntity.Id,
             BrandId = brand.Id,
-            CreatedAtUtc = DateTime.UtcNow.AddHours(-1),
-            ExpiresAtUtc = DateTime.UtcNow.AddYears(1)
+            CreatedAtUtc = TestClock.UtcNow.AddHours(-1),
+            ExpiresAtUtc = TestClock.UtcNow.AddYears(1)
         };
         var later = new Contract
         {
@@ -102,8 +103,8 @@ public sealed class ContractsQueryHandlersTests : IDisposable
             UserId = user.Id,
             LegalEntityId = legalEntity.Id,
             BrandId = brand.Id,
-            CreatedAtUtc = DateTime.UtcNow,
-            ExpiresAtUtc = DateTime.UtcNow.AddYears(1)
+            CreatedAtUtc = TestClock.UtcNow,
+            ExpiresAtUtc = TestClock.UtcNow.AddYears(1)
         };
 
         _context.Contracts.AddRange(earlier, later);
@@ -142,8 +143,8 @@ public sealed class ContractsQueryHandlersTests : IDisposable
             UserId = user.Id,
             LegalEntityId = legalEntity.Id,
             BrandId = brand.Id,
-            CreatedAtUtc = DateTime.UtcNow,
-            ExpiresAtUtc = DateTime.UtcNow.AddYears(1)
+            CreatedAtUtc = TestClock.UtcNow,
+            ExpiresAtUtc = TestClock.UtcNow.AddYears(1)
         };
 
         _context.Contracts.Add(contract);
@@ -153,7 +154,7 @@ public sealed class ContractsQueryHandlersTests : IDisposable
             UserId = user.Id,
             ContractId = contract.Id,
             SignatureData = "sig-1",
-            SignedAtUtc = DateTime.UtcNow.AddHours(-1)
+            SignedAtUtc = TestClock.UtcNow.AddHours(-1)
         });
         await _context.SaveChangesAsync();
 
@@ -189,8 +190,8 @@ public sealed class ContractsQueryHandlersTests : IDisposable
             UserId = user.Id,
             LegalEntityId = legalEntity.Id,
             BrandId = brand.Id,
-            CreatedAtUtc = DateTime.UtcNow,
-            ExpiresAtUtc = DateTime.UtcNow.AddYears(1)
+            CreatedAtUtc = TestClock.UtcNow,
+            ExpiresAtUtc = TestClock.UtcNow.AddYears(1)
         };
 
         _context.Users.Add(user);
@@ -204,7 +205,7 @@ public sealed class ContractsQueryHandlersTests : IDisposable
             UserId = user.Id,
             ContractId = contract.Id,
             SignatureData = "sig-1",
-            SignedAtUtc = DateTime.UtcNow.AddHours(-2)
+            SignedAtUtc = TestClock.UtcNow.AddHours(-2)
         };
         var later = new UserContract
         {
@@ -212,7 +213,7 @@ public sealed class ContractsQueryHandlersTests : IDisposable
             UserId = user.Id,
             ContractId = contract.Id,
             SignatureData = "sig-2",
-            SignedAtUtc = DateTime.UtcNow.AddHours(-1)
+            SignedAtUtc = TestClock.UtcNow.AddHours(-1)
         };
 
         _context.UserContracts.AddRange(earlier, later);

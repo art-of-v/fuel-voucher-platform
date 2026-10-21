@@ -3,6 +3,7 @@ using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -53,8 +54,8 @@ public sealed class OrderEventAtomicityTests : IClassFixture<TestDatabaseFixture
                 Id = userId,
                 PhoneNumber = $"+38{Guid.NewGuid():N}"[..20],
                 IsActive = true,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
 
             AddPaidOrder(seed, new Order
@@ -63,8 +64,8 @@ public sealed class OrderEventAtomicityTests : IClassFixture<TestDatabaseFixture
                 UserId = userId,
                 Price = 100m,
                 Status = OrderStatus.PendingFulfillment,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
 
             await seed.SaveChangesAsync();
@@ -74,7 +75,7 @@ public sealed class OrderEventAtomicityTests : IClassFixture<TestDatabaseFixture
         {
             var order = await write.Orders.SingleAsync(o => o.Id == orderId);
             order.Status = OrderStatus.Fulfilled;
-            order.FulfilledAtUtc = DateTime.UtcNow;
+            order.FulfilledAtUtc = TestClock.UtcNow;
 
             var act = async () => await write.SaveChangesAsync();
 
@@ -138,9 +139,9 @@ public sealed class OrderEventAtomicityTests : IClassFixture<TestDatabaseFixture
             AmountKopecks = (long)(order.Price * 100),
             Currency = "UAH",
             Status = PaymentStatus.Succeeded,
-            PaidAtUtc = DateTime.UtcNow,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            PaidAtUtc = TestClock.UtcNow,
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
     }
 }

@@ -1,4 +1,5 @@
 using FuelFlow.SharedKernel.Abstractions;
+using FuelFlow.SharedKernel.Time;
 using System.Collections.Concurrent;
 
 namespace FuelFlow.SharedKernel.Services
@@ -7,16 +8,24 @@ namespace FuelFlow.SharedKernel.Services
     {
         private readonly ConcurrentDictionary<string, CacheEntry> _cache = new();
         private readonly ILogger<InMemoryCacheService> _logger;
+        private readonly TimeProvider _clock;
         private const int MaxEntries = 10_000;
 
-        public InMemoryCacheService(ILogger<InMemoryCacheService> logger)
+        /// <param name="logger">The logger.</param>
+        /// <param name="clock">
+        /// The clock the entries expire against. It is the application's clock unless a caller
+        /// passes one of its own - which is how a test can move time forward instead of sleeping
+        /// for the TTL to elapse.
+        /// </param>
+        public InMemoryCacheService(ILogger<InMemoryCacheService> logger, TimeProvider? clock = null)
         {
             _logger = logger;
+            _clock = clock ?? SystemClock.Provider;
         }
 
         public Task SetAsync(string key, string value, TimeSpan expiry, CancellationToken cancellationToken = default)
         {
-            var expiresAt = DateTime.UtcNow.Add(expiry);
+            var expiresAt = _clock.GetUtcNow().UtcDateTime.Add(expiry);
             _cache[key] = new CacheEntry(value, expiresAt);
 
             if (_cache.Count > MaxEntries)
@@ -33,7 +42,7 @@ namespace FuelFlow.SharedKernel.Services
         {
             if (_cache.TryGetValue(key, out var entry))
             {
-                if (entry.ExpiresAt > DateTime.UtcNow)
+                if (entry.ExpiresAt > _clock.GetUtcNow().UtcDateTime)
                 {
                     return Task.FromResult<string?>(entry.Value);
                 }
@@ -49,7 +58,7 @@ namespace FuelFlow.SharedKernel.Services
         {
             if (_cache.TryGetValue(key, out var entry))
             {
-                if (entry.ExpiresAt > DateTime.UtcNow)
+                if (entry.ExpiresAt > _clock.GetUtcNow().UtcDateTime)
                 {
                     return Task.FromResult(true);
                 }

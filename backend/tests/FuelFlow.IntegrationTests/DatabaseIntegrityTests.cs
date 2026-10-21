@@ -10,6 +10,7 @@ using FuelFlow.Features.Vouchers.Renewal;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Xunit;
@@ -191,8 +192,8 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
         Id = Guid.NewGuid(),
         PhoneNumber = phone,
         IsActive = true,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 
     private static FuelVoucher NewVoucher(string number, string qr, string fuelTypeId = "okko-dp") => new()
@@ -207,8 +208,8 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
         VoucherNumber = number,
         QrPayload = qr,
         Status = VoucherStatus.Available,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 
     // ── F-29: the two sign constraints the catalogue was missing ──────────────────────────
@@ -278,8 +279,8 @@ public sealed class DatabaseIntegrityTests : IClassFixture<TestDatabaseFixture>
             Name = $"Negative {basePrice}/{discountPrice}",
             BasePrice = (decimal)basePrice,
             DiscountPrice = (decimal)discountPrice,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         var act = async () => await context.SaveChangesAsync();
@@ -306,8 +307,8 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
             {
                 FuelTypeId = giveawayFuel.Id,
                 Liters = 5m,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
             await seed.SaveChangesAsync();
         }
@@ -336,8 +337,8 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
         DiscountPrice = null,
         SupplierPricePerLiter = supplierPricePerLiter,
         MarginUahPerLiter = 1m,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 
     /// <summary>
@@ -351,8 +352,8 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
     {
         FuelTypeId =   ToUuid(fuelTypeId),
         Liters = (decimal)liters,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 
     /// <summary>
@@ -405,8 +406,8 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
             UserId = user.Id,
             Price = 100m,
             Status = OrderStatus.Refunded,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         await using (var seed = CreateContext())
@@ -426,9 +427,9 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
                 AmountKopecks = 100L,
                 Currency = "UAH",
                 Status = PaymentStatus.Succeeded,
-                PaidAtUtc = DateTime.UtcNow,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                PaidAtUtc = TestClock.UtcNow,
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             };
             seed.Payments.Add(capture);
             seed.Payments.Add(new Payment
@@ -443,10 +444,10 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
                 AmountKopecks = 100L,
                 Currency = "UAH",
                 Status = PaymentStatus.Succeeded,
-                PaidAtUtc = DateTime.UtcNow,
+                PaidAtUtc = TestClock.UtcNow,
                 IsAutomatic = false,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
+                CreatedAtUtc = TestClock.UtcNow,
+                UpdatedAtUtc = TestClock.UtcNow
             });
             await seed.SaveChangesAsync();
         }
@@ -528,8 +529,8 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
         MonobankInvoiceId = invoiceId,
         MonobankStatus = MonobankStatus.Success,
         IdempotencyKey = $"idem-{invoiceId}",
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 
     /// <summary>
@@ -559,9 +560,9 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
         AmountKopecks = 100L,
         Currency = "UAH",
         Status = PaymentStatus.Succeeded,
-        PaidAtUtc = DateTime.UtcNow,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        PaidAtUtc = TestClock.UtcNow,
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 
     private static Payment RefundPayment(Guid orderId, Payment capture, string invoiceId) => new()
@@ -576,10 +577,10 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
         AmountKopecks = 100L,
         Currency = "UAH",
         Status = PaymentStatus.Succeeded,
-        PaidAtUtc = DateTime.UtcNow,
+        PaidAtUtc = TestClock.UtcNow,
         IsAutomatic = false,
-        CreatedAtUtc = DateTime.UtcNow,
-        UpdatedAtUtc = DateTime.UtcNow
+        CreatedAtUtc = TestClock.UtcNow,
+        UpdatedAtUtc = TestClock.UtcNow
     };
 
     /// <summary>
@@ -606,8 +607,8 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
             Price = 500m,
             Kind = OrderKind.Renewal,
             Status = OrderStatus.Fulfilled,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         await using (var seed = CreateContext())
@@ -664,8 +665,8 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
             Id = userId,
             PhoneNumber = "+38000555002",
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
         var entity = new LegalEntity
         {
@@ -673,8 +674,8 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
             UserId = userId,
             Name = "Test LLC",
             Edrpou = "1234567890",
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
         var contract = new Contract
             {
@@ -682,10 +683,10 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
                 UserId = userId,
                 LegalEntityId = entityId,
                 BrandId = BrandIds.Okko,
-                CreatedAtUtc = DateTime.UtcNow,
+                CreatedAtUtc = TestClock.UtcNow,
                 // The validity term is mandatory since 2026-10-20, and it has to be AFTER the
                 // contract was created - ck_contracts_expiry_after_creation refuses the other.
-                ExpiresAtUtc = DateTime.UtcNow.AddYears(1)
+                ExpiresAtUtc = TestClock.UtcNow.AddYears(1)
             };
         var signature = new UserContract
         {
@@ -693,7 +694,7 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
             UserId = userId,
             ContractId = contractId,
             SignatureData = "signature-bytes",
-            SignedAtUtc = DateTime.UtcNow
+            SignedAtUtc = TestClock.UtcNow
         };
 
         context.Users.Add(user);
@@ -741,8 +742,8 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
             Id = Guid.NewGuid(),
             UserId = context.Users.Select(u => u.Id).First(),
             Price = -100m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
 
         var act = async () => await context.SaveChangesAsync();
@@ -863,7 +864,7 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
             VoucherId = voucher.Id,
             FromLocation = from,
             ToLocation = to,
-            OccurredAtUtc = DateTime.UtcNow
+            OccurredAtUtc = TestClock.UtcNow
         });
 
         var act = async () => await context.SaveChangesAsync();
@@ -896,7 +897,7 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
             ActorKind = VoucherActorKinds.User,
             ActorUserId = Guid.NewGuid(),
             AmountUah = 500m,
-            OccurredAtUtc = DateTime.UtcNow
+            OccurredAtUtc = TestClock.UtcNow
         });
 
         await context.SaveChangesAsync();
@@ -955,7 +956,7 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
             ToLocation = VoucherLocations.Customer,
             ActorKind = VoucherActorKinds.User,
             ActorUserId = Guid.Empty,
-            OccurredAtUtc = DateTime.UtcNow
+            OccurredAtUtc = TestClock.UtcNow
         });
 
         var act = async () => await context.SaveChangesAsync();
@@ -987,7 +988,7 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
             ToLocation = VoucherLocations.Customer,
             ActorKind = VoucherActorKinds.System,
             ActorUserId = null,
-            OccurredAtUtc = DateTime.UtcNow
+            OccurredAtUtc = TestClock.UtcNow
         });
 
         var act = async () => await context.SaveChangesAsync();
@@ -1020,7 +1021,7 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
             ToLocation = VoucherLocations.Supplier,
             ActorKind = VoucherActorKinds.User,
             ActorUserId = Guid.NewGuid(),
-            OccurredAtUtc = DateTime.UtcNow,
+            OccurredAtUtc = TestClock.UtcNow,
             ReplacedByVoucherId = voucher.Id
         });
 
@@ -1053,7 +1054,7 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
             ToLocation = VoucherLocations.Supplier,
             ActorKind = VoucherActorKinds.User,
             ActorUserId = Guid.NewGuid(),
-            OccurredAtUtc = DateTime.UtcNow,
+            OccurredAtUtc = TestClock.UtcNow,
             SurchargeShareUah = -1m
         });
 
@@ -1085,7 +1086,7 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
             ToLocation = VoucherLocations.Supplier,
             ActorKind = VoucherActorKinds.User,
             ActorUserId = Guid.NewGuid(),
-            OccurredAtUtc = DateTime.UtcNow,
+            OccurredAtUtc = TestClock.UtcNow,
             AppliedCostPerLiter = -1m
         });
 
@@ -1123,7 +1124,7 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
             ToLocation = VoucherLocations.Customer,
             ActorKind = actorKind,
             ActorUserId = hasUserId ? Guid.NewGuid() : null,
-            OccurredAtUtc = DateTime.UtcNow
+            OccurredAtUtc = TestClock.UtcNow
         });
 
         if (shouldBeRefused)
@@ -1161,7 +1162,7 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
             ActorKind = VoucherActorKinds.User,
             ActorUserId = Guid.NewGuid(),
             AmountUah = -1m,
-            OccurredAtUtc = DateTime.UtcNow
+            OccurredAtUtc = TestClock.UtcNow
         });
 
         var act = async () => await context.SaveChangesAsync();
@@ -1203,7 +1204,7 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
             NewCustomerExpiration = hasNewDate ? new DateOnly(2026, 9, 1) : null,
             ActorKind = VoucherActorKinds.User,
             ActorUserId = Guid.NewGuid(),
-            OccurredAtUtc = DateTime.UtcNow
+            OccurredAtUtc = TestClock.UtcNow
         });
 
         var act = async () => await context.SaveChangesAsync();
@@ -1231,7 +1232,7 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
             ToStatus = nameof(VoucherStatus.Assigned),
             ActorKind = VoucherActorKinds.User,
             ActorUserId = Guid.NewGuid(),
-            OccurredAtUtc = DateTime.UtcNow
+            OccurredAtUtc = TestClock.UtcNow
         });
 
         await context.SaveChangesAsync();
@@ -1264,7 +1265,7 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
             ActorKind = VoucherActorKinds.User,
             ActorUserId = Guid.NewGuid(),
             ExternalRef = "order:00000000-0000-0000-0000-000000000001",
-            OccurredAtUtc = DateTime.UtcNow
+            OccurredAtUtc = TestClock.UtcNow
         });
 
         await context.SaveChangesAsync();
@@ -1301,8 +1302,8 @@ var giveawayFuel = NewFuelWithPrice("offer-free-giveaway", 0m);
             UserId = user.Id,
             Price = 5000m,
             Status = OrderStatus.PendingPayment,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
         context.Users.Add(user);
         context.Orders.Add(order);

@@ -1,5 +1,6 @@
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.Extensions.Options;
 
 namespace FuelFlow.API.Features.Orders.SharedServices.Monobank;
@@ -34,8 +35,8 @@ public sealed class MockMonobankClient : IMonobankClient
             InvoiceId = invoiceId,
             Status = "created",
             Amount = request.Amount,
-            CreatedDate = DateTime.UtcNow,
-            ModifiedDate = DateTime.UtcNow
+            CreatedDate = SystemClock.UtcNow,
+            ModifiedDate = SystemClock.UtcNow
         };
 
         _logger.LogInformation(
@@ -64,8 +65,8 @@ public sealed class MockMonobankClient : IMonobankClient
                 InvoiceId = invoiceId,
                 Status = "success",
                 Amount = 10000,
-                CreatedDate = DateTime.UtcNow.AddMinutes(-5),
-                ModifiedDate = DateTime.UtcNow
+                CreatedDate = SystemClock.UtcNow.AddMinutes(-5),
+                ModifiedDate = SystemClock.UtcNow
             };
         }
 
@@ -109,15 +110,15 @@ public sealed class MockMonobankClient : IMonobankClient
             Amount = amountKopecks,
             Ccy = 980,
             ExtRef = extRef,
-            CreatedDate = DateTime.UtcNow,
-            ModifiedDate = DateTime.UtcNow
+            CreatedDate = SystemClock.UtcNow,
+            ModifiedDate = SystemClock.UtcNow
         });
 
         return Task.FromResult(new MonobankCancelResponse
         {
             Status = "processing",
-            CreatedDate = DateTime.UtcNow,
-            ModifiedDate = DateTime.UtcNow
+            CreatedDate = SystemClock.UtcNow,
+            ModifiedDate = SystemClock.UtcNow
         });
     }
 
@@ -165,7 +166,7 @@ public sealed class MockMonobankClient : IMonobankClient
         if (_mockInvoices.TryGetValue(invoiceId, out var invoice))
         {
             invoice.Status = newStatus;
-            invoice.ModifiedDate = DateTime.UtcNow;
+            invoice.ModifiedDate = SystemClock.UtcNow;
             _logger.LogInformation(
                 "[MOCK MODE] Simulated status change for {InvoiceId} to {Status}",
                 invoiceId,
@@ -178,7 +179,7 @@ public sealed class MockMonobankClient : IMonobankClient
         if (_mockCancels.TryGetValue(invoiceId, out var cancels) && cancels.Count > 0)
         {
             cancels[^1].Status = newStatus;
-            cancels[^1].ModifiedDate = DateTime.UtcNow;
+            cancels[^1].ModifiedDate = SystemClock.UtcNow;
             _logger.LogInformation(
                 "[MOCK MODE] Simulated cancel completion for {InvoiceId} to {Status}",
                 invoiceId,

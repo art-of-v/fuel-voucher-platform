@@ -3,6 +3,7 @@ using FuelFlow.Features.Auth.AdminUser.SetUserActive;
 using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -85,11 +86,11 @@ public sealed class SetUserActiveCommandHandlerTests
 
         await using (var seed = CreateNoTrackingContext(dbName, root))
         {
-            var role = new Role { Id = Guid.NewGuid(), Name = "User", CreatedAtUtc = DateTime.UtcNow };
+            var role = new Role { Id = Guid.NewGuid(), Name = "User", CreatedAtUtc = TestClock.UtcNow };
             var user = new User
             {
                 Id = Guid.NewGuid(), PhoneNumber = "+380991234567", RoleId = role.Id,
-                IsActive = false, TokenVersion = 7, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
+                IsActive = false, TokenVersion = 7, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow
             };
             seed.Roles.Add(role);
             seed.Users.Add(user);
@@ -125,11 +126,11 @@ public sealed class SetUserActiveCommandHandlerTests
 
     private static async Task<User> AddUserAsync(ApplicationDbContext context, string roleName)
     {
-        var role = new Role { Id = Guid.NewGuid(), Name = roleName, CreatedAtUtc = DateTime.UtcNow };
+        var role = new Role { Id = Guid.NewGuid(), Name = roleName, CreatedAtUtc = TestClock.UtcNow };
         var user = new User
         {
             Id = Guid.NewGuid(), PhoneNumber = "+380991234567", Role = role, RoleId = role.Id,
-            IsActive = true, TokenVersion = 7, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
+            IsActive = true, TokenVersion = 7, CreatedAtUtc = TestClock.UtcNow, UpdatedAtUtc = TestClock.UtcNow
         };
         context.Users.Add(user);
         await context.SaveChangesAsync();

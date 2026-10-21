@@ -3,6 +3,7 @@ using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Notifications.Email;
 using FuelFlow.SharedKernel.Security;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -47,13 +48,13 @@ public sealed class ConfirmEmailChangeCommandHandler
         if (user is null || string.IsNullOrEmpty(user.PendingEmail))
             return new ConfirmEmailChangeResult(ConfirmEmailChangeStatus.InvalidToken);
 
-        if (user.PendingEmailExpiresAtUtc is null || user.PendingEmailExpiresAtUtc < DateTime.UtcNow)
+        if (user.PendingEmailExpiresAtUtc is null || user.PendingEmailExpiresAtUtc < SystemClock.UtcNow)
         {
             // Expired: burn the pending change so a stale link can never be replayed later.
             user.PendingEmail = null;
             user.PendingEmailTokenHash = null;
             user.PendingEmailExpiresAtUtc = null;
-            user.UpdatedAtUtc = DateTime.UtcNow;
+            user.UpdatedAtUtc = SystemClock.UtcNow;
             await _context.SaveChangesAsync(cancellationToken);
             return new ConfirmEmailChangeResult(ConfirmEmailChangeStatus.Expired);
         }
@@ -65,7 +66,7 @@ public sealed class ConfirmEmailChangeCommandHandler
         user.PendingEmail = null;
         user.PendingEmailTokenHash = null;
         user.PendingEmailExpiresAtUtc = null;
-        user.UpdatedAtUtc = DateTime.UtcNow;
+        user.UpdatedAtUtc = SystemClock.UtcNow;
         await _context.SaveChangesAsync(cancellationToken);
 
         await _eventService.RecordEventAsync(

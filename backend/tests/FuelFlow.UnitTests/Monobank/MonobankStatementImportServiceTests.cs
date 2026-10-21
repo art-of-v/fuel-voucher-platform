@@ -4,6 +4,7 @@ using FuelFlow.API.Features.Orders.SharedServices.Monobank;
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -27,7 +28,7 @@ public class MonobankStatementImportServiceTests
         Amount = amount,
         Ccy = 980,
         Status = "success",
-        Date = DateTime.UtcNow.AddDays(-2),
+        Date = TestClock.UtcNow.AddDays(-2),
         RawJson = """{"invoiceId":"INV-ST1"}"""
     };
 

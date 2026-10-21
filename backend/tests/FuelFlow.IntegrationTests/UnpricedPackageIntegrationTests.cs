@@ -2,6 +2,7 @@ using FluentAssertions;
 using FuelFlow.Features.Orders.CreateCheckout;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
@@ -52,8 +53,8 @@ public sealed class UnpricedPackageIntegrationTests : IClassFixture<TestDatabase
             // What the OKKO catalogue import leaves behind: the pump is published, nobody has set a
             // cost or a margin, so there is no price to charge.
             PumpPricePerLiter = 92.90m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
         context.FuelTypes.Add(fuel);
 
@@ -61,8 +62,8 @@ public sealed class UnpricedPackageIntegrationTests : IClassFixture<TestDatabase
         {
             FuelTypeId =   ToUuid(fuelId),
             Liters = 10m,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
         context.FuelNominals.Add(volume);

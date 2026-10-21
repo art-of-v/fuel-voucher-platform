@@ -2,6 +2,7 @@ using FluentAssertions;
 using FuelFlow.Features.Brands.GetPublicBrandStationsByBrand;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -60,8 +61,8 @@ public sealed class StationNameOrderingTests : IClassFixture<TestDatabaseFixture
                     ExternalId = $"order-test-{Guid.CreateVersion7()}",
                     BrandId = brandId,
                     Name = name,
-                    CreatedAtUtc = DateTime.UtcNow,
-                    UpdatedAtUtc = DateTime.UtcNow
+                    CreatedAtUtc = TestClock.UtcNow,
+                    UpdatedAtUtc = TestClock.UtcNow
                 });
             }
 
@@ -115,8 +116,8 @@ public sealed class StationNameOrderingTests : IClassFixture<TestDatabaseFixture
                     ExternalId = $"order-test-{Guid.CreateVersion7()}",
                     BrandId = brandId,
                     Name = name,
-                    CreatedAtUtc = DateTime.UtcNow,
-                    UpdatedAtUtc = DateTime.UtcNow
+                    CreatedAtUtc = TestClock.UtcNow,
+                    UpdatedAtUtc = TestClock.UtcNow
                 });
             }
 

@@ -1,6 +1,7 @@
 using FuelFlow.Features.Brands;
 using FuelFlow.Features.Vouchers.Events;
 using FuelFlow.Persistence;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
@@ -33,7 +34,7 @@ public sealed class DeleteVoucherCommandHandler
         if (VoucherDeletionGuard.IsPaidOrHeld(entity))
             return new DeleteVoucherResult { Success = false, Error = VoucherDeletionGuard.Reason(entity) };
 
-        var archivedAtUtc = DateTime.UtcNow;
+        var archivedAtUtc = SystemClock.UtcNow;
         entity.IsDeleted = true;
         entity.UpdatedAtUtc = archivedAtUtc;
         _context.FuelVouchers.Update(entity);
