@@ -19,7 +19,7 @@ internal sealed class OrderLineItemConfiguration : IEntityTypeConfiguration<Orde
 
         builder.Property(e => e.OrderId)
             .HasColumnName("order_id")
-            .IsRequired();
+            .IsRequired().HasComment("The order this line belongs to.");
 
         builder.Property(e => e.Brand)
             .HasColumnName("brand")
@@ -46,7 +46,7 @@ internal sealed class OrderLineItemConfiguration : IEntityTypeConfiguration<Orde
            builder.Property(e => e.FuelTypeId)
                .HasColumnName("fuel_type_id")
                .HasColumnType("uuid")
-               .IsRequired();
+               .IsRequired().HasComment("The fuel this line is for.");
 
         builder.Property(e => e.Liters)
             .HasColumnName("liters")

@@ -88,7 +88,7 @@ internal sealed class SettlementMessageConfiguration : IEntityTypeConfiguration<
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
             .HasColumnType("timestamp with time zone")
-            .IsRequired();
+            .IsRequired().HasComment("When the row was written.");
 
         // The idempotency key, and the reason this table exists rather than a log line. Telegram
         // redelivers an update on any non-2xx, and a redelivery that created a second payment would

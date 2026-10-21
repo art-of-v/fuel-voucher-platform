@@ -120,7 +120,8 @@ builder.Property(e => e.AmountKopecks)
 
         builder.Property(e => e.LastSeenAtUtc)
             .HasColumnName("last_seen_at_utc")
-            .IsRequired();
+            .IsRequired().HasComment("When we last saw it in a fetch. A row that keeps being re-reported is one the acquirer is" +
+                    "still revising, which is different from one that is settled and closed.");
 
         // The idempotency guarantee for re-importing a period. Scoped by merchant because the same
         // acquirer statement id can legitimately appear under both merchants, and without the

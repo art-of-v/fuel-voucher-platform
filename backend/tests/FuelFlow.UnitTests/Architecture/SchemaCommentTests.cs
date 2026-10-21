@@ -1172,6 +1172,113 @@ public sealed class SchemaCommentTests
         Assert.Contains("over-count", comment, StringComparison.OrdinalIgnoreCase);
     }
 
+
+    /// <summary>
+    /// The last columns of the tables that are already documented - the ones a reader meets
+    /// last, and the ones that are easiest to get wrong.
+    /// </summary>
+    private static readonly (Type Entity, string[] Columns)[] TheLastColumns =
+    [
+        (typeof(User),
+        [
+            nameof(User.BonusBalance),
+            nameof(User.IsActive),
+            nameof(User.TokenVersion),
+            nameof(User.IsDeleted),
+            nameof(User.IsBanned),
+            nameof(User.IsQaAccount),
+            nameof(User.PendingEmail),
+            nameof(User.PendingEmailExpiresAtUtc),
+            nameof(User.PendingEmailTokenHash)
+        ]),
+        (typeof(FuelVoucher),
+        [
+            nameof(FuelVoucher.FuelTypeId),
+            nameof(FuelVoucher.QrParametersId),
+            nameof(FuelVoucher.LegalEntityId),
+            nameof(FuelVoucher.AcquisitionSource),
+            nameof(FuelVoucher.CreatedAtUtc),
+            nameof(FuelVoucher.UpdatedAtUtc)
+        ]),
+        (typeof(Payment),
+        [
+            nameof(Payment.Merchant),
+            nameof(Payment.CreatedAtUtc),
+            nameof(Payment.UpdatedAtUtc)
+        ]),
+        (typeof(JournalEntry),
+        [
+            nameof(JournalEntry.CreatedAtUtc),
+            nameof(JournalEntry.CreatedByUserId)
+        ]),
+        (typeof(OrderLineItem),
+        [
+            nameof(OrderLineItem.OrderId),
+            nameof(OrderLineItem.FuelTypeId)
+        ]),
+        (typeof(VoucherTermPricing),
+        [
+            nameof(VoucherTermPricing.CreatedAtUtc),
+            nameof(VoucherTermPricing.UpdatedAtUtc)
+        ]),
+        (typeof(MonobankStatementEntry),
+        [
+            nameof(MonobankStatementEntry.LastSeenAtUtc)
+        ]),
+        (typeof(Role),
+        [
+            nameof(Role.IsDefault)
+        ]),
+        (typeof(SettlementMessage),
+        [
+            nameof(SettlementMessage.CreatedAtUtc)
+        ])
+    ];
+
+
+
+    [Fact]
+    public void The_Last_Columns_Should_Say_What_They_Are()
+    {
+        var context = BuildContext();
+
+        foreach (var (entityType, columns) in TheLastColumns)
+        {
+            var entity = context.Model.FindEntityType(entityType);
+            Assert.NotNull(entity);
+
+            foreach (var column in columns)
+            {
+                var property = entity.FindProperty(column);
+                Assert.NotNull(property);
+
+                var comment = CommentOf(property);
+                Assert.False(string.IsNullOrWhiteSpace(comment),
+                    $"{entityType.Name}.{column} carries no comment. These are the columns a reader "
+                    + "meets last, and the ones that are easiest to get wrong: a balance that is a "
+                    + "balance and not a price, a token hash that is a hash and not a token, a "
+                    + "banned account that is banned and not deleted.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// The confirmation token is stored as a hash. A database that is read by somebody must not be
+    /// able to confirm an address, and a comment that does not say so is a comment that a future
+    /// author reads as "the token is here".
+    /// </summary>
+    [Fact]
+    public void The_Pending_Email_Token_Should_Say_That_It_Is_A_Hash()
+    {
+        var context = BuildContext();
+        var user = context.Model.FindEntityType(typeof(User));
+        Assert.NotNull(user);
+
+        var comment = CommentOf(user.FindProperty(nameof(User.PendingEmailTokenHash))!);
+
+        Assert.Contains("never the token itself", comment, StringComparison.OrdinalIgnoreCase);
+    }
+
     /// <summary>
     /// The comments of a property, read as the annotation they are stored as.
     /// </summary>

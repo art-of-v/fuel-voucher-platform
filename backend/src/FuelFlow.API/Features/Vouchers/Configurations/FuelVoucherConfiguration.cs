@@ -49,7 +49,7 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
            builder.Property(e => e.FuelTypeId)
                .HasColumnName("fuel_type_id")
                .HasColumnType("uuid")
-               .IsRequired();
+               .IsRequired().HasComment("The fuel this voucher is for.");
 
         builder.Property(e => e.Liters)
             .HasColumnName("liters")
@@ -113,7 +113,7 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
 
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
-            .IsRequired();
+            .IsRequired().HasComment("When the row was written.");
 
         builder.Property(e => e.Status)
             .HasColumnName("status")
@@ -127,7 +127,7 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
             .HasComment(                "The customer who holds it.");
 
         builder.Property(e => e.LegalEntityId)
-            .HasColumnName("legal_entity_id");
+            .HasColumnName("legal_entity_id").HasComment("The company the voucher was sold to.");
 
         builder.Property(e => e.WorkerUserId)
             .HasColumnName("worker_user_id")
@@ -142,7 +142,8 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
             .HasComment(                "The order it was sold with, when it was sold with one.");
 
         builder.Property(e => e.QrParametersId)
-            .HasColumnName("qr_parameters_id");
+            .HasColumnName("qr_parameters_id").HasComment("The QR parameters read from the original code - the geometry needed to regenerate it. NULL" +
+                    "when the code was not read.");
 
         builder.HasOne(e => e.QrParameters)
             .WithMany()
@@ -227,7 +228,10 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
             .HasColumnName("acquisition_source")
             .HasMaxLength(10)
             .HasDefaultValue(AcquisitionSources.Default)
-            .IsRequired();
+            .IsRequired().HasComment("The supply route this voucher came in on: direct, or through a partner. Immutable, and" +
+                    "enforced by a trigger: the cost of a voucher is a function of where it came from, so an" +
+                    "edited value does not merely relabel a row - it moves real money between two reports that" +
+                    "are supposed to be separate.");
 
         builder.Property(e => e.IsDeleted)
             .HasColumnName("is_deleted")
@@ -325,7 +329,7 @@ internal sealed class FuelVoucherConfiguration : IEntityTypeConfiguration<FuelVo
 
         builder.Property(e => e.UpdatedAtUtc)
             .HasColumnName("updated_at_utc")
-            .IsRequired();
+            .IsRequired().HasComment("When it was last changed.");
 
         // These two arrived in PascalCase because the mapping was forgotten - the only
         // snake_case violations left on this table. Named explicitly, like every other column.

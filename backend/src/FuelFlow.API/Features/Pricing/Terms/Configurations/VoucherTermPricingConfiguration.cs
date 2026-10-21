@@ -58,7 +58,7 @@ internal sealed class VoucherTermPricingConfiguration : IEntityTypeConfiguration
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
             .HasColumnType("timestamp with time zone")
-            .IsRequired();
+            .IsRequired().HasComment("When the row was written.");
 
         builder.Property(e => e.UpdatedByUserId).HasColumnName("updated_by_user_id")
             .HasComment(                "Who closed the previous row and opened this one. NULL on the rows the migration creates," +
@@ -71,7 +71,7 @@ internal sealed class VoucherTermPricingConfiguration : IEntityTypeConfiguration
 
         builder.Property(e => e.UpdatedAtUtc)
             .HasColumnName("updated_at_utc")
-            .HasColumnType("timestamp with time zone");
+            .HasColumnType("timestamp with time zone").HasComment("When it was last changed.");
 
         builder.HasIndex(e => e.UpdatedByUserId)
             .HasDatabaseName("ix_voucher_term_pricing_updated_by")
