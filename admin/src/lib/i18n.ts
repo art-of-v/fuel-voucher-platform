@@ -1091,6 +1091,12 @@ export const translations: Record<Language, Record<string, string>> = {
     "statementAct.mismatches": "Amount mismatches",
     "statementAct.unmatched": "Unmatched",
     "statementAct.refundMatches": "Refund matches",
+    // The refunds we issued in the period: the acquirer nests a reversal under the payment it
+    // reverses and does not file it as a row, so the statement alone cannot show money going back.
+    "statementAct.refundsIssued": "Refunds in period",
+    "statementAct.refundsTitle": "The refunds we issued in this period",
+    "statementAct.refundAmount": "Amount",
+    "statementAct.refundIssuedAt": "Refunded at",
     "statementAct.acquirerTime": "Acquirer time",
     "statementAct.verdict": "Verdict",
     "statementAct.invoice": "Invoice",
@@ -2193,6 +2199,12 @@ export const translations: Record<Language, Record<string, string>> = {
     "statementAct.mismatches": "Розбіжності сум",
     "statementAct.unmatched": "Без пари",
     "statementAct.refundMatches": "Повернення",
+    // The refunds we issued in the period: the acquirer nests a reversal under the payment it
+    // reverses and does not file it as a row, so the statement alone cannot show money going back.
+    "statementAct.refundsIssued": "Повернення за період",
+    "statementAct.refundsTitle": "Повернення, які ми видали за цей період",
+    "statementAct.refundAmount": "Сума",
+    "statementAct.refundIssuedAt": "Дата повернення",
     "statementAct.acquirerTime": "Час в еквайрера",
     "statementAct.verdict": "Висновок",
     "statementAct.invoice": "Інвойс",
@@ -3306,6 +3318,12 @@ export const translations: Record<Language, Record<string, string>> = {
     "statementAct.mismatches": "Betragsabweichungen",
     "statementAct.unmatched": "Ohne Zuordnung",
     "statementAct.refundMatches": "Erstattungen",
+    // The refunds we issued in the period: the acquirer nests a reversal under the payment it
+    // reverses and does not file it as a row, so the statement alone cannot show money going back.
+    "statementAct.refundsIssued": "Erstattungen im Zeitraum",
+    "statementAct.refundsTitle": "Die in diesem Zeitraum erteilten Erstattungen",
+    "statementAct.refundAmount": "Betrag",
+    "statementAct.refundIssuedAt": "Erstattungsdatum",
     "statementAct.acquirerTime": "Zeit beim Acquirer",
     "statementAct.verdict": "Ergebnis",
     "statementAct.invoice": "Rechnung",
