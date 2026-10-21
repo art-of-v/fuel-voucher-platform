@@ -36,9 +36,13 @@ public sealed class AdminController : ControllerBase
 
     [HttpGet("reconciliation")]
     [ProducesResponseType(typeof(GetReconciliationResponse), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetReconciliation(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetReconciliation(
+        [FromQuery] int page = 1,
+        [FromQuery] int limit = 50,
+        CancellationToken cancellationToken = default)
     {
-        var result = await _getReconciliationHandler.HandleAsync(new GetReconciliationQuery(), cancellationToken);
+        var result = await _getReconciliationHandler.HandleAsync(
+            new GetReconciliationQuery(page, limit), cancellationToken);
         return Ok(result);
     }
 

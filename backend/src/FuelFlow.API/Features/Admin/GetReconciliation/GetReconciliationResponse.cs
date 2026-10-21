@@ -1,8 +1,10 @@
+using FuelFlow.Persistence;
+
 namespace FuelFlow.Features.Admin.GetReconciliation;
 
 public sealed record GetReconciliationResponse(
     GetReconciliationResponse.SummaryData Summary,
-    IReadOnlyList<GetReconciliationResponse.ThreeWayMatchItem> ThreeWayMatch,
+    PagedResult<GetReconciliationResponse.ThreeWayMatchItem> ThreeWayMatch,
     IReadOnlyList<GetReconciliationResponse.ExceptionItem> Exceptions,
     IReadOnlyList<GetReconciliationResponse.VoucherFunnelItem> VoucherFunnel,
     IReadOnlyList<GetReconciliationResponse.RevenueSummaryItem> RevenueSummary)

@@ -892,9 +892,17 @@ export default function AdminScreen() {
     enabled: !!user && activeTab === "imports" && !!selectedImportId,
   });
 
+  // The three-way match is a page: one row per order, and the table shows fifty of them. The
+  // count behind the page travels with it, so the screen can say how many there are.
+  const [reconPage, setReconPage] = useState(1);
   const { data: reconciliationData, isLoading: isReconLoading } = useQuery<any>(
     {
-      queryKey: ["/api/admin/reconciliation"],
+      queryKey: ["/api/admin/reconciliation", reconPage],
+      queryFn: () =>
+        apiRequest(
+          "GET",
+          `/api/admin/reconciliation?page=${reconPage}&limit=50`,
+        ),
       enabled: !!user && activeTab === "reconciliation",
       staleTime: 30_000,
     },
@@ -3638,7 +3646,7 @@ export default function AdminScreen() {
                         </tr>
                       </thead>
                       <tbody>
-                        {reconciliationData.threeWayMatch?.map((row: any) => {
+                        {reconciliationData.threeWayMatch?.items?.map((row: any) => {
                           const matchColor =
                             row.matchStatus === "OK"
                               ? "text-success bg-success/10"
@@ -3733,8 +3741,8 @@ export default function AdminScreen() {
                             </tr>
                           );
                         })}
-                        {(!reconciliationData.threeWayMatch ||
-                          reconciliationData.threeWayMatch.length === 0) && (
+                        {(!reconciliationData.threeWayMatch?.items ||
+                          reconciliationData.threeWayMatch.items.length === 0) && (
                           <tr>
                             <td
                               colSpan={11}
@@ -3836,11 +3844,49 @@ export default function AdminScreen() {
                                 </td>
                               </tr>
                             ),
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
+                        )}
+                      </tbody>
+                    </table>
+                    {/* The page: one row per order, and the table shows fifty of them. */}
+                    {reconciliationData.threeWayMatch?.totalCount > 0 && (
+                      <div className="flex items-center justify-between pt-3">
+                        <span className="text-sm text-muted-foreground">
+                          {reconPage} /{" "}
+                          {Math.max(
+                            1,
+                            Math.ceil(
+                              (reconciliationData.threeWayMatch?.totalCount ?? 0) /
+                                (reconciliationData.threeWayMatch?.pageSize || 50),
+                            ),
+                          )}{" "}
+                          · {reconciliationData.threeWayMatch?.totalCount ?? 0}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={reconPage <= 1}
+                            onClick={() => setReconPage((p) => Math.max(1, p - 1))}
+                            className="h-8"
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={
+                              !reconciliationData.threeWayMatch?.hasNextPage
+                            }
+                            onClick={() => setReconPage((p) => p + 1)}
+                            className="h-8"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
+                </div>
                 )}
               </>
             ) : (
