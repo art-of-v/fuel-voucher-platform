@@ -2,7 +2,7 @@ import { fuelHeadlinePrice, fuelSaving } from './pricing';
 
 describe('fuelSaving', () => {
   it('reports a real discount when basePrice is above discountPrice', () => {
-    const r = fuelSaving({ basePrice: 102.9, discountPrice: 97.86 });
+    const r = fuelSaving({ basePrice: 102.9, discountPrice: 97.86, isAvailable: true });
     expect(r.hasSaving).toBe(true);
     expect(r.amount).toBeCloseTo(5.04, 2);
   });
@@ -10,19 +10,19 @@ describe('fuelSaving', () => {
   it('hides the saving when base equals discount (no pump discount, margin=0)', () => {
     // Regression for #112: a fuel priced at its headline must not show a struck
     // price nor a "0 ₴/L" pill.
-    const r = fuelSaving({ basePrice: 97.86, discountPrice: 97.86 });
+    const r = fuelSaving({ basePrice: 97.86, discountPrice: 97.86, isAvailable: true });
     expect(r.hasSaving).toBe(false);
     expect(r.amount).toBe(0);
   });
 
   it('never returns a negative saving when base is below discount', () => {
-    const r = fuelSaving({ basePrice: 95, discountPrice: 100 });
+    const r = fuelSaving({ basePrice: 95, discountPrice: 100, isAvailable: true });
     expect(r.hasSaving).toBe(false);
     expect(r.amount).toBe(0);
   });
 
   it('treats missing prices as zero', () => {
-    const r = fuelSaving({ basePrice: 0, discountPrice: 0 });
+    const r = fuelSaving({ basePrice: 0, discountPrice: 0, isAvailable: true });
     expect(r.hasSaving).toBe(false);
     expect(r.amount).toBe(0);
   });
@@ -34,7 +34,25 @@ describe('fuelSaving', () => {
     //
     // This is the state of the catalogue: fourteen of the twenty-three fuels carried a stored
     // discount price of zero while their price is the column price.
-    const r = fuelSaving({ basePrice: 92.9, discountPrice: 0 });
+    const r = fuelSaving({ basePrice: 92.9, discountPrice: 0, isAvailable: true });
+    expect(r.hasSaving).toBe(false);
+    expect(r.amount).toBe(0);
+  });
+
+  it('shows no saving on a priced fuel that is out of stock', () => {
+    // A fuel we cannot sell is shown at the COLUMN price, so the column price IS the price on
+    // that shelf: the struck price would be the price crossed through against itself, and the
+    // badge would measure a discount against a price the customer is not paying. The shelf
+    // shows the column price and no saving, until the stock is there (planning #552).
+    const r = fuelSaving({ basePrice: 102.9, discountPrice: 97.86, isAvailable: false });
+    expect(r.hasSaving).toBe(false);
+    expect(r.amount).toBe(0);
+  });
+
+  it('treats a payload without the availability flag as out of stock', () => {
+    // The flag is optional on the wire. A payload that does not carry it must not promise a
+    // saving: the price on that shelf is the column price, so there is nothing to save against.
+    const r = fuelSaving({ basePrice: 102.9, discountPrice: 97.86 });
     expect(r.hasSaving).toBe(false);
     expect(r.amount).toBe(0);
   });
@@ -92,5 +110,36 @@ describe('fuelHeadlinePrice', () => {
       isAvailable: true,
     });
     expect(price).toBeCloseTo(97.86, 2);
+  });
+
+  it('shows the column price for a payload that does not say whether the fuel is in stock', () => {
+    // The flag is optional on the wire, and an answer we do not have is not an answer of "in
+    // stock". The shelf falls back to the column price - the same shelf the saving is hidden on.
+    const price = fuelHeadlinePrice({
+      discountPrice: 97.86,
+      pumpPricePerLiter: 102.9,
+      finalPricePerLiter: 97.86,
+    });
+    expect(price).toBeCloseTo(102.9, 2);
+  });
+});
+
+describe('the price and the saving answer the same question', () => {
+  it('hides the saving exactly where the shelf shows the column price', () => {
+    // The pricing model is one rule: out of stock the shelf shows the column price, with no
+    // crossed-out price and no saving, because the column price IS the price there. The two
+    // helpers read the stock flag separately, so they are pinned together here.
+    const outOfStock = {
+      discountPrice: 97.86,
+      pumpPricePerLiter: 102.9,
+      finalPricePerLiter: 97.86,
+      isAvailable: false,
+    };
+
+    expect(fuelHeadlinePrice(outOfStock)).toBeCloseTo(102.9, 2);
+    expect(fuelSaving({ basePrice: 102.9, discountPrice: 97.86, isAvailable: false })).toEqual({
+      amount: 0,
+      hasSaving: false,
+    });
   });
 });
