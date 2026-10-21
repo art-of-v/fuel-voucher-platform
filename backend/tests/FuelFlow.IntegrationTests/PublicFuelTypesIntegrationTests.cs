@@ -137,7 +137,8 @@ public sealed class PublicFuelTypesIntegrationTests : IClassFixture<TestDatabase
 
         var fuel = (await ListAsync()).Single(f => f.Id == fuelId.ToString());
 
-        // 40 + 3 = 43, and the pump ceiling of 92.90 does not bind, so our price is 43.
+        // 40 + 3 = 43: our price is the cost plus the margin, and the column price (92.90) is the
+        // reference it is shown against, not a cap.
         fuel.FinalPricePerLiter.Should().Be(43m);
         fuel.PumpPricePerLiter.Should().Be(92.90m);
         fuel.IsAvailable.Should().BeTrue("there is stock behind it");

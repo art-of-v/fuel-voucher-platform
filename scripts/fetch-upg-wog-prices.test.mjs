@@ -72,8 +72,9 @@ test("a grade with no title is skipped with a reason", () => {
 });
 
 test("an unparseable or non-positive price is skipped, never written", () => {
-  // A zero pump would become the ceiling for every package of that fuel and drive the customer price
-  // to zero, which is why the OKKO importer refuses it at the door and this does too.
+  // A zero pump would become the column price of the fuel - the reference every reader measures the
+  // customer's saving against - which is why the OKKO importer refuses it at the door and this does
+  // too.
   assert.deepEqual(toRow({ Title: "upg95", Price: "abc" }).skip.reason, 'unparseable Price "abc"');
   assert.deepEqual(toRow({ Title: "upg95", Price: 0 }).skip.reason, "non-positive price 0");
   assert.deepEqual(toRow({ Title: "upg95", Price: -1 }).skip.reason, "non-positive price -1");

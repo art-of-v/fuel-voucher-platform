@@ -391,7 +391,7 @@ private FuelNominal NewPackage(string fuelTypeId, decimal liters)
     [Fact]
     public async Task SetCost_AboveCost_DoesNotAlert()
     {
-        // okko-dp packages have no pump ceiling → final = cost + margin, always above cost.
+        // okko-dp packages have no column price → final = cost + margin, always above cost.
         var alerts = new Mock<IAlertNotifier>();
         var dispatcher = new NotificationDispatcher(
             alerts.Object,

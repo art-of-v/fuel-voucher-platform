@@ -93,7 +93,7 @@ public sealed class VoucherTermSaleTests : IDisposable
             liters: 10m,
             price: 600m,
             supplierPricePerLiter: 40m,
-            marginUahPerLiter: 20m,   // cost-plus 60, no pump ceiling -> 60 UAH/L
+            marginUahPerLiter: 20m,   // cost-plus 60 (the column price is a reference, not a cap) -> 60 UAH/L
             finalPricePerLiter: 60m);
         _context.SaveChanges();
     }

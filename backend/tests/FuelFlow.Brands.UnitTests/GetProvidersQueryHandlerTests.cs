@@ -120,7 +120,7 @@ public sealed class GetBrandsQueryHandlerTests : IDisposable
     // read a stored zero as the customer price and made the saving the whole column price - and it
     // seeded the minimum-discount KNOB with that same display number, so an operator saving the
     // card wrote "the price is at least 92.90 under the column" into the fuel. The price formula
-    // then yields min(cost + margin, pump - 92.90) = 0 and the below-cost guard refuses every sale
+    // then yields a price of 0 and the below-cost guard refuses every sale
     // of that fuel.
     //
     // Five of the twenty-three fuels on production are in that state, and it is dormant only
