@@ -2096,60 +2096,73 @@ namespace FuelFlow.API.Migrations
                         .HasMaxLength(12)
                         .HasColumnType("character varying(12)")
                         .HasDefaultValue("system")
-                        .HasColumnName("actor_kind");
+                        .HasColumnName("actor_kind")
+                        .HasComment("Who caused it: a person, or the scheduler. See VoucherActorKinds.");
 
                     b.Property<Guid?>("ActorPartyId")
                         .HasColumnType("uuid")
-                        .HasColumnName("actor_party_id");
+                        .HasColumnName("actor_party_id")
+                        .HasComment("The company that caused it. A bare uuid.");
 
                     b.Property<Guid?>("ActorUserId")
                         .HasColumnType("uuid")
-                        .HasColumnName("actor_user_id");
+                        .HasColumnName("actor_user_id")
+                        .HasComment("The person who caused it, required when actor_kind is 'user'. A bare uuid, no foreignkey - the record has to survive the account.");
 
                     b.Property<string>("EventType")
                         .IsRequired()
                         .HasMaxLength(24)
                         .HasColumnType("character varying(24)")
-                        .HasColumnName("event_type");
+                        .HasColumnName("event_type")
+                        .HasComment("What kind of thing happened - a status change, an expiry being pushed out, a softdelete. See VoucherEventTypes.");
 
                     b.Property<string>("ExternalRef")
                         .HasColumnType("text")
-                        .HasColumnName("external_ref");
+                        .HasColumnName("external_ref")
+                        .HasComment("What the caller can be pointed back at - an order, a movement, a batch, a command.Indexed, because 'show me everything that happened because of order X' is what turns anevent log into evidence.");
 
                     b.Property<string>("FromStatus")
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)")
-                        .HasColumnName("from_status");
+                        .HasColumnName("from_status")
+                        .HasComment("The status before. Set for a status change only.");
 
                     b.Property<DateOnly?>("NewCustomerExpiration")
                         .HasColumnType("date")
-                        .HasColumnName("new_customer_expiration");
+                        .HasColumnName("new_customer_expiration")
+                        .HasComment("The expiry after. Set for an extension only.");
 
                     b.Property<DateTime>("OccurredAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("occurred_at_utc");
+                        .HasColumnName("occurred_at_utc")
+                        .HasComment("When it happened.");
 
                     b.Property<string>("Payload")
                         .HasColumnType("jsonb")
-                        .HasColumnName("payload");
+                        .HasColumnName("payload")
+                        .HasComment("Anything else worth keeping that has no column of its own.");
 
                     b.Property<DateOnly?>("PreviousCustomerExpiration")
                         .HasColumnType("date")
-                        .HasColumnName("previous_customer_expiration");
+                        .HasColumnName("previous_customer_expiration")
+                        .HasComment("The expiry before. Set for an extension only - and it is written at the moment it isstill true, because the voucher's own expiry column is overwritten in place.");
 
                     b.Property<string>("Reason")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
-                        .HasColumnName("reason");
+                        .HasColumnName("reason")
+                        .HasComment("Why, in the operator's words.");
 
                     b.Property<string>("ToStatus")
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)")
-                        .HasColumnName("to_status");
+                        .HasColumnName("to_status")
+                        .HasComment("The status after. Set for a status change only.");
 
                     b.Property<Guid>("VoucherId")
                         .HasColumnType("uuid")
-                        .HasColumnName("voucher_id");
+                        .HasColumnName("voucher_id")
+                        .HasComment("The voucher this happened to.");
 
                     b.HasKey("Id");
 
@@ -3226,53 +3239,63 @@ namespace FuelFlow.API.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
-                        .HasColumnName("aggregate_id");
+                        .HasColumnName("aggregate_id")
+                        .HasComment("Which thing changed, by its own id - a uuid as a string.");
 
                     b.Property<string>("AggregateType")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
-                        .HasColumnName("aggregate_type");
+                        .HasColumnName("aggregate_type")
+                        .HasComment("What kind of thing changed - 'Refund', 'Voucher', and the other kinds the audit screengroups by. A short name, not a table name.");
 
                     b.Property<DateTime>("ChangedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("changed_at_utc");
+                        .HasColumnName("changed_at_utc")
+                        .HasComment("When it happened.");
 
                     b.Property<Guid?>("ChangedByUserId")
                         .HasColumnType("uuid")
-                        .HasColumnName("changed_by_user_id");
+                        .HasColumnName("changed_by_user_id")
+                        .HasComment("Who did it, when a person did. NULL when a machine did - and NULL rather than theall-zero uuid, so that 'no user' is a value that can still be checked against the userstable.");
 
                     b.Property<string>("ChangedByUserName")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
-                        .HasColumnName("changed_by_user_name");
+                        .HasColumnName("changed_by_user_name")
+                        .HasComment("The name of the person who did it, kept on the row so the record still reads after theaccount is gone.");
 
                     b.Property<string>("EventType")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
-                        .HasColumnName("event_type");
+                        .HasColumnName("event_type")
+                        .HasComment("What happened, in the past tense - 'RefundRequested', 'StatusChanged'.");
 
                     b.Property<string>("NewValue")
                         .IsRequired()
                         .HasColumnType("jsonb")
-                        .HasColumnName("new_value");
+                        .HasColumnName("new_value")
+                        .HasComment("The value after the change, as JSON.");
 
                     b.Property<string>("OldValue")
                         .HasColumnType("jsonb")
-                        .HasColumnName("old_value");
+                        .HasColumnName("old_value")
+                        .HasComment("The value before the change, as JSON. NULL when the thing was created: there was novalue before.");
 
                     b.Property<string>("ScopeId")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
-                        .HasColumnName("scope_id");
+                        .HasColumnName("scope_id")
+                        .HasComment("The provider - the brand - the change happened within, so an audit read can be scoped toone.");
 
                     b.Property<string>("Summary")
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
-                        .HasColumnName("summary");
+                        .HasColumnName("summary")
+                        .HasComment("One line, in the operator's words, saying what changed.");
 
                     b.HasKey("Id");
 
@@ -4010,39 +4033,47 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<Guid?>("ActorUserId")
                         .HasColumnType("uuid")
-                        .HasColumnName("actor_user_id");
+                        .HasColumnName("actor_user_id")
+                        .HasComment("Who caused it: a user id, a Telegram staff id, or NULL for a system transition. Not aforeign key - the record has to survive the account.");
 
                     b.Property<string>("EventType")
                         .IsRequired()
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)")
-                        .HasColumnName("event_type");
+                        .HasColumnName("event_type")
+                        .HasComment("What happened - 'Created', 'PaymentCaptured', 'Fulfilled', 'Refunded', 'StatusChanged'and the rest. A CHECK pins the vocabulary.");
 
                     b.Property<string>("ExternalRef")
                         .HasColumnType("text")
-                        .HasColumnName("external_ref");
+                        .HasColumnName("external_ref")
+                        .HasComment("The external reference this transition came from - a Monobank invoice id, usually. Keptdenormalised so the same event can be found without joining the order, which is what aduplicate-delivery investigation looks for.");
 
                     b.Property<string>("FromStatus")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
-                        .HasColumnName("from_status");
+                        .HasColumnName("from_status")
+                        .HasComment("The status before. Set for a status change only.");
 
                     b.Property<DateTime>("OccurredAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("occurred_at_utc");
+                        .HasColumnName("occurred_at_utc")
+                        .HasComment("When it happened.");
 
                     b.Property<Guid>("OrderId")
                         .HasColumnType("uuid")
-                        .HasColumnName("order_id");
+                        .HasColumnName("order_id")
+                        .HasComment("The order this happened to.");
 
                     b.Property<string>("Payload")
                         .HasColumnType("jsonb")
-                        .HasColumnName("payload");
+                        .HasColumnName("payload")
+                        .HasComment("The raw payload that caused the transition, where one exists (a Monobank webhook body).Kept because reconciling against a statement means being able to see what the acquirersaid, not only what we concluded from it.");
 
                     b.Property<string>("ToStatus")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
-                        .HasColumnName("to_status");
+                        .HasColumnName("to_status")
+                        .HasComment("The status after. Set for a status change only.");
 
                     b.HasKey("Id");
 
