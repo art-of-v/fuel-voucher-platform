@@ -18,6 +18,12 @@ internal static class DatabaseSetup
         if (string.IsNullOrWhiteSpace(connStr))
             return connStr;
 
+        // NOTE: the defaults below are DEVELOPMENT defaults. A production connection string has
+        // to say "SSL Mode=Verify Full" and name the CA, because the startup guard refuses to
+        // boot otherwise (SecurityConfigurationValidator) - and the reason is the data on this
+        // connection: refresh-token hashes, phone numbers, order amounts, voucher ciphertext.
+        // "Require" encrypts the session against anyone, and "Trust Server Certificate=true"
+        // accepts any certificate at all.
         if (connStr.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase) ||
             connStr.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase))
         {

@@ -192,5 +192,37 @@ var monobankEnabled = configuration.GetValue<bool?>("Monobank:Enabled") ?? false
                 + "acknowledgement. Expired vouchers can be sold; customers receive fuel that is already "
                 + "out of date. Clear this the moment real money is taken (see #35).");
         }
+
+        // The database transport. Everything else in this file guards a control that is OFF by
+        // default; this one guards a control that is ON by default, which is what makes it easy
+        // to lose: "SSL Mode=Require" encrypts the session against anyone, and "Trust Server
+        // Certificate=true" accepts any certificate at all - so a host that can present a
+        // self-signed certificate terminates the session and reads the refresh-token hashes, the
+        // personal data and the voucher ciphertext. "SSL Mode=Disable" is the same thing without
+        // the encryption.
+        //
+        // The container-to-container connection used to be the reason for it (the local Postgres
+        // had no certificate), and the answer was to keep the default for everybody so that a
+        // managed database could never inherit it by accident. The certificates exist now, so
+        // Production states a verified transport, and a string that says otherwise is a refusal
+        // rather than a warning: the connection carries money and personal data, and the operator
+        // has to say which transport they meant.
+        //
+        // "Verify Full" is the only mode that checks WHO is on the other end, so it is the only
+        // one that passes. A string with no SSL Mode at all also fails: the code would then
+        // append "SSL Mode=Require;Trust Server Certificate=true" to it, which is the old default
+        // wearing a different name.
+        var connectionString = configuration["Database:ConnectionString"] ?? "";
+        if (connectionString.Length > 0
+            && !connectionString.Contains("SSL Mode=Verify Full", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "Refusing to start: the database connection string does not verify the server's "
+                + "certificate. In Production the connection must be "
+                + "'SSL Mode=Verify Full' with the CA ('Root Certificate=<path to ca.crt>'): "
+                + "'Require' and 'Trust Server Certificate=true' encrypt the session against anyone, "
+                + "and 'Disable' does not encrypt it at all - and this connection carries the money and "
+                + "the personal data.");
+        }
     }
 }

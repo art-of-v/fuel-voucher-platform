@@ -129,9 +129,17 @@ services:
       ASPNETCORE_URLS: http://+:8080
 
       # --- Database (the self-hosted postgres service below) ---
-      # IMPORTANT: "SSL Mode=Disable" is REQUIRED for the local container connection.
-      # If omitted, the app auto-appends "SSL Mode=Require" and will fail to connect.
-      Database__ConnectionString: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};SSL Mode=Disable;Trust Server Certificate=true"
+      # The connection VERIFIES the server's certificate. The database presents one signed by
+      # the CA in deploy/certs/postgres (deploy/ensure-postgres-tls.sh creates it, and the
+      # deploy job runs that script before this compose comes up). "Verify Full" is the whole
+      # point: "Require" encrypts the session against anyone, and "Trust Server Certificate"
+      # accepts any certificate at all - the data on this connection is the money and the
+      # personal data, so the other side has to prove who it is.
+      #
+      # The startup guard refuses to boot a production build whose connection string says
+      # otherwise (SecurityConfigurationValidator), so a managed database cannot inherit the
+      # old default by accident.
+      Database__ConnectionString: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};SSL Mode=Verify Full;Root Certificate=/certs/ca.crt"
 
       # --- The connection-pool cap ---
       # One process opens SEVERAL pools against this database: the application's data source, the
@@ -351,6 +359,12 @@ services:
       # /api/updates/manifest answers 204 (no update) — the feature stays inert, so an
       # unconfigured deploy never breaks an installed app.
       Updates__PublicBaseUrl: ${OTA_PUBLIC_BASE_URL:-}
+    volumes:
+      # The CA that signed the database's certificate. The application verifies the server
+      # against it, so the file has to be inside the container - the connection string names
+      # /certs/ca.crt. Created by deploy/ensure-postgres-tls.sh, which the deploy job runs
+      # before this compose comes up.
+      - ./certs/postgres/ca.crt:/certs/ca.crt:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -585,8 +599,23 @@ services:
       - archive_timeout=900
       - -c
       - archive_command=test ! -f /var/lib/postgresql/wal/%f && cp %p /var/lib/postgresql/wal/%f
+      # The server certificate, and the three lines that make Postgres present it. The client
+      # verifies it against the CA in the same directory (the application mounts ca.crt and
+      # says "SSL Mode=Verify Full"), so the session is encrypted AND the other side proves
+      # who it is - the connection carries the money and the personal data.
+      #
+      # The key is read-only to the server, and deploy/ensure-postgres-tls.sh gives it to the
+      # database user with mode 0600, because Postgres refuses to start otherwise.
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/certs/server.crt
+      - -c
+      - ssl_key_file=/certs/server.key
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      # The certificate, read-only: the server reads it at startup and never writes it.
+      - ./certs/postgres:/certs:ro
       # The archive lives on the HOST, not inside the container's data volume, for two reasons.
       # A container that is recreated takes its data volume with it but not a bind mount's
       # contents - and the archive has to survive exactly that. And the backup script ships it
