@@ -182,6 +182,14 @@ GOOD_ENV_STAGING="$TMP/env-staging-complete"
 cp "$FIXTURE/.env" "$GOOD_ENV"
 cp "$FIXTURE/.env.staging" "$GOOD_ENV_STAGING"
 
+# The two environments must not share the QR cipher key, so the fixture gives them different
+# ones - the dummy above wrote the SAME value into both files, which is exactly the defect the
+# new check looks for.
+sed -i 's|^QR_CIPHER_KEY=.*|QR_CIPHER_KEY=prod-only-key|' "$FIXTURE/.env"
+sed -i 's|^QR_CIPHER_KEY=.*|QR_CIPHER_KEY=staging-only-key|' "$FIXTURE/.env.staging"
+cp "$FIXTURE/.env" "$GOOD_ENV"
+cp "$FIXTURE/.env.staging" "$GOOD_ENV_STAGING"
+
 out=$(cd "$FIXTURE" && bash ./preflight.sh --env-only 2>&1); rc=$?
 check "a defaults run with a valid prod .env passes" 0 "$rc"
 # .env.staging SHOULD still be scanned - for structure. It is caddy's credential
@@ -204,6 +212,29 @@ check "a prod .env missing the hash still warns" 0 "$rc"
 [[ "$out" == *".env"* && "$out" == *"not set"* ]] \
   && { echo "  PASS  the warning names .env, the file caddy actually reads"; pass=$((pass+1)); } \
   || { echo "  FAIL  lost the warning for the file that matters: $out"; fail=$((fail+1)); }
+
+# ------------------------------------------------------------------------------
+# The two environments must not share the QR cipher key.
+#
+# It encrypts the redeemable QR payload of every voucher at rest, and it is the only thing
+# that can read it. Staging used production's key until 2026-10-21, so anyone who reached
+# staging could decrypt production's vouchers - and nothing would have said so, because the
+# application starts happily with either key.
+# ------------------------------------------------------------------------------
+cp "$GOOD_ENV_STAGING" "$FIXTURE/.env.staging"
+sed -i 's|^QR_CIPHER_KEY=.*|QR_CIPHER_KEY=prod-only-key|' "$FIXTURE/.env.staging"
+out=$(cd "$FIXTURE" && bash ./preflight.sh --env-only 2>&1); rc=$?
+cp "$GOOD_ENV_STAGING" "$FIXTURE/.env.staging"
+check "a shared QR cipher key is refused" 1 "$rc"
+[[ "$out" == *"share the same QR_CIPHER_KEY"* ]] \
+  && { echo "  PASS  the refusal says what is shared and what it costs"; pass=$((pass+1)); } \
+  || { echo "  FAIL  the refusal does not name the shared key: $out"; fail=$((fail+1)); }
+
+out=$(cd "$FIXTURE" && bash ./preflight.sh --env-only 2>&1); rc=$?
+check "different QR cipher keys pass" 0 "$rc"
+[[ "$out" == *"the QR cipher keys differ"* ]] \
+  && { echo "  PASS  it says the keys were compared"; pass=$((pass+1)); } \
+  || { echo "  FAIL  it does not say the keys were compared: $out"; fail=$((fail+1)); }
 
 # ------------------------------------------------------------------------------
 # The wording of the failure must not assert a cause that measurement disproved.
