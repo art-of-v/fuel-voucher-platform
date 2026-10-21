@@ -55,10 +55,16 @@ public sealed class AdminOrderController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Update([FromRoute] Guid id, [FromBody] UpdateOrderRequest request, CancellationToken cancellationToken)
     {
-        var success = await _updateHandler.HandleAsync(new UpdateOrderStatusCommand(id, request.Status), cancellationToken);
-        if (!success) return NotFound();
+        var result = await _updateHandler.HandleAsync(new UpdateOrderStatusCommand(id, request.Status), cancellationToken);
+        if (!result.Found) return NotFound();
+        // The refusal carries its reason: "the order's status did not change" is not something an
+        // operator can act on, and the reason is usually about money.
+        if (!result.Success) return Conflict(new { success = false, error = result.Error });
         return Ok(new { success = true });
     }
 
