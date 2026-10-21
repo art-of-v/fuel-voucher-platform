@@ -17,34 +17,41 @@ internal sealed class CompanyInvitationConfiguration : IEntityTypeConfiguration<
 
         builder.Property(e => e.LegalEntityId)
             .HasColumnName("legal_entity_id")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "The company that invited.");
 
         builder.Property(e => e.OwnerUserId)
             .HasColumnName("owner_user_id")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "Who sent the invitation.");
 
         builder.Property(e => e.WorkerPhoneNumber)
             .HasColumnName("worker_phone_number")
             .HasMaxLength(20)
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "The phone number the invitation was sent to.");
 
         builder.Property(e => e.WorkerUserId)
             .HasColumnName("worker_user_id")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "The account the invitation names, once it is accepted.");
 
         builder.Property(e => e.Status)
             .HasColumnName("status")
             .HasConversion<string>()
             .HasMaxLength(20)
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "Where the invitation stands.");
 
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "When it was sent.");
 
         builder.Property(e => e.UpdatedAtUtc)
             .HasColumnName("updated_at_utc")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "When it last changed.");
 
         builder.HasIndex(e => e.LegalEntityId);
         builder.HasIndex(e => e.OwnerUserId);

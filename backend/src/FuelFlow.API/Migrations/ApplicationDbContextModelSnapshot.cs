@@ -345,35 +345,42 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
+                        .HasColumnName("created_at_utc")
+                        .HasComment("When it was sent.");
 
                     b.Property<Guid>("LegalEntityId")
                         .HasColumnType("uuid")
-                        .HasColumnName("legal_entity_id");
+                        .HasColumnName("legal_entity_id")
+                        .HasComment("The company that invited.");
 
                     b.Property<Guid>("OwnerUserId")
                         .HasColumnType("uuid")
-                        .HasColumnName("owner_user_id");
+                        .HasColumnName("owner_user_id")
+                        .HasComment("Who sent the invitation.");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
-                        .HasColumnName("status");
+                        .HasColumnName("status")
+                        .HasComment("Where the invitation stands.");
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
+                        .HasColumnName("updated_at_utc")
+                        .HasComment("When it last changed.");
 
                     b.Property<string>("WorkerPhoneNumber")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
-                        .HasColumnName("worker_phone_number");
+                        .HasColumnName("worker_phone_number")
+                        .HasComment("The phone number the invitation was sent to.");
 
                     b.Property<Guid>("WorkerUserId")
                         .HasColumnType("uuid")
-                        .HasColumnName("worker_user_id");
+                        .HasColumnName("worker_user_id")
+                        .HasComment("The account the invitation names, once it is accepted.");
 
                     b.HasKey("Id");
 
@@ -404,23 +411,28 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime?>("DeletedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at_utc");
+                        .HasColumnName("deleted_at_utc")
+                        .HasComment("When the membership was soft-deleted, or NULL while it stands.");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
-                        .HasColumnName("is_deleted");
+                        .HasColumnName("is_deleted")
+                        .HasComment("Firing a worker sets this rather than removing the row. Employment history IS history:the owner policy keeps anything that affects it forever, and 'this person worked hereuntil March' is a fact about the company, not garbage a cleanup job may collect. The!IsDeleted query filter keeps it out of every membership read.");
 
                     b.Property<DateTime>("JoinedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("joined_at_utc");
+                        .HasColumnName("joined_at_utc")
+                        .HasComment("When they joined.");
 
                     b.Property<Guid>("LegalEntityId")
                         .HasColumnType("uuid")
-                        .HasColumnName("legal_entity_id");
+                        .HasColumnName("legal_entity_id")
+                        .HasComment("The company.");
 
                     b.Property<Guid>("WorkerUserId")
                         .HasColumnType("uuid")
-                        .HasColumnName("worker_user_id");
+                        .HasColumnName("worker_user_id")
+                        .HasComment("The person.");
 
                     b.HasKey("Id");
 
@@ -624,90 +636,109 @@ namespace FuelFlow.API.Migrations
                     b.Property<string>("AppVersion")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
-                        .HasColumnName("app_version");
+                        .HasColumnName("app_version")
+                        .HasComment("The client build the message came from - the first thing asked for in a bug report.");
 
                     b.Property<string>("Category")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
-                        .HasColumnName("category");
+                        .HasColumnName("category")
+                        .HasComment("What the classifier says this is about. NULL until it has run.");
 
                     b.Property<DateTime?>("ClassifiedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("classified_at_utc");
+                        .HasColumnName("classified_at_utc")
+                        .HasComment("When the classifier last ran, so a failed row can be retried or aged out.");
 
                     b.Property<string>("ClassifierError")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
-                        .HasColumnName("classifier_error");
+                        .HasColumnName("classifier_error")
+                        .HasComment("The last classifier failure, truncated. A row with this set and no verdict is one theteam can still read - it is only the automation that failed.");
 
                     b.Property<decimal?>("Confidence")
                         .HasColumnType("numeric(5,4)")
-                        .HasColumnName("confidence");
+                        .HasColumnName("confidence")
+                        .HasComment("The classifier's confidence, 0..1. Retained even for dropped messages, so a driftingclassifier is visible in the admin filter rather than invisible in the discard bin. Adecimal, not a double: binary floating point cannot represent 0.1 exactly, and aconfidence of 0.6 is a number people read.");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
+                        .HasColumnName("created_at_utc")
+                        .HasComment("When the customer wrote it.");
 
                     b.Property<string>("Language")
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)")
-                        .HasColumnName("language");
+                        .HasColumnName("language")
+                        .HasComment("The language the classifier detected. NULL until it has run.");
 
                     b.Property<string>("Platform")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
-                        .HasColumnName("platform");
+                        .HasColumnName("platform")
+                        .HasComment("The client platform (ios / android / web).");
 
                     b.Property<string>("Severity")
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)")
-                        .HasColumnName("severity");
+                        .HasColumnName("severity")
+                        .HasComment("How serious the classifier says it is. NULL until it has run.");
 
                     b.Property<long?>("StaffChatId")
                         .HasColumnType("bigint")
-                        .HasColumnName("staff_chat_id");
+                        .HasColumnName("staff_chat_id")
+                        .HasComment("Where this message was posted for the team, and the id it got there under. A staff replyis only relayed when it quotes this id, which is what stops group chatter reachingcustomers.");
 
                     b.Property<long?>("StaffMessageId")
                         .HasColumnType("bigint")
-                        .HasColumnName("staff_message_id");
+                        .HasColumnName("staff_message_id")
+                        .HasComment("The id of the staff reply that was relayed.");
 
                     b.Property<DateTime?>("StaffRepliedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("staff_replied_at_utc");
+                        .HasColumnName("staff_replied_at_utc")
+                        .HasComment("Set once an allowlisted team member's reply was delivered to the customer.");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
-                        .HasColumnName("status");
+                        .HasColumnName("status")
+                        .HasComment("Where the message stands.");
 
                     b.Property<string>("Summary")
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)")
-                        .HasColumnName("summary");
+                        .HasColumnName("summary")
+                        .HasComment("The one-sentence restatement the classifier wrote for the staff chat. Never invented.");
 
                     b.Property<long>("TelegramChatId")
                         .HasColumnType("bigint")
-                        .HasColumnName("telegram_chat_id");
+                        .HasColumnName("telegram_chat_id")
+                        .HasComment("Telegram chat id of the customer's private chat (positive for a 1-on-1 chat).");
 
                     b.Property<long>("TelegramMessageId")
                         .HasColumnType("bigint")
-                        .HasColumnName("telegram_message_id");
+                        .HasColumnName("telegram_message_id")
+                        .HasComment("The id of this message inside that chat. Unique per chat - the webhook de-dupe key.");
 
                     b.Property<string>("Text")
                         .IsRequired()
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)")
-                        .HasColumnName("text");
+                        .HasColumnName("text")
+                        .HasComment("What the customer wrote, capped at the configured maximum length.");
 
                     b.Property<Guid?>("UserId")
                         .HasColumnType("uuid")
-                        .HasColumnName("user_id");
+                        .HasColumnName("user_id")
+                        .HasComment("The FuelFlow account this chat was bound to, or NULL for an unbound chat.");
 
                     b.Property<string>("Verdict")
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)")
-                        .HasColumnName("verdict");
+                        .HasColumnName("verdict")
+                        .HasComment("NULL until the classifier has run. NULL means 'not classified', NOT 'junk' - the two aredifferent facts and the filter has to tell them apart.");
 
                     b.HasKey("Id");
 
@@ -1439,32 +1470,38 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
+                        .HasColumnName("created_at_utc")
+                        .HasComment("When it was created.");
 
                     b.Property<bool>("IsRead")
                         .HasColumnType("boolean")
-                        .HasColumnName("is_read");
+                        .HasColumnName("is_read")
+                        .HasComment("Whether the customer has read it.");
 
                     b.Property<string>("Message")
                         .IsRequired()
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
-                        .HasColumnName("message");
+                        .HasColumnName("message")
+                        .HasComment("The notification's body.");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
-                        .HasColumnName("title");
+                        .HasColumnName("title")
+                        .HasComment("The notification's headline.");
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at_utc")
-                        .HasDefaultValueSql("now()");
+                        .HasDefaultValueSql("now()")
+                        .HasComment("When it last changed.");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid")
-                        .HasColumnName("user_id");
+                        .HasColumnName("user_id")
+                        .HasComment("The account this notification is for.");
 
                     b.HasKey("Id");
 
@@ -2116,38 +2153,45 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
+                        .HasColumnName("created_at_utc")
+                        .HasComment("When they wrote in.");
 
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(254)
                         .HasColumnType("character varying(254)")
-                        .HasColumnName("email");
+                        .HasColumnName("email")
+                        .HasComment("The reply address of the person who wrote in (validated at the edge).");
 
                     b.Property<DateTime?>("EmailSentAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("email_sent_at_utc");
+                        .HasColumnName("email_sent_at_utc")
+                        .HasComment("NULL until the message was successfully handed to the SMTP server. NULL is normal whenSupportMail is not configured (e.g. dev).");
 
                     b.Property<string>("IpAddress")
                         .HasMaxLength(45)
                         .HasColumnType("character varying(45)")
-                        .HasColumnName("ip_address");
+                        .HasColumnName("ip_address")
+                        .HasComment("The client IP as seen by the API (after forwarded-header processing). Used to spotabuse; never shown anywhere.");
 
                     b.Property<string>("Message")
                         .IsRequired()
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)")
-                        .HasColumnName("message");
+                        .HasColumnName("message")
+                        .HasComment("What they wrote.");
 
                     b.Property<string>("SendError")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
-                        .HasColumnName("send_error");
+                        .HasColumnName("send_error")
+                        .HasComment("The last SMTP failure reason, truncated. NULL when delivery succeeded or was neverattempted.");
 
                     b.Property<string>("UserAgent")
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)")
-                        .HasColumnName("user_agent");
+                        .HasColumnName("user_agent")
+                        .HasComment("The free-form browser User-Agent, truncated. Diagnostic only.");
 
                     b.HasKey("Id");
 

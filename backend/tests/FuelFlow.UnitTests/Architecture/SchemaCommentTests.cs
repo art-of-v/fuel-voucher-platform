@@ -2,6 +2,10 @@ using FuelFlow.Features.Ledger.SharedModels;
 using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Acquiring;
+using FuelFlow.Features.Company.SharedModels;
+using FuelFlow.Features.Feedback.SharedModels;
+using FuelFlow.Features.Notifications.SharedModels;
+using FuelFlow.Features.Support.SharedModels;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.Features.Pricing.Terms.SharedModels;
 using FuelFlow.Features.Settlement.SharedModels;
@@ -446,9 +450,117 @@ public sealed class SchemaCommentTests
     }
 
     /// <summary>
-    /// The comments of a property, read as the annotation they are stored as. The relational
-    /// accessor for it lives on a read-only interface, and the design-time model hands out
-    /// the mutable one - so the annotation is what both agree on.
+    /// The tables of a customer's life: their notifications, their feedback, the support
+    /// mailbox, and the company they work for.
+    /// </summary>
+    private static readonly (Type Entity, string[] Columns)[] TheLifecycleTables =
+    [
+        (typeof(Notification),
+        [
+            nameof(Notification.UserId),
+            nameof(Notification.Title),
+            nameof(Notification.Message),
+            nameof(Notification.IsRead),
+            nameof(Notification.CreatedAtUtc),
+            nameof(Notification.UpdatedAtUtc)
+        ]),
+        (typeof(FeedbackMessage),
+        [
+            nameof(FeedbackMessage.UserId),
+            nameof(FeedbackMessage.TelegramChatId),
+            nameof(FeedbackMessage.TelegramMessageId),
+            nameof(FeedbackMessage.Text),
+            nameof(FeedbackMessage.Verdict),
+            nameof(FeedbackMessage.Category),
+            nameof(FeedbackMessage.Severity),
+            nameof(FeedbackMessage.Summary),
+            nameof(FeedbackMessage.Language),
+            nameof(FeedbackMessage.Confidence),
+            nameof(FeedbackMessage.ClassifierError),
+            nameof(FeedbackMessage.ClassifiedAtUtc),
+            nameof(FeedbackMessage.StaffChatId),
+            nameof(FeedbackMessage.StaffMessageId),
+            nameof(FeedbackMessage.StaffRepliedAtUtc),
+            nameof(FeedbackMessage.Status),
+            nameof(FeedbackMessage.AppVersion),
+            nameof(FeedbackMessage.Platform),
+            nameof(FeedbackMessage.CreatedAtUtc)
+        ]),
+        (typeof(SupportMessage),
+        [
+            nameof(SupportMessage.Email),
+            nameof(SupportMessage.Message),
+            nameof(SupportMessage.UserAgent),
+            nameof(SupportMessage.IpAddress),
+            nameof(SupportMessage.EmailSentAtUtc),
+            nameof(SupportMessage.SendError),
+            nameof(SupportMessage.CreatedAtUtc)
+        ]),
+        (typeof(CompanyMember),
+        [
+            nameof(CompanyMember.LegalEntityId),
+            nameof(CompanyMember.WorkerUserId),
+            nameof(CompanyMember.JoinedAtUtc),
+            nameof(CompanyMember.IsDeleted),
+            nameof(CompanyMember.DeletedAtUtc)
+        ]),
+        (typeof(CompanyInvitation),
+        [
+            nameof(CompanyInvitation.LegalEntityId),
+            nameof(CompanyInvitation.OwnerUserId),
+            nameof(CompanyInvitation.WorkerPhoneNumber),
+            nameof(CompanyInvitation.WorkerUserId),
+            nameof(CompanyInvitation.Status),
+            nameof(CompanyInvitation.CreatedAtUtc),
+            nameof(CompanyInvitation.UpdatedAtUtc)
+        ])
+    ];
+
+    [Fact]
+    public void The_Lifecycle_Tables_Should_Say_What_They_Are()
+    {
+        var context = BuildContext();
+
+        foreach (var (entityType, columns) in TheLifecycleTables)
+        {
+            var entity = context.Model.FindEntityType(entityType);
+            Assert.NotNull(entity);
+
+            foreach (var column in columns)
+            {
+                var property = entity.FindProperty(column);
+                Assert.NotNull(property);
+
+                var comment = CommentOf(property);
+                Assert.False(string.IsNullOrWhiteSpace(comment),
+                    $"{entityType.Name}.{column} carries no comment. These are the tables of a "
+                    + "customer's life, and the ones with a NULL that means something - not "
+                    + "classified, not read, not sent - are the ones a reader cannot tell "
+                    + "apart from the names.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// A NULL that means "not yet" and a NULL that means "never" are different facts, and
+    /// the comment is where the difference is written down.
+    /// </summary>
+    [Fact]
+    public void The_Verdict_Should_Say_That_Null_Is_Not_Junk()
+    {
+        var context = BuildContext();
+        var feedback = context.Model.FindEntityType(typeof(FeedbackMessage));
+        Assert.NotNull(feedback);
+
+        var comment = CommentOf(feedback.FindProperty(nameof(FeedbackMessage.Verdict))!);
+
+        Assert.Contains("not classified", comment, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("junk", comment, StringComparison.OrdinalIgnoreCase);
+    }
+
+
+    /// <summary>
+    /// The comments of a property, read as the annotation they are stored as.
     /// </summary>
     private static string? CommentOf(IReadOnlyProperty property)
         => property.FindAnnotation(RelationalAnnotationNames.Comment)?.Value as string;
