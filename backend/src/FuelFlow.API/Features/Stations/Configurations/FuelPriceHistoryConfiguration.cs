@@ -29,6 +29,11 @@ internal sealed class FuelPriceHistoryConfiguration : IEntityTypeConfiguration<F
         builder.Property(e => e.MarginPercent).HasColumnName("margin_percent").HasColumnType("numeric(10,4)");
         builder.Property(e => e.FinalPricePerLiter).HasColumnName("final_price_per_liter").HasColumnType("numeric(10,4)");
         builder.Property(e => e.PumpPricePerLiter).HasColumnName("pump_price_per_liter").HasColumnType("numeric(10,4)");
+        // The knob the live fuel no longer has (dropped 2026-10-21, migration
+        // TheMinimumDiscountColumnGoes). It stays HERE, in the history, on purpose: a history is a
+        // record of what was true at the time, and the knob was true then - so the rows written
+        // before it went keep the number they were written with. New rows leave it NULL, because the
+        // knob did not exist.
         builder.Property(e => e.MinDiscountPerLiter).HasColumnName("min_discount_per_liter").HasColumnType("numeric(10,4)");
 
         builder.Property(e => e.DataKind).HasColumnName("data_kind").HasMaxLength(10).IsRequired();

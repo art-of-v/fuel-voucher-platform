@@ -9,8 +9,9 @@ namespace FuelFlow.Features.Brands;
 /// <remarks>
 /// <para>
 /// The pricing is read off the <b>fuel row</b>, because that is where it lives: since
-/// <c>20261019095748_OfferPricingBecomesTheFuel</c> the cost, the margin, the pump price and the
-/// minimum discount are columns on <c>fuel_types</c>, one set per fuel.
+/// <c>20261019095748_OfferPricingBecomesTheFuel</c> the cost, the margin and the pump price are
+/// columns on <c>fuel_types</c>, one set per fuel. The minimum discount that used to stand beside
+/// them was the last piece of the old formula and is gone (2026-10-21).
 /// </para>
 /// <para>
 /// It used to be read off the <em>packages</em> - the fuel's sizes - which was correct while the

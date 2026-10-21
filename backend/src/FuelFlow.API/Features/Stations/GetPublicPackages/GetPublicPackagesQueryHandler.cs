@@ -76,7 +76,6 @@ var isTestAccount = await _stock.IsTestAccountAsync(query.CallerUserId, ct);
         fuel.SupplierPricePerLiter,
         fuel.MarginUahPerLiter,
         fuel.PumpPricePerLiter,
-        fuel.MinDiscountPerLiter,
     })
     .ToListAsync(ct);
 

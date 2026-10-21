@@ -195,7 +195,6 @@ SELECT
           * nominal.liters, 2)                    AS price,
     fuel.supplier_price_per_liter,
     fuel.pump_price_per_liter,
-    fuel.min_discount_per_liter,
     -- The customer price per litre, derived the way FuelPricing.FinalPerLiterOrNull does: null
     -- unless the fuel has both a cost and a margin, because treating a missing margin as zero would
     -- publish a free fuel.
