@@ -1,0 +1,92 @@
+name: Branch reaper
+
+# WHY THIS EXISTS. GitHub's "automatically delete head branches" removes the head branch at the
+# moment its pull request is merged - and only at that moment. A session that is still working
+# on that branch pushes it again a minute later, and the push recreates the ref: the branch
+# stays on the remote with its work already in main, and nothing deletes it again.
+#
+# Measured on 2026-10-21 on the planning repo: 8 of the 10 branches on the remote were exactly
+# that - a merged pull request, and a push that came after the merge (one second to three
+# minutes after it). The auto-delete setting was on the whole time. It works; it just fires
+# once, and the branch can come back after it.
+#
+# This workflow is the second half of the fix: it deletes a branch whose pull request is MERGED,
+# whatever happened to the branch afterwards. The pre-push hook is the first half - it stops the
+# resurrection at the source, before it reaches the remote.
+#
+# WHAT IT DELETES, AND WHAT IT DOES NOT. A branch whose newest pull request is merged: its work
+# is on main, and the pull request keeps the commits visible even after the branch is gone, so
+# nothing is lost. A branch with an open pull request, and a branch with no pull request at all,
+# are left alone - this workflow does not get to decide that a branch nobody offered is dead.
+#
+# WHY A SCHEDULE AND NOT A PUSH TRIGGER. A `push` trigger would catch the resurrection within
+# seconds, but on a private repo every job-minute is billed and rounded UP, and each push would
+# cost one. The daily sweep costs one. The window in which an orphan branch exists is a day
+# instead of a minute - a map that is one day stale, not a wrong one. `workflow_dispatch` runs it
+# by hand when a branch has to go now.
+
+on:
+  schedule:
+    # 04:23 UTC daily - off the hour, so it does not pile up with whatever else runs at midnight.
+    - cron: '23 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: branch-reaper
+  cancel-in-progress: false
+
+jobs:
+  reap:
+    name: Delete the branches whose pull request is merged
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reap
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          owner="${GH_REPO%%/*}"
+          # The default branch is read from the API, not from the checkout: this job runs
+          # without one, and the branch that must never be deleted is worth naming twice.
+          default_branch="$(gh api -X GET "repos/$GH_REPO" --jq .default_branch)"
+
+          deleted=0
+          kept=0
+
+          while read -r branch; do
+            [ -z "$branch" ] && continue
+
+            if [ "$branch" = "$default_branch" ]; then
+              echo "kept:    $branch (the default branch)"
+              kept=$((kept + 1))
+              continue
+            fi
+
+            # The newest pull request that used this branch as its head, and whether it is
+            # merged. `sort_by(.number) | last` because the API's own order is not the one that
+            # matters here: a branch can carry an old closed pull request AND a newer open one,
+            # and the newer one is the truth.
+            pr="$(gh api -X GET "repos/$GH_REPO/pulls" \
+              -f state=all \
+              -f "head=$owner:$branch" \
+              --jq 'sort_by(.number) | last | if . == null then "0 no-pr -" else "\(.number) \(.merged_at // "-")" end')"
+
+            number="${pr%% *}"
+            merged_at="${pr#* }"
+
+            if [ "$merged_at" != "-" ]; then
+              gh api -X DELETE "repos/$GH_REPO/git/refs/heads/$branch"
+              echo "deleted: $branch (PR #$number, merged $merged_at - the pull request keeps the commits)"
+              deleted=$((deleted + 1))
+            else
+              echo "kept:    $branch (PR #$number)"
+              kept=$((kept + 1))
+            fi
+          done < <(gh api --paginate "repos/$GH_REPO/branches?per_page=100" --jq '.[].name')
+
+          echo "deleted $deleted branch(es), kept $kept"
