@@ -1380,7 +1380,7 @@ namespace FuelFlow.API.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("tax_id")
-                        .HasComment("IПН - the personal tax number. Nullable: most users never provide one, and a guessed tax idis worse than none.");
+                        .HasComment("ІПН - the personal tax number. Nullable: most users never provide one, and a guessed tax idis worse than none.");
 
                     b.HasKey("PartyId");
 
