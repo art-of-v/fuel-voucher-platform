@@ -61,6 +61,13 @@ public static class StatementReconciliationPdf
             column.Item().Element(e => ComposeSummary(e, act));
             column.Item().Element(e => ComposeTable(e, act));
 
+            if (act.RefundsIssued.Count > 0)
+            {
+                column.Item().PaddingTop(12).Text("Повернення за період")
+                    .FontFamily(PdfFonts.Family).Bold().FontSize(10);
+                column.Item().Element(e => ComposeRefunds(e, act));
+            }
+
             if (act.MissingFromStatement.Count > 0)
             {
                 column.Item().PaddingTop(12).Text("Замовлення, яких немає у реєстрі acquirer'а")
@@ -70,7 +77,9 @@ public static class StatementReconciliationPdf
 
             column.Item().PaddingTop(14).Text(
                     "Акт звіряє два незалежні джерела: записи acquirer'а та власні замовлення. " +
-                    "Рядки без збігу показано окремо і не зведено до підсумку.")
+                    "Рядки без збігу показано окремо і не зведено до підсумку. Повернення, які ми " +
+                    "видали за період, показані окремо і не вираховані з узгодженої суми: acquirer " +
+                    "не виносить скасування окремим рядком, тому звіряти їх доводиться з нашого боку.")
                 .FontSize(8).FontColor(Colors.Grey.Medium);
         });
     }
@@ -83,7 +92,7 @@ public static class StatementReconciliationPdf
         {
             table.ColumnsDefinition(columns =>
             {
-                for (var i = 0; i < 5; i++)
+                for (var i = 0; i < 6; i++)
                 {
                     columns.RelativeColumn();
                 }
@@ -114,6 +123,49 @@ public static class StatementReconciliationPdf
                 inner.Item().Text("Без збігу, ₴").FontSize(8).FontColor(Colors.Grey.Darken1);
                 inner.Item().Text(Money(s.UnmatchedTotalUah)).Bold().FontSize(13);
             });
+            // The refunds we issued in the period, beside the matched total and never folded into it:
+            // the acquirer files a reversal nested under the payment it reverses, so the statement
+            // alone cannot show that money going back - and netting the two figures would mix the
+            // periods in a document someone signs.
+            table.Cell().Element(SummaryCell).Column(inner =>
+            {
+                inner.Item().Text("Повернень за період, ₴").FontSize(8).FontColor(Colors.Grey.Darken1);
+                inner.Item().Text(Money(s.IssuedRefundTotalUah)).Bold().FontSize(13);
+            });
+        });
+    }
+
+    /// <summary>
+    /// The refunds we issued in the period: what went back, against the payment it went back
+    /// against.
+    /// </summary>
+    private static void ComposeRefunds(IContainer container, StatementReconciliationResponse act)
+    {
+        container.Table(table =>
+        {
+            table.ColumnsDefinition(columns =>
+            {
+                columns.ConstantColumn(160);   // invoice
+                columns.ConstantColumn(90);    // amount
+                columns.ConstantColumn(120);   // issued at
+                columns.RelativeColumn();      // note
+            });
+
+            table.Header(header =>
+            {
+                header.Cell().Element(HeaderCell).Text("Рахунок");
+                header.Cell().Element(HeaderCell).AlignRight().Text("Сума");
+                header.Cell().Element(HeaderCell).Text("Дата повернення");
+                header.Cell().Element(HeaderCell).Text("Примітка");
+            });
+
+            foreach (var refund in act.RefundsIssued)
+            {
+                table.Cell().Element(BodyCell).Text(refund.InvoiceId ?? "-");
+                table.Cell().Element(BodyCell).AlignRight().Text(Money(refund.Amount));
+                table.Cell().Element(BodyCell).Text(refund.IssuedAtUtc.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+                table.Cell().Element(BodyCell).Text(refund.Note ?? string.Empty);
+            }
         });
     }
 

@@ -36,10 +36,31 @@ public class StatementReconciliationDocumentTests
             new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc),
             new DateTime(2026, 11, 1, 0, 0, 0, DateTimeKind.Utc),
             3,
-            StatementMatcher.Summarise(rows),
+            StatementMatcher.Summarise(rows, Refunds()),
             rows,
-            [new MissingFromStatementRow(Guid.NewGuid(), "INV9", 100m, OrderStatus.PendingFulfillment, DateTime.UtcNow)]);
+            [new MissingFromStatementRow(Guid.NewGuid(), "INV9", 100m, OrderStatus.PendingFulfillment, DateTime.UtcNow)],
+            Refunds());
     }
+
+    /// <summary>
+    /// The refunds the act reports from our side: one of them reverses a payment from an earlier
+    /// period, which is the case the act has to mark rather than net away.
+    /// </summary>
+    private static IReadOnlyList<IssuedRefundRow> Refunds() =>
+    [
+        new IssuedRefundRow(
+            Guid.NewGuid(), Guid.NewGuid(), "INV1", 478.57m,
+            new DateTime(2026, 10, 8, 12, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 10, 3, 9, 0, 0, DateTimeKind.Utc),
+            false,
+            null),
+        new IssuedRefundRow(
+            Guid.NewGuid(), Guid.NewGuid(), "INV2", 250m,
+            new DateTime(2026, 10, 20, 12, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 9, 20, 9, 0, 0, DateTimeKind.Utc),
+            true,
+            "Reverses a payment from 2026-09-20 - an earlier period than this act")
+    ];
 
     [Fact]
     public void The_Csv_Carries_One_Line_Per_Row_Plus_A_Summary()
@@ -137,12 +158,49 @@ public class StatementReconciliationDocumentTests
         {
             Rows = Array.Empty<StatementMatchRow>(),
             MissingFromStatement = Array.Empty<MissingFromStatementRow>(),
+            RefundsIssued = Array.Empty<IssuedRefundRow>(),
             StatementRowCount = 0,
             Summary = StatementMatcher.Summarise(Array.Empty<StatementMatchRow>())
         };
 
         StatementReconciliationCsv.Render(empty).Should().Contain("Rows in statement,0");
         Encoding.ASCII.GetString(StatementReconciliationPdf.Build(empty), 0, 5).Should().Be("%PDF-");
+    }
+
+    // The refunds we issued in the period get their own figure, beside the matched total. The
+    // matched total stays gross - netting the two would mix the periods in a signed document.
+    [Fact]
+    public void The_Csv_Carries_The_Refunds_We_Issued_Beside_The_Matched_Total()
+    {
+        var csv = StatementReconciliationCsv.Render(Act());
+
+        csv.Should().Contain("Refunds issued in period,2");
+        csv.Should().Contain("Refunds issued total UAH,728.57");
+        csv.Should().Contain("Matched total UAH,978.57");
+    }
+
+    // The section names the payment each refund gives back against: the statement cannot, because a
+    // reversal arrives with no invoice id of its own.
+    [Fact]
+    public void The_Csv_Lists_The_Refunds_With_The_Payment_They_Reverse()
+    {
+        var csv = StatementReconciliationCsv.Render(Act());
+
+        csv.Should().Contain("Refunds we issued in this period");
+        csv.Should().Contain("RefundId,InvoiceId,OrderId,Amount,IssuedAt,ReversedPaymentAt,Note");
+        csv.Should().Contain("INV2");
+        csv.Should().Contain("478.57");
+        // The refund that reverses an earlier period's payment says so.
+        csv.Should().Contain("Reverses a payment from 2026-09-20 - an earlier period than this act");
+    }
+
+    [Fact]
+    public void The_Pdf_Renders_The_Refunds_Section()
+    {
+        var pdf = StatementReconciliationPdf.Build(Act());
+
+        pdf.Should().NotBeEmpty();
+        Encoding.ASCII.GetString(pdf, 0, 5).Should().Be("%PDF-");
     }
 
     [Theory]

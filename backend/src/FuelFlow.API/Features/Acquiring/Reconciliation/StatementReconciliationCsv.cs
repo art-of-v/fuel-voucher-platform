@@ -31,6 +31,12 @@ public static class StatementReconciliationCsv
         sb.AppendLine("Unmatched," + FormattableString.Invariant($"{act.Summary.UnmatchedCount}"));
         sb.AppendLine("Refund matches," + FormattableString.Invariant($"{act.Summary.RefundMatchCount}"));
         sb.AppendLine("Matched total UAH," + FormattableString.Invariant($"{act.Summary.MatchedTotalUah:0.00}"));
+        // The refunds we issued in the period, beside the matched total and never folded into it.
+        // The matched total is gross: it is about matching, and a refund issued in this period can
+        // reverse a payment from an earlier one - netting the two would mix the periods in a
+        // document someone signs.
+        sb.AppendLine("Refunds issued in period," + FormattableString.Invariant($"{act.Summary.IssuedRefundCount}"));
+        sb.AppendLine("Refunds issued total UAH," + FormattableString.Invariant($"{act.Summary.IssuedRefundTotalUah:0.00}"));
         sb.AppendLine("Mismatch delta UAH," + FormattableString.Invariant($"{act.Summary.MismatchDeltaUah:0.00}"));
         sb.AppendLine("Unmatched total UAH," + FormattableString.Invariant($"{act.Summary.UnmatchedTotalUah:0.00}"));
         sb.AppendLine();
@@ -58,6 +64,26 @@ public static class StatementReconciliationCsv
                 Q(row.AcquirerCreatedAtUtc?.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)),
                 Q(row.Note)
             }));
+        }
+
+        if (act.RefundsIssued.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("Refunds we issued in this period");
+            sb.AppendLine("RefundId,InvoiceId,OrderId,Amount,IssuedAt,ReversedPaymentAt,Note");
+            foreach (var refund in act.RefundsIssued)
+            {
+                sb.AppendLine(string.Join(',', new[]
+                {
+                    Q(refund.RefundId.ToString()),
+                    Q(refund.InvoiceId),
+                    Q(refund.OrderId?.ToString()),
+                    Q(A(refund.Amount)),
+                    Q(refund.IssuedAtUtc.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)),
+                    Q(refund.ReversedPaymentAtUtc?.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)),
+                    Q(refund.Note)
+                }));
+            }
         }
 
         if (act.MissingFromStatement.Count > 0)

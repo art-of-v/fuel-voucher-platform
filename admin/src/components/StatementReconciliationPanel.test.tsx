@@ -30,6 +30,8 @@ const ACT = {
     matchedTotalUah: 500,
     mismatchDeltaUah: 1.43,
     unmatchedTotalUah: 0,
+    issuedRefundCount: 1,
+    issuedRefundTotalUah: 478.57,
   },
   rows: [
     {
@@ -62,6 +64,18 @@ const ACT = {
     },
   ],
   missingFromStatement: [],
+  refundsIssued: [
+    {
+      refundId: "r-1",
+      orderId: "o-2",
+      invoiceId: "inv-2",
+      amount: 478.57,
+      issuedAtUtc: "2026-09-20T12:00:00Z",
+      reversedPaymentAtUtc: "2026-09-03T10:15:00Z",
+      reversesEarlierPeriodPayment: false,
+      note: null,
+    },
+  ],
 };
 
 function renderPanel() {
@@ -110,6 +124,24 @@ describe("StatementReconciliationPanel", () => {
 
     expect(await screen.findByText("statementAct.mismatches")).toBeDefined();
     expect(screen.getByText("statementAct.matched")).toBeDefined();
+  });
+
+  // The acquirer nests a reversal under the payment it reverses and files no row for it, so the
+  // statement alone cannot show money going back. The act reports the refunds from our side, with
+  // their own figure - and the reader can see which payment each one reverses.
+  it("shows the refunds we issued in the period, with the payment each one reverses", async () => {
+    mockedApiRequest.mockResolvedValue(ACT);
+    renderPanel();
+
+    await userEvent.click(screen.getByText("statementAct.build"));
+
+    expect(await screen.findByText("statementAct.refundsIssued")).toBeDefined();
+    expect(screen.getByText("statementAct.refundsTitle")).toBeDefined();
+    // The invoice appears in the statement rows too, so it is the count that carries the
+    // assertion: the refund names the payment it reverses.
+    expect(screen.getAllByText("inv-2").length).toBeGreaterThanOrEqual(2);
+    // The figure is in the tile and in the refund's own row: the same money, reported twice.
+    expect(screen.getAllByText("478.57 ₴").length).toBe(2);
   });
 
   it("downloads the period's CSV through the blob client, not a JSON request", async () => {
