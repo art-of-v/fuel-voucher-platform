@@ -165,6 +165,32 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
         }
     };
 
+    /// <summary>
+    /// The money record of a paid order: a capture in state Succeeded, which is the only state
+    /// that means the money is ours.
+    /// </summary>
+    private void SeedCapturedPayment(Guid orderId)
+        => SeedPayment(orderId, FuelFlow.Payments.SharedModels.PaymentStatus.Succeeded);
+
+    private void SeedPayment(Guid orderId, FuelFlow.Payments.SharedModels.PaymentStatus status)
+    {
+        _context.Payments.Add(new FuelFlow.Payments.SharedModels.Payment
+        {
+            Id = Guid.NewGuid(),
+            OrderId = orderId,
+            Kind = FuelFlow.Payments.SharedModels.PaymentKind.Capture,
+            Provider = "monobank",
+            ProviderInvoiceId = $"INV-{orderId:N}",
+            AmountUah = 2500,
+            AmountKopecks = 250000,
+            Currency = "UAH",
+            Status = status,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        _context.SaveChanges();
+    }
+
     // `brandId` rather than a default of `BrandIds.Okko`: a static readonly Guid is not a
     // compile-time constant, so it cannot be a default parameter value. Callers that omit it get
     // the same brand the helper always meant.
@@ -209,7 +235,88 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
     }
 
     [Fact]
-    public async Task UpdateOrderStatus_ShouldUpdateStatus_WhenStatusValid()
+    public async Task UpdateOrderStatus_MovesAPaidOrderToFulfilment_WhenTheMoneyIsThere()
+    {
+        var order = BuildOrder(Guid.NewGuid(), OrderStatus.PendingPayment);
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+        SeedCapturedPayment(order.Id);
+
+        var result = await _updateOrderStatusHandler.HandleAsync(new UpdateOrderStatusCommand(order.Id, "PendingFulfillment"));
+
+        result.Success.Should().BeTrue();
+        var updated = await _context.Orders.FindAsync(order.Id);
+        updated!.Status.Should().Be(OrderStatus.PendingFulfillment);
+        updated.UpdatedAtUtc.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(2));
+    }
+
+    [Fact]
+    public async Task UpdateOrderStatus_RefusesToFulfil_AnOrderThatWasNeverPaidFor()
+    {
+        // The defect this exists for: the endpoint wrote any status, and the fulfilment job
+        // selects its work by status alone - so an unpaid order could be handed fuel.
+        var order = BuildOrder(Guid.NewGuid(), OrderStatus.PendingPayment);
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        var result = await _updateOrderStatusHandler.HandleAsync(new UpdateOrderStatusCommand(order.Id, "PendingFulfillment"));
+
+        result.Found.Should().BeTrue();
+        result.Success.Should().BeFalse();
+        result.Error.Should().Contain("payment");
+        var updated = await _context.Orders.FindAsync(order.Id);
+        updated!.Status.Should().Be(OrderStatus.PendingPayment);
+    }
+
+    [Fact]
+    public async Task UpdateOrderStatus_RefusesToFulfil_AnOrderWhosePaymentIsOnlyPending()
+    {
+        // An invoice exists and nobody paid it: the payment row says Pending, so the money has
+        // not arrived either.
+        var order = BuildOrder(Guid.NewGuid(), OrderStatus.PendingPayment);
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+        SeedPayment(order.Id, FuelFlow.Payments.SharedModels.PaymentStatus.Pending);
+
+        var result = await _updateOrderStatusHandler.HandleAsync(new UpdateOrderStatusCommand(order.Id, "PendingFulfillment"));
+
+        result.Success.Should().BeFalse();
+        result.Error.Should().Contain("payment");
+    }
+
+    [Fact]
+    public async Task UpdateOrderStatus_AbandonsAnUnpaidOrder()
+    {
+        var order = BuildOrder(Guid.NewGuid(), OrderStatus.PendingPayment);
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        var result = await _updateOrderStatusHandler.HandleAsync(new UpdateOrderStatusCommand(order.Id, "Cancelled"));
+
+        result.Success.Should().BeTrue();
+        var updated = await _context.Orders.FindAsync(order.Id);
+        updated!.Status.Should().Be(OrderStatus.Cancelled);
+    }
+
+    [Fact]
+    public async Task UpdateOrderStatus_RefusesToCancel_APaidOrder()
+    {
+        // Cancelling a paid order would keep the money and the goods. That is the refund path's
+        // business, and nobody else's.
+        var order = BuildOrder(Guid.NewGuid(), OrderStatus.Paid);
+        _context.Orders.Add(order);
+        await _context.SaveChangesAsync();
+
+        var result = await _updateOrderStatusHandler.HandleAsync(new UpdateOrderStatusCommand(order.Id, "Cancelled"));
+
+        result.Success.Should().BeFalse();
+        result.Error.Should().Contain("refunded");
+        var updated = await _context.Orders.FindAsync(order.Id);
+        updated!.Status.Should().Be(OrderStatus.Paid);
+    }
+
+    [Fact]
+    public async Task UpdateOrderStatus_RefusesATransitionTheOperatorMayNotMake()
     {
         var order = BuildOrder(Guid.NewGuid(), OrderStatus.PendingPayment);
         _context.Orders.Add(order);
@@ -217,14 +324,13 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
 
         var result = await _updateOrderStatusHandler.HandleAsync(new UpdateOrderStatusCommand(order.Id, "Fulfilled"));
 
-        result.Should().BeTrue();
+        result.Success.Should().BeFalse();
         var updated = await _context.Orders.FindAsync(order.Id);
-        updated!.Status.Should().Be(OrderStatus.Fulfilled);
-        updated.UpdatedAtUtc.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(2));
+        updated!.Status.Should().Be(OrderStatus.PendingPayment);
     }
 
     [Fact]
-    public async Task UpdateOrderStatus_ShouldLeaveStatusUnchanged_WhenStatusInvalid()
+    public async Task UpdateOrderStatus_LeavesStatusUnchanged_WhenStatusInvalid()
     {
         var order = BuildOrder(Guid.NewGuid(), OrderStatus.PendingPayment);
         _context.Orders.Add(order);
@@ -232,17 +338,20 @@ public sealed class OrderAdminCommandHandlersTests : IDisposable
 
         var result = await _updateOrderStatusHandler.HandleAsync(new UpdateOrderStatusCommand(order.Id, "NotARealStatus"));
 
-        result.Should().BeTrue();
+        result.Found.Should().BeTrue();
+        result.Success.Should().BeFalse();
+        result.Error.Should().Contain("NotARealStatus");
         var updated = await _context.Orders.FindAsync(order.Id);
         updated!.Status.Should().Be(OrderStatus.PendingPayment);
     }
 
     [Fact]
-    public async Task UpdateOrderStatus_ShouldReturnFalse_WhenOrderMissing()
+    public async Task UpdateOrderStatus_ReturnsNotFound_WhenOrderMissing()
     {
         var result = await _updateOrderStatusHandler.HandleAsync(new UpdateOrderStatusCommand(Guid.NewGuid(), "Fulfilled"));
 
-        result.Should().BeFalse();
+        result.Found.Should().BeFalse();
+        result.Success.Should().BeFalse();
     }
 
     [Fact]
