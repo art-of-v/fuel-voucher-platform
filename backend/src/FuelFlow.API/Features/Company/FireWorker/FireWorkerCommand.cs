@@ -65,6 +65,10 @@ var member = await _context.CompanyMembers
         // was bought under. Vouchers already Blocked are not in the set above, so they keep their
         // issuance order: a frozen voucher stays the worker's, which is why the worker sees why it is
         // unusable.
+        //
+        // Such a voucher is not stuck, though: the owner can put it back into the pool in one step
+        // (ReturnVoucherToPoolCommand, planning #558). It used to have only the thaw, which handed the
+        // paper back to the person who was just fired.
         var restored = await IssuanceOrderLink.RestoreToPurchasesAsync(
             _context,
             assignedWorkerVouchers.Select(v => v.Id).ToList(),

@@ -97,7 +97,8 @@ internal static class CompanyTestFactory
         Guid? workerUserId = null,
         string brand = "okko",
         string fuelTypeId = "okko-95",
-        decimal liters = 50)
+        decimal liters = 50,
+        Guid? orderId = null)
         => new()
         {
             Id = id,
@@ -113,6 +114,7 @@ internal static class CompanyTestFactory
             LegalEntityId = legalEntityId,
             AssignedToUserId = assignedToUserId,
             WorkerUserId = workerUserId,
+            OrderId = orderId,
             CreatedAtUtc = TestClock.UtcNow,
             UpdatedAtUtc = TestClock.UtcNow
         };

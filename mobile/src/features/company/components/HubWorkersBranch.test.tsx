@@ -55,11 +55,13 @@ function renderBranch(overrides: Partial<React.ComponentProps<typeof HubWorkersB
     isBlocking: false,
     isRecalling: false,
     isUnblocking: false,
+    isReturningToPool: false,
     memberName,
     openGift: jest.fn(),
     confirmFire: jest.fn(),
     confirmRecall: jest.fn(),
     confirmBlock: jest.fn(),
+    confirmReturnToPool: jest.fn(),
     ...overrides,
   };
   return { props, ...render(<HubWorkersBranch {...props} />) };
@@ -134,10 +136,55 @@ describe('HubWorkersBranch', () => {
     expect(screen.getByText('company.block.section 1')).toBeTruthy();
     expect(screen.queryByText('Oleksandr')).toBeNull();
 
-    // The fuel still has to be actionable, so the thaw stays.
+    // The fuel still has to be actionable, so the way back to the pool stays.
     fireEvent.press(screen.getByText('company.hub.companyFuel'));
+    fireEvent.press(screen.getByText('company.recall.action'));
+    expect(props.confirmReturnToPool).toHaveBeenCalledWith(expect.objectContaining({ id: 'v9' }));
+  });
+
+  it("offers the way back to the pool, and not the thaw, on a fired worker's fuel", () => {
+    const frozen = mkVoucher({ id: 'v9', workerUserId: 'gone', status: 'blocked' });
+    const { props } = renderBranch({ members: [], blocked: [frozen] });
+
+    openRoster();
+    fireEvent.press(screen.getByText('company.hub.companyFuel'));
+
+    // A thaw hands the paper to whoever holds it — and that is the person who was just
+    // fired, so it is not offered here (planning #558).
+    expect(screen.queryByText('company.block.unblockAction')).toBeNull();
+    expect(screen.getByText('company.recall.action')).toBeTruthy();
+    expect(props.unblock).not.toHaveBeenCalled();
+  });
+
+  it('files the fuel a firing froze on the way out under the company too', () => {
+    // The vouchers that were still active when the worker was fired became company fuel
+    // and frozen at the same moment: no worker holds them and no door is open either.
+    const frozenStock = mkVoucher({ id: 'v10', workerUserId: null, status: 'blocked' });
+    const { props } = renderBranch({ members: [], blocked: [frozenStock] });
+
+    openRoster();
+    expect(screen.getByText('company.hub.companyFuel')).toBeTruthy();
+    expect(screen.getByText('company.block.section 1')).toBeTruthy();
+
+    fireEvent.press(screen.getByText('company.hub.companyFuel'));
+    fireEvent.press(screen.getByText('company.recall.action'));
+    expect(props.confirmReturnToPool).toHaveBeenCalledWith(expect.objectContaining({ id: 'v10' }));
+  });
+
+  it('still offers the thaw on a frozen voucher of a worker who works here', () => {
+    const frozen = mkVoucher({ id: 'v11', workerUserId: 'w1', status: 'blocked' });
+    const { props } = renderBranch({ members: [mkMember()], blocked: [frozen] });
+
+    openRoster();
+    fireEvent.press(screen.getByText('Ivan Petrov'));
+
+    // The worker still works here, so the fuel can go back to them — and it can also go
+    // back to the pool, which is the same word and the same fact.
     fireEvent.press(screen.getByText('company.block.unblockAction'));
-    expect(props.unblock).toHaveBeenCalledWith('v9');
+    expect(props.unblock).toHaveBeenCalledWith('v11');
+
+    fireEvent.press(screen.getByText('company.recall.action'));
+    expect(props.confirmReturnToPool).toHaveBeenCalledWith(expect.objectContaining({ id: 'v11' }));
   });
 
   it('keeps the company fuel visible while the owner searches for a worker', () => {

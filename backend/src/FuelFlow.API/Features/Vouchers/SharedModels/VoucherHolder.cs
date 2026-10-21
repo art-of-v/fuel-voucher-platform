@@ -19,8 +19,10 @@ namespace FuelFlow.Features.Vouchers.SharedModels;
 public static class VoucherHolder
 {
     /// <summary>
-    /// The user who may redeem the voucher, or null when it sits in the company's undistributed pool.
-    /// A worker, once set, wins: the owner no longer holds what they issued.
+    /// The user who may redeem the voucher, or null when nobody holds it - operator stock,
+    /// which has neither a worker nor an assignee. A worker, once set, wins: the owner no
+    /// longer holds what they issued. A company's own pool voucher has no worker, so its
+    /// holder is the owner - which is who may spend it.
     /// </summary>
     public static Guid? Of(Guid? workerUserId, Guid? assignedToUserId)
         => workerUserId ?? assignedToUserId;

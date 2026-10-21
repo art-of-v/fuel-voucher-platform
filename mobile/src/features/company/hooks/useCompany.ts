@@ -10,6 +10,7 @@ import {
   getSentInvitations,
   giftVouchers,
   recallVoucher,
+  returnVoucherToPool,
   sendInvitation,
   unblockWorkerVoucher,
 } from '../api/companyApi';
@@ -234,6 +235,23 @@ export function useCompany(callbacks?: {
     onError: showError,
   });
 
+  // A frozen voucher put back into the company pool (planning #558). The thaw above
+  // is the other thing an owner can do with frozen fuel, and it is not this one: the
+  // thaw hands the paper back to whoever holds it, which for the fuel of a fired
+  // worker means handing it to the person who was just fired.
+  const returnToPoolMutation = useMutation({
+    mutationFn: (voucherId: string) => returnVoucherToPool(voucherId, ownedEntityId),
+    onSuccess: () => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      queryClient.invalidateQueries({ queryKey: ['company', 'members'] });
+      queryClient.invalidateQueries({ queryKey: ['vouchers', 'my'] });
+      // The voucher goes back under the purchase it arrived with, so the orders branch
+      // is stale until it refetches.
+      queryClient.invalidateQueries({ queryKey: ['orders', 'my'] });
+    },
+    onError: showError,
+  });
+
   const refreshAll = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['company', 'invitations'] }),
@@ -279,6 +297,7 @@ export function useCompany(callbacks?: {
     recall: (voucherId: string) => recallMutation.mutate(voucherId),
     block: (voucherId: string) => blockMutation.mutate(voucherId),
     unblock: (voucherId: string) => unblockMutation.mutate(voucherId),
+    returnToPool: (voucherId: string) => returnToPoolMutation.mutate(voucherId),
     refreshAll,
     // pending flags
     isInviting: inviteMutation.isPending,
@@ -288,5 +307,6 @@ export function useCompany(callbacks?: {
     isRecalling: recallMutation.isPending,
     isBlocking: blockMutation.isPending,
     isUnblocking: unblockMutation.isPending,
+    isReturningToPool: returnToPoolMutation.isPending,
   };
 }

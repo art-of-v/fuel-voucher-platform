@@ -10,6 +10,7 @@ using FuelFlow.Features.Company.GetMyMemberships;
 using FuelFlow.Features.Company.GetOwnerInvitations;
 using FuelFlow.Features.Company.GiftVouchers;
 using FuelFlow.Features.Company.RecallVoucher;
+using FuelFlow.Features.Company.ReturnVoucherToPool;
 using FuelFlow.Features.Company.SendInvitation;
 using FuelFlow.Features.Company.UnblockWorkerVoucher;
 using Microsoft.AspNetCore.Authorization;
@@ -37,6 +38,7 @@ private readonly GetMyInvitationsQueryHandler _getMyInvitationsHandler;
     private readonly RecallVoucherCommandHandler _recallVoucherHandler;
     private readonly BlockWorkerVoucherCommandHandler _blockWorkerVoucherHandler;
     private readonly UnblockWorkerVoucherCommandHandler _unblockWorkerVoucherHandler;
+    private readonly ReturnVoucherToPoolCommandHandler _returnVoucherToPoolHandler;
 
     public CompanyController(
         SendInvitationCommandHandler sendInvitationHandler,
@@ -51,7 +53,8 @@ private readonly GetMyInvitationsQueryHandler _getMyInvitationsHandler;
         GiftVouchersCommandHandler giftVouchersHandler,
         RecallVoucherCommandHandler recallVoucherHandler,
         BlockWorkerVoucherCommandHandler blockWorkerVoucherHandler,
-        UnblockWorkerVoucherCommandHandler unblockWorkerVoucherHandler)
+        UnblockWorkerVoucherCommandHandler unblockWorkerVoucherHandler,
+        ReturnVoucherToPoolCommandHandler returnVoucherToPoolHandler)
     {
         _sendInvitationHandler = sendInvitationHandler;
         _getOwnerInvitationsHandler = getOwnerInvitationsHandler;
@@ -66,6 +69,7 @@ private readonly GetMyInvitationsQueryHandler _getMyInvitationsHandler;
         _recallVoucherHandler = recallVoucherHandler;
         _blockWorkerVoucherHandler = blockWorkerVoucherHandler;
         _unblockWorkerVoucherHandler = unblockWorkerVoucherHandler;
+        _returnVoucherToPoolHandler = returnVoucherToPoolHandler;
     }
 
     [HttpPost("invitations")]
@@ -300,6 +304,26 @@ private readonly GetMyInvitationsQueryHandler _getMyInvitationsHandler;
             "Forbidden" => Forbid(),
             "InvalidState" => Conflict(new { error = result.ErrorMessage }),
             _ => BadRequest(new { error = result.ErrorMessage ?? "Failed to unblock voucher." })
+        };
+    }
+
+    [HttpPost("vouchers/return-to-pool/{voucherId:guid}")]
+    public async Task<IActionResult> ReturnVoucherToPool([FromRoute] Guid voucherId, [FromQuery] Guid? legalEntityId, CancellationToken cancellationToken)
+    {
+        var userId = GetUserId();
+        if (userId == null) return Unauthorized();
+
+        var result = await _returnVoucherToPoolHandler.HandleAsync(new ReturnVoucherToPoolCommand(userId.Value, voucherId, legalEntityId), cancellationToken);
+
+        return result.Status switch
+        {
+            "Success" => Ok(new { success = true }),
+            "OwnerCompanyNotFound" => BadRequest(new { error = result.ErrorMessage }),
+            "CompanyNotOwned" => NotFound(new { error = result.ErrorMessage }),
+            "NotFound" => NotFound(new { error = result.ErrorMessage }),
+            "Forbidden" => Forbid(),
+            "InvalidState" => Conflict(new { error = result.ErrorMessage }),
+            _ => BadRequest(new { error = result.ErrorMessage ?? "Failed to return the voucher to the pool." })
         };
     }
 

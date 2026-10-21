@@ -18,7 +18,11 @@ public sealed record UnblockWorkerVoucherResult(string Status, string? ErrorMess
 /// Owner-side thaw of a voucher the owner previously froze with
 /// <see cref="BlockWorkerVoucher"/> (#103 S3b): flips a <c>Blocked</c> voucher back to
 /// <c>Assigned</c>, leaving it with the same worker so it becomes redeemable again. The
-/// one toggle counterpart to block; recalling to the pool stays a separate action.
+/// one toggle counterpart to block; recalling to the pool stays a separate action
+/// (<see cref="RecallVoucher"/>), and so does putting frozen fuel back into the pool
+/// without handing it to anybody (<see cref="ReturnVoucherToPool.ReturnVoucherToPoolCommand"/>,
+/// planning #558) — the thaw gives the paper back to its holder, which is the wrong
+/// direction for the fuel of a worker who no longer works here.
 /// </summary>
 public sealed class UnblockWorkerVoucherCommandHandler
 {

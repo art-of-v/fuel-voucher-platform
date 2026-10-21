@@ -78,8 +78,10 @@ public sealed class RecallVoucherCommandHandler
 
         _context.Update(voucher);
 
-        // D-13. `recall` is the last movement kind with no writer and this is its path: the paper goes
-        // from a worker's hands back to the company that issued it.
+        // D-13. `recall` is the movement a worker's hand-off takes back, and this is its path: the
+        // paper goes from a worker's hands back to the company that issued it. A frozen voucher
+        // reaches the same place through the other door (ReturnVoucherToPoolCommand, planning
+        // #558), which writes the same kind and adds the status change the thaw cannot.
         //
         // No StatusChanged event on purpose — the guard above required `Assigned` and nothing below
         // changes it. A recall takes the voucher back but does not make it a different kind of thing,

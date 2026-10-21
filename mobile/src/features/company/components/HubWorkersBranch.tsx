@@ -41,12 +41,14 @@ type HubWorkersBranchProps = Pick<
   | 'isBlocking'
   | 'isRecalling'
   | 'isUnblocking'
+  | 'isReturningToPool'
 > & {
   memberName: (m: CompanyMemberDto) => string;
   openGift: (m: CompanyMemberDto) => void;
   confirmFire: (m: CompanyMemberDto) => void;
   confirmRecall: (v: Voucher) => void;
   confirmBlock: (v: Voucher) => void;
+  confirmReturnToPool: (v: Voucher) => void;
 };
 
 /**
@@ -63,12 +65,20 @@ interface VoucherActionRowProps {
   voucher: Voucher;
   /** The holder as carried on the voucher, for the "→ name" attribution line. */
   holder: string;
+  /**
+   * Whether the voucher belongs to no current member — the fuel of somebody who no
+   * longer works here. It withdraws the thaw: a thaw hands the paper back to its
+   * holder, and there is nobody to hand it to.
+   */
+  orphaned: boolean;
   isBlocking: boolean;
   isRecalling: boolean;
   isUnblocking: boolean;
+  isReturningToPool: boolean;
   onFreeze: (v: Voucher) => void;
   onRecall: (v: Voucher) => void;
   onUnfreeze: (v: Voucher) => void;
+  onReturnToPool: (v: Voucher) => void;
 }
 
 /**
@@ -76,20 +86,28 @@ interface VoucherActionRowProps {
  * actions its status allows. `ownerActionsForVoucher` is the gate — freezing and recalling
  * both need an assigned voucher on the server, and only a frozen one can be thawed back,
  * so a spent voucher explains itself rather than offering buttons that could only fail.
+ *
+ * A frozen voucher has two ways out and the row offers both: the thaw hands it back to
+ * whoever holds it, and the return puts it back into the company pool. The second one is
+ * the only road the fuel of a fired worker has — the thaw would hand it to the person who
+ * was just fired.
  */
 function VoucherActionRow({
   voucher,
   holder,
+  orphaned,
   isBlocking,
   isRecalling,
   isUnblocking,
+  isReturningToPool,
   onFreeze,
   onRecall,
   onUnfreeze,
+  onReturnToPool,
 }: VoucherActionRowProps) {
   const tokens = useDesignTokens();
   const { t } = useI18n();
-  const actions = ownerActionsForVoucher(voucher.status);
+  const actions = ownerActionsForVoucher(voucher.status, orphaned);
 
   return (
     <View style={[styles.row, { borderColor: tokens.colors.borderLight }]}>
@@ -115,6 +133,22 @@ function VoucherActionRow({
           <Unlock size={14} color={tokens.colors.primary} />
           <Text style={[styles.btnLabel, { color: tokens.colors.primary }]}>
             {t('company.block.unblockAction')}
+          </Text>
+        </Pressable>
+      ) : null}
+      {actions.canReturnToPool ? (
+        <Pressable
+          disabled={isReturningToPool}
+          onPress={() => onReturnToPool(voucher)}
+          style={[
+            styles.smallBtn,
+            { borderColor: tokens.colors.primary },
+            isReturningToPool && { opacity: 0.5 },
+          ]}
+        >
+          <RotateCcw size={14} color={tokens.colors.primary} />
+          <Text style={[styles.btnLabel, { color: tokens.colors.primary }]}>
+            {t('company.recall.action')}
           </Text>
         </Pressable>
       ) : actions.canFreezeOrRecall ? (
@@ -169,6 +203,7 @@ interface WorkerRosterRowProps {
     isBlocking: boolean;
     isRecalling: boolean;
     isUnblocking: boolean;
+    isReturningToPool: boolean;
   };
   memberName: (m: CompanyMemberDto) => string;
   onToggle: () => void;
@@ -177,6 +212,7 @@ interface WorkerRosterRowProps {
   onFreeze: (v: Voucher) => void;
   onRecall: (v: Voucher) => void;
   onUnfreeze: (v: Voucher) => void;
+  onReturnToPool: (v: Voucher) => void;
 }
 
 /**
@@ -200,6 +236,7 @@ function WorkerRosterRow({
   onFreeze,
   onRecall,
   onUnfreeze,
+  onReturnToPool,
 }: WorkerRosterRowProps) {
   const tokens = useDesignTokens();
   const { t } = useI18n();
@@ -284,12 +321,17 @@ function WorkerRosterRow({
                     key={v.id}
                     voucher={v}
                     holder={voucherWorkerName(v)}
+                    // A current member holds it, so the thaw is on the table: the fuel can go
+                    // back to the worker it was frozen for.
+                    orphaned={false}
                     isBlocking={flags.isBlocking}
                     isRecalling={flags.isRecalling}
                     isUnblocking={flags.isUnblocking}
+                    isReturningToPool={flags.isReturningToPool}
                     onFreeze={onFreeze}
                     onRecall={onRecall}
                     onUnfreeze={onUnfreeze}
+                    onReturnToPool={onReturnToPool}
                   />
                 ))}
               </View>
@@ -309,11 +351,13 @@ interface CompanyFuelRowProps {
     isBlocking: boolean;
     isRecalling: boolean;
     isUnblocking: boolean;
+    isReturningToPool: boolean;
   };
   onToggle: () => void;
   onFreeze: (v: Voucher) => void;
   onRecall: (v: Voucher) => void;
   onUnfreeze: (v: Voucher) => void;
+  onReturnToPool: (v: Voucher) => void;
 }
 
 /**
@@ -325,6 +369,9 @@ interface CompanyFuelRowProps {
  * is not a worker: the membership is gone, and a roster that still carries a line for
  * somebody who no longer works here reads as if they did. The name that travels with
  * a voucher stays on the voucher — it says whose fuel it was, not who holds it now.
+ *
+ * The group offers the fuel back to the company, and it does not offer the thaw: a thaw
+ * would hand the paper to the worker who was just fired (planning #558).
  */
 function CompanyFuelRow({
   fuel,
@@ -334,6 +381,7 @@ function CompanyFuelRow({
   onFreeze,
   onRecall,
   onUnfreeze,
+  onReturnToPool,
 }: CompanyFuelRowProps) {
   const tokens = useDesignTokens();
   const { t } = useI18n();
@@ -378,12 +426,17 @@ function CompanyFuelRow({
                   key={v.id}
                   voucher={v}
                   holder={voucherWorkerName(v)}
+                  // No current member holds it, so there is nobody to thaw it for: the way
+                  // out is back to the company pool.
+                  orphaned
                   isBlocking={flags.isBlocking}
                   isRecalling={flags.isRecalling}
                   isUnblocking={flags.isUnblocking}
+                  isReturningToPool={flags.isReturningToPool}
                   onFreeze={onFreeze}
                   onRecall={onRecall}
                   onUnfreeze={onUnfreeze}
+                  onReturnToPool={onReturnToPool}
                 />
               ))}
             </View>
@@ -397,7 +450,8 @@ function CompanyFuelRow({
 /**
  * The hub's workers branch: one entry point instead of a flat wall of vouchers. It opens a
  * searchable roster, each row drilling down into that worker's fuel by brand, with freeze,
- * recall and unfreeze inside it.
+ * recall and unfreeze inside it — and, on the company's own fuel, the way back to the pool
+ * (planning #558).
  *
  * The roster replaces the workers table and both voucher lists, so this component owns
  * everything those three showed — including the counter source, which is the vouchers
@@ -415,11 +469,13 @@ export function HubWorkersBranch(props: HubWorkersBranchProps) {
     isBlocking,
     isRecalling,
     isUnblocking,
+    isReturningToPool,
     memberName,
     openGift,
     confirmFire,
     confirmRecall,
     confirmBlock,
+    confirmReturnToPool,
   } = props;
   const tokens = useDesignTokens();
   const { t } = useI18n();
@@ -529,11 +585,12 @@ export function HubWorkersBranch(props: HubWorkersBranchProps) {
               <CompanyFuelRow
                 fuel={companyFuel}
                 expanded={companyFuelOpen}
-                flags={{ isBlocking, isRecalling, isUnblocking }}
+                flags={{ isBlocking, isRecalling, isUnblocking, isReturningToPool }}
                 onToggle={toggleCompanyFuel}
                 onFreeze={confirmBlock}
                 onRecall={confirmRecall}
                 onUnfreeze={unfreeze}
+                onReturnToPool={confirmReturnToPool}
               />
             )}
 
@@ -553,7 +610,7 @@ export function HubWorkersBranch(props: HubWorkersBranchProps) {
                       entry={entry}
                       member={member}
                       expanded={expandedWorkers.has(entry.memberId)}
-                      flags={{ isFiring, isBlocking, isRecalling, isUnblocking }}
+                      flags={{ isFiring, isBlocking, isRecalling, isUnblocking, isReturningToPool }}
                       memberName={memberName}
                       onToggle={() => toggleWorker(entry.memberId)}
                       onGift={openGift}
@@ -561,6 +618,7 @@ export function HubWorkersBranch(props: HubWorkersBranchProps) {
                       onFreeze={confirmBlock}
                       onRecall={confirmRecall}
                       onUnfreeze={unfreeze}
+                      onReturnToPool={confirmReturnToPool}
                     />
                   );
                 })}

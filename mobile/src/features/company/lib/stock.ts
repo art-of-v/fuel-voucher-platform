@@ -77,17 +77,32 @@ export interface CompanyStock {
  * button on a redeemed voucher could only ever come back as «Ця дія конфліктує з поточним
  * станом». The screen used to render them anyway; the server guard stays as the real
  * protection, this only keeps the UI from proposing what cannot succeed.
+ *
+ * `orphaned` says the voucher belongs to no current member — it is the fuel of somebody
+ * who no longer works here. It changes one thing: the thaw is withdrawn, because a thaw
+ * hands the paper back to its holder, and for the fuel of a fired worker that would hand
+ * it to the person who was just fired. The owner's way back to the pool is the return
+ * instead (planning #558).
  */
-export function ownerActionsForVoucher(status: string | undefined): {
+export function ownerActionsForVoucher(
+  status: string | undefined,
+  orphaned = false,
+): {
   canFreezeOrRecall: boolean;
   canUnblock: boolean;
+  canReturnToPool: boolean;
 } {
   const s = (status ?? '').toLowerCase();
   return {
     // `used` is spent — nothing left to freeze or pull back. A `blocked` voucher is
     // already frozen, so it offers only the way back.
     canFreezeOrRecall: s !== 'used' && s !== 'blocked',
-    canUnblock: s === 'blocked',
+    // A frozen voucher of a current worker can be handed back to them; a frozen voucher
+    // of a former one cannot, because there is nobody to hand it to.
+    canUnblock: s === 'blocked' && !orphaned,
+    // The way back to the pool, for a frozen voucher of anybody: it leaves the worker and
+    // becomes spendable company stock again.
+    canReturnToPool: s === 'blocked',
   };
 }
 
@@ -251,6 +266,15 @@ export function filterRoster(
  *
  * The name that travels with a voucher is its provenance, not its owner: the group says whose
  * fuel it was, the filing says who holds it now, and that is the company.
+ *
+ * Two kinds of fuel land here, and both are the company's own:
+ *
+ * - **the former worker's**, in whatever state it is — it still points at somebody who no
+ *   longer works here;
+ * - **the company's frozen stock** — nobody holds it and while it is frozen it cannot be
+ *   issued either. That is the fuel a firing froze on its way out: the vouchers that were
+ *   still active became company fuel and frozen at the same moment, so they are counted as
+ *   the company's litres and could not be issued to anybody.
  */
 export interface OrphanedCompanyFuel {
   /** Every voucher no current member holds. */
@@ -268,14 +292,22 @@ export interface OrphanedCompanyFuel {
  *
  * A voucher with no worker link at all is not orphaned: it is the company's own pool (or a
  * voucher the owner froze and the server unlinked), and the orders branch already files that
- * one. What lands here is the fuel that still points at a worker who is no longer a member.
+ * one. What lands here is the fuel that still points at a worker who is no longer a member,
+ * plus the company's own frozen stock — the one that has no worker to point at, and no door
+ * open either while it is frozen.
  */
 export function orphanedCompanyFuel(
   members: RosterMember[],
   vouchers: Voucher[],
 ): OrphanedCompanyFuel {
   const memberWorkerIds = new Set(members.map((m) => m.workerUserId));
-  const orphaned = vouchers.filter((v) => !!v.workerUserId && !memberWorkerIds.has(v.workerUserId));
+  const orphaned = vouchers.filter((v) => {
+    // The former worker's fuel, in whatever state it is.
+    if (v.workerUserId && !memberWorkerIds.has(v.workerUserId)) return true;
+    // The company's own frozen stock: nobody holds it, and while it is frozen the pool
+    // cannot issue it — so it belongs with the fuel the owner still has to act on.
+    return (v.status ?? '').toLowerCase() === 'blocked' && !v.workerUserId;
+  });
 
   return {
     vouchers: orphaned,

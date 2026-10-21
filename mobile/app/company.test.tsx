@@ -29,6 +29,7 @@ const mockFire = jest.fn();
 const mockRecall = jest.fn();
 const mockBlock = jest.fn();
 const mockUnblock = jest.fn();
+const mockReturnToPool = jest.fn();
 const mockGift = jest.fn();
 const mockInvite = jest.fn();
 const mockCancelInvite = jest.fn();
@@ -125,6 +126,7 @@ jest.mock('../src/features/company/components', () => {
         {btn('recall-btn-' + p.gifted[0]?.id, () => p.confirmRecall(p.gifted[0]))}
         {btn('block-btn-' + p.gifted[0]?.id, () => p.confirmBlock(p.gifted[0]))}
         {p.blocked.map((v: any) => btn('unblock-' + v.id, () => p.unblock(v.id)))}
+        {btn('return-btn-' + p.blocked[0]?.id, () => p.confirmReturnToPool(p.blocked[0]))}
       </>
     ),
     IssueVoucherModal: (p: Record<string, any>) => (
@@ -182,6 +184,7 @@ const baseData = {
   recall: mockRecall,
   block: mockBlock,
   unblock: mockUnblock,
+  returnToPool: mockReturnToPool,
   refreshAll: jest.fn(),
   isInviting: false,
   isCancelling: false,
@@ -190,6 +193,7 @@ const baseData = {
   isRecalling: false,
   isBlocking: false,
   isUnblocking: false,
+  isReturningToPool: false,
 };
 
 /** Captures the callbacks the screen passes to useCompany. */
@@ -320,6 +324,23 @@ describe('CompanyScreen', () => {
 
       expect(alertSpy).not.toHaveBeenCalled();
       expect(mockUnblock).toHaveBeenCalledWith('b1');
+    });
+
+    it('puts a frozen voucher back into the pool after a confirmation', () => {
+      // Planning #558: the way back to the pool for frozen fuel. It says the same thing
+      // the recall says — it is the same thing, on a voucher that was frozen.
+      renderScreen();
+      fireEvent.press(screen.getByTestId('return-btn-b1'));
+
+      expect(alertSpy).toHaveBeenCalledWith(
+        'company.recall.confirmTitle',
+        'company.recall.confirmDesc',
+        expect.anything(),
+      );
+      expect(mockReturnToPool).not.toHaveBeenCalled();
+
+      answerAlert('company.recall.confirm');
+      expect(mockReturnToPool).toHaveBeenCalledWith('b1');
     });
   });
 
