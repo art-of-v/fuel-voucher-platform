@@ -164,7 +164,7 @@ public sealed class VoucherTermSaleTests : IDisposable
     /// </summary>
     private void SeedStock(int daysUntilPaperExpiry, string brand = "okko", string fuelTypeId = "okko-95", decimal liters = 10m)
     {
-        _context.FuelVouchers.Add(new FuelVoucher
+        var voucher = new FuelVoucher
         {
             Id = Guid.NewGuid(),
             BrandId = BrandIds.ForSlug(brand),
@@ -178,7 +178,12 @@ public sealed class VoucherTermSaleTests : IDisposable
             Status = VoucherStatus.Available,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
-        });
+        };
+        _context.FuelVouchers.Add(voucher);
+        // The stock queries read the summary, not the vouchers, and the in-memory provider has no
+        // trigger to keep it in step. The row is derived from the voucher, so it cannot disagree
+        // with it - see StockSummaryFollowsTheVouchers for the real thing.
+        _context.StockSummary.Add(TestStock.SummaryFor(voucher));
         _context.SaveChanges();
     }
 

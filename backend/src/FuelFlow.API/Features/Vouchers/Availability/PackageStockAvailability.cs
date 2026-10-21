@@ -327,17 +327,19 @@ var key = StockKey.For(row.BrandSlug, row.Fuel.Id, row.Liters);
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var pool = DataKinds.ForPool(isTestAccount);
 
-        var query = _context.FuelVouchers
+        var query = _context.StockSummary
             .AsNoTracking()
-            .Where(v => v.Status == VoucherStatus.Available
-                     && v.DataKind == pool
-                     && (!_expiryEnabled || v.SupplierExpirationDate >= today));
+            .Where(s => s.Status == VoucherStatus.Available
+                     && s.DataKind == pool
+                     && !s.IsDeleted
+                     && (!_expiryEnabled || s.SupplierExpirationDate >= today)
+                     && s.VoucherCount > 0);
 
-        if (brands is not null)
+        if (brands != null)
         {
-            query = query.Where(v => brands.Contains(v.Brand)
-                                  && fuelTypeIds!.Contains(v.FuelTypeId)
-                                  && literSizes!.Contains(v.Liters));
+            query = query.Where(s => brands.Contains(s.Brand)
+                                  && fuelTypeIds!.Contains(s.FuelTypeId)
+                                  && literSizes!.Contains(s.Liters));
         }
 
         // The brand is projected RAW, not case-folded in SQL. `lower(brand)` in a projection is
@@ -346,8 +348,8 @@ var key = StockKey.For(row.BrandSlug, row.Fuel.Id, row.Liters);
         // canonical form is the slug, and StockKey's contract is the lower-cased slug, so the fold
         // happens on the rows that come back.
         return query
-            .Select(v => new { v.Brand, v.FuelTypeId, v.Liters })
+            .Select(s => new { s.Brand, s.FuelTypeId, s.Liters })
             .Distinct()
-            .Select(v => new StockKey(v.Brand.ToLowerInvariant(), v.FuelTypeId, v.Liters));
+            .Select(s => new StockKey(s.Brand.ToLowerInvariant(), s.FuelTypeId, s.Liters));
     }
 }
