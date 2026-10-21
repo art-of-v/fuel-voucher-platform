@@ -1823,7 +1823,8 @@ namespace FuelFlow.API.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CreatedAtUtc")
-                        .HasDatabaseName("ix_outbox_events_created_at_utc");
+                        .HasDatabaseName("ix_outbox_events_pending_consumed")
+                        .HasFilter("processed = false AND event_type IN ('OrderCreated', 'OrderFulfilled', 'VoucherIssued')");
 
                     b.HasIndex("Processed")
                         .HasDatabaseName("ix_outbox_events_processed");

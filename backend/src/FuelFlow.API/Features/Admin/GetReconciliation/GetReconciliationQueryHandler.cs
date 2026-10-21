@@ -102,7 +102,14 @@ from f in _context.FuelTypes.AsNoTracking()
             .CountAsync(v => v.Status == VoucherStatus.Assigned
                 && !_context.Fulfillments.Any(f => f.VoucherId == v.Id), cancellationToken);
 
-        var unprocessed = await _context.OutboxEvents.CountAsync(e => !e.Processed, cancellationToken);
+        // The events that are waiting for a CONSUMER, not every event that is unprocessed. Five of
+        // the eight event types have no consumer and are never marked processed - they are the
+        // record of something that happened, and they are most of the table. Counting them here
+        // made the number thousands instead of units, so the "fulfillment jobs may be stalled"
+        // alarm below was always on, which is the same as no alarm at all.
+        var unprocessed = await _context.OutboxEvents.CountAsync(
+            e => !e.Processed && ConsumedOutboxEventTypes.All.Contains(e.EventType),
+            cancellationToken);
 
         var importErrors = await _context.VoucherImportErrors
             .CountAsync(e => e.CreatedAtUtc >= DateTime.UtcNow.AddDays(-7), cancellationToken);
