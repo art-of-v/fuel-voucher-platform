@@ -10,7 +10,7 @@ Three applications share one backend:
 
 | App | Stack | Purpose |
 |---|---|---|
-| [`mobile/`](mobile) | React Native 0.81 · Expo 54 · Expo Router · NativeWind · Zustand · TanStack Query | End-user app: map, stations, packages, basket, checkout, payments, vouchers, profile |
+| [`mobile/`](mobile) | React Native 0.81 · Expo 54 · Expo Router · NativeWind · Zustand · TanStack Query | End-user app: map, stations, packages, basket, checkout, payments, vouchers, referrals, profile |
 | [`admin/`](admin) | React 19 · Vite 7 · TypeScript · shadcn/ui · Tailwind 4 · TanStack Query · Zustand · Recharts | Back-office: voucher import, providers/pricing, users, contracts, reports, audit & error logs |
 | [`backend/`](backend) | .NET 10 · ASP.NET Core · EF Core 10 · PostgreSQL (Npgsql) · Hangfire · Redis | REST API, background jobs, Monobank integration, auth, outbox |
 

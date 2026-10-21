@@ -1,7 +1,7 @@
 import React from 'react';
 import { Linking, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Bell, FileText, Mail, PiggyBank } from 'lucide-react-native';
+import { Bell, FileText, Gift, Mail, PiggyBank } from 'lucide-react-native';
 
 import { Badge, Card, ListItem, SectionHeader } from '../../../core/ui';
 import { useDesignTokens } from '../../../core/hooks/useTheme';
@@ -57,6 +57,20 @@ export function ActivitySection({
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             router.push('/savings');
+          }}
+          showChevron
+          divider
+        />
+
+        {/* The referral codes the customer hands out and redeems. The backend
+            has always had them (planning #288); this row is what gives them a
+            surface — a customer cannot reach a code they never see. */}
+        <ListItem
+          leading={<Gift size={20} color={tokens.colors.text.muted} />}
+          title={t('referral.title')}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push('/referral');
           }}
           showChevron
           divider={pendingInvitationCount > 0}

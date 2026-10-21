@@ -356,6 +356,7 @@ export default function RootLayout() {
                   <Stack.Screen name="contexts" />
                   <Stack.Screen name="invitations" />
                   <Stack.Screen name="notifications" />
+                  <Stack.Screen name="referral" />
                   <Stack.Screen name="renew" />
                   <Stack.Screen name="renew-select" />
                 </Stack>

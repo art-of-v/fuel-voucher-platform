@@ -283,6 +283,17 @@ export interface User {
   birthdate?: string;
   profileImageUrl?: string;
   userType?: 'INDIVIDUAL' | 'LEGAL_ENTITY';
+  /**
+   * The code this customer hands out to friends. `null` until they choose one —
+   * the customer owns the code, the server stores it as given (trimmed and
+   * upper-cased) and never changes it.
+   */
+  referralCode?: string | null;
+  /**
+   * The code of whoever referred this customer. `null` until they redeem one,
+   * and then for good: a customer is referred once.
+   */
+  referredBy?: string | null;
 }
 
 export interface CartItem {
