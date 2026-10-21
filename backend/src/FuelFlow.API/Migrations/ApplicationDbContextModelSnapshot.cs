@@ -1808,6 +1808,11 @@ namespace FuelFlow.API.Migrations
                     b.HasIndex("VoucherId")
                         .HasDatabaseName("ix_fulfillments_voucher_id");
 
+                    b.HasIndex("OrderId", "VoucherId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_fulfillments_order_id_voucher_id")
+                        .HasFilter("released_at_utc IS NULL");
+
                     b.ToTable("fulfillments", (string)null);
                 });
 
@@ -4553,7 +4558,7 @@ namespace FuelFlow.API.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("from_status")
-                        .HasComment("The status before. Set for a status change only.");
+                        .HasComment("The status before. Set for a status change only. One of the order's eight statuses - a CHECK pins the vocabulary.");
 
                     b.Property<DateTime>("OccurredAtUtc")
                         .HasColumnType("timestamp with time zone")
@@ -4574,7 +4579,7 @@ namespace FuelFlow.API.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("to_status")
-                        .HasComment("The status after. Set for a status change only.");
+                        .HasComment("The status after. Set for a status change only. One of the order's eight statuses - a CHECK pins the vocabulary.");
 
                     b.HasKey("Id");
 
@@ -4592,6 +4597,8 @@ namespace FuelFlow.API.Migrations
                             t.HasCheckConstraint("ck_order_events_event_type", "event_type IN ('Created', 'StatusChanged', 'InvoiceCreated', 'PaymentCaptured', 'Fulfilled', 'PartiallyFulfilled', 'Refunded', 'Cancelled')");
 
                             t.HasCheckConstraint("ck_order_events_from_to", "(event_type = 'Created' AND from_status IS NULL) OR (event_type <> 'Created' AND to_status IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_order_events_statuses", "(from_status IS NULL OR from_status IN ('PendingPayment', 'Paid', 'PendingFulfillment', 'PartiallyFulfilled', 'Fulfilled', 'PartiallyRefunded', 'Refunded', 'Cancelled')) AND (to_status IS NULL OR to_status IN ('PendingPayment', 'Paid', 'PendingFulfillment', 'PartiallyFulfilled', 'Fulfilled', 'PartiallyRefunded', 'Refunded', 'Cancelled'))");
                         });
                 });
 
