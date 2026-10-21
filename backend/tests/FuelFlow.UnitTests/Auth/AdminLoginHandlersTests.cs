@@ -135,7 +135,6 @@ public sealed class AdminLoginHandlersTests : IDisposable
     [InlineData(SeedRoles.AdminName)]
     [InlineData(SeedRoles.ProductOwnerName)]
     [InlineData(SeedRoles.ManagerName)]
-    [InlineData(SeedRoles.QaName)]
     public async Task AdminSendCode_StaffPhone_GeneratesAndSendsCode(string staffRole)
     {
         const string phone = "+380991112233";
@@ -147,6 +146,23 @@ public sealed class AdminLoginHandlersTests : IDisposable
         result.Success.Should().BeTrue();
         (await _context.VerificationCodes.CountAsync(v => v.PhoneNumber == phone)).Should().Be(1);
         smsMock.Verify(x => x.SendVerificationCodeAsync(phone, It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task AdminSendCode_TheRetiredQaRole_SendsNothing_ButReturnsSuccess()
+    {
+        // QA is not staff any more (2026-10-21), so an account that still carries the retired
+        // role is not admitted to the admin sign-in. The answer is the same generic success a
+        // staff phone gets, so the endpoint cannot be used to enumerate which numbers are staff.
+        const string phone = "+380991112244";
+        await SeedUser(phone, SeedRoles.QaName);
+        var smsMock = new Mock<ISmsService>();
+
+        var result = await BuildAdminSendCode(smsMock).HandleAsync(new AdminSendCodeCommand(phone), CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        (await _context.VerificationCodes.CountAsync(v => v.PhoneNumber == phone)).Should().Be(0);
+        smsMock.Verify(x => x.SendVerificationCodeAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

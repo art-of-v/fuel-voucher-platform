@@ -35,13 +35,21 @@ public sealed class RoleHierarchyTests
     }
 
     [Fact]
-    public void CanAssignRole_ProductOwner_MayAssignAdminManagerQaUser()
+    public void CanAssignRole_ProductOwner_MayAssignAdminManagerUser()
     {
         RoleHierarchy.CanAssignRole(SeedRoles.ProductOwnerName, SeedRoles.UserName, SeedRoles.AdminName).Should().BeTrue();
         RoleHierarchy.CanAssignRole(SeedRoles.ProductOwnerName, SeedRoles.UserName, SeedRoles.ManagerName).Should().BeTrue();
         RoleHierarchy.CanAssignRole(SeedRoles.ProductOwnerName, SeedRoles.ManagerName, SeedRoles.UserName).Should().BeTrue();
-        // The ProductOwner is the only role that can hand out QA - nobody else may mint a tester.
-        RoleHierarchy.CanAssignRole(SeedRoles.ProductOwnerName, SeedRoles.UserName, SeedRoles.QaName).Should().BeTrue();
+    }
+
+    [Fact]
+    public void CanAssignRole_TheRetiredQaRole_CannotBeHandedOut()
+    {
+        // The QA staff role is retired (2026-10-21): the QA identity the product needs is the
+        // client-side test account, and granting a role that grants nothing is how an account
+        // ends up with powers nobody can explain.
+        RoleHierarchy.CanAssignRole(SeedRoles.ProductOwnerName, SeedRoles.UserName, SeedRoles.QaName).Should().BeFalse();
+        RoleHierarchy.CanAssignRole(SeedRoles.AdminName, SeedRoles.UserName, SeedRoles.QaName).Should().BeFalse();
     }
 
     [Fact]
@@ -63,27 +71,34 @@ public sealed class RoleHierarchyTests
     [Fact]
     public void CanAssignRole_Qa_MayNotChangeAnyRole_IncludingItsOwn()
     {
-        // QA flips a User account's active switch to test the flow, but it never mints roles -
-        // least of all its own, which would otherwise be privilege escalation in one click.
+        // QA is not staff any more (2026-10-21), so it has no role to change - least of all its
+        // own, which would otherwise be privilege escalation in one click.
         RoleHierarchy.CanAssignRole(SeedRoles.QaName, SeedRoles.UserName, SeedRoles.QaName).Should().BeFalse();
         RoleHierarchy.CanAssignRole(SeedRoles.QaName, SeedRoles.UserName, SeedRoles.ManagerName).Should().BeFalse();
         RoleHierarchy.CanAssignRole(SeedRoles.QaName, SeedRoles.UserName, SeedRoles.AdminName).Should().BeFalse();
         RoleHierarchy.CanAssignRole(SeedRoles.QaName, SeedRoles.QaName, SeedRoles.UserName).Should().BeFalse();
     }
 
-    [Theory]
-    [InlineData(SeedRoles.ManagerName)]
-    [InlineData(SeedRoles.QaName)]
-    public void CanActivateDeactivate_EmployeeTier_MayOnlyFlipAUserAccount(string actorRole)
+    [Fact]
+    public void CanActivateDeactivate_Manager_MayOnlyFlipAUserAccount()
     {
-        // Manager and QA share one reach: User accounts. Neither may disable a colleague's own
-        // staff account - that is the Admin's privilege, and for QA it would be a way to lock
-        // real staff out of a live panel.
-        RoleHierarchy.CanActivateDeactivate(actorRole, SeedRoles.UserName).Should().BeTrue();
-        RoleHierarchy.CanActivateDeactivate(actorRole, SeedRoles.ManagerName).Should().BeFalse();
-        RoleHierarchy.CanActivateDeactivate(actorRole, SeedRoles.QaName).Should().BeFalse();
-        RoleHierarchy.CanActivateDeactivate(actorRole, SeedRoles.AdminName).Should().BeFalse();
-        RoleHierarchy.CanActivateDeactivate(actorRole, SeedRoles.ProductOwnerName).Should().BeFalse();
+        // The Manager is the employee tier: User accounts. It may not disable a colleague's own
+        // staff account - that is the Admin's privilege.
+        RoleHierarchy.CanActivateDeactivate(SeedRoles.ManagerName, SeedRoles.UserName).Should().BeTrue();
+        RoleHierarchy.CanActivateDeactivate(SeedRoles.ManagerName, SeedRoles.ManagerName).Should().BeFalse();
+        RoleHierarchy.CanActivateDeactivate(SeedRoles.ManagerName, SeedRoles.AdminName).Should().BeFalse();
+        RoleHierarchy.CanActivateDeactivate(SeedRoles.ManagerName, SeedRoles.ProductOwnerName).Should().BeFalse();
+    }
+
+    [Fact]
+    public void CanActivateDeactivate_TheRetiredQaRole_MayNotManageAnything()
+    {
+        // QA is not staff any more, so it is refused before the tier is even consulted - and it
+        // is refused for a roleless target too, which is the case that used to be the only way
+        // out of a dead account.
+        RoleHierarchy.CanActivateDeactivate(SeedRoles.QaName, SeedRoles.UserName).Should().BeFalse();
+        RoleHierarchy.CanActivateDeactivate(SeedRoles.QaName, null).Should().BeFalse();
+        RoleHierarchy.CanActivateDeactivate(SeedRoles.QaName, SeedRoles.ManagerName).Should().BeFalse();
     }
 
     [Theory]
@@ -155,18 +170,23 @@ public sealed class RoleHierarchyTests
     }
 
     [Fact]
-    public void IsValidRoleName_AcceptsQa()
+    public void IsValidRoleName_RefusesTheRetiredQaRole()
     {
-        // Without this, QA could not be assigned to anyone at all: CanAssignRole gates on it.
-        SeedRoles.IsValidRoleName(SeedRoles.QaName).Should().BeTrue();
-        SeedRoles.IsStaff(SeedRoles.QaName).Should().BeTrue();
+        // QA was a staff role, and while it was, CanAssignRole gated on this: a name that is not
+        // valid cannot be handed to anybody. The role is retired (2026-10-21), so the answer is
+        // "no" - and the constant stays so a row the database may still carry can be named.
+        SeedRoles.IsValidRoleName(SeedRoles.QaName).Should().BeFalse();
+        SeedRoles.IsStaff(SeedRoles.QaName).Should().BeFalse();
     }
 
     [Fact]
     public void IsStaff_ExcludesThePlainUserRole()
     {
-        // QA is a staff role despite sitting below Manager; User never is.
+        // User never is staff; the three staff roles are exactly ProductOwner, Admin and Manager.
         SeedRoles.IsStaff(SeedRoles.UserName).Should().BeFalse();
         SeedRoles.IsValidRoleName(SeedRoles.UserName).Should().BeTrue();
+        SeedRoles.IsStaff(SeedRoles.ProductOwnerName).Should().BeTrue();
+        SeedRoles.IsStaff(SeedRoles.AdminName).Should().BeTrue();
+        SeedRoles.IsStaff(SeedRoles.ManagerName).Should().BeTrue();
     }
 }

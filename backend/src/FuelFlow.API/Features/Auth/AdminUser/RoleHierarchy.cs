@@ -4,19 +4,28 @@ namespace FuelFlow.Features.Auth.AdminUser;
 
 /// <summary>
 /// Server-side guard for the staff hierarchy:
-/// ProductOwner(100) &gt; Admin(50) &gt; Manager(10) &gt; QA(5) &gt; User(0).
+/// ProductOwner(100) &gt; Admin(50) &gt; Manager(10) &gt; User(0).
 /// ProductOwner can do anything (absolute rights, incl. creating Admins).
 /// Admins are product developers under the owner: they manage User and Manager
 /// accounts only (Admins themselves are created by the ProductOwner only).
-/// Managers are employees: they activate/deactivate User accounts only and
-/// never change roles. Users have no staff rights at all.
+/// Managers are employees: they activate/deactivate User accounts, and they move
+/// money — a refund, a payment placed for a customer, an order's status. Users
+/// have no staff rights at all.
 /// <para>
-/// QA is the tester role. It reads everything the Staff policy admits it to, and it can flip the
-/// reversible account switch on User accounts so an activation/deactivation flow can be exercised
-/// end to end. It is denied every irreversible or money-moving privilege - ban, delete, role
-/// assignment - which means the `AdminOrOwner` policy and CanBan/CanAssignRole already exclude it;
-/// no explicit QA branch is needed there. There is deliberately no QA case in those methods, so
-/// granting this role a new privilege later is a conscious edit rather than an accident.
+/// <b>The retired `QA` staff role.</b> It used to sit between Manager and User and admitted a
+/// tester to every endpoint the Staff policy covers, including the ones that move money. The
+/// owner ruled on 2026-10-21 that the QA identity the product needs is the client-side test
+/// account — an ordinary <c>User</c> row with <c>is_qa_account = true</c>, a sandboxed merchant
+/// and the QA stock pool — and that the staff role is unused. So the role is no longer staff:
+/// <c>SeedRoles.IsStaff</c> answers "no", <c>CanAssignRole</c> refuses to hand it out, and every
+/// rule below refuses it as an actor. The <c>roles</c> row still exists; a name the code no
+/// longer knows would make a row the database may still carry unnameable.
+/// </para>
+/// <para>
+/// <b>Money movement and the order.</b> The hierarchy says who may move money. It does not say
+/// that money has been received: an order may only be handed fuel once a payment for it has been
+/// captured, and that rule lives with the order, not with the role — so it holds for every actor,
+/// the ProductOwner included.
 /// </para>
 /// <para>
 /// <b>An account with no role at all.</b> `users.role_id` is nullable and the backfill did not
@@ -49,9 +58,9 @@ public static class RoleHierarchy
         if (actorRole == SeedRoles.AdminName)
             return targetRole == SeedRoles.UserName || targetRole == SeedRoles.ManagerName;
 
-        // Manager and QA share the same reach: User accounts only. Both are employees of the
-        // Admin tier, so neither may flip the switch on a colleague's own account.
-        if (actorRole == SeedRoles.ManagerName || actorRole == SeedRoles.QaName)
+        // Manager is the employee tier now: User accounts only. It may not flip the switch on a
+        // colleague's own account — that is the Admin's privilege.
+        if (actorRole == SeedRoles.ManagerName)
             return targetRole == SeedRoles.UserName;
 
         return false;
