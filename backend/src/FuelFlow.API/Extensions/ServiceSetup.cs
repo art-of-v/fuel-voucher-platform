@@ -184,6 +184,10 @@ internal static class ServiceSetup
 
     private static void AddVoucherServices(IServiceCollection services)
     {
+        // The writer that gives a company its contracts (planning #445). Registered here
+        // because the contracts feature had no writer at all: the table existed with a term and
+        // a foreign key to a brand, and nothing in the platform ever created a row in it.
+        services.AddScoped<FuelFlow.Features.Contracts.ContractWriter>();
         services.AddScoped<ImportVouchersCommandHandler>();
         // Singleton: one slot process-wide is the whole point.
         services.AddSingleton<ImportConcurrencyGuard>();

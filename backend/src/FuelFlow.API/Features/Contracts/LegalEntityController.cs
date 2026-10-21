@@ -17,15 +17,18 @@ public sealed class LegalEntityController : ControllerBase
     private readonly ApplicationDbContext _dbContext;
     private readonly ILogger<LegalEntityController> _logger;
     private readonly NotificationDispatcher _notifications;
+    private readonly ContractWriter _contractWriter;
 
     public LegalEntityController(
         ApplicationDbContext dbContext,
         ILogger<LegalEntityController> logger,
-        NotificationDispatcher notifications)
+        NotificationDispatcher notifications,
+        ContractWriter contractWriter)
     {
         _dbContext = dbContext;
         _logger = logger;
         _notifications = notifications;
+        _contractWriter = contractWriter;
     }
 
     [HttpGet("profile")]
@@ -113,7 +116,15 @@ public sealed class LegalEntityController : ControllerBase
         // profile edits are routine.
         if (isNewEntity)
         {
-            await _notifications.CompanyCreatedAsync(entity.Id, entity.Name, entity.Edrpou, cancellationToken);
+        await _notifications.CompanyCreatedAsync(entity.Id, entity.Name, entity.Edrpou, cancellationToken);
+
+        // A company gets its contracts here, not by an operator's hand: the owner decided on
+        // 2026-10-21 that a company is created with a contract for every provider, and the
+        // client signs what already exists. The writer only adds what is missing, so calling
+        // it again when a provider publishes a new text is the backfill too.
+        await _contractWriter.EnsureContractsForAsync(entity, userId.Value, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
         }
 
         return Ok(MapToDto(entity));
@@ -192,6 +203,13 @@ public sealed class LegalEntityController : ControllerBase
         }
 
         await _notifications.CompanyCreatedAsync(entity.Id, entity.Name, entity.Edrpou, cancellationToken);
+
+        // A company gets its contracts here, not by an operator's hand: the owner decided on
+        // 2026-10-21 that a company is created with a contract for every provider, and the
+        // client signs what already exists. The writer only adds what is missing, so calling
+        // it again when a provider publishes a new text is the backfill too.
+        await _contractWriter.EnsureContractsForAsync(entity, userId.Value, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Ok(MapToDto(entity));
     }
@@ -274,18 +292,37 @@ public sealed class LegalEntityController : ControllerBase
             .OrderByDescending(c => c.CreatedAtUtc)
             .ToListAsync(cancellationToken);
 
-        var result = contracts.Select(c => new
+        // The text the customer is asked to read before signing. It lives once per provider and
+        // the contract says which version it is against - so the text is read by that pair, and
+        // a contract whose version has no text yet says so rather than showing an empty page.
+        // The table holds one row per provider per version - four providers and a handful of
+        // versions each - so it is read whole and matched here.
+        var texts = (await _dbContext.ContractVersions
+                .AsNoTracking()
+                .ToListAsync(cancellationToken))
+            .ToDictionary(v => (v.BrandId, v.Version), v => v.Body);
+
+        var result = contracts.Select(c =>
         {
-            id = c.Id,
-            legalEntityId = c.LegalEntityId,
-            legalEntityName = c.Entity?.Name,
-            brandId = c.BrandId,
-            brandName = c.Brand?.Name,
-            createdAt = c.CreatedAtUtc,
-            // The validity term, and whether it has run out. A contract list that does not
-            // say when a contract ends cannot answer "which of these is about to expire".
-            expiresAt = c.ExpiresAtUtc,
-            expired = c.ExpiresAtUtc <= DateTime.UtcNow
+            texts.TryGetValue((c.BrandId, c.TermsVersion), out var body);
+            return new
+            {
+                id = c.Id,
+                legalEntityId = c.LegalEntityId,
+                legalEntityName = c.Entity?.Name,
+                brandId = c.BrandId,
+                brandName = c.Brand?.Name,
+                createdAt = c.CreatedAtUtc,
+                // The validity term, and whether it has run out. A contract list that does not
+                // say when a contract ends cannot answer "which of these is about to expire".
+                expiresAt = c.ExpiresAtUtc,
+                expired = c.ExpiresAtUtc <= DateTime.UtcNow,
+                // Which version of the provider's text this contract is against, and the text
+                // itself. The mobile's "REVIEW THE TEXT" had nothing behind it before this.
+                termsVersion = c.TermsVersion,
+                termsText = body,
+                hasText = body is not null
+            };
         });
 
         return Ok(result);
@@ -337,7 +374,11 @@ public sealed class LegalEntityController : ControllerBase
             UserId = userId.Value,
             ContractId = request.ContractId,
             SignatureData = request.SignatureData,
-            SignedAtUtc = DateTime.UtcNow
+            SignedAtUtc = DateTime.UtcNow,
+            // The version that was actually signed, frozen into the signature. A later version
+            // of the terms does not rewrite what the customer read, and the audit trail has to
+            // be able to say which one it was.
+            TermsVersion = contract.TermsVersion
         };
 
         _dbContext.UserContracts.Add(userContract);

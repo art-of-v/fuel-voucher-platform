@@ -41,12 +41,35 @@ internal sealed class ContractConfiguration : IEntityTypeConfiguration<Contract>
                     "happened. The sign endpoint refuses to sign a contract that has already expired, so the" +
                     "term is not a field nobody reads - it is the thing that stops a signature.");
 
+        // The version of the provider's text this contract is against. The customer reads this
+        // version and signs it, so it is recorded rather than inferred from "whatever is
+        // current" - which is a number that moves.
+        //
+        // The default of 1 is the backfill: a contract created before the versions existed was
+        // against the only text there was, and saying "version 1" is true in the way a default
+        // is true - and the writer always sets the version itself, so the default is only what a
+        // writer that forgot produces.
+        builder.Property(e => e.TermsVersion)
+            .HasColumnName("terms_version")
+            .HasDefaultValue((short)1)
+            .IsRequired()
+            .HasComment("The version of the provider's text this contract is against - the one the customer reads and signs. A contract that says 'version 2' while the provider's text is at version 3 is a question the act and the audit trail have to be able to answer.");
+
         // A term that ends before it starts is a typo, and the database is the cheapest place
         // to refuse it.
         builder.ToTable(t =>
             t.HasCheckConstraint("ck_contracts_expiry_after_creation",
                 "expires_at_utc > created_at_utc"));
 
+        // A version number of zero is not a version.
+        builder.ToTable(t =>
+            t.HasCheckConstraint("ck_contracts_terms_version_positive", "terms_version > 0"));
+
+        // One contract per company per provider. The writer adds what is missing and changes
+        // nothing else, and this index is what makes "missing" a fact the database can state:
+        // a second contract for the same company and the same provider is a duplicate, not a
+        // new document.
+        builder.HasIndex(e => new { e.LegalEntityId, e.BrandId }).IsUnique();
         // A signed contract is not owned by the account that signed it, nor by the company or the
         // brand it names. Cascade here used to walk users -> legal_entities -> contracts ->
         // user_contracts and end at a digital signature; Restrict stops it at the first hop.
