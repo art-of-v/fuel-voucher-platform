@@ -186,6 +186,9 @@ public sealed class ReconciliationPagingIntegrationTests : IClassFixture<TestDat
                     Id = Guid.NewGuid(),
                     OrderId = orderId,
                     Brand = brandSlug,
+                    // The brand's key beside its name - the seeded network's own key, which is what
+                    // the composite foreign key over (fuel type, brand) checks the pair against.
+                    BrandId = BrandIds.ForSlug(brandSlug),
                     FuelTypeId = fuelId,
                     Liters = 50m,
                     Quantity = 1,
@@ -206,6 +209,8 @@ public sealed class ReconciliationPagingIntegrationTests : IClassFixture<TestDat
             Id = voucherId,
             OrderId = orderId,
             Brand = brandSlug,
+            // The brand's key beside its name - the seeded network's own key.
+            BrandId = BrandIds.ForSlug(brandSlug),
             FuelTypeId = fuelId,
             Liters = 50m,
             VoucherNumber = $"recon-page-{voucherId:N}"[..20],
