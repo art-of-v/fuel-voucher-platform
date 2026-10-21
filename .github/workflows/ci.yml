@@ -677,7 +677,31 @@ jobs:
           echo "history.csv $(wc -l < "$out/history.csv") lines"
 
           for t in $TABLES; do
-            pg -q -t -A -c "COPY (SELECT * FROM \"$t\") TO STDOUT WITH (FORMAT csv, HEADER true)" \
+            # The WRITABLE columns only, and that is the whole fix.
+            #
+            # `SELECT *` returns a GENERATED column - PostgreSQL computes it, and it is part of
+            # the row - but a COPY target is not: a generated column cannot be written, so the
+            # restore expects one field fewer than the CSV carries and dies with
+            #   ERROR: extra data after last expected column
+            #   CONTEXT: COPY fuel_types, line 2: "..."
+            # The dry run then fails on a table the pull request never touched, and it fails for
+            # EVERY pull request that opens the gate - which is every pull request that changes a
+            # root file, because the change filter treats those as a change to everything.
+            #
+            # That is not hypothetical: `fuel_types.grade_key` is a generated column (the grade
+            # key, added 2026-10-21), production carries it, and the gate has been red on the
+            # restore since that deploy - on this repository's own pull requests, and on others'
+            # too. Reproduced against postgres:16-alpine before this change.
+            #
+            # The column list is read from the catalog rather than written down, so the next
+            # generated column needs no edit here: `attgenerated = ''` is a plain column.
+            cols="$(pg -q -t -A -c "SELECT coalesce(string_agg(quote_ident(attname), ', ' ORDER BY attnum), '') FROM pg_attribute WHERE attrelid = to_regclass('$t') AND attnum > 0 AND NOT attisdropped AND attgenerated = ''")"
+            if [ -z "$cols" ]; then
+              echo "::warning::table $t not present in production"
+              rm -f "$out/$t.csv"
+              continue
+            fi
+            pg -q -t -A -c "COPY (SELECT $cols FROM \"$t\") TO STDOUT WITH (FORMAT csv, HEADER true)" \
               > "$out/$t.csv" || { echo "::warning::table $t not present in production"; rm -f "$out/$t.csv"; continue; }
             echo "$t.csv $(( $(wc -l < "$out/$t.csv") - 1 )) rows"
           done
