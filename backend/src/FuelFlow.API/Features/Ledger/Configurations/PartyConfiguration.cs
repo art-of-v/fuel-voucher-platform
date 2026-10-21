@@ -53,18 +53,21 @@ internal sealed class NaturalPersonConfiguration : IEntityTypeConfiguration<Natu
         builder.HasKey(e => e.PartyId);
 
         builder.Property(e => e.PartyId)
-            .HasColumnName("party_id");
+            .HasColumnName("party_id").HasComment("The party these details belong to. A natural person IS a party: the party is the person, and" +
+                    "this row is what we know about them.");
 
         builder.Property(e => e.Birthdate)
             .HasColumnName("birthdate")
-            .HasComment(                "The person's date of birth, when they gave it.");
+            .HasComment(                "The person's date of birth, when they gave it.").HasComment("The date of birth, if we were told it. Nullable - nobody is required to give it, and a guessed" +
+                    "date is worse than none.");
 
         builder.Property(e => e.TaxId)
             .HasColumnName("tax_id")
             .HasMaxLength(20)
             .HasComment(                "The person's tax id (РНОКПП), when they gave it. A company cannot be invoiced without" +
                     "one, which is why a natural person without one is a gap in the data and not a defect in" +
-                    "the column.");
+                    "the column.").HasComment("IПН - the personal tax number. Nullable: most users never provide one, and a guessed tax id" +
+                            "is worse than none.");
 
         builder.HasOne(e => e.Party)
             .WithOne(e => e.NaturalPerson)

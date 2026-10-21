@@ -1,4 +1,6 @@
 using FuelFlow.Features.Ledger.SharedModels;
+using FuelFlow.Features.Contracts.SharedModels;
+using FuelFlow.Features.Vouchers.Exchange;
 using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Acquiring;
@@ -768,6 +770,141 @@ public sealed class SchemaCommentTests
 
         Assert.Contains("frozen at checkout", comment, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("not backfilled", comment, StringComparison.OrdinalIgnoreCase);
+    }
+
+
+    /// <summary>
+    /// The last tables: what a fact becomes in the books, what we are known by, what arrived from
+    /// the supplier's file, and the company that signs.
+    /// </summary>
+    private static readonly (Type Entity, string[] Columns)[] TheLastTables =
+    [
+        (typeof(LedgerMappingRule),
+        [
+            nameof(LedgerMappingRule.SourceType),
+            nameof(LedgerMappingRule.SourceEvent),
+            nameof(LedgerMappingRule.AccountId),
+            nameof(LedgerMappingRule.Side)
+        ]),
+        (typeof(BankAccount),
+        [
+            nameof(BankAccount.OperatorLegalEntityId),
+            nameof(BankAccount.BankCode),
+            nameof(BankAccount.AccountRef),
+            nameof(BankAccount.Currency),
+            nameof(BankAccount.IsDefault),
+            nameof(BankAccount.IsActive)
+        ]),
+        (typeof(OperatorLegalEntity),
+        [
+            nameof(OperatorLegalEntity.Edrpou),
+            nameof(OperatorLegalEntity.Name),
+            nameof(OperatorLegalEntity.LegalForm),
+            nameof(OperatorLegalEntity.VatNumber),
+            nameof(OperatorLegalEntity.Rnkrr),
+            nameof(OperatorLegalEntity.TaxRegime),
+            nameof(OperatorLegalEntity.RegisteredAddress),
+            nameof(OperatorLegalEntity.IsActive),
+            nameof(OperatorLegalEntity.CreatedAtUtc),
+            nameof(OperatorLegalEntity.UpdatedAtUtc)
+        ]),
+        (typeof(DocumentSequence),
+        [
+            nameof(DocumentSequence.Name),
+            nameof(DocumentSequence.LastValue)
+        ]),
+        (typeof(NaturalPerson),
+        [
+            nameof(NaturalPerson.PartyId),
+            nameof(NaturalPerson.Birthdate),
+            nameof(NaturalPerson.TaxId)
+        ]),
+        (typeof(VoucherImport),
+        [
+            nameof(VoucherImport.FileName),
+            nameof(VoucherImport.PageCount),
+            nameof(VoucherImport.StartedAtUtc),
+            nameof(VoucherImport.CompletedAtUtc),
+            nameof(VoucherImport.Status),
+            nameof(VoucherImport.ImportedCount),
+            nameof(VoucherImport.DuplicateCount),
+            nameof(VoucherImport.FailedCount),
+            nameof(VoucherImport.VerificationFailedCount),
+            nameof(VoucherImport.VerifiedWithWarningsCount)
+        ]),
+        (typeof(VoucherExchange),
+        [
+            nameof(VoucherExchange.ExchangeBatchId),
+            nameof(VoucherExchange.OldVoucherId),
+            nameof(VoucherExchange.NewVoucherId),
+            nameof(VoucherExchange.FuelTypeId),
+            nameof(VoucherExchange.Brand),
+            nameof(VoucherExchange.BrandId),
+            nameof(VoucherExchange.SurchargeUah),
+            nameof(VoucherExchange.CostPerLiterApplied),
+            nameof(VoucherExchange.SupplierId),
+            nameof(VoucherExchange.ActingUserId),
+            nameof(VoucherExchange.ActingUserName),
+            nameof(VoucherExchange.CreatedAtUtc)
+        ]),
+        (typeof(LegalEntity),
+        [
+            nameof(LegalEntity.UserId),
+            nameof(LegalEntity.Name),
+            nameof(LegalEntity.Edrpou),
+            nameof(LegalEntity.VatNumber),
+            nameof(LegalEntity.Address),
+            nameof(LegalEntity.DirectorName),
+            nameof(LegalEntity.Phone),
+            nameof(LegalEntity.Email),
+            nameof(LegalEntity.CreatedAtUtc),
+            nameof(LegalEntity.UpdatedAtUtc)
+        ])
+    ];
+
+
+
+    [Fact]
+    public void The_Last_Tables_Should_Say_What_They_Are()
+    {
+        var context = BuildContext();
+
+        foreach (var (entityType, columns) in TheLastTables)
+        {
+            var entity = context.Model.FindEntityType(entityType);
+            Assert.NotNull(entity);
+
+            foreach (var column in columns)
+            {
+                var property = entity.FindProperty(column);
+                Assert.NotNull(property);
+
+                var comment = CommentOf(property);
+                Assert.False(string.IsNullOrWhiteSpace(comment),
+                    $"{entityType.Name}.{column} carries no comment. A rule that maps a fact to an "
+                    + "account, an account that money arrives into, a counter that hands out entry "
+                    + "numbers, a file that arrived, a company that signs - these are the columns "
+                    + "someone reads with the code closed.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// The surcharge on an exchange row is this row's OWN share, not the batch's. Reading one row
+    /// as the batch charge shipped once already and cost real money, so the comment has to say so
+    /// where the number is read.
+    /// </summary>
+    [Fact]
+    public void The_Exchange_Surcharge_Should_Say_That_It_Is_One_Row_Share()
+    {
+        var context = BuildContext();
+        var exchange = context.Model.FindEntityType(typeof(VoucherExchange));
+        Assert.NotNull(exchange);
+
+        var comment = CommentOf(exchange.FindProperty(nameof(VoucherExchange.SurchargeUah))!);
+
+        Assert.Contains("NOT the batch total", comment, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("ExchangeBatchId", comment, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

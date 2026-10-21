@@ -198,11 +198,15 @@ internal sealed class LedgerMappingRuleConfiguration : IEntityTypeConfiguration<
         builder.Property(e => e.Id).HasColumnName("id");
 
         builder.Property(e => e.SourceType)
-            .HasColumnName("source_type").HasConversion<string>().HasMaxLength(24).IsRequired();
-        builder.Property(e => e.SourceEvent).HasColumnName("source_event").HasMaxLength(40).IsRequired();
-        builder.Property(e => e.AccountId).HasColumnName("account_id").IsRequired();
+            .HasColumnName("source_type").HasConversion<string>().HasMaxLength(24).IsRequired().HasComment("What kind of fact this rule maps: a payment, a refund, a fulfilment. The rule is matched on" +
+                    "this together with the event below.");
+        builder.Property(e => e.SourceEvent).HasColumnName("source_event").HasMaxLength(40).IsRequired().HasComment("The domain event this rule answers to, e.g. order.fulfilled. It is the key the mapping hangs" +
+                "on - a business fact without a rule is a fact that never reaches the books.");
+        builder.Property(e => e.AccountId).HasColumnName("account_id").IsRequired().HasComment("The account the fact is posted to. One account per side per event, which is what makes the" +
+                "mapping total rather than a preference.");
         builder.Property(e => e.Side)
-            .HasColumnName("side").HasConversion<string>().HasMaxLength(6).IsRequired();
+            .HasColumnName("side").HasConversion<string>().HasMaxLength(6).IsRequired().HasComment("Whether the fact debits or credits this account. A rule states one side; the other side is a" +
+                    "second rule, and the two together are what balance.");
 
         // One account per side per event, which is what makes the mapping total rather than
         // a preference: an event that posts to two accounts on the same side is a bug in the data.

@@ -14,10 +14,11 @@ internal sealed class DocumentSequenceConfiguration : IEntityTypeConfiguration<D
         builder.Property(s => s.Id).HasColumnName("id");
 
         builder.Property(s => s.Name)
-            .HasColumnName("name").HasMaxLength(80).IsRequired();
+            .HasColumnName("name").HasMaxLength(80).IsRequired().HasComment("The identity of the sequence, e.g. journal:<period id>. Unique - two rows sharing it are two" +
+                    "counters racing for the same numbers, which is what this table exists to prevent.");
 
         builder.Property(s => s.LastValue)
-            .HasColumnName("last_value").IsRequired();
+            .HasColumnName("last_value").IsRequired().HasComment("The last number handed out. Starts at 0, so the first call returns 1.");
 
         // The name is the sequence. Two rows sharing it are two counters racing for the same
         // numbers, which is precisely what this table exists to prevent.

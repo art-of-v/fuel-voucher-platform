@@ -18,47 +18,52 @@ internal sealed class OperatorLegalEntityConfiguration : IEntityTypeConfiguratio
         builder.Property(e => e.Edrpou)
             .HasColumnName("edrpou")
             .HasMaxLength(20)
-            .IsRequired();
+            .IsRequired().HasComment("The EDDRPOU - the state registry number that identifies the company. It is the key, and the" +
+                    "database checks its shape.");
 
         builder.Property(e => e.Name)
             .HasColumnName("name")
             .HasMaxLength(200)
-            .IsRequired();
+            .IsRequired().HasComment("The company's name as it appears on its own documents.");
 
         builder.Property(e => e.LegalForm)
             .HasColumnName("legal_form")
-            .HasMaxLength(32);
+            .HasMaxLength(32).HasComment("The legal form, e.g. TOV. Free text here, but a fiscal document must print one.");
 
         builder.Property(e => e.VatNumber)
             .HasColumnName("vat_number")
-            .HasMaxLength(20);
+            .HasMaxLength(20).HasComment("The VAT number, if the company is a VAT payer. NULL is a real answer - most small companies" +
+                    "are not.");
 
         builder.Property(e => e.Rnkrr)
             .HasColumnName("rnkrr")
-            .HasMaxLength(20);
+            .HasMaxLength(20).HasComment("The RNC RR - the record number in the unified state register - when it differs from the" +
+                    "EDDRPOU. A sole trader has no EDDRPOU but does have an RNC RR.");
 
         builder.Property(e => e.TaxRegime)
             .HasColumnName("tax_regime")
             .HasConversion<string>()
             .HasMaxLength(16)
-            .IsRequired();
+            .IsRequired().HasComment("Which tax regime the company is on: VAT or simplified. The document that follows from this is" +
+                    "a different document.");
 
         builder.Property(e => e.RegisteredAddress)
             .HasColumnName("registered_address")
-            .HasMaxLength(500);
+            .HasMaxLength(500).HasComment("The legal address, as the registry has it. Not the address for delivery.");
 
         builder.Property(e => e.IsActive)
             .HasColumnName("is_active")
             .HasDefaultValue(false)
-            .IsRequired();
+            .IsRequired().HasComment("Whether fiscal documents may name this entity as their issuer. Seeded false; the row becomes" +
+                    "usable only once someone confirms its EDDRPOU and VAT number are real.");
 
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
-            .IsRequired();
+            .IsRequired().HasComment("When the row was written.");
 
         builder.Property(e => e.UpdatedAtUtc)
             .HasColumnName("updated_at_utc")
-            .IsRequired();
+            .IsRequired().HasComment("When it was last changed.");
 
         builder.HasIndex(e => e.Edrpou).IsUnique();
 
