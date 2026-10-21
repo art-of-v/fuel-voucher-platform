@@ -3013,6 +3013,11 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("amount_uah")
                         .HasComment("What the customer paid for this movement, in UAH. NULL when money did not move - mostmovements are the operator's own housekeeping. NOT the batch total: a settlement's totallives on movement_batches.surcharge_uah.");
 
+                    b.Property<decimal?>("AppliedCostPerLiter")
+                        .HasColumnType("numeric(12,4)")
+                        .HasColumnName("applied_cost_per_liter")
+                        .HasComment("The cost per litre stamped on the replacement when it arrived. A level, not a delta. Recorded AT THE TIME because it cannot be derived afterwards: fuel_vouchers.cost_per_liter is mutable and gets restamped.");
+
                     b.Property<Guid?>("BatchId")
                         .HasColumnType("uuid")
                         .HasColumnName("batch_id")
@@ -3058,6 +3063,16 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("reason")
                         .HasComment("Why, in the operator's words.");
 
+                    b.Property<Guid?>("ReplacedByVoucherId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("replaced_by_voucher_id")
+                        .HasComment("The paper that took this voucher's place, when this paper was traded for another one. NULL for a movement that was not a trade - a sale, a return, an import. The row of the retired paper carries it, not the row of the successor.");
+
+                    b.Property<decimal?>("SurchargeShareUah")
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("surcharge_share_uah")
+                        .HasComment("This movement's share of the money a settlement moved: the doplata the operator paid the supplier for this pair of paper. NOT the settlement total - that lives on movement_batches.surcharge_uah, and the shares can sum to less than it.");
+
                     b.Property<string>("ToLocation")
                         .IsRequired()
                         .HasMaxLength(16)
@@ -3084,6 +3099,10 @@ namespace FuelFlow.API.Migrations
                         .HasDatabaseName("ix_voucher_movements_order")
                         .HasFilter("order_id IS NOT NULL");
 
+                    b.HasIndex("ReplacedByVoucherId")
+                        .HasDatabaseName("ix_voucher_movements_replaced_by")
+                        .HasFilter("replaced_by_voucher_id IS NOT NULL");
+
                     b.HasIndex("VoucherId", "OccurredAtUtc")
                         .HasDatabaseName("ix_voucher_movements_voucher");
 
@@ -3097,11 +3116,17 @@ namespace FuelFlow.API.Migrations
 
                             t.HasCheckConstraint("ck_voucher_movements_amount_non_negative", "amount_uah IS NULL OR amount_uah >= 0");
 
+                            t.HasCheckConstraint("ck_voucher_movements_applied_cost_non_negative", "applied_cost_per_liter IS NULL OR applied_cost_per_liter >= 0");
+
                             t.HasCheckConstraint("ck_voucher_movements_distinct_locations", "from_location <> to_location");
 
                             t.HasCheckConstraint("ck_voucher_movements_kind", "kind IN ('deposit','issued','returned','replace_out','exchange_out','exchange_in','gift','recall')");
 
                             t.HasCheckConstraint("ck_voucher_movements_locations", "from_location IN ('pool','customer','supplier','company','worker') AND to_location IN ('pool','customer','supplier','company','worker')");
+
+                            t.HasCheckConstraint("ck_voucher_movements_not_self_replaced", "replaced_by_voucher_id IS NULL OR replaced_by_voucher_id <> voucher_id");
+
+                            t.HasCheckConstraint("ck_voucher_movements_surcharge_share_non_negative", "surcharge_share_uah IS NULL OR surcharge_share_uah >= 0");
                         });
                 });
 
@@ -5480,6 +5505,11 @@ namespace FuelFlow.API.Migrations
                     b.HasOne("FuelFlow.Features.Vouchers.Exchange.MovementBatch", null)
                         .WithMany()
                         .HasForeignKey("BatchId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", null)
+                        .WithMany()
+                        .HasForeignKey("ReplacedByVoucherId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", null)
