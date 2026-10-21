@@ -20,6 +20,7 @@ import { FuelPriceHistory } from "@/components/FuelPriceHistory";
 import CatalogueSyncButton from "@/components/CatalogueSyncButton";
 import { apiRequest } from "@/lib/api-client";
 import { resolveAllowBelowCost } from "@/lib/belowCostOptIn";
+import { computeFinal } from "@/lib/finalPrice";
 import { toast } from "sonner";
 import {
   formatDateTime,
@@ -86,24 +87,6 @@ interface AuditEventDto {
 }
 
 const DEFAULT_PROVIDER_COLOR = "#00ff80";
-
-// Live preview mirror of the backend FuelPricing.FinalPerLiter formula:
-// final/л = cost + profit; with no cost or no margin there is no price of ours and the
-// column price is what the customer is shown. The server is authoritative and recomputes on
-// write — this only keeps the operator's Фінал column honest while editing.
-function computeFinal(
-  cost: number | null,
-  profit: number | null,
-  pump: number | null,
-): number {
-  // No cost means no price of ours: the column is the only figure we honestly have, and the
-  // storefront shows that with "not in stock" next to it. Before this, a blank cost was a
-  // ZERO here and in the payload, which priced the fuel at its margin.
-  if (cost === null || profit === null) return pump ?? 0;
-  // The column price is a reference, not a term of the price: our price is the cost plus the
-  // margin, and it can sit above what the pump charges. The server charges this number.
-  return cost + profit;
-}
 
 interface BrandsTabProps {
   // Jumps to the Imports tab, where batch costs — the source of the derived supplier cost — are entered.
