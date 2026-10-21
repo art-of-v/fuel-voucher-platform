@@ -66,12 +66,12 @@ public sealed class ReconciliationMoneyIntegrationTests : IClassFixture<TestData
         // ordered and what was delivered: A earns 10 x 50 x 1 = 500, B earns 10 x 50 x 1 =
         // 500, C earns nothing. 1 000 in total.
         //
-        // The number is the one the C# produced, unchanged - and it is UAH, whatever the
-        // field calls it. The margin is UAH per litre, so the product is UAH; the field says
-        // kopecks, and the screen shows it as UAH without dividing, so the screen is right and
-        // the name lies. That is a separate finding and a separate pull request: this one
-        // promises the number does not move, and this is the number.
-        response.Summary.TotalRevenueKopecks.Should().Be(1_000m);
+        // The number is the one the C# produced, unchanged - and it is UAH, and it says so:
+        // the margin is UAH per litre, so the product is UAH. The field is called
+        // `TotalRevenueUah`; it used to say "kopecks" while holding UAH, which made the
+        // screen and the field disagree about the unit of the same number. The number did
+        // not move, and it does not move here.
+        response.Summary.TotalRevenueUah.Should().Be(1_000m);
 
         // RECEIVED - what the brand confirmed it took: A's price (2 000 UAH) and B's price
         // (500 UAH). C was never paid, so it is not received.
@@ -93,7 +93,7 @@ public sealed class ReconciliationMoneyIntegrationTests : IClassFixture<TestData
         // The monthly summary carries the same revenue, with the closed orders beside it.
         var month = response.RevenueSummary.Should().ContainSingle().Subject;
         month.OrderCount.Should().Be(2, "two orders are closed, and both are in the month");
-        month.RevenueKopecks.Should().Be(1_000m, "the same revenue the total carries");
+        month.RevenueUah.Should().Be(1_000m, "the same revenue the total carries");
     }
 
     private async Task SeedAsync(ApplicationDbContext context)

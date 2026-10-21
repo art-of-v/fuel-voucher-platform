@@ -235,7 +235,7 @@ public sealed class AdminQueryHandlersTests : IDisposable
         response.Summary.TotalFulfilledValueKopecks.Should().Be(100000);
         response.Summary.TotalRefundedKopecks.Should().Be(0);
         // Margin earned on the one delivered voucher: 2 UAH/L * 50 L * 1.
-        response.Summary.TotalRevenueKopecks.Should().Be(100);
+        response.Summary.TotalRevenueUah.Should().Be(100);
 
         response.ThreeWayMatch.Should().HaveCount(2);
         response.ThreeWayMatch.Should().ContainSingle(t => t.OrderId == fulfilledOrder.Id && t.MatchStatus == "OK");
@@ -290,7 +290,7 @@ public sealed class AdminQueryHandlersTests : IDisposable
         response.Summary.TotalFulfilledValueKopecks.Should().Be(100000);
         response.Summary.TotalRefundedKopecks.Should().Be(200000);
         // Margin is earned only on the delivered voucher: 2 UAH/L * 50 L * 1.
-        response.Summary.TotalRevenueKopecks.Should().Be(100);
+        response.Summary.TotalRevenueUah.Should().Be(100);
 
         response.ThreeWayMatch.Should().ContainSingle(t =>
             t.OrderId == refundedOrder.Id
@@ -306,7 +306,7 @@ public sealed class AdminQueryHandlersTests : IDisposable
             && t.VouchersExpected == 2);
 
         response.RevenueSummary.Should().ContainSingle(m =>
-            m.OrderCount == 2 && m.RevenueKopecks == 100);
+            m.OrderCount == 2 && m.RevenueUah == 100);
     }
 
     [Fact]
@@ -348,9 +348,9 @@ public sealed class AdminQueryHandlersTests : IDisposable
 
         response.RevenueSummary.Should().HaveCount(2);
         response.RevenueSummary.Should().ContainSingle(m =>
-            m.Year == 2026 && m.Month == 3 && m.OrderCount == 1 && m.RevenueKopecks == 100);
+            m.Year == 2026 && m.Month == 3 && m.OrderCount == 1 && m.RevenueUah == 100);
         response.RevenueSummary.Should().ContainSingle(m =>
-            m.Year == 2026 && m.Month == 4 && m.OrderCount == 1 && m.RevenueKopecks == 100);
+            m.Year == 2026 && m.Month == 4 && m.OrderCount == 1 && m.RevenueUah == 100);
         // Newest month first.
         response.RevenueSummary.First().Month.Should().Be(4);
     }

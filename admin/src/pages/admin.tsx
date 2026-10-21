@@ -3489,7 +3489,7 @@ export default function AdminScreen() {
                       {t("report.totalSpent")}
                     </p>
                     <p className="text-2xl font-bold text-success">
-                      {reconciliationData.summary.totalRevenueKopecks.toLocaleString()}{" "}
+                      {reconciliationData.summary.totalRevenueUah.toLocaleString()}{" "}
                       ₴
                     </p>
                     <p className="text-xs text-muted-foreground">
@@ -3827,11 +3827,11 @@ export default function AdminScreen() {
                                   {m.orderCount}
                                 </td>
                                 <td className="p-3 text-right font-mono text-success">
-                                  {m.revenueKopecks.toLocaleString()} ₴
+                                  {m.revenueUah.toLocaleString()} ₴
                                 </td>
                                 <td className="p-3 text-right font-mono text-muted-foreground">
                                   {m.orderCount > 0
-                                    ? `${(m.revenueKopecks / m.orderCount).toLocaleString()} ₴`
+                                    ? `${(m.revenueUah / m.orderCount).toLocaleString()} ₴`
                                     : "—"}
                                 </td>
                               </tr>

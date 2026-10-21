@@ -95,7 +95,7 @@ public sealed class GetReconciliationQueryHandler
             {
                 g.Key.Year,
                 g.Key.Month,
-                RevenueKopecks = g.Sum(x => (x.f.MarginUahPerLiter ?? 0m) * x.lg.Liters
+                RevenueUah = g.Sum(x => (x.f.MarginUahPerLiter ?? 0m) * x.lg.Liters
                     * Math.Min(x.lg.OrderedQty, x.d.DeliveredQty))
             })
             .ToListAsync(cancellationToken);
@@ -103,7 +103,11 @@ public sealed class GetReconciliationQueryHandler
         // The total is the sum of the months, which is the same number as the sum over the
         // orders: the margin is a decimal and the additions are exact, so the grouping does
         // not change the figure - it only decides how many rows the database has to add up.
-        var revenue = revenueByMonth.Sum(m => m.RevenueKopecks);
+        //
+        // It is UAH, and it is called UAH: the margin is UAH per litre, so the product is
+        // UAH. A field that says "kopecks" and holds UAH is a number that lies about itself
+        // in a summary of money.
+        var revenueUah = revenueByMonth.Sum(m => m.RevenueUah);
 
 
         var orphanVouchers = await _context.FuelVouchers
@@ -249,15 +253,15 @@ public sealed class GetReconciliationQueryHandler
                 m.Year,
                 m.Month,
                 m.OrderCount,
-                RevenueKopecks = revenueByMonth
+                RevenueUah = revenueByMonth
                     .Where(r => r.Year == m.Year && r.Month == m.Month)
-                    .Select(r => r.RevenueKopecks)
+                    .Select(r => r.RevenueUah)
                     .FirstOrDefault()
             })
             .OrderByDescending(x => x.Year)
             .ThenByDescending(x => x.Month)
             .Select(x => new GetReconciliationResponse.RevenueSummaryItem(
-                x.Year, x.Month, x.OrderCount, x.RevenueKopecks))
+                x.Year, x.Month, x.OrderCount, x.RevenueUah))
             .ToList();
 
         // THE MONEY LEDGER, SUMMED BY THE DATABASE.
@@ -328,7 +332,7 @@ public sealed class GetReconciliationQueryHandler
 
         var summary = new GetReconciliationResponse.SummaryData(
             totalOrders, paidUnfulfilled, partiallyFulfilled, fulfilled,
-            revenue, orphanVouchers, unprocessed, lowInventoryProviders, importErrors,
+            revenueUah, orphanVouchers, unprocessed, lowInventoryProviders, importErrors,
             refundedOrders,
             totalReceivedKopecks,
             deliveredValueKopecks,
