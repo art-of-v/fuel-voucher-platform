@@ -240,6 +240,52 @@ export function filterRoster(
 }
 
 /**
+ * The fuel the company holds that no worker holds any more.
+ *
+ * Firing deletes the membership but leaves the frozen vouchers pointing at the worker they
+ * were issued to: only the vouchers that were still active are unlinked and sent back to the
+ * purchase they arrived with, so the ones the owner had already frozen keep their worker
+ * link. The fuel is the company's again — the owner's decision of 2026-10-21 (planning #294)
+ * files it at the company's level rather than under the former worker's name — so the roster
+ * groups it on its own instead of inventing a row for somebody who no longer works here.
+ *
+ * The name that travels with a voucher is its provenance, not its owner: the group says whose
+ * fuel it was, the filing says who holds it now, and that is the company.
+ */
+export interface OrphanedCompanyFuel {
+  /** Every voucher no current member holds. */
+  vouchers: Voucher[];
+  /** How many of them are frozen — the ones the owner can still act on. */
+  frozenCount: number;
+  /** How many of them are spent. */
+  usedCount: number;
+  /** The same fuel, by brand, for the drill-down. */
+  brands: ProviderGroup[];
+}
+
+/**
+ * The vouchers in `vouchers` that belong to no current member of the company.
+ *
+ * A voucher with no worker link at all is not orphaned: it is the company's own pool (or a
+ * voucher the owner froze and the server unlinked), and the orders branch already files that
+ * one. What lands here is the fuel that still points at a worker who is no longer a member.
+ */
+export function orphanedCompanyFuel(
+  members: RosterMember[],
+  vouchers: Voucher[],
+): OrphanedCompanyFuel {
+  const memberWorkerIds = new Set(members.map((m) => m.workerUserId));
+  const orphaned = vouchers.filter((v) => !!v.workerUserId && !memberWorkerIds.has(v.workerUserId));
+
+  return {
+    vouchers: orphaned,
+    frozenCount: orphaned.filter((v) => (v.status ?? '').toLowerCase() === 'blocked').length,
+    usedCount: orphaned.filter((v) => (v.status ?? '').toLowerCase() === 'used').length,
+    brands: groupVouchersByProvider(orphaned),
+  };
+}
+
+/**
  * One order as the owner's Orders branch shows it: the order, and how much of what it delivered
  * is still sitting undistributed in the company.
  *

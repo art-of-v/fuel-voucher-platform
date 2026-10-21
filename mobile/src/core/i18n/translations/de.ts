@@ -94,6 +94,7 @@ export const de: Record<string, string> = {
   'nav.codes': 'MEINE CODES',
   'nav.profile': 'PROFIL',
   'nav.feedback': 'Feedback',
+  'nav.company': 'UNTERNEHMEN',
   'feedback.subtitle': 'Sagen Sie uns, was nicht funktioniert oder fehlt',
   'feedback.whatTitle': 'So funktioniert es',
   'feedback.whatBody':
@@ -467,6 +468,7 @@ export const de: Record<string, string> = {
   'company.hub.noWorkerMatches': 'Keine Mitarbeiter gefunden',
   'company.hub.noOrders': 'Noch keine Bestellungen',
   'company.hub.undistributedShort': 'NICHT VERTEILT',
+  'company.hub.companyFuel': 'KRAFTSTOFF DER FIRMA',
   'company.members.empty': 'Noch keine Mitarbeiter',
   'company.members.joined': 'Beigetreten {0}',
   'company.members.giftedCount': '{0} ausgegeben',
@@ -496,7 +498,6 @@ export const de: Record<string, string> = {
   'company.recall.empty': 'Keine ausgegebenen Gutscheine',
   'company.recall.action': 'ZURÜCKHOLEN',
   'company.recall.spentAction': 'GENUTZT',
-  'company.recall.formerWorker': 'Inhaber ist kein Mitarbeiter mehr',
   'company.recall.confirmTitle': 'Gutschein zurückholen?',
   'company.recall.confirmDesc': 'Diesen Gutschein in den Firmenpool zurücklegen?',
   'company.recall.confirm': 'ZURÜCKHOLEN',

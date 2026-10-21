@@ -91,6 +91,7 @@ export const en: Record<string, string> = {
   'nav.codes': 'MY CODES',
   'nav.profile': 'PROFILE',
   'nav.feedback': 'Feedback',
+  'nav.company': 'COMPANY',
   'feedback.subtitle': 'Tell us what is broken or missing',
   'feedback.whatTitle': 'How this works',
   'feedback.whatBody':
@@ -453,6 +454,7 @@ export const en: Record<string, string> = {
   'company.hub.noWorkerMatches': 'No workers found',
   'company.hub.noOrders': 'No orders yet',
   'company.hub.undistributedShort': 'UNDISTRIBUTED',
+  'company.hub.companyFuel': 'COMPANY FUEL',
   'company.members.empty': 'No workers yet',
   'company.members.joined': 'Joined {0}',
   'company.members.giftedCount': '{0} issued',
@@ -482,7 +484,6 @@ export const en: Record<string, string> = {
   'company.recall.empty': 'No issued vouchers',
   'company.recall.action': 'RECALL',
   'company.recall.spentAction': 'SPENT',
-  'company.recall.formerWorker': 'Holder is no longer an employee',
   'company.recall.confirmTitle': 'Recall voucher?',
   'company.recall.confirmDesc': 'Return this voucher to the company pool?',
   'company.recall.confirm': 'RECALL',

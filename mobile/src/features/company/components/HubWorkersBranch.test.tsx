@@ -1,15 +1,15 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
-import { HubWorkersBranch, rosterMembers } from './HubWorkersBranch';
+import { HubWorkersBranch } from './HubWorkersBranch';
 import type { CompanyMemberDto } from '../types';
 import type { Voucher } from '../../../core/types/api';
 
 // The roster is where "how much does this person hold, and can I still thaw it" is
 // answered, so this suite is about the two things a flat voucher list got wrong: the
-// counters come from the vouchers rather than the API's `giftedVoucherCount`, and a
-// worker who still holds fuel after being fired keeps a row — without it their frozen
-// vouchers would be unreachable from every screen.
+// counters come from the vouchers rather than the API's `giftedVoucherCount`, and the
+// fuel of a worker who no longer works here is filed under the company rather than
+// under their name (planning #294).
 jest.mock('../../../core/i18n', () => ({
   __esModule: true,
   useI18n: () => ({ t: (key: string) => key, language: 'uk', setLanguage: jest.fn() }),
@@ -70,27 +70,6 @@ function openRoster() {
   fireEvent.press(screen.getByText('company.members.section'));
 }
 
-describe('rosterMembers', () => {
-  it('gives a fired worker who still holds fuel a row of their own', () => {
-    const rows = rosterMembers(
-      [],
-      [mkVoucher({ workerUserId: 'gone', workerFirstName: 'Oleksandr' })],
-    );
-
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ workerUserId: 'gone', workerFirstName: 'Oleksandr' });
-    // Namespaced so a synthesized row can never collide with a membership id.
-    expect(rows[0].id).not.toBe('gone');
-  });
-
-  it('does not invent a second row for someone who is still a member', () => {
-    const rows = rosterMembers([mkMember()], [mkVoucher({ workerUserId: 'w1' })]);
-
-    expect(rows).toHaveLength(1);
-    expect(rows[0].id).toBe('m1');
-  });
-});
-
 describe('HubWorkersBranch', () => {
   it('counts what each worker holds from the vouchers, not from giftedVoucherCount', () => {
     renderBranch({
@@ -139,7 +118,7 @@ describe('HubWorkersBranch', () => {
     expect(screen.getAllByText('company.recall.spentAction')).toHaveLength(1);
   });
 
-  it('keeps a fired worker reachable so their frozen fuel can still be thawed', () => {
+  it("files a fired worker's frozen fuel under the company, not under their name", () => {
     const frozen = mkVoucher({
       id: 'v9',
       workerUserId: 'gone',
@@ -150,14 +129,36 @@ describe('HubWorkersBranch', () => {
     const { props } = renderBranch({ members: [], blocked: [frozen] });
 
     openRoster();
-    expect(screen.getByText('Oleksandr')).toBeTruthy();
-    // Firing deleted the membership, so the membership actions are gone with it.
-    expect(screen.queryByText('company.members.fire')).toBeNull();
+    // The company's group — not a roster row for somebody who no longer works here.
+    expect(screen.getByText('company.hub.companyFuel')).toBeTruthy();
+    expect(screen.getByText('company.block.section 1')).toBeTruthy();
+    expect(screen.queryByText('Oleksandr')).toBeNull();
 
-    // The thaw lives inside the drill-down, exactly like it did in the blocked list.
-    fireEvent.press(screen.getByText('Oleksandr'));
+    // The fuel still has to be actionable, so the thaw stays.
+    fireEvent.press(screen.getByText('company.hub.companyFuel'));
     fireEvent.press(screen.getByText('company.block.unblockAction'));
     expect(props.unblock).toHaveBeenCalledWith('v9');
+  });
+
+  it('keeps the company fuel visible while the owner searches for a worker', () => {
+    const frozen = mkVoucher({ id: 'v9', workerUserId: 'gone', status: 'blocked' });
+    renderBranch({ members: [mkMember()], blocked: [frozen] });
+
+    openRoster();
+    fireEvent.changeText(screen.getByPlaceholderText('company.hub.searchPlaceholder'), 'zzzz');
+
+    // It is a fact about the company, not a row about a person, so a name search
+    // must not hide the fuel the owner still has to act on.
+    expect(screen.getByText('company.hub.companyFuel')).toBeTruthy();
+    expect(screen.getByText('company.hub.noWorkerMatches')).toBeTruthy();
+  });
+
+  it('does not put the fuel of a current worker into the company group', () => {
+    renderBranch({ members: [mkMember()], gifted: [mkVoucher({ id: 'v1', status: 'active' })] });
+
+    openRoster();
+
+    expect(screen.queryByText('company.hub.companyFuel')).toBeNull();
   });
 
   it('searches by phone number as well as by name', () => {
