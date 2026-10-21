@@ -12,6 +12,13 @@ namespace FuelFlow.API.Features.Acquiring;
 /// Read-only, and separate from the existing <c>GET /api/admin/reconciliation</c> on purpose. That
 /// one reconciles orders against vouchers and margin - all internal, all ours. This one compares two
 /// independent sources, which is the only reconciliation that can find us being wrong.
+///
+/// <para>
+/// One of the two sources cannot report a reversal on its own: Monobank nests a reversal under the
+/// payment it reverses and files no row for it, so the acquirer's statement alone cannot show money
+/// going back. The act therefore reconciles the refunds from our side - the refunds we issued in
+/// the period - beside the statement, with a figure of their own. See <c>StatementRefunds</c>.
+/// </para>
 /// </remarks>
 [ApiController]
 [Route("api/admin/reconciliation/statement")]
@@ -25,8 +32,8 @@ public sealed class StatementReconciliationController : ControllerBase
         _handler = handler;
     }
 
-    /// <summary>The act as JSON: the summary, every row with its verdict, and the orders the
-    /// acquirer never mentioned.</summary>
+    /// <summary>The act as JSON: the summary, every row with its verdict, the orders the
+    /// acquirer never mentioned, and the refunds we issued in the period.</summary>
     // Route restored 2026-10-12. Commenting out [HttpGet] does not disable an action: under
     // [ApiController] a method with no HTTP attribute binds to the controller prefix, so all three
     // actions here claimed `api/admin/reconciliation/statement` and the router answered 500

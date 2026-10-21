@@ -270,4 +270,29 @@ public class StatementMatcherTests
         summary.TotalRows.Should().Be(0);
         summary.MatchedTotalUah.Should().Be(0m);
     }
+
+    // The refunds we issued in the period get their own figure, beside the matched total and never
+    // folded into it. The matched total is about matching, not about net money: a refund issued in
+    // the period can reverse a payment from an earlier one, so netting the two would mix the
+    // periods in a document someone signs.
+    [Fact]
+    public void The_Summary_Carries_The_Refunds_We_Issued_Without_Netting_Them_Into_The_Matched_Total()
+    {
+        var rows = StatementMatcher.Match(
+            new[] { Entry("ST1", "INV1", 97857) },
+            new[] { Order("INV1", 978.57m) },
+            Array.Empty<Payment>());
+
+        var summary = StatementMatcher.Summarise(rows, new[]
+        {
+            new IssuedRefundRow(
+                Guid.NewGuid(), Guid.NewGuid(), "INV1", 478.57m,
+                new DateTime(2026, 10, 8, 12, 0, 0, DateTimeKind.Utc), null, false, null)
+        });
+
+        summary.IssuedRefundCount.Should().Be(1);
+        summary.IssuedRefundTotalUah.Should().Be(478.57m);
+        // Gross, exactly as it was: the refund is reported beside it, not inside it.
+        summary.MatchedTotalUah.Should().Be(978.57m);
+    }
 }

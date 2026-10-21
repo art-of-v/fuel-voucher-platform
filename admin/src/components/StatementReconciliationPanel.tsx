@@ -26,6 +26,8 @@ interface StatementMatchSummary {
   matchedTotalUah: number;
   mismatchDeltaUah: number;
   unmatchedTotalUah: number;
+  issuedRefundCount: number;
+  issuedRefundTotalUah: number;
 }
 
 interface StatementMatchRow {
@@ -51,6 +53,25 @@ interface MissingRow {
   createdAtUtc: string;
 }
 
+/**
+ * A refund we issued inside the period.
+ *
+ * The acquirer nests a reversal under the payment it reverses and the entry carries no invoice id,
+ * so the statement alone cannot show money going back. The act reports the refunds from our side
+ * instead - and keeps them beside the matched total rather than inside it, because a refund issued
+ * in this period can reverse a payment from an earlier one.
+ */
+interface IssuedRefund {
+  refundId: string;
+  orderId: string | null;
+  invoiceId: string | null;
+  amount: number;
+  issuedAtUtc: string;
+  reversedPaymentAtUtc: string | null;
+  reversesEarlierPeriodPayment: boolean;
+  note: string | null;
+}
+
 interface StatementAct {
   merchant: string;
   fromUtc: string;
@@ -59,6 +80,7 @@ interface StatementAct {
   summary: StatementMatchSummary;
   rows: StatementMatchRow[];
   missingFromStatement: MissingRow[];
+  refundsIssued: IssuedRefund[];
 }
 
 /**
@@ -188,7 +210,7 @@ export function StatementReconciliationPanel() {
 
       {act.data && summary && (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             <Tile label={t('statementAct.totalRows')} value={String(summary.totalRows)} />
             <Tile label={t('statementAct.matched')} value={String(summary.matchedCount)} />
             <Tile label={t('statementAct.mismatches')} value={String(summary.mismatchCount)}
@@ -196,6 +218,10 @@ export function StatementReconciliationPanel() {
             <Tile label={t('statementAct.unmatched')} value={String(summary.unmatchedCount)}
               tone={summary.unmatchedCount > 0 ? 'bad' : undefined} />
             <Tile label={t('statementAct.refundMatches')} value={String(summary.refundMatchCount)} />
+            {/* The refunds we issued in the period, beside the matched total and never inside it:
+                the statement cannot show a reversal, so this figure is the act's own side. */}
+            <Tile label={t('statementAct.refundsIssued')}
+              value={`${summary.issuedRefundTotalUah} ₴`} />
           </div>
 
           <div className="overflow-x-auto">
@@ -244,6 +270,36 @@ export function StatementReconciliationPanel() {
               </tbody>
             </table>
           </div>
+
+          {(act.data.refundsIssued?.length ?? 0) > 0 && (
+            <div>
+              <h4 className="font-medium text-sm mb-2">{t('statementAct.refundsTitle')}</h4>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-left">
+                      <th className="p-3">{t('statementAct.invoice')}</th>
+                      <th className="p-3">{t('statementAct.refundAmount')}</th>
+                      <th className="p-3">{t('statementAct.refundIssuedAt')}</th>
+                      <th className="p-3">{t('statementAct.note')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {act.data.refundsIssued.map((refund) => (
+                      <tr key={refund.refundId} className="border-b border-border/50">
+                        <td className="p-3 font-mono text-xs">{refund.invoiceId ?? '—'}</td>
+                        <td className="p-3 whitespace-nowrap">{refund.amount} ₴</td>
+                        <td className="p-3 whitespace-nowrap">
+                          {refund.issuedAtUtc.slice(0, 10)}
+                        </td>
+                        <td className="p-3 text-muted-foreground">{refund.note ?? '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {act.data.missingFromStatement.length > 0 && (
             <div>

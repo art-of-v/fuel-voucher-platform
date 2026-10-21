@@ -20,6 +20,21 @@ public enum StatementMatchStatus
     Unmatched,
 
     /// <summary>The acquirer tagged this row against a refund we issued.</summary>
+    /// <remarks>
+    /// <para>
+    /// <b>This cannot fire against a real Monobank statement.</b> Monobank does not file a reversal
+    /// as a row of its own: it nests the reversal under the payment it reverses, in a
+    /// <c>cancelList</c>, and the entry carries no invoice id - so there is never a statement row
+    /// with our refund's invoice on it for this to match.
+    /// </para>
+    /// <para>
+    /// The category stays because the match is correct when a row does carry that invoice - a
+    /// statement row for an invoice we refunded is a reversal, whatever the acquirer calls it - and
+    /// because removing it would change the verdicts of rows that already exist. What the act shows
+    /// for real reversals is the refunds section: the refunds we issued in the period, reconciled
+    /// from our side. See <see cref="StatementRefunds"/>.
+    /// </para>
+    /// </remarks>
     RefundMatch,
 }
 
@@ -150,7 +165,14 @@ public static class StatementMatcher
     /// <summary>Totals for the act's header. Unmatched rows are counted separately and never folded
     /// into the matched total - a summary that nets an unexplained payment into "reconciled" is how
     /// a reconciliation stops meaning anything.</summary>
-    public static StatementMatchSummary Summarise(IReadOnlyList<StatementMatchRow> rows)
+    /// <param name="rows">The statement's rows, each with its verdict.</param>
+    /// <param name="refundsIssued">The refunds we issued in the period. They carry their own
+    /// figure and are never netted into the matched total: the matched total is about matching, not
+    /// about net money, and a refund issued in the period can reverse a payment from an earlier one
+    /// - so subtracting the two would mix the periods in a document someone signs.</param>
+    public static StatementMatchSummary Summarise(
+        IReadOnlyList<StatementMatchRow> rows,
+        IReadOnlyList<IssuedRefundRow>? refundsIssued = null)
     {
         var matched = rows.Where(r => r.Status == StatementMatchStatus.Matched).ToList();
         var mismatch = rows.Where(r => r.Status == StatementMatchStatus.AmountMismatch).ToList();
@@ -165,13 +187,20 @@ public static class StatementMatcher
             refundMatches.Count,
             matched.Sum(r => r.AcquirerAmount ?? 0m),
             mismatch.Sum(r => (r.AcquirerAmount ?? 0m) - (r.LocalAmount ?? 0m)),
-            unmatched.Sum(r => r.AcquirerAmount ?? 0m));
+            unmatched.Sum(r => r.AcquirerAmount ?? 0m),
+            refundsIssued?.Count ?? 0,
+            refundsIssued?.Sum(r => r.Amount) ?? 0m);
     }
 }
 
-/// <param name="MatchedTotalUah">What the acquirer says it took, over the rows we can explain.</param>
+/// <param name="MatchedTotalUah">What the acquirer says it took, over the rows we can explain.
+/// Gross of any refund: it is about matching, not about net money.</param>
 /// <param name="MismatchDeltaUah">Signed difference on the rows where the two disagree.</param>
 /// <param name="UnmatchedTotalUah">Money the acquirer reports that we cannot account for at all.</param>
+/// <param name="IssuedRefundCount">How many refunds we issued in the period.</param>
+/// <param name="IssuedRefundTotalUah">The money we returned in the period. Its own figure, beside
+/// the matched total and never folded into it - a refund issued in the period can reverse a payment
+/// from an earlier one, and netting the two would mix the periods in a signed document.</param>
 public sealed record StatementMatchSummary(
     int TotalRows,
     int MatchedCount,
@@ -180,4 +209,6 @@ public sealed record StatementMatchSummary(
     int RefundMatchCount,
     decimal MatchedTotalUah,
     decimal MismatchDeltaUah,
-    decimal UnmatchedTotalUah);
+    decimal UnmatchedTotalUah,
+    int IssuedRefundCount,
+    decimal IssuedRefundTotalUah);

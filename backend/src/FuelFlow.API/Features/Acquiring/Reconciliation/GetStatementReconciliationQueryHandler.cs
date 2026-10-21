@@ -59,16 +59,64 @@ public sealed class GetStatementReconciliationQueryHandler
                 .Where(o => o.MonobankInvoiceId != null && invoiceIds.Contains(o.MonobankInvoiceId))
                 .ToListAsync(cancellationToken);
 
-var refunds = invoiceIds.Count == 0
+        // The refunds the act needs, in one query, and they are two sets:
+        //
+        //   - the refunds whose invoice the statement mentions, so a statement row can be recognised
+        //     as a reversal of a refund of ours;
+        //   - the refunds we issued inside the period, which are the act's own refunds section.
+        //
+        // The first is narrowed by the statement's own ids and the second by the period, so the
+        // union is still two small sets. The period filter here is deliberately a SUPERSET of
+        // `StatementRefunds.IsIssuedInPeriod` - it does not look at the status - so that a change to
+        // which statuses count as issued can never lose a row to a query narrower than the rule that
+        // decides what the act reports.
+        var refunds = await _context.Payments
+            .AsNoTracking()
+            .Where(p => p.Kind == PaymentKind.Refund
+                     && (invoiceIds.Contains(p.ProviderInvoiceId)
+                         || ((p.PaidAtUtc ?? p.CreatedAtUtc) >= fromUtc
+                             && (p.PaidAtUtc ?? p.CreatedAtUtc) < toUtc)))
+            .ToListAsync(cancellationToken);
+
+        // The refunds of the period, and the two lookups the act needs to say which payment each of
+        // them gives back against: the order it belongs to and the capture it reverses.
+        var issued = refunds
+            .Where(r => StatementRefunds.IsIssuedInPeriod(r, fromUtc, toUtc))
+            .ToList();
+
+        var issuedOrderIds = issued
+            .Where(r => r.OrderId.HasValue)
+            .Select(r => r.OrderId!.Value)
+            .Distinct()
+            .ToList();
+
+        var issuedOrders = issuedOrderIds.Count == 0
+            ? new List<Order>()
+            : await _context.Orders
+                .AsNoTracking()
+                // A deleted order must not hide the refund that belongs to it: the money went back
+                // either way, and the act is a record of money.
+                .IgnoreQueryFilters()
+                .Where(o => issuedOrderIds.Contains(o.Id))
+                .ToListAsync(cancellationToken);
+
+        var captureIds = issued
+            .Where(r => r.ParentPaymentId.HasValue)
+            .Select(r => r.ParentPaymentId!.Value)
+            .Distinct()
+            .ToList();
+
+        var issuedCaptures = captureIds.Count == 0
             ? new List<Payment>()
             : await _context.Payments
                 .AsNoTracking()
-                .Where(p => p.Kind == PaymentKind.Refund
-                         && invoiceIds.Contains(p.ProviderInvoiceId))
+                .Where(p => captureIds.Contains(p.Id))
                 .ToListAsync(cancellationToken);
 
+        var refundsIssued = StatementRefunds.Compose(refunds, issuedOrders, issuedCaptures, fromUtc, toUtc);
+
         var rows = StatementMatcher.Match(entries, orders, refunds);
-        var summary = StatementMatcher.Summarise(rows);
+        var summary = StatementMatcher.Summarise(rows, refundsIssued);
 
         // Orders we believe took money in this period whose invoice the acquirer never mentioned.
         // The other direction of the disagreement: we believe we were paid, they say nothing.
@@ -114,7 +162,8 @@ var refunds = invoiceIds.Count == 0
             entries.Count,
             summary,
             rows,
-            missing);
+            missing,
+            refundsIssued);
     }
 
     /// <summary>
@@ -152,6 +201,8 @@ public sealed record StatementReconciliationQuery
 
 /// <param name="MissingFromStatement">Orders in the period whose invoice the acquirer never
 /// mentioned - the opposite direction of the disagreement to a mismatch.</param>
+/// <param name="RefundsIssued">The refunds we issued in the period - the act's own side of the
+/// reconciliation, beside the acquirer's statement. See <see cref="StatementRefunds"/>.</param>
 public sealed record StatementReconciliationResponse(
     MonobankMerchant Merchant,
     DateTime FromUtc,
@@ -159,7 +210,8 @@ public sealed record StatementReconciliationResponse(
     int StatementRowCount,
     StatementMatchSummary Summary,
     IReadOnlyList<StatementMatchRow> Rows,
-    IReadOnlyList<MissingFromStatementRow> MissingFromStatement);
+    IReadOnlyList<MissingFromStatementRow> MissingFromStatement,
+    IReadOnlyList<IssuedRefundRow> RefundsIssued);
 
 public sealed record MissingFromStatementRow(
     Guid OrderId,
@@ -167,3 +219,26 @@ public sealed record MissingFromStatementRow(
     decimal Amount,
     OrderStatus Status,
     DateTime CreatedAtUtc);
+
+/// <param name="RefundId">The refund payment's own id.</param>
+/// <param name="OrderId">The order the refund belongs to.</param>
+/// <param name="InvoiceId">The acquirer invoice of the payment the refund reverses - so the reader
+/// can see which payment it belongs to, which is the detail the statement cannot give us: a
+/// reversal arrives with no invoice id of its own.</param>
+/// <param name="Amount">What went back, in UAH.</param>
+/// <param name="IssuedAtUtc">When the money left - the acquirer's own date for the reversal.</param>
+/// <param name="ReversedPaymentAtUtc">When we took the money it gives back against.</param>
+/// <param name="ReversesEarlierPeriodPayment">True when that payment belongs to an earlier period
+/// than the one this act covers - the case that makes a net figure meaningless, because the two
+/// sides would not be talking about the same money.</param>
+/// <param name="Note">A human-readable reason, in the act's language, for anything the reader would
+/// otherwise have to work out from the dates.</param>
+public sealed record IssuedRefundRow(
+    Guid RefundId,
+    Guid? OrderId,
+    string? InvoiceId,
+    decimal Amount,
+    DateTime IssuedAtUtc,
+    DateTime? ReversedPaymentAtUtc,
+    bool ReversesEarlierPeriodPayment,
+    string? Note);

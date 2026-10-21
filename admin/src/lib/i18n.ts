@@ -4418,6 +4418,12 @@ export const translations: Record<Language, Record<string, string>> = {
     "statementAct.mismatches": "Discrepancias de importe",
     "statementAct.unmatched": "Sin correspondencia",
     "statementAct.refundMatches": "Reembolsos",
+    // The refunds we issued in the period: the acquirer nests a reversal under the payment it
+    // reverses and does not file it as a row, so the statement alone cannot show money going back.
+    "statementAct.refundsIssued": "Reembolsos del período",
+    "statementAct.refundsTitle": "Los reembolsos que emitimos en el período",
+    "statementAct.refundAmount": "Importe",
+    "statementAct.refundIssuedAt": "Fecha del reembolso",
     "statementAct.acquirerTime": "Hora en la acquiring",
     "statementAct.verdict": "Resultado",
     "statementAct.invoice": "Factura",
