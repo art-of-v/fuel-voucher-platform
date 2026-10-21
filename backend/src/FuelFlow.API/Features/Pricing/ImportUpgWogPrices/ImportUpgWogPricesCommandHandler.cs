@@ -206,10 +206,26 @@ public sealed class ImportUpgWogPricesCommandHandler
             // second run over the same file writes nothing at all.
             if (!command.DryRun && changed)
             {
-                var final = FuelPricing.FinalPerLiter(cost, profit, row.PricePerLiter, minDiscount);
+                // The customer price, or NULL when the fuel has no cost or no margin recorded.
+                //
+                // The nullable twin of the formula, and for the same reason the operator panel uses
+                // it: a fuel nobody has priced has no price, and a price of ZERO is a price - it
+                // says the customer takes the fuel for nothing, and the database refuses the row
+                // (ck_fuel_types_prices_non_negative).
+                //
+                // This used to take the non-nullable formula with the cost and the margin defaulted
+                // to zero, which for an uncosted fuel computed min(0 + 0, pump) = 0 and wrote it.
+                // Fourteen fuels on production carried discount_price = 0.00 for exactly that
+                // reason, and the moment the constraint landed this import would have failed on
+                // every fuel whose pump had moved - which, at a cron of every fifteen minutes, is
+                // up to ninety-six times a day.
+                var customerPrice = FuelPricing.FinalPerLiterOrNull(
+                    fuel.SupplierPricePerLiter, fuel.MarginUahPerLiter, row.PricePerLiter, minDiscount);
 
                 fuel.BasePrice = Math.Round(row.PricePerLiter, 2, MidpointRounding.AwayFromZero);
-                fuel.DiscountPrice = Math.Round(final, 2, MidpointRounding.AwayFromZero);
+                fuel.DiscountPrice = customerPrice is { } price
+                    ? Math.Round(price, 2, MidpointRounding.AwayFromZero)
+                    : null;
                 fuel.UpdatedAtUtc = now;
             }
 
@@ -229,10 +245,12 @@ public sealed class ImportUpgWogPricesCommandHandler
     /// Creates one grade the brand sells and we do not, with its price and default nominals.
     /// </summary>
     /// <remarks>
-    /// The pump is written straight onto the fuel, because a fuel with no recorded price has nothing
-    /// to price from and would sit on the shelf at a derived zero - the very state planning #360
-    /// forbids. It carries the pump and no supplier cost, which is the honest description of what we
-    /// know.
+    /// The pump goes on the fuel, because it is what the brand charges and it is the only figure we
+    /// know. It is the REFERENCE - the list price the customer's saving is measured against - and it
+    /// is not the price the customer pays: we know nothing about what we pay, so nobody has priced
+    /// this fuel yet, and the customer price is NULL until an operator sets the cost and the margin.
+    /// Zero here would claim we sell this fuel for nothing, and the pump would claim we sell it at
+    /// the pump, which is not true either.
     /// </remarks>
     private async Task<UpgWogFuelCreated> CreateAsync(
         Guid brandId,
@@ -253,11 +271,13 @@ public sealed class ImportUpgWogPricesCommandHandler
                 // derived, not normalised: `ДП Mustang+` and `upg95` are both already the name.
                 Name = code,
                 BrandFuelCode = code,
-                // Priced at the pump on purpose. We know what they charge and nothing about what we
-                // pay, so the pump is the only figure we can honestly show; an operator sets the margin
-                // and it becomes a real price. Zero here would claim we sell this fuel for nothing.
-BasePrice = Math.Round(pump, 2, MidpointRounding.AwayFromZero),
-                DiscountPrice = Math.Round(pump, 2, MidpointRounding.AwayFromZero),
+                // The pump is the reference, and it belongs on BasePrice: that is the list price the
+                // customer's saving is measured against. The customer price is a different thing, and
+                // it is NULL: we know what the brand charges and nothing about what we pay, so
+                // nobody has priced this fuel yet - an operator sets the cost and the margin, and it
+                // becomes a real price. Zero here would claim we sell this fuel for nothing.
+                BasePrice = Math.Round(pump, 2, MidpointRounding.AwayFromZero),
+                DiscountPrice = null,
                 PumpPricePerLiter = Math.Round(pump, 2, MidpointRounding.AwayFromZero),
                 MinDiscountPerLiter = DefaultMinDiscountPerLiter,
                 MarginUahPerLiter = null,

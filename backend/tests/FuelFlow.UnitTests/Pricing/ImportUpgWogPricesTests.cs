@@ -58,7 +58,7 @@ public sealed class ImportUpgWogPricesTests : IDisposable
         return sb.ToString();
     }
 
-    private FuelTypeEntity SeedFuel(string id, Guid brandId, string name, string? code, decimal cost, decimal profit, decimal pump)
+    private FuelTypeEntity SeedFuel(string id, Guid brandId, string name, string? code, decimal? cost, decimal? profit, decimal pump)
     {
         var fuel = new FuelTypeEntity
         {
@@ -67,7 +67,9 @@ public sealed class ImportUpgWogPricesTests : IDisposable
             Name = name,
             BrandFuelCode = code,
             BasePrice = pump,
-            DiscountPrice = pump - 1m,
+            // A fuel with no cost has no customer price either - which is the state the catalogue's
+            // own fuels are in, and the state the import has to leave them in.
+            DiscountPrice = cost is null ? null : pump - 1m,
             MarginUahPerLiter = profit,
             SupplierPricePerLiter = cost,
             PumpPricePerLiter = pump,
@@ -126,9 +128,11 @@ public sealed class ImportUpgWogPricesTests : IDisposable
             // The name is the brand's own token. Nothing translates `upgDIESEL` into ДП: UPG does not
             // call it that, and a name we invented here is a name an operator has to correct later.
             fuel.Name.Should().Be(created.Code);
-            // Priced at the pump, because the pump is the only figure we actually know.
+            // The pump is the reference - the list price the customer's saving is measured against.
             fuel.BasePrice.Should().Be(created.PumpPerLiter);
-            fuel.DiscountPrice.Should().Be(created.PumpPerLiter);
+            // And there is no customer price: we know what the brand charges and nothing about what
+            // we pay, so nobody has priced this fuel yet. A zero would claim we sell it for nothing.
+            fuel.DiscountPrice.Should().BeNull();
             fuel.MarginUahPerLiter.Should().BeNull("no acquisition cost is known yet, so there is no margin");
         }
     }
@@ -237,6 +241,41 @@ public sealed class ImportUpgWogPricesTests : IDisposable
         second.BelowCostSkipped.Should().BeEmpty();
         _context.ChangeTracker.Clear();
     (await _context.FuelTypes.SingleAsync(f => f.Id == ToUuid("upg-95"))).PumpPricePerLiter.Should().Be(60m);
+    }
+
+    [Fact]
+    public async Task AFuelNobodyHasPriced_IsNotGivenAPriceOfZero()
+    {
+        // The state every fuel on the catalogue is in today: no supplier cost, no margin. The pump
+        // moved, so the reprice path runs - and it must not write a price of zero, because a price of
+        // zero IS a price: it says the customer takes the fuel for nothing, and the database refuses
+        // the row (ck_fuel_types_prices_non_negative). The old code wrote one on every fuel it
+        // touched, and fourteen of them on production carried it.
+        SeedFuel("upg-100", BrandIds.Upg, "upg100", "upg100", cost: null, profit: null, pump: 90.00m);
+        await _context.SaveChangesAsync();
+
+        await Handler().HandleAsync(
+            new ImportUpgWogPricesCommand(Sheet(("upg100", 99.90m)), "upg", DryRun: false), Guid.Empty, null);
+
+        _context.ChangeTracker.Clear();
+        var fuel = await _context.FuelTypes.SingleAsync(f => f.Id == ToUuid("upg-100"));
+
+        // The pump is known, and it is written - it is the reference, not the customer price.
+        fuel.PumpPricePerLiter.Should().Be(99.90m);
+        fuel.BasePrice.Should().Be(99.90m);
+        fuel.DiscountPrice.Should().BeNull("a price of zero is a price, and it is not this one");
+
+        // And the other half of it: a fuel that IS priced keeps the price the formula gives it. The
+        // fix must not turn every price into a null.
+        SeedFuel("upg-95", BrandIds.Upg, "upg95", "upg95", cost: 86.90m, profit: 5m, pump: 91.90m);
+        await _context.SaveChangesAsync();
+
+        await Handler().HandleAsync(
+            new ImportUpgWogPricesCommand(Sheet(("upg95", 95.00m)), "upg", DryRun: false), Guid.Empty, null);
+
+        _context.ChangeTracker.Clear();
+        var priced = await _context.FuelTypes.SingleAsync(f => f.Id == ToUuid("upg-95"));
+        priced.DiscountPrice.Should().Be(91.90m, "min(cost + margin, pump - min discount)");
     }
 
     [Fact]
