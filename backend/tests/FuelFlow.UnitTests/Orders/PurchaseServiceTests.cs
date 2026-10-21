@@ -260,26 +260,31 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
     }
 
 /// <summary>
-    /// A merchant that is not configured degrades the same way any other Monobank failure does:
-    /// the order is still created, with no invoice, and the failure is logged. Taking the shop's
-    /// checkout down is not the failure mode we want for a payment-brand problem - and a
-    /// missing live token in one environment must not take every customer's checkout with it.
+    /// The acquirer refuses the payment. The order is still written - it is written BEFORE the
+    /// acquirer is asked for money - and the caller is told the payment could not be set up.
     /// </summary>
+    /// <remarks>
+    /// This used to answer with an order and no invoice, as if the checkout had worked. It had not:
+    /// the customer had no link to pay, and the failure was swallowed into a success. Now the sale
+    /// is on record (with the merchant it would have been paid through, so the retry and the
+    /// reconciliation paths know whom to ask), and the failure reaches the caller.
+    /// </remarks>
     [Fact]
-    public async Task CreateCheckout_UnconfiguredMerchant_StillReturnsAnOrderWithoutInvoice()
+    public async Task CreateCheckout_UnconfiguredMerchant_LeavesTheOrderBehindAndFails()
     {
         var factory = new ThrowingMonobankClientFactory(MonobankMerchant.Live);
         var handler = CheckoutHandlerWith(new StubMonobankMerchantResolver(), factory);
 
-        var response = await handler.HandleAsync(CheckoutCommand());
+        await Assert.ThrowsAsync<MonobankMerchantUnavailableException>(
+            () => handler.HandleAsync(CheckoutCommand()));
 
-        Assert.NotEqual(Guid.Empty, response.OrderId);
-        Assert.Null(response.MonobankInvoiceId);
-        Assert.Null(response.PaymentUrl);
-
-        var order = await _context.Orders.FindAsync(response.OrderId);
+        var order = await _context.Orders.SingleAsync();
+        Assert.Equal(OrderStatus.PendingPayment, order.Status);
         // The merchant is still recorded: the later refund/reconciliation paths read it from here.
-        Assert.Equal(MonobankMerchant.Live, order!.MonobankMerchant);
+        Assert.Equal(MonobankMerchant.Live, order.MonobankMerchant);
+        // And there is no invoice, because the acquirer never minted one.
+        Assert.Null(order.MonobankInvoiceId);
+        Assert.Null(order.MonobankPaymentUrl);
     }
 
     /// <summary>
@@ -430,10 +435,11 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
     /// <summary>
     /// A failed attempt is over, and an attempt that is over must not hold the basket against the
     /// customer's next try. The order stays - it is the record of what was attempted - and gives
-    /// the basket back.
+    /// the basket back. The failure also reaches the caller: a checkout that cannot be paid is
+    /// not a successful checkout, and the operator has to hear that the payment setup broke.
     /// </summary>
     [Fact]
-    public async Task CreateCheckout_WhenTheAcquirerRefuses_GivesTheBasketBack()
+    public async Task CreateCheckout_WhenTheAcquirerRefuses_GivesTheBasketBackAndFails()
     {
         var client = new Mock<IMonobankClient>();
         client
@@ -444,11 +450,12 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
             new StubMonobankMerchantResolver(),
             new StubMonobankClientFactory(client.Object));
 
-        var response = await handler.HandleAsync(CheckoutCommand());
+        await Assert.ThrowsAsync<HttpRequestException>(() => handler.HandleAsync(CheckoutCommand()));
 
-        var order = await _context.Orders.FindAsync(response.OrderId);
-        Assert.NotNull(order);
-        Assert.Null(order!.MonobankInvoiceId);
+        // The basket is given back even so: the attempt is over, and the customer's next tap is a
+        // fresh one.
+        var order = await _context.Orders.SingleAsync();
+        Assert.Null(order.MonobankInvoiceId);
         Assert.Null(order.CheckoutKey);
     }
 
