@@ -162,11 +162,15 @@ public sealed class ImportOkkoCatalogueCommandHandler
             .Select(f => f.BrandFuelCode!)
             .ToHashSet(StringComparer.Ordinal);
 
+        // The grade keys we already hold, so that a second spelling of a grade we sell is refused
+        // rather than written. The key is the name folded onto one spelling - the same rule the
+        // database's ux_fuel_types_brand_grade_key enforces - and the comparison used to be a
+        // case-insensitive string, which let "А-95" and "A-95" through as two rows.
         var knownNames = carried
-            .Select(f => FuelTypeEntity.NormaliseBrandFuelCode(f.Name))
-            .Where(name => name is not null)
-            .Select(name => name!)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            .Select(f => FuelGrade.Key(f.Name))
+            .Where(key => key is not null)
+            .Select(key => key!)
+            .ToHashSet(StringComparer.Ordinal);
 
         // The grade each carried fuel already occupies, and under what name. This is what makes a second
         // row for one grade impossible: a fuel is identified by (brand, grade), and the grade is read
@@ -245,7 +249,7 @@ if (knownCodes.Contains(code))
             // "100 PULLS".
             var name = OkkoFuelClassifier.CanonicalName(grade);
 
-            if (!command.DryRun && knownNames.Contains(name))
+            if (!command.DryRun && knownNames.Contains(FuelGrade.Key(name) ?? name))
             {
                 // Two grades wanting one name. The unique index would refuse it and guessing which to
                 // rename would be worse, so it is reported and a human decides.
@@ -254,7 +258,7 @@ if (knownCodes.Contains(code))
             }
 
             knownCodes.Add(code);
-            knownNames.Add(name);
+            knownNames.Add(FuelGrade.Key(name) ?? name);
             // The id is recorded below, once the fuel exists: a dry run has no row to point at.
 
             if (command.DryRun)

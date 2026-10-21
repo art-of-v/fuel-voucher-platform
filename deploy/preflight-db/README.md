@@ -76,6 +76,7 @@ what to write.
 | `015-roles-columns-match-the-model.sql` | Are the columns of `roles` exactly the set the EF model maps | blocks the deploy |
 | `016-migration-ids-are-well-formed.sql` | Is every `MigrationId` `^<14 digits>_<name>$`, and recorded once | blocks the deploy |
 | `017-fuels-without-a-supplier-cost.sql` | Which fuels **that are in stock** have no supplier cost, or a cost and no margin | blocks the deploy |
+| `018-fuel-type-grade-twins.sql` | Do two **live** fuels at one brand spell one grade two ways | blocks the deploy |
 
 **Every file in this directory is the same instrument**: a warning by default, a failed
 deploy when `PREFLIGHT_DB_STRICT` is on. The distinction between the files is what they
@@ -118,6 +119,18 @@ production served 200s throughout. The file now joins the stock the same way the
 (`PackageStockAvailability.SellableKeys`: `Available`, in the `real` pool, not deleted, not past its
 supplier expiry), so a gate that used a different definition than the shop would report fuels the shop
 never offers - the same class of bug as the one the file had.
+
+**`018` asks whether one grade is written two ways at one brand.** The catalogue says a grade once:
+"А-95" and "A-95" are one grade, and the owner's decision (planning #349, 2026-10-21) is that the
+second spelling must not become a second row. `011` asks whether one NAME is written twice; `018`
+asks the harder question - the same grade under two spellings - and the index it guards is
+`ux_fuel_types_brand_grade_key`, on (brand, the name folded onto one spelling).
+
+The rule is written out in the file rather than called, because the function that computes the key
+(`fuelflow_fuel_grade_key`) arrives with the migration that adds the column: on the deploy that
+carries the migration there is nothing to call, and the migration's own guard is what refuses
+there. `FuelTypeGradeKeyTests` reads both and compares them over every name the catalogue holds,
+and seeds a twin to prove the file finds one.
 
 
 ## A check that cannot run is a warning, never a pass

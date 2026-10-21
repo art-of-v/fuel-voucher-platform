@@ -108,6 +108,27 @@ public sealed class ImportKloPricesCommandHandlerTests : IDisposable
     }
 
     [Fact]
+    public async Task It_should_match_a_fuel_by_grade_even_when_the_script_or_the_punctuation_differs()
+    {
+        await SeedBrandAsync();
+        // The operator wrote "А-95" and Minfin's column says "А 95": the same grade, written with a
+        // hyphen and a Latin letter. The comparison used to ignore whitespace and case only, so
+        // this was a second row for a grade the catalogue already held.
+        await SeedOperatorFuelsAsync("А-95", "ДП", "Газ");
+
+        await Handler().HandleAsync(
+            new ImportKloPricesCommand(Sheet, DryRun: false), Guid.Empty, "test");
+        _context.ChangeTracker.Clear();
+
+        var a95 = await _context.FuelTypes.SingleAsync(f => f.Name == "А-95");
+        a95.PumpPricePerLiter.Should().Be(87.90m, "the column's price is the price of this grade");
+        a95.BrandFuelCode.Should().Be("А 95", "and the code makes it resolve exactly from now on");
+
+        (await _context.FuelTypes.CountAsync(f => f.BrandId == BrandIds.Klo)).Should().Be(5,
+            "one grade is one row: the sheet's 'А 95' found our 'А-95', and it did not write a second one");
+    }
+
+    [Fact]
     public async Task It_should_create_the_grades_the_catalogue_lacks()
     {
         await SeedBrandAsync();

@@ -43,8 +43,10 @@ public sealed record KloPriceImportResult(
 /// </para>
 /// <para>
 /// <b>Matched by name, not by code.</b> The KLO fuels carry no brand code, and Minfin publishes a
-/// grade name rather than a code, so name is what there is to match on. The comparison ignores
-/// whitespace and case: our fuel is "А95" and the column is "А 95", and they are the same grade.
+/// grade name rather than a code, so name is what there is to match on. The comparison folds the
+/// name onto one spelling - our fuel is "А95" and the column is "А 95", and they are the same
+/// grade - which is the same rule the database's <c>ux_fuel_types_brand_grade_key</c> enforces, so
+/// the import cannot write the second spelling of a grade the catalogue already holds.
 /// A match that finds a fuel with no code GIVES it one - the column's name - because a code is what
 /// makes a fuel resolve exactly, and this is the only source that can say which grade it is.
 /// </para>
@@ -114,12 +116,13 @@ public sealed class ImportKloPricesCommandHandler
             .Where(f => f.BrandId == klo && !f.IsDeleted)
             .ToListAsync(ct);
 
-        // One key for both sides: the grade's name, upper-cased, with the whitespace gone. Minfin
-        // writes "А 95" and an operator wrote "А95", and they are the same grade.
+        // One key for both sides: the grade's key - the name folded onto one spelling, so that
+        // "А95", "А 95" and "A-95" are one grade. Minfin writes "А 95" and an operator wrote
+        // "А95", and they are the same grade.
         var byName = new Dictionary<string, FuelTypeEntity>(StringComparer.Ordinal);
         foreach (var fuel in ours)
         {
-            byName[Key(fuel.Name)] = fuel;
+            byName[MatchKey(fuel.Name)] = fuel;
         }
 
         var created = new List<KloPriceFuelCreated>();
@@ -129,7 +132,7 @@ public sealed class ImportKloPricesCommandHandler
 
         foreach (var row in command.Sheet)
         {
-            var key = Key(row.Grade);
+            var key = MatchKey(row.Grade);
             seen.Add(key);
 
             if (!byName.TryGetValue(key, out var fuel))
@@ -170,7 +173,7 @@ public sealed class ImportKloPricesCommandHandler
         // The grades our catalogue holds that Minfin does not list for KLO. Reported, not archived:
         // a network's own grade can be one Minfin does not average, and archiving a fuel over a
         // third party's table would be a decision this importer has no standing to make.
-        foreach (var fuel in ours.Where(f => !seen.Contains(Key(f.Name))))
+        foreach (var fuel in ours.Where(f => !seen.Contains(MatchKey(f.Name))))
         {
             notSold.Add(fuel.Name);
         }
@@ -238,8 +241,11 @@ public sealed class ImportKloPricesCommandHandler
     }
 
     /// <summary>
-    /// The key a grade is matched by: its name, upper-cased, with the whitespace gone.
+    /// The key a grade is matched by: the name folded onto one spelling, so that "А95", "А 95" and
+    /// "A-95" are one grade - the same rule the database's ux_fuel_types_brand_grade_key enforces.
+    /// A name that says no grade at all is matched by itself, because two rows with no grade are
+    /// still two rows.
     /// </summary>
-    private static string Key(string name)
-        => string.Concat(name.Where(c => !char.IsWhiteSpace(c))).ToUpperInvariant();
+    private static string MatchKey(string name)
+        => FuelGrade.Key(name) ?? name.Trim().ToUpperInvariant();
 }

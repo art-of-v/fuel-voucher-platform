@@ -141,6 +141,19 @@ public sealed class UpgWogPriceSyncService
                     string.Join(", ", result.Created.Select(f => $"{f.Name} [{f.Code}]")));
             }
 
+            if (result.Held.Count > 0)
+            {
+                // Information, not Debug: the catalogue already had this grade under a name of its
+                // own, so the price went to the row that was already there and that row was given
+                // the brand's code. The operator is told which row it was - one grade is one row,
+                // and a second row for it would be a second price on the shelf.
+                _logger.LogInformation(
+                    "{Brand} publishes {Count} grade(s) we already sell under our own name: {Grades}. "
+                    + "The price went to the row that already existed, and it was given the brand's code.",
+                    brand, result.Held.Count,
+                    string.Join(" | ", result.Held.Select(g => $"{g.Code} = \"{g.OurFuelName}\"")));
+            }
+
             if (result.Repriced.Count > 0)
             {
                 _logger.LogDebug(

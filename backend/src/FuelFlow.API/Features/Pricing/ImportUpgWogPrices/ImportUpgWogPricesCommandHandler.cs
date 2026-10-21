@@ -29,9 +29,20 @@ public sealed record UpgWogFuelRepriced(
     Guid FuelTypeId, string Name, string Code, decimal PumpPerLiter,
     decimal? PreviousPumpPerLiter, bool Changed, int VolumesRepriced);
 
+/// <summary>
+/// A grade the brand publishes that we already sell under a name of our own: the row that won, and
+/// the brand's code it was given.
+/// </summary>
+/// <remarks>
+/// The same shape as the OKKO catalogue import's "we already sell this grade under our own name"
+/// report: the grade is one row, and the row that already exists is the one the price belongs to.
+/// </remarks>
+public sealed record UpgWogGradeHeld(Guid FuelTypeId, string OurFuelName, string Code);
+
 public sealed record UpgWogPriceImportResult(
     IReadOnlyList<UpgWogFuelCreated> Created,
     IReadOnlyList<UpgWogFuelRepriced> Repriced,
+    IReadOnlyList<UpgWogGradeHeld> Held,
     IReadOnlyList<OkkoPriceSheetError> Errors,
     bool DryRun)
 {
@@ -63,6 +74,12 @@ public sealed record UpgWogPriceImportResult(
 /// that already exists. The margin is the operator's commercial term and a third party's price move
 /// must not reprice the business; the name is how a human recognises the fuel, and renaming a row
 /// because a site changed its label would silently re-key the catalogue.
+/// <para>
+/// The one thing it does add to a row that already exists is the brand's CODE, and only where the
+/// row has none: a fuel an operator typed by hand carries no code, and the sheet is the only thing
+/// that can say which grade it is. That is also how a grade the catalogue already holds is found
+/// when the code is unknown - by the grade key, the name folded onto one spelling - so the second
+/// spelling of a grade is resolved to the row that already exists instead of becoming a twin.
 /// </para>
 /// <para>
 /// <b>A new grade is born priced at the pump.</b> We know what the brand charges and nothing about
@@ -105,7 +122,7 @@ public sealed class ImportUpgWogPricesCommandHandler
         if (!SupportedBrandIds.Contains(brandSlug))
         {
             return new UpgWogPriceImportResult(
-                [], [],
+                [], [], [],
                 [new OkkoPriceSheetError(0, $"Unsupported brand '{command.BrandId}'")],
                 command.DryRun);
         }
@@ -114,7 +131,7 @@ public sealed class ImportUpgWogPricesCommandHandler
         if (brandId is null)
         {
             return new UpgWogPriceImportResult(
-                [], [],
+                [], [], [],
                 [new OkkoPriceSheetError(0, $"Brand '{brandSlug}' is not in the catalogue")],
                 command.DryRun);
         }
@@ -124,18 +141,31 @@ public sealed class ImportUpgWogPricesCommandHandler
         var parsed = OkkoPriceSheetParser.Parse(command.Content);
         if (parsed.Errors.Count > 0)
         {
-            return new UpgWogPriceImportResult([], [], parsed.Errors, command.DryRun);
+            return new UpgWogPriceImportResult([], [], [], parsed.Errors, command.DryRun);
         }
+
+        var ours = await _context.FuelTypes
+            .AsTracking()
+            .Where(f => f.BrandId == brandKey && !f.IsDeleted)
+            .ToListAsync(ct);
 
         // Matched on the code alone. Unlike OKKO there is no category fallback here and there must
         // not be one: these brands publish two distinct 95s and two distinct diesels, and a name- or
         // category-based fallback is exactly what would hand both prices to whichever row sorted first.
-        var byCode = (await _context.FuelTypes
-                .AsTracking()
-                .Where(f => f.BrandId == brandKey && !f.IsDeleted)
-                .ToListAsync(ct))
+        var byCode = ours
             .Where(f => FuelTypeEntity.NormaliseBrandFuelCode(f.BrandFuelCode) is not null)
             .GroupBy(f => FuelTypeEntity.NormaliseBrandFuelCode(f.BrandFuelCode)!, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.OrderBy(f => f.Id).First());
+
+        // And the grade key, which is what catches the one case the code cannot: a fuel an operator
+        // typed without a code, whose name is the grade the sheet publishes. "upg95" typed by hand
+        // and "upg95" published are one fuel, so the sheet's price belongs to the row that is
+        // already there - and that row is given the code, which is what makes it resolve exactly.
+        // It is NOT a category fallback: the key is the name folded onto one spelling, so "upg95"
+        // and "A-95" stay two fuels, as they are.
+        var byGradeKey = ours
+            .Where(f => FuelGrade.Key(f.Name) is not null)
+            .GroupBy(f => FuelGrade.Key(f.Name)!, StringComparer.Ordinal)
             .ToDictionary(g => g.Key, g => g.OrderBy(f => f.Id).First());
 
         var now = DateTime.UtcNow;
@@ -144,6 +174,7 @@ public sealed class ImportUpgWogPricesCommandHandler
 
         var created = new List<UpgWogFuelCreated>();
         var repriced = new List<UpgWogFuelRepriced>();
+        var held = new List<UpgWogGradeHeld>();
 
         foreach (var row in parsed.Rows)
         {
@@ -153,16 +184,37 @@ public sealed class ImportUpgWogPricesCommandHandler
 
             if (!byCode.TryGetValue(code, out var fuel))
             {
-                if (!command.CreateMissing)
+                // The code is unknown, but the GRADE may not be: a fuel an operator typed by hand
+                // carries no code, and its name is the grade the sheet publishes. That row is the
+                // one this price belongs to - it is given the code and the price, and no second row
+                // is written, because one grade is one row. The report names the row that won, so
+                // the operator can see which one it was.
+                var gradeKey = FuelGrade.Key(code);
+                if (gradeKey is not null && byGradeKey.TryGetValue(gradeKey, out var sameGrade))
                 {
-                    // A grade we do not carry, on a refresh that is only allowed to move prices.
-                    // Skipped rather than created, and the weekly catalogue check is what brings it in.
+                    // The row that won, and the reason the operator is told: the grade is one row,
+                    // this is the row the catalogue already had, and it was given the brand's code so
+                    // that it resolves exactly from now on.
+                    held.Add(new UpgWogGradeHeld(sameGrade.Id, sameGrade.Name, code));
+                    fuel = sameGrade;
+                    if (string.IsNullOrWhiteSpace(fuel.BrandFuelCode))
+                    {
+                        fuel.BrandFuelCode = code;
+                    }
+                }
+                else
+                {
+                    if (!command.CreateMissing)
+                    {
+                        // A grade we do not carry, on a refresh that is only allowed to move prices.
+                        // Skipped rather than created, and the weekly catalogue check is what brings it in.
+                        continue;
+                    }
+
+                    var made = await CreateAsync(brandKey, code, row.PricePerLiter, actor, now, command.DryRun, ct);
+                    created.Add(made);
                     continue;
                 }
-
-                var made = await CreateAsync(brandKey, code, row.PricePerLiter, actor, now, command.DryRun, ct);
-                created.Add(made);
-                continue;
             }
 
             var previousPump = fuel.PumpPricePerLiter;
@@ -214,7 +266,7 @@ public sealed class ImportUpgWogPricesCommandHandler
             await _context.SaveChangesAsync(ct);
         }
 
-        return new UpgWogPriceImportResult(created, repriced, [], command.DryRun);
+        return new UpgWogPriceImportResult(created, repriced, held, [], command.DryRun);
     }
 
     /// <summary>

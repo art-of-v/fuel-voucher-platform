@@ -274,8 +274,47 @@ public sealed class RehearsalFlagWritePathTests : IDisposable
     }
 
     [Fact]
-    public async Task TheSameFuelNameAtAnotherBrand_IsNotADuplicate()
+    public async Task ASecondSpellingOfTheSameFuel_IsRefused_AndTheWinnerIsNamed()
     {
+        // The owner's decision (planning #349, 2026-10-21): "А-95" and "A-95" are one grade, and the
+        // catalogue says so once. The index on the name cannot tell them apart - it is on the name,
+        // and the name is what a person typed - so the write path asks the grade key instead, and
+        // says which of the two rows already exists.
+        await SeedQaFuelAsync();
+        await _context.SaveChangesAsync();
+
+        var result = await _controller.AddFuel(
+            BrandIds.Okko,
+            new CreateFuelRequest
+            {
+                Name = "A95 ЄВРО(QA)",
+                SupplierPricePerLiter = 60m,
+                MarginUahPerLiter = 12.34m,
+                PumpPricePerLiter = 92.90m,
+                IsTestData = true
+            },
+            CancellationToken.None);
+
+        var conflict = result.Should().BeOfType<ConflictObjectResult>().Subject;
+
+        (await _context.FuelTypes.CountAsync(f => f.BrandId == BrandIds.Okko))
+            .Should().Be(1, "a second row for the same grade is what the storefront lists twice");
+        (await _context.FuelTypes.CountAsync(f => f.Name == "A95 ЄВРО(QA)"))
+            .Should().Be(0, "the second spelling did not land");
+
+        // The operator is told WHICH row won, and what to do about it - that is the part the issue
+        // left open, and a refusal that names nothing is a refusal the operator cannot act on.
+        conflict.Value.Should().NotBeNull("the refusal says something");
+        var payload = conflict.Value!;
+        var fuelTypeId = payload.GetType().GetProperty("fuelTypeId")?.GetValue(payload);
+        fuelTypeId.Should().Be(ToUuid("qa-a95"),
+            "the operator is told which fuel already holds the grade");
+        var message = payload.GetType().GetProperty("message")?.GetValue(payload) as string;
+        message.Should().Contain("А95 ЄВРО(QA)", "the refusal names the row that won");
+    }
+
+    [Fact]
+    public async Task TheSameFuelNameAtAnotherBrand_IsNotADuplicate()    {
         // The uniqueness is per Brand, deliberately: two networks both listing 'ГАЗ' is the
         // catalogue working, not a duplicate.
         await SeedQaFuelAsync();

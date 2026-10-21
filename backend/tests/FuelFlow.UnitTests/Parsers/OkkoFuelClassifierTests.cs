@@ -274,4 +274,70 @@ public class OkkoFuelClassifierTests
         result.Should().NotBeNull();
         result!.Id.Should().Be(ToUuid("okko-95"));
     }
+
+    /// <summary>
+    /// The names this catalogue creates must be names the classifier can read back.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <c>CanonicalName</c> is what the catalogue import names a fuel after, and
+    /// <c>CategoryFromName</c> is how the voucher importer finds that fuel again. If the two do not
+    /// agree, the system creates a fuel it cannot later resolve: "Пульс 95" read as a plain 95 and
+    /// "Пропан" read as no grade at all, which is how a premium or a gas voucher came to be
+    /// refused - the fuel was there, under a name the classifier did not recognise.
+    /// </para>
+    /// <para>
+    /// The rule is now that every name the catalogue writes is read back as the grade it stands
+    /// for, and the test says so over all five of them.
+    /// </para>
+    /// </remarks>
+    [Theory]
+    [InlineData(OkkoFuelCategory.A95)]
+    [InlineData(OkkoFuelCategory.A95Pulls)]
+    [InlineData(OkkoFuelCategory.Diesel)]
+    [InlineData(OkkoFuelCategory.DieselPulls)]
+    [InlineData(OkkoFuelCategory.Gas)]
+    public void EveryNameTheCatalogueWrites_IsReadBackAsItsGrade(OkkoFuelCategory grade)
+    {
+        var name = OkkoFuelClassifier.CanonicalName(grade);
+
+        OkkoFuelClassifier.CategoryFromName(name).Should().Be(grade,
+            $"'{name}' is the name this catalogue gives {grade}, and the voucher importer has to be "
+            + "able to find that fuel by its name");
+    }
+
+    [Fact]
+    public void TheFuelTheCatalogueCreates_ResolvesTheVoucherThatCarriesItsGrade()
+    {
+        // The whole point of the round trip: a catalogue built by the import - names and all - has
+        // to resolve every voucher the brand publishes, by the name the import gave the fuel.
+        var catalogue = new[]
+        {
+            new FuelTypeEntity { Id = ToUuid("c-a95"), Name = OkkoFuelClassifier.CanonicalName(OkkoFuelCategory.A95) },
+            new FuelTypeEntity { Id = ToUuid("c-a95pulls"), Name = OkkoFuelClassifier.CanonicalName(OkkoFuelCategory.A95Pulls) },
+            new FuelTypeEntity { Id = ToUuid("c-diesel"), Name = OkkoFuelClassifier.CanonicalName(OkkoFuelCategory.Diesel) },
+            new FuelTypeEntity { Id = ToUuid("c-dieselpulls"), Name = OkkoFuelClassifier.CanonicalName(OkkoFuelCategory.DieselPulls) },
+            new FuelTypeEntity { Id = ToUuid("c-gas"), Name = OkkoFuelClassifier.CanonicalName(OkkoFuelCategory.Gas) }
+        };
+
+        var cases = new (string Code, string Id)[]
+        {
+            ("9015", "c-a95"),
+            ("45290", "c-dieselpulls"),
+            ("9018", "c-diesel"),
+            ("9019", "c-gas")
+        };
+
+        foreach (var (code, expected) in cases)
+        {
+            var resolved = OkkoFuelClassifier.ResolveFuelType(
+                rawText: null,
+                qrPayload: $"{code}$2000$;99999600000020368126=4507101299?",
+                catalogue);
+
+            resolved.Should().NotBeNull($"a voucher carrying the product code {code} names a grade the catalogue holds");
+            resolved!.Id.Should().Be(ToUuid(expected),
+                $"the voucher carrying {code} must land on the fuel the catalogue wrote for that grade");
+        }
+    }
 }

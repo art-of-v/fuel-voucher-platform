@@ -102,8 +102,18 @@ public sealed class KloVoucherParser : IVoucherProviderParser
                     region.Bounds, context.PageRender.PageNumber);
             }
 
-            var fuelTypeEntity = await _context.FuelTypes
-                .FirstOrDefaultAsync(f => f.BrandId == kloId.Value && f.Name == fuelTypeName, cancellationToken);
+            // The fuel is found by the GRADE, not by the string: the catalogue says a grade once,
+            // so "ГАЗ" and "Газ" are one fuel and the row the catalogue holds is the row a voucher
+            // must land on. The grade key is the name folded onto one spelling - the same rule the
+            // database's ux_fuel_types_brand_grade_key enforces.
+            //
+            // A grade the catalogue does not hold stays unresolved: the parsed name says which grade
+            // it is, and a guess at a name the catalogue does not carry would land the voucher on
+            // whatever row sorted first.
+            var gradeKey = FuelGrade.Key(fuelTypeName);
+            var fuelTypeEntity = gradeKey is null
+                ? null
+                : kloFuelTypes.FirstOrDefault(f => FuelGrade.Key(f.Name) == gradeKey);
 
             // No invented id when the name does not match, which is what this used to do: the fallback was the
             // literal "klo-dp", a natural key that exists only in the rows
