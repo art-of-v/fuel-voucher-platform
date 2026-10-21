@@ -103,9 +103,9 @@ public static class ServerPricing
     /// </summary>
     /// <remarks>
     /// Exposed so the below-cost guard can be evaluated against the figure the customer is actually
-    /// charged. <see cref="FuelPricing.IsBelowCost(cost, profit, pump, minDiscount)"/> recomputes the
-    /// price from cost + margin and would never see a term discount — so a generous tier would have been
-    /// able to sell under cost while the guard reported the line was fine.
+    /// charged. Recomputing the price from cost + margin would never see a term discount — so a
+    /// generous tier would have been able to sell under cost while the guard reported the line was
+    /// fine.
     /// </remarks>
     public static decimal? DiscountedPricePerLiter(SellablePackage package, decimal discountPerLiter)
     {

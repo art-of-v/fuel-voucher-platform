@@ -192,18 +192,20 @@ public sealed class OkkoPriceSyncServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task Sync_ShouldApplyAPumpBelowCost_WhenTheFuelIsOptedIn()
+    public async Task Sync_ShouldApplyAPumpBelowOurCost_BecauseTheColumnPriceIsAReference()
     {
-        // AllowBelowCost is the same escape hatch the manual price panel offers: a deliberate
-        // loss-leader, entered by a person, must not be second-guessed by the scheduler.
+        // The column price is a reference; our price is the cost plus the margin. A pump under what
+        // we pay is written as it stands - the scheduler neither refuses it nor needs an opt-in to
+        // apply it. The guard that can lose us money is at checkout, where the price the customer is
+        // actually charged is compared against our cost.
         await SeedAsync(pump: 50m);
         var a95 = await _context.FuelTypes.FindAsync(Id("okko-95"));
-        a95!.AllowBelowCost = true;
-        await _context.SaveChangesAsync();
-        _context.ChangeTracker.Clear();
+        a95!.SupplierPricePerLiter.Should().NotBeNull();
+        a95.SupplierPricePerLiter!.Value.Should().BeGreaterThan(39.50m,
+            "the pump the sheet publishes is under what we pay - that is what makes this the below-cost case");
+
         var result = await new ImportOkkoPumpPricesCommandHandler(_context, new BrandSlugResolver(_context), _events, new PriceHistoryRecorder(_context))
             .ApplyAsync([new OkkoPumpPrice("A-95", 39.50m)], dryRun: false, Guid.Empty, "OKKO price sync");
-        result.BelowCostSkipped.Should().BeEmpty();
         result.FuelsChanged.Should().Be(1);
         _context.ChangeTracker.Clear();
         (await FuelOfAsync("okko-95"))

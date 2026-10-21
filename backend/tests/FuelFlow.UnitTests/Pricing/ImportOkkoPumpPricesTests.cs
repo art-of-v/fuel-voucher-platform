@@ -187,19 +187,23 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
         gas.PumpPricePerLiter.Should().Be(46.90m);
         gas.FinalPerLiter().Should().Be(33m);   // cost 29 + profit 4, under the column price
     }
+
     [Fact]
-    public async Task Import_ShouldApplyABelowCostPump_WhenTheFuelIsOptedIn()
+    public async Task Import_ShouldApplyAPumpBelowOurCost_BecauseTheColumnPriceIsAReference()
     {
+        // The column price is what the pump charges; our price is the cost plus the margin. A pump
+        // under what we pay is therefore written as it stands - the import neither refuses it nor
+        // needs an opt-in to apply it. The guard that can lose us money is at checkout, where the
+        // price the customer is actually charged is compared against our cost.
         await SeedCatalogAsync();
         var a95 = await _context.FuelTypes.FirstAsync(f => f.Id == ToUuid("okko-95"));
-        a95.AllowBelowCost = true;
-        await _context.SaveChangesAsync();
-        _context.ChangeTracker.Clear();
+        a95.SupplierPricePerLiter.Should().NotBeNull();
+        a95.SupplierPricePerLiter!.Value.Should().BeGreaterThan(50m,
+            "the pump the sheet publishes is under what we pay - that is what makes this the below-cost case");
 
         var result = await Handler().HandleAsync(
             Import("fuelCode,pricePerLiter\r\nA-95,50.00\r\n"), Guid.Empty, "tester");
 
-        result.BelowCostSkipped.Should().BeEmpty();
         result.FuelsChanged.Should().Be(1);
         _context.ChangeTracker.Clear();
         (await ReadAsync("okko-95-20")).Fuel.PumpPricePerLiter.Should().Be(50m);

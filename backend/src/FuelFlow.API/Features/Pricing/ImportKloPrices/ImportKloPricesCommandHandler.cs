@@ -27,7 +27,6 @@ public sealed record KloPriceFuelRepriced(Guid FuelTypeId, string Name, string G
 public sealed record KloPriceImportResult(
     IReadOnlyList<KloPriceFuelCreated> Created,
     IReadOnlyList<KloPriceFuelRepriced> Repriced,
-    IReadOnlyList<string> BelowCostSkipped,
     IReadOnlyList<string> GradesNotSold,
     bool DryRun);
 
@@ -55,9 +54,10 @@ public sealed record KloPriceImportResult(
 /// nothing about what we pay.
 /// </para>
 /// <para>
-/// <b>What it refuses.</b> A pump price that would sell the fuel below our own cost is refused, the
-/// same guard the other vendors' imports carry - a price move by a third party must not be able to
-/// take a fuel off sale unattended.
+/// <b>What it does not refuse.</b> A pump price below what we pay is written as it stands: the
+/// column price is a reference, and our price is the cost plus the margin. The guard that can lose
+/// us money is at checkout, where the price the customer is charged - our price minus the term
+/// discount - is compared against our cost.
 /// </para>
 /// </remarks>
 public sealed class ImportKloPricesCommandHandler
@@ -149,10 +149,6 @@ public sealed class ImportKloPricesCommandHandler
             var previousPump = fuel.PumpPricePerLiter;
             var changed = previousPump != row.PricePerLiter;
 
-            var cost = fuel.SupplierPricePerLiter ?? 0m;
-            var profit = fuel.MarginUahPerLiter ?? 0m;
-            var minDiscount = fuel.MinDiscountPerLiter ?? 0m;
-
             if (!command.DryRun)
             {
                 fuel.PumpPricePerLiter = row.PricePerLiter;
@@ -189,7 +185,7 @@ public sealed class ImportKloPricesCommandHandler
             }
         }
 
-        return new KloPriceImportResult(created, repriced, [], notSold, command.DryRun);
+        return new KloPriceImportResult(created, repriced, notSold, command.DryRun);
     }
 
     /// <summary>

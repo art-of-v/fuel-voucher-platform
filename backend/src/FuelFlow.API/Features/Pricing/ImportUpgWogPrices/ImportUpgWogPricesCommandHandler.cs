@@ -32,7 +32,6 @@ public sealed record UpgWogFuelRepriced(
 public sealed record UpgWogPriceImportResult(
     IReadOnlyList<UpgWogFuelCreated> Created,
     IReadOnlyList<UpgWogFuelRepriced> Repriced,
-    IReadOnlyList<string> BelowCostSkipped,
     IReadOnlyList<OkkoPriceSheetError> Errors,
     bool DryRun)
 {
@@ -77,7 +76,6 @@ public sealed class ImportUpgWogPricesCommandHandler
     /// <summary>The brands this importer serves, and the only ones its sheet may name.</summary>
     public static readonly string[] SupportedBrandIds = ["upg", "wog"];
 
-    private const int DefaultMinDiscountPerLiter = 0;
     private static readonly int[] DefaultNominals = [10, 20, 50];
 
     private readonly ApplicationDbContext _context;
@@ -107,7 +105,7 @@ public sealed class ImportUpgWogPricesCommandHandler
         if (!SupportedBrandIds.Contains(brandSlug))
         {
             return new UpgWogPriceImportResult(
-                [], [], [],
+                [], [],
                 [new OkkoPriceSheetError(0, $"Unsupported brand '{command.BrandId}'")],
                 command.DryRun);
         }
@@ -116,7 +114,7 @@ public sealed class ImportUpgWogPricesCommandHandler
         if (brandId is null)
         {
             return new UpgWogPriceImportResult(
-                [], [], [],
+                [], [],
                 [new OkkoPriceSheetError(0, $"Brand '{brandSlug}' is not in the catalogue")],
                 command.DryRun);
         }
@@ -126,7 +124,7 @@ public sealed class ImportUpgWogPricesCommandHandler
         var parsed = OkkoPriceSheetParser.Parse(command.Content);
         if (parsed.Errors.Count > 0)
         {
-            return new UpgWogPriceImportResult([], [], [], parsed.Errors, command.DryRun);
+            return new UpgWogPriceImportResult([], [], parsed.Errors, command.DryRun);
         }
 
         // Matched on the code alone. Unlike OKKO there is no category fallback here and there must
@@ -171,11 +169,11 @@ public sealed class ImportUpgWogPricesCommandHandler
             var changed = previousPump != row.PricePerLiter;
             var volumesRepriced = 0;
 
-            // Identical guard to the OKKO automatic path: a third party's price move must not be
-            // able to take a fuel below cost unattended, or the checkout guard refuses to sell it.
-            var cost = fuel.SupplierPricePerLiter ?? 0m;
-            var profit = fuel.MarginUahPerLiter ?? 0m;
-            var minDiscount = fuel.MinDiscountPerLiter ?? DefaultMinDiscountPerLiter;
+            // The published price is a reference, not our price: our price is the cost plus the
+            // margin, and the column price is what the customer's saving is measured against. A pump
+            // below what we pay is therefore written as it stands - it does not stop the import. The
+            // guard that can still lose us money is at checkout, where the price the customer is
+            // actually charged is compared against our cost.
 
             if (!command.DryRun && changed)
             {
@@ -199,22 +197,6 @@ public sealed class ImportUpgWogPricesCommandHandler
             // second run over the same file writes nothing at all.
             if (!command.DryRun && changed)
             {
-                // The customer price, or NULL when the fuel has no cost or no margin recorded.
-                //
-                // The nullable twin of the formula, and for the same reason the operator panel uses
-                // it: a fuel nobody has priced has no price, and a price of ZERO is a price - it
-                // says the customer takes the fuel for nothing, and the database refuses the row
-                // (ck_fuel_types_prices_non_negative).
-                //
-                // This used to take the non-nullable formula with the cost and the margin defaulted
-                // to zero, which for an uncosted fuel computed min(0 + 0, pump) = 0 and wrote it.
-                // Fourteen fuels on production carried discount_price = 0.00 for exactly that
-                // reason, and the moment the constraint landed this import would have failed on
-                // every fuel whose pump had moved - which, at a cron of every fifteen minutes, is
-                // up to ninety-six times a day.
-                var customerPrice = FuelPricing.FinalPerLiterOrNull(
-                    fuel.SupplierPricePerLiter, fuel.MarginUahPerLiter);
-
                 // The price the customer pays is computed, so there is nothing to write for it: the
                 // fuel carries the cost, the margin and the column price, and every reader derives
                 // the customer price the same way. The column price is still written - it is the
@@ -232,7 +214,7 @@ public sealed class ImportUpgWogPricesCommandHandler
             await _context.SaveChangesAsync(ct);
         }
 
-        return new UpgWogPriceImportResult(created, repriced, [], [], command.DryRun);
+        return new UpgWogPriceImportResult(created, repriced, [], command.DryRun);
     }
 
     /// <summary>

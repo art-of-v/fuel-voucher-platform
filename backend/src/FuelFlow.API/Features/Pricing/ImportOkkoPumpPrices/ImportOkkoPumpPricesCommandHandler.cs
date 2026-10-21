@@ -130,7 +130,6 @@ public sealed class ImportOkkoPumpPricesCommandHandler
                 Applied: [],
                 UnmatchedSiteFuels: [],
                 OkkoFuelsWithoutPrice: [],
-                BelowCostSkipped: [],
                 Errors: [new OkkoPriceSheetError(0,
                     $"No live brand carries the slug '{OkkoSlug}', so no pump price could be applied.")],
                 DryRun: dryRun);
@@ -228,23 +227,14 @@ public sealed class ImportOkkoPumpPricesCommandHandler
             // construction rather than by a loop that happens to keep them in step.
             var cost = ft.SupplierPricePerLiter ?? 0m; // held constant: a pump change is not a cost event
             var profit = ft.MarginUahPerLiter ?? 0m;
-            var minDiscount = ft.MinDiscountPerLiter ?? 0m;
             var finalPerLiter = FuelPricing.FinalPerLiter(cost, profit);
 
-            // What the CUSTOMER pays, which is a different question from what the knobs add up
-            // to. A fuel with no cost or no margin has no customer price at all, and the column
-            // says so by being empty - the old code read the missing knobs as zero and published
-            // a price of 0, which is a price: a zero discount price means the customer takes the
-            // fuel for nothing.
-            var customerPrice = FuelPricing.FinalPerLiterOrNull(
-                ft.SupplierPricePerLiter, ft.MarginUahPerLiter, pump, ft.MinDiscountPerLiter);
-
-            // A pump low enough that the ceiling (pump - minDiscount) drops under our own cost would
-            // make every sale of this fuel below cost - and checkout then refuses to sell it at all
-            // (BelowCostSaleBlockedException), so the fuel becomes unbuyable until a human intervenes.
-            // The manual path refuses the same write unless the fuel is opted in via AllowBelowCost
-            // (BrandsController.UpdateFuel); the automatic path must behave identically, or a
-            // third party's price move could take a fuel off sale unattended.
+            // The published pump price is a reference, not our price: our price is the cost plus the
+            // margin, and the column price is what the customer's saving is measured against. A pump
+            // that sits below what we pay is therefore written as it stands - it is what the column
+            // charges - and it does not stop the import. The guard that can still lose us money is at
+            // checkout, where the price the customer is actually charged (our price minus the term
+            // discount) is compared against our cost.
             if (category is { } matched) matchedCategories.Add(matched);
 
             var previousPump = ft.PumpPricePerLiter;
@@ -307,7 +297,6 @@ public sealed class ImportOkkoPumpPricesCommandHandler
             Applied: applied,
             UnmatchedSiteFuels: unmatchedSheet,
             OkkoFuelsWithoutPrice: withoutPrice,
-            BelowCostSkipped: [],
             Errors: Array.Empty<OkkoPriceSheetError>(),
             DryRun: dryRun);
     }
