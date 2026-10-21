@@ -42,7 +42,17 @@ namespace FuelFlow.IntegrationTests;
 [Collection("Integration Tests")]
 public sealed class SeedScriptsExecuteTests : IClassFixture<TestDatabaseFixture>
 {
-    private const string SeededFuelName = "А-95";
+    /// <summary>
+    /// The name of the fuel this fixture creates at OKKO.
+    /// </summary>
+    /// <remarks>
+    /// It carries a suffix on purpose. The migrated catalogue already holds OKKO's "A-95", and
+    /// <c>ux_fuel_types_brand_grade_key</c> refuses two live rows of one brand that spell one grade
+    /// two ways - "А-95" and "A-95" are one grade, and a fixture that inserted the second
+    /// spelling of the grade the seed already carries would be refused by the index it is
+    /// supposed to be tested against.
+    /// </remarks>
+    private const string SeededFuelName = "А-95 (seed script)";
     private const string SeededBrandSlug = "okko";
 
     private readonly TestDatabaseFixture _fixture;
@@ -287,9 +297,11 @@ public sealed class SeedScriptsExecuteTests : IClassFixture<TestDatabaseFixture>
             WHERE NOT EXISTS (SELECT 1 FROM users WHERE phone_number = '+380110010203');
 
             -- The brand is the one the catalogue already carries, found by its slug: inserting a
-            -- second 'okko' would break the unique index on the slug.
+            -- second 'okko' would break the unique index on the slug. The fuel's name carries a
+            -- suffix, because the catalogue already holds OKKO's "A-95" and the grade key refuses
+            -- two spellings of one grade at one brand.
             INSERT INTO fuel_types (id, name, brand_id, base_price, discount_price, created_at_utc, updated_at_utc, is_deleted)
-            SELECT '33333333-3333-4333-8333-0000000000cc', 'А-95', b.id, 40.00, 40.00, now(), now(), false
+            SELECT '33333333-3333-4333-8333-0000000000cc', 'А-95 (seed script)', b.id, 40.00, 40.00, now(), now(), false
             FROM brands b
             WHERE b.slug = 'okko'
             ON CONFLICT (id) DO NOTHING;
