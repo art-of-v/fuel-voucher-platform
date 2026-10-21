@@ -840,21 +840,6 @@ public sealed class SchemaCommentTests
             nameof(VoucherImport.VerificationFailedCount),
             nameof(VoucherImport.VerifiedWithWarningsCount)
         ]),
-        (typeof(VoucherExchange),
-        [
-            nameof(VoucherExchange.ExchangeBatchId),
-            nameof(VoucherExchange.OldVoucherId),
-            nameof(VoucherExchange.NewVoucherId),
-            nameof(VoucherExchange.FuelTypeId),
-            nameof(VoucherExchange.Brand),
-            nameof(VoucherExchange.BrandId),
-            nameof(VoucherExchange.SurchargeUah),
-            nameof(VoucherExchange.CostPerLiterApplied),
-            nameof(VoucherExchange.SupplierId),
-            nameof(VoucherExchange.ActingUserId),
-            nameof(VoucherExchange.ActingUserName),
-            nameof(VoucherExchange.CreatedAtUtc)
-        ]),
         (typeof(LegalEntity),
         [
             nameof(LegalEntity.UserId),
@@ -898,21 +883,25 @@ public sealed class SchemaCommentTests
     }
 
     /// <summary>
-    /// The surcharge on an exchange row is this row's OWN share, not the batch's. Reading one row
+    /// The surcharge on a pair is this pair's OWN share, not the settlement's. Reading one pair
     /// as the batch charge shipped once already and cost real money, so the comment has to say so
     /// where the number is read.
+    /// <para>
+    /// It moved with the fold (planning #319): the pairs live in the ledger now, so the ledger's
+    /// column carries the warning.
+    /// </para>
     /// </summary>
     [Fact]
     public void The_Exchange_Surcharge_Should_Say_That_It_Is_One_Row_Share()
     {
         var context = BuildContext();
-        var exchange = context.Model.FindEntityType(typeof(VoucherExchange));
-        Assert.NotNull(exchange);
+        var movement = context.Model.FindEntityType(typeof(VoucherMovement));
+        Assert.NotNull(movement);
 
-        var comment = CommentOf(exchange.FindProperty(nameof(VoucherExchange.SurchargeUah))!);
+        var comment = CommentOf(movement.FindProperty(nameof(VoucherMovement.SurchargeShareUah))!);
 
-        Assert.Contains("NOT the batch total", comment, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("ExchangeBatchId", comment, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("NOT the settlement total", comment, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("movement_batches.surcharge_uah", comment, StringComparison.OrdinalIgnoreCase);
     }
 
 
@@ -1080,22 +1069,6 @@ public sealed class SchemaCommentTests
             nameof(MovementBatch.ConfirmedAtUtc),
             nameof(MovementBatch.RejectionReason),
             nameof(MovementBatch.CreatedAtUtc)
-        ]),
-        (typeof(OperatorVoucherRenewal),
-        [
-            nameof(OperatorVoucherRenewal.VoucherId),
-            nameof(OperatorVoucherRenewal.ReplacementVoucherId),
-            nameof(OperatorVoucherRenewal.CustomerUserId),
-            nameof(OperatorVoucherRenewal.Branch),
-            nameof(OperatorVoucherRenewal.TermCode),
-            nameof(OperatorVoucherRenewal.OldExpiration),
-            nameof(OperatorVoucherRenewal.NewExpiration),
-            nameof(OperatorVoucherRenewal.SurchargeUah),
-            nameof(OperatorVoucherRenewal.InvoiceNumber),
-            nameof(OperatorVoucherRenewal.InvoiceDate),
-            nameof(OperatorVoucherRenewal.ActingUserId),
-            nameof(OperatorVoucherRenewal.ActingUserName),
-            nameof(OperatorVoucherRenewal.CreatedAtUtc)
         ]),
         (typeof(UserPushToken),
         [

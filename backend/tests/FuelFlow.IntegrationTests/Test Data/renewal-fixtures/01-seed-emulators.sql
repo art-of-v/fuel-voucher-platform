@@ -45,14 +45,11 @@ WHERE voucher_id IN (SELECT id FROM fuel_vouchers WHERE voucher_number LIKE 'EMU
 DELETE FROM order_line_items
 WHERE source_voucher_id IN (SELECT id FROM fuel_vouchers WHERE voucher_number LIKE 'EMU2-%');
 
-UPDATE voucher_exchanges
-SET new_voucher_id = NULL
-WHERE new_voucher_id IN (SELECT id FROM fuel_vouchers WHERE voucher_number LIKE 'EMU2-%');
+UPDATE voucher_movements
+SET replaced_by_voucher_id = NULL
+WHERE replaced_by_voucher_id IN (SELECT id FROM fuel_vouchers WHERE voucher_number LIKE 'EMU2-%');
 
-DELETE FROM voucher_exchanges
-WHERE old_voucher_id IN (SELECT id FROM fuel_vouchers WHERE voucher_number LIKE 'EMU2-%');
-
-DELETE FROM operator_voucher_renewals
+DELETE FROM voucher_movements
 WHERE voucher_id IN (SELECT id FROM fuel_vouchers WHERE voucher_number LIKE 'EMU2-%');
 
 -- Do NOT null out order_id here. CHECK ck_voucher_held_has_order is evaluated per row on UPDATE, so

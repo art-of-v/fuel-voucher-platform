@@ -132,7 +132,7 @@ public sealed class XminConcurrencyTokenIntegrationTests : IClassFixture<TestDat
             .ToList();
 
         tokenised.Should().BeEquivalentTo(
-            ["fuel_vouchers", "operator_voucher_renewals", "orders", "payments", "voucher_exchanges"],
+            ["fuel_vouchers", "orders", "payments"],
             "the two hot tables are included now that nothing mixes a raw write with a tracked save of the same row");
     }
 

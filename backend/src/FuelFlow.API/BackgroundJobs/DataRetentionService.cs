@@ -91,19 +91,16 @@ public class DataRetentionService
 
     // Deliberately NOT covered, and the reason matters more than the list:
     //
-    //   voucher_exchanges          - the settlement record. "Who do we settle with, for what, at
-    //                                 what cost" is answerable only from these rows, and
-    //                                 VOUCHER_LIFECYCLE.md calls the system itself the record
-    //                                 (suppliers issue no invoices, there is no paper to check
-    //                                 against). Pruning them destroys the audit trail.
-    //   movement_batches           - the settlement those rows belong to (#319). Same argument one
-    //                                 level up: the batch is the statement of what was agreed, and a
-    //                                 pair list without it cannot answer "which batch, with whom,
-    //                                 for how much". It is also the only place a batch's lifecycle
-    //                                 (opened, confirmed, rejected) is written down at all.
-//   order_line_items (renewals)- what the customer paid and how the term moved. Their order_id was
-//                                 CASCADE, the only thing that may have removed one, and flipped to
-//                                 RESTRICT when voucher_renewal_items was dissolved (20261017065731).
+    //   movement_batches           - the settlement the exchange pairs belong to (#319). "Who do we
+    //                                 settle with, for what, at what cost" is answerable only from
+    //                                 these rows and the ledger's pairs, and VOUCHER_LIFECYCLE.md calls
+    //                                 the system itself the record (suppliers issue no invoices, there
+    //                                 is no paper to check against). Pruning them destroys the audit
+    //                                 trail. It is also the only place a batch's lifecycle (opened,
+    //                                 confirmed, rejected) is written down at all.
+    //   order_line_items (renewals)- what the customer paid and how the term moved. Their order_id was
+    //                                 CASCADE, the only thing that may have removed one, and flipped to
+    //                                 RESTRICT when voucher_renewal_items was dissolved (20261017065731).
     //   operator_voucher_renewals  - the same settlement fact for the operator path.
     //   monobank_statement_entries - the acquirer's immutable evidence. Re-import must never
     //                                 rewrite a stored amount (acquiring-statement-118.md), so a
@@ -120,9 +117,10 @@ public class DataRetentionService
     //                                 warehouse: import puts it in the pool, the sale puts it in a
     //                                 customer's hands, a recall brings it back. It cannot be rebuilt
     //                                 from fuel_vouchers, because one row there is updated in place for
-    //                                 the voucher's whole life and never says where it was. Same
-    //                                 argument as voucher_exchanges one level down: the movement IS the
+    //                                 the voucher's whole life and never says where it was. It is also
+    //                                 where an exchange's pairs live now (#319), so the movement IS the
     //                                 record, there is no other copy.
+
 
     private readonly ApplicationDbContext _context;
     private readonly RuntimeSettingsService _settings;

@@ -1828,6 +1828,17 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("created_at_utc")
                         .HasComment("When the row was written.");
 
+                    b.Property<DateOnly?>("ExternalInvoiceDate")
+                        .HasColumnType("date")
+                        .HasColumnName("external_invoice_date")
+                        .HasComment("The date on that invoice. NULL with it.");
+
+                    b.Property<string>("ExternalInvoiceNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("external_invoice_number")
+                        .HasComment("The brand's invoice for an off-platform renewal - the document the customer paid against. NULL fora self-serve order, where the acquirer's invoice is monobank_invoice_id.");
+
                     b.Property<DateTime?>("FulfilledAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("fulfilled_at_utc")
@@ -2075,6 +2086,11 @@ namespace FuelFlow.API.Migrations
 
                     b.HasIndex("FuelTypeId", "BrandId")
                         .HasDatabaseName("ix_order_line_items_fuel_type_id_brand_id");
+
+                    b.HasIndex("SourceVoucherId", "NewCustomerExpiration")
+                        .IsUnique()
+                        .HasDatabaseName("ix_order_line_items_renewal_once")
+                        .HasFilter("source_voucher_id IS NOT NULL AND new_customer_expiration IS NOT NULL");
 
                     b.ToTable("order_line_items", null, t =>
                         {
@@ -2690,110 +2706,6 @@ namespace FuelFlow.API.Migrations
                         });
                 });
 
-            modelBuilder.Entity("FuelFlow.Features.Vouchers.Exchange.VoucherExchange", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("ActingUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("acting_user_id")
-                        .HasComment("The admin who recorded the exchange.");
-
-                    b.Property<string>("ActingUserName")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("acting_user_name")
-                        .HasComment("The admin's display name at the time, for the audit. The name is frozen, so it still readsright after the person is renamed or leaves.");
-
-                    b.Property<string>("Brand")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("brand")
-                        .HasComment("The brand of the retired voucher (okko/wog/...), denormalized for audit.");
-
-                    b.Property<Guid>("BrandId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("brand_id")
-                        .HasComment("The brand's id - the key the text above is a copy of. The composite foreign key(fuel_type_id, brand_id) -> fuel_types(id, brand_id) is what refuses a row whose brand isnot its fuel's brand.");
-
-                    b.Property<decimal?>("CostPerLiterApplied")
-                        .HasColumnType("numeric(10,4)")
-                        .HasColumnName("cost_per_liter_applied")
-                        .HasComment("The cost per litre set on the new fuel batch for this exchange (the old blended cost plus thesurcharge per litre), when there is one.");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc")
-                        .HasComment("When the exchange was recorded.");
-
-                    b.Property<Guid>("ExchangeBatchId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("exchange_batch_id")
-                        .HasComment("Groups every old voucher retired in one confirm action. The batch's lifecycle lives inmovement_batches, which this points at.");
-
-                    b.Property<Guid>("FuelTypeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("fuel_type_id")
-                        .HasComment("The fuel of the retired voucher, and of its paired replacement - the same bucket.");
-
-                    b.Property<Guid?>("NewVoucherId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("new_voucher_id")
-                        .HasComment("The new stock voucher this old one was replaced by, or NULL when the old voucher was notpaired - more old than new in its bucket.");
-
-                    b.Property<Guid>("OldVoucherId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("old_voucher_id")
-                        .HasComment("The retired stock voucher.");
-
-                    b.Property<Guid>("SupplierId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("supplier_id")
-                        .HasComment("The supplier the old vouchers were bought from and the new ones were obtained from. Oneexchange involves exactly one supplier, so every row of a batch carries the same value - butit is recorded per row because this table is also read one voucher at a time during supplierreconciliation, where the row alone has to answer 'who do we settle with for this voucher'.");
-
-                    b.Property<decimal>("SurchargeUah")
-                        .HasColumnType("numeric(10,2)")
-                        .HasColumnName("surcharge_uah")
-                        .HasComment("This row's OWN share of the batch surcharge - the brand charge spread pro-rata over thispair's litres, NOT the batch total repeated. Do not read one row and call it the batchcharge: a four-voucher exchange would report a quarter of what was actually paid. Sum therows of an ExchangeBatchId.");
-
-                    b.Property<uint>("xmin")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ExchangeBatchId")
-                        .HasDatabaseName("ix_voucher_exchanges_exchange_batch_id");
-
-                    b.HasIndex("NewVoucherId")
-                        .HasDatabaseName("ix_voucher_exchanges_new_voucher_id");
-
-                    b.HasIndex("OldVoucherId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_voucher_exchanges_old_voucher_id");
-
-                    b.HasIndex("SupplierId")
-                        .HasDatabaseName("ix_voucher_exchanges_supplier_id");
-
-                    b.HasIndex("FuelTypeId", "BrandId")
-                        .HasDatabaseName("ix_voucher_exchanges_fuel_type_id_brand_id");
-
-                    b.ToTable("voucher_exchanges", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_voucher_exchange_cost_non_negative", "cost_per_liter_applied IS NULL OR cost_per_liter_applied >= 0");
-
-                            t.HasCheckConstraint("ck_voucher_exchange_not_self", "old_voucher_id IS DISTINCT FROM new_voucher_id");
-
-                            t.HasCheckConstraint("ck_voucher_exchange_surcharge_non_negative", "surcharge_uah >= 0");
-                        });
-                });
-
             modelBuilder.Entity("FuelFlow.Features.Vouchers.FuelVoucher", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3168,6 +3080,11 @@ namespace FuelFlow.API.Migrations
                         .HasDatabaseName("ix_voucher_movements_replaced_by")
                         .HasFilter("replaced_by_voucher_id IS NOT NULL");
 
+                    b.HasIndex("VoucherId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_voucher_movements_exchange_out")
+                        .HasFilter("kind = 'exchange_out'");
+
                     b.HasIndex("VoucherId", "OccurredAtUtc")
                         .HasDatabaseName("ix_voucher_movements_voucher");
 
@@ -3245,118 +3162,6 @@ namespace FuelFlow.API.Migrations
                             t.HasCheckConstraint("ck_qr_parameters_mask_pattern", "mask_pattern IS NULL OR mask_pattern BETWEEN 0 AND 7");
 
                             t.HasCheckConstraint("ck_qr_parameters_version", "version IS NULL OR version BETWEEN 1 AND 40");
-                        });
-                });
-
-            modelBuilder.Entity("FuelFlow.Features.Vouchers.Renewal.Operator.OperatorVoucherRenewal", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("ActingUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("acting_user_id")
-                        .HasComment("The admin who recorded the renewal.");
-
-                    b.Property<string>("ActingUserName")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("acting_user_name")
-                        .HasComment("Their display name at the time, for the audit.");
-
-                    b.Property<string>("Branch")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)")
-                        .HasColumnName("branch")
-                        .HasComment("Which branch ran: extend or replace.");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc")
-                        .HasComment("When the renewal was recorded.");
-
-                    b.Property<Guid>("CustomerUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("customer_user_id")
-                        .HasComment("The customer who owns the voucher at the time of the renewal.");
-
-                    b.Property<DateOnly?>("InvoiceDate")
-                        .HasColumnType("date")
-                        .HasColumnName("invoice_date")
-                        .HasComment("The brand's накладна / invoice date, when there is one.");
-
-                    b.Property<string>("InvoiceNumber")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("invoice_number")
-                        .HasComment("The brand's накладна / invoice number, when there is one.");
-
-                    b.Property<DateOnly>("NewExpiration")
-                        .HasColumnType("date")
-                        .HasColumnName("new_expiration")
-                        .HasComment("The expiry the customer ends up with - the extended voucher's new expiry, or the stockvoucher's expiry.");
-
-                    b.Property<DateOnly>("OldExpiration")
-                        .HasColumnType("date")
-                        .HasColumnName("old_expiration")
-                        .HasComment("The expiry of the customer's voucher before the renewal.");
-
-                    b.Property<Guid?>("ReplacementVoucherId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("replacement_voucher_id")
-                        .HasComment("The fresh stock voucher handed to the customer on the replace branch, or NULL on theextend branch (the same voucher was kept).");
-
-                    b.Property<decimal>("SurchargeUah")
-                        .HasColumnType("numeric(10,2)")
-                        .HasColumnName("surcharge_uah")
-                        .HasComment("The доплата the customer paid off-platform; 0 means a free compensation. Audit only - itnever reprices the stock.");
-
-                    b.Property<string>("TermCode")
-                        .IsRequired()
-                        .HasMaxLength(8)
-                        .HasColumnType("character varying(8)")
-                        .HasColumnName("term_code")
-                        .HasComment("The chosen term as a stable code (1w/2w/1m...6m).");
-
-                    b.Property<Guid>("VoucherId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("voucher_id")
-                        .HasComment("The customer's voucher that was renewed (extended) or retired (replace).");
-
-                    b.Property<uint>("xmin")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedAtUtc")
-                        .HasDatabaseName("ix_operator_voucher_renewals_created_at_utc");
-
-                    b.HasIndex("CustomerUserId")
-                        .HasDatabaseName("ix_operator_voucher_renewals_customer_user_id");
-
-                    b.HasIndex("ReplacementVoucherId")
-                        .HasDatabaseName("ix_operator_voucher_renewals_replacement_voucher_id");
-
-                    b.HasIndex("VoucherId")
-                        .HasDatabaseName("ix_operator_voucher_renewals_voucher_id");
-
-                    b.HasIndex("VoucherId", "NewExpiration")
-                        .IsUnique()
-                        .HasDatabaseName("ix_operator_voucher_renewals_voucher_id_new_expiration");
-
-                    b.ToTable("operator_voucher_renewals", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_operator_renewal_branch", "branch IN ('extend', 'replace')");
-
-                            t.HasCheckConstraint("ck_operator_renewal_expiration_moves_forward", "new_expiration > old_expiration");
-
-                            t.HasCheckConstraint("ck_operator_renewal_surcharge_non_negative", "surcharge_uah >= 0");
                         });
                 });
 
@@ -5467,47 +5272,6 @@ namespace FuelFlow.API.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
-            modelBuilder.Entity("FuelFlow.Features.Vouchers.Exchange.VoucherExchange", b =>
-                {
-                    b.HasOne("FuelFlow.Features.Vouchers.Exchange.MovementBatch", "MovementBatch")
-                        .WithMany()
-                        .HasForeignKey("ExchangeBatchId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", "NewVoucher")
-                        .WithMany()
-                        .HasForeignKey("NewVoucherId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", "OldVoucher")
-                        .WithMany()
-                        .HasForeignKey("OldVoucherId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("FuelFlow.SharedKernel.Domain.Supplier", "Supplier")
-                        .WithMany()
-                        .HasForeignKey("SupplierId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("FuelFlow.SharedKernel.Domain.FuelTypeEntity", null)
-                        .WithMany()
-                        .HasForeignKey("FuelTypeId", "BrandId")
-                        .HasPrincipalKey("Id", "BrandId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("MovementBatch");
-
-                    b.Navigation("NewVoucher");
-
-                    b.Navigation("OldVoucher");
-
-                    b.Navigation("Supplier");
-                });
-
             modelBuilder.Entity("FuelFlow.Features.Vouchers.FuelVoucher", b =>
                 {
                     b.HasOne("FuelFlow.SharedKernel.Domain.User", "AssignedToUser")
@@ -5584,24 +5348,6 @@ namespace FuelFlow.API.Migrations
                         .HasForeignKey("VoucherId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("FuelFlow.Features.Vouchers.Renewal.Operator.OperatorVoucherRenewal", b =>
-                {
-                    b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", "ReplacementVoucher")
-                        .WithMany()
-                        .HasForeignKey("ReplacementVoucherId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("FuelFlow.Features.Vouchers.FuelVoucher", "Voucher")
-                        .WithMany()
-                        .HasForeignKey("VoucherId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("ReplacementVoucher");
-
-                    b.Navigation("Voucher");
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Vouchers.VoucherImportError", b =>

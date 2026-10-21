@@ -24,11 +24,12 @@
 --     not a row in a table of its own, and the capture it reverses restricts the same way.
 --   * `fulfillments` now cascades from its order (FK added in AddFulfillmentOrderForeignKey), but
 --     its `voucher_id` restricts, so vouchers have to go too.
---   * every row an operator renewal writes -- `operator_voucher_renewals.voucher_id`,
---     `order_line_items.source_voucher_id` (the renewal lines themselves, since
---     `voucher_renewal_items` was dropped in `20261017073518`),
---     `voucher_exchanges.old_voucher_id` -- restricts against `fuel_vouchers`, so a session that
---     produced a renewal cannot be reset until those audit rows are cleared first.
+--   * every row a renewal or an exchange writes -- `order_line_items.source_voucher_id` (the
+--     renewal lines themselves, since `voucher_renewal_items` was dropped in `20261017073518` and
+--     the operator's renewals became orders in `20261021143655`), and the ledger's
+--     `voucher_movements.voucher_id` / `replaced_by_voucher_id` -- restricts against
+--     `fuel_vouchers`, so a session that produced a renewal cannot be reset until those audit rows
+--     are cleared first.
 -- Running it inside one transaction means a failure anywhere leaves the database untouched.
 
 \set ON_ERROR_STOP on
@@ -66,15 +67,15 @@ SELECT coalesce(voucher_number, '(null)') AS voucher_number, status, count(*)
 FROM fuel_vouchers v JOIN reset_vouchers r ON r.id = v.id
 GROUP BY 1, 2 ORDER BY 1;
 
--- `voucher_exchanges.exchange_batch_id` restricts onto `movement_batches` since #319, so the exchange
--- rows go first and the batches they were part of follow. A batch that still has members left is kept
--- rather than half-deleted.
-DELETE FROM voucher_exchanges
-WHERE old_voucher_id IN (SELECT id FROM reset_vouchers)
-   OR new_voucher_id IN (SELECT id FROM reset_vouchers);
+-- The exchange pairs live in the ledger now (#319), on the row of the retired paper, and they
+-- restrict onto the vouchers they name - so the rows go before the vouchers do, and the batches
+-- they were part of follow. A batch that still has members left is kept rather than half-deleted.
+DELETE FROM voucher_movements
+WHERE voucher_id IN (SELECT id FROM reset_vouchers)
+   OR replaced_by_voucher_id IN (SELECT id FROM reset_vouchers);
 
 DELETE FROM movement_batches b
-WHERE NOT EXISTS (SELECT 1 FROM voucher_exchanges e WHERE e.exchange_batch_id = b.id);
+WHERE NOT EXISTS (SELECT 1 FROM voucher_movements m WHERE m.batch_id = b.id);
 
 -- `voucher_renewal_items` was dropped in `20261017073518_DropVoucherRenewalItems`, and the renewal
 -- rows live in `order_line_items` now: `source_voucher_id` is the column that points at the voucher
@@ -87,17 +88,10 @@ WHERE NOT EXISTS (SELECT 1 FROM voucher_exchanges e WHERE e.exchange_batch_id = 
 DELETE FROM order_line_items
 WHERE source_voucher_id IN (SELECT id FROM reset_vouchers);
 
--- An operator renewal writes an audit row whose `voucher_id` restricts, so it has to go BEFORE the
--- voucher it points at -- otherwise the DELETE below dies on the FK and the whole reset rolls back.
--- (The two NOT IN clauses are leftovers from a hand-cleaned database: they catch audit rows already
--- orphaned by hand, not the ones this script creates.)
-DELETE FROM operator_voucher_renewals
-WHERE voucher_id IN (SELECT id FROM reset_vouchers)
-   OR (replacement_voucher_id IS NOT NULL
-       AND replacement_voucher_id IN (SELECT id FROM reset_vouchers))
-   OR voucher_id NOT IN (SELECT id FROM fuel_vouchers)
-   OR (replacement_voucher_id IS NOT NULL
-       AND replacement_voucher_id NOT IN (SELECT id FROM fuel_vouchers));
+-- An operator renewal is an ORDER now (#319): the renewal's intent and outcome live on the order
+-- line, and `source_voucher_id` is the column that points at the voucher a line renews - so the
+-- statement above, which deletes the renewal lines, is what has to go before the voucher it points
+-- at. Otherwise the DELETE below dies on the FK and the whole reset rolls back.
 
 DELETE FROM fulfillments
 WHERE order_id IN (SELECT id FROM reset_orders)

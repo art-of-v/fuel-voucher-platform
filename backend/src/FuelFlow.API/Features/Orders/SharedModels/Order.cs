@@ -22,6 +22,22 @@ public class Order
     /// </summary>
     public Guid? SourceOrderId { get; set; }
     public string? MonobankInvoiceId { get; set; }
+
+    /// <summary>
+    /// The brand's накладна / invoice for an off-platform renewal — the document the customer paid
+    /// against when they renewed with the operator instead of in the app. Null for a self-serve
+    /// order, where the acquirer's own invoice is <see cref="MonobankInvoiceId"/>.
+    /// </summary>
+    /// <remarks>
+    /// Planning #319: the operator's renewal wrote this on a table of its own. The renewal is an
+    /// order like any other, so its settlement document belongs with the order's other money
+    /// columns.
+    /// </remarks>
+    public string? ExternalInvoiceNumber { get; set; }
+
+    /// <summary>The date on that invoice. Null with it.</summary>
+    public DateOnly? ExternalInvoiceDate { get; set; }
+
     public string? MonobankPaymentUrl { get; set; }
     public MonobankStatus? MonobankStatus { get; set; }
     public MonobankMerchant? MonobankMerchant { get; set; }

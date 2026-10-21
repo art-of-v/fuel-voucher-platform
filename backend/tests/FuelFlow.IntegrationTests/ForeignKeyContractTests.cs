@@ -171,8 +171,6 @@ public sealed class ForeignKeyContractTests : IClassFixture<TestDatabaseFixture>
             // movement the thing that blocks deleting the account that made it.
             "movement_batches.opened_by_user_id",
             "order_events.actor_user_id",
-            "operator_voucher_renewals.acting_user_id",
-            "operator_voucher_renewals.customer_user_id",
             "payments.webhook_event_id",
             "provider_event_outbox.changed_by_user_id",
             // The batch's operator: the same rule as the rows above, and the reason the column

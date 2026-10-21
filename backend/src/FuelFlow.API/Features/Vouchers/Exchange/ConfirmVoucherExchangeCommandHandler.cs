@@ -18,8 +18,9 @@ public sealed record ExchangeFuelCost(Guid FuelTypeId, decimal CostPerLiter);
 /// <summary>
 /// Records one operator→supplier exchange (planning #104): retire the selected OLD stock vouchers,
 /// activate the freshly-imported NEW ones at a cost that bakes in the доплата (so the remaining stock
-/// reprices upward), pair old→new flexibly, and write an audit-grade <c>voucher_exchanges</c> row per
-/// old voucher. No payment, no device signature — <c>Staff</c> policy only.
+/// reprices upward), pair old→new flexibly, and write the audit-grade ledger rows for the settlement
+/// and for every piece of paper that changed hands. No payment, no device signature — <c>Staff</c>
+/// policy only.
 /// </summary>
 public sealed record ConfirmVoucherExchangeCommand(
     List<Guid> OldVoucherIds,
@@ -126,10 +127,13 @@ public sealed class ConfirmVoucherExchangeCommandHandler
         }
         var supplierId = supplierIds[0];
 
-        // Idempotency: refuse if any selected voucher was already recorded as exchanged.
-        var alreadyExchanged = await _context.VoucherExchanges
+        // Idempotency: refuse if any selected voucher was already recorded as exchanged. The ledger's
+        // exchange_out row IS that record (planning #319): it is written for the retired paper, in the
+        // same transaction as the settlement, and the database refuses a second one for the same paper
+        // (ix_voucher_movements_exchange_out).
+        var alreadyExchanged = await _context.VoucherMovements
             .AsNoTracking()
-            .Where(x => oldIds.Contains(x.OldVoucherId))
+            .Where(m => m.Kind == VoucherMovementKinds.ExchangeOut && oldIds.Contains(m.VoucherId))
             .CountAsync(ct);
         if (alreadyExchanged > 0)
             return Fail($"{alreadyExchanged} selected voucher(s) were already exchanged.");
@@ -299,13 +303,12 @@ public sealed class ConfirmVoucherExchangeCommandHandler
         if (!activateResult.Success)
             return Fail(activateResult.Error ?? "Failed to activate the new vouchers.");
 
-        // One row per OLD voucher, each carrying ITS OWN surcharge share and cost. The old vouchers of one
-        // exchange routinely cost different amounts per liter, so a batch-wide copy would misreport every
-        // row but one during supplier reconciliation.
+        // One settlement per confirm action.
         var batchId = Guid.CreateVersion7();
 
-        // The same three facts per pair, for the ledger row of the retired paper. Kept beside the
-        // voucher_exchanges rows above so the two cannot drift: one loop, one source of truth.
+        // The pair's three facts, for the ledger row of the retired paper. The old vouchers of one
+        // exchange routinely cost different amounts per liter, so a batch-wide copy would misreport
+        // every row but one during supplier reconciliation.
         var pairFacts = new Dictionary<Guid, ExchangePairFacts>();
 
         // The settlement itself, written before its members so the pair lands in one transaction with
@@ -335,31 +338,10 @@ public sealed class ConfirmVoucherExchangeCommandHandler
                 ? decimal.Round(command.SurchargeUah * pairLiters / totalNewLiters, 2, MidpointRounding.AwayFromZero)
                 : 0m;
 
-            _context.VoucherExchanges.Add(new VoucherExchange
-            {
-                Id = Guid.CreateVersion7(),
-                ExchangeBatchId = batchId,
-                OldVoucherId = oldId,
-                NewVoucherId = newId,
-                FuelTypeId = old.FuelTypeId,
-                Brand = old.Brand,
-                // The brand's key beside its name - the retired voucher's own key, because the
-                // exchange is about the same fuel.
-                BrandId = old.BrandId,
-                SurchargeUah = pairSurcharge,
-                CostPerLiterApplied = newId.HasValue
-                    ? newCostById.GetValueOrDefault(newId.Value)
-                    : null,
-                SupplierId = supplierId,
-                ActingUserId = command.ActingUserId,
-                ActingUserName = command.ActingUserName,
-                CreatedAtUtc = now
-            });
-
-            // D-13, planning #319: the same three facts, on the ledger row of the RETIRED paper.
-            // The pairing, the pair's share of the doplata and the cost stamped on the replacement -
-            // all three are what voucher_exchanges holds, and the ledger is what has to answer for it
-            // once that table is folded in.
+            // D-13, planning #319: the pair's three facts, for the ledger row of the RETIRED paper -
+            // the pairing, the pair's share of the doplata and the cost stamped on the replacement.
+            // This table used to hold them in a row of its own; the ledger holds them now, and the
+            // readers read them from there.
             pairFacts[oldId] = new ExchangePairFacts(
                 newId,
                 pairSurcharge,
@@ -372,7 +354,8 @@ public sealed class ConfirmVoucherExchangeCommandHandler
         //
         // Iterating `olds` and `news` rather than `pairing.Pairs` is deliberate: custody is a fact about
         // a voucher, and an old can legitimately come back with no replacement. Pairing is about which
-        // replacement matched which retirement, which is a different question and already has a table.
+        // replacement matched which retirement, which is a different question — and the row of the
+        // retired paper answers it, because it names its replacement.
         //
         // The gate here is the transaction, not a rows-affected count. `tx.CommitAsync` runs only on the
         // path below, so every early `Fail(...)` returns without committing and the movements roll back
@@ -382,9 +365,9 @@ public sealed class ConfirmVoucherExchangeCommandHandler
         {
             // The ledger row of the retired paper carries the pair's facts: which paper replaced it,
             // the pair's share of the doplata, and the cost stamped on the replacement. That is the
-            // whole of what voucher_exchanges held, on the row that answers "what happened to THIS
-            // voucher" - so the fold does not have to keep a second table beside the ledger to say
-            // which old paper became which new one.
+            // whole of what the exchange pairs used to hold in a table of their own, on the row that
+            // answers "what happened to THIS voucher" - so the ledger does not have to keep a second
+            // table beside it to say which old paper became which new one.
             pairFacts.TryGetValue(old.Id, out var pair);
 
             _context.VoucherMovements.Add(new VoucherMovement
@@ -439,11 +422,11 @@ public sealed class ConfirmVoucherExchangeCommandHandler
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException
         {
             SqlState: PostgresErrorCodes.UniqueViolation,
-            ConstraintName: "ix_voucher_exchanges_old_voucher_id"
+            ConstraintName: "ix_voucher_movements_exchange_out"
         })
         {
-            // The database refused a second exchange row for a voucher that is already retired into
-            // one. The check above catches this in every ordinary case - it is the race it cannot
+            // The database refused a second exchange for a voucher that is already retired into one.
+            // The check above catches this in every ordinary case - it is the race it cannot
             // cover, two operators confirming the same selection at the same moment - and the answer
             // is the same answer the check gives, not a 500. The transaction rolls back on the way
             // out of this method, so nothing half-exchanged survives.

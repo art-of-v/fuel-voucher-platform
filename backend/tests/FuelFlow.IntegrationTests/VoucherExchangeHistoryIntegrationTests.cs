@@ -14,8 +14,9 @@ namespace FuelFlow.IntegrationTests;
 /// The exchange audit read as batches and as pairs (#223), against a real PostgreSQL database.
 /// </summary>
 /// <remarks>
-/// This surface exists because <c>voucher_exchanges</c> was written by every exchange and read by
-/// nothing. The thing worth protecting is the arithmetic: each row carries only its OWN share of the
+/// This surface exists because the exchange's pairs were written by every exchange and read by
+/// nothing. They live in the ledger now (#319), and the thing worth protecting is the arithmetic:
+/// each pair carries only its OWN share of the
 /// batch surcharge, so the batch's charge is the sum of the rows, and the vouchers of one exchange
 /// deliberately carry different costs per liter so nothing can be reported as a single flat number.
 ///
@@ -216,7 +217,7 @@ new decimal?[] { 90.00m }, surchargePerPair: 10m, reset: false);
         await using (var clean = CreateContext())
         {
             await clean.Database.ExecuteSqlRawAsync(
-                """TRUNCATE TABLE "payments", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "voucher_exchanges", "movement_batches", "purchase_batches", "voucher_imports", "company_invitations", "company_members", "legal_entities", "verification_codes", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
+                """TRUNCATE TABLE "payments", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "movement_batches", "purchase_batches", "voucher_imports", "company_invitations", "company_members", "legal_entities", "verification_codes", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
         }
 
         var response = await BatchesAsync();
@@ -266,7 +267,7 @@ private async Task SeedExchangeAsync(
         if (reset)
         {
             await seed.Database.ExecuteSqlRawAsync(
-                """TRUNCATE TABLE "payments", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "voucher_exchanges", "movement_batches", "purchase_batches", "voucher_imports", "company_invitations", "company_members", "legal_entities", "verification_codes", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
+                """TRUNCATE TABLE "payments", "fulfillments", "orders", "order_line_items", "outbox_events", "fuel_vouchers", "movement_batches", "purchase_batches", "voucher_imports", "company_invitations", "company_members", "legal_entities", "verification_codes", "users", "provider_event_outbox", "app_settings" RESTART IDENTITY CASCADE""");
         }
 
         if (!await seed.Suppliers.AnyAsync(s => s.Id == supplierId))
@@ -324,22 +325,13 @@ foreach (var (cost, index) in costsPerLiter.Select((c, i) => (c, i)))
             seed.FuelVouchers.Add(oldVoucher);
             seed.FuelVouchers.Add(newVoucher);
 
-            seed.VoucherExchanges.Add(new VoucherExchange
-            {
-                Id = Guid.NewGuid(),
-                ExchangeBatchId = batchId,
-                OldVoucherId = oldVoucher.Id,
-                NewVoucherId = newVoucher.Id,
-                FuelTypeId = ToUuid("okko-dp"),
-                BrandId = BrandIds.ForSlug("okko"),
-                Brand = "okko",
-                SupplierId = supplierId,
-                SurchargeUah = surchargePerPair,
-                CostPerLiterApplied = cost + 2.50m,
-                ActingUserId = Guid.NewGuid(),
-                ActingUserName = "Operator One",
-                CreatedAtUtc = atUtc
-            });
+            // The ledger's row of the retired paper: the pair, its share of the surcharge and the
+            // cost stamped on the replacement (#319).
+            MovementBatchSeeder.AddExchangeOut(
+                seed, batchId, oldVoucher.Id, newVoucher.Id,
+                surchargeShareUah: surchargePerPair,
+                appliedCostPerLiter: cost + 2.50m,
+                atUtc: atUtc);
         }
 
         if (softDeleteReplacements)

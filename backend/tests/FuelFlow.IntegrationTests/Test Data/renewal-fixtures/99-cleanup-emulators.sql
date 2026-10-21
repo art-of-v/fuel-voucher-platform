@@ -25,11 +25,11 @@ WHERE voucher_id IN (SELECT id FROM _emu)
 DELETE FROM order_line_items
 WHERE source_voucher_id IN (SELECT id FROM _emu);
 
-UPDATE voucher_exchanges SET new_voucher_id = NULL
-WHERE new_voucher_id IN (SELECT id FROM _emu);
-DELETE FROM voucher_exchanges WHERE old_voucher_id IN (SELECT id FROM _emu);
+UPDATE voucher_movements SET replaced_by_voucher_id = NULL
+WHERE replaced_by_voucher_id IN (SELECT id FROM _emu);
 
-DELETE FROM operator_voucher_renewals WHERE voucher_id IN (SELECT id FROM _emu);
+DELETE FROM voucher_movements WHERE voucher_id IN (SELECT id FROM _emu);
+
 DELETE FROM fuel_vouchers WHERE id IN (SELECT id FROM _emu);
 
 DELETE FROM order_line_items

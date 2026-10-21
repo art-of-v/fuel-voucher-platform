@@ -1,3 +1,4 @@
+using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -51,9 +52,9 @@ public sealed record ImportBatchCostTimeline
 /// </summary>
 /// <remarks>
 /// <para>
-/// Built as an aggregation over <c>voucher_exchanges</c> rather than a new ledger table, because
-/// that table already holds the raw record of every exchange - which vouchers went out, the surcharge,
-/// the resulting cost/liter, the invoice - and it is a durable entity, not a transport queue. (The
+/// Built as an aggregation over the movement ledger rather than a new table of its own, because the
+/// ledger already holds the raw record of every exchange - which vouchers went out, the surcharge,
+/// the resulting cost/liter - and it is a durable ledger, not a transport queue. (The
 /// <c>BatchCostEntered</c> brand event also records cost entries, but brand events are an
 /// outbox: they exist to be dispatched and are not a ledger to audit against.)
 /// </para>
@@ -84,28 +85,40 @@ public sealed class GetImportBatchCostTimelineQueryHandler
     {
         // Only exchanges whose RETIRED voucher belonged to this import - that is what makes an
         // exchange part of this batch's costing story.
-        var exchangeRows = await _context.VoucherExchanges
+        //
+        // The pairs are the ledger's rows (planning #319): the row of the retired paper names the
+        // replacement, the pair's share of the doplata and the cost stamped on the replacement.
+        var exchangeRows = await _context.VoucherMovements
             .AsNoTracking()
-            .Where(e => _context.FuelVouchers
-                .IgnoreQueryFilters()
-                .Any(v => v.Id == e.OldVoucherId && v.ImportJobId == query.ImportId))
-            .Select(e => new
+            .Where(m => m.Kind == VoucherMovementKinds.ExchangeOut
+                && _context.FuelVouchers
+                    .IgnoreQueryFilters()
+                    .Any(v => v.Id == m.VoucherId && v.ImportJobId == query.ImportId))
+            .Select(m => new
             {
-                e.ExchangeBatchId,
-                e.OldVoucherId,
-                e.FuelTypeId,
-                e.Brand,
-                e.SurchargeUah,
-                e.CostPerLiterApplied,
-                e.CreatedAtUtc,
+                ExchangeBatchId = m.BatchId,
+                OldVoucherId = m.VoucherId,
+                FuelTypeId = _context.FuelVouchers
+                    .IgnoreQueryFilters()
+                    .Where(v => v.Id == m.VoucherId)
+                    .Select(v => (Guid?)v.FuelTypeId)
+                    .FirstOrDefault() ?? Guid.Empty,
+                Brand = _context.FuelVouchers
+                    .IgnoreQueryFilters()
+                    .Where(v => v.Id == m.VoucherId)
+                    .Select(v => v.Brand)
+                    .FirstOrDefault() ?? string.Empty,
+                SurchargeUah = m.SurchargeShareUah,
+                CostPerLiterApplied = m.AppliedCostPerLiter,
+                CreatedAtUtc = m.OccurredAtUtc,
                 OldLiters = _context.FuelVouchers
                     .IgnoreQueryFilters()
-                    .Where(v => v.Id == e.OldVoucherId)
+                    .Where(v => v.Id == m.VoucherId)
                     .Select(v => (decimal?)v.Liters)
                     .FirstOrDefault(),
                 OldCostPerLiter = _context.FuelVouchers
                     .IgnoreQueryFilters()
-                    .Where(v => v.Id == e.OldVoucherId)
+                    .Where(v => v.Id == m.VoucherId)
                     .Select(v => (decimal?)v.CostPerLiter)
                     .FirstOrDefault()
             })
@@ -117,16 +130,16 @@ public sealed class GetImportBatchCostTimelineQueryHandler
             .GroupBy(e => new { e.ExchangeBatchId, e.FuelTypeId })
             .Select(g => new BatchCostTimelineEntry
             {
-                ExchangeBatchId = g.Key.ExchangeBatchId,
+                ExchangeBatchId = g.Key.ExchangeBatchId ?? Guid.Empty,
                 AtUtc = g.Min(e => e.CreatedAtUtc),
                 FuelTypeId = g.Key.FuelTypeId,
                 Brand = g.First().Brand,
                 VouchersExchangedOut = g.Count(),
                 LitersExchangedOut = g.Sum(e => e.OldLiters ?? 0m),
-                // Summed, because each row carries only its own share of the surcharge. The rows of one
+                // Summed, because each pair carries only its own share of the surcharge. The pairs of one
                 // fuel bucket are one pair of same-volume vouchers each, so their shares add up to the
                 // bucket's surcharge exactly.
-                SurchargeUah = g.Sum(e => e.SurchargeUah),
+                SurchargeUah = g.Sum(e => e.SurchargeUah ?? 0m),
                 CostPerLiterBefore = g.Max(e => e.OldCostPerLiter),
                 CostPerLiterAfter = g.First().CostPerLiterApplied
             })

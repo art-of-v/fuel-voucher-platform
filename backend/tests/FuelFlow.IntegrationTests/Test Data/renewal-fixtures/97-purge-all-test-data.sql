@@ -27,8 +27,8 @@
 --   worker is running — can leave a job claimed but never executed.
 --
 -- Delete order is forced by ON DELETE RESTRICT from several tables onto fuel_vouchers
--- (fulfillments.voucher_id, order_line_items.source_voucher_id, voucher_exchanges.old_voucher_id,
--- operator_voucher_renewals.voucher_id) plus fuel_vouchers.order_id onto orders. Unhook, then delete
+-- (fulfillments.voucher_id, order_line_items.source_voucher_id, voucher_movements.voucher_id and
+-- voucher_movements.replaced_by_voucher_id) plus fuel_vouchers.order_id onto orders. Unhook, then delete
 -- vouchers, then orders. Never UPDATE fuel_vouchers SET order_id = NULL to "unlink": CHECK
 -- ck_voucher_held_has_order is evaluated per row on UPDATE and aborts the statement.
 -- =============================================================================================
@@ -106,9 +106,8 @@ UNION ALL SELECT 'fulfilments', count(*) FROM fulfillments WHERE order_id IN (SE
 UNION ALL SELECT 'order line items', count(*) FROM order_line_items WHERE order_id IN (SELECT id FROM _test_order)
 UNION ALL SELECT 'refund payments', count(*) FROM payments WHERE order_id IN (SELECT id FROM _test_order) AND kind = 'Refund'
 UNION ALL SELECT 'renewal lines', count(*) FROM order_line_items WHERE source_voucher_id IS NOT NULL AND order_id IN (SELECT id FROM _test_order)
-UNION ALL SELECT 'supplier exchanges', count(*) FROM voucher_exchanges
-    WHERE old_voucher_id IN (SELECT id FROM _test_voucher)
-UNION ALL SELECT 'operator renewals', count(*) FROM operator_voucher_renewals WHERE voucher_id IN (SELECT id FROM _test_voucher)
+    WHERE kind = 'exchange_out' AND voucher_id IN (SELECT id FROM _test_voucher)
+UNION ALL SELECT 'operator renewals', count(*) FROM order_line_items WHERE source_voucher_id IN (SELECT id FROM _test_voucher)
 UNION ALL SELECT 'devices', count(*) FROM devices WHERE user_id IN (SELECT id FROM _test_user)
 UNION ALL SELECT 'push tokens', count(*) FROM push_tokens WHERE user_id IN (SELECT id FROM _test_user)
 UNION ALL SELECT 'refresh tokens', count(*) FROM refresh_tokens
@@ -137,18 +136,16 @@ ORDER BY 1, 2;
   \echo '################ APPLYING ################'
 
   -- 1. Voucher references (all RESTRICT onto fuel_vouchers).
-  DELETE FROM operator_voucher_renewals o WHERE o.voucher_id IN (SELECT id FROM _test_voucher);
+  UPDATE voucher_movements m SET replaced_by_voucher_id = NULL
+  WHERE m.replaced_by_voucher_id IN (SELECT id FROM _test_voucher);
 
-  UPDATE voucher_exchanges x SET new_voucher_id = NULL
-  WHERE x.new_voucher_id IN (SELECT id FROM _test_voucher);
+  DELETE FROM voucher_movements m WHERE m.voucher_id IN (SELECT id FROM _test_voucher);
 
-  DELETE FROM voucher_exchanges x WHERE x.old_voucher_id IN (SELECT id FROM _test_voucher);
-
-  -- 1b. Settlements those rows belonged to (#319). exchange_batch_id restricts onto this table, so the
+  -- 1b. Settlements those rows belonged to (#319). batch_id restricts onto this table, so the
   --     batches have to be cleared after their members or not at all - and only the ones left empty,
   --     so a batch that still covers real stock survives the purge.
   DELETE FROM movement_batches b
-  WHERE NOT EXISTS (SELECT 1 FROM voucher_exchanges e WHERE e.exchange_batch_id = b.id);
+  WHERE NOT EXISTS (SELECT 1 FROM voucher_movements m WHERE m.batch_id = b.id);
 
   DELETE FROM order_line_items l WHERE l.order_id IN (SELECT id FROM _test_order) AND l.source_voucher_id IS NOT NULL;
 
@@ -240,8 +237,7 @@ COMMIT;
   UNION ALL SELECT 'fulfilments', count(*) FROM fulfillments
   UNION ALL SELECT 'refund payments', count(*) FROM payments WHERE kind = 'Refund'
   UNION ALL SELECT 'renewal lines', count(*) FROM order_line_items WHERE source_voucher_id IS NOT NULL
-  UNION ALL SELECT 'supplier exchanges', count(*) FROM voucher_exchanges
-  UNION ALL SELECT 'devices', count(*) FROM devices
+  UNION ALL SELECT 'supplier exchanges', count(*) FROM voucher_movements WHERE kind = 'exchange_out'
   UNION ALL SELECT 'push tokens', count(*) FROM push_tokens
   UNION ALL SELECT 'refresh tokens', count(*) FROM refresh_tokens
   UNION ALL SELECT 'verification codes', count(*) FROM verification_codes

@@ -3,7 +3,7 @@ namespace FuelFlow.Features.Vouchers.Movements;
 /// <summary>
 /// One movement of one piece of paper: it was in one place, and now it is in another. The append-only
 /// custody log D-13 exists to build, replacing <c>voucher_renewal_items</c> (dissolved 2026-10-17),
-/// <c>voucher_exchanges</c> and <c>operator_voucher_renewals</c>.
+/// the exchange pairs and <c>operator_voucher_renewals</c>.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -122,7 +122,7 @@ public sealed class VoucherMovement
     /// <remarks>
     /// <para>
     /// A movement says where a piece of paper went; this says which piece of paper it became. It is
-    /// the pairing <c>voucher_exchanges</c> kept as <c>old_voucher_id</c> → <c>new_voucher_id</c>, folded
+    /// the pairing the exchange pairs kept as <c>old_voucher_id</c> → <c>new_voucher_id</c>, folded
     /// into the ledger (planning #319) so the ledger can answer "what replaced this voucher" without
     /// the old table beside it.
     /// </para>
@@ -147,7 +147,7 @@ public sealed class VoucherMovement
     /// <remarks>
     /// The settlement's total lives on <c>movement_batches.surcharge_uah</c>, and the shares can sum to
     /// less than it — so the total is not this column's value, and this column is not the total.
-    /// <c>voucher_exchanges.surcharge_uah</c> held exactly this per-pair share, and the three readers
+    /// The exchange pairs held exactly this per-pair share, and the three readers
     /// that summed it per batch and per fuel still need it.
     /// </remarks>
     public decimal? SurchargeShareUah { get; set; }
@@ -159,7 +159,7 @@ public sealed class VoucherMovement
     /// A level, not a delta: what the new paper cost per litre. It cannot be read back later —
     /// <c>fuel_vouchers.cost_per_liter</c> is mutable and <c>SetBatchCostCommandHandler</c> restamps
     /// it, so "what did this paper cost when it arrived" stops existing the moment the column is
-    /// restamped. <c>voucher_exchanges.cost_per_liter_applied</c> held exactly this.
+    /// restamped. The exchange pairs held exactly this.
     /// </remarks>
     public decimal? AppliedCostPerLiter { get; set; }
 

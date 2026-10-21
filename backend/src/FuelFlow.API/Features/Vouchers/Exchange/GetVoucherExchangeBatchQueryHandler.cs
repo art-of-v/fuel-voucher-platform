@@ -1,3 +1,4 @@
+using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,12 +15,14 @@ public sealed record GetVoucherExchangeBatchQuery(Guid ExchangeBatchId);
 /// voucher and the replacement that took its place, carrying the cost that voucher actually had and
 /// the share of the surcharge that pair alone accounts for.
 ///
-/// Both vouchers are fetched by id rather than through navigations, even though
-/// <c>new_voucher_id</c> is now a real foreign key (4dd6128a). A navigation would apply the model's
-/// global <c>!IsDeleted</c> filter, and an audit row has to outlive the stock it is about: the
+/// Both vouchers are fetched by id rather than through navigations. A navigation would apply the
+/// model's global <c>!IsDeleted</c> filter, and an audit row has to outlive the stock it is about: the
 /// replacements are routinely soft-deleted once they are sold or retired, and an exchange that
 /// vanishes from the history because its stock was cleaned up is precisely the quiet history loss
 /// the audit exists to prevent. The by-id lookups keep <c>IgnoreQueryFilters</c> in reach for that.
+///
+/// The pairs are the ledger's rows (planning #319): the row of the retired paper names the
+/// replacement, the pair's share of the doplata and the cost stamped on the replacement.
 /// </summary>
 public sealed class GetVoucherExchangeBatchQueryHandler
 {
@@ -37,41 +40,47 @@ public sealed class GetVoucherExchangeBatchQueryHandler
         if (query.ExchangeBatchId == Guid.Empty)
             return null;
 
-        var rows = await _context.VoucherExchanges
+        var rows = await _context.VoucherMovements
             .AsNoTracking()
-            .Where(e => e.ExchangeBatchId == query.ExchangeBatchId)
-            .Select(e => new
+            .Where(m => m.Kind == VoucherMovementKinds.ExchangeOut && m.BatchId == query.ExchangeBatchId)
+            .Select(m => new
             {
-                e.Id,
-                e.OldVoucherId,
-                e.NewVoucherId,
-                e.FuelTypeId,
-                e.Brand,
-                e.SupplierId,
-                e.ActingUserName,
-                e.SurchargeUah,
-                e.CostPerLiterApplied,
-                e.CreatedAtUtc,
+                m.Id,
+                OldVoucherId = m.VoucherId,
+                NewVoucherId = m.ReplacedByVoucherId,
+                FuelTypeId = _context.FuelVouchers
+                    .IgnoreQueryFilters()
+                    .Where(v => v.Id == m.VoucherId)
+                    .Select(v => v.FuelTypeId)
+                    .FirstOrDefault(),
+                Brand = _context.FuelVouchers
+                    .IgnoreQueryFilters()
+                    .Where(v => v.Id == m.VoucherId)
+                    .Select(v => v.Brand)
+                    .FirstOrDefault(),
+                SurchargeUah = m.SurchargeShareUah,
+                CostPerLiterApplied = m.AppliedCostPerLiter,
+                CreatedAtUtc = m.OccurredAtUtc,
                 OldNumber = _context.FuelVouchers
                     .IgnoreQueryFilters()
-                    .Where(v => v.Id == e.OldVoucherId)
+                    .Where(v => v.Id == m.VoucherId)
                     .Select(v => v.VoucherNumber)
                     .FirstOrDefault(),
                 OldLiters = _context.FuelVouchers
                     .IgnoreQueryFilters()
-                    .Where(v => v.Id == e.OldVoucherId)
+                    .Where(v => v.Id == m.VoucherId)
                     .Select(v => (decimal?)v.Liters)
                     .FirstOrDefault(),
                 OldCostPerLiter = _context.FuelVouchers
                     .IgnoreQueryFilters()
-                    .Where(v => v.Id == e.OldVoucherId)
+                    .Where(v => v.Id == m.VoucherId)
                     .Select(v => (decimal?)v.CostPerLiter)
                     .FirstOrDefault(),
-                NewNumber = e.NewVoucherId == null
+                NewNumber = m.ReplacedByVoucherId == null
                     ? null
                     : _context.FuelVouchers
                         .IgnoreQueryFilters()
-                        .Where(v => v.Id == e.NewVoucherId.Value)
+                        .Where(v => v.Id == m.ReplacedByVoucherId.Value)
                         .Select(v => v.VoucherNumber)
                         .FirstOrDefault()
             })
@@ -93,11 +102,10 @@ public sealed class GetVoucherExchangeBatchQueryHandler
             .AsNoTracking()
             .FirstOrDefaultAsync(b => b.Id == query.ExchangeBatchId, cancellationToken);
 
-        var head = rows[0];
-
         // Hoisted: a null-propagating operator inside an EF predicate is an expression-tree error,
-        // and the value is needed twice anyway.
-        var supplierId = batch?.SupplierId ?? head.SupplierId;
+        // and the value is needed twice anyway. The supplier is the settlement's fact now: the batch
+        // says who it was with, and every pair of that batch is with the same one.
+        var supplierId = batch?.SupplierId ?? Guid.Empty;
 
         return new VoucherExchangeBatchDetailDto
         {
@@ -110,11 +118,10 @@ public sealed class GetVoucherExchangeBatchQueryHandler
                 .Where(s => s.Id == supplierId)
                 .Select(s => s.Name)
                 .FirstOrDefaultAsync(cancellationToken),
-            RecordedBy = batch?.OpenedByUserName
-                ?? rows.FirstOrDefault(r => r.ActingUserName is not null)?.ActingUserName,
+            RecordedBy = batch?.OpenedByUserName,
             // The batch total is the amount the brand charged, which the sum of shares only reproduces
             // when every retired voucher was paired. See MovementBatch.SurchargeUah.
-            TotalSurchargeUah = batch?.SurchargeUah ?? rows.Sum(r => r.SurchargeUah),
+            TotalSurchargeUah = batch?.SurchargeUah ?? rows.Sum(r => r.SurchargeUah ?? 0m),
             TotalLiters = rows.Sum(r => r.OldLiters ?? 0m),
             Pairs = rows
                 .OrderBy(r => r.OldNumber)
@@ -129,7 +136,7 @@ public sealed class GetVoucherExchangeBatchQueryHandler
                     FuelTypeId = r.FuelTypeId,
                     Brand = r.Brand,
                     /// <summary>This pair's own share of the batch surcharge — not the batch total.</summary>
-                    SurchargeShareUah = r.SurchargeUah,
+                    SurchargeShareUah = r.SurchargeUah ?? 0m,
                     NewCostPerLiter = r.CostPerLiterApplied
                 })
                 .ToList()

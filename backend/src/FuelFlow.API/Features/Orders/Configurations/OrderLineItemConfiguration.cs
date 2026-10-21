@@ -155,6 +155,18 @@ internal sealed class OrderLineItemConfiguration : IEntityTypeConfiguration<Orde
         builder.HasIndex(e => e.SourceVoucherId)
             .HasDatabaseName("ix_order_line_items_source_voucher_id");
 
+        // Planning #319: the same renewal to the same date cannot be recorded twice. This is the
+        // folded form of the UNIQUE index the operator's renewals used to carry on their own table
+        // (voucher_id, new_expiration) - the line carries both halves now, so the guarantee moves
+        // with them.
+        //
+        // Partial, because the rule is about a renewal: a buy-fuel line names no source voucher and
+        // is not a renewal at all.
+        builder.HasIndex(e => new { e.SourceVoucherId, e.NewCustomerExpiration })
+            .HasDatabaseName("ix_order_line_items_renewal_once")
+            .IsUnique()
+            .HasFilter("source_voucher_id IS NOT NULL AND new_customer_expiration IS NOT NULL");
+
         builder.ToTable(t =>
         {
             // line_total is unit_price * quantity, computed in the handler. Nothing enforced that

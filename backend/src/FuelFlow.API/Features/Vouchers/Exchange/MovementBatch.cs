@@ -1,13 +1,13 @@
 namespace FuelFlow.Features.Vouchers.Exchange;
 
 /// <summary>
-/// One operator-initiated settlement that moves more than a single voucher — the parent a
-/// <c>voucher_exchanges</c> row now points at.
+/// One operator-initiated settlement that moves more than a single voucher — the parent the
+/// exchange's ledger rows point at.
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Why this table exists at all.</b> <c>voucher_exchanges.exchange_batch_id</c> has been an indexed
-/// uuid pointing at nothing since the column was created on 2026-10-01. The schema presented it as a
+/// <b>Why this table exists at all.</b> The exchange's batch id has been an indexed uuid pointing at
+/// nothing since the column was created on 2026-10-01. The schema presented it as a
 /// reference to a thing that did not exist, so a batch's lifecycle — who opened it, when, whether it
 /// was ever confirmed, and what was actually agreed with the supplier — had nowhere to live. Every
 /// reader reconstructed the header by folding over the member rows: <c>MIN(created_at_utc)</c> for
@@ -17,7 +17,7 @@ namespace FuelFlow.Features.Vouchers.Exchange;
 /// <para>
 /// <b>What is stored here and what is still derived.</b> This table holds the facts that belong to the
 /// settlement as a whole: which supplier, what was agreed, who did it, when, and its lifecycle state.
-/// Per-pair facts stay derived from the rows that own them — which fuels it touched, how many
+/// Per-pair facts stay on the pair — which fuels it touched, how many
 /// vouchers moved, the litres-weighted cost before. Those are genuinely a property of the pairs, and
 /// duplicating them here would create a second thing to keep in step. The line is: <i>a fact about
 /// the batch</i> is stored; <i>a fact about a pair</i> is stored on the pair.
@@ -29,7 +29,7 @@ namespace FuelFlow.Features.Vouchers.Exchange;
 /// and the actor-column rule in §G of that same document says audit actor columns stay FK-free because
 /// a settlement record that refuses to be written over a missing actor row is worse than a row
 /// carrying an id nobody can resolve. This table follows the rule the codebase already follows for
-/// <c>voucher_exchanges.acting_user_id</c> and <c>operator_voucher_renewals.acting_user_id</c>. When
+/// <c>operator_voucher_renewals.acting_user_id</c>. When
 /// D-02 lands, the supplier column is an additive change.
 /// </para>
 /// <para>
@@ -65,7 +65,7 @@ public sealed class MovementBatch
     /// </summary>
     /// <remarks>
     /// <b>This is the amount on the command, not the sum of the rows' shares.</b> Each
-    /// <see cref="VoucherExchange"/> row carries only its own share, computed as
+    /// pair of paper carries only its own share, computed as
     /// <c>surcharge × pair_litres / total_new_litres</c>, and those shares sum back to the total only
     /// when every retired voucher was paired with a replacement. An exchange that returns vouchers
     /// without reissuing them — a legitimate, supported case — contributes retired litres to the
@@ -86,7 +86,7 @@ public sealed class MovementBatch
     /// </summary>
     /// <remarks>
     /// A denormalised copy so the record stays readable after a rename, never a join target — the same
-    /// reasoning as <c>voucher_exchanges.acting_user_name</c>.
+    /// reasoning every other audit row in this schema follows.
     /// </remarks>
     public string? OpenedByUserName { get; set; }
 

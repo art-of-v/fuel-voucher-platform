@@ -80,8 +80,6 @@ public sealed class XminMigrationGuardTests
     [InlineData("orders")]
     [InlineData("fuel_vouchers")]
     [InlineData("payments")]
-    [InlineData("voucher_exchanges")]
-    [InlineData("operator_voucher_renewals")]
     public void The_Token_Reach_This_Table_In_The_Model(string table)
     {
         var snapshot = File.ReadAllText(

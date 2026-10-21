@@ -61,11 +61,11 @@ SELECT id, 'serves as a renewal result' FROM fuel_vouchers
 WHERE id IN (SELECT voucher_id FROM fulfillments WHERE line_item_id IS NOT NULL)
 UNION ALL
 SELECT id, 'referenced by a supplier exchange' FROM fuel_vouchers
-WHERE id IN (SELECT old_voucher_id FROM voucher_exchanges)
-   OR id IN (SELECT new_voucher_id FROM voucher_exchanges WHERE new_voucher_id IS NOT NULL)
+WHERE id IN (SELECT voucher_id FROM voucher_movements WHERE kind = 'exchange_out')
+   OR id IN (SELECT replaced_by_voucher_id FROM voucher_movements WHERE replaced_by_voucher_id IS NOT NULL)
 UNION ALL
 SELECT id, 'referenced by an operator renewal' FROM fuel_vouchers
-WHERE id IN (SELECT voucher_id FROM operator_voucher_renewals)
+WHERE id IN (SELECT source_voucher_id FROM order_line_items WHERE source_voucher_id IS NOT NULL)
 UNION ALL
 SELECT id, 'referenced by a paid order' FROM fuel_vouchers
 WHERE order_id IS NOT NULL;
@@ -129,12 +129,12 @@ WHERE voucher_id IN (SELECT id FROM _expired);
 DELETE FROM order_line_items
 WHERE source_voucher_id IN (SELECT id FROM _expired);
 
-UPDATE voucher_exchanges SET new_voucher_id = NULL
-WHERE old_voucher_id IN (SELECT id FROM _expired);
+UPDATE voucher_movements SET replaced_by_voucher_id = NULL
+WHERE voucher_id IN (SELECT id FROM _expired);
 
-DELETE FROM voucher_exchanges WHERE old_voucher_id IN (SELECT id FROM _expired);
+DELETE FROM voucher_movements WHERE voucher_id IN (SELECT id FROM _expired);
 
-DELETE FROM operator_voucher_renewals WHERE voucher_id IN (SELECT id FROM _expired);
+
 
 -- No order_id clearing: CHECK ck_voucher_held_has_order is checked per row on UPDATE, and these
 -- rows are about to be deleted anyway. Deleting the vouchers leaves the orders unreferenced.

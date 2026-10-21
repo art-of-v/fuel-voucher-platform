@@ -22,7 +22,7 @@
 --     row and there is nothing to translate.
 --   - What is left to translate is every OTHER table that names a fuel by that id, and those have
 --     no foreign key to check them: `order_line_items.fuel_type_id varchar(100)`, and the same
---     shape on `purchase_batches` and `voucher_exchanges`. An orphaned text id there would survive
+--     shape on `purchase_batches`. An orphaned text id there would survive
 --     the type change as a row that can never resolve, and nothing in the schema would say so.
 --
 -- That second list is the whole reason this file exists, and the reason it is a values question
@@ -92,14 +92,9 @@ GROUP BY fuel_type_id
 ORDER BY fuel_type_id;
 \endif
 
-SELECT to_regclass('public.voucher_exchanges') IS NOT NULL AS t \gset
-\if :t
-SELECT 'voucher_exchanges' AS table_name, fuel_type_id AS id, count(*)::text AS rows
-FROM voucher_exchanges
-WHERE fuel_type_id IS NOT NULL
-  AND fuel_type_id::text !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-GROUP BY fuel_type_id
-ORDER BY fuel_type_id;
-\endif
+-- The exchange pairs used to live in their own table and carried a fuel_type_id of their own. They
+-- live in the ledger now (planning #319), and the ledger's rows name the paper, not a fuel - so
+-- there is nothing left to check here. The check that remains is the one above: the tables that
+-- still carry a fuel of their own.
 
 COMMIT;
