@@ -300,9 +300,9 @@ CreateBrandStation(StationId(1), BrandId(1), "Node A"),
     [Fact]
     public async Task GetPublicPackages_NullPump_FallsBackToSalePrice_SoNoFabricatedSaving()
     {
-        // Legacy fuel priced before any pump was recorded: with no pump ceiling the "before" price is
-        // just the sale price, so the store-front shows no fabricated saving — and still never the
-        // stored cost-derived OriginalPrice (planning #73).
+        // Legacy fuel priced before any column price was recorded: with no column price the "before"
+        // price is just the sale price, so the store-front shows no fabricated saving — and still
+        // never the stored cost-derived OriginalPrice (planning #73).
 // The legacy case: a package with no pump price at all. There is nothing to recompute the struck
         // price from, so the storefront falls back to the sale price and shows no fabricated saving.
         _context.FuelNominals.Add(CreatePackage("pkg-legacy", BrandId(1), "ft-a", "A-95", 10m));

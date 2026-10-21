@@ -72,8 +72,9 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
                 BrandId: fuelTypeId.StartsWith("okko") ? BrandIds.Okko : BrandIds.Wog,
                 fuelTypeId: fuelTypeId,
                 liters: nominal,
-                // The price these knobs produce, not cost + profit: for WOG the pump ceiling binds, and
-                // stating the unbound number here would pin every nominal as an override - which is
+                // The price these knobs produce: the cost plus the margin, for every nominal and
+                // every fuel. The column price is a reference, so it does not enter the charge -
+                // and stating a number here would pin every nominal as an override, which is
                 // exactly the drift this suite exists to rule out.
                 price: Math.Round(
                     FuelPricing.PackagePrice(cost, profit, pump, nominal),
@@ -237,9 +238,9 @@ public sealed class ImportOkkoPumpPricesTests : IDisposable
 var (wogVolume, wogFuel) = await ReadAsync("wog-95-20");
         wogFuel.PumpPricePerLiter.Should().Be(58m);
         // Untouched: this brand's rate did not move, so its nominals still work out from the fuel's
-        // own rate - 56 cost + 5 margin = 61, capped by the ceiling at pump 58 less the guaranteed
-        // 1 UAH discount, which is 57 and therefore what the customer pays. Derived through the
-        // formula rather than from a stored total, which is all there has ever been.
+        // own rate - 56 cost + 5 margin = 61. The column price (58) is a reference, not a cap, so
+        // the price is 61 and not what the pump allows. Derived through the formula rather than
+        // from a stored total, which is all there has ever been.
         wogFuel.FinalPerLiter().Should().Be(61m);
     }
 

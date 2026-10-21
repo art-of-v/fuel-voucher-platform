@@ -106,7 +106,8 @@ MarginUahPerLiter = 2m,
             PumpPricePerLiter = 50m
         };
 
-        // The ceiling binds, so the customer price is 50 and not the 51 a cost-plus reading would give.
+        // 49 + 2 = 51: the column price (50) is a reference, so it does not cap the price — the
+        // cost-plus reading is the right one.
         package.ComputedFinalPricePerLiter.Should().Be(51m);
     }
 }

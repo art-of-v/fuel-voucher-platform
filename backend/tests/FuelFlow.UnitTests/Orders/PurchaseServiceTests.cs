@@ -176,49 +176,6 @@ public OrderCommandHandlersTests()
         }
     };
 
-    /// <summary>
-    /// Seeds a supplier+fuel whose recomputed price/л sits below supplier cost: cost 50,
-    /// margin 2 (cost-plus 52) but a pump ceiling of 49 − 0.5 = 48.5 binds → final 48.5 &lt; 50.
-    /// <paramref name="allowBelowCost"/> flips the manager opt-in on the fuel type.
-    /// </summary>
-    private void SeedBelowCostFuel(bool allowBelowCost)
-    {
-        _context.FuelTypes.Add(new FuelTypeEntity
-        {
-            Id = ToUuid("okko-loss"), Name = "ДП збиток", BrandId = BrandIds.Okko,
-            BasePrice = 49, DiscountPrice = 49, AllowBelowCost = allowBelowCost,
-            CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
-        });
-        _context.SeedPackage("pkg-okko-loss-50", BrandIds.Okko, "okko-loss", 50m, 2425m,
-            supplierPricePerLiter: 50m, marginUahPerLiter: 2m,
-            pumpPricePerLiter: 49m, finalPricePerLiter: 52m);
-        _context.SaveChanges();
-        // Stock behind it, so these tests reach the PRICING guard they are about. The stock gate runs
-        // first on purpose: without stock here they would all fail as out-of-stock and assert nothing
-        // about below-cost at all — which is exactly what happened before this line existed.
-        SeedSellableStock("okko-loss", 50m);
-    }
-
-    private CreateCheckoutCommand BelowCostCommand() => new()
-    {
-        UserId = _context.Users.First().Id,
-        FuelTypeId = ToUuid("okko-loss"), BrandId = BrandIds.Okko, BrandName = "okko",
-        Liters = 50, Quantity = 1, Price = 2425
-    };
-
-    private BulkCheckoutCommand BelowCostBulkCommand() => new()
-    {
-        UserId = _context.Users.First().Id,
-        Items =
-        {
-            new CheckoutItem
-            {
-                FuelTypeId = ToUuid("okko-loss"), BrandId = BrandIds.Okko, BrandName = "okko",
-                Liters = 50, Quantity = 1, Price = 2425
-            }
-        }
-    };
-
     private Order BuildOrder(OrderStatus status, string? monobankPaymentUrl = null) => new()    {
         Id = Guid.NewGuid(),
         UserId = _context.Users.First().Id,
@@ -368,7 +325,8 @@ public async Task CreateCheckout_ShouldCreateOrder_WithCorrectDetails()
     public async Task CreateCheckout_ShouldChargeFractionalKopecks_AndMatchMonobankAmountExactly()
     {
         // #90 decimal money: a fractional per-litre price must survive to the kopeck all the way to
-        // the Monobank invoice. 43.00 cost + 2.67 margin = 45.67/л (no pump ceiling) × 10 л = 456.70 UAH.
+        // the Monobank invoice. 43.00 cost + 2.67 margin = 45.67/л (the price is cost + margin)
+        // × 10 л = 456.70 UAH.
         // Before #90 this collapsed to a whole 457 UAH and would then mismatch the success webhook.
         _context.FuelTypes.Add(new FuelTypeEntity
         {

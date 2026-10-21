@@ -5,16 +5,16 @@ using FuelFlow.SharedKernel.Domain;
 namespace FuelFlow.UnitTests.Orders;
 
 /// <summary>
-/// Pricing epic slice 1a: final/л = min(cost + profit, pump), with a null-pump fallback to
-/// cost + profit. Covers the shared <see cref="FuelPricing"/> formula and the checkout
-/// <see cref="ServerPricing"/> that recomputes from it.
+/// Pricing epic slice 1a: final/л = cost + profit. Covers the shared <see cref="FuelPricing"/>
+/// formula and the checkout <see cref="ServerPricing"/> that recomputes from it.
 /// </summary>
 /// <remarks>
 /// <para>
 /// <b>There is no minimum-discount term any more.</b> The formula used to be
 /// <c>min(cost + profit, pump − minDiscount)</c>: the column price was the ceiling with a dial
 /// under it, and the dial was a second way of saying the same thing as the margin. It is gone by
-/// decision (planning D-23), and the price is now simply never above the column.
+/// decision (planning D-23). The column price is a reference, not a term of the formula: our
+/// price is the cost plus the margin, and our price can sit above the column price.
 /// </para>
 /// <para>
 /// The reason is not tidiness. The dial was maintained by four writers, and the admin card fell back
@@ -33,10 +33,10 @@ public sealed class PricingFormulaTests
     // null, not a number built from whatever happens to be present.
 
     [Theory]
-    [InlineData(null, 2.0, null)]
-    [InlineData(49.0, null, null)]
-    [InlineData(null, null, null)]
-    public void FinalPerLiterOrNull_NoCostOrNoMargin_IsNotAPrice(double? cost, double? margin, double? pump)
+    [InlineData(null, 2.0)]
+    [InlineData(49.0, null)]
+    [InlineData(null, null)]
+    public void FinalPerLiterOrNull_NoCostOrNoMargin_IsNotAPrice(double? cost, double? margin)
     {
         var result = FuelPricing.FinalPerLiterOrNull(
             cost is null ? null : (decimal)cost.Value,
@@ -55,13 +55,14 @@ public sealed class PricingFormulaTests
         FuelPricing.FinalPerLiterOrNull(49m, 2m)
             .Should().Be(FuelPricing.FinalPerLiter(49m, 2m));
 
-        // Ceiling binding: 49 + 2 = 51 against a column price of 50 → the column caps it.
+        // 49 + 2 = 51 against a column price of 50 — the column price is a reference, so it does
+        // not cap anything.
         FuelPricing.FinalPerLiterOrNull(49m, 2m)
             .Should().Be(51m);
     }
 
     [Fact]
-    public void FinalPerLiterOrNull_WithoutAPump_FallsBackToCostPlus()
+    public void FinalPerLiterOrNull_WithCostAndMargin_IsTheCostPlus()
     {
         FuelPricing.FinalPerLiterOrNull(49m, 2m).Should().Be(51m);
     }
@@ -69,40 +70,43 @@ public sealed class PricingFormulaTests
     // --- FuelPricing.FinalPerLiter -----------------------------------------
 
     [Fact]
-    public void FinalPerLiter_CostPlusBelowCeiling_ReturnsCostPlus()
+    public void FinalPerLiter_CostPlus_ReturnsCostPlus()
     {
-        // cost 49 + profit 2 = 51; ceiling 55 → cost-plus wins.
+        // cost 49 + profit 2 = 51; the column price beside it is a reference and does not enter
+        // the formula.
         FuelPricing.FinalPerLiter(49m, 2m).Should().Be(51m);
     }
 
     [Fact]
-    public void FinalPerLiter_CeilingBelowCostPlus_ReturnsCeiling()
+    public void FinalPerLiter_AboveTheColumnPrice_IsStillTheCostPlus()
     {
-        // cost 49 + profit 5 = 54; ceiling 55 → still cost-plus.
+        // cost 49 + profit 5 = 54, and cost 49 + profit 7 = 56 — the column price (55) is a
+        // reference, not a cap: our price is what we charge, and it can sit above the pump.
         FuelPricing.FinalPerLiter(49m, 5m).Should().Be(54m);
-        // cost 49 + profit 7 = 56; ceiling 55 → the column caps it.
         FuelPricing.FinalPerLiter(49m, 7m).Should().Be(56m);
     }
 
     [Fact]
-    public void FinalPerLiter_NullPump_FallsBackToCostPlus()
+    public void FinalPerLiter_TakesOnlyTheCostAndTheMargin()
     {
+        // There is no third input to be without: the column price is not a term of the formula.
         FuelPricing.FinalPerLiter(49m, 2m).Should().Be(51m);
     }
 
     [Fact]
-    public void FinalPerLiter_PumpBelowCostPlus_ReturnsBelowCost()
+    public void FinalPerLiter_WhateverTheColumnPrice_IsTheCostPlus()
     {
-        // Below-cost guarding is deferred to slice 3; the pure formula still returns
-        // the ceiling even when it dips under cost so the math stays predictable.
+        // The formula has no column price to return: our price is the cost plus the margin, and
+        // the guard that judges the price the customer is charged is slice 3's business.
         FuelPricing.FinalPerLiter(50m, 2m).Should().Be(52m);
     }
 
     [Fact]
-    public void FinalPerLiter_IsNeverAboveTheColumnPrice()
+    public void FinalPerLiter_TheColumnPriceIsNotATerm()
     {
         // The one property the model change was for: the column price is NOT a term of the formula.
-        // Our price is the cost plus our margin, and the pump is what the customer is shown against.
+        // Our price is the cost plus our margin, and the column price is what the customer is shown
+        // against — so our price can sit above it.
         FuelPricing.FinalPerLiter(1m, 100m).Should().Be(101m);
         FuelPricing.FinalPerLiter(49m, 2m).Should().Be(51m);
     }
@@ -131,19 +135,20 @@ public sealed class PricingFormulaTests
     // --- ServerPricing.PackagePrice ----------------------------------------
 
     [Fact]
-    public void PackagePrice_RecomputesFromKnobs_WhenCeilingBinds()
+    public void PackagePrice_RecomputesFromTheKnobs_EvenWhenTheColumnPriceIsLower()
     {
         var pkg = new SellablePackage
         {
             Liters = 10m,
             SupplierPricePerLiter = 49m,     // cost
             MarginUahPerLiter = 7m,          // profit → cost-plus 56
-            PumpPricePerLiter = 55m,            // ceiling 55 binds
+            PumpPricePerLiter = 55m,            // the column price: a reference, it does not cap the charge
             // No stale stored final to ignore any more: the offer stopped carrying one on 2026-10-17.
             // What this pins is that the knobs, and only the knobs, decide the charge.
         };
 
-        // 55 * 10 = 550
+        // 56 * 10 = 560 — the column price (55) is a reference, so the charge is the cost plus
+        // the margin even when our price sits above the pump.
         ServerPricing.PackagePrice(pkg, 10m).Should().Be(560);
     }
 
@@ -207,9 +212,9 @@ public void TryPackagePrice_WithKnobs_IsTheSameNumberTheThrowingFormReturns()
     /// "590 vs 54" and looked profitable while the customer was being charged 11.80/litre against a
     /// 54/litre cost: a 42 UAH/litre loss on every litre, guard green.
     /// <para>
-    /// There is no stored total any more — the charge is always the rate x litres, capped by the
-    /// ceiling. This pins that the guard judges the same number the customer is charged, per litre
-    /// against per litre, and refuses the sale when the ceiling lands under cost.
+    /// There is no stored total any more — the charge is always the rate x litres. This pins that
+    /// the guard judges the same number the customer is charged, per litre against per litre, and
+    /// refuses the sale when a term discount takes it under what we paid.
     /// </para>
     /// </summary>
     [Fact]

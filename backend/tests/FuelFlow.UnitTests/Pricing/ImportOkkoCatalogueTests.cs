@@ -184,7 +184,7 @@ public sealed class ImportOkkoCatalogueTests : IDisposable
             // The price is the fuel's: the pump the operator set and the margin he set with it.
             PumpPricePerLiter = 60m,
             SupplierPricePerLiter = 49m,
-            MarginUahPerLiter = 2m, // 49 + 2 = the 51 the assertion below expects, under the 60 ceiling
+            MarginUahPerLiter = 2m, // 49 + 2 = the 51 the assertion below expects; the column price (60) is a reference
             AllowBelowCost = true,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
