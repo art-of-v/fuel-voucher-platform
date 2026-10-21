@@ -131,7 +131,7 @@ services:
       # --- Database (the self-hosted postgres service below) ---
       # The connection VERIFIES the server's certificate. The database presents one signed by
       # the CA in deploy/certs/postgres (deploy/ensure-postgres-tls.sh creates it, and the
-      # deploy job runs that script before this compose comes up). "Verify Full" is the whole
+      # deploy job runs that script before this compose comes up). "VerifyFull" is the whole
       # point: "Require" encrypts the session against anyone, and "Trust Server Certificate"
       # accepts any certificate at all - the data on this connection is the money and the
       # personal data, so the other side has to prove who it is.
@@ -139,7 +139,7 @@ services:
       # The startup guard refuses to boot a production build whose connection string says
       # otherwise (SecurityConfigurationValidator), so a managed database cannot inherit the
       # old default by accident.
-      Database__ConnectionString: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};SSL Mode=Verify Full;Root Certificate=/certs/ca.crt"
+      Database__ConnectionString: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};SSL Mode=VerifyFull;Root Certificate=/certs/ca.crt"
 
       # --- The connection-pool cap ---
       # One process opens SEVERAL pools against this database: the application's data source, the
@@ -601,7 +601,7 @@ services:
       - archive_command=test ! -f /var/lib/postgresql/wal/%f && cp %p /var/lib/postgresql/wal/%f
       # The server certificate, and the three lines that make Postgres present it. The client
       # verifies it against the CA in the same directory (the application mounts ca.crt and
-      # says "SSL Mode=Verify Full"), so the session is encrypted AND the other side proves
+      # says "SSL Mode=VerifyFull"), so the session is encrypted AND the other side proves
       # who it is - the connection carries the money and the personal data.
       #
       # The key is read-only to the server, and deploy/ensure-postgres-tls.sh gives it to the
