@@ -1,6 +1,7 @@
 using FuelFlow.Features.Ledger.SharedModels;
 using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Orders.SharedModels;
+using FuelFlow.Features.Acquiring;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.Features.Pricing.Terms.SharedModels;
 using FuelFlow.Features.Settlement.SharedModels;
@@ -357,6 +358,92 @@ public sealed class SchemaCommentTests
         Assert.Contains("restamp", comment, StringComparison.OrdinalIgnoreCase);
     }
 
+
+    /// <summary>
+    /// The tables where money meets the outside world: the acquirer's statement, the
+    /// acquirer's webhooks, and the errors the system kept.
+    /// </summary>
+    private static readonly (Type Entity, string[] Columns)[] TheIntegrationTables =
+    [
+        (typeof(MonobankStatementEntry),
+        [
+            nameof(MonobankStatementEntry.Merchant),
+            nameof(MonobankStatementEntry.StatementId),
+            nameof(MonobankStatementEntry.InvoiceId),
+            nameof(MonobankStatementEntry.Reference),
+            nameof(MonobankStatementEntry.Destination),
+            nameof(MonobankStatementEntry.AmountKopecks),
+            nameof(MonobankStatementEntry.Ccy),
+            nameof(MonobankStatementEntry.Status),
+            nameof(MonobankStatementEntry.AcquirerCreatedAtUtc),
+            nameof(MonobankStatementEntry.AcquirerModifiedAtUtc),
+            nameof(MonobankStatementEntry.ExtRef),
+            nameof(MonobankStatementEntry.MaskedCard),
+            nameof(MonobankStatementEntry.Rrn),
+            nameof(MonobankStatementEntry.ApprovalCode),
+            nameof(MonobankStatementEntry.RawPayload),
+            nameof(MonobankStatementEntry.FirstSeenAtUtc)
+        ]),
+        (typeof(WebhookEvent),
+        [
+            nameof(WebhookEvent.Provider),
+            nameof(WebhookEvent.ProviderEventId),
+            nameof(WebhookEvent.ProviderStatus),
+            nameof(WebhookEvent.InvoiceId),
+            nameof(WebhookEvent.AmountKopecks),
+            nameof(WebhookEvent.ProviderCreatedAtUtc),
+            nameof(WebhookEvent.ProviderModifiedAtUtc),
+            nameof(WebhookEvent.Payload),
+            nameof(WebhookEvent.Signature),
+            nameof(WebhookEvent.KeyId),
+            nameof(WebhookEvent.Status),
+            nameof(WebhookEvent.ReceivedAtUtc),
+            nameof(WebhookEvent.ProcessedAtUtc),
+            nameof(WebhookEvent.Attempts),
+            nameof(WebhookEvent.Error)
+        ]),
+        (typeof(ErrorLog),
+        [
+            nameof(ErrorLog.LoggedAtUtc),
+            nameof(ErrorLog.Level),
+            nameof(ErrorLog.Message),
+            nameof(ErrorLog.ExceptionType),
+            nameof(ErrorLog.ExceptionMessage),
+            nameof(ErrorLog.StackTrace),
+            nameof(ErrorLog.Source),
+            nameof(ErrorLog.RequestPath),
+            nameof(ErrorLog.RequestMethod),
+            nameof(ErrorLog.UserName),
+            nameof(ErrorLog.TraceId),
+            nameof(ErrorLog.ResolvedAtUtc),
+            nameof(ErrorLog.ResolvedByUserId),
+            nameof(ErrorLog.ResolvedByUserName)
+        ])
+    ];
+
+    [Fact]
+    public void The_Integration_Tables_Should_Say_What_They_Are()
+    {
+        var context = BuildContext();
+
+        foreach (var (entityType, columns) in TheIntegrationTables)
+        {
+            var entity = context.Model.FindEntityType(entityType);
+            Assert.NotNull(entity);
+
+            foreach (var column in columns)
+            {
+                var property = entity.FindProperty(column);
+                Assert.NotNull(property);
+
+                var comment = CommentOf(property);
+                Assert.False(string.IsNullOrWhiteSpace(comment),
+                    $"{entityType.Name}.{column} carries no comment. These are the tables where "
+                    + "money meets the outside world - and a column that is EVIDENCE (what the "
+                    + "acquirer said, what the customer typed) must not be mistaken for a key.");
+            }
+        }
+    }
 
     /// <summary>
     /// The comments of a property, read as the annotation they are stored as. The relational

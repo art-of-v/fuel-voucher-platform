@@ -31,43 +31,52 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime?>("AcquirerCreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("acquirer_created_at_utc");
+                        .HasColumnName("acquirer_created_at_utc")
+                        .HasComment("The financial operation time (the 'date' on the wire). The period the act filters on.");
 
                     b.Property<DateTime?>("AcquirerModifiedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("acquirer_modified_at_utc");
+                        .HasColumnName("acquirer_modified_at_utc")
+                        .HasComment("Kept, and empty. The documented statement payload carries one timestamp per row and noseparate modification time, so nothing populates this column today - it stays ratherthan being dropped so a future acquirer field does not need a migration to accept.");
 
                     b.Property<decimal?>("AmountKopecks")
                         .HasColumnType("numeric(14,0)")
-                        .HasColumnName("amount_kopecks");
+                        .HasColumnName("amount_kopecks")
+                        .HasComment("Kopecks, exactly as Monobank reports them - the acquirer's API speaks kopecks andnothing else, so this is a boundary value and is not converted on the way in.");
 
                     b.Property<string>("ApprovalCode")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
-                        .HasColumnName("approval_code");
+                        .HasColumnName("approval_code")
+                        .HasComment("The acquirer's approval code.");
 
                     b.Property<int?>("Ccy")
                         .HasColumnType("integer")
-                        .HasColumnName("ccy");
+                        .HasColumnName("ccy")
+                        .HasComment("The currency code, 980 for UAH.");
 
                     b.Property<string>("Destination")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
-                        .HasColumnName("destination");
+                        .HasColumnName("destination")
+                        .HasComment("The payment purpose as the acquirer shows it on the receipt. Evidence, and never a key,for the same reason.");
 
                     b.Property<string>("ExtRef")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
-                        .HasColumnName("ext_ref");
+                        .HasColumnName("ext_ref")
+                        .HasComment("The acquirer's own reference for the operation.");
 
                     b.Property<DateTime>("FirstSeenAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("first_seen_at_utc");
+                        .HasColumnName("first_seen_at_utc")
+                        .HasComment("When we first saw this row.");
 
                     b.Property<string>("InvoiceId")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
-                        .HasColumnName("invoice_id");
+                        .HasColumnName("invoice_id")
+                        .HasComment("The acquirer's invoice id, when the row carries one.");
 
                     b.Property<DateTime>("LastSeenAtUtc")
                         .HasColumnType("timestamp with time zone")
@@ -76,38 +85,45 @@ namespace FuelFlow.API.Migrations
                     b.Property<string>("MaskedCard")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
-                        .HasColumnName("masked_card");
+                        .HasColumnName("masked_card")
+                        .HasComment("The card, masked by the acquirer.");
 
                     b.Property<string>("Merchant")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
-                        .HasColumnName("merchant");
+                        .HasColumnName("merchant")
+                        .HasComment("Which merchant's statement this came from. The same acquirer id can exist on bothmerchants, so the unique key is scoped by merchant rather than by id alone.");
 
                     b.Property<string>("RawPayload")
                         .HasColumnType("text")
-                        .HasColumnName("raw_payload");
+                        .HasColumnName("raw_payload")
+                        .HasComment("The statement row exactly as received.");
 
                     b.Property<string>("Reference")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
-                        .HasColumnName("reference");
+                        .HasColumnName("reference")
+                        .HasComment("Our reference, echoed back. Evidence, NOT a key - the same string appears on thousandsof unrelated payments, and a match key built on it would match a customer's own memo tosomebody else's invoice.");
 
                     b.Property<string>("Rrn")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
-                        .HasColumnName("rrn");
+                        .HasColumnName("rrn")
+                        .HasComment("The acquirer's retrieval reference number.");
 
                     b.Property<string>("StatementId")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
-                        .HasColumnName("statement_id");
+                        .HasColumnName("statement_id")
+                        .HasComment("The key this row is filed under. OURS, composed from what the acquirer sends - thestatement carries no id of its own - and stable across re-fetches of the same period,which is what makes re-importing a month idempotent. It is printed in the act anaccountant signs, so it is readable rather than a hash.");
 
                     b.Property<string>("Status")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
-                        .HasColumnName("status");
+                        .HasColumnName("status")
+                        .HasComment("The acquirer-side status, in the acquirer's vocabulary.");
 
                     b.HasKey("Id");
 
@@ -3218,76 +3234,91 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<decimal?>("AmountKopecks")
                         .HasColumnType("numeric(14,0)")
-                        .HasColumnName("amount_kopecks");
+                        .HasColumnName("amount_kopecks")
+                        .HasComment("Kopecks, as reported. Evidence of what was charged, independent of our price.");
 
                     b.Property<int>("Attempts")
                         .HasColumnType("integer")
-                        .HasColumnName("attempts");
+                        .HasColumnName("attempts")
+                        .HasComment("Deliveries seen for this event. Above 1 means the acquirer retried us.");
 
                     b.Property<string>("Error")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
-                        .HasColumnName("error");
+                        .HasColumnName("error")
+                        .HasComment("Why processing failed, when it did.");
 
                     b.Property<string>("InvoiceId")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
-                        .HasColumnName("invoice_id");
+                        .HasColumnName("invoice_id")
+                        .HasComment("The acquirer's invoice id. Indexed, because every question about an event starts there.");
 
                     b.Property<string>("KeyId")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
-                        .HasColumnName("key_id");
+                        .HasColumnName("key_id")
+                        .HasComment("Which key the signature was made with.");
 
                     b.Property<string>("Payload")
                         .IsRequired()
                         .HasColumnType("jsonb")
-                        .HasColumnName("payload");
+                        .HasColumnName("payload")
+                        .HasComment("The body exactly as received.");
 
                     b.Property<DateTime?>("ProcessedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("processed_at_utc");
+                        .HasColumnName("processed_at_utc")
+                        .HasComment("When processing finished. NULL while a delivery is still outstanding.");
 
                     b.Property<string>("Provider")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
-                        .HasColumnName("provider");
+                        .HasColumnName("provider")
+                        .HasComment("The vendor token, lowercase: 'monobank'.");
 
                     b.Property<DateTime?>("ProviderCreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("provider_created_at_utc");
+                        .HasColumnName("provider_created_at_utc")
+                        .HasComment("When the acquirer says the event happened.");
 
                     b.Property<string>("ProviderEventId")
                         .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)")
-                        .HasColumnName("provider_event_id");
+                        .HasColumnName("provider_event_id")
+                        .HasComment("The provider's identity for this event, or our stable derivation of it where theprovider supplies none. Unique with the provider: that pair is what makes a REDELIVERYimpossible rather than merely ignored.");
 
                     b.Property<DateTime?>("ProviderModifiedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("provider_modified_at_utc");
+                        .HasColumnName("provider_modified_at_utc")
+                        .HasComment("When the acquirer last changed it.");
 
                     b.Property<string>("ProviderStatus")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
-                        .HasColumnName("provider_status");
+                        .HasColumnName("provider_status")
+                        .HasComment("The acquirer's status word - 'success', 'failure', 'reversed', 'expired' - in its ownvocabulary, kept exactly as sent rather than mapped onto our status enum. The wholereason a stored event is worth storing is that it says what THEY said.");
 
                     b.Property<DateTime>("ReceivedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("received_at_utc");
+                        .HasColumnName("received_at_utc")
+                        .HasComment("When we received it. Our clock, and the one thing here we are the authority on.");
 
                     b.Property<string>("Signature")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
-                        .HasColumnName("signature");
+                        .HasColumnName("signature")
+                        .HasComment("The signature header, so a stored delivery can be re-verified later without the request.");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)")
-                        .HasColumnName("status");
+                        .HasColumnName("status")
+                        .HasComment("Where our processing of the delivery stands.");
 
                     b.HasKey("Id");
 
@@ -3625,70 +3656,84 @@ namespace FuelFlow.API.Migrations
                     b.Property<string>("ExceptionMessage")
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)")
-                        .HasColumnName("exception_message");
+                        .HasColumnName("exception_message")
+                        .HasComment("The exception's message, when there was one.");
 
                     b.Property<string>("ExceptionType")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
-                        .HasColumnName("exception_type");
+                        .HasColumnName("exception_type")
+                        .HasComment("The exception's type, when there was one.");
 
                     b.Property<string>("Level")
                         .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)")
-                        .HasColumnName("level");
+                        .HasColumnName("level")
+                        .HasComment("How bad it was - information, warning, error, critical.");
 
                     b.Property<DateTime>("LoggedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("logged_at_utc");
+                        .HasColumnName("logged_at_utc")
+                        .HasComment("When the error was logged.");
 
                     b.Property<string>("Message")
                         .IsRequired()
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)")
-                        .HasColumnName("message");
+                        .HasColumnName("message")
+                        .HasComment("The log message, in one line.");
 
                     b.Property<string>("RequestMethod")
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)")
-                        .HasColumnName("request_method");
+                        .HasColumnName("request_method")
+                        .HasComment("The method of that request.");
 
                     b.Property<string>("RequestPath")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
-                        .HasColumnName("request_path");
+                        .HasColumnName("request_path")
+                        .HasComment("The path of the request that failed, when it was a request.");
 
                     b.Property<DateTime?>("ResolvedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("resolved_at_utc");
+                        .HasColumnName("resolved_at_utc")
+                        .HasComment("When staff ACKNOWLEDGED this error as handled, or NULL while it is still outstanding. Afault is only 'resolved' once a human says so - the log cannot tell whether a deploymentfixed the cause.");
 
                     b.Property<Guid?>("ResolvedByUserId")
                         .HasColumnType("uuid")
-                        .HasColumnName("resolved_by_user_id");
+                        .HasColumnName("resolved_by_user_id")
+                        .HasComment("Who acknowledged it.");
 
                     b.Property<string>("ResolvedByUserName")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
-                        .HasColumnName("resolved_by_user_name");
+                        .HasColumnName("resolved_by_user_name")
+                        .HasComment("Their name at the time.");
 
                     b.Property<string>("Source")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
-                        .HasColumnName("source");
+                        .HasColumnName("source")
+                        .HasComment("Where the error came from - the logger's source, or the component that raised it.");
 
                     b.Property<string>("StackTrace")
                         .HasColumnType("text")
-                        .HasColumnName("stack_trace");
+                        .HasColumnName("stack_trace")
+                        .HasComment("The stack, when there was one. The longest column in the table, and the one that fillsit.");
 
                     b.Property<string>("TraceId")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
-                        .HasColumnName("trace_id");
+                        .HasColumnName("trace_id")
+                        .HasComment("The W3C trace id of the activity that was current when the record was logged. One failedrequest emits SEVERAL records - request logging, the global handler, the featurehandler, EF Core - and this is what lets the admin log group them back into a singleincident. NULL for records logged outside any activity: startup, shutdown, backgroundjobs.");
 
                     b.Property<string>("UserName")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
-                        .HasColumnName("user_name");
+                        .HasColumnName("user_name")
+                        .HasComment("The user the request was made by, when we know who it was.");
 
                     b.HasKey("Id");
 
