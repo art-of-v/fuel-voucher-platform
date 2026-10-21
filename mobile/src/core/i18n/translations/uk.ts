@@ -606,6 +606,7 @@ export const uk: Record<string, string> = {
   'notifications.expand': 'Показати повністю',
   'notifications.collapse': 'Згорнути',
   'notifications.openOrder': 'Відкрити замовлення',
+  'notifications.openFuel': 'Відкрити паливо',
   'notifications.time.justNow': 'щойно',
   'notifications.time.minutes': '{0} хв тому',
   'notifications.time.hours': '{0} год тому',

@@ -28,6 +28,10 @@ export default function NotificationsScreen() {
   const { t } = useI18n();
   const { isAuthenticated: hookAuth, isLoading: authLoading } = useAuth();
   const storeAuth = useStore((s) => s.isAuthenticated);
+  // Switching the account context is what makes a worker notification land in the right
+  // company: a worker may work for several companies (W1), so the context cannot come from
+  // wherever the app happened to be.
+  const setCurrentContext = useStore((s) => s.setCurrentContext);
   // A tap reveals the message; it does not navigate away. See the ListItem below.
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
   const isAuthenticated = storeAuth || hookAuth;
@@ -122,7 +126,15 @@ export default function NotificationsScreen() {
           const unread = !n.isRead;
           // The order id rides inside the message text: the collapsed row drops the
           // whole fragment, the expanded one shows the message verbatim.
-          const { orderId, preview } = parseOrderNotification(n.message);
+          const { orderId: scrapedOrderId, preview } = parseOrderNotification(n.message);
+          // The structured id wins. The copy may be reworded, and a row that points at an
+          // order should not depend on the order id still being spelled out in a sentence.
+          // The scraped one is the fallback for a row written before the type existed.
+          const orderId = n.orderId ?? scrapedOrderId;
+          // The company a "fuel was issued to you" row opens. Null for every other row, and
+          // null for one that names no company - there is nothing to open, and guessing would
+          // show a worker somebody else's fuel.
+          const workerCompanyId = n.type === 'voucher_issued' ? n.legalEntityId : null;
           const expanded = expandedId === n.id;
           return (
             <View key={n.id}>
@@ -180,6 +192,20 @@ export default function NotificationsScreen() {
                       size="sm"
                       label={t('notifications.openOrder')}
                       onPress={() => router.push({ pathname: '/my-codes', params: { orderId } })}
+                    />
+                  ) : null}
+                  {workerCompanyId ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      label={t('notifications.openFuel')}
+                      onPress={() => {
+                        // Switch first, then navigate: the wallet reads the context when it
+                        // renders, so navigating first would open the context that was active
+                        // before - a worker's own fuel, or somebody else's.
+                        setCurrentContext(workerCompanyId);
+                        router.push('/my-codes');
+                      }}
                     />
                   ) : null}
                   <Button

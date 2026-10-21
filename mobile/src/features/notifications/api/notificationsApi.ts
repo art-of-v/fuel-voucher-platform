@@ -1,5 +1,5 @@
 import { apiFetch } from '../../../core/api/apiClient';
-import type { AppNotification, MarkNotificationReadResult } from '../types';
+import type { AppNotification, MarkNotificationReadResult, NotificationType } from '../types';
 
 /**
  * The caller's own notifications, newest-first. A 401 is treated as "logged
@@ -32,5 +32,17 @@ function mapNotification(n: any): AppNotification {
     message: n.message ?? '',
     isRead: n.isRead ?? false,
     createdAt: n.createdAt ?? n.createdAtUtc ?? '',
+    type: toNotificationType(n.type),
+    legalEntityId: n.legalEntityId ?? null,
+    orderId: n.orderId ?? null,
   };
+}
+
+/**
+ * A type this build does not know reads as `generic`: it is a row the customer still reads,
+ * it is simply a row this build cannot route. A row written before the type existed has
+ * none at all, and it means the same thing.
+ */
+function toNotificationType(value: unknown): NotificationType {
+  return value === 'order_fulfilled' || value === 'voucher_issued' ? value : 'generic';
 }

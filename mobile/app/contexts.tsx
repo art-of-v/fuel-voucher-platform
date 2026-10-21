@@ -85,8 +85,10 @@ export default function ContextsScreen() {
   });
 
   // Companies the user works for (epic #103 S5). A company they own is listed above
-  // with owner rights, so it is not repeated here; `membership.isOwner` covers the
-  // overlap the backend reports.
+  // with owner rights, so it is not repeated here; the overlap is settled by the
+  // owned-id set, because the list of owned companies is what the screen renders
+  // the owner rows from. The role itself is resolved in `resolveContext`, which
+  // checks the owned list first.
   const { memberships } = useMemberships();
   const ownedIds = new Set(companies.map((c) => c.id));
   const workerCompanies = memberships.filter((m) => !ownedIds.has(m.legalEntityId));
