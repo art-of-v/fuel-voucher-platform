@@ -143,10 +143,10 @@ public sealed class AdminSettingsController : ControllerBase
         // the `Min(...)` across pools existed because two pools of one fuel could be priced apart,
         // and now they cannot.
         //
-        // Materialised before the projection, because the customer price is not a column any more: it
-        // is `cost + profit` over two nullable columns, which SQL cannot
-        // express through the one function that owns it. The row count is one per fuel - 25 on
-        // production - so this is a list, not a scan.
+        // Materialised before the projection, because the customer price is not a column any more:
+        // it is `cost + profit` over two nullable columns, and the decision that a missing knob
+        // means "no price of ours" belongs to the one function that owns it. The row count is one
+        // per fuel - 25 on production - so this is a list, not a scan.
         var priced = (await _context.FuelTypes
                 .AsNoTracking()
                 .ToListAsync(cancellationToken))
