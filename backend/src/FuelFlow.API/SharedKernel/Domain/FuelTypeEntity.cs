@@ -61,7 +61,26 @@ public sealed class FuelTypeEntity
     /// </remarks>
     public string? BrandFuelCode { get; set; }
     public decimal BasePrice { get; set; }
-    public decimal DiscountPrice { get; set; }
+
+    /// <summary>
+    /// What the customer pays per litre. NULL means it is not set: the grade is in the
+    /// catalogue and nobody has priced it yet.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A price of zero is a price, and a price of zero means the customer takes the fuel for
+    /// nothing. So "not priced yet" is NULL and never 0 - the same way the neighbouring cost
+    /// says it, and the reason this column is nullable at all.
+    /// </para>
+    /// <para>
+    /// The catalogue import is what leaves a grade unpriced, and it leaves it as NULL: the pump
+    /// publishes a price, the cost and the margin are not known, and until an operator sets a
+    /// margin there is no customer price to quote. A grade with no price is not on the shelf -
+    /// its computed price is null and the storefront does not list a package with no price - so
+    /// nothing reaches a customer at 0.
+    /// </para>
+    /// </remarks>
+    public decimal? DiscountPrice { get; set; }
 
     /// <summary>
     /// Manager standing opt-in: allow this brand+fuel to be priced and sold BELOW blended

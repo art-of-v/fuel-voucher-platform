@@ -22,7 +22,7 @@ public sealed record PublicFuelTypeResponse(
     string BrandSlug,
     string Name,
     decimal BasePrice,
-    decimal DiscountPrice,
+    decimal? DiscountPrice,
     /// <summary>
     /// What the network charges at the pump - the column price. Null when it is not known.
     /// </summary>

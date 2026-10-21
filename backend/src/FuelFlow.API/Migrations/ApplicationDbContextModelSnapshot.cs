@@ -3963,10 +3963,10 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_at_utc");
 
-                    b.Property<decimal>("DiscountPrice")
+                    b.Property<decimal?>("DiscountPrice")
                         .HasColumnType("numeric(12,2)")
                         .HasColumnName("discount_price")
-                        .HasComment("What the customer pays per litre. While the fuel is unpriced it equals the column price, because a fuel with no stated cost has no price of its own.");
+                        .HasComment("What the customer pays per litre. NULL means it is not set: the grade is in the catalogue and nobody has priced it yet. A price of zero is a price, and a price of zero means the customer takes the fuel for nothing - so the unset state is NULL and never 0.");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
@@ -4044,7 +4044,7 @@ namespace FuelFlow.API.Migrations
 
                             t.HasCheckConstraint("ck_fuel_types_name_length", "length(name) <= 200");
 
-                            t.HasCheckConstraint("ck_fuel_types_prices_non_negative", "base_price >= 0 AND discount_price >= 0");
+                            t.HasCheckConstraint("ck_fuel_types_prices_non_negative", "base_price >= 0 AND (discount_price IS NULL OR discount_price > 0)");
 
                             t.HasCheckConstraint("ck_fuel_types_pricing_knobs_non_negative", "(supplier_price_per_liter IS NULL OR supplier_price_per_liter >= 0) AND (pump_price_per_liter IS NULL OR pump_price_per_liter >= 0) AND (min_discount_per_liter IS NULL OR min_discount_per_liter >= 0)");
                         });

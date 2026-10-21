@@ -100,23 +100,22 @@ public sealed class CatalogueReferentialIntegrityTests : IClassFixture<TestDatab
     }
 
     [Fact]
-    public async Task A_Zero_Discount_Price_Is_Allowed()
+    public async Task An_Unset_Discount_Price_Is_Null_And_Is_Allowed()
     {
-        // Zero is a price state, not a violation. A grade the network lists but nobody has priced
-        // yet has a published pump price, no cost and no margin, and a discount price of 0 - which
-        // is exactly what the OKKO catalogue import leaves behind, and exactly what
-        // UnpricedPackageIntegrationTests.A_Nominal_With_Neither_Rate_Nor_Margin_Is_Not_Charged
-        // builds. A row-level CHECK that forbade it would refuse every grade the catalogue sync
-        // creates.
+        // "Not priced yet" is an empty column, and that is what the cost beside it has always
+        // said. A grade the network lists but nobody has priced yet has a published pump price, no
+        // cost and no margin - and no customer price, because the customer price is what an
+        // operator sets when they set a margin. The OKKO catalogue import leaves exactly that
+        // behind, and UnpricedPackageIntegrationTests.A_Nominal_With_Neither_Rate_Nor_Margin_Is_Not_Charged
+        // builds it.
         //
-        // What keeps such a grade off the shelf is not the column: its price computes to null,
-        // and the storefront does not list a package with no price. This test is here so that the
-        // next person to "fix" the zero does not have to rediscover that.
+        // A grade with no price is not on the shelf: its price computes to null, and the
+        // storefront does not list a package with no price.
         await using var context = CreateContext();
         var brandId = await SeededBrand(context);
 
         var fuel = NewFuel("catalogue-unpriced", brandId);
-        fuel.DiscountPrice = 0m;
+        fuel.DiscountPrice = null;
         fuel.PumpPricePerLiter = 92.90m;
 
         await context.Set<FuelTypeEntity>().AddAsync(fuel);
@@ -124,17 +123,30 @@ public sealed class CatalogueReferentialIntegrityTests : IClassFixture<TestDatab
 
         await act.Should().NotThrowAsync();
 
+        (await context.Set<FuelTypeEntity>()
+            .IgnoreQueryFilters()
+            .SingleAsync(f => f.Id == ToUuid("catalogue-unpriced"))).DiscountPrice
+            .Should().BeNull("an unset price stays unset");
+
         await context.Set<FuelTypeEntity>().Where(f => f.Id == ToUuid("catalogue-unpriced")).ExecuteDeleteAsync();
     }
 
     [Fact]
-    public async Task A_Negative_Discount_Price_Is_Refused()
+    public async Task A_Zero_Discount_Price_Is_Refused()
     {
+        // A price of zero is a price, and a price of zero means the customer takes the fuel for
+        // nothing. The unset state is NULL, so a zero is a mistake and the database says so.
+        //
+        // This is the business's call (2026-10-21). It reverses what this file used to say: the
+        // zero was the catalogue import's placeholder for "not priced yet", and the column now
+        // carries that state as an empty column instead - which is what its neighbour, the cost,
+        // has always done.
         await using var context = CreateContext();
         var brandId = await SeededBrand(context);
 
-        var fuel = NewFuel("catalogue-negative-price", brandId);
-        fuel.DiscountPrice = -1m;
+        var fuel = NewFuel("catalogue-zero-price", brandId);
+        fuel.DiscountPrice = 0m;
+        fuel.PumpPricePerLiter = 92.90m;
 
         var act = async () => { context.Set<FuelTypeEntity>().Add(fuel); await context.SaveChangesAsync(); };
 
@@ -150,7 +162,7 @@ public sealed class CatalogueReferentialIntegrityTests : IClassFixture<TestDatab
         var fuel = NewFuel("catalogue-positive-price", brandId);
         fuel.DiscountPrice = 1m;
 
-        await context.Set<FuelTypeEntity>().AddAsync(fuel);
+        context.Set<FuelTypeEntity>().Add(fuel);
         await context.SaveChangesAsync();
 
         (await context.Set<FuelTypeEntity>()

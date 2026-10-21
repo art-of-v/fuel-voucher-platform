@@ -48,7 +48,7 @@ public sealed class UnpricedPackageIntegrationTests : IClassFixture<TestDatabase
             Name = "Unpriced test fuel",
             BrandId = BrandIds.Okko,
             BasePrice = 0m,
-            DiscountPrice = 0m,
+            DiscountPrice = null,
             // What the OKKO catalogue import leaves behind: the pump is published, nobody has set a
             // cost or a margin, so there is no price to charge.
             PumpPricePerLiter = 92.90m,
