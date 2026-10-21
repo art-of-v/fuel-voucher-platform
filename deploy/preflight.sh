@@ -223,6 +223,46 @@ check_env_file() {
 }
 
 # ------------------------------------------------------------------------------
+# The two environments must not share the voucher QR cipher key.
+#
+# The key encrypts the redeemable QR payload of every voucher at rest, and it is
+# the ONLY thing that can read it. Until 2026-10-21 staging used production's
+# key, so anyone who reached staging - behind an HTTP Basic credential, on the
+# same host - could decrypt production's vouchers. The keys are separate now.
+#
+# The check is here because the failure mode is a copy-paste of one value into
+# the other file, and nothing else would notice: the application starts happily
+# with either key, and a voucher that cannot be decrypted shows up much later as
+# an operator staring at a QR that will not scan.
+#
+# A literal scan, like the env-file check above: sourcing the file would execute
+# it, and these files hold secrets.
+# ------------------------------------------------------------------------------
+check_qr_key_separation() {
+  local prod_file=".env" staging_file=".env.staging"
+
+  if [[ ! -f "$prod_file" || ! -f "$staging_file" ]]; then
+    warn "one of the two env files is missing (skipping the QR cipher key separation check)"
+    return 0
+  fi
+
+  local prod_key staging_key
+  prod_key="$(grep -E '^QR_CIPHER_KEY=' "$prod_file" | head -1 | cut -d= -f2-)"
+  staging_key="$(grep -E '^QR_CIPHER_KEY=' "$staging_file" | head -1 | cut -d= -f2-)"
+
+  if [[ -z "$prod_key" || -z "$staging_key" ]]; then
+    warn "one of the two env files has no QR_CIPHER_KEY (skipping the separation check)"
+    return 0
+  fi
+
+  if [[ "$prod_key" == "$staging_key" ]]; then
+    fail "production and staging share the same QR_CIPHER_KEY. It encrypts every voucher's redeemable payload, so anyone who reaches staging can decrypt production's vouchers. Generate a different one for staging (openssl rand -base64 32) and put it in .env.staging - the two are not interchangeable, and the staging database holds no vouchers that would need re-encrypting."
+  fi
+
+  echo "  .env and .env.staging: the QR cipher keys differ"
+}
+
+# ------------------------------------------------------------------------------
 # The staging basic-auth hash reaches caddy as a well-formed bcrypt hash.
 #
 # `caddy validate` above catches a value that is not a hash at all - it reads one
@@ -289,6 +329,8 @@ echo "== env files =="
 if [[ "$NO_DEFAULTS" -eq 0 ]]; then
   check_env_file .env required
   check_env_file .env.staging optional
+  # The two environments must not share the voucher QR cipher key - see the function.
+  check_qr_key_separation
 fi
 for extra in ${EXTRA_ENV_FILES+"${EXTRA_ENV_FILES[@]}"}; do
   check_env_file "$extra" optional
