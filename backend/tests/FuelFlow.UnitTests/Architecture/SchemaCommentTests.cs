@@ -1,4 +1,5 @@
 using FuelFlow.Features.Ledger.SharedModels;
+using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Payments.SharedModels;
 using FuelFlow.Features.Pricing.Terms.SharedModels;
@@ -271,6 +272,90 @@ public sealed class SchemaCommentTests
         Assert.Contains("NULL", acquirer, StringComparison.OrdinalIgnoreCase);
     }
 
+
+
+    /// <summary>
+    /// The ledger and the custody: the tables the accountant reads, and the one that answers
+    /// "where is this paper".
+    /// </summary>
+    private static readonly (Type Entity, string[] Columns)[] TheLedgerTables =
+    [
+        (typeof(VoucherMovement),
+        [
+            nameof(VoucherMovement.BatchId),
+            nameof(VoucherMovement.Kind),
+            nameof(VoucherMovement.VoucherId),
+            nameof(VoucherMovement.FromLocation),
+            nameof(VoucherMovement.ToLocation),
+            nameof(VoucherMovement.OrderId),
+            nameof(VoucherMovement.ActorKind),
+            nameof(VoucherMovement.ActorUserId),
+            nameof(VoucherMovement.ActorPartyId),
+            nameof(VoucherMovement.AmountUah),
+            nameof(VoucherMovement.CostDeltaUah),
+            nameof(VoucherMovement.OccurredAtUtc),
+            nameof(VoucherMovement.Reason),
+            nameof(VoucherMovement.LineItemId)
+        ]),
+        (typeof(ChartOfAccount),
+        [
+            nameof(ChartOfAccount.Code),
+            nameof(ChartOfAccount.NameUkr),
+            nameof(ChartOfAccount.AccountType),
+            nameof(ChartOfAccount.NormalBalance),
+            nameof(ChartOfAccount.ParentId),
+            nameof(ChartOfAccount.IsPostable),
+            nameof(ChartOfAccount.IsActive)
+        ]),
+        (typeof(AccountingPeriod),
+        [
+            nameof(AccountingPeriod.PeriodStart),
+            nameof(AccountingPeriod.PeriodEnd),
+            nameof(AccountingPeriod.Status),
+            nameof(AccountingPeriod.ClosedAtUtc),
+            nameof(AccountingPeriod.ClosedByUserId)
+        ])
+    ];
+
+    [Fact]
+    public void The_Ledger_And_The_Custody_Should_Say_What_They_Are()
+    {
+        var context = BuildContext();
+
+        foreach (var (entityType, columns) in TheLedgerTables)
+        {
+            var entity = context.Model.FindEntityType(entityType);
+            Assert.NotNull(entity);
+
+            foreach (var column in columns)
+            {
+                var property = entity.FindProperty(column);
+                Assert.NotNull(property);
+
+                var comment = CommentOf(property);
+                Assert.False(string.IsNullOrWhiteSpace(comment),
+                    $"{entityType.Name}.{column} carries no comment. The ledger is what the "
+                    + "accountant reads and the custody is what answers 'where is this paper' - "
+                    + "and the column names alone do not say which is which.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// The cost delta is recorded at the time, and that is the whole point of it.
+    /// </summary>
+    [Fact]
+    public void The_Cost_Delta_Should_Say_Why_It_Is_Recorded()
+    {
+        var context = BuildContext();
+        var movement = context.Model.FindEntityType(typeof(VoucherMovement));
+        Assert.NotNull(movement);
+
+        var comment = CommentOf(movement.FindProperty(nameof(VoucherMovement.CostDeltaUah))!);
+
+        Assert.Contains("NULL", comment, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("restamp", comment, StringComparison.OrdinalIgnoreCase);
+    }
 
 
     /// <summary>

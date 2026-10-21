@@ -124,16 +124,25 @@ internal sealed class JournalLineConfiguration : IEntityTypeConfiguration<Journa
         builder.HasKey(e => e.Id);
         builder.Property(e => e.Id).HasColumnName("id");
 
-        builder.Property(e => e.EntryId).HasColumnName("entry_id").IsRequired();
-        builder.Property(e => e.LineNo).HasColumnName("line_no").IsRequired();
-        builder.Property(e => e.AccountId).HasColumnName("account_id").IsRequired();
-        builder.Property(e => e.PartyId).HasColumnName("party_id");
+        builder.Property(e => e.EntryId).HasColumnName("entry_id").IsRequired()
+            .HasComment(                "The entry this line belongs to.");
+        builder.Property(e => e.LineNo).HasColumnName("line_no").IsRequired()
+            .HasComment(                "The line's number within its entry.");
+        builder.Property(e => e.AccountId).HasColumnName("account_id").IsRequired()
+            .HasComment(                "The account this line posts to.");
+        builder.Property(e => e.PartyId).HasColumnName("party_id")
+            .HasComment(                "The counterparty, for the subledger. NULL when the posting has no counterparty.");
         // offer_id is gone with the offer (2026-10-19) - see the note where its foreign key was.
-        builder.Property(e => e.LegalEntityId).HasColumnName("legal_entity_id");
-        builder.Property(e => e.VoucherId).HasColumnName("voucher_id");
-        builder.Property(e => e.QuantityLiters).HasColumnName("quantity_liters").HasPrecision(10, 2);
-        builder.Property(e => e.DebitUah).HasColumnName("debit_uah").HasPrecision(14, 2).HasDefaultValue(0m).IsRequired();
-        builder.Property(e => e.CreditUah).HasColumnName("credit_uah").HasPrecision(14, 2).HasDefaultValue(0m).IsRequired();
+        builder.Property(e => e.LegalEntityId).HasColumnName("legal_entity_id")
+            .HasComment(                "The company the line belongs to. Keyed on id until D-02 re-keys it to party_id.");
+        builder.Property(e => e.VoucherId).HasColumnName("voucher_id")
+            .HasComment(                "The voucher the line is about, where the line is about one.");
+        builder.Property(e => e.QuantityLiters).HasColumnName("quantity_liters").HasPrecision(10, 2)
+            .HasComment(                "The litres the line moves, for the subledger. NULL when the line moves no fuel.");
+        builder.Property(e => e.DebitUah).HasColumnName("debit_uah").HasPrecision(14, 2).HasDefaultValue(0m).IsRequired()
+            .HasComment(                "The amount this line debits, in UAH.");
+        builder.Property(e => e.CreditUah).HasColumnName("credit_uah").HasPrecision(14, 2).HasDefaultValue(0m).IsRequired()
+            .HasComment(                "The amount this line credits, in UAH.");
 
         builder.HasIndex(e => new { e.EntryId, e.LineNo }).IsUnique();
         builder.HasIndex(e => e.AccountId);

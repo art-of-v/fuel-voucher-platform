@@ -784,19 +784,23 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime?>("ClosedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("closed_at_utc");
+                        .HasColumnName("closed_at_utc")
+                        .HasComment("When the period was closed. NULL while it is open.");
 
                     b.Property<Guid?>("ClosedByUserId")
                         .HasColumnType("uuid")
-                        .HasColumnName("closed_by_user_id");
+                        .HasColumnName("closed_by_user_id")
+                        .HasComment("Who closed it.");
 
                     b.Property<DateOnly>("PeriodEnd")
                         .HasColumnType("date")
-                        .HasColumnName("period_end");
+                        .HasColumnName("period_end")
+                        .HasComment("The last day of the period.");
 
                     b.Property<DateOnly>("PeriodStart")
                         .HasColumnType("date")
-                        .HasColumnName("period_start");
+                        .HasColumnName("period_start")
+                        .HasComment("The first day of the period.");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -804,7 +808,8 @@ namespace FuelFlow.API.Migrations
                         .HasMaxLength(8)
                         .HasColumnType("character varying(8)")
                         .HasDefaultValue("Open")
-                        .HasColumnName("status");
+                        .HasColumnName("status")
+                        .HasComment("Whether the period is open or closed.");
 
                     b.HasKey("Id");
 
@@ -903,41 +908,48 @@ namespace FuelFlow.API.Migrations
                         .IsRequired()
                         .HasMaxLength(12)
                         .HasColumnType("character varying(12)")
-                        .HasColumnName("account_type");
+                        .HasColumnName("account_type")
+                        .HasComment("What kind of account this is: an asset, a liability, income or expense.");
 
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)")
-                        .HasColumnName("code");
+                        .HasColumnName("code")
+                        .HasComment("The account number as the accountant writes it, e.g. 7911.");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(true)
-                        .HasColumnName("is_active");
+                        .HasColumnName("is_active")
+                        .HasComment("Whether the account is in use. A retired account stays, because entries point at it.");
 
                     b.Property<bool>("IsPostable")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(true)
-                        .HasColumnName("is_postable");
+                        .HasColumnName("is_postable")
+                        .HasComment("Whether entries may post to this account.");
 
                     b.Property<string>("NameUkr")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
-                        .HasColumnName("name_ukr");
+                        .HasColumnName("name_ukr")
+                        .HasComment("The account's name, in Ukrainian.");
 
                     b.Property<string>("NormalBalance")
                         .IsRequired()
                         .HasMaxLength(6)
                         .HasColumnType("character varying(6)")
-                        .HasColumnName("normal_balance");
+                        .HasColumnName("normal_balance")
+                        .HasComment("Which side the account normally carries: a debit or a credit.");
 
                     b.Property<Guid?>("ParentId")
                         .HasColumnType("uuid")
-                        .HasColumnName("parent_id");
+                        .HasColumnName("parent_id")
+                        .HasComment("The account this one rolls up into.");
 
                     b.HasKey("Id");
 
@@ -1130,46 +1142,55 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<Guid>("AccountId")
                         .HasColumnType("uuid")
-                        .HasColumnName("account_id");
+                        .HasColumnName("account_id")
+                        .HasComment("The account this line posts to.");
 
                     b.Property<decimal>("CreditUah")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(14, 2)
                         .HasColumnType("numeric(14,2)")
                         .HasDefaultValue(0m)
-                        .HasColumnName("credit_uah");
+                        .HasColumnName("credit_uah")
+                        .HasComment("The amount this line credits, in UAH.");
 
                     b.Property<decimal>("DebitUah")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(14, 2)
                         .HasColumnType("numeric(14,2)")
                         .HasDefaultValue(0m)
-                        .HasColumnName("debit_uah");
+                        .HasColumnName("debit_uah")
+                        .HasComment("The amount this line debits, in UAH.");
 
                     b.Property<Guid>("EntryId")
                         .HasColumnType("uuid")
-                        .HasColumnName("entry_id");
+                        .HasColumnName("entry_id")
+                        .HasComment("The entry this line belongs to.");
 
                     b.Property<Guid?>("LegalEntityId")
                         .HasColumnType("uuid")
-                        .HasColumnName("legal_entity_id");
+                        .HasColumnName("legal_entity_id")
+                        .HasComment("The company the line belongs to. Keyed on id until D-02 re-keys it to party_id.");
 
                     b.Property<short>("LineNo")
                         .HasColumnType("smallint")
-                        .HasColumnName("line_no");
+                        .HasColumnName("line_no")
+                        .HasComment("The line's number within its entry.");
 
                     b.Property<Guid?>("PartyId")
                         .HasColumnType("uuid")
-                        .HasColumnName("party_id");
+                        .HasColumnName("party_id")
+                        .HasComment("The counterparty, for the subledger. NULL when the posting has no counterparty.");
 
                     b.Property<decimal?>("QuantityLiters")
                         .HasPrecision(10, 2)
                         .HasColumnType("numeric(10,2)")
-                        .HasColumnName("quantity_liters");
+                        .HasColumnName("quantity_liters")
+                        .HasComment("The litres the line moves, for the subledger. NULL when the line moves no fuel.");
 
                     b.Property<Guid?>("VoucherId")
                         .HasColumnType("uuid")
-                        .HasColumnName("voucher_id");
+                        .HasColumnName("voucher_id")
+                        .HasComment("The voucher the line is about, where the line is about one.");
 
                     b.HasKey("Id");
 
@@ -2630,66 +2651,80 @@ namespace FuelFlow.API.Migrations
                         .HasMaxLength(12)
                         .HasColumnType("character varying(12)")
                         .HasDefaultValue("system")
-                        .HasColumnName("actor_kind");
+                        .HasColumnName("actor_kind")
+                        .HasComment("Who caused it: a person, or the scheduler. See VoucherActorKinds.");
 
                     b.Property<Guid?>("ActorPartyId")
                         .HasColumnType("uuid")
-                        .HasColumnName("actor_party_id");
+                        .HasColumnName("actor_party_id")
+                        .HasComment("The company that caused the movement, when it was a company rather than a user. A bareuuid.");
 
                     b.Property<Guid?>("ActorUserId")
                         .HasColumnType("uuid")
-                        .HasColumnName("actor_user_id");
+                        .HasColumnName("actor_user_id")
+                        .HasComment("The person who caused it, required when actor_kind is 'user'. A bare uuid, no foreignkey - the reason every other audit record in this schema gives.");
 
                     b.Property<decimal?>("AmountUah")
                         .HasColumnType("numeric(12,2)")
-                        .HasColumnName("amount_uah");
+                        .HasColumnName("amount_uah")
+                        .HasComment("What the customer paid for this movement, in UAH. NULL when money did not move - mostmovements are the operator's own housekeeping. NOT the batch total: a settlement's totallives on movement_batches.surcharge_uah.");
 
                     b.Property<Guid?>("BatchId")
                         .HasColumnType("uuid")
-                        .HasColumnName("batch_id");
+                        .HasColumnName("batch_id")
+                        .HasComment("The settlement this movement is part of, when there was one. NULL for a movement anoperator or a customer performed on its own.");
 
                     b.Property<decimal?>("CostDeltaUah")
                         .HasColumnType("numeric(14,2)")
-                        .HasColumnName("cost_delta_uah");
+                        .HasColumnName("cost_delta_uah")
+                        .HasComment("What this movement did to supplier-side cost, in UAH. NULL when cost did not move.Recorded AT THE TIME, from the values written in the same transaction, because it cannotbe derived afterwards: fuel_vouchers.cost_per_liter is mutable and gets overwritten, so'what did this voucher cost before' stops existing the moment the column is restamped.");
 
                     b.Property<string>("FromLocation")
                         .IsRequired()
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)")
-                        .HasColumnName("from_location");
+                        .HasColumnName("from_location")
+                        .HasComment("Where it was. See VoucherLocations.");
 
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(24)
                         .HasColumnType("character varying(24)")
-                        .HasColumnName("kind");
+                        .HasColumnName("kind")
+                        .HasComment("What happened - issued, redeemed, blocked, released, and the rest. SeeVoucherMovementKinds.");
 
                     b.Property<Guid?>("LineItemId")
                         .HasColumnType("uuid")
-                        .HasColumnName("line_item_id");
+                        .HasColumnName("line_item_id")
+                        .HasComment("The order line this movement settled, for the renewal paths.");
 
                     b.Property<DateTime>("OccurredAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("occurred_at_utc");
+                        .HasColumnName("occurred_at_utc")
+                        .HasComment("When it happened.");
 
                     b.Property<Guid?>("OrderId")
                         .HasColumnType("uuid")
-                        .HasColumnName("order_id");
+                        .HasColumnName("order_id")
+                        .HasComment("The order this movement settled, when a customer paid for it. A bare uuid, no foreignkey: an audit row must not be the thing that blocks deleting its own subject.");
 
                     b.Property<string>("Reason")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
-                        .HasColumnName("reason");
+                        .HasColumnName("reason")
+                        .HasComment("Why, in the operator's words.");
 
                     b.Property<string>("ToLocation")
                         .IsRequired()
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)")
-                        .HasColumnName("to_location");
+                        .HasColumnName("to_location")
+                        .HasComment("Where it is now. Never equal to from_location - that isck_voucher_movements_distinct_locations, and a row that says a paper moved from theshelf to the shelf is not a movement.");
 
                     b.Property<Guid>("VoucherId")
                         .HasColumnType("uuid")
-                        .HasColumnName("voucher_id");
+                        .HasColumnName("voucher_id")
+                        .HasComment("The piece of paper that moved.");
 
                     b.HasKey("Id");
 

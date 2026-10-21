@@ -17,15 +17,22 @@ internal sealed class ChartOfAccountConfiguration : IEntityTypeConfiguration<Cha
         builder.HasKey(e => e.Id);
         builder.Property(e => e.Id).HasColumnName("id");
 
-        builder.Property(e => e.Code).HasColumnName("code").HasMaxLength(10).IsRequired();
-        builder.Property(e => e.NameUkr).HasColumnName("name_ukr").HasMaxLength(200).IsRequired();
+        builder.Property(e => e.Code).HasColumnName("code").HasMaxLength(10).IsRequired()
+            .HasComment(                "The account number as the accountant writes it, e.g. 7911.");
+        builder.Property(e => e.NameUkr).HasColumnName("name_ukr").HasMaxLength(200).IsRequired()
+            .HasComment(                "The account's name, in Ukrainian.");
         builder.Property(e => e.AccountType)
-            .HasColumnName("account_type").HasConversion<string>().HasMaxLength(12).IsRequired();
+            .HasColumnName("account_type").HasConversion<string>().HasMaxLength(12).IsRequired()
+            .HasComment(                "What kind of account this is: an asset, a liability, income or expense.");
         builder.Property(e => e.NormalBalance)
-            .HasColumnName("normal_balance").HasConversion<string>().HasMaxLength(6).IsRequired();
-        builder.Property(e => e.ParentId).HasColumnName("parent_id");
-        builder.Property(e => e.IsPostable).HasColumnName("is_postable").HasDefaultValue(true).IsRequired();
-        builder.Property(e => e.IsActive).HasColumnName("is_active").HasDefaultValue(true).IsRequired();
+            .HasColumnName("normal_balance").HasConversion<string>().HasMaxLength(6).IsRequired()
+            .HasComment(                "Which side the account normally carries: a debit or a credit.");
+        builder.Property(e => e.ParentId).HasColumnName("parent_id")
+            .HasComment(                "The account this one rolls up into.");
+        builder.Property(e => e.IsPostable).HasColumnName("is_postable").HasDefaultValue(true).IsRequired()
+            .HasComment(                "Whether entries may post to this account.");
+        builder.Property(e => e.IsActive).HasColumnName("is_active").HasDefaultValue(true).IsRequired()
+            .HasComment(                "Whether the account is in use. A retired account stays, because entries point at it.");
 
         // RESTRICT both ways: a chart is a tree, and deleting an account with a parent or a child
         // would silently re-parent postings that were balanced against it.
@@ -66,13 +73,18 @@ internal sealed class AccountingPeriodConfiguration : IEntityTypeConfiguration<A
         builder.HasKey(e => e.Id);
         builder.Property(e => e.Id).HasColumnName("id");
 
-        builder.Property(e => e.PeriodStart).HasColumnName("period_start").IsRequired();
-        builder.Property(e => e.PeriodEnd).HasColumnName("period_end").IsRequired();
+        builder.Property(e => e.PeriodStart).HasColumnName("period_start").IsRequired()
+            .HasComment(                "The first day of the period.");
+        builder.Property(e => e.PeriodEnd).HasColumnName("period_end").IsRequired()
+            .HasComment(                "The last day of the period.");
         builder.Property(e => e.Status)
             .HasColumnName("status").HasConversion<string>().HasMaxLength(8)
-            .HasDefaultValue(PeriodStatus.Open).IsRequired();
-        builder.Property(e => e.ClosedAtUtc).HasColumnName("closed_at_utc");
-        builder.Property(e => e.ClosedByUserId).HasColumnName("closed_by_user_id");
+            .HasDefaultValue(PeriodStatus.Open).IsRequired()
+            .HasComment(                "Whether the period is open or closed.");
+        builder.Property(e => e.ClosedAtUtc).HasColumnName("closed_at_utc")
+            .HasComment(                "When the period was closed. NULL while it is open.");
+        builder.Property(e => e.ClosedByUserId).HasColumnName("closed_by_user_id")
+            .HasComment(                "Who closed it.");
 
         builder.HasIndex(e => e.PeriodStart).IsUnique();
 
