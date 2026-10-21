@@ -60,7 +60,8 @@ export interface FuelType {
    */
   basePrice?: number;
   /**
-   * What WE charge - the cost plus the margin, capped at the column price. Null when we have no
+   * What WE charge - the cost plus the margin. The column price beside it is a reference, not a
+   * term of this number, so it can sit below what we charge. Null when we have no
    * cost or no margin set, which is the state an imported fuel is in until an operator prices it.
    *
    * The server computes it - it used to be a stored column, and it was a zero on fourteen of the
@@ -76,7 +77,8 @@ export interface FuelType {
    */
   pumpPricePerLiter?: number;
   /**
-   * What WE charge - the cost plus the margin, capped at the pump price. Null when we have no
+   * What WE charge - the cost plus the margin. The column price beside it is a reference, not a
+   * term of this number, so it can sit below what we charge. Null when we have no
    * margin set, which is the state an imported fuel is in until an operator prices it.
    */
   finalPricePerLiter?: number;

@@ -496,7 +496,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "price.supplier": "Cost",
     "price.pump": "Pump",
     "price.pumpHint":
-      "Pump/board price (UAH/L) — the ceiling. Leave empty until you record it; while empty the price is cost + margin.",
+      "Pump/board price (UAH/L) — the reference the customer's saving is measured against. Leave empty until you record it; while empty the price is cost + margin.",
     "price.belowCost": "below cost",
     "price.belowCostHint": "Final price is below cost per liter.",
     "price.spread": "packages disagree",
@@ -1608,7 +1608,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "price.supplier": "Собівартість",
     "price.pump": "Колонка",
     "price.pumpHint":
-      "Ціна на колонці/табло (грн/л) — стеля. Лишіть порожнім, поки не внесете; поки порожнє — ціна = собівартість + маржа.",
+      "Ціна на колонці/табло (грн/л) — орієнтир, від якого рахується знижка покупця. Лишіть порожнім, поки не внесете; поки порожнє — ціна = собівартість + маржа.",
     "price.belowCost": "мінус",
     "price.belowCostHint": "Фінальна ціна нижча за собівартість.",
     "price.spread": "пакети різняться",
@@ -2625,7 +2625,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "price.supplier": "Einkaufspreis",
     "price.pump": "Säule",
     "price.pumpHint":
-      "Zapfsäulen-/Anzeigepreis (UAH/L) — die Obergrenze. Leer lassen, bis er erfasst wird; solange leer ist der Preis Einkaufspreis + Marge.",
+      "Zapfsäulen-/Anzeigepreis (UAH/L) — der Referenzpreis, an dem die Ersparnis des Kunden gemessen wird. Leer lassen, bis er erfasst wird; solange leer ist der Preis Einkaufspreis + Marge.",
     "price.belowCost": "unter EK",
     "price.belowCostHint": "Endpreis liegt unter dem Einkaufspreis pro Liter.",
     "price.spread": "Pakete weichen ab",
@@ -3740,7 +3740,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "price.supplier": "Costo",
     "price.pump": "Surtidor",
     "price.pumpHint":
-      "Precio de surtidor/panel (UAH/L): el techo. Déjalo vacío hasta registrarlo; mientras esté vacío el precio es costo + margen.",
+      "Precio de surtidor/panel (UAH/L): la referencia contra la que se mide el ahorro del cliente. Déjalo vacío hasta registrarlo; mientras esté vacío el precio es costo + margen.",
     "price.belowCost": "bajo costo",
     "price.belowCostHint":
       "El precio final está por debajo del costo por litro.",

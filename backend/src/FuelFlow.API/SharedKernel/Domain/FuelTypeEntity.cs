@@ -110,8 +110,9 @@ public sealed class FuelTypeEntity
 
     /// <summary>
     /// What we add per litre on top of what we paid, and the only knob of the customer price an
-    /// operator sets directly. The customer price is <c>min(cost + this, pump)</c> — the pump is the
-    /// ceiling and there is no second discount knob, because two caps on one number is one too many.
+    /// operator sets directly. The customer price is <c>cost + this</c> — the column price is the
+    /// reference the customer is shown against, not a term of the price, and there is no second
+    /// discount knob, because two caps on one number is one too many.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -146,15 +147,17 @@ public sealed class FuelTypeEntity
     public decimal? SupplierPricePerLiter { get; set; }
 
     /// <summary>
-    /// The ceiling: the highest a litre may sell for whatever the margin asks. Null means no ceiling,
-    /// which is a grade nobody tracks against the pump.
+    /// The COLUMN price: what the network charges at the pump, and the reference the customer's
+    /// saving is measured against. It is not a term of our price - our price is the cost plus the
+    /// margin - and it can sit below what we charge. Null means the market price is not known.
     /// </summary>
     public decimal? PumpPricePerLiter { get; set; }
 
     /// <summary>
-    /// The guaranteed gap under that ceiling - a discount the operator promises even if the margin
-    /// would not cover it. Not the same number as <see cref="DiscountPrice"/>, which is the
-    /// headline the customer sees.
+    /// The guaranteed gap under the column price - a discount the operator promises even if the
+    /// margin would not cover it. Not the same number as <see cref="DiscountPrice"/>, which is the
+    /// headline the customer sees. It is no longer a term of our price: the price is the cost plus
+    /// the margin, and the column price is a reference.
     /// </summary>
     public decimal? MinDiscountPerLiter { get; set; }
 

@@ -76,8 +76,8 @@ public static class OkkoPriceSheetParser
                 result.Errors.Add(new OkkoPriceSheetError(lineNumber, $"Invalid pricePerLiter '{priceRaw}'"));
                 continue;
             }
-            // A zero or negative pump price would silently become the ceiling for every package of
-            // that fuel and drive the customer price to zero — refuse it at the door.
+            // A zero or negative pump price would be published as the column price of the fuel — the
+            // reference every reader measures the customer's saving against — so refuse it at the door.
             if (price <= 0m)
             {
                 result.Errors.Add(new OkkoPriceSheetError(lineNumber, $"pricePerLiter must be greater than 0, got {priceRaw}"));

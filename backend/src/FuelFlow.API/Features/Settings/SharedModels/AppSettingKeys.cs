@@ -144,8 +144,9 @@ public static class AppSettingKeys
     /// bigger the discount — that is the whole incentive.
     ///
     /// A discount rather than an absolute price on purpose: the sell price still comes from the
-    /// cost + margin engine and stays capped by the pump price, so a term can never be configured into
-    /// selling below cost. The below-cost guard keeps applying on top.
+    /// cost + margin engine, so the term says how much to give away rather than what the litre
+    /// costs. A generous term CAN take a sale under what we paid, and that is what the below-cost
+    /// guard is for - it judges the price the customer is actually charged, term discount included.
     /// </summary>
     public static string VoucherTermTierDiscountPerLiter(string termCode)
         => $"{VoucherTermPrefix}Tier:{termCode}:DiscountPerLiter";

@@ -31,7 +31,8 @@ public sealed record PublicFuelTypeResponse(
     /// </remarks>
     decimal? BasePrice,
     /// <summary>
-    /// What WE charge - the cost plus the margin, capped at the column price. Null when we have no
+    /// What WE charge - the cost plus the margin. The column price beside it is a reference, not a
+    /// term of this number, so it can sit below what we charge. Null when we have no
     /// cost or no margin set, which is the state an imported fuel is in until an operator prices it.
     /// </summary>
     /// <remarks>
@@ -49,7 +50,8 @@ public sealed record PublicFuelTypeResponse(
     /// </remarks>
     decimal? PumpPricePerLiter,
     /// <summary>
-    /// What WE charge - the cost plus the margin, capped at the pump price. Null when we have no
+    /// What WE charge - the cost plus the margin. The column price beside it is a reference, not a
+    /// term of this number, so it can sit below what we charge. Null when we have no
     /// margin set, which is the state an imported fuel is in until an operator prices it.
     /// </summary>
     decimal? FinalPricePerLiter,

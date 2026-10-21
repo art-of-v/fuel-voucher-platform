@@ -4192,7 +4192,7 @@ namespace FuelFlow.API.Migrations
                     b.Property<decimal?>("MinDiscountPerLiter")
                         .HasColumnType("numeric(10,4)")
                         .HasColumnName("min_discount_per_liter")
-                        .HasComment("The smallest discount we give the customer per litre, so that our price always sits below the column price - we are never dearer than the pump. RETIRED: the price is computed as min(cost + margin, pump), and this column no longer takes part in it. It stays until the migration that drops it.");
+                        .HasComment("The smallest discount we give the customer per litre. RETIRED: the price is computed as cost + margin, and the column price beside it is a reference, so this column no longer takes part in it. It stays until the migration that drops it.");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -4211,7 +4211,7 @@ namespace FuelFlow.API.Migrations
                     b.Property<decimal?>("PumpPricePerLiter")
                         .HasColumnType("numeric(10,4)")
                         .HasColumnName("pump_price_per_liter")
-                        .HasComment("The COLUMN price - what the driver pays at the pump. It is the ceiling: our price is never above it, and it is the price the customer sees struck through when our price is below it.");
+                        .HasComment("The COLUMN price - what the driver pays at the pump. It is a reference, not a term of our price: our price is the cost plus the margin, and it can sit below what we charge. It is the price the customer sees struck through when it sits above what we charge.");
 
                     b.Property<decimal?>("SupplierPricePerLiter")
                         .HasColumnType("numeric(10,4)")

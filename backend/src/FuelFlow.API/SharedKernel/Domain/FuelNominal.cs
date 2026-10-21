@@ -12,9 +12,10 @@ namespace FuelFlow.SharedKernel.Domain;
 /// </para>
 /// <para>
 /// <b>What does not remain is the price.</b> There is no per-size price anywhere: a nominal sells at
-/// its fuel's rate, capped by the ceiling on <see cref="FuelTypeEntity"/>. That is why the pool can
+/// its fuel's rate - the cost plus the margin, and the column price beside them is the reference
+/// the customer is shown against, not a term of the price. That is why the pool can
 /// stay while the offer goes - the offer carried one thing a pool genuinely needed (the size list)
-/// and four the fuel does not need to be told twice (cost, ceiling, guaranteed discount, margin
+/// and four the fuel does not need to be told twice (cost, column price, guaranteed discount, margin
 /// percent).
 /// </para>
 /// <para>

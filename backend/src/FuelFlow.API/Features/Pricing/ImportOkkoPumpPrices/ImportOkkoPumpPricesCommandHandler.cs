@@ -39,18 +39,17 @@ public sealed record SyncOkkoPumpPricesCommand(
 /// tell apart, and falling back would hand the price to whichever sorted first.
 /// </para>
 /// <para>
-/// Writing the pump means writing the offer's ceiling and repricing its volumes, mirroring the pump
-/// path of <c>BrandsController.UpdateFuel</c>. A pump change is NOT a cost event, so the supplier cost
-/// (<c>SupplierPricePerLiter</c> — what we pay the reseller) is held constant; only the ceiling moves.
-/// It lowers the sale price only when the ceiling actually binds
-/// (<c>final = min(cost + profit, pump − minDiscount)</c>).
+/// Writing the pump means writing the fuel's COLUMN price and repricing the packages that follow it,
+/// mirroring the pump path of <c>BrandsController.UpdateFuel</c>. A pump change is NOT a cost event, so
+/// the supplier cost (<c>SupplierPricePerLiter</c> — what we pay the reseller) is held constant; so is
+/// our price, which is the cost plus the margin. The column price is the reference the customer is
+/// shown against, so it moves what the customer sees next to the price, not the price itself.
 /// </para>
 /// <para>
-/// The supplier cost is per-package rather than per-fuel, and packages of the same fuel can in
-/// principle disagree, so the cost of the <i>first</i> package (lowest id order, matching the
-/// operator path's <c>packages.First()</c>) is the one the price is computed from. This mirrors
-/// <c>UpdateFuel</c>, which likewise computes a single per-liter price for the whole fuel from one
-/// representative package.
+/// The supplier cost is the fuel's, and every size of that fuel is priced by the same rate: the cost
+/// and the margin are read off the fuel row, so a size cannot disagree with another about what a
+/// litre costs. This mirrors <c>UpdateFuel</c>, which likewise computes a single per-liter price for
+/// the whole fuel.
 /// </para>
 /// <para>
 /// Packages load <c>AsTracking</c> because the API DbContext is read-only by default for queries —
