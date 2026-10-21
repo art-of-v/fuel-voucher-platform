@@ -112,7 +112,8 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
                .HasColumnName("bonus_balance")
                .HasColumnType("numeric(12,2)")
                .HasDefaultValue(0m)
-               .IsRequired();
+               .IsRequired().HasComment("The bonus balance in UAH - the money the platform owes the customer. A balance, not a price:" +
+                       "it is what is LEFT, and it can be negative when a company has used more than it has paid.");
 
         // A negative bonus is not a discount, it is a bug: nothing in the domain credits a balance
         // below zero, and one that can go negative silently means every figure derived from it - the
@@ -122,41 +123,50 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(e => e.IsActive)
             .HasColumnName("is_active")
             .HasDefaultValue(false)
-            .IsRequired();
+            .IsRequired().HasComment("Whether the account may sign in. Separate from being banned: an inactive account is one the" +
+                    "customer closed, a banned one is one we closed.");
 
         builder.Property(e => e.TokenVersion)
             .HasColumnName("token_version")
             .HasDefaultValue(1)
-            .IsRequired();
+            .IsRequired().HasComment("The version of the tokens this account's sessions carry. Bumping it invalidates every" +
+                    "refresh token at once - which is what a password change or a ban has to do, and what no" +
+                    "single-token revocation can do.");
 
         builder.Property(e => e.IsDeleted)
             .HasColumnName("is_deleted")
             .HasDefaultValue(false)
-            .IsRequired();
+            .IsRequired().HasComment("Soft delete. The user stays in the schema, because the orders, the money and the vouchers" +
+                    "behind them have to stay readable.");
 
         builder.Property(e => e.IsBanned)
             .HasColumnName("is_banned")
             .HasDefaultValue(false)
-            .IsRequired();
+            .IsRequired().HasComment("Whether the account is banned. Separate from being deleted: a banned account keeps its" +
+                    "history and cannot sign in.");
 
         builder.Property(e => e.IsQaAccount)
             .HasColumnName("is_qa_account")
             .HasDefaultValue(false)
-            .IsRequired();
+            .IsRequired().HasComment("Whether this is a test account. The QA identity is explicitly distinguishable from a real" +
+                    "customer, and the reports that count customers leave it out.");
 
         // Arrived in PascalCase (and unbounded text) because the mapping was forgotten. Named and
         // bounded explicitly now: the address matches users.email, and the token hash is a
         // SHA-256 hex digest, never the token itself.
         builder.Property(e => e.PendingEmail)
             .HasColumnName("pending_email")
-            .HasMaxLength(200);
+            .HasMaxLength(200).HasComment("The address waiting to be confirmed, while the current one still works. NULL when nothing" +
+                    "is pending.");
 
         builder.Property(e => e.PendingEmailTokenHash)
             .HasColumnName("pending_email_token_hash")
-            .HasMaxLength(100);
+            .HasMaxLength(100).HasComment("The HASH of the confirmation token, never the token itself: a database that is read by" +
+                    "somebody must not be able to confirm an address.");
 
         builder.Property(e => e.PendingEmailExpiresAtUtc)
-            .HasColumnName("pending_email_expires_at_utc");
+            .HasColumnName("pending_email_expires_at_utc").HasComment("When the pending address stops being claimable. The token is short-lived on purpose - a" +
+                    "confirmation link that works for a year is a key.");
 
         builder.HasOne(e => e.Role)
             .WithMany()

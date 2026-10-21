@@ -80,7 +80,8 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime>("LastSeenAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("last_seen_at_utc");
+                        .HasColumnName("last_seen_at_utc")
+                        .HasComment("When we last saw it in a fetch. A row that keeps being re-reported is one the acquirer isstill revising, which is different from one that is settled and closed.");
 
                     b.Property<string>("MaskedCard")
                         .HasMaxLength(50)
@@ -1121,11 +1122,13 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
+                        .HasColumnName("created_at_utc")
+                        .HasComment("When the entry was WRITTEN - which is not when it was posted: a draft can sit for days.");
 
                     b.Property<Guid?>("CreatedByUserId")
                         .HasColumnType("uuid")
-                        .HasColumnName("created_by_user_id");
+                        .HasColumnName("created_by_user_id")
+                        .HasComment("Who wrote it. Distinct from who posted it: a draft has a writer and no poster.");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -1901,7 +1904,8 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<Guid>("FuelTypeId")
                         .HasColumnType("uuid")
-                        .HasColumnName("fuel_type_id");
+                        .HasColumnName("fuel_type_id")
+                        .HasComment("The fuel this line is for.");
 
                     b.Property<decimal>("LineTotal")
                         .HasColumnType("numeric(12,2)")
@@ -1920,7 +1924,8 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<Guid>("OrderId")
                         .HasColumnType("uuid")
-                        .HasColumnName("order_id");
+                        .HasColumnName("order_id")
+                        .HasComment("The order this line belongs to.");
 
                     b.Property<decimal?>("OriginalLineTotal")
                         .HasColumnType("numeric(12,2)")
@@ -2066,7 +2071,8 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
+                        .HasColumnName("created_at_utc")
+                        .HasComment("When the row was written.");
 
                     b.Property<bool>("Enabled")
                         .HasColumnType("boolean")
@@ -2094,7 +2100,8 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime?>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
+                        .HasColumnName("updated_at_utc")
+                        .HasComment("When it was last changed.");
 
                     b.Property<Guid?>("UpdatedByUserId")
                         .HasColumnType("uuid")
@@ -2204,7 +2211,8 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
+                        .HasColumnName("created_at_utc")
+                        .HasComment("When the row was written.");
 
                     b.Property<long>("MessageId")
                         .HasColumnType("bigint")
@@ -2651,7 +2659,8 @@ namespace FuelFlow.API.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)")
                         .HasDefaultValue("direct")
-                        .HasColumnName("acquisition_source");
+                        .HasColumnName("acquisition_source")
+                        .HasComment("The supply route this voucher came in on: direct, or through a partner. Immutable, andenforced by a trigger: the cost of a voucher is a function of where it came from, so anedited value does not merely relabel a row - it moves real money between two reports thatare supposed to be separate.");
 
                     b.Property<Guid?>("AssignedToUserId")
                         .HasColumnType("uuid")
@@ -2677,7 +2686,8 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
+                        .HasColumnName("created_at_utc")
+                        .HasComment("When the row was written.");
 
                     b.Property<DateOnly>("CustomerExpirationDate")
                         .HasColumnType("date")
@@ -2693,7 +2703,8 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<Guid>("FuelTypeId")
                         .HasColumnType("uuid")
-                        .HasColumnName("fuel_type_id");
+                        .HasColumnName("fuel_type_id")
+                        .HasComment("The fuel this voucher is for.");
 
                     b.Property<string>("HolderKind")
                         .IsRequired()
@@ -2723,7 +2734,8 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<Guid?>("LegalEntityId")
                         .HasColumnType("uuid")
-                        .HasColumnName("legal_entity_id");
+                        .HasColumnName("legal_entity_id")
+                        .HasComment("The company the voucher was sold to.");
 
                     b.Property<decimal>("Liters")
                         .HasColumnType("numeric(10,2)")
@@ -2737,7 +2749,8 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<Guid?>("QrParametersId")
                         .HasColumnType("uuid")
-                        .HasColumnName("qr_parameters_id");
+                        .HasColumnName("qr_parameters_id")
+                        .HasComment("The QR parameters read from the original code - the geometry needed to regenerate it. NULLwhen the code was not read.");
 
                     b.Property<byte[]>("QrPayload")
                         .IsRequired()
@@ -2770,7 +2783,8 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
+                        .HasColumnName("updated_at_utc")
+                        .HasComment("When it was last changed.");
 
                     b.Property<DateTime?>("UsedAtUtc")
                         .HasColumnType("timestamp with time zone")
@@ -3319,7 +3333,8 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
+                        .HasColumnName("created_at_utc")
+                        .HasComment("When the row was written.");
 
                     b.Property<Guid?>("CreatedByUserId")
                         .HasColumnType("uuid")
@@ -3360,7 +3375,8 @@ namespace FuelFlow.API.Migrations
                     b.Property<string>("Merchant")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
-                        .HasColumnName("merchant");
+                        .HasColumnName("merchant")
+                        .HasComment("Which acquirer took the money. The word is ours and the list is ours too - this is amerchant WE chose, which is why this one is constrained and the acquirer's own statusesare not.");
 
                     b.Property<Guid?>("OrderId")
                         .HasColumnType("uuid")
@@ -3415,7 +3431,8 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
+                        .HasColumnName("updated_at_utc")
+                        .HasComment("When it was last changed.");
 
                     b.Property<Guid?>("UserId")
                         .HasColumnType("uuid")
@@ -4576,7 +4593,8 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<bool>("IsDefault")
                         .HasColumnType("boolean")
-                        .HasColumnName("is_default");
+                        .HasColumnName("is_default")
+                        .HasComment("Whether a new user gets this role when nobody says otherwise.");
 
                     b.Property<int>("Level")
                         .HasColumnType("integer")
@@ -4716,7 +4734,8 @@ namespace FuelFlow.API.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("numeric(12,2)")
                         .HasDefaultValue(0m)
-                        .HasColumnName("bonus_balance");
+                        .HasColumnName("bonus_balance")
+                        .HasComment("The bonus balance in UAH - the money the platform owes the customer. A balance, not a price:it is what is LEFT, and it can be negative when a company has used more than it has paid.");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
@@ -4739,25 +4758,29 @@ namespace FuelFlow.API.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(false)
-                        .HasColumnName("is_active");
+                        .HasColumnName("is_active")
+                        .HasComment("Whether the account may sign in. Separate from being banned: an inactive account is one thecustomer closed, a banned one is one we closed.");
 
                     b.Property<bool>("IsBanned")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(false)
-                        .HasColumnName("is_banned");
+                        .HasColumnName("is_banned")
+                        .HasComment("Whether the account is banned. Separate from being deleted: a banned account keeps itshistory and cannot sign in.");
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(false)
-                        .HasColumnName("is_deleted");
+                        .HasColumnName("is_deleted")
+                        .HasComment("Soft delete. The user stays in the schema, because the orders, the money and the vouchersbehind them have to stay readable.");
 
                     b.Property<bool>("IsQaAccount")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(false)
-                        .HasColumnName("is_qa_account");
+                        .HasColumnName("is_qa_account")
+                        .HasComment("Whether this is a test account. The QA identity is explicitly distinguishable from a realcustomer, and the reports that count customers leave it out.");
 
                     b.Property<DateTime?>("LastLoginAtUtc")
                         .HasColumnType("timestamp with time zone")
@@ -4778,16 +4801,19 @@ namespace FuelFlow.API.Migrations
                     b.Property<string>("PendingEmail")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
-                        .HasColumnName("pending_email");
+                        .HasColumnName("pending_email")
+                        .HasComment("The address waiting to be confirmed, while the current one still works. NULL when nothingis pending.");
 
                     b.Property<DateTime?>("PendingEmailExpiresAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("pending_email_expires_at_utc");
+                        .HasColumnName("pending_email_expires_at_utc")
+                        .HasComment("When the pending address stops being claimable. The token is short-lived on purpose - aconfirmation link that works for a year is a key.");
 
                     b.Property<string>("PendingEmailTokenHash")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
-                        .HasColumnName("pending_email_token_hash");
+                        .HasColumnName("pending_email_token_hash")
+                        .HasComment("The HASH of the confirmation token, never the token itself: a database that is read bysomebody must not be able to confirm an address.");
 
                     b.Property<string>("PhoneNumber")
                         .IsRequired()
@@ -4830,7 +4856,8 @@ namespace FuelFlow.API.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
                         .HasDefaultValue(1)
-                        .HasColumnName("token_version");
+                        .HasColumnName("token_version")
+                        .HasComment("The version of the tokens this account's sessions carry. Bumping it invalidates everyrefresh token at once - which is what a password change or a ban has to do, and what nosingle-token revocation can do.");
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")

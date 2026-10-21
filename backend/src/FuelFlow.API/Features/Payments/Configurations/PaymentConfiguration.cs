@@ -76,7 +76,9 @@ internal sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
         builder.Property(e => e.Merchant)
             .HasColumnName("merchant")
             .HasConversion<string>()
-            .HasMaxLength(20);
+            .HasMaxLength(20).HasComment("Which acquirer took the money. The word is ours and the list is ours too - this is a" +
+                    "merchant WE chose, which is why this one is constrained and the acquirer's own statuses" +
+                    "are not.");
 
         builder.Property(e => e.AmountUah)
             .HasColumnName("amount_uah")
@@ -152,11 +154,11 @@ builder.Property(e => e.ProviderAmountKopecks)
 
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
-            .IsRequired();
+            .IsRequired().HasComment("When the row was written.");
 
         builder.Property(e => e.UpdatedAtUtc)
             .HasColumnName("updated_at_utc")
-            .IsRequired();
+            .IsRequired().HasComment("When it was last changed.");
 
         // The provider-level identity. Deliberately NOT a unique constraint on order_id: an order can
         // legitimately have more than one capture row when a payment link is re-issued, and that is

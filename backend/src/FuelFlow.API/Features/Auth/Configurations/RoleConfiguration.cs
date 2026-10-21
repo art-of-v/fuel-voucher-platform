@@ -33,7 +33,7 @@ internal sealed class RoleConfiguration : IEntityTypeConfiguration<Role>
                     "whom.");
 
         builder.Property(e => e.IsDefault)
-            .HasColumnName("is_default");
+            .HasColumnName("is_default").HasComment("Whether a new user gets this role when nobody says otherwise.");
 
         builder.HasIndex(e => e.Name)
             .IsUnique();

@@ -53,8 +53,8 @@ internal sealed class JournalEntryConfiguration : IEntityTypeConfiguration<Journ
         builder.Property(e => e.TamperHash).HasColumnName("tamper_hash").HasMaxLength(64)
             .HasComment(                "SHA-256 over the entry's own content. A hash that anyone can recompute is not a" +
                     "signature.");
-        builder.Property(e => e.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();
-        builder.Property(e => e.CreatedByUserId).HasColumnName("created_by_user_id");
+        builder.Property(e => e.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired().HasComment("When the entry was WRITTEN - which is not when it was posted: a draft can sit for days.");
+        builder.Property(e => e.CreatedByUserId).HasColumnName("created_by_user_id").HasComment("Who wrote it. Distinct from who posted it: a draft has a writer and no poster.");
 
         // The entry number is what a bookkeeper cites, so it is unique inside the period and nowhere
         // else - two periods may each hold entry 1.
