@@ -227,6 +227,7 @@ public sealed class FulfillmentLineAttributionTests : IClassFixture<TestDatabase
     {
         Id = id,
         OrderId = orderId,
+        BrandId = BrandIds.ForSlug(brand),
         Brand = brand,
         FuelTypeId =   ToUuid(fuelTypeId),
         Liters = liters,

@@ -252,6 +252,7 @@ public sealed class FulfillmentTransactionScopeTests : IClassFixture<TestDatabas
         Guid id, string brand, string fuelTypeId, decimal liters, string tag, Guid userId, Guid orderId) => new()
     {
         Id = id,
+        BrandId = BrandIds.ForSlug(brand),
         Brand = brand,
         FuelTypeId = ToUuid(fuelTypeId),
         Liters = liters,
@@ -270,6 +271,7 @@ public sealed class FulfillmentTransactionScopeTests : IClassFixture<TestDatabas
         Guid id, string brand, string fuelTypeId, decimal liters, string tag) => new()
     {
         Id = id,
+        BrandId = BrandIds.ForSlug(brand),
         Brand = brand,
         FuelTypeId = ToUuid(fuelTypeId),
         Liters = liters,

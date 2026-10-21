@@ -221,6 +221,7 @@ public sealed class ReconciliationMoneyIntegrationTests : IClassFixture<TestData
                 {
                     Id = Guid.NewGuid(),
                     OrderId = orderId,
+                    BrandId = BrandIds.ForSlug(brandSlug),
                     Brand = brandSlug,
                     FuelTypeId = fuelId,
                     Liters = Liters,
@@ -247,6 +248,7 @@ public sealed class ReconciliationMoneyIntegrationTests : IClassFixture<TestData
         {
             Id = voucherId,
             OrderId = order.Id,
+            BrandId = BrandIds.ForSlug(brandSlug),
             Brand = brandSlug,
             FuelTypeId = fuelId,
             Liters = Liters,

@@ -337,6 +337,9 @@ public sealed class ConfirmOperatorRenewalCommandHandler
                 {
                     Id = Guid.CreateVersion7(),
                     Brand = voucher.Brand,
+                    // The brand's key beside its name - the voucher's own key, because the line is
+                    // about the same fuel the customer brings back.
+                    BrandId = voucher.BrandId,
                     FuelTypeId = voucher.FuelTypeId,
                     Liters = voucher.Liters,
                     Quantity = 1,

@@ -264,6 +264,7 @@ public sealed class FulfillmentMismatchRepairTests : IClassFixture<TestDatabaseF
         Guid id, string brand, string fuelTypeId, decimal liters, string tag, Guid userId, Guid orderId) => new()
     {
         Id = id,
+        BrandId = BrandIds.ForSlug(brand),
         Brand = brand,
         FuelTypeId =   ToUuid(fuelTypeId),
         Liters = liters,
