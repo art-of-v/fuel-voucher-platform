@@ -330,9 +330,9 @@ public sealed class CreateCheckoutCommandHandler
             var monobankClient = _monobankClientFactory.ForMerchant(merchant);
 
             // The receipt's goods lines. Always sent: Monobank registers the fiscal receipt for us
-            // and can only print what we declare, and the ╨ƒ╨á╨á╨₧ link is switched on in the bank's web
-            // cabinet without warning us. Declaring always means activating it is not a launch-day
-            // event.
+            // and can only print what we declare, and the hryvnia link is switched on in the bank's
+            // web cabinet without warning us. Declaring always means activating it is not a
+            // launch-day event.
             var fuelNames = await MonobankBasketBuilder.FuelNamesAsync(
                 _context, order.LineItems.Select(li => li.FuelTypeId), cancellationToken);
 
@@ -341,7 +341,7 @@ public sealed class CreateCheckoutCommandHandler
                 // Monobank is the one place amounts must be kopecks.
                 Amount = Money.ForMonobank(order.Price),
                 MerchantPaymentInfo = $"FuelFlow Order {order.Id}",
-                Destination = "╨ƒ╨░╨╗╨╕╨▓╨╛",
+                Destination = "Паливо",
                 Items = MonobankBasketBuilder.Build(order.LineItems.Select(li => (
                     li.Brand, li.FuelTypeId,
                     fuelNames.GetValueOrDefault(li.FuelTypeId),
@@ -373,10 +373,15 @@ public sealed class CreateCheckoutCommandHandler
         }
         catch (Exception ex)
         {
-            // The exception is deliberately swallowed so checkout still returns an order, and the
-            // order is already written - it was, on purpose, committed before the acquirer was
-            // asked. So the customer gets an order with no payment link instead of an error, and
-            // the metric below is the only lasting signal that payment setup broke.
+            // The failure is NOT swallowed. The order is already written - it was, on purpose,
+            // committed before the acquirer was asked - so the sale is on record and the basket is
+            // given back below, which makes the customer's next tap a fresh attempt. But a checkout
+            // that cannot be paid is not a successful checkout: the customer has no link to pay,
+            // and the operator has to hear that the payment setup broke.
+            //
+            // Answering 200 with an order and no invoice (what this used to do) bought nobody
+            // anything: the app turns a missing payment link into an error of its own, and the
+            // metric was the only trace a payment outage left behind.
             _metrics.MonobankInvoiceFailed(ex.GetType().Name);
             _logger.LogError(ex, "Failed to create Monobank invoice for order {OrderId}", order.Id);
 
@@ -385,6 +390,8 @@ public sealed class CreateCheckoutCommandHandler
             // the record of what was attempted.
             CheckoutGuard.Release(order);
             await _context.SaveChangesAsync(cancellationToken);
+
+            throw;
         }
 
         // The invoice, written onto the order that is already there. A second attempt for this

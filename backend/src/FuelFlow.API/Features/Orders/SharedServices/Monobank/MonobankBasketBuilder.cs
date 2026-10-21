@@ -70,7 +70,7 @@ public static class MonobankBasketBuilder
                 Qty = line.Liters * line.Quantity,
                 Sum = (long)Math.Round(Money.ToKopecks(line.UnitPrice), MidpointRounding.AwayFromZero),
                 Total = (long)Math.Round(Money.ToKopecks(line.LineTotal), MidpointRounding.AwayFromZero),
-                Unit = "╨╗",
+                Unit = "л",
                 Code = line.FuelTypeId.ToString(),
             });
         }
