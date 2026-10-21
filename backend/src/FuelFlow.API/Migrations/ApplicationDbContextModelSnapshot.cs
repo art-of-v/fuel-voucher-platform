@@ -3985,6 +3985,8 @@ namespace FuelFlow.API.Migrations
 
                     b.ToTable("fuel_types", null, t =>
                         {
+                            t.HasCheckConstraint("ck_fuel_types_allow_below_cost_needs_a_cost", "allow_below_cost = false OR supplier_price_per_liter IS NOT NULL");
+
                             t.HasCheckConstraint("ck_fuel_types_brand_fuel_code_length", "brand_fuel_code IS NULL OR length(brand_fuel_code) <= 50");
 
                             t.HasCheckConstraint("ck_fuel_types_margin_signs", "margin_uah_per_liter IS NULL OR margin_uah_per_liter >= 0");

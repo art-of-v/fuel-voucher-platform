@@ -194,6 +194,14 @@ internal sealed class FuelTypeEntityConfiguration : IEntityTypeConfiguration<Fue
         {
                 t.HasCheckConstraint("ck_fuel_types_name_length", "length(name) <= 200");
 
+            // The switch that says "this fuel may be sold below cost" means something only when
+            // there is a cost to be below. Without one it is a switch that disarms the guard for
+            // nothing - and it becomes a live one the moment a cost is recorded, for every fuel
+            // that carries it. So the rule is in the schema: the switch can only be on for a
+            // fuel whose cost is known.
+            t.HasCheckConstraint("ck_fuel_types_allow_below_cost_needs_a_cost",
+                "allow_below_cost = false OR supplier_price_per_liter IS NOT NULL");
+
             // 50 for a brand's own code for a grade - "A-95", "Pulls 95", "SPBT", a QR product
             // code. Generous for what it is, bounded because it is indexed and unique per Brand.
             t.HasCheckConstraint("ck_fuel_types_brand_fuel_code_length", "brand_fuel_code IS NULL OR length(brand_fuel_code) <= 50");
