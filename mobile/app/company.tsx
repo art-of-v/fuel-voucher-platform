@@ -114,7 +114,11 @@ export default function CompanyScreen() {
   const confirmReturnToPool = (v: Voucher) => {
     Alert.alert(t('company.recall.confirmTitle'), t('company.recall.confirmDesc'), [
       { text: t('common.cancel'), style: 'cancel' },
-      { text: t('company.recall.confirm'), style: 'destructive', onPress: () => returnToPool(v.id) },
+      {
+        text: t('company.recall.confirm'),
+        style: 'destructive',
+        onPress: () => returnToPool(v.id),
+      },
     ]);
   };
 

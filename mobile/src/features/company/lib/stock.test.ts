@@ -406,7 +406,7 @@ describe('orphanedCompanyFuel', () => {
     expect(fuel.vouchers).toEqual([]);
   });
 
-  it('files the company\'s own frozen stock under the company too', () => {
+  it("files the company's own frozen stock under the company too", () => {
     // Planning #558: the fuel that was still active when a worker was fired became
     // company fuel and frozen at the same moment. Nobody holds it, and while it is frozen
     // the pool cannot issue it either — so the owner has to be able to act on it here.
