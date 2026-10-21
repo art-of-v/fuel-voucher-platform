@@ -126,6 +126,7 @@ public static class StatementReconciliationPdf
                 columns.ConstantColumn(110);  // statement id
                 columns.ConstantColumn(80);   // status
                 columns.ConstantColumn(110);  // invoice
+                columns.ConstantColumn(90);   // destination
                 columns.ConstantColumn(70);   // acquirer amount
                 columns.ConstantColumn(70);   // local amount
                 columns.RelativeColumn();     // note
@@ -135,9 +136,10 @@ public static class StatementReconciliationPdf
             {
                 header.Cell().Element(HeaderCell).Text("Statement ID");
                 header.Cell().Element(HeaderCell).Text("Статус");
+                header.Cell().Element(HeaderCell).Text("Рахунок");
+                header.Cell().Element(HeaderCell).Text("Призначення");
                 header.Cell().Element(HeaderCell).AlignRight().Text("Acquirer");
                 header.Cell().Element(HeaderCell).AlignRight().Text("В нас");
-                header.Cell().Element(HeaderCell).AlignRight().Text("Розбіжність");
                 header.Cell().Element(HeaderCell).Text("Примітка");
             });
 
@@ -146,6 +148,9 @@ public static class StatementReconciliationPdf
                 table.Cell().Element(BodyCell).Text(row.StatementId);
                 table.Cell().Element(BodyCell).Text(StatusLabel(row.Status));
                 table.Cell().Element(BodyCell).Text(row.InvoiceId ?? "-");
+                // The payment purpose the acquirer shows on the receipt: evidence for a dispute,
+                // never a match key.
+                table.Cell().Element(BodyCell).Text(row.Destination ?? "-");
                 table.Cell().Element(BodyCell).AlignRight().Text(Money(row.AcquirerAmount));
                 table.Cell().Element(BodyCell).AlignRight().Text(Money(row.LocalAmount));
                 table.Cell().Element(BodyCell).Text(row.Note ?? string.Empty);

@@ -50,6 +50,11 @@ namespace FuelFlow.API.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("ccy");
 
+                    b.Property<string>("Destination")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("destination");
+
                     b.Property<string>("ExtRef")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")

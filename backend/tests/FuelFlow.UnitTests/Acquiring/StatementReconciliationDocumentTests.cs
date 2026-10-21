@@ -15,14 +15,17 @@ public class StatementReconciliationDocumentTests
     {
         var rows = new List<StatementMatchRow>
         {
-            new("ST1", StatementMatchStatus.Matched, "INV1", "FuelFlow Order x", 97857, 978.57m,
+            new("ST1", StatementMatchStatus.Matched, "INV1", "FuelFlow Order x", "оплата за пальне",
+                97857, 978.57m,
                 Guid.NewGuid(), 978.57m, "ord-1", OrderStatus.Fulfilled,
                 new DateTime(2026, 10, 5, 9, 0, 0, DateTimeKind.Utc), null),
-            new("ST2", StatementMatchStatus.AmountMismatch, "INV2", "FuelFlow Bundle", 97900, 979.00m,
+            new("ST2", StatementMatchStatus.AmountMismatch, "INV2", "FuelFlow Bundle", "оплата за пальне",
+                97900, 979.00m,
                 Guid.NewGuid(), 978.57m, "ord-2", OrderStatus.Fulfilled,
                 new DateTime(2026, 10, 6, 9, 0, 0, DateTimeKind.Utc),
                 "Acquirer reports 979.00, the order was priced 978.57"),
-            new("ST3", StatementMatchStatus.Unmatched, "INV3", null, 25000, 250.00m,
+            new("ST3", StatementMatchStatus.Unmatched, "INV3", null, null,
+                25000, 250.00m,
                 null, null, null, null,
                 new DateTime(2026, 10, 7, 9, 0, 0, DateTimeKind.Utc),
                 "No order or refund of ours carries this invoice")
@@ -50,6 +53,19 @@ public class StatementReconciliationDocumentTests
         csv.Should().Contain("ST2");
         csv.Should().Contain("ST3");
         csv.Should().Contain("INV9");
+    }
+
+    [Fact]
+    public void The_Csv_Shows_The_Destination_Beside_The_Reference()
+    {
+        // The acquirer's `destination` is the payment purpose as it appears on the receipt - the
+        // only human-readable string on the row, and the one an accountant reads when a customer
+        // says they paid for something else. It sits BESIDE our own echoed reference, which is what
+        // ties the row to our invoice; it never replaces it, and it is never a match key.
+        var csv = StatementReconciliationCsv.Render(Act());
+
+        csv.Should().Contain("StatementId,Status,InvoiceId,Reference,Destination,");
+        csv.Should().Contain("оплата за пальне");
     }
 
     // The act is read in a spreadsheet, and Excel on Windows decides a CSV's encoding from the BOM

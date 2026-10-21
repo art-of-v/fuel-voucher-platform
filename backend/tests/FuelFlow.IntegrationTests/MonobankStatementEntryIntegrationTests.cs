@@ -44,6 +44,9 @@ public sealed class MonobankStatementEntryIntegrationTests : IClassFixture<TestD
             StatementId = statementId,
             InvoiceId = "INV-" + statementId,
             Reference = "order-" + statementId,
+            // The payment purpose as the acquirer shows it on the receipt. Evidence for a dispute,
+            // never a match key.
+            Destination = "purpose-" + statementId,
             AmountKopecks = amountKopecks,
             Ccy = 980,
             Status = "settled",
@@ -70,6 +73,9 @@ public sealed class MonobankStatementEntryIntegrationTests : IClassFixture<TestD
         loaded.Merchant.Should().Be(MonobankMerchant.Live);
         loaded.StatementId.Should().Be("ST1");
         loaded.Ccy.Should().Be(980);
+        // The destination is stored beside the reference, not instead of it: the act needs both.
+        loaded.Destination.Should().Be("purpose-ST1");
+        loaded.Reference.Should().Be("order-ST1");
         loaded.RawPayload.Should().Contain("ST1");
         loaded.AcquirerCreatedAtUtc.Should().Be(new DateTime(2026, 10, 5, 9, 0, 0, DateTimeKind.Utc));
     }

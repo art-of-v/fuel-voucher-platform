@@ -51,6 +51,14 @@ public class MonobankStatementEntry
     public string? Reference { get; set; }
 
     /// <summary>
+    /// The payment purpose as the acquirer shows it on the receipt - what the customer typed, or
+    /// what the checkout asked for. Evidence, and never a key: the same string appears on
+    /// thousands of unrelated payments, and a match key built on it would match a customer's own
+    /// memo to somebody else's invoice.
+    /// </summary>
+    public string? Destination { get; set; }
+
+    /// <summary>
     /// Kopecks, exactly as Monobank reports them - the acquirer's API speaks kopecks and nothing else,
     /// so this is a boundary value and is not converted on the way in.
     /// </summary>
