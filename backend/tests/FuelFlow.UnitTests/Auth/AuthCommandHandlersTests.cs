@@ -85,7 +85,9 @@ public sealed class AuthCommandHandlersTests : IDisposable
         await _context.SaveChangesAsync();
 
         var handler = new DeleteUserCommandHandler(_context, new Mock<ILogger<DeleteUserCommandHandler>>().Object, new AuditEventService(_context));
-        var command = new DeleteUserCommand(UserId);
+        // The acting role travels with the command: the delete path asks the hierarchy who may
+        // delete whom, and the owner may delete anyone (planning #455).
+        var command = new DeleteUserCommand(UserId, Guid.NewGuid(), "Owner", SeedRoles.ProductOwnerName);
 
         var result = await handler.HandleAsync(command, CancellationToken.None);
 

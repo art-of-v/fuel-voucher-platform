@@ -126,7 +126,10 @@ public sealed class UserController : ControllerBase
         if (string.IsNullOrEmpty(userId) || !Guid.TryParse(userId, out var parsedUserId))
             return Unauthorized("User ID not found");
 
-        var result = await _deleteUserHandler.HandleAsync(new DeleteUserCommand(parsedUserId), cancellationToken);
+        // The acting id travels with the command: a user closing their own account is not a staff
+        // action, and the handler has to be able to tell it from one (planning #455).
+        var result = await _deleteUserHandler.HandleAsync(
+            new DeleteUserCommand(parsedUserId, parsedUserId), cancellationToken);
 
         if (!result.Success)
             return NotFound(new { message = result.Error });
