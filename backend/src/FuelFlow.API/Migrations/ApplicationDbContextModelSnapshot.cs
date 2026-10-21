@@ -153,46 +153,55 @@ namespace FuelFlow.API.Migrations
                     b.Property<string>("AppVersion")
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")
-                        .HasColumnName("app_version");
+                        .HasColumnName("app_version")
+                        .HasComment("The app version, as the app reports it.");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
+                        .HasColumnName("created_at")
+                        .HasComment("When the device was first seen.");
 
                     b.Property<string>("DeviceId")
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")
-                        .HasColumnName("device_id");
+                        .HasColumnName("device_id")
+                        .HasComment("The device's own id, as the app reports it.");
 
                     b.Property<string>("DeviceModel")
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")
-                        .HasColumnName("device_model");
+                        .HasColumnName("device_model")
+                        .HasComment("The device model, as the app reports it.");
 
                     b.Property<DateTime>("LastSeenAt")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("last_seen_at");
+                        .HasColumnName("last_seen_at")
+                        .HasComment("When it was last seen.");
 
                     b.Property<string>("OsVersion")
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")
-                        .HasColumnName("os_version");
+                        .HasColumnName("os_version")
+                        .HasComment("The operating system version, as the app reports it.");
 
                     b.Property<string>("PublicKey")
                         .IsRequired()
                         .HasColumnType("text")
-                        .HasColumnName("public_key");
+                        .HasColumnName("public_key")
+                        .HasComment("The public key the device signs with. The private half never leaves the device.");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
-                        .HasColumnName("status");
+                        .HasColumnName("status")
+                        .HasComment("Whether the device is trusted, blocked or pending.");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid")
-                        .HasColumnName("user_id");
+                        .HasColumnName("user_id")
+                        .HasComment("The account this device belongs to.");
 
                     b.HasKey("Id");
 
@@ -221,43 +230,52 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
+                        .HasColumnName("created_at_utc")
+                        .HasComment("When it was issued.");
 
                     b.Property<string>("DeviceId")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
-                        .HasColumnName("device_id");
+                        .HasColumnName("device_id")
+                        .HasComment("The device the token was issued to, when it is known.");
 
                     b.Property<DateTime>("ExpiresAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("expires_at_utc");
+                        .HasColumnName("expires_at_utc")
+                        .HasComment("When the token stops being valid.");
 
                     b.Property<Guid>("FamilyId")
                         .HasColumnType("uuid")
-                        .HasColumnName("family_id");
+                        .HasColumnName("family_id")
+                        .HasComment("The family the token belongs to. Every token issued from one login shares a family, anda reuse of a revoked token revokes the whole family - that is how a stolen token isdetected rather than merely used once.");
 
                     b.Property<bool>("IsRevoked")
                         .HasColumnType("boolean")
-                        .HasColumnName("is_revoked");
+                        .HasColumnName("is_revoked")
+                        .HasComment("Whether the token has been taken back.");
 
                     b.Property<DateTime?>("RevokedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("revoked_at_utc");
+                        .HasColumnName("revoked_at_utc")
+                        .HasComment("When it was taken back, or NULL while it has not been.");
 
                     b.Property<string>("RoleNameAtIssue")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
-                        .HasColumnName("role_name_at_issue");
+                        .HasColumnName("role_name_at_issue")
+                        .HasComment("The role the account had WHEN the token was issued. The role is copied rather than readat use time, so that a role change does not silently change what an old token can do.");
 
                     b.Property<string>("Token")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
-                        .HasColumnName("token");
+                        .HasColumnName("token")
+                        .HasComment("The token itself, hashed. The plaintext exists only in the response that issued it.");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid")
-                        .HasColumnName("user_id");
+                        .HasColumnName("user_id")
+                        .HasComment("The account the token belongs to.");
 
                     b.HasKey("Id");
 
@@ -291,35 +309,42 @@ namespace FuelFlow.API.Migrations
                         .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)")
-                        .HasColumnName("code");
+                        .HasColumnName("code")
+                        .HasComment("The code itself, hashed.");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
+                        .HasColumnName("created_at_utc")
+                        .HasComment("When it was sent.");
 
                     b.Property<DateTime>("ExpiresAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("expires_at_utc");
+                        .HasColumnName("expires_at_utc")
+                        .HasComment("When the code stops being valid.");
 
                     b.Property<int>("FailedAttempts")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
                         .HasDefaultValue(0)
-                        .HasColumnName("failed_attempts");
+                        .HasColumnName("failed_attempts")
+                        .HasComment("How many times it was tried and failed.");
 
                     b.Property<bool>("IsUsed")
                         .HasColumnType("boolean")
-                        .HasColumnName("is_used");
+                        .HasColumnName("is_used")
+                        .HasComment("Whether the code has been redeemed.");
 
                     b.Property<string>("PhoneNumber")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
-                        .HasColumnName("phone_number");
+                        .HasColumnName("phone_number")
+                        .HasComment("The number the code was sent to.");
 
                     b.Property<DateTime?>("UsedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("used_at_utc");
+                        .HasColumnName("used_at_utc")
+                        .HasComment("When it was redeemed, or NULL while it has not been.");
 
                     b.HasKey("Id");
 
@@ -1325,12 +1350,14 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateOnly?>("Birthdate")
                         .HasColumnType("date")
-                        .HasColumnName("birthdate");
+                        .HasColumnName("birthdate")
+                        .HasComment("The person's date of birth, when they gave it.");
 
                     b.Property<string>("TaxId")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
-                        .HasColumnName("tax_id");
+                        .HasColumnName("tax_id")
+                        .HasComment("The person's tax id (РНОКПП), when they gave it. A company cannot be invoiced withoutone, which is why a natural person without one is a gap in the data and not a defect inthe column.");
 
                     b.HasKey("PartyId");
 
@@ -1437,19 +1464,22 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
+                        .HasColumnName("created_at_utc")
+                        .HasComment("When the party record was created.");
 
                     b.Property<string>("DisplayName")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
-                        .HasColumnName("display_name");
+                        .HasColumnName("display_name")
+                        .HasComment("The name this party is shown under. Denormalised on purpose - the ledger needs one nameto print, and a person and a company are named differently.");
 
                     b.Property<string>("PartyType")
                         .IsRequired()
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)")
-                        .HasColumnName("party_type");
+                        .HasColumnName("party_type")
+                        .HasComment("What kind of party this is: a natural person or a company.");
 
                     b.HasKey("Id");
 
@@ -4351,7 +4381,8 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
+                        .HasColumnName("created_at_utc")
+                        .HasComment("When the role was created.");
 
                     b.Property<bool>("IsDefault")
                         .HasColumnType("boolean")
@@ -4359,13 +4390,15 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<int>("Level")
                         .HasColumnType("integer")
-                        .HasColumnName("level");
+                        .HasColumnName("level")
+                        .HasComment("The role's rank: User 0, QA 5, Manager 10, Admin 50, ProductOwner 100. The hierarchy isthe number, so a role's place in it is arithmetic rather than a table of who outrankswhom.");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
-                        .HasColumnName("name");
+                        .HasColumnName("name")
+                        .HasComment("The role's name, and the value the application matches on.");
 
                     b.HasKey("Id");
 
@@ -4474,7 +4507,8 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateOnly?>("Birthdate")
                         .HasColumnType("date")
-                        .HasColumnName("birthdate");
+                        .HasColumnName("birthdate")
+                        .HasComment("The customer's date of birth, when they gave it.");
 
                     b.Property<decimal>("BonusBalance")
                         .ValueGeneratedOnAdd()
@@ -4484,17 +4518,20 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
+                        .HasColumnName("created_at_utc")
+                        .HasComment("When the account was created.");
 
                     b.Property<string>("Email")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
-                        .HasColumnName("email");
+                        .HasColumnName("email")
+                        .HasComment("The customer's email, when they gave one.");
 
                     b.Property<string>("FirstName")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
-                        .HasColumnName("first_name");
+                        .HasColumnName("first_name")
+                        .HasComment("The customer's first name.");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
@@ -4522,16 +4559,19 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime?>("LastLoginAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("last_login_at_utc");
+                        .HasColumnName("last_login_at_utc")
+                        .HasComment("When it last signed in. NULL until it does.");
 
                     b.Property<string>("LastName")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
-                        .HasColumnName("last_name");
+                        .HasColumnName("last_name")
+                        .HasComment("The customer's last name.");
 
                     b.Property<Guid?>("PartyId")
                         .HasColumnType("uuid")
-                        .HasColumnName("party_id");
+                        .HasColumnName("party_id")
+                        .HasComment("The user's party record (D-02, additive step 1). NULLABLE on purpose: the documentedsequence is insert, switch, reconcile, then retire, and this column is the insert.Nothing reads it yet and no handler depends on it, so a user existing without one is notan error today - it becomes one when the column is promoted to NOT NULL, and that is aseparate migration with a test that says so.");
 
                     b.Property<string>("PendingEmail")
                         .HasMaxLength(200)
@@ -4551,32 +4591,38 @@ namespace FuelFlow.API.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
-                        .HasColumnName("phone_number");
+                        .HasColumnName("phone_number")
+                        .HasComment("The customer's phone number, and their identity: the login is the number.");
 
                     b.Property<string>("ProfileImageUrl")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
-                        .HasColumnName("profile_image_url");
+                        .HasColumnName("profile_image_url")
+                        .HasComment("Where the avatar is.");
 
                     b.Property<string>("ReferralCode")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
-                        .HasColumnName("referral_code");
+                        .HasColumnName("referral_code")
+                        .HasComment("The code the customer chose to be referred by. Optional, and it may change - correct formarketing, and deliberately NOT the same thing as the settlement code.");
 
                     b.Property<string>("ReferredBy")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
-                        .HasColumnName("referred_by");
+                        .HasColumnName("referred_by")
+                        .HasComment("Who referred this customer, in their own words.");
 
                     b.Property<Guid?>("RoleId")
                         .HasColumnType("uuid")
-                        .HasColumnName("role_id");
+                        .HasColumnName("role_id")
+                        .HasComment("The role this account has, or NULL for an account with no role - which is a state theadmin can repair, not a state the database should refuse.");
 
                     b.Property<string>("SettlementCode")
                         .ValueGeneratedOnAdd()
                         .HasMaxLength(8)
                         .HasColumnType("character varying(8)")
-                        .HasColumnName("settlement_code");
+                        .HasColumnName("settlement_code")
+                        .HasComment("The short identifier an operator quotes to the finance channel to attribute money tothis customer. Issued once by the database and immutable for the life of the account: achanged code orphans every payment recorded against it. Deliberately NOT the referralcode - that one is optional and may change, and a customer without one would have no wayto be paid on this route at all. It also avoids the 0/O/1/I/L pairs: it is transcribedby hand, and those are the pairs people misread. A mistyped code credits money to thewrong person, so the alphabet trades a little space for legibility. Staff-only, and itmust not appear in any customer-facing response.");
 
                     b.Property<int>("TokenVersion")
                         .ValueGeneratedOnAdd()
@@ -4586,7 +4632,8 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
+                        .HasColumnName("updated_at_utc")
+                        .HasComment("When it last changed.");
 
                     b.HasKey("Id");
 

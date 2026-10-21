@@ -19,16 +19,20 @@ internal sealed class PartyConfiguration : IEntityTypeConfiguration<Party>
             .HasColumnName("party_type")
             .HasConversion<string>()
             .HasMaxLength(16)
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "What kind of party this is: a natural person or a company.");
 
         builder.Property(e => e.DisplayName)
             .HasColumnName("display_name")
             .HasMaxLength(200)
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "The name this party is shown under. Denormalised on purpose - the ledger needs one name" +
+                    "to print, and a person and a company are named differently.");
 
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "When the party record was created.");
 
         builder.ToTable(t =>
         {
@@ -52,11 +56,15 @@ internal sealed class NaturalPersonConfiguration : IEntityTypeConfiguration<Natu
             .HasColumnName("party_id");
 
         builder.Property(e => e.Birthdate)
-            .HasColumnName("birthdate");
+            .HasColumnName("birthdate")
+            .HasComment(                "The person's date of birth, when they gave it.");
 
         builder.Property(e => e.TaxId)
             .HasColumnName("tax_id")
-            .HasMaxLength(20);
+            .HasMaxLength(20)
+            .HasComment(                "The person's tax id (РНОКПП), when they gave it. A company cannot be invoiced without" +
+                    "one, which is why a natural person without one is a gap in the data and not a defect in" +
+                    "the column.");
 
         builder.HasOne(e => e.Party)
             .WithOne(e => e.NaturalPerson)

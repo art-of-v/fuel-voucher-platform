@@ -3,6 +3,7 @@ using FuelFlow.Features.Vouchers.Movements;
 using FuelFlow.Features.Orders.SharedModels;
 using FuelFlow.Features.Acquiring;
 using FuelFlow.Features.Company.SharedModels;
+using FuelFlow.Features.Auth.SharedModels;
 using FuelFlow.Features.Feedback.SharedModels;
 using FuelFlow.Features.Notifications.SharedModels;
 using FuelFlow.Features.Support.SharedModels;
@@ -558,6 +559,122 @@ public sealed class SchemaCommentTests
         Assert.Contains("junk", comment, StringComparison.OrdinalIgnoreCase);
     }
 
+
+
+    /// <summary>
+    /// The account tables: who the customer is, what they may do, and the tokens that stand
+    /// in for them.
+    /// </summary>
+    private static readonly (Type Entity, string[] Columns)[] TheAccountTables =
+    [
+        (typeof(User),
+        [
+            nameof(User.PhoneNumber),
+            nameof(User.RoleId),
+            nameof(User.CreatedAtUtc),
+            nameof(User.LastLoginAtUtc),
+            nameof(User.UpdatedAtUtc),
+            nameof(User.Email),
+            nameof(User.FirstName),
+            nameof(User.LastName),
+            nameof(User.Birthdate),
+            nameof(User.ProfileImageUrl),
+            nameof(User.PartyId),
+            nameof(User.ReferralCode),
+            nameof(User.ReferredBy),
+            nameof(User.SettlementCode)
+        ]),
+        (typeof(Role),
+        [
+            nameof(Role.Name),
+            nameof(Role.Level),
+            nameof(Role.CreatedAtUtc)
+        ]),
+        (typeof(Device),
+        [
+            nameof(Device.UserId),
+            nameof(Device.DeviceId),
+            nameof(Device.PublicKey),
+            nameof(Device.DeviceModel),
+            nameof(Device.OsVersion),
+            nameof(Device.AppVersion),
+            nameof(Device.Status),
+            nameof(Device.CreatedAt),
+            nameof(Device.LastSeenAt)
+        ]),
+        (typeof(RefreshToken),
+        [
+            nameof(RefreshToken.UserId),
+            nameof(RefreshToken.FamilyId),
+            nameof(RefreshToken.DeviceId),
+            nameof(RefreshToken.RoleNameAtIssue),
+            nameof(RefreshToken.Token),
+            nameof(RefreshToken.ExpiresAtUtc),
+            nameof(RefreshToken.CreatedAtUtc),
+            nameof(RefreshToken.IsRevoked),
+            nameof(RefreshToken.RevokedAtUtc)
+        ]),
+        (typeof(VerificationCode),
+        [
+            nameof(VerificationCode.PhoneNumber),
+            nameof(VerificationCode.Code),
+            nameof(VerificationCode.ExpiresAtUtc),
+            nameof(VerificationCode.CreatedAtUtc),
+            nameof(VerificationCode.IsUsed),
+            nameof(VerificationCode.UsedAtUtc),
+            nameof(VerificationCode.FailedAttempts)
+        ]),
+        (typeof(Party),
+        [
+            nameof(Party.PartyType),
+            nameof(Party.DisplayName),
+            nameof(Party.CreatedAtUtc)
+        ])
+    ];
+
+
+    [Fact]
+    public void The_Account_Tables_Should_Say_What_They_Are()
+    {
+        var context = BuildContext();
+
+        foreach (var (entityType, columns) in TheAccountTables)
+        {
+            var entity = context.Model.FindEntityType(entityType);
+            Assert.NotNull(entity);
+
+            foreach (var column in columns)
+            {
+                var property = entity.FindProperty(column);
+                Assert.NotNull(property);
+
+                var comment = CommentOf(property);
+                Assert.False(string.IsNullOrWhiteSpace(comment),
+                    $"{entityType.Name}.{column} carries no comment. These are the tables that "
+                    + "say who the customer is and what they may do - and a role level, a token "
+                    + "family and a settlement code all mean something that the name alone "
+                    + "does not say.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// The settlement code is transcribed by hand, so the alphabet that avoids the pairs
+    /// people misread is part of what the column is.
+    /// </summary>
+    [Fact]
+    public void The_Settlement_Code_Should_Say_Why_Its_Alphabet_Is_What_It_Is()
+    {
+        var context = BuildContext();
+        var user = context.Model.FindEntityType(typeof(User));
+        Assert.NotNull(user);
+
+        var comment = CommentOf(user.FindProperty(nameof(User.SettlementCode))!);
+
+        Assert.Contains("transcribed", comment, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("immutable", comment, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("mistyped", comment, StringComparison.OrdinalIgnoreCase);
+    }
 
     /// <summary>
     /// The comments of a property, read as the annotation they are stored as.

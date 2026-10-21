@@ -18,43 +18,52 @@ internal sealed class DeviceConfiguration : IEntityTypeConfiguration<Device>
 
         builder.Property(e => e.UserId)
             .HasColumnName("user_id")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "The account this device belongs to.");
 
         builder.Property(e => e.DeviceId)
             .HasColumnName("device_id")
             .HasMaxLength(255)
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "The device's own id, as the app reports it.");
 
         builder.Property(e => e.PublicKey)
             .HasColumnName("public_key")
             .HasColumnType("text")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "The public key the device signs with. The private half never leaves the device.");
 
         builder.Property(e => e.DeviceModel)
             .HasColumnName("device_model")
-            .HasMaxLength(255);
+            .HasMaxLength(255)
+            .HasComment(                "The device model, as the app reports it.");
 
         builder.Property(e => e.OsVersion)
             .HasColumnName("os_version")
-            .HasMaxLength(255);
+            .HasMaxLength(255)
+            .HasComment(                "The operating system version, as the app reports it.");
 
         builder.Property(e => e.AppVersion)
             .HasColumnName("app_version")
-            .HasMaxLength(255);
+            .HasMaxLength(255)
+            .HasComment(                "The app version, as the app reports it.");
 
         builder.Property(e => e.Status)
             .HasColumnName("status")
             .HasConversion<string>()
             .HasMaxLength(50)
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "Whether the device is trusted, blocked or pending.");
 
         builder.Property(e => e.CreatedAt)
             .HasColumnName("created_at")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "When the device was first seen.");
 
         builder.Property(e => e.LastSeenAt)
             .HasColumnName("last_seen_at")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "When it was last seen.");
 
         builder.HasOne(e => e.User)
             .WithMany()

@@ -20,48 +20,62 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(e => e.PhoneNumber)
             .HasColumnName("phone_number")
             .HasMaxLength(20)
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "The customer's phone number, and their identity: the login is the number.");
 
         builder.Property(e => e.RoleId)
-            .HasColumnName("role_id");
+            .HasColumnName("role_id")
+            .HasComment(                "The role this account has, or NULL for an account with no role - which is a state the" +
+                    "admin can repair, not a state the database should refuse.");
 
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "When the account was created.");
 
         builder.Property(e => e.LastLoginAtUtc)
-            .HasColumnName("last_login_at_utc");
+            .HasColumnName("last_login_at_utc")
+            .HasComment(                "When it last signed in. NULL until it does.");
 
         builder.Property(e => e.UpdatedAtUtc)
             .HasColumnName("updated_at_utc")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "When it last changed.");
 
         builder.Property(e => e.Email)
             .HasColumnName("email")
-            .HasMaxLength(200);
+            .HasMaxLength(200)
+            .HasComment(                "The customer's email, when they gave one.");
 
         builder.Property(e => e.FirstName)
             .HasColumnName("first_name")
-            .HasMaxLength(100);
+            .HasMaxLength(100)
+            .HasComment(                "The customer's first name.");
 
         builder.Property(e => e.LastName)
             .HasColumnName("last_name")
-            .HasMaxLength(100);
+            .HasMaxLength(100)
+            .HasComment(                "The customer's last name.");
 
         builder.Property(e => e.Birthdate)
-            .HasColumnName("birthdate");
+            .HasColumnName("birthdate")
+            .HasComment(                "The customer's date of birth, when they gave it.");
 
         builder.Property(e => e.ProfileImageUrl)
             .HasColumnName("profile_image_url")
-            .HasMaxLength(500);
+            .HasMaxLength(500)
+            .HasComment(                "Where the avatar is.");
 
         builder.Property(e => e.ReferralCode)
             .HasColumnName("referral_code")
-            .HasMaxLength(50);
+            .HasMaxLength(50)
+            .HasComment(                "The code the customer chose to be referred by. Optional, and it may change - correct for" +
+                    "marketing, and deliberately NOT the same thing as the settlement code.");
 
         builder.Property(e => e.ReferredBy)
             .HasColumnName("referred_by")
-            .HasMaxLength(50);
+            .HasMaxLength(50)
+            .HasComment(                "Who referred this customer, in their own words.");
 
         builder.Property(e => e.SettlementCode)
             .HasColumnName("settlement_code")
@@ -76,7 +90,15 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             // client, where there is no trigger to fill it. Every unit test that seeds a user would
             // then fail on a column the application never sets - which is the InMemory provider
             // asserting a database invariant it cannot possibly know about, not a real defect.
-            .ValueGeneratedOnAdd();
+            .ValueGeneratedOnAdd()
+            .HasComment(                "The short identifier an operator quotes to the finance channel to attribute money to" +
+                    "this customer. Issued once by the database and immutable for the life of the account: a" +
+                    "changed code orphans every payment recorded against it. Deliberately NOT the referral" +
+                    "code - that one is optional and may change, and a customer without one would have no way" +
+                    "to be paid on this route at all. It also avoids the 0/O/1/I/L pairs: it is transcribed" +
+                    "by hand, and those are the pairs people misread. A mistyped code credits money to the" +
+                    "wrong person, so the alphabet trades a little space for legibility. Staff-only, and it" +
+                    "must not appear in any customer-facing response.");
 
         // Unique across every row, soft-deleted ones included - the opposite of phone_number and
         // referral_code, which a soft-deleted user is deliberately allowed to release. A settlement
@@ -167,7 +189,12 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         // the 1:1 with a party is what the trigger guarantees, and a unique index here would also
         // forbid the two NULLs that a partially-migrated table legitimately has.
         builder.Property(e => e.PartyId)
-            .HasColumnName("party_id");
+            .HasColumnName("party_id")
+            .HasComment(                "The user's party record (D-02, additive step 1). NULLABLE on purpose: the documented" +
+                    "sequence is insert, switch, reconcile, then retire, and this column is the insert." +
+                    "Nothing reads it yet and no handler depends on it, so a user existing without one is not" +
+                    "an error today - it becomes one when the column is promoted to NOT NULL, and that is a" +
+                    "separate migration with a test that says so.");
 
         builder.HasIndex(e => e.PartyId);
 
