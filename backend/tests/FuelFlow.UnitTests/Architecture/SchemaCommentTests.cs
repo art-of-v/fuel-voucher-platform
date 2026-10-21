@@ -907,6 +907,114 @@ public sealed class SchemaCommentTests
         Assert.Contains("ExchangeBatchId", comment, StringComparison.OrdinalIgnoreCase);
     }
 
+
+    /// <summary>
+    /// The supplier side and the contracts: who we buy from, what came in, and what was signed.
+    /// </summary>
+    private static readonly (Type Entity, string[] Columns)[] TheSupplierAndTheContract =
+    [
+        (typeof(Supplier),
+        [
+            nameof(Supplier.Name),
+            nameof(Supplier.LegalForm),
+            nameof(Supplier.Phone),
+            nameof(Supplier.Email),
+            nameof(Supplier.EdrIpn),
+            nameof(Supplier.Rnkrr),
+            nameof(Supplier.Address),
+            nameof(Supplier.Notes),
+            nameof(Supplier.IsActive),
+            nameof(Supplier.CreatedAtUtc),
+            nameof(Supplier.UpdatedAtUtc),
+            nameof(Supplier.AcquisitionSource)
+        ]),
+        (typeof(PurchaseBatch),
+        [
+            nameof(PurchaseBatch.ImportJobId),
+            nameof(PurchaseBatch.FuelTypeId),
+            nameof(PurchaseBatch.Brand),
+            nameof(PurchaseBatch.BrandId),
+            nameof(PurchaseBatch.SupplierId),
+            nameof(PurchaseBatch.EnteredByUserId),
+            nameof(PurchaseBatch.CreatedAtUtc),
+            nameof(PurchaseBatch.UpdatedAtUtc)
+        ]),
+        (typeof(QrParameters),
+        [
+            nameof(QrParameters.Version),
+            nameof(QrParameters.EccLevel),
+            nameof(QrParameters.MaskPattern),
+            nameof(QrParameters.EncodingMode),
+            nameof(QrParameters.CreatedAtUtc)
+        ]),
+        (typeof(VoucherImportError),
+        [
+            nameof(VoucherImportError.ImportId),
+            nameof(VoucherImportError.PageNumber),
+            nameof(VoucherImportError.VoucherNumber),
+            nameof(VoucherImportError.ErrorMessage),
+            nameof(VoucherImportError.RawText),
+            nameof(VoucherImportError.CreatedAtUtc)
+        ]),
+        (typeof(Contract),
+        [
+            nameof(Contract.UserId),
+            nameof(Contract.LegalEntityId),
+            nameof(Contract.BrandId),
+            nameof(Contract.CreatedAtUtc),
+            nameof(Contract.ExpiresAtUtc)
+        ]),
+        (typeof(UserContract),
+        [
+            nameof(UserContract.UserId),
+            nameof(UserContract.ContractId),
+            nameof(UserContract.SignatureData),
+            nameof(UserContract.SignedAtUtc)
+        ])
+    ];
+
+
+
+    [Fact]
+    public void The_Supplier_And_The_Contract_Should_Say_What_They_Are()
+    {
+        var context = BuildContext();
+
+        foreach (var (entityType, columns) in TheSupplierAndTheContract)
+        {
+            var entity = context.Model.FindEntityType(entityType);
+            Assert.NotNull(entity);
+
+            foreach (var column in columns)
+            {
+                var property = entity.FindProperty(column);
+                Assert.NotNull(property);
+
+                var comment = CommentOf(property);
+                Assert.False(string.IsNullOrWhiteSpace(comment),
+                    $"{entityType.Name}.{column} carries no comment. A supplier, a batch of stock, a "
+                    + "file that did not read, a contract and a signature - these are the columns a "
+                    + "person opens the database to find, with the code closed.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// A contract without a term is not a contract. The comment has to say that, because the
+    /// column is what stops a signature.
+    /// </summary>
+    [Fact]
+    public void The_Contract_Should_Say_Why_Its_Term_Is_Mandatory()
+    {
+        var context = BuildContext();
+        var contract = context.Model.FindEntityType(typeof(Contract));
+        Assert.NotNull(contract);
+
+        var comment = CommentOf(contract.FindProperty(nameof(Contract.ExpiresAtUtc))!);
+
+        Assert.Contains("stops a signature", comment, StringComparison.OrdinalIgnoreCase);
+    }
+
     /// <summary>
     /// The comments of a property, read as the annotation they are stored as.
     /// </summary>

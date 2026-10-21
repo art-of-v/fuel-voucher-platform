@@ -18,25 +18,30 @@ internal sealed class SupplierConfiguration : IEntityTypeConfiguration<Supplier>
         builder.Property(e => e.Name)
             .HasColumnName("name")
             .HasMaxLength(200)
-            .IsRequired();
+            .IsRequired().HasComment("The supplier's display name. Unique among suppliers - two rows with the same name are one" +
+                    "counterparty recorded twice.");
 
         builder.Property(e => e.LegalForm)
             .HasColumnName("legal_form")
-            .HasMaxLength(32);
+            .HasMaxLength(32).HasComment("ФОП / ТОВ / ТзОВ / ФОП-ЄЗ / інше. Which form it is decides which requisites are" +
+                    "meaningful.");
 
         builder.Property(e => e.Phone)
             .HasColumnName("phone")
-            .HasMaxLength(32);
+            .HasMaxLength(32).HasComment("The phone to call about this supplier.");
 
         builder.Property(e => e.Email)
             .HasColumnName("email")
-            .HasMaxLength(200);
+            .HasMaxLength(200).HasComment("The address to write to.");
 
         // Single column because ФОП has an ІПН and an LLC has an ЄДРОПУ; they never both apply, and a
         // caller reading a supplier needs one field regardless of form.
         builder.Property(e => e.EdrIpn)
             .HasColumnName("edr_ipn")
-            .HasMaxLength(20);
+            .HasMaxLength(20).HasComment("The registry code - ЄДРОПУ for a company, ІПН for an individual. Optional, and unique" +
+                    "when it is there: two rows with the same code are the same counterparty recorded twice, and" +
+                    "a business that pays two suppliers who are one person pays twice and reconciles the" +
+                    "difference by hand.");
 
         // One supplier, one registry code. Two rows with the same code are the same counterparty
         // recorded twice, and a business that pays "two" suppliers who is one person pays twice
@@ -53,29 +58,30 @@ internal sealed class SupplierConfiguration : IEntityTypeConfiguration<Supplier>
 
         builder.Property(e => e.Rnkrr)
             .HasColumnName("rnkrr")
-            .HasMaxLength(20);
+            .HasMaxLength(20).HasComment("РНОКР - the tax register number. Individuals have one too; companies may omit it.");
 
         builder.Property(e => e.Address)
             .HasColumnName("address")
-            .HasMaxLength(500);
+            .HasMaxLength(500).HasComment("The supplier's address.");
 
         builder.Property(e => e.Notes)
             .HasColumnName("notes")
-            .HasMaxLength(2000);
+            .HasMaxLength(2000).HasComment("Free-form: settlement terms, who to call, what the invoice must include.");
 
         builder.Property(e => e.IsActive)
             .HasColumnName("is_active")
-            .IsRequired();
+            .IsRequired().HasComment("Inactive suppliers stay on past vouchers for audit, but they are not offered to the" +
+                    "operator.");
 
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
             .HasColumnType("timestamp with time zone")
-            .IsRequired();
+            .IsRequired().HasComment("When the row was written.");
 
         builder.Property(e => e.UpdatedAtUtc)
             .HasColumnName("updated_at_utc")
             .HasColumnType("timestamp with time zone")
-            .IsRequired();
+            .IsRequired().HasComment("When it was last changed.");
 
         // HasDefaultValue as well as the CLR default: the value has to reach the database for the
         // supplier-creation paths that do not think in terms of routes at all, and EF omits an unset
@@ -84,7 +90,9 @@ internal sealed class SupplierConfiguration : IEntityTypeConfiguration<Supplier>
             .HasColumnName("acquisition_source")
             .HasMaxLength(10)
             .HasDefaultValue(AcquisitionSources.Default)
-            .IsRequired();
+            .IsRequired().HasComment("Which supply route this supplier sells on: direct, or through a partner. Immutable - a" +
+                    "supplier that moves between routes is a different supply relationship, and a voucher bought" +
+                    "last quarter has to keep reporting in the bucket it was bought into.");
 
         // The value set AcquisitionSources.All documents - see AcquisitionSources.
         builder.ToTable(t =>

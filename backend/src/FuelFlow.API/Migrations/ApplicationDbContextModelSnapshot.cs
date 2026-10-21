@@ -484,23 +484,28 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<Guid>("BrandId")
                         .HasColumnType("uuid")
-                        .HasColumnName("brand_id");
+                        .HasColumnName("brand_id")
+                        .HasComment("The brand the contract covers - the terms of one brand, not of the platform.");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
+                        .HasColumnName("created_at_utc")
+                        .HasComment("When the contract was created.");
 
                     b.Property<DateTime>("ExpiresAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("expires_at_utc");
+                        .HasColumnName("expires_at_utc")
+                        .HasComment("When the contract stops being valid. Mandatory since 2026-10-20, on the business'sinstruction: a contract without a term is not a contract, it is a record that something oncehappened. The sign endpoint refuses to sign a contract that has already expired, so theterm is not a field nobody reads - it is the thing that stops a signature.");
 
                     b.Property<Guid>("LegalEntityId")
                         .HasColumnType("uuid")
-                        .HasColumnName("legal_entity_id");
+                        .HasColumnName("legal_entity_id")
+                        .HasComment("The company the contract is for.");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid")
-                        .HasColumnName("user_id");
+                        .HasColumnName("user_id")
+                        .HasComment("The user who signs this contract.");
 
                     b.HasKey("Id");
 
@@ -611,19 +616,23 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<Guid>("ContractId")
                         .HasColumnType("uuid")
-                        .HasColumnName("contract_id");
+                        .HasColumnName("contract_id")
+                        .HasComment("The contract that was signed.");
 
                     b.Property<string>("SignatureData")
                         .HasColumnType("text")
-                        .HasColumnName("signature_data");
+                        .HasColumnName("signature_data")
+                        .HasComment("The signature itself, as it was captured. NULL for a contract signed on paper and keyed inby hand - which is a real answer, not a missing value.");
 
                     b.Property<DateTime>("SignedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("signed_at_utc");
+                        .HasColumnName("signed_at_utc")
+                        .HasComment("When it was signed.");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid")
-                        .HasColumnName("user_id");
+                        .HasColumnName("user_id")
+                        .HasComment("The user who signed.");
 
                     b.HasKey("Id");
 
@@ -2946,26 +2955,31 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
+                        .HasColumnName("created_at_utc")
+                        .HasComment("When the row was written.");
 
                     b.Property<string>("EccLevel")
                         .IsRequired()
                         .HasMaxLength(1)
                         .HasColumnType("character varying(1)")
-                        .HasColumnName("ecc_level");
+                        .HasColumnName("ecc_level")
+                        .HasComment("The error correction level of the original QR: L, M, Q or H.");
 
                     b.Property<string>("EncodingMode")
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)")
-                        .HasColumnName("encoding_mode");
+                        .HasColumnName("encoding_mode")
+                        .HasComment("The data-encoding mode of the original QR: NUMERIC, ALPHANUMERIC or BYTE. A hint when thecode is regenerated.");
 
                     b.Property<int?>("MaskPattern")
                         .HasColumnType("integer")
-                        .HasColumnName("mask_pattern");
+                        .HasColumnName("mask_pattern")
+                        .HasComment("The data-mask reference number (0-7), read from the format-information strip.");
 
                     b.Property<int?>("Version")
                         .HasColumnType("integer")
-                        .HasColumnName("version");
+                        .HasColumnName("version")
+                        .HasComment("The QR code version (1-40), read from the aligned bit-matrix width. It controls the griddensity.");
 
                     b.HasKey("Id");
 
@@ -3171,31 +3185,37 @@ namespace FuelFlow.API.Migrations
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
+                        .HasColumnName("created_at_utc")
+                        .HasComment("When the row was written.");
 
                     b.Property<string>("ErrorMessage")
                         .IsRequired()
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)")
-                        .HasColumnName("error_message");
+                        .HasColumnName("error_message")
+                        .HasComment("What went wrong, in words. The reason the row was refused.");
 
                     b.Property<Guid>("ImportId")
                         .HasColumnType("uuid")
-                        .HasColumnName("import_id");
+                        .HasColumnName("import_id")
+                        .HasComment("The import this error belongs to. Every failed row points at the run that produced it, soone file's failures are read together.");
 
                     b.Property<int>("PageNumber")
                         .HasColumnType("integer")
-                        .HasColumnName("page_number");
+                        .HasColumnName("page_number")
+                        .HasComment("The page of the file the row was read from. The page, not the row: a page is what a personcan look at.");
 
                     b.Property<string>("RawText")
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)")
-                        .HasColumnName("raw_text");
+                        .HasColumnName("raw_text")
+                        .HasComment("The line as it arrived, exactly as the file had it. The evidence: without it, nobody cantell whether the importer read the file wrong or the file was wrong.");
 
                     b.Property<string>("VoucherNumber")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
-                        .HasColumnName("voucher_number");
+                        .HasColumnName("voucher_number")
+                        .HasComment("The voucher number as it was read, if it could be read at all. NULL when the line wasunreadable - which is often exactly why it is an error.");
 
                     b.HasKey("Id");
 
@@ -4411,35 +4431,43 @@ namespace FuelFlow.API.Migrations
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
-                        .HasColumnName("brand");
+                        .HasColumnName("brand")
+                        .HasComment("The brand's NAME - what a report groups by and what a parser reads. The id below is whatthe database can check, and the two are the same fact written twice.");
 
                     b.Property<Guid>("BrandId")
                         .HasColumnType("uuid")
-                        .HasColumnName("brand_id");
+                        .HasColumnName("brand_id")
+                        .HasComment("The brand's id - the key the text above is a copy of. The composite foreign key(fuel_type_id, brand_id) -> fuel_types(id, brand_id) is what refuses a row whose brand isnot its fuel's brand.");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
+                        .HasColumnName("created_at_utc")
+                        .HasComment("When the row was written.");
 
                     b.Property<Guid?>("EnteredByUserId")
                         .HasColumnType("uuid")
-                        .HasColumnName("entered_by_user_id");
+                        .HasColumnName("entered_by_user_id")
+                        .HasComment("The user who entered the batch. NULL for a batch that came in through an import.");
 
                     b.Property<Guid>("FuelTypeId")
                         .HasColumnType("uuid")
-                        .HasColumnName("fuel_type_id");
+                        .HasColumnName("fuel_type_id")
+                        .HasComment("The fuel this batch is.");
 
                     b.Property<Guid>("ImportJobId")
                         .HasColumnType("uuid")
-                        .HasColumnName("import_job_id");
+                        .HasColumnName("import_job_id")
+                        .HasComment("The import that brought this stock in.");
 
                     b.Property<Guid>("SupplierId")
                         .HasColumnType("uuid")
-                        .HasColumnName("supplier_id");
+                        .HasColumnName("supplier_id")
+                        .HasComment("The company this stock was bought from. Unlike the brand, this is the party we settle withand hand vouchers back to.");
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
+                        .HasColumnName("updated_at_utc")
+                        .HasComment("When it was last changed.");
 
                     b.HasKey("Id");
 
@@ -4509,60 +4537,72 @@ namespace FuelFlow.API.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)")
                         .HasDefaultValue("direct")
-                        .HasColumnName("acquisition_source");
+                        .HasColumnName("acquisition_source")
+                        .HasComment("Which supply route this supplier sells on: direct, or through a partner. Immutable - asupplier that moves between routes is a different supply relationship, and a voucher boughtlast quarter has to keep reporting in the bucket it was bought into.");
 
                     b.Property<string>("Address")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
-                        .HasColumnName("address");
+                        .HasColumnName("address")
+                        .HasComment("The supplier's address.");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
+                        .HasColumnName("created_at_utc")
+                        .HasComment("When the row was written.");
 
                     b.Property<string>("EdrIpn")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
-                        .HasColumnName("edr_ipn");
+                        .HasColumnName("edr_ipn")
+                        .HasComment("The registry code - ЄДРОПУ for a company, ІПН for an individual. Optional, and uniquewhen it is there: two rows with the same code are the same counterparty recorded twice, anda business that pays two suppliers who are one person pays twice and reconciles thedifference by hand.");
 
                     b.Property<string>("Email")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
-                        .HasColumnName("email");
+                        .HasColumnName("email")
+                        .HasComment("The address to write to.");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
-                        .HasColumnName("is_active");
+                        .HasColumnName("is_active")
+                        .HasComment("Inactive suppliers stay on past vouchers for audit, but they are not offered to theoperator.");
 
                     b.Property<string>("LegalForm")
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)")
-                        .HasColumnName("legal_form");
+                        .HasColumnName("legal_form")
+                        .HasComment("ФОП / ТОВ / ТзОВ / ФОП-ЄЗ / інше. Which form it is decides which requisites aremeaningful.");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
-                        .HasColumnName("name");
+                        .HasColumnName("name")
+                        .HasComment("The supplier's display name. Unique among suppliers - two rows with the same name are onecounterparty recorded twice.");
 
                     b.Property<string>("Notes")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)")
-                        .HasColumnName("notes");
+                        .HasColumnName("notes")
+                        .HasComment("Free-form: settlement terms, who to call, what the invoice must include.");
 
                     b.Property<string>("Phone")
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)")
-                        .HasColumnName("phone");
+                        .HasColumnName("phone")
+                        .HasComment("The phone to call about this supplier.");
 
                     b.Property<string>("Rnkrr")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
-                        .HasColumnName("rnkrr");
+                        .HasColumnName("rnkrr")
+                        .HasComment("РНОКР - the tax register number. Individuals have one too; companies may omit it.");
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
+                        .HasColumnName("updated_at_utc")
+                        .HasComment("When it was last changed.");
 
                     b.HasKey("Id");
 

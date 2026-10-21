@@ -17,26 +17,29 @@ internal sealed class ContractConfiguration : IEntityTypeConfiguration<Contract>
 
         builder.Property(e => e.UserId)
             .HasColumnName("user_id")
-            .IsRequired();
+            .IsRequired().HasComment("The user who signs this contract.");
 
         builder.Property(e => e.LegalEntityId)
             .HasColumnName("legal_entity_id")
-            .IsRequired();
+            .IsRequired().HasComment("The company the contract is for.");
 
         builder.Property(e => e.BrandId)
             .HasColumnName("brand_id")
             .HasColumnType("uuid")
-            .IsRequired();
+            .IsRequired().HasComment("The brand the contract covers - the terms of one brand, not of the platform.");
 
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
-            .IsRequired();
+            .IsRequired().HasComment("When the contract was created.");
 
         // The validity term, mandatory since 2026-10-20. A contract that never expires is a
         // record that something once happened, not an agreement.
         builder.Property(e => e.ExpiresAtUtc)
             .HasColumnName("expires_at_utc")
-            .IsRequired();
+            .IsRequired().HasComment("When the contract stops being valid. Mandatory since 2026-10-20, on the business's" +
+                    "instruction: a contract without a term is not a contract, it is a record that something once" +
+                    "happened. The sign endpoint refuses to sign a contract that has already expired, so the" +
+                    "term is not a field nobody reads - it is the thing that stops a signature.");
 
         // A term that ends before it starts is a typo, and the database is the cheapest place
         // to refuse it.
