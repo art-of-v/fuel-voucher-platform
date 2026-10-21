@@ -43,7 +43,8 @@ internal sealed class VoucherEventConfiguration : IEntityTypeConfiguration<Vouch
 
         builder.Property(e => e.VoucherId)
             .HasColumnName("voucher_id")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "The voucher this happened to.");
 
         builder.HasOne<FuelVoucher>()
             .WithMany()
@@ -53,26 +54,36 @@ internal sealed class VoucherEventConfiguration : IEntityTypeConfiguration<Vouch
         builder.Property(e => e.EventType)
             .HasColumnName("event_type")
             .HasMaxLength(24)
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "What kind of thing happened - a status change, an expiry being pushed out, a soft" +
+                    "delete. See VoucherEventTypes.");
 
         builder.Property(e => e.FromStatus)
             .HasColumnName("from_status")
-            .HasMaxLength(32);
+            .HasMaxLength(32)
+            .HasComment(                "The status before. Set for a status change only.");
 
         builder.Property(e => e.ToStatus)
             .HasColumnName("to_status")
-            .HasMaxLength(32);
+            .HasMaxLength(32)
+            .HasComment(                "The status after. Set for a status change only.");
 
         builder.Property(e => e.PreviousCustomerExpiration)
             .HasColumnName("previous_customer_expiration")
-            .HasColumnType("date");
+            .HasColumnType("date")
+            .HasComment(                "The expiry before. Set for an extension only - and it is written at the moment it is" +
+                    "still true, because the voucher's own expiry column is overwritten in place.");
 
         builder.Property(e => e.NewCustomerExpiration)
             .HasColumnName("new_customer_expiration")
-            .HasColumnType("date");
+            .HasColumnType("date")
+            .HasComment(                "The expiry after. Set for an extension only.");
 
         builder.Property(e => e.ExternalRef)
-            .HasColumnName("external_ref");
+            .HasColumnName("external_ref")
+            .HasComment(                "What the caller can be pointed back at - an order, a movement, a batch, a command." +
+                    "Indexed, because 'show me everything that happened because of order X' is what turns an" +
+                    "event log into evidence.");
 
         // Bare uuid, no FK: an event has to stay writable whatever happened to the actor row, which is
         // §G of TARGET_SCHEMA and what order_events and the three settlement records already do.
@@ -84,29 +95,36 @@ internal sealed class VoucherEventConfiguration : IEntityTypeConfiguration<Vouch
             .HasColumnName("actor_kind")
             .HasMaxLength(12)
             .HasDefaultValue(VoucherActorKinds.System)
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "Who caused it: a person, or the scheduler. See VoucherActorKinds.");
 
         // Bare uuid, no FK: an event has to be writable whatever happened to the actor row, and the
         // event must not be the thing that blocks deleting that account (planning #307,
         // TARGET_SCHEMA §G). The pairing constraint below is what says a 'user' actor is named.
         builder.Property(e => e.ActorUserId)
-            .HasColumnName("actor_user_id");
+            .HasColumnName("actor_user_id")
+            .HasComment(                "The person who caused it, required when actor_kind is 'user'. A bare uuid, no foreign" +
+                    "key - the record has to survive the account.");
 
         builder.Property(e => e.ActorPartyId)
-            .HasColumnName("actor_party_id");
+            .HasColumnName("actor_party_id")
+            .HasComment(                "The company that caused it. A bare uuid.");
 
         builder.Property(e => e.Reason)
             .HasColumnName("reason")
-            .HasMaxLength(500);
+            .HasMaxLength(500)
+            .HasComment(                "Why, in the operator's words.");
 
         builder.Property(e => e.OccurredAtUtc)
             .HasColumnName("occurred_at_utc")
             .HasColumnType("timestamp with time zone")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "When it happened.");
 
         builder.Property(e => e.Payload)
             .HasColumnName("payload")
-            .HasColumnType("jsonb");
+            .HasColumnType("jsonb")
+            .HasComment(                "Anything else worth keeping that has no column of its own.");
 
         // The question this table exists to answer is "what happened to THIS voucher", and it reads
         // forwards through time, so occurred_at_utc rides along in the key.
