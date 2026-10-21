@@ -61,6 +61,7 @@ jest.mock('lucide-react-native', () => {
   const Icon = () => null;
   return {
     __esModule: true,
+    Building2: Icon,
     Home: Icon,
     MapPin: Icon,
     ShoppingCart: Icon,
@@ -139,6 +140,9 @@ const TAB_NAMES = [
 ] as const;
 
 type TabName = (typeof TAB_NAMES)[number];
+
+/** The hub tab only exists in an owner context, so it is not part of the default set. */
+const OWNER_TAB_NAMES = [...TAB_NAMES, 'nav.company'] as const;
 
 function tab(name: TabName) {
   return screen.getByRole('tab', { name });
@@ -416,6 +420,47 @@ describe('BottomTabs — rendering', () => {
       expect(flat(tab(name)).flex).toBe(1);
       expect(flat(tab(name)).minWidth).toBe(tokens.touchTarget.min);
     }
+  });
+
+  it('gives the hub a tab of its own in an owner context', () => {
+    // Planning #294: the hub is a permanent destination, not a row on the profile.
+    mockContextKind = 'owner';
+    render(<BottomTabs />);
+
+    expect(screen.getByRole('tab', { name: 'nav.company' })).toBeTruthy();
+    expect(screen.getAllByRole('tab')).toHaveLength(OWNER_TAB_NAMES.length);
+  });
+
+  it('hides the hub tab outside an owner context', () => {
+    // The screen behind the tab redirects to the wallet for a worker or a personal
+    // context, so a tab that is always there would be a dead destination.
+    mockContextKind = 'worker';
+    render(<BottomTabs />);
+
+    expect(screen.queryByRole('tab', { name: 'nav.company' })).toBeNull();
+  });
+
+  it('keeps every tab full-width when the hub tab joins the bar', () => {
+    mockContextKind = 'owner';
+    render(<BottomTabs />);
+
+    for (const name of OWNER_TAB_NAMES) {
+      expect(flat(screen.getByRole('tab', { name })).flex).toBe(1);
+      expect(flat(screen.getByRole('tab', { name })).minWidth).toBe(tokens.touchTarget.min);
+    }
+  });
+
+  it('marks the hub as the selected tab on the hub itself', () => {
+    mockContextKind = 'owner';
+    mockPathname = '/company';
+    render(<BottomTabs />);
+
+    expect(screen.getByRole('tab', { name: 'nav.company' }).props.accessibilityState.selected).toBe(
+      true,
+    );
+    expect(screen.getByRole('tab', { name: 'nav.profile' }).props.accessibilityState.selected).toBe(
+      false,
+    );
   });
 
   it('renders nothing on a route that hides the bar', () => {

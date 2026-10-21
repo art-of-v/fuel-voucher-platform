@@ -5,6 +5,7 @@ import {
   groupVouchersByProvider,
   buildWorkerRoster,
   filterRoster,
+  orphanedCompanyFuel,
   groupOrdersByBrand,
   brandsOfOrder,
   orderBranchEntry,
@@ -357,6 +358,64 @@ describe('buildWorkerRoster', () => {
     );
 
     expect(roster.map((r) => r.workerName)).toEqual(['Андрій Аа', 'Іван Петренко']);
+  });
+});
+
+describe('orphanedCompanyFuel', () => {
+  const member = (over: Record<string, unknown> = {}) => ({
+    id: 'm1',
+    workerUserId: 'w1',
+    workerFirstName: 'Іван',
+    workerLastName: 'Петренко',
+    ...over,
+  });
+
+  it("files a fired worker's frozen fuel under the company, not under their name", () => {
+    // Planning #294: the fuel is the company's again, so it is grouped at the company's
+    // level rather than under a former worker who no longer works here.
+    const fuel = orphanedCompanyFuel(
+      [member()],
+      [
+        mkVoucher({ id: 'mine', workerUserId: 'w1' }),
+        mkVoucher({ id: 'gone', workerUserId: 'gone', status: 'blocked' }),
+      ],
+    );
+
+    expect(fuel.vouchers.map((v) => v.id)).toEqual(['gone']);
+    expect(fuel.frozenCount).toBe(1);
+    expect(fuel.usedCount).toBe(0);
+  });
+
+  it('leaves the company pool alone — that one belongs to the orders branch', () => {
+    const fuel = orphanedCompanyFuel([member()], [mkVoucher({ id: 'pool', workerUserId: null })]);
+
+    expect(fuel.vouchers).toEqual([]);
+  });
+
+  it('counts what the former worker spent as well as what is still frozen', () => {
+    const fuel = orphanedCompanyFuel(
+      [member()],
+      [
+        mkVoucher({ id: 'a', workerUserId: 'gone', status: 'blocked' }),
+        mkVoucher({ id: 'b', workerUserId: 'gone', status: 'used' }),
+      ],
+    );
+
+    expect(fuel.frozenCount).toBe(1);
+    expect(fuel.usedCount).toBe(1);
+  });
+
+  it('breaks the fuel down by brand for the drill-down', () => {
+    const fuel = orphanedCompanyFuel(
+      [member()],
+      [
+        mkVoucher({ id: 'a', workerUserId: 'gone', brand: 'OKKO', amount: 10, status: 'blocked' }),
+        mkVoucher({ id: 'b', workerUserId: 'gone', brand: 'wog', amount: 20, status: 'blocked' }),
+      ],
+    );
+
+    expect(fuel.brands.map((g) => g.brand)).toEqual(['OKKO', 'WOG']);
+    expect(fuel.brands[0].liters).toBe(10);
   });
 });
 

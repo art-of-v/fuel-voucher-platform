@@ -92,6 +92,7 @@ export const es: Record<string, string> = {
   'nav.codes': 'MIS CÓDIGOS',
   'nav.profile': 'PERFIL',
   'nav.feedback': 'Comentarios',
+  'nav.company': 'EMPRESA',
   'feedback.subtitle': 'Cuéntanos qué falla o qué falta',
   'feedback.whatTitle': 'Cómo funciona',
   'feedback.whatBody':
@@ -459,6 +460,7 @@ export const es: Record<string, string> = {
   'company.hub.noWorkerMatches': 'No se encontraron trabajadores',
   'company.hub.noOrders': 'Aún no hay pedidos',
   'company.hub.undistributedShort': 'SIN REPARTIR',
+  'company.hub.companyFuel': 'COMBUSTIBLE DE LA EMPRESA',
   'company.members.empty': 'Aún no hay trabajadores',
   'company.members.joined': 'Se unió {0}',
   'company.members.giftedCount': '{0} emitidos',
@@ -487,7 +489,6 @@ export const es: Record<string, string> = {
   'company.recall.empty': 'No hay vales emitidos',
   'company.recall.action': 'RECUPERAR',
   'company.recall.spentAction': 'USADO',
-  'company.recall.formerWorker': 'El portador ya no es empleado',
   'company.recall.confirmTitle': '¿Recuperar vale?',
   'company.recall.confirmDesc': '¿Devolver este vale al fondo de la empresa?',
   'company.recall.confirm': 'RECUPERAR',

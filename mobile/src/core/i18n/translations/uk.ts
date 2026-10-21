@@ -92,6 +92,7 @@ export const uk: Record<string, string> = {
   'nav.codes': 'МОЇ КОДИ',
   'nav.profile': 'ПРОФІЛЬ',
   'nav.feedback': "Зворотний зв'язок",
+  'nav.company': 'КОМПАНІЯ',
   'feedback.subtitle': 'Розкажіть, що не працює або чого бракує',
   'feedback.whatTitle': 'Як це працює',
   'feedback.whatBody':
@@ -459,6 +460,7 @@ export const uk: Record<string, string> = {
   'company.hub.noWorkerMatches': 'Працівників не знайдено',
   'company.hub.noOrders': 'Замовлень ще немає',
   'company.hub.undistributedShort': 'НЕ РОЗДАНО',
+  'company.hub.companyFuel': 'ПАЛЬНО КОМПАНІЇ',
   'company.members.empty': 'Працівників ще немає',
   'company.members.joined': 'Приєднався {0}',
   'company.members.giftedCount': 'видано: {0}',
@@ -488,7 +490,6 @@ export const uk: Record<string, string> = {
   'company.recall.empty': 'Немає виданих талонів',
   'company.recall.action': 'ПОВЕРНУТИ',
   'company.recall.spentAction': 'ВИКОРИСТАНО',
-  'company.recall.formerWorker': 'Одержувач більше не працює',
   'company.recall.confirmTitle': 'Повернути талон?',
   'company.recall.confirmDesc': 'Повернути цей талон до пулу компанії?',
   'company.recall.confirm': 'ПОВЕРНУТИ',

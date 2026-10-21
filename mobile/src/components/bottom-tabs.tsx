@@ -1,6 +1,14 @@
 import React, { useState } from 'react';
 import { View, Pressable, StyleSheet, ViewStyle } from 'react-native';
-import { Home, ShoppingCart, QrCode, User, MapPin, MessageSquare } from 'lucide-react-native';
+import {
+  Building2,
+  Home,
+  ShoppingCart,
+  QrCode,
+  User,
+  MapPin,
+  MessageSquare,
+} from 'lucide-react-native';
 import { Link, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStore } from '../core/state/appStore';
@@ -38,6 +46,15 @@ import { Text } from '../core/ui';
  * Multi-company epic #103 S5: in a *worker* context the basket tab is dropped —
  * a worker redeems the fuel their company issued and buys nothing on the
  * employer's behalf. Buying stays available by switching to the personal context.
+ *
+ * The owner hub (`/company`) is the other context-dependent tab, and the other way
+ * round: it appears in an *owner* context and nowhere else. A worker has no roster
+ * to manage and no fuel to hand out, and the screen behind the tab redirects to the
+ * wallet outside an owner context, so a tab that is always there would be a dead
+ * destination for most of the people who see it. The owner's decision (planning #294,
+ * 2026-10-21) made the hub a permanent destination rather than a row on the profile:
+ * roughly 40% of the screen surface was reachable only through the profile, and the
+ * hub is the part of it an owner opens daily.
  *
  * ## Making a tab press unmistakable
  *
@@ -110,7 +127,11 @@ export function BottomTabs() {
   const isAuthenticated = storeAuth || hookAuth;
   const cartCount = useCartStore((state) => state.getCartItemCount());
   const unreadCount = useUnreadNotificationCount();
-  const isWorkerContext = useAccountContext().kind === 'worker';
+  // One hook, two answers: the basket is dropped for a worker and the hub is shown
+  // only for an owner, so the bar's shape follows the context the user is acting in.
+  const accountContext = useAccountContext();
+  const isWorkerContext = accountContext.kind === 'worker';
+  const isOwnerContext = accountContext.kind === 'owner';
   const [pressedTab, setPressedTab] = useState<string | null>(null);
   // Server-decided, and hidden until the server has answered - see useFeedbackChannel. The tab
   // is absent rather than disabled so a switched-off channel costs the bar no width.
@@ -136,6 +157,11 @@ export function BottomTabs() {
     { name: 'my-codes', icon: QrCode, path: '/my-codes', label: t('nav.codes') },
     ...(feedbackChannel.available
       ? [{ name: 'feedback', icon: MessageSquare, path: '/feedback', label: t('nav.feedback') }]
+      : []),
+    // The hub sits next to the profile: both are the owner's own tools, and the
+    // profile keeps the last slot.
+    ...(isOwnerContext
+      ? [{ name: 'company', icon: Building2, path: '/company', label: t('nav.company') }]
       : []),
     {
       name: 'profile',
