@@ -32,6 +32,7 @@ public sealed class FuelFlowMetrics : IDisposable
     private readonly Counter<long> _vouchersRecalled;
     private readonly Counter<long> _vouchersBlocked;
     private readonly Counter<long> _vouchersUnblocked;
+    private readonly Counter<long> _vouchersReturnedToPool;
 
     // Fulfillment
     private readonly Counter<long> _fulfillmentSucceeded;
@@ -92,6 +93,10 @@ public sealed class FuelFlowMetrics : IDisposable
         _vouchersUnblocked = _meter.CreateCounter<long>(
             "fuelflow.vouchers.unblocked", "vouchers",
             "Worker-held vouchers an owner froze and then unblocked.");
+
+        _vouchersReturnedToPool = _meter.CreateCounter<long>(
+            "fuelflow.vouchers.returned_to_pool", "vouchers",
+            "Frozen vouchers an owner put back into the company pool in one step.");
 
         _fulfillmentSucceeded = _meter.CreateCounter<long>(
             "fuelflow.fulfillment.succeeded", "orders",
@@ -243,6 +248,8 @@ public sealed class FuelFlowMetrics : IDisposable
     public void VouchersBlocked(int count) => _vouchersBlocked.Add(count);
 
     public void VoucherUnblocked() => _vouchersUnblocked.Add(1);
+
+    public void VoucherReturnedToPool() => _vouchersReturnedToPool.Add(1);
 
     public void FulfillmentSucceeded(double elapsedMs)
     {

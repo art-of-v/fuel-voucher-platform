@@ -55,6 +55,7 @@ export default function CompanyScreen() {
     recall,
     block,
     unblock,
+    returnToPool,
     refreshAll,
     isInviting,
     isCancelling,
@@ -63,6 +64,7 @@ export default function CompanyScreen() {
     isRecalling,
     isBlocking,
     isUnblocking,
+    isReturningToPool,
   } = useCompany({
     onInviteSuccess: () => setPhone(UA_DIAL_PREFIX),
     onGiftSuccess: () => {
@@ -101,6 +103,18 @@ export default function CompanyScreen() {
     Alert.alert(t('company.block.confirmTitle'), t('company.block.confirmDesc'), [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('company.block.confirm'), style: 'destructive', onPress: () => block(v.id) },
+    ]);
+  };
+
+  // Putting a frozen voucher back into the company pool (planning #558). It says the
+  // same thing the recall says — «return this voucher to the company pool» — because it
+  // is the same thing, on a voucher that was frozen. The thaw is the other way out of a
+  // freeze, and it hands the paper to whoever holds it: for the fuel of a fired worker
+  // that is the person who was just fired, so the group offers this one instead.
+  const confirmReturnToPool = (v: Voucher) => {
+    Alert.alert(t('company.recall.confirmTitle'), t('company.recall.confirmDesc'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('company.recall.confirm'), style: 'destructive', onPress: () => returnToPool(v.id) },
     ]);
   };
 
@@ -251,11 +265,13 @@ export default function CompanyScreen() {
           isBlocking={isBlocking}
           isRecalling={isRecalling}
           isUnblocking={isUnblocking}
+          isReturningToPool={isReturningToPool}
           memberName={memberName}
           openGift={openGift}
           confirmFire={confirmFire}
           confirmRecall={confirmRecall}
           confirmBlock={confirmBlock}
+          confirmReturnToPool={confirmReturnToPool}
         />
 
         {/* The second hub branch: the company's own purchases by brand, and under each

@@ -219,7 +219,9 @@ export async function recallVoucher(
 
 // Epic #103 S3b: one toggle freezing/unfreezing a voucher held by a worker.
 // Block flips Assigned→Blocked (unredeemable, worker link kept); unblock flips it
-// back. Recall-to-pool stays the separate recallVoucher action above.
+// back. Recall-to-pool stays the separate recallVoucher action above, and so does
+// returnVoucherToPool below — the one that puts frozen fuel back into the pool
+// without handing it to anybody.
 export async function blockWorkerVoucher(
   voucherId: string,
   legalEntityId?: string | null,
@@ -238,6 +240,27 @@ export async function unblockWorkerVoucher(
 ): Promise<{ success: boolean }> {
   const response = await apiFetch(
     withEntity(`/api/company/vouchers/unblock/${voucherId}`, legalEntityId),
+    { method: 'POST' },
+  );
+  if (!response.ok) throw await parseError(response);
+  return response.json();
+}
+
+/**
+ * Puts a frozen voucher back into the company pool, in one step (planning #558).
+ *
+ * The thaw is the other thing an owner can do with a frozen voucher, and it is not this:
+ * the thaw hands the paper back to whoever holds it, which for the fuel of a fired
+ * worker means handing it to the person who was just fired. This returns it to the
+ * company instead — spendable company stock, filed back under the purchase it came
+ * from — so the pool can issue it to whoever the owner likes next.
+ */
+export async function returnVoucherToPool(
+  voucherId: string,
+  legalEntityId?: string | null,
+): Promise<{ success: boolean }> {
+  const response = await apiFetch(
+    withEntity(`/api/company/vouchers/return-to-pool/${voucherId}`, legalEntityId),
     { method: 'POST' },
   );
   if (!response.ok) throw await parseError(response);

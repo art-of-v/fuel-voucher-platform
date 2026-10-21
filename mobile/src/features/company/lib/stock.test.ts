@@ -241,6 +241,7 @@ describe('ownerActionsForVoucher (#159)', () => {
     expect(ownerActionsForVoucher('assigned')).toEqual({
       canFreezeOrRecall: true,
       canUnblock: false,
+      canReturnToPool: false,
     });
   });
 
@@ -250,12 +251,25 @@ describe('ownerActionsForVoucher (#159)', () => {
     const actions = ownerActionsForVoucher('used');
     expect(actions.canFreezeOrRecall).toBe(false);
     expect(actions.canUnblock).toBe(false);
+    expect(actions.canReturnToPool).toBe(false);
   });
 
   it('offers only the way back on a frozen voucher', () => {
     expect(ownerActionsForVoucher('blocked')).toEqual({
       canFreezeOrRecall: false,
       canUnblock: true,
+      canReturnToPool: true,
+    });
+  });
+
+  it('withdraws the thaw on the fuel of somebody who no longer works here', () => {
+    // Planning #558: a thaw hands the paper back to its holder, so on the fuel of a
+    // fired worker it would hand the fuel back to the person who was just fired.
+    // The way back to the pool is offered instead.
+    expect(ownerActionsForVoucher('blocked', true)).toEqual({
+      canFreezeOrRecall: false,
+      canUnblock: false,
+      canReturnToPool: true,
     });
   });
 
@@ -390,6 +404,22 @@ describe('orphanedCompanyFuel', () => {
     const fuel = orphanedCompanyFuel([member()], [mkVoucher({ id: 'pool', workerUserId: null })]);
 
     expect(fuel.vouchers).toEqual([]);
+  });
+
+  it('files the company\'s own frozen stock under the company too', () => {
+    // Planning #558: the fuel that was still active when a worker was fired became
+    // company fuel and frozen at the same moment. Nobody holds it, and while it is frozen
+    // the pool cannot issue it either — so the owner has to be able to act on it here.
+    const fuel = orphanedCompanyFuel(
+      [member()],
+      [
+        mkVoucher({ id: 'pool', workerUserId: null }),
+        mkVoucher({ id: 'frozen-stock', workerUserId: null, status: 'blocked' }),
+      ],
+    );
+
+    expect(fuel.vouchers.map((v) => v.id)).toEqual(['frozen-stock']);
+    expect(fuel.frozenCount).toBe(1);
   });
 
   it('counts what the former worker spent as well as what is still frozen', () => {
