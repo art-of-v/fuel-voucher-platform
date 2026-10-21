@@ -66,7 +66,7 @@ internal sealed class NaturalPersonConfiguration : IEntityTypeConfiguration<Natu
             .HasMaxLength(20)
             .HasComment(                "The person's tax id (РНОКПП), when they gave it. A company cannot be invoiced without" +
                     "one, which is why a natural person without one is a gap in the data and not a defect in" +
-                    "the column.").HasComment("IПН - the personal tax number. Nullable: most users never provide one, and a guessed tax id" +
+                    "the column.").HasComment("ІПН - the personal tax number. Nullable: most users never provide one, and a guessed tax id" +
                             "is worse than none.");
 
         builder.HasOne(e => e.Party)
