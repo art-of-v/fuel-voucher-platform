@@ -132,6 +132,15 @@ public sealed class NotificationService
             Message = payload.CompanyName is { Length: > 0 } company
                 ? $"{company} видав вам {DescribeVoucherCount(payload.VoucherCount)}. Це паливо для роботи — його не потрібно купувати."
                 : $"Вам видано {DescribeVoucherCount(payload.VoucherCount)}.",
+            // The company is what the row points at. A worker may work for several companies (W1),
+            // so the in-app row has to say which one the fuel came from - the same reason the push
+            // carries it.
+            Type = NotificationTypes.VoucherIssued,
+            Payload = NotificationPayload.Serialize(new NotificationPayload
+            {
+                LegalEntityId = payload.LegalEntityId,
+                VoucherCount = payload.VoucherCount,
+            }),
             IsRead = false,
             CreatedAtUtc = DateTime.UtcNow
         };
@@ -215,6 +224,14 @@ public sealed class NotificationService
             UserId = userId,
             Title = "Замовлення виконано",
             Message = $"Ваше замовлення #{payload.OrderId} виконано. Ваучери призначені та готові до використання.",
+            // The order id is in the payload as well as in the copy: the copy is prose, the payload
+            // is the contract. The client can open the order without scraping its id out of a
+            // sentence.
+            Type = NotificationTypes.OrderFulfilled,
+            Payload = NotificationPayload.Serialize(new NotificationPayload
+            {
+                OrderId = payload.OrderId.ToString(),
+            }),
             IsRead = false,
             CreatedAtUtc = DateTime.UtcNow
         };

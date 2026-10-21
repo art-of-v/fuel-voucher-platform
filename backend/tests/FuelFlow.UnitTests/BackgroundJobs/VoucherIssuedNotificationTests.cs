@@ -164,6 +164,50 @@ public sealed class VoucherIssuedNotificationTests : IDisposable
         data["legalEntityId"].Should().Be(companyId.ToString());
     }
 
+    /// <summary>
+    /// The in-app row has to carry the company too, and it has to say what it is about.
+    /// <para>
+    /// The push is the fast path and it can be missing: no notification permission, no APNs token,
+    /// a device that was reinstalled. The row in the bell is the fallback, and a fallback that
+    /// cannot say which company the fuel came from opens the wrong wallet - a worker in two
+    /// companies would read one company's fuel as another's.
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task The_Row_Itself_Carries_The_Type_And_The_Company()
+    {
+        var workerId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        Seed(CreateEvent(workerId, "ACME LLC", 2, companyId.ToString()));
+        await _context.SaveChangesAsync();
+
+        await _service.ProcessVoucherIssuedEventsAsync();
+
+        var notification = await _context.Notifications.SingleAsync();
+        notification.Type.Should().Be(NotificationTypes.VoucherIssued);
+        NotificationPayload.ReadId(notification.Payload, "legalEntityId").Should().Be(companyId.ToString());
+    }
+
+    /// <summary>
+    /// A row with no company cannot be routed to a worker context, and the worker may work for
+    /// several companies (W1) - so the row must not pretend. The type is still right: the fuel WAS
+    /// issued, the copy still names the company, and the client falls back to the notifications
+    /// list rather than opening the wrong one.
+    /// </summary>
+    [Fact]
+    public async Task A_Payload_Without_A_Company_Still_Carries_The_Type()
+    {
+        var workerId = Guid.NewGuid();
+        Seed(CreateEvent(workerId, "ACME LLC", 1, legalEntityId: null));
+        await _context.SaveChangesAsync();
+
+        await _service.ProcessVoucherIssuedEventsAsync();
+
+        var notification = await _context.Notifications.SingleAsync();
+        notification.Type.Should().Be(NotificationTypes.VoucherIssued);
+        NotificationPayload.ReadId(notification.Payload, "legalEntityId").Should().BeNull();
+    }
+
     [Fact]
     public async Task An_Invalid_Payload_Is_Marked_Processed_Without_Creating_Anything()
     {

@@ -473,7 +473,9 @@ public sealed class SchemaCommentTests
             nameof(Notification.Message),
             nameof(Notification.IsRead),
             nameof(Notification.CreatedAtUtc),
-            nameof(Notification.UpdatedAtUtc)
+            nameof(Notification.UpdatedAtUtc),
+            nameof(Notification.Type),
+            nameof(Notification.Payload)
         ]),
         (typeof(FeedbackMessage),
         [

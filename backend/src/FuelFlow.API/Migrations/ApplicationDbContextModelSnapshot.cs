@@ -1653,12 +1653,26 @@ namespace FuelFlow.API.Migrations
                         .HasColumnName("message")
                         .HasComment("The notification's body.");
 
+                    b.Property<string>("Payload")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("payload")
+                        .HasComment("What a client needs to open what the notification is about, as JSON. NULL when there is nothing to open.");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("title")
                         .HasComment("The notification's headline.");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("generic")
+                        .HasColumnName("type")
+                        .HasComment("What the notification is about - the routing key the client reads.");
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
@@ -1683,7 +1697,10 @@ namespace FuelFlow.API.Migrations
                     b.HasIndex("UserId", "IsRead")
                         .HasDatabaseName("ix_notifications_user_id_is_read");
 
-                    b.ToTable("notifications", (string)null);
+                    b.ToTable("notifications", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_notification_type", "type IN ('generic', 'order_fulfilled', 'voucher_issued')");
+                        });
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Notifications.SharedModels.UserPushToken", b =>
