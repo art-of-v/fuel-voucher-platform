@@ -99,9 +99,11 @@ public sealed class PublicFuelTypesIntegrationTests : IClassFixture<TestDatabase
 
             context.FuelVouchers.Add(new FuelVoucher
             {
-                Id = Guid.NewGuid(),
-                BrandId = BrandIds.ForSlug(slug),
-                Brand = slug,
+                   Id = Guid.NewGuid(),
+                   // The brand's key is the network this test created - a runtime network with an
+                   // id of its own, so the voucher's key is that id.
+                   BrandId = brandId,
+                   Brand = slug,
                 FuelTypeId =   fuelId,
                 Liters = 10m,
                 Status = VoucherStatus.Available,

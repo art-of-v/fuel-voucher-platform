@@ -28,12 +28,17 @@ namespace FuelFlow.IntegrationTests;
 /// backfill, or a future code path that forgets the check is refused rather than accepted.
 /// </para>
 /// <para>
-/// <b>The instrument is a foreign key, not a trigger.</b> The key is the pair
-/// <c>(fuel_type_id, brand_id)</c> pointing at the fuel's own <c>(id, brand_id)</c>, so the row's
+/// <b>The instrument is a foreign key, beside the trigger that is still there.</b> The key is the
+/// pair <c>(fuel_type_id, brand_id)</c> pointing at the fuel's own <c>(id, brand_id)</c>, so the row's
 /// brand and its fuel's brand are one fact rather than two that a function compares. The key is
 /// enforced by the engine, it cannot fall out of step with the schema, and it costs one index probe
-/// rather than a query per write. The trigger that stood here asked the same question in plpgsql and
-/// is gone.
+/// rather than a query per write.
+/// </para>
+/// <para>
+/// <b>The trigger is still there, and it guards the other column.</b> The trigger asks the same
+/// question about the <b>name</b>, and the key asks it about the <b>id</b> - so a row whose name says
+/// one brand and whose key says another is refused by neither. The trigger goes with the name, in
+/// the step that moves the readers to the id.
 /// </para>
 /// <para>
 /// The seeded catalogue is what the test leans on: <c>okko-95</c> is an OKKO fuel and <c>wog-95</c> is
@@ -66,6 +71,51 @@ public sealed class BrandMatchesItsFuelTypeIntegrationTests : IClassFixture<Test
             SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
             CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
             VoucherNumber = $"WRONG-BRAND-{Guid.NewGuid():N}",
+            QrPayload = $"payload-{Guid.NewGuid():N}",
+            Status = VoucherStatus.Available,
+            DataKind = DataKinds.Real,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+
+        context.FuelVouchers.Add(voucher);
+
+        var act = async () => await context.SaveChangesAsync();
+
+        // The refusal is the database's, so it arrives wrapped: EF's own message is the generic
+        // "an error occurred while saving", and the one that says what was wrong is inside it.
+        var thrown = (await act.Should().ThrowAsync<DbUpdateException>()).Which;
+
+        var inner = thrown.InnerException;
+        var message = (inner?.Message ?? thrown.Message);
+        message.Should().Contain("is not the brand",
+            "the refusal says which brand was wrong and which one was right");
+    }
+
+    [Fact]
+    public async Task A_Voucher_Whose_Brand_Key_Is_Not_Its_Fuel_Type_S_Brand_Is_Refused()
+    {
+        // The case the key catches and the trigger cannot see: the NAME is right and the KEY is
+        // wrong. The trigger compares the name with the fuel's brand, so it passes this row; the key
+        // compares the pair, and the pair is not a row of the catalogue.
+        //
+        // This is the guarantee the key adds, and it is the reason the key is not merely a cheaper
+        // trigger: before it, a writer that mixed the two copies up wrote a row that nothing
+        // refused.
+        await using var context = CreateContext();
+
+        var voucher = new FuelVoucher
+        {
+            Id = Guid.NewGuid(),
+            // The name is right - OKKO, on an OKKO fuel.
+            Brand = "okko",
+            // The key is WOG's. The row says OKKO and carries WOG's key, and the fuel is OKKO's.
+            BrandId = BrandIds.ForSlug("wog"),
+            FuelTypeId = ToUuid("okko-95"),
+            Liters = 50m,
+            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(1),
+            VoucherNumber = $"WRONG-KEY-{Guid.NewGuid():N}",
             QrPayload = $"payload-{Guid.NewGuid():N}",
             Status = VoucherStatus.Available,
             DataKind = DataKinds.Real,
@@ -143,13 +193,16 @@ public sealed class BrandMatchesItsFuelTypeIntegrationTests : IClassFixture<Test
     }
 
     [Fact]
-    public async Task The_Key_Is_A_Foreign_Key_And_Not_A_Trigger()
+    public async Task The_Key_Is_A_Foreign_Key_And_The_Trigger_Still_Guards_The_Name()
     {
-        // The instrument is the claim this test makes. A trigger would ask the same question in
-        // plpgsql on every write and would have to be kept in step with the schema by hand; a key
-        // is enforced by the engine and cannot fall out of step. So the shape of the schema is
-        // asserted, not just its effect: a schema that has the key AND the trigger would be doing
-        // the work twice.
+        // Two instruments, two columns, and this is the part that is easy to get wrong: the key
+        // checks the ID, the trigger checks the NAME, and neither sees what the other sees. A row
+        // whose name says OKKO and whose key says WOG is refused by neither - so the trigger stays
+        // while the name is still a column, and it goes with the name.
+        //
+        // The importer is why the two copies are not redundant: the name is what the supplier's
+        // paper says and the key is what the catalogue says, so a misread paper writes a wrong name
+        // with a right key, and the trigger is the only thing that sees it.
         await using var context = CreateContext();
 
         var keys = await context.Database
@@ -178,8 +231,8 @@ public sealed class BrandMatchesItsFuelTypeIntegrationTests : IClassFixture<Test
                 """)
             .ToListAsync();
 
-        triggers.Should().BeEmpty(
-            "the trigger that asked the same question in plpgsql is gone - the key is the instrument now");
+        triggers.Should().HaveCount(4,
+            "the trigger still guards the name - it goes with the name, in the step that moves the readers to the id");
     }
 
     private ApplicationDbContext CreateContext()

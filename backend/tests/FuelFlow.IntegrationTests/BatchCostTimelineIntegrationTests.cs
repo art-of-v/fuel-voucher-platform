@@ -283,6 +283,7 @@ public sealed class BatchCostTimelineIntegrationTests : IClassFixture<TestDataba
         => new()
         {
             Id = Guid.NewGuid(),
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-dp"),
             Liters = liters,

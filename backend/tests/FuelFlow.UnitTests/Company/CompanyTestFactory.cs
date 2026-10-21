@@ -100,6 +100,7 @@ internal static class CompanyTestFactory
         => new()
         {
             Id = id,
+            BrandId = BrandIds.ForSlug(brand),
             Brand = brand,
             FuelTypeId = ToUuid(fuelTypeId),
             Liters = liters,

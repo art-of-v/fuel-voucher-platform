@@ -345,6 +345,7 @@ public sealed class WorkerUsageReportIntegrationTests : IClassFixture<TestDataba
         => new()
         {
             Id = Guid.NewGuid(),
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-dp"),
             Liters = liters,

@@ -985,9 +985,10 @@ public sealed class RenewalFulfillmentIntegrationTests : IClassFixture<TestDatab
                     new()
                     {
                         Id = Guid.NewGuid(),
-                        OrderId = secondOrderId,
-                        Brand = "okko",
-                        FuelTypeId = ToUuid("okko-95"),
+                           OrderId = secondOrderId,
+                           Brand = "okko",
+                           BrandId = BrandIds.ForSlug("okko"),
+                           FuelTypeId = ToUuid("okko-95"),
                         Liters = 50m,
                         Quantity = 1,
                         UnitPrice = 500,
@@ -1424,6 +1425,7 @@ var exchangedId = Guid.NewGuid();
         => new()
         {
             Id = id,
+            BrandId = BrandIds.ForSlug(brand),
             Brand = brand,
             FuelTypeId =   ToUuid(fuelTypeId),
             Liters = liters,
@@ -1442,6 +1444,7 @@ var exchangedId = Guid.NewGuid();
         => new()
         {
             Id = id,
+            BrandId = BrandIds.ForSlug(brand),
             Brand = brand,
             FuelTypeId =   ToUuid(fuelTypeId),
             Liters = liters,

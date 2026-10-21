@@ -149,8 +149,8 @@ public class QaCataloguePoolIntegrationTests : IClassFixture<TestDatabaseFixture
         // Brand is the network's NAME, compared case-insensitively against the slug -
         // StockKey is (brand, fuel type, nominal), so a row keyed to the brand's id instead would
         // never match its own package. See StockKey for why those two have always been the same string.
-        Brand = BrandSlug,
-        BrandId = BrandIds.ForSlug(BrandSlug),
+           Brand = BrandSlug,
+           BrandId = Brand,
         FuelTypeId =   ToUuid(FuelType),
         Liters = liters,
         CostPerLiter = 45m,

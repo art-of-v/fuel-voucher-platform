@@ -331,6 +331,7 @@ public sealed class TestDatabaseFixture : WebApplicationFactory<Program>, IAsync
         {
             Database = name,
             SslMode = SslMode.Disable,
+            IncludeErrorDetail = true,
         }.ConnectionString;
     }
 

@@ -324,6 +324,7 @@ var chosen = await availability.FindPackageAsync(false, BrandIds.Okko, ToUuid("o
         => new()
         {
             Id = Guid.NewGuid(),
+            BrandId = BrandIds.ForSlug(brand),
             Brand = brand,
             FuelTypeId =   ToUuid(fuelTypeId),
             Liters = liters,

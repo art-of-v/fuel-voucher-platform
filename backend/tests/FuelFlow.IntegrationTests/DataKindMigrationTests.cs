@@ -262,13 +262,14 @@ public sealed class DataKindMigrationTests : IClassFixture<TestDatabaseFixture>
     {
         var expiry = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(3));
 
-        var voucher = new FuelVoucher
-        {
-            Id = Guid.NewGuid(),
-            // The voucher's network is the brand's slug, and the database refuses a row that names
-            // a different network than the fuel it claims.
-            Brand = brandSlug,
-            FuelTypeId = fuelTypeId,
+            var voucher = new FuelVoucher
+            {
+                Id = Guid.NewGuid(),
+                // The voucher's network is the brand's slug, and the database refuses a row that names
+                // a different network than the fuel it claims.
+                Brand = brandSlug,
+                BrandId = BrandIds.ForSlug(brandSlug),
+                FuelTypeId = fuelTypeId,
             Liters = 10m,
             SupplierExpirationDate = expiry,
             CustomerExpirationDate = expiry,

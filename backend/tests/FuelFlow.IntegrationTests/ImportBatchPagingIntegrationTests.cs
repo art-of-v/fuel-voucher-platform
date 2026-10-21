@@ -203,11 +203,12 @@ public sealed class ImportBatchPagingIntegrationTests : IClassFixture<TestDataba
 
         for (var index = 0; index < count; index++)
         {
-            context.FuelVouchers.Add(new FuelVoucher
-            {
-                Id = Guid.NewGuid(),
-                Brand = "okko",
-                FuelTypeId = fuelTypeId,
+                context.FuelVouchers.Add(new FuelVoucher
+                {
+                    Id = Guid.NewGuid(),
+                    Brand = "okko",
+                    BrandId = BrandIds.ForSlug("okko"),
+                    FuelTypeId = fuelTypeId,
                 Liters = 50m,
                 CostPerLiter = withCost ? 45m : null,
                 VoucherNumber = $"BATCH-{Guid.NewGuid():N}"[..20],

@@ -210,9 +210,10 @@ public sealed class QaTestPoolSegregationIntegrationTests : IClassFixture<TestDa
             new()
             {
                 Id = Guid.NewGuid(),
-                OrderId = orderId,
-                Brand = Brand,
-                FuelTypeId =   ToUuid(FuelTypeId),
+                    OrderId = orderId,
+                    Brand = Brand,
+                    BrandId = BrandIds.ForSlug(Brand),
+                    FuelTypeId =   ToUuid(FuelTypeId),
                 Liters = Liters,
                 Quantity = 1,
                 UnitPrice = 520,

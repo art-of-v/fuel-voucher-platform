@@ -225,6 +225,7 @@ public sealed class DeletedUnpaidOrderCleanupIntegrationTests : IClassFixture<Te
                     Id = Guid.NewGuid(),
                     OrderId = orderId,
                     Brand = "okko",
+                    BrandId = BrandIds.ForSlug("okko"),
                     FuelTypeId = ToUuid("okko-dp"),
                     Liters = 10m,
                     Quantity = 2,

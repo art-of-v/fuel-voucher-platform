@@ -144,6 +144,7 @@ public class VoucherActivationStorefrontIntegrationTests : IClassFixture<TestDat
         => new()
         {
             Id = Guid.CreateVersion7(),
+            BrandId = BrandIds.ForSlug(brand),
             Brand = brand,
             FuelTypeId =   ToUuid(fuelTypeId),
             Liters = liters,

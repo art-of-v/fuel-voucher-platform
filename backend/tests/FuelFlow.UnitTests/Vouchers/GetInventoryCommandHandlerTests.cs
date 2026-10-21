@@ -129,6 +129,7 @@ public sealed class GetInventoryCommandHandlerTests : IDisposable
     {
         Id = Guid.NewGuid(),
         Brand = "okko",
+        BrandId = BrandIds.ForSlug("okko"),
         FuelTypeId = fuelTypeId,
         Liters = 50,
         VoucherNumber = Guid.NewGuid().ToString("N"),
