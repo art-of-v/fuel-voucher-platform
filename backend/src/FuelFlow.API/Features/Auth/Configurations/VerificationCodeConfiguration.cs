@@ -18,32 +18,39 @@ internal sealed class VerificationCodeConfiguration : IEntityTypeConfiguration<V
         builder.Property(e => e.PhoneNumber)
             .HasColumnName("phone_number")
             .HasMaxLength(20)
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "The number the code was sent to.");
 
         builder.Property(e => e.Code)
             .HasColumnName("code")
             .HasMaxLength(64)
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "The code itself, hashed.");
 
         builder.Property(e => e.ExpiresAtUtc)
             .HasColumnName("expires_at_utc")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "When the code stops being valid.");
 
         builder.Property(e => e.CreatedAtUtc)
             .HasColumnName("created_at_utc")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "When it was sent.");
 
         builder.Property(e => e.IsUsed)
             .HasColumnName("is_used")
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "Whether the code has been redeemed.");
 
         builder.Property(e => e.UsedAtUtc)
-            .HasColumnName("used_at_utc");
+            .HasColumnName("used_at_utc")
+            .HasComment(                "When it was redeemed, or NULL while it has not been.");
 
         builder.Property(e => e.FailedAttempts)
             .HasColumnName("failed_attempts")
             .HasDefaultValue(0)
-            .IsRequired();
+            .IsRequired()
+            .HasComment(                "How many times it was tried and failed.");
 
         builder.HasIndex(e => e.PhoneNumber);
         builder.HasIndex(e => e.ExpiresAtUtc);
