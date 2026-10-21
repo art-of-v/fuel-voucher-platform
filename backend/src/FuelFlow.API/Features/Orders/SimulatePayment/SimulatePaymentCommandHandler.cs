@@ -187,8 +187,15 @@ public sealed class SimulatePaymentCommandHandler
         var payment = await _context.Payments
             .FirstOrDefaultAsync(p => p.OrderId == order.Id && p.Kind == PaymentKind.Capture, cancellationToken);
 
+        var isNew = payment is null;
         if (payment is null)
         {
+            // A zero-price order has no money to record, and the database refuses a zero-amount
+            // capture - so there is nothing to write, and the order stays unpaid (which is the
+            // safe direction: no money recorded, no fuel handed over).
+            if (order.Price <= 0)
+                return;
+
             payment = PaymentFactory.CreateCapture(
                 order,
                 order.MonobankMerchant ?? MonobankMerchant.Sandbox,
@@ -198,6 +205,11 @@ public sealed class SimulatePaymentCommandHandler
         }
 
         PaymentFactory.ApplyStatus(payment, PaymentStatus.Succeeded, DateTime.UtcNow, DateTime.UtcNow);
-        _context.Payments.Update(payment);
+
+        // Only a row that was already in the store is marked as updated: Update() on a row that
+        // was just Added turns the insert into an update of a row that does not exist yet, and
+        // the context does not track by default, so a loaded row has to be marked explicitly.
+        if (!isNew)
+            _context.Payments.Update(payment);
     }
 }
