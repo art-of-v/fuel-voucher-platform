@@ -169,8 +169,9 @@ public static class FuelPricing
     /// there is one expression and every caller uses it.
     /// </para>
     /// <para>
-    /// <b>The rate is the fuel's, and the size only multiplies it.</b> The three knobs - supplier cost,
-    /// margin and pump ceiling - live on the fuel, and every size of that fuel is priced by the same
+    /// <b>The rate is the fuel's, and the size only multiplies it.</b> The knobs that decide the
+    /// price - supplier cost and margin - live on the fuel, and the column price beside them is the
+    /// reference the customer is shown against; every size of that fuel is priced by the same
     /// rate. There is no per-nominal override any more: the one-off prices went with the offers on
     /// 2026-10-18 (<c>20261018190514_NoOneOffPrices</c>), and with them the question of what a
     /// deliberate price for one size would survive a repricing.
@@ -182,7 +183,8 @@ public static class FuelPricing
     /// </remarks>
     /// <param name="costPerLiter">The fuel's supplier cost, or null when the fuel is not priced yet.</param>
     /// <param name="profitPerLiter">The fuel's margin, or null when the fuel is not priced yet.</param>
-    /// <param name="pumpPricePerLiter">The pump ceiling (колонка), or null when none is recorded.</param>
+    /// <param name="pumpPricePerLiter">The column price (колонка) the caller has on file. It is not a
+    /// term of the price - the rate is the cost plus the margin - and the parameter is no longer read.</param>
     /// <param name="liters">The nominal being priced.</param>
     public static decimal PackagePrice(
         decimal? costPerLiter,
