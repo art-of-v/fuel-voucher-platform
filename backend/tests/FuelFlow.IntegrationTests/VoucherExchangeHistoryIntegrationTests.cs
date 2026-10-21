@@ -358,6 +358,7 @@ foreach (var (cost, index) in costsPerLiter.Select((c, i) => (c, i)))
         => new()
         {
             Id = Guid.NewGuid(),
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-dp"),
             Liters = liters,

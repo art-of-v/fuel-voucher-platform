@@ -792,6 +792,7 @@ var actingUserId = Guid.NewGuid();
         => new()
         {
             Id = id,
+            BrandId = BrandIds.ForSlug(brand),
             Brand = brand,
             FuelTypeId =   ToUuid(fuelTypeId),
             Liters = liters,

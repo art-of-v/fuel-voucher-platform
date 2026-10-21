@@ -69,6 +69,7 @@ public sealed class AdminVoucherListSortTests : IDisposable
         Liters = 5,
         FuelTypeId = ToUuid("okko-95"),
         Brand = "okko",
+        BrandId = BrandIds.ForSlug("okko"),
         SupplierExpirationDate = new DateOnly(2027, 1, 31),
         CustomerExpirationDate = new DateOnly(2027, 1, 31),
         VoucherNumber = number,

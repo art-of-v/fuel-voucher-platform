@@ -101,6 +101,7 @@ public sealed class FulfillmentOrderForeignKeyIntegrationTests : IClassFixture<T
         => new()
         {
             Id = id,
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 10m,

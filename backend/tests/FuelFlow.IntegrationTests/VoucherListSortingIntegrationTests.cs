@@ -136,7 +136,9 @@ public sealed class VoucherListSortingIntegrationTests : IClassFixture<TestDatab
                 Id = Guid.NewGuid(),
                 QrPayload = $"sort-{tag}-{Guid.NewGuid():N}",
                 VoucherNumber = $"sort-{tag}-{Guid.NewGuid():N}",
-                BrandId = BrandIds.ForSlug(brand),
+                // The brand's key is the network this test created, not a derived one: the network
+                // is a row of its own with an id of its own, so the voucher's key is that id.
+                BrandId = brandId,
                 Brand = brand,
                 FuelTypeId =   ToUuid(fuelTypeId),
                 Liters = 5m,

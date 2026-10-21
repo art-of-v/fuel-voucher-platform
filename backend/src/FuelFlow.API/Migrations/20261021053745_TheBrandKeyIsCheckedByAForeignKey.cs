@@ -21,9 +21,16 @@ namespace FuelFlow.API.Migrations
     /// <b>The instrument is a composite foreign key</b> - <c>(fuel_type_id, brand_id) →
     /// fuel_types(id, brand_id)</c> - and not another trigger. A key says what a check cannot: the row
     /// names a fuel and a brand, and the key says they are the same one, because the pair it points at
-    /// is a row of the catalogue. The trigger that stood here asked the same question in plpgsql on
-    /// every write, and it is dropped here: a foreign key cannot be wrong, and it is checked by the
-    /// database rather than by a function that has to be kept in step with the schema by hand.
+    /// is a row of the catalogue. It is checked by the engine, so it cannot fall out of step with the
+    /// schema the way a function kept by hand can.
+    /// </para>
+    /// <para>
+    /// <b>The trigger stays, and that is not an oversight.</b> The trigger asks the same question
+    /// about the <b>name</b> - the column it can see - and the key asks it about the <b>id</b>. They
+    /// are not the same check: a row whose name says OKKO and whose key says WOG is refused by
+    /// neither. The importer is exactly the case where the two copies come from different sources,
+    /// because the name is what the supplier's paper says and the key is what the catalogue says.
+    /// The trigger goes with the name, in the step that moves the readers to the id.
     /// </para>
     /// <para>
     /// <b>Why the key is the pair and not the fuel alone.</b> A foreign key over <c>fuel_type_id</c>
@@ -36,9 +43,8 @@ namespace FuelFlow.API.Migrations
     /// <para>
     /// <b>Why the key is NOT NULL.</b> A foreign key with a NULL in it is not compared at all - the
     /// row satisfies it vacuously. A nullable <c>brand_id</c> would therefore be a brand the database
-    /// never checks, and the trigger being dropped would leave nothing behind: a row could name one
-    /// brand and carry the other's key, and nothing would say so. The column becomes required, and
-    /// the backfill below is what makes that possible.
+    /// never checks: a row could name one brand and carry the other's key, and nothing would say so.
+    /// The column becomes required, and the backfill below is what makes that possible.
     /// </para>
     /// <para>
     /// <b>The backfill is exact and runs again here.</b> The previous migration filled
@@ -57,15 +63,6 @@ namespace FuelFlow.API.Migrations
     /// </remarks>
     public partial class TheBrandKeyIsCheckedByAForeignKey : Migration
     {
-        /// <summary>The four tables that carry a brand as a name.</summary>
-        private static readonly string[] BrandCarryingTables =
-        {
-            "fuel_vouchers",
-            "order_line_items",
-            "purchase_batches",
-            "voucher_exchanges"
-        };
-
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
@@ -221,63 +218,39 @@ namespace FuelFlow.API.Migrations
                 table: "voucher_exchanges",
                 columns: new[] { "fuel_type_id", "brand_id" });
 
-            // The trigger goes. The key says what the trigger asked, and says it in a way the
-            // database guarantees: a foreign key is enforced by the engine, and it cannot fall out of
-            // step with the schema the way a function kept by hand can.
+            // The trigger STAYS, and this is the part that is easy to get wrong.
             //
-            // The trigger's own remarks named this instrument as the better one, and could not use it
-            // because the row carried the brand's NAME and a key cannot span two hops. The row
-            // carries the brand's ID now, so the key spans one hop - and the trigger's cost (one
-            // lookup per row written to these four tables) goes with it.
-            foreach (var table in BrandCarryingTables)
-            {
-                migrationBuilder.Sql($"""DROP TRIGGER IF EXISTS trg_ck_brand_matches_fuel_type ON "{table}";""");
-            }
-
-            migrationBuilder.Sql("DROP FUNCTION IF EXISTS ck_brand_matches_fuel_type();");
+            // The trigger asks "is the brand on this row the brand of its fuel?" - and it asks it
+            // about the NAME, because the name is what the column holds. The key asks the same
+            // question about the ID, and the two are not the same check: a row whose name says OKKO
+            // and whose key says WOG is refused by neither today and refused by the pair.
+            //
+            // The importer is exactly the case where the two copies come from different sources:
+            // the name is what the supplier's PDF says, and the key is what the catalogue says. A
+            // misread PDF writes a wrong name with a right key, and nothing but the trigger sees
+            // it. So the trigger stays while the name stays.
+            //
+            // It goes with the name, in the step that moves the readers to the id: at that point
+            // the text column is gone, the trigger has nothing left to compare, and the key is the
+            // only instrument there is. That is the step D-21 calls the second one, and this
+            // migration is not it.
+            //
+            // What this migration does change about the trigger's cost: the key now answers the
+            // question the trigger's second hop was making. The trigger reaches the fuel's brand
+            // through fuel_types and brands, because the fuel carried the brand's id and a key
+            // could not span two hops. The row carries the brand's id now, so the pair is one hop,
+            // and the check on the key is an index probe rather than a join.
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            // The trigger comes back, exactly as `20261020164744_TheBrandCannotDisagreeWithItsFuel`
-            // left it. The key cannot be undone by re-adding the trigger alone: the columns are NOT
-            // NULL now, and the trigger's question ("is the brand on this row the brand of its
-            // fuel?") is asked over the name, which the trigger can still do.
-            migrationBuilder.Sql(
-                """
-                CREATE OR REPLACE FUNCTION ck_brand_matches_fuel_type() RETURNS trigger
-                LANGUAGE plpgsql AS $$
-                BEGIN
-                    IF NOT EXISTS (
-                        SELECT 1
-                        FROM fuel_types ft
-                        JOIN brands b ON b.id = ft.brand_id
-                        WHERE ft.id = NEW.fuel_type_id
-                          AND b.slug = NEW.brand
-                    ) THEN
-                        RAISE EXCEPTION
-                            'The brand (%) of this row is not the brand (%) of the fuel it claims',
-                            NEW.brand,
-                            (SELECT b.slug FROM fuel_types ft JOIN brands b ON b.id = ft.brand_id WHERE ft.id = NEW.fuel_type_id);
-                    END IF;
-
-                    RETURN NEW;
-                END;
-                $$;
-                """);
-
-            foreach (var table in BrandCarryingTables)
-            {
-                migrationBuilder.Sql(
-                    $"""
-                    CREATE TRIGGER trg_ck_brand_matches_fuel_type
-                    BEFORE INSERT OR UPDATE OF brand, fuel_type_id ON "{table}"
-                    FOR EACH ROW
-                    EXECUTE FUNCTION ck_brand_matches_fuel_type();
-                    """);
-            }
-
+            // The trigger is not touched in either direction: it was there before this migration
+            // and it is there after it, because it guards the NAME and the name is still a column.
+            // It goes with the name, in the step that moves the readers to the id.
+            //
+            // The key cannot be undone by the weaker keys alone: the columns are NOT NULL now, and a
+            // key over a nullable column says nothing.
             migrationBuilder.DropIndex(
                 name: "ix_fuel_vouchers_fuel_type_id_brand_id",
                 table: "fuel_vouchers");

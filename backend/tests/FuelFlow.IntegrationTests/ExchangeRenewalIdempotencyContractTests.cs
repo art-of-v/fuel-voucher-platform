@@ -172,6 +172,7 @@ public sealed class ExchangeRenewalIdempotencyContractTests : IClassFixture<Test
         => new()
         {
             Id = id,
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
@@ -193,6 +194,7 @@ public sealed class ExchangeRenewalIdempotencyContractTests : IClassFixture<Test
             ExchangeBatchId = batchId,
             OldVoucherId = oldVoucherId,
             FuelTypeId = ToUuid("okko-95"),
+            BrandId = BrandIds.ForSlug("okko"),
             Brand = "okko",
             SurchargeUah = 0m,
             SupplierId = supplierId,

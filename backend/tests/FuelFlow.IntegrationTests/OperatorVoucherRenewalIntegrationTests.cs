@@ -769,6 +769,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
         => new()
     {
         Id = id,
+        BrandId = BrandIds.ForSlug(brand),
         Brand = brand,
         FuelTypeId =   ToUuid(fuelTypeId),
         Liters = liters,
@@ -787,6 +788,7 @@ public sealed class OperatorVoucherRenewalIntegrationTests : IClassFixture<TestD
         => new()
         {
             Id = id,
+            BrandId = BrandIds.ForSlug(brand),
             Brand = brand,
             FuelTypeId =   ToUuid(fuelTypeId),
             Liters = liters,
