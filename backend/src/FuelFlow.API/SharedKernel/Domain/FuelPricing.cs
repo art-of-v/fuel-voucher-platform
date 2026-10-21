@@ -116,8 +116,15 @@ public static class FuelPricing
     /// </para>
     /// <para>
     /// The consequence to know: our price can now be <b>above</b> the column price, and the customer
-    /// sees that as it is. When the market falls below what we pay, the below-cost guard refuses the
-    /// sale unless a manager has opted the fuel in.
+    /// sees that as it is. A market that falls below what we pay refuses nothing - the column price
+    /// is a reference, not a term of our price.
+    /// </para>
+    /// <para>
+    /// The guard that can still lose us money is at checkout, and it judges the price the customer is
+    /// <b>actually charged</b> - our price minus the term discount - against our cost
+    /// (<c>ServerPricing.TryGetBelowCostVerdict</c>). A generous term on the ladder can take a sale
+    /// under what we paid; the market falling cannot. <c>allow_below_cost</c> is what disarms it for
+    /// a deliberate loss leader.
     /// </para>
     /// </remarks>
     public static decimal FinalPerLiter(
@@ -129,9 +136,10 @@ public static class FuelPricing
 
     /// <summary>
     /// The public "before" / struck-through reference price for a package: the pump
-    /// price (колонка) × liters — the ceiling the customer's price sits below, i.e. the
-    /// saving they get. Falls back to <paramref name="salePrice"/> when no pump price is
-    /// recorded, so the store-front never fabricates a saving.
+    /// price (колонка) × liters — the price the customer is shown <em>against</em>, i.e. the
+    /// saving they get when it sits above what we charge. Falls back to
+    /// <paramref name="salePrice"/> when no pump price is recorded, so the store-front never
+    /// fabricates a saving.
     ///
     /// This deliberately REPLACES the old <c>OriginalPrice = cost × liters</c>, which
     /// leaked the operator's supplier cost to anonymous callers and rendered the struck
