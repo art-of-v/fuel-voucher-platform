@@ -79,11 +79,11 @@ public sealed record OkkoCatalogueApplyResult(
 /// an import turns a supplier's new product into a sellable row nobody priced.
 /// </para>
 /// <para>
-/// <b>A created fuel is not sellable.</b> It gets the published pump price and <em>no sizes</em>,
-/// and the storefront lists sizes: so the fuel is invisible until an operator adds nominals, at which
-/// point it appears at the pump price with no acquisition cost behind it. An import that guessed a
-/// margin would be publishing a price nobody approved, which is the incident the whole offer split came
-/// from (F-33: 1,00 грн/л on the live site).
+/// <b>A created fuel is not sellable.</b> It gets the published pump price, the three sizes every
+/// other importer gives a grade it creates, and <em>no margin</em>: a fuel with no margin has no
+/// customer price at all, so it waits for an operator instead of going live at cost-plus-zero. An
+/// import that guessed a margin would be publishing a price nobody approved, which is the incident
+/// the whole offer split came from (F-33: 1,00 грн/л on the live site).
 /// </para>
 /// <para>
 /// <b>An empty sheet is refused outright.</b> Zero rows must never be able to mean "the catalogue is
