@@ -1607,6 +1607,20 @@ jobs:
       - name: Test the deploy data preconditions
         run: bash /root/FuelFlow/deploy/preflight-db.test.sh
 
+      # The database certificate. The production connection verifies the server's certificate
+      # ("SSL Mode=Verify Full"), so the server has to present one - and the script that makes
+      # it is idempotent, so running it on every deploy keeps the same CA (the trust anchor)
+      # and renews only the server certificate when it is close to expiring.
+      #
+      # The test runs first, so a broken script is caught before it can leave the box without
+      # a certificate: a deploy that brings up Postgres with no certificate does not start the
+      # database, and the application then refuses to boot.
+      - name: Test the database certificate script
+        run: bash /root/FuelFlow/deploy/ensure-postgres-tls.test.sh
+
+      - name: Ensure the database certificate exists
+        run: bash /root/FuelFlow/deploy/ensure-postgres-tls.sh --dir /root/FuelFlow/deploy/certs/postgres
+
       # ...and then run the whole preflight against the live box, so a bad .env, a bad
       # Caddyfile, an ambiguous upstream or a stale :main tag stops THIS deploy rather
       # than the next person who restarts something by hand.

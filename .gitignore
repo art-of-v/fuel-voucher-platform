@@ -28,8 +28,14 @@
 !.env.example
 !.env.template
 # Committed templates (e.g. .env.production.example, .env.staging.example) carry no real
-# secrets — keep them tracked. The .env.* rule above would otherwise swallow them.
+# secrets - keep them tracked. The .env.* rule above would otherwise swallow them.
 !.env.*.example
+
+# The database certificate authority and its private keys. deploy/ensure-postgres-tls.sh
+# creates them on the box; the CA key is the trust anchor for every production database
+# connection, and a committed one is a published one.
+deploy/certs/
+
 
 
 # ============================================================
