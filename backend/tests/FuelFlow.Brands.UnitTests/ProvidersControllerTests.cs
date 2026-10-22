@@ -5,6 +5,10 @@ using System.Security.Claims;
 using System.Text.Json;
 using FluentAssertions;
 using FuelFlow.Features.Brands;
+using FuelFlow.Features.Brands.AdminAddFuel;
+using FuelFlow.Features.Brands.AdminDeleteFuel;
+using FuelFlow.Features.Brands.AdminUpdateFuel;
+using FuelFlow.Features.Brands.AdminUpdateNominals;
 using FuelFlow.Features.Brands.GetProviderById;
 using FuelFlow.Features.Brands.GetProviderHistory;
 using FuelFlow.Features.Brands.GetProviders;
@@ -51,19 +55,20 @@ public sealed class BrandFuelControllerTests : IDisposable
             new Claim("last_name", "Admin")
         ], "TestAuth"));
 
-        _controller = BuildController(NotificationDispatcher.Disabled);
+        _controller = BuildController();
     }
 
-    // Builds a controller sharing _context + the admin principal; the dispatcher is swappable so the
-    // below-cost tests can assert the loss-leader Telegram alert through a Moq IAlertNotifier.
-    private BrandFuelController BuildController(NotificationDispatcher notifications) =>
+    // Builds a controller sharing _context + the admin principal. The write paths live in the
+    // handlers now - the controller asks one of them and maps the answer - so the handlers are
+    // built here over the same context.
+    private BrandFuelController BuildController() =>
         new(
         new FuelFlow.Features.Brands.GetFuelPriceHistory.GetFuelPriceHistoryQueryHandler(_context),
             new GetFuelPriceAtQueryHandler(_context),
-            new AuditEventService(_context),
-            _context,
-            notifications,
-            new PriceHistoryRecorder(_context))
+            new AdminAddFuelCommandHandler(_context, new AuditEventService(_context), new PriceHistoryRecorder(_context)),
+            new AdminUpdateFuelCommandHandler(_context, new AuditEventService(_context), new PriceHistoryRecorder(_context)),
+            new AdminDeleteFuelCommandHandler(_context, new AuditEventService(_context)),
+            new AdminUpdateNominalsCommandHandler(_context, new AuditEventService(_context)))
         {
             ControllerContext = new ControllerContext
             {
