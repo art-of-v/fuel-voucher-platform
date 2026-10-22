@@ -52,6 +52,17 @@ public class AuthPoliciesTests
     }
 
     [Fact]
+    public void The_Settlement_Code_Is_The_Money_Tier_And_A_List_Of_Its_Own()
+    {
+        // The settlement code is what the settlement channel resolves money to, and what an
+        // operator quotes when they place a customer's payment - so the roles that may read it are
+        // the roles that move money. And it is a list of its own: a role that joins the read
+        // surface must not thereby be handed every customer's code.
+        SeedRoles.SettlementCodeRoleNames.Should().BeEquivalentTo(SeedRoles.MoneyMovementRoleNames);
+        SeedRoles.SettlementCodeRoleNames.Should().NotBeSameAs(SeedRoles.StaffRoleNames);
+    }
+
+    [Fact]
     public void The_Capability_Lists_Are_Separate_Lists_And_Not_One_Array_Under_Another_Name()
     {
         // The point of separate lists: narrowing one capability must not narrow the others, and a

@@ -109,6 +109,11 @@ public sealed class AdminUserDto
     /// Read-only, staff-only, no setter anywhere. The operator quotes this to attribute money to a
     /// customer, so the panel is the only place it may be surfaced - it must not be added to any
     /// customer-facing response, and no endpoint may accept it as an input.
+    /// <para>
+    /// It is money data, so the roles that may read it are the money tier (the
+    /// <c>SettlementCode</c> capability); a caller without that capability gets an empty value here
+    /// rather than the code. The controller fills it in - the handler does not know the caller.
+    /// </para>
     /// </summary>
     public string SettlementCode { get; set; } = null!;
 

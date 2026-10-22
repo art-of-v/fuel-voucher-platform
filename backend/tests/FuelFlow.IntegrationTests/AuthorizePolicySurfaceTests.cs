@@ -85,9 +85,9 @@ public sealed class AuthorizePolicySurfaceTests : IClassFixture<TestDatabaseFixt
         ["GET /api/admin/orders"] = AuthPolicies.Staff,
         ["GET /api/admin/orders/{id}"] = AuthPolicies.Staff,
         ["GET /api/admin/orders/{id:guid}/receipt"] = AuthPolicies.Staff,
-        ["GET /api/admin/payments/customers"] = AuthPolicies.Staff,
-        ["GET /api/admin/payments/customers/by-code"] = AuthPolicies.Staff,
-        ["GET /api/admin/payments/unallocated"] = AuthPolicies.Staff,
+        ["GET /api/admin/payments/customers"] = AuthPolicies.SettlementCode,
+        ["GET /api/admin/payments/customers/by-code"] = AuthPolicies.SettlementCode,
+        ["GET /api/admin/payments/unallocated"] = AuthPolicies.SettlementCode,
         ["GET /api/admin/purchases"] = AuthPolicies.Staff,
         ["GET /api/admin/qa-test-access"] = AuthPolicies.Staff,
         ["GET /api/admin/reconciliation"] = AuthPolicies.Staff,
@@ -205,6 +205,10 @@ public sealed class AuthorizePolicySurfaceTests : IClassFixture<TestDatabaseFixt
         // the customer's fuel, and nothing records that they did. So it is narrower than the money
         // movement a Manager may do - a refund is an audited row, a redemption is neither.
         (AuthPolicies.VoucherPayload, [SeedRoles.ProductOwnerName, SeedRoles.AdminName]),
+        // The settlement code is the identifier the settlement channel resolves money to, so it
+        // belongs to the tier that moves money - and it is a list of its own, so that joining the
+        // read surface does not hand over every customer's code.
+        (AuthPolicies.SettlementCode, [SeedRoles.ProductOwnerName, SeedRoles.AdminName, SeedRoles.ManagerName]),
     ];
 
     /// <summary>

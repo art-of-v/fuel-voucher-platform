@@ -81,4 +81,22 @@ internal static class AuthPolicies
     /// </para>
     /// </remarks>
     public const string VoucherPayload = "VoucherPayload";
+
+    /// <summary>
+    /// See a customer's settlement code - the identifier the settlement channel resolves money to.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The code is financial data: it is what a message on the settlement channel resolves to a
+    /// customer, and it is what an operator quotes to attribute a payment. It is not a bearer
+    /// instrument - the channel is closed to the finance function - so it does not need the Admin
+    /// tier the way a voucher's redeemable payload does.
+    /// </para>
+    /// <para>
+    /// It is a capability of its own anyway, because the read surface must not decide it: a role
+    /// that joins the staff surface joins the LISTS, and a list is not the same thing as money.
+    /// The membership is a decision about money, so it is written down as one (planning #530, S-10).
+    /// </para>
+    /// </remarks>
+    public const string SettlementCode = "SettlementCode";
 }

@@ -173,7 +173,13 @@ internal static class AuthSetup
             // the staff surface for that reason - a Manager reads the stock, the Admin tier
             // holds the code.
             .AddPolicy(AuthPolicies.VoucherPayload, policy =>
-                policy.RequireRole(SeedRoles.VoucherPayloadRoleNames));
+                policy.RequireRole(SeedRoles.VoucherPayloadRoleNames))
+            // The settlement code is the identifier the settlement channel resolves money to, so
+            // it is a decision about money and not about the lists. It is the money tier - the
+            // roles that may place a payment for a customer (planning #530, S-10) - and it is
+            // listed apart from the read surface, so joining the lists does not bring it along.
+            .AddPolicy(AuthPolicies.SettlementCode, policy =>
+                policy.RequireRole(SeedRoles.SettlementCodeRoleNames));
 
         return services;
     }
