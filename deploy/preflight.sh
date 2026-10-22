@@ -263,6 +263,54 @@ check_qr_key_separation() {
 }
 
 # ------------------------------------------------------------------------------
+# The chat id the alert scripts use and the chat id the Grafana provisioning
+# ships must be the same number.
+#
+# They live in two places on purpose. The provisioning file carries it as a
+# LITERAL, because Grafana substitutes $VAR into that YAML and parses the result
+# again: a chat id that arrives as a variable is a YAML NUMBER, and Grafana's
+# Telegram integration refuses to start on it ("cannot unmarshal number into Go
+# struct field Config.chatid of type string") - which takes the whole alerting
+# provisioning down, rules included, and leaves Grafana restart-looping.
+# deploy/.env carries the same number for the systemd scripts that send the
+# backup and disk alerts.
+#
+# Two places, one fact, so this check says whether they still agree. Without it
+# the alerting would quietly split in two: Grafana's alerts in one group, the
+# scripts' in another, and neither place complete.
+# ------------------------------------------------------------------------------
+check_telegram_chat_id() {
+  local file="../backend/observability/grafana/provisioning/alerting-telegram/contact-points.yml"
+  local env_file=".env"
+
+  if [[ ! -f "$file" ]]; then
+    warn "$file is missing (skipping the Telegram chat id check)"
+    return 0
+  fi
+  if [[ ! -f "$env_file" ]]; then
+    warn "$env_file is missing (skipping the Telegram chat id check)"
+    return 0
+  fi
+
+  local shipped env_value
+  shipped="$(grep -E '^[[:space:]]+chatid:' "$file" | head -1 \
+    | sed -E 's/.*chatid:[[:space:]]*//' | tr -d '"'"'"'' | tr -d ' ')"
+  env_value="$(grep -E '^TELEGRAM_CHAT_ID=' "$env_file" | head -1 \
+    | cut -d= -f2- | tr -d '"'"'"'' | tr -d ' ')"
+
+  if [[ -z "$shipped" || -z "$env_value" ]]; then
+    warn "no chat id in one of the two places (skipping the Telegram chat id check)"
+    return 0
+  fi
+
+  if [[ "$shipped" != "$env_value" ]]; then
+    fail "the Telegram chat id in $file ($shipped) is not the one in $env_file ($env_value). Grafana sends the metric alerts to the first and the systemd scripts to the second, so the alerts would arrive in two different groups - and the one that says 'the app is down' would arrive in neither."
+  fi
+
+  echo "  the chat id in $file and $env_file agree"
+}
+
+# ------------------------------------------------------------------------------
 # The staging basic-auth hash reaches caddy as a well-formed bcrypt hash.
 #
 # `caddy validate` above catches a value that is not a hash at all - it reads one
@@ -504,6 +552,21 @@ fi
 echo "== the alerting chain's names =="
 if ! bash "$SCRIPT_DIR/check-alerting-names.sh"; then
   fail "the alerting chain names something that does not resolve. Nothing has been restarted, and a Prometheus target or a Grafana datasource that points at a name nobody runs is an alerting chain that cannot fire."
+fi
+
+# ------------------------------------------------------------------------------
+# The provisioning must LOAD, and the two chat ids must agree.
+#
+# The names above say the chain points at things that exist. These two say the
+# chain is switched on at all: on 2026-10-22 the production Grafana had neither
+# the Telegram overlay nor a single alerting rule, so the nine hours the API was
+# down produced no alert at all - and the one alert that did arrive (the nightly
+# backup) comes from systemd, not from Grafana.
+# ------------------------------------------------------------------------------
+echo "== the alerting provisioning =="
+check_telegram_chat_id
+if ! bash "$SCRIPT_DIR/check-alerting-provisioning.sh"; then
+  fail "the Grafana alerting provisioning does not load. Nothing has been restarted, and a Grafana that cannot provision its contact point takes the rules with it - which is an alerting chain that is switched off while it looks switched on."
 fi
 
 # ------------------------------------------------------------------------------

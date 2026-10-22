@@ -6,19 +6,34 @@
 #
 # Requires in deploy/.env (git-ignored):
 #   TELEGRAM_BOT_TOKEN=123456:ABC-your-token
-#   TELEGRAM_CHAT_ID=-1001234567890
+#   TELEGRAM_CHAT_ID=-5510388216
+#
+# TELEGRAM_CHAT_ID is still required here, and deploy/preflight.sh checks it
+# against the chat id the provisioning file ships — the one Grafana actually
+# sends to. They have to be the same number, because the provisioning file
+# carries it as a literal: Grafana substitutes $VAR into the YAML and parses
+# the result again, so a chat id that arrives as a variable becomes a YAML
+# NUMBER, and Grafana's Telegram integration refuses to start with
+# "cannot unmarshal number into Go struct field Config.chatid of type string" —
+# which takes the whole alerting provisioning (rules included) down with it.
+# The chat id is an identifier, not a credential, so it lives in the repository;
+# the token, which is the credential, stays in .env.
 #
 # Setup steps are in docs/OBSERVABILITY.md (private docs repo) ("Telegram alerts"); the short version:
 #   1. Telegram → @BotFather → /newbot → copy the token.
 #   2. Create a private group, add the bot, post any message into it.
 #   3. curl "https://api.telegram.org/bot<TOKEN>/getUpdates" and read
-#      result[].chat.id (a negative number).
+#      result[].chat.id (a negative number), and put it in deploy/.env AND in
+#      backend/observability/grafana/provisioning/alerting-telegram/contact-points.yml.
 #
 # Run with:
 #   cd ~/FuelFlow/deploy
 #   docker compose --env-file .env \
 #     -f docker-compose.observability.yml \
 #     -f docker-compose.observability.telegram.yml up -d
+#
+# Check it before you apply it: deploy/check-alerting-provisioning.sh loads the
+# provisioning in a throwaway Grafana and fails if it does not load.
 #
 # Alert rules provisioned by this overlay: ServiceDown, HighErrorRate,
 # HighRequestLatency, HighCpuUsage, HighMemoryUsage, LogErrorBurst, LogFatal,
@@ -29,7 +44,9 @@
 services:
   grafana:
     environment:
+      # The token is interpolated into the contact point. The chat id is not:
+      # it is a literal in the provisioning file, because a number that arrives
+      # through the substitution is a YAML number, and Grafana will not start.
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?set TELEGRAM_BOT_TOKEN in .env}
-      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:?set TELEGRAM_CHAT_ID in .env}
     volumes:
       - ../backend/observability/grafana/provisioning/alerting-telegram:/etc/grafana/provisioning/alerting:ro

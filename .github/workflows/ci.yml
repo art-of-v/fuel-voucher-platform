@@ -86,6 +86,11 @@ jobs:
             if [ -z "$f" ]; then continue; fi
             case "$f" in
             backend/src/FuelFlow.API/Migrations/*) migrations=true ;;
+            # The Grafana provisioning. It is not backend code, and the backend suite cannot
+            # see it - a contact point whose chat id is a YAML number takes the whole
+            # alerting provisioning down on the box, and the rules go with it. The deploy
+            # scripts job loads it, so a change here has to run that job.
+            backend/observability/grafana/provisioning/*) deploy=true; other=true ;;
             backend/*) backend=true ;;
             admin/*)   admin=true ;;
             mobile/*)  mobile=true ;;
@@ -536,6 +541,15 @@ jobs:
         run: bash deploy/diff-schema.test.sh
       - name: Test the alerting chain's names
         run: bash deploy/check-alerting-names.test.sh
+
+      # The Grafana alerting provisioning, loaded for real in the Grafana image the
+      # compose file pins. The contact point is a YAML type, not a typo: a chat id
+      # that arrives as a variable is a number, and Grafana refuses to start on it -
+      # which takes the rules down with it, and leaves an alerting chain that is
+      # switched off while it looks switched on. On the production box that is
+      # exactly what happened on 2026-10-22, and nothing noticed for two days.
+      - name: Test the alerting provisioning
+        run: bash deploy/check-alerting-provisioning.sh
 
       # The script that turns WAL archiving on. It was written, syntax-checked, merged
       # and shipped without ever being RUN, and the first run on the production server
