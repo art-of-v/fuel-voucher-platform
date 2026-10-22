@@ -1,8 +1,29 @@
 using System.IO.Compression;
+using System.Text;
 using System.Xml.Linq;
 using UglyToad.PdfPig;
 
 namespace FuelFlow.Features.Contracts;
+
+/// <summary>
+/// The document is larger than this reader will open.
+/// </summary>
+/// <remarks>
+/// A .docx is a zip, and a zip can expand a few kilobytes into gigabytes. The upload is capped at
+/// 20 MB - the COMPRESSED size - so without a bound on the expanded size one request could ask
+/// the process for twenty gigabytes. The PDF path does not need the same guard: a PDF is not
+/// compressed, so the request limit already bounds it.
+/// </remarks>
+public sealed class ContractDocumentTooLargeException : Exception
+{
+    public ContractDocumentTooLargeException(long sizeBytes)
+        : base($"The document expands to {sizeBytes} bytes, which is more than this reader opens ({ContractTextExtractor.MaxDocumentBytes}).")
+    {
+        SizeBytes = sizeBytes;
+    }
+
+    public long SizeBytes { get; }
+}
 
 /// <summary>
 /// Reads the text out of a contract document the operator uploaded.
@@ -36,6 +57,19 @@ public sealed class ContractTextExtractor
 {
     /// <summary>The file extensions this reads.</summary>
     public static readonly string[] SupportedExtensions = [".docx", ".pdf"];
+
+    /// <summary>
+    /// How much text a document may carry, in bytes of the document's own markup.
+    /// </summary>
+    /// <remarks>
+    /// A .docx is a zip, and a zip can expand a few kilobytes into gigabytes - a "zip bomb" is a
+    /// small upload that fills the memory of whatever opens it. The upload itself is capped at
+    /// 20 MB, which is the COMPRESSED size, so without this cap a single request could ask the
+    /// process for twenty gigabytes. 16 MB of markup is far above any real contract (Word's own
+    /// document.xml for a long agreement is a few hundred kilobytes) and far below what a bomb
+    /// wants.
+    /// </remarks>
+    public const int MaxDocumentBytes = 16 * 1024 * 1024;
 
     /// <summary>
     /// The text of the document, or <c>null</c> when the file is not one this reads.
@@ -74,8 +108,27 @@ public sealed class ContractTextExtractor
             return null;
         }
 
-        using var reader = new StreamReader(entry.Open());
-        var xml = await reader.ReadToEndAsync(cancellationToken);
+        // The entry's own length is what the archive CLAIMS, and a crafted one can claim
+        // anything - so the claim is a cheap first check and the read below is the real bound.
+        if (entry.Length > MaxDocumentBytes)
+            throw new ContractDocumentTooLargeException(entry.Length);
+
+        using var stream = entry.Open();
+        using var buffer = new MemoryStream();
+
+        var chunk = new byte[81920];
+        long total = 0;
+        int read;
+        while ((read = await stream.ReadAsync(chunk, cancellationToken)) > 0)
+        {
+            total += read;
+            if (total > MaxDocumentBytes)
+                throw new ContractDocumentTooLargeException(total);
+
+            await buffer.WriteAsync(chunk.AsMemory(0, read), cancellationToken);
+        }
+
+        var xml = Encoding.UTF8.GetString(buffer.GetBuffer(), 0, (int)buffer.Length);
 
         XNamespace wordprocessing = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 

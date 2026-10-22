@@ -74,6 +74,51 @@ public sealed class ContractTextExtractorTests
         text.Should().BeNull();
     }
 
+    [Fact]
+    public async Task A_Document_That_Expands_Into_Gigabytes_Is_Refused()
+    {
+        // A .docx is a zip, and a zip can expand a few kilobytes into gigabytes. The upload is
+        // capped at 20 MB - the COMPRESSED size - so without a bound on the expanded size one
+        // request could ask the process for twenty gigabytes.
+        var extractor = new ContractTextExtractor();
+        await using var content = ZipBomb(ContractTextExtractor.MaxDocumentBytes + 1);
+
+        var act = () => extractor.ExtractAsync(content, "terms.docx", CancellationToken.None);
+
+        await act.Should().ThrowAsync<ContractDocumentTooLargeException>(
+            "a document that expands past the cap is refused, not read");
+    }
+
+    [Fact]
+    public async Task A_Document_Just_Under_The_Cap_Is_Still_Read()
+    {
+        // The bound is a bound and not a wall: a real document that fits is read as before.
+        var extractor = new ContractTextExtractor();
+        await using var content = WordDocument("First paragraph.");
+
+        var text = await extractor.ExtractAsync(content, "terms.docx", CancellationToken.None);
+
+        text.Should().Contain("First paragraph.");
+    }
+
+    /// <summary>
+    /// A .docx whose body is a huge run of zeros: a few kilobytes on the wire, gigabytes when
+    /// expanded.
+    /// </summary>
+    private static MemoryStream ZipBomb(int sizeBytes)
+    {
+        var stream = new MemoryStream();
+        using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            var entry = archive.CreateEntry("word/document.xml");
+            using var entryStream = entry.Open();
+            entryStream.Write(new byte[sizeBytes]);
+        }
+
+        stream.Position = 0;
+        return stream;
+    }
+
     /// <summary>A .docx with the given paragraphs, built the way Word builds one.</summary>
     private static MemoryStream WordDocument(params string[] paragraphs)
     {
