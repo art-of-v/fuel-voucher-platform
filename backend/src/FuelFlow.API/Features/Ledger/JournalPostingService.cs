@@ -25,6 +25,13 @@ namespace FuelFlow.Features.Ledger;
 /// one. That uniqueness is a database index rather than a read-then-write check, so two concurrent
 /// replays cannot both decide they are first.
 /// </para>
+/// <para>
+/// Every key this feature writes is time-ordered - <c>Guid.CreateVersion7()</c> - like every other
+/// key in the schema. It is not a cosmetic choice: <c>journal_lines</c> gets two rows per
+/// accounting fact and grows forever, and a random key would land every one of them on a random
+/// leaf of the B-tree, writing the index across the whole key space instead of at its right-hand
+/// edge. The platform made that choice everywhere else; this is where it was missed.
+/// </para>
 /// </summary>
 public sealed class JournalPostingService
 {
@@ -68,7 +75,7 @@ public sealed class JournalPostingService
 
         var entry = new JournalEntry
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
             EntryNo = entryNo,
             EntryDate = request.EntryDate,
             PeriodId = period.Id,
@@ -186,7 +193,7 @@ public sealed class JournalPostingService
             var start = new DateOnly(date.Year, date.Month, 1);
             period = new AccountingPeriod
             {
-                Id = Guid.NewGuid(),
+                Id = Guid.CreateVersion7(),
                 PeriodStart = start,
                 PeriodEnd = start.AddMonths(1).AddDays(-1),
                 Status = PeriodStatus.Open,
@@ -219,11 +226,12 @@ public sealed class JournalPostingService
         await using var command = _db.Database.GetDbConnection().CreateCommand();
         command.CommandText = """
             INSERT INTO document_sequences (id, name, last_value)
-            VALUES (gen_random_uuid(), @name, 1)
+            VALUES (@id, @name, 1)
             ON CONFLICT (name) DO UPDATE
                 SET last_value = document_sequences.last_value + 1
             RETURNING last_value;
             """;
+        command.Parameters.Add(new NpgsqlParameter("id", NpgsqlDbType.Uuid) { Value = Guid.CreateVersion7() });
         command.Parameters.Add(new NpgsqlParameter("name", NpgsqlDbType.Varchar) { Value = name });
 
         var result = await command.ExecuteScalarAsync(cancellationToken);
@@ -306,7 +314,7 @@ public sealed class JournalPostingService
             var request = pending[index];
             var entry = new JournalEntry
             {
-                Id = Guid.NewGuid(),
+                Id = Guid.CreateVersion7(),
                 // Consecutive, so the ledger's numbers stay a gapless sequence.
                 EntryNo = firstNo + index,
                 EntryDate = request.EntryDate,
@@ -383,11 +391,12 @@ public sealed class JournalPostingService
         await using var command = _db.Database.GetDbConnection().CreateCommand();
         command.CommandText = """
             INSERT INTO document_sequences (id, name, last_value)
-            VALUES (gen_random_uuid(), @name, @count)
+            VALUES (@id, @name, @count)
             ON CONFLICT (name) DO UPDATE
                 SET last_value = document_sequences.last_value + @count
             RETURNING last_value;
             """;
+        command.Parameters.Add(new NpgsqlParameter("id", NpgsqlDbType.Uuid) { Value = Guid.CreateVersion7() });
         command.Parameters.Add(new NpgsqlParameter("name", NpgsqlDbType.Varchar) { Value = name });
         command.Parameters.Add(new NpgsqlParameter("count", NpgsqlDbType.Integer) { Value = count });
 
@@ -404,7 +413,7 @@ public sealed class JournalPostingService
         // position, never from the account.
         return new JournalLine
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
             LineNo = lineNo,
             AccountId = account.Id,
             PartyId = request.PartyId,
