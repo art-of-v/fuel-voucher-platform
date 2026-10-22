@@ -4,6 +4,7 @@ using Google.Apis.PlayIntegrity.v1;
 using Google.Apis.PlayIntegrity.v1.Data;
 using Google.Apis.Services;
 using FuelFlow.SharedKernel.Options;
+using FuelFlow.SharedKernel.Time;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -204,7 +205,7 @@ public sealed class PlayIntegrityVerifier : IPlayIntegrityVerifier
                 isTesting);
         }
 
-        var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var now = SystemClock.Now.ToUnixTimeMilliseconds();
         var age = Math.Abs((double)now - request.TimestampMillis.Value);
 
         if (age > options.GoogleClockSkewSeconds * 1000d)

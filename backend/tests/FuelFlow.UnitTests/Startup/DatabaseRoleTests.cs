@@ -50,6 +50,7 @@ public sealed class DatabaseRoleTests
         ["SmsClub:Token"] = "sms-token",
         ["SmsClub:SenderName"] = "FuelFlow",
         ["DeviceAuth:Enabled"] = "true",
+        ["Attestation:AcknowledgeDisabledInProduction"] = "true",
         ["Database:ConnectionString"] =
             "Host=postgres;Port=5432;Database=fuelflow;Username=fuelflow_app;Password=secret;SSL Mode=VerifyFull;Root Certificate=/certs/ca.crt",
         ["Database:MigrationConnectionString"] =
