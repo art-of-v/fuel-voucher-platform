@@ -102,6 +102,13 @@ fi
 echo "== the alerting provisioning loads =="
 echo "  image: $GRAFANA_IMAGE"
 
+# A container left behind by an interrupted run would make the next run fail with
+# "the container name is already in use" - and this check runs inside the deploy's
+# preflight, so that failure would stop a deploy over a leftover container. The
+# timeout below kills the CLIENT, not the container, so a run that is interrupted
+# leaves one behind. Take the name back before using it.
+docker rm -f alerting-provisioning-check >/dev/null 2>&1 || true
+
 # A sample token: the check is about the TYPES in the file, not about the token.
 # Nothing is sent anywhere - the rules have no data to alert on in here.
 LOG="$TMP/grafana.log"
@@ -110,6 +117,9 @@ timeout 60 docker run --rm --name alerting-provisioning-check \
   -e TELEGRAM_BOT_TOKEN=123456:ABC-check \
   -v "$TMP/provisioning:/etc/grafana/provisioning:ro" \
   "$GRAFANA_IMAGE" > "$LOG" 2>&1 || true
+
+# And clean up after ourselves even if the run was cut short.
+docker rm -f alerting-provisioning-check >/dev/null 2>&1 || true
 
 if grep -q "Failed to provision alerting" "$LOG"; then
   echo "ERROR: the alerting provisioning does not load:" >&2
