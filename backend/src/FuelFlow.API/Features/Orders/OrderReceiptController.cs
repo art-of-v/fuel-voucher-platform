@@ -1,12 +1,9 @@
 using System.Security.Claims;
-using FuelFlow.API.Features.Orders.RefundOrder;
 using FuelFlow.Features.Orders.Receipt;
+using FuelFlow.Features.Orders.Receipt.GetOrderReceipt;
 using FuelFlow.Features.Orders.SharedModels;
-using FuelFlow.Persistence;
-using FuelFlow.Payments.SharedModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Orders;
 
@@ -21,11 +18,11 @@ namespace FuelFlow.Features.Orders;
 [ApiController]
 public sealed class OrderReceiptController : ControllerBase
 {
-    private readonly ApplicationDbContext _context;
+    private readonly GetOrderReceiptQueryHandler _handler;
 
-    public OrderReceiptController(ApplicationDbContext context)
+    public OrderReceiptController(GetOrderReceiptQueryHandler handler)
     {
-        _context = context;
+        _handler = handler;
     }
 
     /// <summary>The caller's own receipt.</summary>
@@ -49,7 +46,8 @@ public sealed class OrderReceiptController : ControllerBase
             return Unauthorized();
         }
 
-        var receipt = await LoadAsync(o => o.Id == id && o.UserId == userId, cancellationToken);
+        var receipt = await _handler.HandleAsync(
+            GetOrderReceiptQuery.ForCaller(id, userId), cancellationToken);
 
         // The same response for "not yours" and "not there", as above.
         return receipt is null ? NotFound("Order not found") : Build(receipt);
@@ -62,17 +60,14 @@ public sealed class OrderReceiptController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetAnyReceipt(Guid id, CancellationToken cancellationToken)
     {
-        var receipt = await LoadAsync(o => o.Id == id, cancellationToken);
+        var receipt = await _handler.HandleAsync(
+            GetOrderReceiptQuery.ForAnyOrder(id), cancellationToken);
 
         return receipt is null ? NotFound("Order not found") : Build(receipt);
     }
 
-    private IActionResult Build(ReceiptData receipt)
+    private IActionResult Build(OrderReceiptData receipt)
     {
-        // Computed once: the two calls below are the same pure function, and calling it twice to
-        // share a condition and a value would let them disagree if it ever stopped being pure.
-        var refundable = RefundOrderCommandHandler.ComputeRefundAmountKopecks(receipt.Order);
-
         var document = new OrderReceiptDocument
         {
             OrderId = receipt.Id,
@@ -92,7 +87,7 @@ public sealed class OrderReceiptController : ControllerBase
                     receipt.FuelNames.TryGetValue(l.FuelTypeId, out var name) ? name : l.FuelTypeId.ToString(),
                     l.Liters, l.Quantity, l.UnitPrice, l.LineTotal))
                 .ToList(),
-            Refund = BuildRefundSection(receipt.Status, refundable, receipt.RefundedAtUtc, receipt.Id)
+            Refund = BuildRefundSection(receipt.Status, receipt.RefundableKopecks, receipt.RefundedAtUtc, receipt.Id)
         };
 
         var pdf = OrderReceiptDocumentBuilder.Build(document);
@@ -128,94 +123,5 @@ public sealed class OrderReceiptController : ControllerBase
 
         // Kopecks to hryvnia; the receipt is a human-facing document, not a ledger entry.
         return new RefundReceiptInfo(refundedAtUtc, refundableKopecks / 100m, orderId);
-    }
-
-    private sealed record ReceiptLineData(Guid FuelTypeId, decimal Liters, int Quantity, decimal UnitPrice, decimal LineTotal);
-
-    private sealed class ReceiptData
-    {
-        public required Order Order { get; init; }
-        public required Guid Id { get; init; }
-        public required DateTime CreatedAtUtc { get; init; }
-        public required DateTime UpdatedAtUtc { get; init; }
-        public required DateTime RefundedAtUtc { get; init; }
-        public required decimal Price { get; init; }
-        public required OrderStatus Status { get; init; }
-        public string? MonobankInvoiceId { get; init; }
-        public MonobankStatus? MonobankStatus { get; init; }
-        public string? CompanyName { get; init; }
-        public required List<ReceiptLineData> Lines { get; init; }
-
-        /// <summary>
-        /// Fuel type id to the name a customer should read, e.g. "3808d410-..." to "А 95+".
-        /// </summary>
-        public required IReadOnlyDictionary<Guid, string> FuelNames { get; init; }
-    }
-
-    private async Task<ReceiptData?> LoadAsync(
-        System.Linq.Expressions.Expression<Func<Order, bool>> predicate,
-        CancellationToken cancellationToken)
-    {
-        // The whole order is loaded because the refund amount is computed from the line items by
-        // RefundOrderCommandHandler, and that handler is the single definition of what is refundable.
-        // Recomputing it here would let the two drift - and a receipt that disagrees with the refund
-        // button in the admin UI is worse than no receipt.
-        //
-        // Fulfillments + Voucher are part of that graph, not an extra. ComputeRefundAmountKopecks
-        // subtracts what has been delivered from what was paid; without them EF hands back an EMPTY
-        // collection, every unit reads as undelivered, and the function reports the entire order
-        // value as still refundable.
-        var order = await _context.Orders
-            .AsNoTracking()
-            .Include(o => o.LineItems)
-            .Include(o => o.Fulfillments)
-                .ThenInclude(f => f.Voucher)
-            .FirstOrDefaultAsync(predicate, cancellationToken);
-
-        if (order is null)
-        {
-            return null;
-        }
-
-        // Order carries only LegalEntityId, so the company name needs an explicit lookup.
-        var companyName = order.LegalEntityId is null
-            ? null
-            : await _context.LegalEntities
-                .Where(le => le.Id == order.LegalEntityId)
-                .Select(le => le.Name)
-                .FirstOrDefaultAsync(cancellationToken);
-
-        // The line stores the fuel type ID, which for real fuels is a GUID. Printing it makes the
-        // receipt's fuel column unreadable, so the names come from the catalog the customer saw.
-        var fuelIds = order.LineItems.Select(li => li.FuelTypeId).Distinct().ToList();
-        var fuelNames = await _context.FuelTypes
-            .Where(ft => fuelIds.Contains(ft.Id))
-            .ToDictionaryAsync(ft => ft.Id, ft => ft.Name, cancellationToken);
-
-        // The refund row knows when the refund was actually recorded; UpdatedAtUtc moves on any
-        // later edit to the order, which is not when the money went back.
-var refundedAtUtc = await _context.Payments
-    .Where(p => p.OrderId == order.Id && p.Kind == PaymentKind.Refund)
-    .OrderByDescending(p => p.CreatedAtUtc)
-    .Select(p => (DateTime?)p.CreatedAtUtc)
-    .FirstOrDefaultAsync(cancellationToken) ?? order.UpdatedAtUtc;
-
-        return new ReceiptData
-        {
-            Order = order,
-            Id = order.Id,
-            CreatedAtUtc = order.CreatedAtUtc,
-            UpdatedAtUtc = order.UpdatedAtUtc,
-            RefundedAtUtc = refundedAtUtc,
-            Price = order.Price,
-            Status = order.Status,
-            MonobankInvoiceId = order.MonobankInvoiceId,
-            MonobankStatus = order.MonobankStatus,
-            CompanyName = companyName,
-            FuelNames = fuelNames,
-            Lines = order.LineItems
-                .Select(li => new ReceiptLineData(li.FuelTypeId, li.Liters, li.Quantity, li.UnitPrice, li.LineTotal))
-                .ToList()
-        };
     }
 }

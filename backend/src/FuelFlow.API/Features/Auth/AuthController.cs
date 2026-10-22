@@ -1,16 +1,15 @@
 using FuelFlow.Features.Auth.AdminLogin;
+using FuelFlow.Features.Auth.GetCurrentUser;
 using FuelFlow.Features.Auth.Logout;
 using FuelFlow.Features.Auth.Refresh;
 using FuelFlow.Features.Auth.SendCode;
 using FuelFlow.Features.Auth.SendCode.Services;
 using FuelFlow.Features.Auth.Verify;
-using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using System.Security.Claims;
 using static FuelFlow.API.Extensions.RateLimiterSetup;
@@ -27,7 +26,7 @@ public sealed class AuthController : ControllerBase
     private readonly AdminVerifyCodeCommandHandler _adminVerifyCodeHandler;
     private readonly RefreshTokenCommandHandler _refreshTokenHandler;
     private readonly LogoutSessionCommandHandler _logoutSessionHandler;
-    private readonly ApplicationDbContext _context;
+    private readonly GetCurrentUserQueryHandler _getCurrentUserHandler;
     private readonly JwtOptions _jwtOptions;
     private readonly IConfiguration _configuration;
 
@@ -38,7 +37,7 @@ public sealed class AuthController : ControllerBase
         AdminVerifyCodeCommandHandler adminVerifyCodeHandler,
         RefreshTokenCommandHandler refreshTokenHandler,
         LogoutSessionCommandHandler logoutSessionHandler,
-        ApplicationDbContext context,
+        GetCurrentUserQueryHandler getCurrentUserHandler,
         IOptions<JwtOptions> jwtOptions,
         IConfiguration configuration)
     {
@@ -48,7 +47,7 @@ public sealed class AuthController : ControllerBase
         _adminVerifyCodeHandler = adminVerifyCodeHandler;
         _refreshTokenHandler = refreshTokenHandler;
         _logoutSessionHandler = logoutSessionHandler;
-        _context = context;
+        _getCurrentUserHandler = getCurrentUserHandler;
         _jwtOptions = jwtOptions.Value;
         _configuration = configuration;
     }
@@ -303,26 +302,11 @@ public sealed class AuthController : ControllerBase
         if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
             return Unauthorized();
 
-        var user = await _context.Users
-            .Include(u => u.Role)
-            .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+        var user = await _getCurrentUserHandler.HandleAsync(
+            new GetCurrentUserQuery(userId), cancellationToken);
 
-        if (user == null || user.IsDeleted) return Unauthorized();
+        if (user == null) return Unauthorized();
 
-        return Ok(new
-        {
-            id = user.Id,
-            phone = user.PhoneNumber,
-            email = user.Email,
-            firstName = user.FirstName,
-            lastName = user.LastName,
-            birthdate = user.Birthdate,
-            profileImageUrl = user.ProfileImageUrl,
-            referralCode = user.ReferralCode,
-            referredBy = user.ReferredBy,
-            bonusBalance = user.BonusBalance,
-            role = user.Role?.Name,
-            createdAt = user.CreatedAtUtc
-        });
+        return Ok(user);
     }
 }
