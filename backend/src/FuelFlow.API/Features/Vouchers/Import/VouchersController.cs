@@ -36,6 +36,10 @@ public sealed class VouchersController : ControllerBase
     [Authorize(Policy = AuthPolicies.VoucherWrite)]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(25_000_000)]
+    // The multipart reader has its own ceiling, and it is global like the body one was. The
+    // import is the one route that genuinely carries a file of this size, so it raises that
+    // ceiling too - otherwise the reader would refuse the body the route accepts.
+    [RequestFormLimits(MultipartBodyLengthLimit = 25_000_000)]
     [ProducesResponseType(typeof(ImportVouchersResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]

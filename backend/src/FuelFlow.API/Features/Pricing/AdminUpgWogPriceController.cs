@@ -38,6 +38,9 @@ public sealed class AdminUpgWogPriceController : ControllerBase
 
     [HttpPost("{brand}/import")]
     [RequestSizeLimit(1024 * 1024)]
+    // The multipart reader's ceiling is global, so a route that accepts a file declares that
+    // one too - here the same number the body ceiling is.
+    [RequestFormLimits(MultipartBodyLengthLimit = 1024 * 1024)]
     public async Task<IActionResult> Import(
         string brand,
         IFormFile file,

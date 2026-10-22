@@ -69,6 +69,10 @@ proxy_pass http://${BACKEND_HOST}:8080;
         # (RequestSizeLimit on VouchersController.ImportVouchers). nginx's default
         # client_max_body_size is 1 MB, which would reject it here with a 413 before
         # the backend ever saw it.
+        #
+        # This is the IMPORT's ceiling and nothing else's: the backend's own ceiling is
+        # 1 MiB for every route that does not take a file (RequestSizeLimits in the API),
+        # so a bigger body on any other route is refused by the API itself.
         client_max_body_size 25m;
         proxy_read_timeout 300s;
         proxy_send_timeout 300s;

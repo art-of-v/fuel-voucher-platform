@@ -153,10 +153,21 @@ try
     builder.Services.AddStackExchangeRedisCache(options =>
         options.ConnectionMultiplexerFactory = () => Task.FromResult<IConnectionMultiplexer>(redisMultiplexer));
     builder.Services.AddResponseCaching();
+
+    // The request-body ceiling, and the multipart one that goes with it. Both used to be 25 MB
+    // globally, because 25 MB is what a voucher-PDF import needs - but a global ceiling is a
+    // ceiling on EVERY route, so every endpoint (the anonymous ones included) could be handed
+    // 25 MB of body, and 300 requests a minute per source address is about 7.5 GB a minute of
+    // buffering against a container with an 896 MB memory limit.
+    //
+    // The ceiling is now what a JSON body needs, and the routes that genuinely accept a file
+    // raise it for themselves with [RequestSizeLimit] (and [RequestFormLimits] for the multipart
+    // reader). The middleware in FuelFlow.Middleware enforces the same number, so the ceiling
+    // is a property of the API rather than of the web server.
     builder.Services.Configure<FormOptions>(options =>
-        options.MultipartBodyLengthLimit = 25_000_000);
+        options.MultipartBodyLengthLimit = RequestSizeLimits.DefaultMaxRequestBodySize);
     builder.WebHost.ConfigureKestrel(options =>
-        options.Limits.MaxRequestBodySize = 25_000_000);
+        options.Limits.MaxRequestBodySize = RequestSizeLimits.DefaultMaxRequestBodySize);
     builder.Services.AddControllers(options =>
         {
             // Every failure leaves the API as the same RFC 9457 document, with the request path

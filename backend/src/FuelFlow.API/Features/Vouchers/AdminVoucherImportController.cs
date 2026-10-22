@@ -170,6 +170,9 @@ public sealed class AdminVoucherImportController : ControllerBase
     [HttpPost("{id:guid}/parse-invoice")]
     [Authorize(Policy = AuthPolicies.VoucherWrite)]
     [RequestSizeLimit(20 * 1024 * 1024)]
+    // The multipart reader's ceiling is global, so a route that accepts a file this size raises
+    // that one too - otherwise the reader refuses the body the route accepts.
+    [RequestFormLimits(MultipartBodyLengthLimit = 20 * 1024 * 1024)]
     public async Task<IActionResult> ParseInvoice(Guid id, IFormFile file, CancellationToken cancellationToken)
     {
         if (file is null || file.Length == 0)
