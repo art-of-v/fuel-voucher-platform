@@ -1,8 +1,7 @@
-using FuelFlow.Persistence;
-using FuelFlow.SharedKernel.Domain;
+using FuelFlow.Features.Audit.GetAuditEvents;
+using FuelFlow.Features.Audit.GetAuditFacets;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Audit;
 
@@ -11,36 +10,23 @@ namespace FuelFlow.Features.Audit;
 [Authorize(Policy = "Staff")]
 public sealed class AuditController : ControllerBase
 {
-    private readonly ApplicationDbContext _context;
+    private readonly GetAuditEventsQueryHandler _getAllHandler;
+    private readonly GetAuditFacetsQueryHandler _getFacetsHandler;
 
-    public AuditController(ApplicationDbContext context) => _context = context;
+    public AuditController(
+        GetAuditEventsQueryHandler getAllHandler,
+        GetAuditFacetsQueryHandler getFacetsHandler)
+    {
+        _getAllHandler = getAllHandler;
+        _getFacetsHandler = getFacetsHandler;
+    }
 
     [HttpGet("facets")]
     public async Task<IActionResult> GetFacets(CancellationToken ct = default)
     {
-        var eventTypes = await _context.Set<AuditEventOutbox>()
-            .AsNoTracking()
-            .Select(e => e.EventType)
-            .Distinct()
-            .OrderBy(x => x)
-            .ToListAsync(ct);
+        var facets = await _getFacetsHandler.HandleAsync(new GetAuditFacetsQuery(), ct);
 
-        var aggregateTypes = await _context.Set<AuditEventOutbox>()
-            .AsNoTracking()
-            .Select(e => e.AggregateType)
-            .Distinct()
-            .OrderBy(x => x)
-            .ToListAsync(ct);
-
-        var users = await _context.Set<AuditEventOutbox>()
-            .AsNoTracking()
-            .Where(e => e.ChangedByUserName != null)
-            .Select(e => e.ChangedByUserName!)
-            .Distinct()
-            .OrderBy(x => x)
-            .ToListAsync(ct);
-
-        return Ok(new { eventTypes, aggregateTypes, users });
+        return Ok(facets);
     }
 
     [HttpGet]
@@ -55,47 +41,11 @@ public sealed class AuditController : ControllerBase
         [FromQuery] DateTime? to = null,
         CancellationToken ct = default)
     {
-        var query = _context.Set<AuditEventOutbox>().AsNoTracking();
+        var page = await _getAllHandler.HandleAsync(
+            new GetAuditEventsQuery(offset, limit, eventType, aggregateType, changedBy, search, from, to),
+            ct);
 
-        if (!string.IsNullOrWhiteSpace(eventType))
-            query = query.Where(e => e.EventType == eventType);
-        if (!string.IsNullOrWhiteSpace(aggregateType))
-            query = query.Where(e => e.AggregateType == aggregateType);
-        if (!string.IsNullOrWhiteSpace(changedBy))
-            query = query.Where(e => e.ChangedByUserName != null && e.ChangedByUserName.Contains(changedBy));
-        if (!string.IsNullOrWhiteSpace(search))
-            query = query.Where(e =>
-                e.Summary.Contains(search)
-                || e.AggregateId.Contains(search)
-                || e.EventType.Contains(search)
-                || (e.ChangedByUserName != null && e.ChangedByUserName.Contains(search)));
-        if (from.HasValue)
-            query = query.Where(e => e.ChangedAtUtc >= from.Value);
-        if (to.HasValue)
-            query = query.Where(e => e.ChangedAtUtc <= to.Value);
-
-        var total = await query.CountAsync(ct);
-
-        var events = await query
-               .OrderByDescending(e => e.ChangedAtUtc)
-               // The tie-break: many audit rows share one timestamp, and without a unique second
-               // key the sort is unstable - a row can land on two pages or on none.
-               .ThenBy(e => e.Id)
-            .Skip(PageLimits.ClampOffset(offset))
-            .Take(PageLimits.ClampPageSize(limit))
-            .Select(e => new AuditEventDto
-            {
-                Id = e.Id,
-                AggregateType = e.AggregateType,
-                AggregateId = e.AggregateId,
-                EventType = e.EventType,
-                ChangedByUserName = e.ChangedByUserName,
-                Summary = e.Summary,
-                ChangedAtUtc = e.ChangedAtUtc
-            })
-            .ToListAsync(ct);
-
-        return Ok(new { total, events });
+        return Ok(page);
     }
 }
 

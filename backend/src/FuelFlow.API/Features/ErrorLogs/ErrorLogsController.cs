@@ -1,14 +1,22 @@
 using System.Security.Claims;
-using System.Text.Json;
-using FuelFlow.Features.Brands;
-using FuelFlow.Persistence;
+using FuelFlow.Features.ErrorLogs.ClearErrorLogs;
+using FuelFlow.Features.ErrorLogs.GetErrorLogFacets;
+using FuelFlow.Features.ErrorLogs.GetErrorLogs;
+using FuelFlow.Features.ErrorLogs.ResolveErrorLogs;
 using FuelFlow.SharedKernel.Domain;
-using FuelFlow.SharedKernel.Time;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.ErrorLogs;
+
+/// <summary>Which side of the resolved flag the journal should show. An unrecognised value
+/// falls back to <see cref="Unresolved"/> rather than to no filter at all.</summary>
+public enum ResolutionFilter
+{
+    Unresolved,
+    Resolved,
+    All
+}
 
 /// <summary>
 /// The admin error journal. Reads default to the outstanding errors only: an acknowledged fault
@@ -19,49 +27,30 @@ namespace FuelFlow.Features.ErrorLogs;
 [Route("api/admin/errors")]
 public sealed class ErrorLogsController : ControllerBase
 {
-    /// <summary>Which side of the resolved flag the journal should show. An unrecognised value
-    /// falls back to <see cref="Unresolved"/> rather than to no filter at all.</summary>
-    public enum ResolutionFilter
+    private readonly GetErrorLogFacetsQueryHandler _getFacetsHandler;
+    private readonly GetErrorLogsQueryHandler _getAllHandler;
+    private readonly ResolveErrorLogsCommandHandler _resolveHandler;
+    private readonly ClearErrorLogsCommandHandler _clearHandler;
+
+    public ErrorLogsController(
+        GetErrorLogFacetsQueryHandler getFacetsHandler,
+        GetErrorLogsQueryHandler getAllHandler,
+        ResolveErrorLogsCommandHandler resolveHandler,
+        ClearErrorLogsCommandHandler clearHandler)
     {
-        Unresolved,
-        Resolved,
-        All
-    }
-
-    /// <summary>Upper bound on ids in one resolve call, so a crafted request cannot turn a single
-    /// POST into an unbounded UPDATE ... WHERE id = ANY(...).</summary>
-    private const int MaxIdsPerResolveCall = 500;
-
-    private readonly ApplicationDbContext _context;
-    private readonly AuditEventService _eventService;
-
-    public ErrorLogsController(ApplicationDbContext context, AuditEventService eventService)
-    {
-        _context = context;
-        _eventService = eventService;
+        _getFacetsHandler = getFacetsHandler;
+        _getAllHandler = getAllHandler;
+        _resolveHandler = resolveHandler;
+        _clearHandler = clearHandler;
     }
 
     [HttpGet("facets")]
     [Authorize(Policy = AuthPolicies.Staff)]
     public async Task<IActionResult> GetFacets(CancellationToken ct = default)
     {
-        var levels = await _context.ErrorLogs
-            .AsNoTracking()
-            .Select(e => e.Level)
-            .Distinct()
-            .OrderBy(x => x)
-            .ToListAsync(ct);
+        var facets = await _getFacetsHandler.HandleAsync(new GetErrorLogFacetsQuery(), ct);
 
-        var sources = await _context.ErrorLogs
-            .AsNoTracking()
-            .Where(e => e.Source != null)
-            .Select(e => e.Source!)
-            .Distinct()
-            .OrderBy(x => x)
-            .Take(200)
-            .ToListAsync(ct);
-
-        return Ok(new { levels, sources });
+        return Ok(facets);
     }
 
     [HttpGet]
@@ -78,68 +67,20 @@ public sealed class ErrorLogsController : ControllerBase
         [FromQuery] DateTime? to = null,
         CancellationToken ct = default)
     {
-        var query = _context.ErrorLogs.AsNoTracking();
+        var page = await _getAllHandler.HandleAsync(
+            new GetErrorLogsQuery(
+                Offset: offset,
+                Limit: limit,
+                Level: level,
+                Source: source,
+                TraceId: traceId,
+                Resolved: resolved,
+                Search: search,
+                From: from,
+                To: to),
+            ct);
 
-        // A numeric value outside the enum binds successfully, so an unrecognised one must not
-        // fall through to "no filter" and quietly dump the whole journal at a caller who asked
-        // for something narrower. Same default as a caller who passes nothing.
-        if (resolved is not (ResolutionFilter.Unresolved or ResolutionFilter.Resolved or ResolutionFilter.All))
-            resolved = ResolutionFilter.Unresolved;
-
-        if (!string.IsNullOrWhiteSpace(level))
-            query = query.Where(e => e.Level == level);
-        if (!string.IsNullOrWhiteSpace(source))
-            query = query.Where(e => e.Source != null && e.Source.Contains(source));
-        if (!string.IsNullOrWhiteSpace(traceId))
-            query = query.Where(e => e.TraceId == traceId);
-        if (resolved == ResolutionFilter.Unresolved)
-            query = query.Where(e => e.ResolvedAtUtc == null);
-        else if (resolved == ResolutionFilter.Resolved)
-            query = query.Where(e => e.ResolvedAtUtc != null);
-        if (!string.IsNullOrWhiteSpace(search))
-            query = query.Where(e =>
-                e.Message.Contains(search)
-                || (e.ExceptionType != null && e.ExceptionType.Contains(search))
-                || (e.ExceptionMessage != null && e.ExceptionMessage.Contains(search))
-                || (e.Source != null && e.Source.Contains(search))
-                || (e.RequestPath != null && e.RequestPath.Contains(search))
-                || (e.TraceId != null && e.TraceId.Contains(search))
-                || (e.UserName != null && e.UserName.Contains(search)));
-        if (from.HasValue)
-            query = query.Where(e => e.LoggedAtUtc >= from.Value);
-        if (to.HasValue)
-            query = query.Where(e => e.LoggedAtUtc <= to.Value);
-
-        var total = await query.CountAsync(ct);
-
-        var items = await query
-            .OrderByDescending(e => e.LoggedAtUtc)
-            // The tie-break: many log rows share one timestamp, and without a unique second key
-            // the sort is unstable - a row can land on two pages or on none.
-            .ThenBy(e => e.Id)
-            .Skip(PageLimits.ClampOffset(offset))
-            .Take(PageLimits.ClampPageSize(limit))
-            .Select(e => new ErrorLogDto
-            {
-                Id = e.Id,
-                LoggedAtUtc = e.LoggedAtUtc,
-                Level = e.Level,
-                Message = e.Message,
-                ExceptionType = e.ExceptionType,
-                ExceptionMessage = e.ExceptionMessage,
-                StackTrace = e.StackTrace,
-                Source = e.Source,
-                RequestPath = e.RequestPath,
-                RequestMethod = e.RequestMethod,
-                UserName = e.UserName,
-                TraceId = e.TraceId,
-                ResolvedAtUtc = e.ResolvedAtUtc,
-                ResolvedByUserId = e.ResolvedByUserId,
-                ResolvedByUserName = e.ResolvedByUserName
-            })
-            .ToListAsync(ct);
-
-        return Ok(new { total, items });
+        return Ok(page);
     }
 
     /// <summary>
@@ -153,77 +94,24 @@ public sealed class ErrorLogsController : ControllerBase
     [Authorize(Policy = AuthPolicies.StaffOperations)]
     public async Task<IActionResult> Resolve([FromBody] ResolveErrorLogsRequest request, CancellationToken ct)
     {
-        if (request.Ids is not { Count: > 0 })
-            return BadRequest(new { error = "No error ids supplied" });
-
-        var actingId = GetUserId();
-        if (actingId is null)
-            return Unauthorized();
-
-        var ids = request.Ids.Distinct().Take(MaxIdsPerResolveCall).ToList();
-
-        // ExecuteUpdateAsync bypasses change tracking by design, so it lands regardless of the query
-        // default (TrackAll, DatabaseSetup). That is the point of using it here: the alternative
-        // would load rows, mutate them in memory and call SaveChanges, which is a second round-trip
-        // for an operation that does not need the entities at all.
-        var query = _context.ErrorLogs.Where(e => ids.Contains(e.Id));
-        query = request.Resolved
-            ? query.Where(e => e.ResolvedAtUtc == null)
-            : query.Where(e => e.ResolvedAtUtc != null);
-
-        var actingName = GetUserName();
-
-        // One transaction for the flip and the audit row. ExecuteUpdateAsync commits on its own, so
-        // without the transaction a resolved error log could exist with no row naming who resolved
-        // it - and the audit row would be a separate write that can fail on its own (planning #533).
-        await using var tx = _context.Database.IsRelational()
-            ? await _context.Database.BeginTransactionAsync(ct)
-            : null;
-
-        var changed = await query.ExecuteUpdateAsync(setters => setters
-                .SetProperty(e => e.ResolvedAtUtc,
-                    request.Resolved ? SystemClock.UtcNow : (DateTime?)null)
-                .SetProperty(e => e.ResolvedByUserId,
-                    request.Resolved ? actingId : (Guid?)null)
-                .SetProperty(e => e.ResolvedByUserName,
-                    request.Resolved ? actingName : null),
+        var result = await _resolveHandler.HandleAsync(
+            new ResolveErrorLogsCommand(request.Ids, request.Resolved, GetUserId(), GetUserName()),
             ct);
 
-        if (changed > 0)
+        return result.Status switch
         {
-            // ScopeId is required and an error record has none, so the acting user stands in -
-            // the same workaround the user and QA-access aggregates already use.
-            _eventService.RecordEvent(
-                "ErrorLog",
-                ids.Count == 1 ? ids[0].ToString() : $"bulk:{changed}",
-                request.Resolved ? "ErrorLogsResolved" : "ErrorLogsReopened",
-                null,
-                JsonSerializer.Serialize(new { count = changed, resolved = request.Resolved }),
-                actingId.Value,
-                actingName,
-                $"{(request.Resolved ? "Resolved" : "Reopened")} {changed} error log record(s)",
-                actingId.Value.ToString());
-
-            await _context.SaveChangesAsync(ct);
-        }
-
-        if (tx is not null)
-        {
-            await tx.CommitAsync(ct);
-        }
-
-        return Ok(new { success = true, changed });
+            "NoIds" => BadRequest(new { error = result.Error }),
+            "Unauthenticated" => Unauthorized(),
+            _ => Ok(new { success = true, changed = result.Changed })
+        };
     }
 
     [HttpDelete]
     [Authorize(Policy = AuthPolicies.StaffOperations)]
     public async Task<IActionResult> Clear([FromQuery] DateTime? before = null, CancellationToken ct = default)
     {
-        IQueryable<ErrorLog> query = _context.ErrorLogs;
-        if (before.HasValue)
-            query = query.Where(e => e.LoggedAtUtc <= before.Value);
+        var deleted = await _clearHandler.HandleAsync(new ClearErrorLogsCommand(before), ct);
 
-        var deleted = await query.ExecuteDeleteAsync(ct);
         return Ok(new { deleted });
     }
 

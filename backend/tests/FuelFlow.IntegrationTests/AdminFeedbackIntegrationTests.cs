@@ -1,7 +1,12 @@
 using System.Security.Claims;
 using FluentAssertions;
 using FuelFlow.Features.Feedback;
+using FuelFlow.Features.Feedback.DeleteAdminFeedback;
+using FuelFlow.Features.Feedback.GetAdminFeedback;
+using FuelFlow.Features.Feedback.GetAdminFeedbackById;
+using FuelFlow.Features.Feedback.GetAdminFeedbackFacets;
 using FuelFlow.Features.Feedback.SharedModels;
+using FuelFlow.Features.Feedback.UpdateFeedbackStatus;
 using FuelFlow.Persistence;
 using FuelFlow.Testing;
 using Microsoft.AspNetCore.Http;
@@ -294,8 +299,11 @@ public sealed class AdminFeedbackIntegrationTests : IClassFixture<TestDatabaseFi
     private AdminFeedbackController NewController(ApplicationDbContext context)
     {
         var controller = new AdminFeedbackController(
-            context,
-            new FuelFlow.Features.Brands.AuditEventService(context));
+            new GetAdminFeedbackFacetsQueryHandler(context),
+            new GetAdminFeedbackQueryHandler(context),
+            new GetAdminFeedbackByIdQueryHandler(context),
+            new UpdateFeedbackStatusCommandHandler(context, new FuelFlow.Features.Brands.AuditEventService(context)),
+            new DeleteAdminFeedbackCommandHandler(context));
 
         controller.ControllerContext = new ControllerContext
         {
