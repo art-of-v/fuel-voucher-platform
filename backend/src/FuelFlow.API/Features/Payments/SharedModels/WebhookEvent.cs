@@ -35,6 +35,9 @@ namespace FuelFlow.Payments.SharedModels;
 /// <b>The unique index is the idempotency guarantee.</b> A redelivery is rejected by Postgres
 /// (23505) rather than by a handler deciding it looks like a duplicate. That is the difference
 /// between "the application judged this to be a replay" and "this exact event cannot exist twice".
+/// The index refuses a second <em>row</em>, not a retry of the first: a delivery that failed can
+/// claim the outstanding row through <see cref="ProcessingStartedAtUtc"/> and run again, which is
+/// the retry the money step's rollback relies on.
 /// </para>
 /// </remarks>
 public sealed class WebhookEvent
@@ -82,6 +85,18 @@ public sealed class WebhookEvent
 
     /// <summary>When processing finished. Null while a delivery is still outstanding.</summary>
     public DateTime? ProcessedAtUtc { get; set; }
+
+    /// <summary>
+    /// When the current processing attempt started, held as a lease: a redelivery may take over
+    /// only once this is null or older than the lease. Null means no attempt is running.
+    /// </summary>
+    /// <remarks>
+    /// Without it a redelivery cannot tell "the first attempt is still running" from "the process
+    /// that took it died", and refusing both is exactly the defect: a delivery whose money step
+    /// rolled back could never be tried again. The lease answers both without a new status - a
+    /// fresh claim is in flight, a stale one is abandoned and may be retried.
+    /// </remarks>
+    public DateTime? ProcessingStartedAtUtc { get; set; }
 
     /// <summary>Deliveries seen for this event. Above 1 means the acquirer retried us.</summary>
     public int Attempts { get; set; } = 1;

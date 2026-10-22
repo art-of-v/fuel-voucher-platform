@@ -75,16 +75,23 @@ public sealed partial class ProcessMonobankWebhookCommandHandler
         //
         // In its own commit, deliberately: the delivery has to survive a business failure, because
         // "we received it and could not act on it" is a state an operator can find.
+        //
+        // The recorder also decides what a redelivery may do. The unique index still refuses a
+        // second row, but a delivery whose earlier attempt failed or died is claimed and processed
+        // again - that retry is what the money step's rollback relies on.
         var outcome = await WebhookEventRecorder.RecordAsync(_context, command, _logger, cancellationToken);
 
-        if (outcome.IsRedelivery)
+        if (outcome.Decision != WebhookRecordDecision.Process)
         {
             // Acknowledged, not processed. Monobank retries on a non-2xx, so anything else here turns
-            // one redelivery into a loop against an event we already acted on.
+            // one redelivery into a loop against an event we already acted on - or, when another
+            // attempt still holds the lease, into a second attempt at the same money.
             return new ProcessMonobankWebhookResponse
             {
                 Success = true,
-                Message = "Duplicate delivery already recorded"
+                Message = outcome.Decision == WebhookRecordDecision.InFlight
+                    ? "Duplicate delivery is already being processed"
+                    : "Duplicate delivery already recorded"
             };
         }
 

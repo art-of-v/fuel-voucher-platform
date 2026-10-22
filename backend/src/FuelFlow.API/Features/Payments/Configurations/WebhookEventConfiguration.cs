@@ -89,6 +89,11 @@ internal sealed class WebhookEventConfiguration : IEntityTypeConfiguration<Webho
             .HasColumnName("processed_at_utc")
             .HasComment(                "When processing finished. NULL while a delivery is still outstanding.");
 
+        builder.Property(e => e.ProcessingStartedAtUtc)
+            .HasColumnName("processing_started_at_utc")
+            .HasComment(                "When the current attempt started, held as a lease. A redelivery may claim the row " +
+                    "once this is NULL or older than the lease; a fresh value means an attempt is in flight.");
+
         builder.Property(e => e.Attempts)
             .HasColumnName("attempts")
             .IsRequired()
@@ -132,6 +137,12 @@ internal sealed class WebhookEventConfiguration : IEntityTypeConfiguration<Webho
             // direction is what "processed at" means, so it is the one worth a constraint.
             t.HasCheckConstraint("ck_webhook_events_processed",
                 "status NOT IN ('Processed','Ignored') OR processed_at_utc IS NOT NULL");
+
+            // A settled delivery has no attempt in flight. CompleteAsync writes the status and the
+            // cleared lease together; a row that keeps a lease while claiming to be settled would
+            // look like it is being retried forever.
+            t.HasCheckConstraint("ck_webhook_events_settled_has_no_claim",
+                "status NOT IN ('Processed','Ignored') OR processing_started_at_utc IS NULL");
 
             // provider_event_id is a hex SHA-256 from WebhookEventIdentity.Derive, which returns
             // null rather than inventing one for an event it cannot identify.

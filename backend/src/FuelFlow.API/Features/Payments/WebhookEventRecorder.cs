@@ -7,13 +7,32 @@ using Npgsql;
 
 namespace FuelFlow.Payments;
 
+/// <summary>What <see cref="WebhookEventRecorder.RecordAsync"/> decided about a delivery.</summary>
+internal enum WebhookRecordDecision
+{
+    /// <summary>The delivery is on file and this caller owns the attempt; the handler processes it.</summary>
+    Process,
+
+    /// <summary>
+    /// The delivery was already settled - processed, ignored, or refused by the business rules - so
+    /// running it again could only duplicate an effect that has already happened.
+    /// </summary>
+    AlreadyActedOn,
+
+    /// <summary>
+    /// Another attempt at this delivery holds the lease and has not finished. This caller must not
+    /// start a second one; the running attempt will answer the acquirer.
+    /// </summary>
+    InFlight
+}
+
 /// <summary>What <see cref="WebhookEventRecorder.RecordAsync"/> did with a delivery.</summary>
-/// <param name="Stored">The stored row, or null when the delivery was a redelivery.</param>
-/// <param name="IsRedelivery">
-/// True when the unique index refused the insert, which is the authoritative signal that this exact
-/// provider event is already on file. Nothing downstream runs in that case.
+/// <param name="Stored">
+/// The stored row, or null when the caller must not process the delivery. On a retry this is the
+/// row the earlier attempt left behind, not a new one.
 /// </param>
-internal readonly record struct WebhookRecordOutcome(WebhookEvent? Stored, bool IsRedelivery);
+/// <param name="Decision">Whether the caller processes the delivery, and if not, why.</param>
+internal readonly record struct WebhookRecordOutcome(WebhookEvent? Stored, WebhookRecordDecision Decision);
 
 /// <summary>
 /// Stores every provider delivery before anything acts on it.
@@ -21,9 +40,11 @@ internal readonly record struct WebhookRecordOutcome(WebhookEvent? Stored, bool 
 /// <remarks>
 /// <para>
 /// The write happens first, on purpose. A delivery that arrives, is stored, and then fails during
-/// processing leaves a <see cref="WebhookReceiptStatus.Received"/> row - which is the useful
-/// outcome, because the next question is always "did they tell us?". Writing afterwards would record
-/// only the successes, which is exactly the class of event nobody needs recorded.
+/// processing leaves an outstanding row - <see cref="WebhookReceiptStatus.Received"/> when the
+/// attempt never finished, <see cref="WebhookReceiptStatus.Failed"/> when it finished badly - which
+/// is the useful outcome, because the next question is always "did they tell us?". Writing
+/// afterwards would record only the successes, which is exactly the class of event nobody needs
+/// recorded.
 /// </para>
 /// <para>
 /// <b>Why the unique index and not a lookup.</b> Checking for an existing row and then inserting is a
@@ -33,6 +54,15 @@ internal readonly record struct WebhookRecordOutcome(WebhookEvent? Stored, bool 
 /// case, at the cost of implying the lookup is what enforces uniqueness.
 /// </para>
 /// <para>
+/// <b>A redelivery is not automatically a replay.</b> The unique index refuses a second row, which
+/// is right, but the delivery it refused may be the acquirer retrying one whose money step rolled
+/// back - that row is Failed and has never advanced the order. So the violation now decides:
+/// a settled delivery is refused, an outstanding one whose attempt is still running is refused as
+/// in flight, and an outstanding one whose attempt died or failed is claimed and processed. The
+/// claim is a single conditional UPDATE against a lease column, so Postgres - not the handler -
+/// picks the one caller that gets to retry.
+/// </para>
+/// <para>
 /// Static rather than injected: it is persistence against a context the caller already owns, and
 /// registering it would have meant a new constructor argument on the handler and on every test that
 /// builds one.
@@ -40,6 +70,17 @@ internal readonly record struct WebhookRecordOutcome(WebhookEvent? Stored, bool 
 /// </remarks>
 internal static class WebhookEventRecorder
 {
+    /// <summary>
+    /// How long one attempt owns a delivery before a redelivery may take it over.
+    /// </summary>
+    /// <remarks>
+    /// Long enough that a money step doing an outbound refund sync is not overtaken by a second
+    /// delivery, short enough that a process that died mid-attempt is retried by the next acquirer
+    /// redelivery or reconciliation poll instead of being stuck forever. An attempt that finishes
+    /// clears the lease in <see cref="CompleteAsync"/>, so the window only matters when it does not.
+    /// </remarks>
+    internal static readonly TimeSpan ProcessingLease = TimeSpan.FromMinutes(5);
+
     internal static async Task<WebhookRecordOutcome> RecordAsync(
         ApplicationDbContext context,
         ProcessMonobankWebhookCommand command,
@@ -68,6 +109,7 @@ internal static class WebhookEventRecorder
                 "so it cannot be recorded without weakening ux_webhook_events_provider_event.");
         }
 
+        var now = SystemClock.UtcNow;
         var stored = new WebhookEvent
         {
             Id = Guid.CreateVersion7(),
@@ -82,7 +124,8 @@ internal static class WebhookEventRecorder
             Signature = command.Signature,
             KeyId = command.KeyId,
             Status = WebhookReceiptStatus.Received,
-            ReceivedAtUtc = SystemClock.UtcNow,
+            ReceivedAtUtc = now,
+            ProcessingStartedAtUtc = now,
             Attempts = 1
         };
 
@@ -91,23 +134,97 @@ internal static class WebhookEventRecorder
         try
         {
             await context.SaveChangesAsync(cancellationToken);
-            return new WebhookRecordOutcome(stored, false);
+            return new WebhookRecordOutcome(stored, WebhookRecordDecision.Process);
         }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
         {
-            // The authoritative duplicate signal. Detach the row that lost the race and count the
-            // delivery on the one that won: "the acquirer sent this twice" is an answer, and until
-            // this table existed nothing anywhere recorded it.
+            // The authoritative duplicate signal. Detach the row that lost the race: the one already
+            // on file is the delivery's identity, and what happens next depends on what that row
+            // has already done.
             context.Entry(stored).State = EntityState.Detached;
 
             logger.LogInformation(
-                "Redelivery of Monobank event {ProviderEventId} for invoice {InvoiceId}; already recorded",
+                "Redelivery of Monobank event {ProviderEventId} for invoice {InvoiceId}; checking whether it is retryable",
                 providerEventId, command.InvoiceId);
 
-            await CountRedeliveryAsync(context, WebhookEventIdentity.Monobank, providerEventId, cancellationToken);
-
-            return new WebhookRecordOutcome(null, true);
+            return await DecideRedeliveryAsync(context, providerEventId, now, logger, cancellationToken);
         }
+    }
+
+    /// <summary>
+    /// Decides what a delivery the unique index refused may do, and claims it for this attempt when
+    /// the answer is "retry".
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The claim is one conditional UPDATE. It matches only a row that is still outstanding
+    /// (<c>Received</c> or <c>Failed</c>) and has no live lease - either no attempt ever finished
+    /// clearing it, or the attempt that held it is older than <see cref="ProcessingLease"/>. Two
+    /// redeliveries racing for the same failed event both run this statement; the first commits a
+    /// fresh lease, the second re-evaluates the predicate against the committed row, matches nothing
+    /// and is refused. That is what keeps "process the retry" from becoming "process it twice".
+    /// </para>
+    /// <para>
+    /// A refused delivery still counts as an attempt, because "the acquirer sent this twice" is an
+    /// answer and was previously recorded nowhere.
+    /// </para>
+    /// </remarks>
+    private static async Task<WebhookRecordOutcome> DecideRedeliveryAsync(
+        ApplicationDbContext context,
+        string providerEventId,
+        DateTime now,
+        ILogger logger,
+        CancellationToken cancellationToken)
+    {
+        var leaseExpiredBefore = now - ProcessingLease;
+
+        var claimed = await context.WebhookEvents
+            .Where(e => e.Provider == WebhookEventIdentity.Monobank
+                     && e.ProviderEventId == providerEventId
+                     && (e.Status == WebhookReceiptStatus.Received || e.Status == WebhookReceiptStatus.Failed)
+                     && (e.ProcessingStartedAtUtc == null || e.ProcessingStartedAtUtc < leaseExpiredBefore))
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(e => e.ProcessingStartedAtUtc, now)
+                    .SetProperty(e => e.Attempts, e => e.Attempts + 1),
+                cancellationToken);
+
+        var existing = await context.WebhookEvents
+            .FirstOrDefaultAsync(
+                e => e.Provider == WebhookEventIdentity.Monobank && e.ProviderEventId == providerEventId,
+                cancellationToken)
+            ?? throw new InvalidOperationException(
+                $"Monobank delivery {providerEventId} lost the unique index but could not be read back.");
+
+        if (claimed == 1)
+        {
+            // The claim UPDATE bypassed the tracker. Reload so a row this context already tracked
+            // from an earlier attempt carries the claim and attempt count the database now holds -
+            // without it, CompleteAsync would not write the cleared claim, because EF only sends
+            // properties whose in-memory value changed.
+            await context.Entry(existing).ReloadAsync(cancellationToken);
+
+            logger.LogInformation(
+                "Retrying Monobank event {ProviderEventId} for invoice {InvoiceId}: the earlier attempt did not settle it",
+                providerEventId, existing.InvoiceId);
+
+            return new WebhookRecordOutcome(existing, WebhookRecordDecision.Process);
+        }
+
+        await CountRedeliveryAsync(context, WebhookEventIdentity.Monobank, providerEventId, cancellationToken);
+
+        var inFlight = existing.ProcessingStartedAtUtc is not null
+            && existing.ProcessingStartedAtUtc >= leaseExpiredBefore;
+
+        logger.LogInformation(
+            "Monobank event {ProviderEventId} refused as {Decision}: status {Status}, attempt started {StartedAt}",
+            providerEventId,
+            inFlight ? nameof(WebhookRecordDecision.InFlight) : nameof(WebhookRecordDecision.AlreadyActedOn),
+            existing.Status,
+            existing.ProcessingStartedAtUtc);
+
+        return new WebhookRecordOutcome(
+            null, inFlight ? WebhookRecordDecision.InFlight : WebhookRecordDecision.AlreadyActedOn);
     }
 
     /// <summary>
@@ -129,6 +246,10 @@ internal static class WebhookEventRecorder
     {
         stored.Status = status;
         stored.ProcessedAtUtc = SystemClock.UtcNow;
+        // The attempt is over either way - processed, ignored or failed. Clearing the lease is what
+        // lets a later redelivery of a failed event claim it; a row that keeps a lease while settling
+        // would answer "in flight" to every retry until the lease aged out for no reason.
+        stored.ProcessingStartedAtUtc = null;
         stored.Error = error is null ? null : error[..Math.Min(error.Length, 1000)];
 
         try
