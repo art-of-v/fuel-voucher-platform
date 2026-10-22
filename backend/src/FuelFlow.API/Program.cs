@@ -5,6 +5,7 @@ using FuelFlow.BackgroundJobs;
 using FuelFlow.Features.ErrorLogs.Logging;
 using FuelFlow.Middleware;
 using FuelFlow.SharedKernel.Database;
+using FuelFlow.SharedKernel.Errors;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
@@ -156,7 +157,12 @@ try
         options.MultipartBodyLengthLimit = 25_000_000);
     builder.WebHost.ConfigureKestrel(options =>
         options.Limits.MaxRequestBodySize = 25_000_000);
-    builder.Services.AddControllers()
+    builder.Services.AddControllers(options =>
+        {
+            // Every failure leaves the API as the same RFC 9457 document, with the request path
+            // and the correlation id on it. See SharedKernel/Errors/ApiError.cs.
+            options.Filters.Add<ProblemDetailsEnricher>();
+        })
         .AddJsonOptions(options =>
         {
             options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());

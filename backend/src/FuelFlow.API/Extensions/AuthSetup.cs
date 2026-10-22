@@ -2,12 +2,15 @@ using System.Security.Cryptography;
 using System.Text;
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.SharedKernel.Domain;
+using FuelFlow.SharedKernel.Errors;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Services;
 using FuelFlow.SharedKernel.Security;
 using FuelFlow.SharedKernel.Time;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization.Policy;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 
@@ -180,6 +183,14 @@ internal static class AuthSetup
             // listed apart from the read surface, so joining the lists does not bring it along.
             .AddPolicy(AuthPolicies.SettlementCode, policy =>
                 policy.RequireRole(SeedRoles.SettlementCodeRoleNames));
+
+        // A 401 and a 403 answer with an empty body by default, which would be a second error
+        // shape. They leave as the one envelope instead - the headers are untouched.
+        // Replace, not Add: the framework registers its own handler with TryAdd, so a second
+        // registration would be ignored and the empty body would stay.
+        services.Replace(ServiceDescriptor.Singleton<
+            IAuthorizationMiddlewareResultHandler,
+            ProblemDetailsAuthorizationResultHandler>());
 
         return services;
     }

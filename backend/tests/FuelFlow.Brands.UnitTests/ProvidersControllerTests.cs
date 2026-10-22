@@ -262,7 +262,7 @@ public sealed class BrandFuelControllerTests : IDisposable
             FuelRequest("X", 50m, 1m, 51m),
             CancellationToken.None);
 
-        result.Should().BeOfType<NotFoundResult>();
+        result.Should().BeOfType<NotFoundObjectResult>();
     }
 
     // Regression for #113: the per-liter price and the package total must carry kopecks, not round to
@@ -412,7 +412,7 @@ public sealed class BrandFuelControllerTests : IDisposable
             FuelDto("missing", "X", 50m, 1m, 51m),
             CancellationToken.None);
 
-        result.Should().BeOfType<NotFoundResult>();
+        result.Should().BeOfType<NotFoundObjectResult>();
     }
 
     // --- UpdateNominals ---------------------------------------------------
@@ -483,7 +483,7 @@ public sealed class BrandFuelControllerTests : IDisposable
             new List<int> { 5 },
             CancellationToken.None);
 
-        result.Should().BeOfType<NotFoundResult>();
+        result.Should().BeOfType<NotFoundObjectResult>();
     }
 
     /// <summary>

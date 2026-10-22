@@ -749,7 +749,7 @@ public sealed class FeedbackBotIntegrationTests : IClassFixture<TestDatabaseFixt
         var result = await controller.Receive(
             FeedbackTestFactory.CustomerMessage(CustomerChatId, 600, "підробка"), default);
 
-        result.Should().BeOfType<UnauthorizedResult>();
+        result.Should().BeOfType<UnauthorizedObjectResult>();
         (await CountForMessageAsync(600)).Should().Be(0, "an unauthenticated delivery must not reach the table");
         client.Sent.Should().BeEmpty();
     }
