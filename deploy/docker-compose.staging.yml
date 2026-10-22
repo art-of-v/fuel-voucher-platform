@@ -91,6 +91,8 @@ services:
       # .env.staging if you want codes delivered to phones during staging tests.
       SmsClub__Token: ${SMSCLUB_TOKEN:-}
       SmsClub__SenderName: ${SMSCLUB_SENDER_NAME:-}
+      # The deadline the SMS brand is given (the OTP path waits on it).
+      SmsClub__TimeoutSeconds: ${SMSCLUB_TIMEOUT_SECONDS:-10}
 
       # Payments OFF by default: staging must never take a real charge. Flip Enabled=true and
       # supply Monobank SANDBOX credentials in .env.staging to exercise the payment flow.
@@ -140,6 +142,8 @@ services:
       # Self-hosted OTA manifest endpoint (planning #42). Unset here -> /api/updates/manifest
       # answers 204 (no update); set OTA_PUBLIC_BASE_URL in .env.staging to exercise it.
       Updates__PublicBaseUrl: ${OTA_PUBLIC_BASE_URL:-}
+      # The deadline the CDN is given (an installed app's update check waits on it).
+      Updates__TimeoutSeconds: ${OTA_TIMEOUT_SECONDS:-15}
     ports:
       # localhost only — lets you verify staging over an SSH tunnel BEFORE the prod Caddy
       # fronts it publicly (a different port from anything prod publishes). The public path
