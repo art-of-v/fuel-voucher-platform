@@ -87,6 +87,29 @@ else
 fi
 check_contains "it says which container it wanted" "fuelflow-no-such-container" "$out"
 
+echo "=== the passwords-only mode writes the passwords and touches no database ==="
+# The PRODUCTION compose file names the two role passwords, and the staging deploy's
+# preflight resolves that file against the production .env - so the passwords have to be
+# in that file before the staging deploy runs. This mode does it without the database,
+# so a staging deploy does not depend on the production database being up.
+PASSWORDS_ENV="$(mktemp)"
+out="$(FUELFLOW_ENV_FILE="$PASSWORDS_ENV" POSTGRES_CONTAINER=fuelflow-no-such-container \
+  POSTGRES_USER=postgres POSTGRES_DB=fuelflow \
+  bash "$SCRIPT" --passwords-only 2>&1)"; rc=$?
+check "it exits 0 with no database at all" "0" "$rc"
+
+if grep -q '^POSTGRES_APP_PASSWORD=.' "$PASSWORDS_ENV"; then
+  echo "  PASS  it wrote the application's password into the env file"; pass=$((pass + 1))
+else
+  echo "  FAIL  it did not write the application's password into the env file"; fail=$((fail + 1))
+fi
+if grep -q '^POSTGRES_MIGRATOR_PASSWORD=.' "$PASSWORDS_ENV"; then
+  echo "  PASS  it wrote the migration role's password into the env file"; pass=$((pass + 1))
+else
+  echo "  FAIL  it did not write the migration role's password into the env file"; fail=$((fail + 1))
+fi
+rm -f "$PASSWORDS_ENV"
+
 echo "=== against a real cluster ==="
 CONTAINER_NAME="fuelflow-roles-test-$$"
 ENV_FILE="$(mktemp)"
