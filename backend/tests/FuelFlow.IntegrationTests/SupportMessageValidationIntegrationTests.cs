@@ -21,6 +21,10 @@ namespace FuelFlow.IntegrationTests;
 /// The endpoint is anonymous and rate-limited (five messages per hour per IP), so this class
 /// posts twice and no more.
 /// </para>
+/// <para>
+/// Both tests share the class's own database, and xUnit runs them in an order it chooses - so
+/// the assertions are scoped to the row they are about rather than to the table's count.
+/// </para>
 /// </remarks>
 [Collection("Integration Tests")]
 public sealed class SupportMessageValidationIntegrationTests : IClassFixture<TestDatabaseFixture>
@@ -49,7 +53,7 @@ public sealed class SupportMessageValidationIntegrationTests : IClassFixture<Tes
         body.Should().Contain("Message");
 
         await using var context = CreateContext();
-        (await context.SupportMessages.CountAsync()).Should().Be(
+        (await context.SupportMessages.CountAsync(m => m.Email == "not-an-email")).Should().Be(
             0,
             "a refused message is not a message: nothing may reach the table");
     }
@@ -68,8 +72,7 @@ public sealed class SupportMessageValidationIntegrationTests : IClassFixture<Tes
         response.StatusCode.Should().Be(HttpStatusCode.Accepted);
 
         await using var context = CreateContext();
-        var stored = await context.SupportMessages.SingleAsync();
-        stored.Email.Should().Be("customer@example.com");
+        var stored = await context.SupportMessages.SingleAsync(m => m.Email == "customer@example.com");
         stored.Message.Should().Contain("Оплата пройшла");
     }
 
