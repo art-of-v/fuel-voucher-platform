@@ -118,6 +118,23 @@ public class StatementReconciliationDocumentTests
         csv.Should().NotContain("'оплата");
     }
 
+    [Fact]
+    public void A_Negative_Amount_Stays_A_Number()
+    {
+        // The defusal marker is Excel's "this is text" marker, and a money column the spreadsheet
+        // reads as text is a column nobody can sum. A negative amount is a number, not a formula -
+        // so the money is written without the marker, whatever it starts with.
+        var act = Act();
+        var rows = act.Rows
+            .Select(r => r with { AcquirerAmount = -12.50m, LocalAmount = -12.50m })
+            .ToList();
+
+        var csv = StatementReconciliationCsv.Render(act with { Rows = rows });
+
+        csv.Should().Contain("\"-12.50\"");
+        csv.Should().NotContain("'-12.50");
+    }
+
     /// <summary>
     /// The same act, with a payer-chosen destination.
     /// </summary>
