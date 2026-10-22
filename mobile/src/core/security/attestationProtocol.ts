@@ -24,11 +24,9 @@ export function isAttestationProtected(endpoint: string): boolean {
 }
 
 async function sha256Base64Url(value: string): Promise<string> {
-  const digest = await Crypto.digestStringAsync(
-    Crypto.CryptoDigestAlgorithm.SHA256,
-    value,
-    { encoding: Crypto.CryptoEncoding.BASE64 },
-  );
+  const digest = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, value, {
+    encoding: Crypto.CryptoEncoding.BASE64,
+  });
 
   return digest.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }

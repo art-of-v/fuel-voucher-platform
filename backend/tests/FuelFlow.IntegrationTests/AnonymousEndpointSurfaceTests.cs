@@ -93,6 +93,13 @@ public class AnonymousEndpointSurfaceTests : IClassFixture<TestDatabaseFixture>
         "POST /api/auth/device/verify",
         "POST /api/auth/device/verify-raw",
 
+        // App Attest registration and the one-time attestation challenge. Both happen before the
+        // caller has a token: the challenge is bound to the request and consumed once, and
+        // registration proves possession of an App Attest key. Both are rate-limited. A reviewed
+        // decision, not a missing [Authorize].
+        "POST /api/attestation/challenge",
+        "POST /api/attestation/apple/register",
+
         // Payment callback. Authenticates by ECDSA signature over the raw body, not by token.
         "POST /api/monobank/webhook",
 
