@@ -17,13 +17,14 @@ namespace FuelFlow.API.Migrations
     /// with them.
     /// </para>
     /// <para>
-    /// <b>Only the application's traffic role is policed.</b> The policies are <c>TO
+    /// <b>Only the application's traffic role is policed.</b> The tenant policies are <c>TO
     /// fuelflow_app</c>. The table owner (<c>fuelflow_migrator</c>) is not forced through them -
-    /// <c>FORCE ROW LEVEL SECURITY</c> is deliberately absent - so a migration keeps working, and
-    /// the optional read-only reporting role is unaffected. The <c>DO</c> block is what lets this
-    /// migration run on a development database where <c>fuelflow_app</c> has not been created:
-    /// a policy naming a role that does not exist is an error, and a migration that cannot run is
-    /// a worse trade than a database whose traffic role is a superuser anyway.
+    /// <c>FORCE ROW LEVEL SECURITY</c> is deliberately absent - so a migration keeps working. The
+    /// optional read-only reporting role gets a read-all policy of its own, because row-level
+    /// security is default-deny for every role a policy does not name. The <c>DO</c> blocks are
+    /// what let this migration run on a development database where those roles have not been
+    /// created: a policy naming a role that does not exist is an error, and a migration that
+    /// cannot run is a worse trade than a database whose traffic role is a superuser anyway.
     /// </para>
     /// <para>
     /// <b>The predicates.</b> Orders are visible to the customer who placed them and to the
@@ -150,6 +151,33 @@ namespace FuelFlow.API.Migrations
                 END
                 $$;
                 """);
+
+            migrationBuilder.Sql(
+                """
+                DO $$
+                BEGIN
+                    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fuelflow_readonly') THEN
+                        DROP POLICY IF EXISTS tenant_isolation_readonly ON public.orders;
+                        CREATE POLICY tenant_isolation_readonly ON public.orders
+                            FOR SELECT
+                            TO fuelflow_readonly
+                            USING (true);
+
+                        DROP POLICY IF EXISTS tenant_isolation_readonly ON public.fuel_vouchers;
+                        CREATE POLICY tenant_isolation_readonly ON public.fuel_vouchers
+                            FOR SELECT
+                            TO fuelflow_readonly
+                            USING (true);
+
+                        DROP POLICY IF EXISTS tenant_isolation_readonly ON public.user_contracts;
+                        CREATE POLICY tenant_isolation_readonly ON public.user_contracts
+                            FOR SELECT
+                            TO fuelflow_readonly
+                            USING (true);
+                    END IF;
+                END
+                $$;
+                """);
         }
 
         /// <inheritdoc />
@@ -158,10 +186,13 @@ namespace FuelFlow.API.Migrations
             migrationBuilder.Sql(
                 """
                 DROP POLICY IF EXISTS tenant_isolation ON public.orders;
+                DROP POLICY IF EXISTS tenant_isolation_readonly ON public.orders;
                 DROP POLICY IF EXISTS tenant_isolation ON public.fuel_vouchers;
                 DROP POLICY IF EXISTS tenant_isolation_read ON public.fuel_vouchers;
                 DROP POLICY IF EXISTS tenant_isolation_write ON public.fuel_vouchers;
+                DROP POLICY IF EXISTS tenant_isolation_readonly ON public.fuel_vouchers;
                 DROP POLICY IF EXISTS tenant_isolation ON public.user_contracts;
+                DROP POLICY IF EXISTS tenant_isolation_readonly ON public.user_contracts;
 
                 ALTER TABLE public.orders DISABLE ROW LEVEL SECURITY;
                 ALTER TABLE public.fuel_vouchers DISABLE ROW LEVEL SECURITY;

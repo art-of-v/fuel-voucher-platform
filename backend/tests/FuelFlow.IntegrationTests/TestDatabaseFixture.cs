@@ -342,14 +342,14 @@ public sealed class TestDatabaseFixture : WebApplicationFactory<Program>, IAsync
     }
 
     /// <summary>
-    /// Creates the role the application connects as in production, so the conditional policies in
-    /// <c>TheTenantScopeIsAGate</c> are installed in the template.
+    /// Creates the roles the application and the optional reporting connection use in production,
+    /// so the conditional policies in <c>TheTenantScopeIsAGate</c> are installed in the template.
     /// </summary>
     /// <remarks>
-    /// NOLOGIN and NOREPLICATION because the suite never connects as it: it connects as the
+    /// NOLOGIN and NOREPLICATION because the suite never connects as them: it connects as the
     /// container's superuser and uses <c>SET ROLE</c> for the policy tests. A superuser may SET
-    /// ROLE to any role, and after SET ROLE the current user is fuelflow_app, so the policies
-    /// apply exactly as they do to the production traffic.
+    /// ROLE to any role, and after SET ROLE the current user is the role under test, so the
+    /// policies apply exactly as they do to that role in production.
     /// </remarks>
     private static async Task EnsureTenantTestRoleAsync(PostgreSqlContainer container)
     {
@@ -362,21 +362,27 @@ public sealed class TestDatabaseFixture : WebApplicationFactory<Program>, IAsync
                     CREATE ROLE fuelflow_app NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE
                         NOINHERIT NOREPLICATION NOBYPASSRLS;
                 END IF;
+
+                IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fuelflow_readonly') THEN
+                    CREATE ROLE fuelflow_readonly NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE
+                        NOINHERIT NOREPLICATION NOBYPASSRLS;
+                END IF;
             END
             $$;
             """);
     }
 
     /// <summary>
-    /// The grants production's <c>ensure-database-roles.sh</c> gives the traffic role. The policy
-    /// predicates read the membership and owner tables, so those need SELECT as well.
+    /// The grants production's <c>ensure-database-roles.sh</c> gives the traffic and reporting
+    /// roles. The policy predicates read the membership and owner tables, so those need SELECT as
+    /// well, and the reporting role is read-only.
     /// </summary>
     private static async Task GrantTenantTestRoleAsync(PostgreSqlContainer container)
     {
         await using var template = new ApplicationDbContext(NonPoolingContextOptions(container, TemplateDatabaseName), TestQrCipher.Instance);
         await template.Database.ExecuteSqlRawAsync(
             """
-            GRANT USAGE ON SCHEMA public TO fuelflow_app;
+            GRANT USAGE ON SCHEMA public TO fuelflow_app, fuelflow_readonly;
             GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
                 public.orders,
                 public.fuel_vouchers,
@@ -384,6 +390,13 @@ public sealed class TestDatabaseFixture : WebApplicationFactory<Program>, IAsync
                 public.company_members,
                 public.legal_entities
                 TO fuelflow_app;
+            GRANT SELECT ON TABLE
+                public.orders,
+                public.fuel_vouchers,
+                public.user_contracts,
+                public.company_members,
+                public.legal_entities
+                TO fuelflow_readonly;
             """);
     }
 
