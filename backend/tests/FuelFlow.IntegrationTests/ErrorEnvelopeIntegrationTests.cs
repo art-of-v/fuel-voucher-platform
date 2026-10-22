@@ -54,10 +54,10 @@ public sealed class ErrorEnvelopeIntegrationTests : WebApplicationFactory<Progra
         var document = await ReadDocument(response);
 
         document.Should().ContainKey("type");
-        document.Should().ContainKey("title").WhoseValue.Should().Be("Bad Request");
-        document.Should().ContainKey("status").WhoseValue.Should().Be(400);
-        document.Should().ContainKey("detail").WhoseValue.Should().Be("Phone number is required");
-        document.Should().ContainKey("instance").WhoseValue.Should().Be("/api/auth/send-code");
+        document["title"].GetString().Should().Be("Bad Request");
+        document["status"].GetInt32().Should().Be(400);
+        document["detail"].GetString().Should().Be("Phone number is required");
+        document["instance"].GetString().Should().Be("/api/auth/send-code");
         document.Should().ContainKey("traceId");
 
         // The shapes the API used to send. A client that still sniffs for them is sniffing a
@@ -72,7 +72,7 @@ public sealed class ErrorEnvelopeIntegrationTests : WebApplicationFactory<Progra
     {
         var client = CreateClient();
 
-        // No credentials at all: the session middleware refuses before the endpoint runs.
+        // No credentials at all: the authorization middleware refuses before the endpoint runs.
         var response = await client.GetAsync("/api/company/members");
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
@@ -80,10 +80,10 @@ public sealed class ErrorEnvelopeIntegrationTests : WebApplicationFactory<Progra
 
         var document = await ReadDocument(response);
 
-        document.Should().ContainKey("title").WhoseValue.Should().Be("Unauthorized");
-        document.Should().ContainKey("status").WhoseValue.Should().Be(401);
-        document.Should().ContainKey("detail");
-        document.Should().ContainKey("instance").WhoseValue.Should().Be("/api/company/members");
+        document["title"].GetString().Should().Be("Unauthorized");
+        document["status"].GetInt32().Should().Be(401);
+        document["detail"].GetString().Should().NotBeNullOrWhiteSpace();
+        document["instance"].GetString().Should().Be("/api/company/members");
         document.Should().ContainKey("traceId");
         document.Should().NotContainKey("error");
         document.Should().NotContainKey("message");

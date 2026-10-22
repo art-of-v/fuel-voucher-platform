@@ -178,7 +178,7 @@ public sealed class AdminFeedbackIntegrationTests : IClassFixture<TestDatabaseFi
 
         var result = await NewController(context).GetById(Guid.CreateVersion7(), default);
 
-        result.Should().BeOfType<NotFoundResult>();
+        result.Should().BeOfType<NotFoundObjectResult>();
     }
 
     [Fact]
