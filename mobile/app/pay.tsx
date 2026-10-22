@@ -233,7 +233,7 @@ export default function PaymentScreen() {
     // another scheme). Say so rather than render an empty screen that looks like a hung
     // payment, and say WHICH of the two it is: a missing link is a navigation bug, a refused
     // one is a link this app was never asked to show.
-    const refused = rawPageUrl !== undefined;
+    const refused = Boolean(rawPageUrl);
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: tokens.colors.background }}>
         <ScreenHeader title={t('payment.title')} />
