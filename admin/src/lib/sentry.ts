@@ -23,11 +23,11 @@ export function initSentry(): boolean {
   }
 
   Sentry.init({
-      dsn,
-      environment: import.meta.env.MODE,
-      // Errors only. No performance tracing, no session replay - see the doc comment.
-      tracesSampleRate: 0,
-    });
+    dsn,
+    environment: import.meta.env.MODE,
+    // Errors only. No performance tracing, no session replay - see the doc comment.
+    tracesSampleRate: 0,
+  });
 
   return true;
 }

@@ -9,7 +9,11 @@ import { formatDate, formatDateTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { SignatureViewer } from "@/components/SignatureViewer";
 
@@ -102,21 +106,38 @@ export default function ContractsTab() {
       fd.append("termDays", termDays);
       fd.append("file", file);
 
-      return apiRequest<unknown, { version: number; characters: number; contractsCreated: number }>(
-        "POST", "/api/admin/contract-versions/upload", fd, undefined, 120_000, 0,
+      return apiRequest<
+        unknown,
+        { version: number; characters: number; contractsCreated: number }
+      >(
+        "POST",
+        "/api/admin/contract-versions/upload",
+        fd,
+        undefined,
+        120_000,
+        0,
       );
     },
     onSuccess: (res) => {
       toast.success(t("contracts.published", String(res.version)));
       setFile(null);
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/contract-versions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/legal-entity/contracts"] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/admin/contract-versions"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/admin/legal-entity/contracts"],
+      });
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const term = Number(termDays);
-  const canPublish = !!brandId && !!file && Number.isFinite(term) && term > 0 && !publish.isPending;
+  const canPublish =
+    !!brandId &&
+    !!file &&
+    Number.isFinite(term) &&
+    term > 0 &&
+    !publish.isPending;
 
   const brandName = (id: string | null) =>
     brands.find((b) => b.id === id)?.name ?? id ?? "-";
@@ -131,7 +152,9 @@ export default function ContractsTab() {
           <ScrollText className="w-5 h-5 text-primary" />
           {t("contracts.textsTitle")}
         </h2>
-        <p className="text-sm text-muted-foreground mb-4">{t("contracts.textsHint")}</p>
+        <p className="text-sm text-muted-foreground mb-4">
+          {t("contracts.textsHint")}
+        </p>
 
         <div className="flex items-end gap-3 flex-wrap">
           <div className="flex flex-col gap-1">
@@ -144,7 +167,9 @@ export default function ContractsTab() {
               </SelectTrigger>
               <SelectContent>
                 {brands.map((b) => (
-                  <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                  <SelectItem key={b.id} value={b.id}>
+                    {b.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -178,10 +203,17 @@ export default function ContractsTab() {
             />
           </div>
 
-          <Button size="sm" className="h-8" onClick={() => publish.mutate()} disabled={!canPublish}>
-            {publish.isPending
-              ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
-              : <FileUp className="w-3.5 h-3.5 mr-1" />}
+          <Button
+            size="sm"
+            className="h-8"
+            onClick={() => publish.mutate()}
+            disabled={!canPublish}
+          >
+            {publish.isPending ? (
+              <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+            ) : (
+              <FileUp className="w-3.5 h-3.5 mr-1" />
+            )}
             {t("contracts.upload")}
           </Button>
         </div>
@@ -189,15 +221,23 @@ export default function ContractsTab() {
         {brandId && (
           <div className="mt-4">
             {versions.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t("contracts.noText")}</p>
+              <p className="text-sm text-muted-foreground">
+                {t("contracts.noText")}
+              </p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-muted">
                     <tr>
-                      <th className="text-left p-3">{t("contracts.versionNumber")}</th>
-                      <th className="text-left p-3">{t("contracts.termDays")}</th>
-                      <th className="text-left p-3">{t("contracts.publishedAt")}</th>
+                      <th className="text-left p-3">
+                        {t("contracts.versionNumber")}
+                      </th>
+                      <th className="text-left p-3">
+                        {t("contracts.termDays")}
+                      </th>
+                      <th className="text-left p-3">
+                        {t("contracts.publishedAt")}
+                      </th>
                       <th className="text-left p-3">{t("contracts.text")}</th>
                     </tr>
                   </thead>
@@ -206,7 +246,9 @@ export default function ContractsTab() {
                       <tr key={v.id} className="border-border">
                         <td className="p-3 font-mono">{v.version}</td>
                         <td className="p-3 tabular-nums">{v.termDays}</td>
-                        <td className="p-3 text-muted-foreground">{formatDate(v.createdAtUtc)}</td>
+                        <td className="p-3 text-muted-foreground">
+                          {formatDate(v.createdAtUtc)}
+                        </td>
                         <td className="p-3 text-muted-foreground">
                           <span className="line-clamp-2">{v.body}</span>
                         </td>
@@ -222,7 +264,9 @@ export default function ContractsTab() {
 
       {/* Every contract on the platform. */}
       <div className="glass-panel p-6">
-        <h2 className="text-xl font-bold mb-4">{t("contracts.availableTitle")}</h2>
+        <h2 className="text-xl font-bold mb-4">
+          {t("contracts.availableTitle")}
+        </h2>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-muted">
@@ -239,7 +283,9 @@ export default function ContractsTab() {
             <tbody>
               {contracts.map((contract) => (
                 <tr key={contract.id} className="border-border">
-                  <td className="p-4 font-bold">{brandName(contract.brandId)}</td>
+                  <td className="p-4 font-bold">
+                    {brandName(contract.brandId)}
+                  </td>
                   <td className="p-4">{contract.companyName ?? "-"}</td>
                   <td className="p-4">{contract.customerName ?? "-"}</td>
                   <td className="p-4 font-mono">{contract.termsVersion}</td>
@@ -269,7 +315,10 @@ export default function ContractsTab() {
               ))}
               {contracts.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-muted-foreground">
+                  <td
+                    colSpan={7}
+                    className="p-8 text-center text-muted-foreground"
+                  >
                     {t("contracts.noneAvailable")}
                   </td>
                 </tr>
@@ -326,7 +375,10 @@ export default function ContractsTab() {
               ))}
               {signedContracts.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-muted-foreground">
+                  <td
+                    colSpan={7}
+                    className="p-8 text-center text-muted-foreground"
+                  >
                     {t("contracts.noneSigned")}
                   </td>
                 </tr>
@@ -343,11 +395,19 @@ export default function ContractsTab() {
         >
           <div
             className="glass-panel p-6 max-w-lg w-full animate-in zoom-in-50 duration-200"
-            onClick={(e) => { e.stopPropagation(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+            }}
           >
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-foreground">{t("contracts.signature")}</h3>
-              <Button variant="ghost" size="sm" onClick={() => setSignature(null)}>
+              <h3 className="text-xl font-bold text-foreground">
+                {t("contracts.signature")}
+              </h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSignature(null)}
+              >
                 <X className="w-5 h-5" />
               </Button>
             </div>
@@ -356,7 +416,10 @@ export default function ContractsTab() {
               <SignatureViewer data={signature} />
             </div>
 
-            <Button className="w-full font-bold" onClick={() => setSignature(null)}>
+            <Button
+              className="w-full font-bold"
+              onClick={() => setSignature(null)}
+            >
               {t("common.close")}
             </Button>
           </div>

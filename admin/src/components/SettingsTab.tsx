@@ -120,7 +120,7 @@ export default function SettingsTab() {
   const { data, isLoading } = useQuery<SettingsDto>({
     queryKey: ["/api/admin/settings"],
     queryFn: async () =>
-      apiRequest<any, SettingsDto>("GET", "/api/admin/settings"),
+      apiRequest<void, SettingsDto>("GET", "/api/admin/settings"),
   });
 
   const [autoRefund, setAutoRefund] = useState({
@@ -207,8 +207,11 @@ export default function SettingsTab() {
     });
 
   const saveMutation = useMutation({
-    mutationFn: async () =>
-      apiRequest<any, { success: boolean }>("PUT", "/api/admin/settings", {
+    mutationFn: async () => {
+      // The body is named first so its type is the body's own: one request carries every
+      // section, and the compiler checks the payload against what is actually sent rather
+      // than against a hand-written duplicate of it.
+      const body = {
         autoRefund: {
           enabled: autoRefund.enabled,
           delayDays: Math.max(1, Math.round(autoRefund.delayDays) || 1),
@@ -243,7 +246,13 @@ export default function SettingsTab() {
             discountPerLiterUah: Math.max(0, tier.discountPerLiterUah || 0),
           })),
         },
-      }),
+      };
+      return apiRequest<typeof body, { success: boolean }>(
+        "PUT",
+        "/api/admin/settings",
+        body,
+      );
+    },
     onSuccess: async () => {
       // Await the refetch. Invalidate-and-forget is what let the stale payload win the race and roll the
       // screen back to the values the operator had just replaced.
@@ -320,8 +329,12 @@ export default function SettingsTab() {
           enabled={feedbackBot.enabled}
           telegramConfigured={feedbackBot.telegramConfigured}
           webhook={feedbackBot.webhook}
-          onChange={(enabled) => setFeedbackBot((prev) => ({ ...prev, enabled }))}
-          onRegistered={() => queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] })}
+          onChange={(enabled) =>
+            setFeedbackBot((prev) => ({ ...prev, enabled }))
+          }
+          onRegistered={() =>
+            queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] })
+          }
         />
 
         <VoucherRenewalCard
@@ -368,8 +381,15 @@ type LocalSettings = {
 function sectionsDiffer(server: SettingsDto, local: LocalSettings): boolean {
   if (server.autoRefund.enabled !== local.autoRefund.enabled) return true;
   if (server.autoRefund.delayDays !== local.autoRefund.delayDays) return true;
-  if (server.deletedUnpaidOrderCleanup.enabled !== local.deletedUnpaidOrderCleanup.enabled) return true;
-  if (server.deletedUnpaidOrderCleanup.retentionDays !== local.deletedUnpaidOrderCleanup.retentionDays)
+  if (
+    server.deletedUnpaidOrderCleanup.enabled !==
+    local.deletedUnpaidOrderCleanup.enabled
+  )
+    return true;
+  if (
+    server.deletedUnpaidOrderCleanup.retentionDays !==
+    local.deletedUnpaidOrderCleanup.retentionDays
+  )
     return true;
   if (server.dataRetention.enabled !== local.dataRetention) return true;
   if (server.expiredVoucherLoss.enabled !== local.expiredVoucherLoss)
@@ -807,7 +827,7 @@ function FeedbackBotCard({
     try {
       // Refetch afterwards rather than trusting the POST's own echo: registration is asynchronous on
       // Telegram's side, so a 200 from setWebhook only means the request was accepted.
-      await apiRequest<any, { success: boolean }>(
+      await apiRequest<void, { success: boolean }>(
         "POST",
         "/api/admin/settings/feedback/webhook",
       );
@@ -834,7 +854,9 @@ function FeedbackBotCard({
       <div className="space-y-6">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="font-medium text-sm">{t("settings.enableFeedbackBot")}</p>
+            <p className="font-medium text-sm">
+              {t("settings.enableFeedbackBot")}
+            </p>
             <p className="text-xs text-muted-foreground mt-1">
               {t("settings.enableFeedbackBotHint")}
             </p>
@@ -873,7 +895,8 @@ function FeedbackBotCard({
               )}
               {webhook.lastErrorMessage && (
                 <p className="text-destructive">
-                  {t("settings.feedbackBotWebhookError")}: {webhook.lastErrorMessage}
+                  {t("settings.feedbackBotWebhookError")}:{" "}
+                  {webhook.lastErrorMessage}
                   {webhook.lastErrorDate ? ` (${webhook.lastErrorDate})` : ""}
                 </p>
               )}
@@ -1230,7 +1253,7 @@ function QaTestAccessCard() {
   const { data, isLoading } = useQuery<QaTestAccessDto>({
     queryKey: ["/api/admin/qa-test-access"],
     queryFn: async () =>
-      apiRequest<any, QaTestAccessDto>("GET", "/api/admin/qa-test-access"),
+      apiRequest<void, QaTestAccessDto>("GET", "/api/admin/qa-test-access"),
   });
 
   const toggleMutation = useMutation({

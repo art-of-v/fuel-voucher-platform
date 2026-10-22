@@ -22,7 +22,12 @@ export function isoToDisplay(iso: string): string {
   return `${m[3]}.${m[2]}.${m[1]}`;
 }
 
-export default function DateInput({ value, onChange, className, title }: DateInputProps) {
+export default function DateInput({
+  value,
+  onChange,
+  className,
+  title,
+}: DateInputProps) {
   const [text, setText] = useState(isoToDisplay(value));
   const nativeRef = useRef<HTMLInputElement>(null);
 
@@ -46,7 +51,9 @@ export default function DateInput({ value, onChange, className, title }: DateInp
   };
 
   return (
-    <div className={`relative inline-flex items-center border rounded-md ${className ?? ""}`}>
+    <div
+      className={`relative inline-flex items-center border rounded-md ${className ?? ""}`}
+    >
       <Input
         type="text"
         inputMode="numeric"
@@ -56,8 +63,10 @@ export default function DateInput({ value, onChange, className, title }: DateInp
         onChange={(e) => {
           const digits = e.target.value.replace(/\D/g, "").slice(0, 8);
           let out = digits;
-          if (digits.length > 4) out = `${digits.slice(0, 2)}.${digits.slice(2, 4)}.${digits.slice(4)}`;
-          else if (digits.length > 2) out = `${digits.slice(0, 2)}.${digits.slice(2)}`;
+          if (digits.length > 4)
+            out = `${digits.slice(0, 2)}.${digits.slice(2, 4)}.${digits.slice(4)}`;
+          else if (digits.length > 2)
+            out = `${digits.slice(0, 2)}.${digits.slice(2)}`;
           setText(out);
           onChange(dateToISO(digits));
         }}

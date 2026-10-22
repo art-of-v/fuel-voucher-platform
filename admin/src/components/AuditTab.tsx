@@ -1,7 +1,15 @@
 import { useState, useMemo } from "react";
 import { useI18n } from "@/lib/i18n";
 import { useQuery } from "@tanstack/react-query";
-import { ScrollText, Loader2, ChevronLeft, ChevronRight, Search, Download, X } from "lucide-react";
+import {
+  ScrollText,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  Download,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -37,11 +45,14 @@ interface AuditFacets {
 }
 
 function formatEventType(type: string) {
-  return type.replace(/([a-z])([A-Z])/g, '$1 $2');
+  return type.replace(/([a-z])([A-Z])/g, "$1 $2");
 }
 
-function localizeEventType(type: string, t: (k: string, ...p: string[]) => string): string {
-  const key = 'auditlog.event.' + type;
+function localizeEventType(
+  type: string,
+  t: (k: string, ...p: string[]) => string,
+): string {
+  const key = "auditlog.event." + type;
   const translation = t(key);
   return translation === key ? formatEventType(type) : translation;
 }
@@ -65,7 +76,10 @@ export default function AuditTab() {
   });
 
   const filters = useMemo(() => {
-    const params = new URLSearchParams({ offset: String(page * PAGE_SIZE), limit: String(PAGE_SIZE) });
+    const params = new URLSearchParams({
+      offset: String(page * PAGE_SIZE),
+      limit: String(PAGE_SIZE),
+    });
     if (search.trim()) params.set("search", search.trim());
     if (eventType !== "all") params.set("eventType", eventType);
     if (aggregateType !== "all") params.set("aggregateType", aggregateType);
@@ -82,7 +96,13 @@ export default function AuditTab() {
 
   const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 0;
 
-  const hasFilters = search.trim() !== "" || eventType !== "all" || aggregateType !== "all" || changedBy !== "all" || from !== "" || to !== "";
+  const hasFilters =
+    search.trim() !== "" ||
+    eventType !== "all" ||
+    aggregateType !== "all" ||
+    changedBy !== "all" ||
+    from !== "" ||
+    to !== "";
 
   const resetFilters = () => {
     setSearch("");
@@ -97,24 +117,30 @@ export default function AuditTab() {
   const exportCsv = () => {
     const rows = data?.events ?? [];
     const header = [
-      t('auditlog.date'),
-      t('auditlog.eventType'),
-      t('auditlog.aggregate'),
-      t('auditlog.summary'),
-      t('auditlog.changedBy'),
+      t("auditlog.date"),
+      t("auditlog.eventType"),
+      t("auditlog.aggregate"),
+      t("auditlog.summary"),
+      t("auditlog.changedBy"),
     ];
     const escape = csvCell;
     const lines = [
       header.map(escape).join(","),
-      ...rows.map((e) => [
-        formatDateTime(e.changedAtUtc),
-        localizeEventType(e.eventType, t),
-        `${e.aggregateType}/${e.aggregateId}`,
-        localizeEventSummary(e.summary, t),
-        e.changedByUserName ?? '',
-      ].map(escape).join(",")),
+      ...rows.map((e) =>
+        [
+          formatDateTime(e.changedAtUtc),
+          localizeEventType(e.eventType, t),
+          `${e.aggregateType}/${e.aggregateId}`,
+          localizeEventSummary(e.summary, t),
+          e.changedByUserName ?? "",
+        ]
+          .map(escape)
+          .join(","),
+      ),
     ];
-    const blob = new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob(["\uFEFF" + lines.join("\n")], {
+      type: "text/csv;charset=utf-8;",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -130,57 +156,107 @@ export default function AuditTab() {
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(0); }}
-            placeholder={t('common.search')}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(0);
+            }}
+            placeholder={t("common.search")}
             className="pl-9 h-9"
           />
         </div>
-        <Select value={eventType} onValueChange={(v) => { setEventType(v); setPage(0); }}>
-          <SelectTrigger className="h-9 w-48"><SelectValue /></SelectTrigger>
+        <Select
+          value={eventType}
+          onValueChange={(v) => {
+            setEventType(v);
+            setPage(0);
+          }}
+        >
+          <SelectTrigger className="h-9 w-48">
+            <SelectValue />
+          </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">{t('auditlog.eventType')}: all</SelectItem>
+            <SelectItem value="all">{t("auditlog.eventType")}: all</SelectItem>
             {facets?.eventTypes.map((et) => (
-              <SelectItem key={et} value={et}>{localizeEventType(et, t)}</SelectItem>
+              <SelectItem key={et} value={et}>
+                {localizeEventType(et, t)}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <Select value={aggregateType} onValueChange={(v) => { setAggregateType(v); setPage(0); }}>
-          <SelectTrigger className="h-9 w-40"><SelectValue /></SelectTrigger>
+        <Select
+          value={aggregateType}
+          onValueChange={(v) => {
+            setAggregateType(v);
+            setPage(0);
+          }}
+        >
+          <SelectTrigger className="h-9 w-40">
+            <SelectValue />
+          </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">{t('auditlog.aggregate')}: all</SelectItem>
+            <SelectItem value="all">{t("auditlog.aggregate")}: all</SelectItem>
             {facets?.aggregateTypes.map((at) => (
-              <SelectItem key={at} value={at}>{at}</SelectItem>
+              <SelectItem key={at} value={at}>
+                {at}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <Select value={changedBy} onValueChange={(v) => { setChangedBy(v); setPage(0); }}>
-          <SelectTrigger className="h-9 w-44"><SelectValue /></SelectTrigger>
+        <Select
+          value={changedBy}
+          onValueChange={(v) => {
+            setChangedBy(v);
+            setPage(0);
+          }}
+        >
+          <SelectTrigger className="h-9 w-44">
+            <SelectValue />
+          </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">{t('auditlog.changedBy')}: all</SelectItem>
+            <SelectItem value="all">{t("auditlog.changedBy")}: all</SelectItem>
             {facets?.users.map((u) => (
-              <SelectItem key={u} value={u}>{u}</SelectItem>
+              <SelectItem key={u} value={u}>
+                {u}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
         <DateInput
           value={from}
-          onChange={(v) => { setFrom(v); setPage(0); }}
+          onChange={(v) => {
+            setFrom(v);
+            setPage(0);
+          }}
           className="h-9 w-36"
-          title={t('report.from')}
+          title={t("report.from")}
         />
         <DateInput
           value={to}
-          onChange={(v) => { setTo(v); setPage(0); }}
+          onChange={(v) => {
+            setTo(v);
+            setPage(0);
+          }}
           className="h-9 w-36"
-          title={t('report.to')}
+          title={t("report.to")}
         />
         {hasFilters && (
-          <Button variant="ghost" size="sm" onClick={resetFilters} className="h-9">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={resetFilters}
+            className="h-9"
+          >
             <X className="w-4 h-4 mr-1" />
-            {t('common.close')}
+            {t("common.close")}
           </Button>
         )}
-        <Button variant="outline" size="sm" onClick={exportCsv} disabled={!data?.events.length} className="h-9">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={exportCsv}
+          disabled={!data?.events.length}
+          className="h-9"
+        >
           <Download className="w-4 h-4 mr-1" />
           CSV
         </Button>
@@ -193,7 +269,7 @@ export default function AuditTab() {
       ) : !data?.events.length ? (
         <div className="text-center py-20 text-muted-foreground">
           <ScrollText className="w-12 h-12 mx-auto mb-4 opacity-40" />
-          <p>{t('auditlog.noEvents')}</p>
+          <p>{t("auditlog.noEvents")}</p>
         </div>
       ) : (
         <>
@@ -202,16 +278,29 @@ export default function AuditTab() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/50">
-                    <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">{t('auditlog.date')}</th>
-                    <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">{t('auditlog.eventType')}</th>
-                    <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">{t('auditlog.aggregate')}</th>
-                    <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">{t('auditlog.summary')}</th>
-                    <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">{t('auditlog.changedBy')}</th>
+                    <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                      {t("auditlog.date")}
+                    </th>
+                    <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                      {t("auditlog.eventType")}
+                    </th>
+                    <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                      {t("auditlog.aggregate")}
+                    </th>
+                    <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                      {t("auditlog.summary")}
+                    </th>
+                    <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                      {t("auditlog.changedBy")}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.events.map((evt) => (
-                    <tr key={evt.id} className="border-t border-border hover:bg-muted/20 transition-colors">
+                    <tr
+                      key={evt.id}
+                      className="border-t border-border hover:bg-muted/20 transition-colors"
+                    >
                       <td className="p-3 whitespace-nowrap text-muted-foreground text-xs tabular-nums">
                         {formatDateTime(evt.changedAtUtc)}
                       </td>
@@ -223,9 +312,11 @@ export default function AuditTab() {
                       <td className="p-3 text-muted-foreground text-xs">
                         {evt.aggregateType}/{evt.aggregateId.substring(0, 8)}...
                       </td>
-                      <td className="p-3 text-xs">{localizeEventSummary(evt.summary, t)}</td>
+                      <td className="p-3 text-xs">
+                        {localizeEventSummary(evt.summary, t)}
+                      </td>
                       <td className="p-3 text-xs text-muted-foreground font-mono tabular-nums">
-                        {evt.changedByUserName ?? '—'}
+                        {evt.changedByUserName ?? "—"}
                       </td>
                     </tr>
                   ))}
@@ -236,13 +327,29 @@ export default function AuditTab() {
 
           {totalPages > 1 && (
             <div className="flex items-center justify-between text-sm text-muted-foreground">
-              <span>{t('auditlog.total')}: {data.total}</span>
+              <span>
+                {t("auditlog.total")}: {data.total}
+              </span>
               <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" disabled={page === 0} onClick={() => setPage(p => p - 1)} className="h-8">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={page === 0}
+                  onClick={() => setPage((p) => p - 1)}
+                  className="h-8"
+                >
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
-                <span className="text-xs">{page + 1} / {totalPages}</span>
-                <Button variant="ghost" size="sm" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)} className="h-8">
+                <span className="text-xs">
+                  {page + 1} / {totalPages}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={page >= totalPages - 1}
+                  onClick={() => setPage((p) => p + 1)}
+                  className="h-8"
+                >
                   <ChevronRight className="w-4 h-4" />
                 </Button>
               </div>

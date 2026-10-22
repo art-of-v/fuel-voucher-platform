@@ -7,7 +7,11 @@ import CatalogueSyncButton from "./CatalogueSyncButton";
 
 vi.mock("@/lib/api-client", () => ({ apiRequest: vi.fn() }));
 vi.mock("@/lib/i18n", () => ({
-  useI18n: () => ({ t: (key: string) => key, language: "uk", setLanguage: vi.fn() }),
+  useI18n: () => ({
+    t: (key: string) => key,
+    language: "uk",
+    setLanguage: vi.fn(),
+  }),
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 

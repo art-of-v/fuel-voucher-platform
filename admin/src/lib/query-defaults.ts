@@ -14,8 +14,11 @@ import { apiRequest } from "./api-client";
  * query that names a path in its key behaves like every other admin call.
  * </p>
  */
-export const defaultQueryFn = async ({ queryKey }: { queryKey: readonly unknown[] }) =>
-  apiRequest("GET", queryKey[0] as string);
+export const defaultQueryFn = async ({
+  queryKey,
+}: {
+  queryKey: readonly unknown[];
+}) => apiRequest("GET", queryKey[0] as string);
 
 export const queryClient = new QueryClient({
   defaultOptions: {

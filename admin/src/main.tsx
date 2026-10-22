@@ -36,5 +36,5 @@ createRoot(document.getElementById("root")!).render(
     <Sentry.ErrorBoundary fallback={<CrashFallback />}>
       <App />
     </Sentry.ErrorBoundary>
-  </StrictMode>
+  </StrictMode>,
 );

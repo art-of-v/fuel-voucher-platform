@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { parseNominals, DEFAULT_NOMINALS, localizeEventSummary, csvCell } from "./utils";
+import {
+  parseNominals,
+  DEFAULT_NOMINALS,
+  localizeEventSummary,
+  csvCell,
+} from "./utils";
 
 function mockT(key: string, ...params: string[]): string {
   return params.reduce((acc, p, i) => acc.replace(`{${i}}`, p), `[${key}]`);
@@ -30,32 +35,46 @@ describe("parseNominals", () => {
 
 describe("localizeEventSummary", () => {
   it("localizes a fuel price-change summary with old and new values", () => {
-    const t = (key: string, ...params: string[]) => `${key}:${params.join("|")}`;
-    const result = localizeEventSummary("OKKO / A-95: supplier 49.00 → 100.00, margin 2.00 → 0.50", t);
+    const t = (key: string, ...params: string[]) =>
+      `${key}:${params.join("|")}`;
+    const result = localizeEventSummary(
+      "OKKO / A-95: supplier 49.00 → 100.00, margin 2.00 → 0.50",
+      t,
+    );
     expect(result).toBe(
-      "OKKO / A-95: history.changeSupplier:49.00|100.00, history.changeMargin:2.00|0.50"
+      "OKKO / A-95: history.changeSupplier:49.00|100.00, history.changeMargin:2.00|0.50",
     );
   });
 
   it("localizes brand creation", () => {
-    expect(localizeEventSummary("Created brand OKKO", mockT)).toBe("[history.providerCreated]");
+    expect(localizeEventSummary("Created brand OKKO", mockT)).toBe(
+      "[history.providerCreated]",
+    );
   });
 
   it("localizes nominals change", () => {
-    expect(localizeEventSummary("OKKO: nominals changed [2, 3, 5]", mockT)).toBe("[history.nominalsChanged]");
+    expect(
+      localizeEventSummary("OKKO: nominals changed [2, 3, 5]", mockT),
+    ).toBe("[history.nominalsChanged]");
   });
 
   it("localizes fuel added with price", () => {
-    expect(localizeEventSummary("OKKO / A-95: added at 51.00 UAH/L", mockT)).toBe("[history.fuelAdded]");
+    expect(
+      localizeEventSummary("OKKO / A-95: added at 51.00 UAH/L", mockT),
+    ).toBe("[history.fuelAdded]");
   });
 
   it("passes through unknown summaries unchanged", () => {
-    expect(localizeEventSummary("something else entirely", mockT)).toBe("something else entirely");
+    expect(localizeEventSummary("something else entirely", mockT)).toBe(
+      "something else entirely",
+    );
   });
 
   it("localizes a brand-scoped name change", () => {
     const t = (_key: string, ...params: string[]) => params.join("|");
-    expect(localizeEventSummary("OKKO: name ttt → KLO", t)).toBe("OKKO: ttt|KLO");
+    expect(localizeEventSummary("OKKO: name ttt → KLO", t)).toBe(
+      "OKKO: ttt|KLO",
+    );
   });
 });
 
@@ -71,7 +90,9 @@ describe("csvCell", () => {
     // The reachable case: DatabaseLoggerProvider stores Request.Path verbatim, so the
     // attacker picks this string simply by requesting that path.
     expect(csvCell("=cmd|'/c calc'!A0")).toBe(`"'=cmd|'/c calc'!A0"`);
-    expect(csvCell('=HYPERLINK("http://evil")')).toBe(`"'=HYPERLINK(""http://evil"")"`);
+    expect(csvCell('=HYPERLINK("http://evil")')).toBe(
+      `"'=HYPERLINK(""http://evil"")"`,
+    );
     for (const lead of ["=", "+", "-", "@", "\t", "\r"]) {
       expect(csvCell(lead + "danger")).toBe(`"'${lead}danger"`);
     }

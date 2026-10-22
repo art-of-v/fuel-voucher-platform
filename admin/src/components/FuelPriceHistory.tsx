@@ -69,7 +69,9 @@ function endOfDayUtc(value: string): string {
 }
 
 function perL(value: number | null | undefined): string {
-  return value == null ? "—" : formatMoney(value, { decimals: 2, hideSymbol: true });
+  return value == null
+    ? "—"
+    : formatMoney(value, { decimals: 2, hideSymbol: true });
 }
 
 /**
@@ -88,7 +90,7 @@ export function FuelPriceHistory({ fuelId }: { fuelId: string }) {
   const log = useQuery<FuelPriceHistoryEntry[]>({
     queryKey: [`/api/admin/brand-fuels/${fuelId}`, "price-history"],
     queryFn: () =>
-      apiRequest<any, FuelPriceHistoryEntry[]>(
+      apiRequest<void, FuelPriceHistoryEntry[]>(
         "GET",
         `/api/admin/brand-fuels/${fuelId}/price-history?limit=200`,
       ),
@@ -98,7 +100,7 @@ export function FuelPriceHistory({ fuelId }: { fuelId: string }) {
   const asOf = useQuery<FuelPriceAt | null>({
     queryKey: [`/api/admin/brand-fuels/${fuelId}`, "price-at", asOfDate],
     queryFn: () =>
-      apiRequest<any, FuelPriceAt | null>(
+      apiRequest<void, FuelPriceAt | null>(
         "GET",
         `/api/admin/brand-fuels/${fuelId}/price-at?asOf=${encodeURIComponent(endOfDayUtc(asOfDate))}`,
       ),
@@ -127,16 +129,24 @@ export function FuelPriceHistory({ fuelId }: { fuelId: string }) {
         {asOfDate !== "" && (
           <div className="flex flex-col gap-1 text-xs">
             {asOf.isLoading ? (
-              <span className="text-muted-foreground">{t("common.loading")}</span>
+              <span className="text-muted-foreground">
+                {t("common.loading")}
+              </span>
             ) : asOf.data ? (
               <>
-                <span className="text-muted-foreground">{t("priceHistory.atResult")}</span>
+                <span className="text-muted-foreground">
+                  {t("priceHistory.atResult")}
+                </span>
                 <span className="font-medium tabular-nums">
-                  {perL(asOf.data.finalPricePerLiter)} {t("priceHistory.perLiter")}
+                  {perL(asOf.data.finalPricePerLiter)}{" "}
+                  {t("priceHistory.perLiter")}
                   {" · "}
                   {t("priceHistory.pump")} {perL(asOf.data.pumpPricePerLiter)}
                   {" · "}
-                  {t(REASON_KEYS[asOf.data.reason] ?? "priceHistory.reasonUnknown")}
+                  {t(
+                    REASON_KEYS[asOf.data.reason] ??
+                      "priceHistory.reasonUnknown",
+                  )}
                 </span>
                 <span className="text-[10px] text-muted-foreground">
                   {t("priceHistory.stoodFrom", day(asOf.data.effectiveFromUtc))}
@@ -146,33 +156,51 @@ export function FuelPriceHistory({ fuelId }: { fuelId: string }) {
                 </span>
               </>
             ) : (
-              <span className="text-muted-foreground">{t("priceHistory.atNone")}</span>
+              <span className="text-muted-foreground">
+                {t("priceHistory.atNone")}
+              </span>
             )}
           </div>
         )}
       </div>
 
       {log.isLoading ? (
-        <p className="p-3 text-xs text-muted-foreground">{t("common.loading")}</p>
+        <p className="p-3 text-xs text-muted-foreground">
+          {t("common.loading")}
+        </p>
       ) : entries.length === 0 ? (
-        <p className="p-3 text-xs text-muted-foreground">{t("priceHistory.empty")}</p>
+        <p className="p-3 text-xs text-muted-foreground">
+          {t("priceHistory.empty")}
+        </p>
       ) : (
         <div className="max-h-72 overflow-y-auto">
           <table className="w-full text-xs">
             <thead className="sticky top-0 bg-muted/60">
               <tr className="text-left text-muted-foreground">
                 <th className="p-2 font-medium">{t("priceHistory.colWhen")}</th>
-                <th className="p-2 font-medium text-right">{t("priceHistory.colCustomer")}</th>
-                <th className="p-2 font-medium text-right">{t("priceHistory.colBuy")}</th>
-                <th className="p-2 font-medium text-right">{t("priceHistory.colMargin")}</th>
-                <th className="p-2 font-medium text-right">{t("priceHistory.colPump")}</th>
-                <th className="p-2 font-medium">{t("priceHistory.colReason")}</th>
+                <th className="p-2 font-medium text-right">
+                  {t("priceHistory.colCustomer")}
+                </th>
+                <th className="p-2 font-medium text-right">
+                  {t("priceHistory.colBuy")}
+                </th>
+                <th className="p-2 font-medium text-right">
+                  {t("priceHistory.colMargin")}
+                </th>
+                <th className="p-2 font-medium text-right">
+                  {t("priceHistory.colPump")}
+                </th>
+                <th className="p-2 font-medium">
+                  {t("priceHistory.colReason")}
+                </th>
               </tr>
             </thead>
             <tbody>
               {entries.map((entry) => (
                 <tr key={entry.id} className="border-t border-border/50">
-                  <td className="p-2 font-mono whitespace-nowrap">{day(entry.effectiveFromUtc)}</td>
+                  <td className="p-2 font-mono whitespace-nowrap">
+                    {day(entry.effectiveFromUtc)}
+                  </td>
                   <td className="p-2 text-right font-medium tabular-nums">
                     {perL(entry.finalPricePerLiter)}
                   </td>
@@ -186,7 +214,9 @@ export function FuelPriceHistory({ fuelId }: { fuelId: string }) {
                     {perL(entry.pumpPricePerLiter)}
                   </td>
                   <td className="p-2">
-                    {t(REASON_KEYS[entry.reason] ?? "priceHistory.reasonUnknown")}
+                    {t(
+                      REASON_KEYS[entry.reason] ?? "priceHistory.reasonUnknown",
+                    )}
                     {entry.dataKind !== "real" && (
                       <span className="ml-1 text-[10px] uppercase text-muted-foreground">
                         {entry.dataKind}

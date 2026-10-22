@@ -37,7 +37,13 @@ const FACETS = {
 };
 
 /** The figures in the order the slots expect them, deliberately not in a readable order. */
-const EXPECTED_ORDER = [FACETS.total, FACETS.kept, FACETS.junk, FACETS.unclassified, FACETS.replied];
+const EXPECTED_ORDER = [
+  FACETS.total,
+  FACETS.kept,
+  FACETS.junk,
+  FACETS.unclassified,
+  FACETS.replied,
+];
 
 function renderTab() {
   const client = new QueryClient({
@@ -86,7 +92,9 @@ describe("FeedbackTab — the triage summary line", () => {
 
     // Split rather than substring-search: two of the five fixtures are single digits, and
     // indexOf("1") inside "42" would make a swapped pair look correct.
-    const segments = (summary.textContent ?? "").split("·").map((part) => part.trim());
+    const segments = (summary.textContent ?? "")
+      .split("·")
+      .map((part) => part.trim());
 
     expect(segments).toHaveLength(5);
     segments.forEach((segment, index) => {

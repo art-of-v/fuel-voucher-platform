@@ -2,18 +2,34 @@ import { useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  Plus, Trash2, Edit2, Save, X, Loader2, FileUp, MapPin, AlertTriangle,
-  ChevronLeft, ChevronRight,
+  Plus,
+  Trash2,
+  Edit2,
+  Save,
+  X,
+  Loader2,
+  FileUp,
+  MapPin,
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { apiRequest } from "@/lib/api-client";
 import { toast } from "sonner";
 import {
-  StationNode, PagedResult, isValidCoordinate, deriveExternalId,
+  StationNode,
+  PagedResult,
+  isValidCoordinate,
+  deriveExternalId,
 } from "@/lib/station-nodes";
 
 interface Brand {
@@ -45,8 +61,15 @@ type NodeForm = {
 };
 
 const EMPTY_FORM: NodeForm = {
-  brandId: "", externalId: "", name: "", address: "", phone: "",
-  city: "", stationType: "", lat: "", lng: "",
+  brandId: "",
+  externalId: "",
+  name: "",
+  address: "",
+  phone: "",
+  city: "",
+  stationType: "",
+  lat: "",
+  lng: "",
 };
 
 function toNodePayload(form: NodeForm): Omit<StationNode, "id"> {
@@ -109,19 +132,27 @@ export default function StationNodesTab() {
   const { data: paged, isLoading } = useQuery<PagedResult<StationNode>>({
     queryKey: ["/api/admin/brand-stations", page, brandFilter],
     queryFn: async () => {
-      const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(PAGE_SIZE),
+      });
       if (brandFilter) params.set("BrandId", brandFilter);
-      return apiRequest<unknown, PagedResult<StationNode>>("GET", `/api/admin/brand-stations?${params.toString()}`);
+      return apiRequest<unknown, PagedResult<StationNode>>(
+        "GET",
+        `/api/admin/brand-stations?${params.toString()}`,
+      );
     },
   });
 
   const nodes = paged?.items ?? [];
   const totalPages = paged?.totalPages ?? 1;
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["/api/admin/brand-stations"] });
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/brand-stations"] });
 
   const createMutation = useMutation({
-    mutationFn: (n: Omit<StationNode, "id">) => apiRequest("POST", "/api/admin/brand-stations", n),
+    mutationFn: (n: Omit<StationNode, "id">) =>
+      apiRequest("POST", "/api/admin/brand-stations", n),
     onSuccess: () => {
       invalidate();
       setIsCreating(false);
@@ -133,7 +164,11 @@ export default function StationNodesTab() {
 
   const updateMutation = useMutation({
     mutationFn: (n: StationNode) =>
-      apiRequest("PUT", `/api/admin/brand-stations/${encodeURIComponent(n.id)}`, n),
+      apiRequest(
+        "PUT",
+        `/api/admin/brand-stations/${encodeURIComponent(n.id)}`,
+        n,
+      ),
     onSuccess: () => {
       invalidate();
       setEditingId(null);
@@ -144,7 +179,11 @@ export default function StationNodesTab() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("DELETE", `/api/admin/brand-stations/${encodeURIComponent(id)}`),
+    mutationFn: (id: string) =>
+      apiRequest(
+        "DELETE",
+        `/api/admin/brand-stations/${encodeURIComponent(id)}`,
+      ),
     onSuccess: () => {
       invalidate();
       toast.success(t("common.deleted"));
@@ -180,7 +219,10 @@ export default function StationNodesTab() {
 
   const autoDeriveId = () => {
     if (!selectedBrandSlug || !coordsValid) return;
-    setForm((f) => ({ ...f, externalId: deriveExternalId(selectedBrandSlug, latNum, lngNum) }));
+    setForm((f) => ({
+      ...f,
+      externalId: deriveExternalId(selectedBrandSlug, latNum, lngNum),
+    }));
   };
 
   const submitForm = () => {
@@ -204,10 +246,19 @@ export default function StationNodesTab() {
     try {
       const fd = new FormData();
       fd.append("file", importFile);
-      const res = await apiRequest<any, ImportResult>(
-        "POST", "/api/admin/brand-stations/import", fd, undefined, 300_000, 0,
+      const res = await apiRequest<FormData, ImportResult>(
+        "POST",
+        "/api/admin/brand-stations/import",
+        fd,
+        undefined,
+        300_000,
+        0,
       );
-      setImportResult({ added: res.added ?? 0, updated: res.updated ?? 0, errors: res.errors ?? [] });
+      setImportResult({
+        added: res.added ?? 0,
+        updated: res.updated ?? 0,
+        errors: res.errors ?? [],
+      });
       invalidate();
       setImportFile(null);
     } catch (e) {
@@ -216,7 +267,10 @@ export default function StationNodesTab() {
     setIsImporting(false);
   };
 
-  const busy = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
+  const busy =
+    createMutation.isPending ||
+    updateMutation.isPending ||
+    deleteMutation.isPending;
   const showForm = isCreating || editingId !== null;
 
   return (
@@ -226,15 +280,22 @@ export default function StationNodesTab() {
         <div className="flex items-center gap-2">
           <Select
             value={brandFilter || "__all__"}
-            onValueChange={(v) => { setBrandFilter(v === "__all__" ? "" : v); setPage(1); }}
+            onValueChange={(v) => {
+              setBrandFilter(v === "__all__" ? "" : v);
+              setPage(1);
+            }}
           >
             <SelectTrigger className="h-8 w-56">
               <SelectValue placeholder={t("stationNodes.allBrands")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">{t("stationNodes.allBrands")}</SelectItem>
+              <SelectItem value="__all__">
+                {t("stationNodes.allBrands")}
+              </SelectItem>
               {brands.map((b) => (
-                <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                <SelectItem key={b.id} value={b.id}>
+                  {b.name}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -258,7 +319,11 @@ export default function StationNodesTab() {
               e.target.value = "";
             }}
           />
-          <Button variant="outline" size="sm" onClick={() => document.getElementById("node-import")?.click()}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => document.getElementById("node-import")?.click()}
+          >
             <FileUp className="w-3.5 h-3.5 mr-1" />
             {t("stationNodes.import")}
           </Button>
@@ -273,17 +338,33 @@ export default function StationNodesTab() {
       {importFile && (
         <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between gap-3 flex-wrap animate-in fade-in slide-in-from-top-2 duration-200">
           <div className="text-sm">
-            <span className="text-muted-foreground">{t("stationNodes.selectedFile")}: </span>
+            <span className="text-muted-foreground">
+              {t("stationNodes.selectedFile")}:{" "}
+            </span>
             <span className="font-mono text-primary">{importFile.name}</span>
-            <span className="text-muted-foreground"> ({Math.round(importFile.size / 1024)} KB)</span>
-            <p className="text-xs text-muted-foreground mt-1">{t("stationNodes.importHint")}</p>
+            <span className="text-muted-foreground">
+              {" "}
+              ({Math.round(importFile.size / 1024)} KB)
+            </span>
+            <p className="text-xs text-muted-foreground mt-1">
+              {t("stationNodes.importHint")}
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <Button size="sm" onClick={runImport} disabled={isImporting}>
-              {isImporting ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <FileUp className="w-3.5 h-3.5 mr-1" />}
+              {isImporting ? (
+                <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+              ) : (
+                <FileUp className="w-3.5 h-3.5 mr-1" />
+              )}
               {t("stationNodes.upload")}
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => setImportFile(null)} disabled={isImporting}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setImportFile(null)}
+              disabled={isImporting}
+            >
               <X className="w-3.5 h-3.5" />
             </Button>
           </div>
@@ -299,10 +380,19 @@ export default function StationNodesTab() {
       {importResult && (
         <div className="bg-muted border border-border rounded-xl p-4 text-sm space-y-2">
           <div className="flex gap-4 flex-wrap">
-            <span className="text-success">{t("stationNodes.importedAdded")}: {importResult.added}</span>
-            <span className="text-info">{t("stationNodes.importedUpdated")}: {importResult.updated}</span>
-            <span className="text-destructive">{t("stationNodes.importErrors")}: {importResult.errors.length}</span>
-            <button onClick={() => setImportResult(null)} className="ml-auto text-xs text-muted-foreground hover:text-foreground underline">
+            <span className="text-success">
+              {t("stationNodes.importedAdded")}: {importResult.added}
+            </span>
+            <span className="text-info">
+              {t("stationNodes.importedUpdated")}: {importResult.updated}
+            </span>
+            <span className="text-destructive">
+              {t("stationNodes.importErrors")}: {importResult.errors.length}
+            </span>
+            <button
+              onClick={() => setImportResult(null)}
+              className="ml-auto text-xs text-muted-foreground hover:text-foreground underline"
+            >
               {t("import.close")}
             </button>
           </div>
@@ -310,8 +400,12 @@ export default function StationNodesTab() {
             <div className="max-h-48 overflow-y-auto space-y-1 pt-2 border-t border-border">
               {importResult.errors.map((er, i) => (
                 <div key={i} className="text-xs flex gap-2">
-                  <span className="text-muted-foreground font-mono shrink-0">#{er.line}</span>
-                  <span className="text-destructive break-words">{er.message}</span>
+                  <span className="text-muted-foreground font-mono shrink-0">
+                    #{er.line}
+                  </span>
+                  <span className="text-destructive break-words">
+                    {er.message}
+                  </span>
                 </div>
               ))}
             </div>
@@ -325,46 +419,122 @@ export default function StationNodesTab() {
           <div className="flex items-center justify-between mb-3">
             <h4 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground flex items-center gap-2">
               <MapPin className="w-4 h-4 text-primary" />
-              {editingId ? t("stationNodes.editNode") : t("stationNodes.addNode")}
+              {editingId
+                ? t("stationNodes.editNode")
+                : t("stationNodes.addNode")}
             </h4>
           </div>
           <div className="flex items-end gap-3 flex-wrap">
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{t("stationNodes.brand")}</label>
-              <Select value={form.brandId} onValueChange={(v) => setForm((f) => ({ ...f, brandId: v }))}>
-                <SelectTrigger className="h-8 w-48"><SelectValue placeholder={t("stationNodes.brand")} /></SelectTrigger>
+              <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
+                {t("stationNodes.brand")}
+              </label>
+              <Select
+                value={form.brandId}
+                onValueChange={(v) => setForm((f) => ({ ...f, brandId: v }))}
+              >
+                <SelectTrigger className="h-8 w-48">
+                  <SelectValue placeholder={t("stationNodes.brand")} />
+                </SelectTrigger>
                 <SelectContent>
-                  {brands.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                  {brands.map((b) => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{t("table.name")}</label>
-              <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} className="h-8 w-56" placeholder={t("stationNodes.namePlaceholder")} />
+              <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
+                {t("table.name")}
+              </label>
+              <Input
+                value={form.name}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, name: e.target.value }))
+                }
+                className="h-8 w-56"
+                placeholder={t("stationNodes.namePlaceholder")}
+              />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{t("stationNodes.lat")}</label>
-              <Input type="number" step="any" value={form.lat} onChange={(e) => setForm((f) => ({ ...f, lat: e.target.value }))} className="h-8 w-32 text-right" placeholder="50.45010" />
+              <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
+                {t("stationNodes.lat")}
+              </label>
+              <Input
+                type="number"
+                step="any"
+                value={form.lat}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, lat: e.target.value }))
+                }
+                className="h-8 w-32 text-right"
+                placeholder="50.45010"
+              />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{t("stationNodes.lng")}</label>
-              <Input type="number" step="any" value={form.lng} onChange={(e) => setForm((f) => ({ ...f, lng: e.target.value }))} className="h-8 w-32 text-right" placeholder="30.52340" />
+              <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
+                {t("stationNodes.lng")}
+              </label>
+              <Input
+                type="number"
+                step="any"
+                value={form.lng}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, lng: e.target.value }))
+                }
+                className="h-8 w-32 text-right"
+                placeholder="30.52340"
+              />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{t("stationNodes.city")}</label>
-              <Input value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} className="h-8 w-40" />
+              <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
+                {t("stationNodes.city")}
+              </label>
+              <Input
+                value={form.city}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, city: e.target.value }))
+                }
+                className="h-8 w-40"
+              />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{t("stationNodes.address")}</label>
-              <Input value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} className="h-8 w-64" />
+              <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
+                {t("stationNodes.address")}
+              </label>
+              <Input
+                value={form.address}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, address: e.target.value }))
+                }
+                className="h-8 w-64"
+              />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{t("stationNodes.phone")}</label>
-              <Input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} className="h-8 w-40" />
+              <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
+                {t("stationNodes.phone")}
+              </label>
+              <Input
+                value={form.phone}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, phone: e.target.value }))
+                }
+                className="h-8 w-40"
+              />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{t("stationNodes.stationType")}</label>
-              <Input value={form.stationType} onChange={(e) => setForm((f) => ({ ...f, stationType: e.target.value }))} className="h-8 w-40" />
+              <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
+                {t("stationNodes.stationType")}
+              </label>
+              <Input
+                value={form.stationType}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, stationType: e.target.value }))
+                }
+                className="h-8 w-40"
+              />
             </div>
           </div>
 
@@ -374,25 +544,59 @@ export default function StationNodesTab() {
               without changing this contract. */}
           <div className="flex items-end gap-3 flex-wrap mt-3 pt-3 border-t border-border">
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">{t("stationNodes.externalId")}</label>
-              <Input value={form.externalId} onChange={(e) => setForm((f) => ({ ...f, externalId: e.target.value }))} disabled={!!editingId} className="h-8 w-72 font-mono text-xs" placeholder={t("stationNodes.externalIdHint")} />
+              <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
+                {t("stationNodes.externalId")}
+              </label>
+              <Input
+                value={form.externalId}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, externalId: e.target.value }))
+                }
+                disabled={!!editingId}
+                className="h-8 w-72 font-mono text-xs"
+                placeholder={t("stationNodes.externalIdHint")}
+              />
             </div>
             {!editingId && (
-              <Button variant="ghost" size="sm" className="h-8" onClick={autoDeriveId} disabled={!selectedBrandSlug || !coordsValid} title={t("stationNodes.autoIdHint")}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8"
+                onClick={autoDeriveId}
+                disabled={!selectedBrandSlug || !coordsValid}
+                title={t("stationNodes.autoIdHint")}
+              >
                 {t("stationNodes.autoId")}
               </Button>
             )}
-            {!coordsValid && (form.lat.trim() !== "" || form.lng.trim() !== "") && (
-              <span className="text-xs text-destructive flex items-center gap-1 pb-1.5">
-                <AlertTriangle className="w-3 h-3" /> {t("stationNodes.invalidCoords")}
-              </span>
-            )}
+            {!coordsValid &&
+              (form.lat.trim() !== "" || form.lng.trim() !== "") && (
+                <span className="text-xs text-destructive flex items-center gap-1 pb-1.5">
+                  <AlertTriangle className="w-3 h-3" />{" "}
+                  {t("stationNodes.invalidCoords")}
+                </span>
+              )}
             <div className="flex items-end gap-1 pb-0.5 ml-auto">
-              <Button size="sm" className="h-8" onClick={submitForm} disabled={!formValid || busy}>
-                {busy ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1" />}
+              <Button
+                size="sm"
+                className="h-8"
+                onClick={submitForm}
+                disabled={!formValid || busy}
+              >
+                {busy ? (
+                  <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                ) : (
+                  <Save className="w-3.5 h-3.5 mr-1" />
+                )}
                 {editingId ? t("common.save") : t("common.create")}
               </Button>
-              <Button variant="ghost" size="sm" className="h-8" onClick={cancelForm} disabled={busy}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8"
+                onClick={cancelForm}
+                disabled={busy}
+              >
                 <X className="w-3.5 h-3.5" />
               </Button>
             </div>
@@ -418,44 +622,94 @@ export default function StationNodesTab() {
             <table className="w-full text-sm">
               <thead className="bg-muted/50">
                 <tr>
-                  <th className="text-left p-3 whitespace-nowrap">{t("table.name")}</th>
-                  <th className="text-left p-3 whitespace-nowrap">{t("stationNodes.brand")}</th>
-                  <th className="text-left p-3 whitespace-nowrap">{t("stationNodes.city")}</th>
-                  <th className="text-right p-3 whitespace-nowrap">{t("stationNodes.coordinates")}</th>
-                  <th className="text-center p-3 whitespace-nowrap">{t("common.actions")}</th>
+                  <th className="text-left p-3 whitespace-nowrap">
+                    {t("table.name")}
+                  </th>
+                  <th className="text-left p-3 whitespace-nowrap">
+                    {t("stationNodes.brand")}
+                  </th>
+                  <th className="text-left p-3 whitespace-nowrap">
+                    {t("stationNodes.city")}
+                  </th>
+                  <th className="text-right p-3 whitespace-nowrap">
+                    {t("stationNodes.coordinates")}
+                  </th>
+                  <th className="text-center p-3 whitespace-nowrap">
+                    {t("common.actions")}
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {nodes.map((n) => (
-                  <tr key={n.id} className="border-t border-border hover:bg-muted/20 transition-colors">
+                  <tr
+                    key={n.id}
+                    className="border-t border-border hover:bg-muted/20 transition-colors"
+                  >
                     <td className="p-3">
                       <span className="font-medium">{n.name}</span>
-                      {n.address && <div className="text-xs text-muted-foreground">{n.address}</div>}
+                      {n.address && (
+                        <div className="text-xs text-muted-foreground">
+                          {n.address}
+                        </div>
+                      )}
                     </td>
-                    <td className="p-3 text-muted-foreground">{brandName(n.brandId)}</td>
-                    <td className="p-3 text-muted-foreground">{n.city ?? "—"}</td>
+                    <td className="p-3 text-muted-foreground">
+                      {brandName(n.brandId)}
+                    </td>
+                    <td className="p-3 text-muted-foreground">
+                      {n.city ?? "—"}
+                    </td>
                     <td className="p-3 text-right tabular-nums text-xs text-muted-foreground whitespace-nowrap">
-                      {n.lat != null && n.lng != null ? `${n.lat.toFixed(5)}, ${n.lng.toFixed(5)}` : "—"}
+                      {n.lat != null && n.lng != null
+                        ? `${n.lat.toFixed(5)}, ${n.lng.toFixed(5)}`
+                        : "—"}
                     </td>
                     <td className="p-3">
                       <div className="flex justify-center gap-1">
                         {confirmDelete === n.id ? (
                           <div className="flex items-center gap-1 animate-in fade-in slide-in-from-right-2">
-                            <Button size="sm" variant="destructive" className="h-8" disabled={deleteMutation.isPending}
-                              onClick={() => { deleteMutation.mutate(n.id); setConfirmDelete(null); }}>
-                              {deleteMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5 mr-1" />}
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="h-8"
+                              disabled={deleteMutation.isPending}
+                              onClick={() => {
+                                deleteMutation.mutate(n.id);
+                                setConfirmDelete(null);
+                              }}
+                            >
+                              {deleteMutation.isPending ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-3.5 h-3.5 mr-1" />
+                              )}
                               {t("common.delete")}
                             </Button>
-                            <Button variant="ghost" size="sm" className="h-8" onClick={() => setConfirmDelete(null)}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8"
+                              onClick={() => setConfirmDelete(null)}
+                            >
                               <X className="w-3.5 h-3.5" />
                             </Button>
                           </div>
                         ) : (
                           <>
-                            <Button variant="ghost" size="sm" className="text-info hover:brightness-125 h-8" onClick={() => startEdit(n)}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-info hover:brightness-125 h-8"
+                              onClick={() => startEdit(n)}
+                            >
                               <Edit2 className="w-3.5 h-3.5" />
                             </Button>
-                            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive h-8" onClick={() => setConfirmDelete(n.id)}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive h-8"
+                              onClick={() => setConfirmDelete(n.id)}
+                            >
                               <Trash2 className="w-3.5 h-3.5" />
                             </Button>
                           </>
@@ -471,11 +725,25 @@ export default function StationNodesTab() {
           {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-3 pt-2">
-              <Button variant="outline" size="sm" className="h-8" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
                 <ChevronLeft className="w-4 h-4" />
               </Button>
-              <span className="text-sm text-muted-foreground tabular-nums">{page} / {totalPages}</span>
-              <Button variant="outline" size="sm" className="h-8" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
+              <span className="text-sm text-muted-foreground tabular-nums">
+                {page} / {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
                 <ChevronRight className="w-4 h-4" />
               </Button>
             </div>
@@ -485,4 +753,3 @@ export default function StationNodesTab() {
     </div>
   );
 }
-

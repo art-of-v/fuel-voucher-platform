@@ -25,9 +25,17 @@ export interface StatementPeriod {
  * Defaults to the previous calendar month. The current month is always wrong to reconcile: it is
  * still accruing statement rows, so the act would disagree with tomorrow's data and get signed off.
  */
-export function defaultStatementPeriod(now: Date = new Date()): StatementPeriod {
-  const previous = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
-  return { merchant: "live", month: previous.getUTCMonth() + 1, year: previous.getUTCFullYear() };
+export function defaultStatementPeriod(
+  now: Date = new Date(),
+): StatementPeriod {
+  const previous = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1),
+  );
+  return {
+    merchant: "live",
+    month: previous.getUTCMonth() + 1,
+    year: previous.getUTCFullYear(),
+  };
 }
 
 /**
@@ -35,7 +43,10 @@ export function defaultStatementPeriod(now: Date = new Date()): StatementPeriod 
  * of the next. Half-open because "the last millisecond of the month" is a boundary nobody wants to
  * reason about, and a closed range double-counts nothing but invites an off-by-one.
  */
-export function statementRange(period: StatementPeriod): { fromUtc: Date; toUtc: Date } {
+export function statementRange(period: StatementPeriod): {
+  fromUtc: Date;
+  toUtc: Date;
+} {
   const fromUtc = new Date(Date.UTC(period.year, period.month - 1, 1, 0, 0, 0));
   const toUtc = new Date(Date.UTC(period.year, period.month, 1, 0, 0, 0));
   return { fromUtc, toUtc };

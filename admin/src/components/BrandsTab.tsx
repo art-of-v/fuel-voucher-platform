@@ -93,9 +93,7 @@ interface BrandsTabProps {
   onNavigateToImports?: () => void;
 }
 
-export default function BrandsTab({
-  onNavigateToImports,
-}: BrandsTabProps) {
+export default function BrandsTab({ onNavigateToImports }: BrandsTabProps) {
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const [expandedBrand, setExpandedBrand] = useState<string | null>(null);
@@ -130,9 +128,7 @@ export default function BrandsTab({
     color: DEFAULT_PROVIDER_COLOR,
     sortOrder: 999,
   });
-  const [editingBrandId, setEditingBrandId] = useState<string | null>(
-    null,
-  );
+  const [editingBrandId, setEditingBrandId] = useState<string | null>(null);
   const [editBrand, setEditBrand] = useState({
     name: "",
     logoText: "",
@@ -147,13 +143,17 @@ export default function BrandsTab({
     newFuelPump.trim() === "" ? null : parseFloat(newFuelPump) || 0;
   // A blank cost is "not stated", not zero. Zero would price the fuel at its margin and blind the
   // below-cost guard - and the fuel would sell for 2.75 UAH/litre.
-  const newFuelCost = newFuelSupplierPrice.trim() === "" ? null : parseFloat(newFuelSupplierPrice);
+  const newFuelCost =
+    newFuelSupplierPrice.trim() === ""
+      ? null
+      : parseFloat(newFuelSupplierPrice);
   const newFuelFinalPrice = computeFinal(
     newFuelCost,
     newFuelMargin.trim() === "" ? null : parseFloat(newFuelMargin),
     newFuelPumpNum,
   );
-  const newFuelBelowCost = newFuelCost !== null && newFuelCost > 0 && newFuelFinalPrice < newFuelCost;
+  const newFuelBelowCost =
+    newFuelCost !== null && newFuelCost > 0 && newFuelFinalPrice < newFuelCost;
 
   const [editingNominals, setEditingNominals] = useState<string | null>(null);
   const [nominalInput, setNominalInput] = useState("");
@@ -170,7 +170,7 @@ export default function BrandsTab({
     enabled: !!expandedHistory,
     queryFn: async () => {
       if (!expandedHistory) return [];
-      const res = await apiRequest<any, AuditEventDto[]>(
+      const res = await apiRequest<void, AuditEventDto[]>(
         "GET",
         `/api/admin/brands/${expandedHistory}/history`,
       );
@@ -207,21 +207,18 @@ export default function BrandsTab({
     if (!name) return;
     // The slug is derived here, not on the server: it is the network's own code, and an operator
     // typing "OKKO" means "okko". The server owns the uuid and rejects a duplicate slug with a 409.
-    const slug =
-      name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "")
-        .slice(0, 100);
+    const slug = name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 100);
     if (!slug) return;
     createBrandMutation.mutate({
       slug,
       name,
       logoText: newBrand.logoText.trim(),
       color: newBrand.color,
-      sortOrder: Number.isFinite(newBrand.sortOrder)
-        ? newBrand.sortOrder
-        : 999,
+      sortOrder: Number.isFinite(newBrand.sortOrder) ? newBrand.sortOrder : 999,
     });
   };
 
@@ -301,7 +298,9 @@ export default function BrandsTab({
     onSuccess: (_result, { fuelId }) => {
       // The history panel is keyed on the fuel's own URL, so that is what has to be invalidated -
       // the bare controller prefix is not a route, and this handler has no fuel of its own.
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/brands", `/api/admin/brand-fuels/${fuelId}`] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/admin/brands", `/api/admin/brand-fuels/${fuelId}`],
+      });
       setEditingFuel(null);
       toast.success(t("common.saved"));
     },
@@ -313,7 +312,9 @@ export default function BrandsTab({
       await apiRequest("DELETE", `/api/admin/brand-fuels/${fuelId}`);
     },
     onSuccess: (_result, fuelId) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/brands", `/api/admin/brand-fuels/${fuelId}`] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/admin/brands", `/api/admin/brand-fuels/${fuelId}`],
+      });
       toast.success(t("common.deleted"));
     },
     onError: (e: Error) => toast.error(e.message),
@@ -430,8 +431,12 @@ export default function BrandsTab({
         name: newFuelName,
         // A blank cost is "not stated", not zero. Zero would price the fuel at its margin and
         // blind the below-cost guard.
-        supplierPricePerLiter: newFuelSupplierPrice.trim() === "" ? null : parseFloat(newFuelSupplierPrice),
-        marginUahPerLiter: newFuelMargin.trim() === "" ? null : parseFloat(newFuelMargin),
+        supplierPricePerLiter:
+          newFuelSupplierPrice.trim() === ""
+            ? null
+            : parseFloat(newFuelSupplierPrice),
+        marginUahPerLiter:
+          newFuelMargin.trim() === "" ? null : parseFloat(newFuelMargin),
         finalPricePerLiter: newFuelFinalPrice,
         pumpPricePerLiter: newFuelPumpNum,
         allowBelowCost: newFuelAllowBelowCost,
@@ -684,8 +689,7 @@ export default function BrandsTab({
                     size="sm"
                     onClick={handleSaveBrand}
                     disabled={
-                      !editBrand.name.trim() ||
-                      updateBrandMutation.isPending
+                      !editBrand.name.trim() || updateBrandMutation.isPending
                     }
                     className="h-8"
                   >
@@ -727,9 +731,7 @@ export default function BrandsTab({
             {/* Brand Header */}
             <div
               className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50 transition-colors"
-              onClick={() =>
-                setExpandedBrand(isExpanded ? null : brand.id)
-              }
+              onClick={() => setExpandedBrand(isExpanded ? null : brand.id)}
             >
               <div className="flex items-center gap-3">
                 <div
@@ -1026,9 +1028,9 @@ export default function BrandsTab({
                                         },
                                       }))
                                     }
-className="w-24 h-8 text-right text-xs"
-                                     aria-label={`${t("price.margin")} — ${fuel.name}`}
-                                   />
+                                    className="w-24 h-8 text-right text-xs"
+                                    aria-label={`${t("price.margin")} — ${fuel.name}`}
+                                  />
                                 ) : (
                                   <span className="block text-right tabular-nums text-primary">
                                     {fuel.marginUahPerLiter !== null
@@ -1100,9 +1102,14 @@ className="w-24 h-8 text-right text-xs"
                     flatten - and what the disagreement was - before they do it, not after. */}
                                 {fuel.priceSpread && !isEditing && (
                                   <div className="mt-0.5 text-right text-[10px] text-muted-foreground tabular-nums">
-                                    {t("price.spreadCost",
-                                      fuel.priceSpread.minSupplierPricePerLiter.toFixed(2),
-                                      fuel.priceSpread.maxSupplierPricePerLiter.toFixed(2),
+                                    {t(
+                                      "price.spreadCost",
+                                      fuel.priceSpread.minSupplierPricePerLiter.toFixed(
+                                        2,
+                                      ),
+                                      fuel.priceSpread.maxSupplierPricePerLiter.toFixed(
+                                        2,
+                                      ),
                                     )}
                                   </div>
                                 )}
@@ -1112,29 +1119,29 @@ className="w-24 h-8 text-right text-xs"
                     switch without first mispricing live fuel to reveal it.
                     `fuel.allowBelowCost` is the fallback for "untouched yet" — otherwise a fuel that
                     IS opted in renders as unchecked the moment the editor opens. */}
-                {isEditing && (
-                  <label
-                    className={`mt-1.5 flex items-center justify-end gap-1.5 text-[10px] font-medium cursor-pointer ${belowCost || resolveAllowBelowCost(vals?.allowBelowCost, fuel.allowBelowCost) ? "text-destructive" : "text-muted-foreground"}`}
-                    title={t("price.allowBelowCostHint")}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={resolveAllowBelowCost(
-                        vals?.allowBelowCost,
-                        fuel.allowBelowCost,
-                      )}
-                      onChange={(e) =>
-                        setEditValues((prev) => ({
-                          ...prev,
-                          [fuel.id]: {
-                            ...prev[fuel.id],
-                            allowBelowCost: e.target.checked,
-                          },
-                        }))
-                      }
-                      className="h-3 w-3 accent-destructive"
-                    />
-                    {t("price.allowBelowCost")}
+                                {isEditing && (
+                                  <label
+                                    className={`mt-1.5 flex items-center justify-end gap-1.5 text-[10px] font-medium cursor-pointer ${belowCost || resolveAllowBelowCost(vals?.allowBelowCost, fuel.allowBelowCost) ? "text-destructive" : "text-muted-foreground"}`}
+                                    title={t("price.allowBelowCostHint")}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={resolveAllowBelowCost(
+                                        vals?.allowBelowCost,
+                                        fuel.allowBelowCost,
+                                      )}
+                                      onChange={(e) =>
+                                        setEditValues((prev) => ({
+                                          ...prev,
+                                          [fuel.id]: {
+                                            ...prev[fuel.id],
+                                            allowBelowCost: e.target.checked,
+                                          },
+                                        }))
+                                      }
+                                      className="h-3 w-3 accent-destructive"
+                                    />
+                                    {t("price.allowBelowCost")}
                                   </label>
                                 )}
 
@@ -1166,10 +1173,7 @@ className="w-24 h-8 text-right text-xs"
                                     }
                                     className="h-3 w-3 accent-primary"
                                   />
-                                  {isQaFuel(
-                                    vals?.isTestData,
-                                    fuel.isTestData,
-                                  )
+                                  {isQaFuel(vals?.isTestData, fuel.isTestData)
                                     ? t("price.isTestData")
                                     : t("price.live")}
                                 </label>
@@ -1223,10 +1227,7 @@ className="w-24 h-8 text-right text-xs"
                                         ) : (
                                           <Trash2 className="w-3.5 h-3.5 mr-1" />
                                         )}
-                                        {t(
-                                          "brands.deleteConfirm",
-                                          fuel.name,
-                                        )}
+                                        {t("brands.deleteConfirm", fuel.name)}
                                       </Button>
                                       <Button
                                         variant="ghost"
@@ -1250,7 +1251,9 @@ className="w-24 h-8 text-right text-xs"
                                         size="sm"
                                         onClick={() =>
                                           setPriceHistoryFor((current) =>
-                                            current === fuel.id ? null : fuel.id,
+                                            current === fuel.id
+                                              ? null
+                                              : fuel.id,
                                           )
                                         }
                                         title={t("priceHistory.openHint")}
@@ -1291,7 +1294,9 @@ className="w-24 h-8 text-right text-xs"
                         {/* The open price history, as a full-width row under the fuel it belongs to.
                             One fuel at a time: two open panels side by side would answer neither. */}
                         {priceHistoryFor &&
-                          brand.fuels.some((fuel) => fuel.id === priceHistoryFor) && (
+                          brand.fuels.some(
+                            (fuel) => fuel.id === priceHistoryFor,
+                          ) && (
                             <tr className="border-t border-border bg-muted/20">
                               <td colSpan={8} className="p-3">
                                 <FuelPriceHistory fuelId={priceHistoryFor} />

@@ -56,16 +56,19 @@ describe("translation parity", () => {
    * Cross-locale agreement is not correctness; the runtime contract is positional, and a named
    * placeholder is invisible to a test that only compares the locales to each other.
    */
-  it.each(languages)("%s interpolates positionally, because t() only substitutes {0}-style", (lang) => {
-    const offenders = keys(lang)
-      .filter((key) => nonPositionalSlots(translations[lang][key]).length > 0)
-      .map((key) => ({
-        key,
-        slots: nonPositionalSlots(translations[lang][key]),
-      }));
+  it.each(languages)(
+    "%s interpolates positionally, because t() only substitutes {0}-style",
+    (lang) => {
+      const offenders = keys(lang)
+        .filter((key) => nonPositionalSlots(translations[lang][key]).length > 0)
+        .map((key) => ({
+          key,
+          slots: nonPositionalSlots(translations[lang][key]),
+        }));
 
-    expect(offenders).toEqual([]);
-  });
+      expect(offenders).toEqual([]);
+    },
+  );
 
   /**
    * The companion trap: a slot the call site never passes is not a visible failure either - the
@@ -75,7 +78,11 @@ describe("translation parity", () => {
     const offenders = keys(lang)
       .map((key) => translations[lang][key].match(/\{\d+\}/g) ?? [])
       // De-duplicate first: a value that repeats {0} twice is one slot, not two.
-      .map((slots) => [...new Set(slots)].map((s) => Number(s.slice(1, -1))).sort((a, b) => a - b))
+      .map((slots) =>
+        [...new Set(slots)]
+          .map((s) => Number(s.slice(1, -1)))
+          .sort((a, b) => a - b),
+      )
       .filter((indices) => indices.some((n, i) => n !== i));
 
     expect(offenders).toEqual([]);

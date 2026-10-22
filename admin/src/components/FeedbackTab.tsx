@@ -1,7 +1,17 @@
 import { useState, useMemo, Fragment } from "react";
 import { useI18n } from "@/lib/i18n";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { MessageSquare, Loader2, ChevronLeft, ChevronRight, Search, X, Trash2, CheckCheck, MessagesSquare } from "lucide-react";
+import {
+  MessageSquare,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  X,
+  Trash2,
+  CheckCheck,
+  MessagesSquare,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -128,7 +138,10 @@ export default function FeedbackTab() {
     queryFn: () => apiRequest("GET", `/api/admin/feedback?${filters}`),
   });
 
-  const { data: detail } = useQuery<{ item: FeedbackItem; replies: FeedbackReply[] }>({
+  const { data: detail } = useQuery<{
+    item: FeedbackItem;
+    replies: FeedbackReply[];
+  }>({
     queryKey: ["/api/admin/feedback", expanded],
     queryFn: () => apiRequest("GET", `/api/admin/feedback/${expanded}`),
     enabled: !!expanded,
@@ -159,7 +172,11 @@ export default function FeedbackTab() {
   const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 0;
   const listed = data?.items ?? [];
   const hasFilters =
-    search.trim() !== "" || verdict !== "kept" || category !== "all" || status !== "all" || unsureOnly;
+    search.trim() !== "" ||
+    verdict !== "kept" ||
+    category !== "all" ||
+    status !== "all" ||
+    unsureOnly;
 
   const resetFilters = () => {
     setSearch("");
@@ -183,45 +200,83 @@ export default function FeedbackTab() {
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(0);
+            }}
             placeholder={t("common.search")}
             className="pl-9 h-9"
           />
         </div>
         <Select
           value={verdict}
-          onValueChange={(v) => { setVerdict(v as VerdictFilter); setUnsureOnly(false); setPage(0); }}
+          onValueChange={(v) => {
+            setVerdict(v as VerdictFilter);
+            setUnsureOnly(false);
+            setPage(0);
+          }}
         >
-          <SelectTrigger className="h-9 w-44" title={t("feedback.verdictHint")}><SelectValue /></SelectTrigger>
+          <SelectTrigger className="h-9 w-44" title={t("feedback.verdictHint")}>
+            <SelectValue />
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value="kept">{t("feedback.verdictKept")}</SelectItem>
             <SelectItem value="junk">{t("feedback.verdictJunk")}</SelectItem>
-            <SelectItem value="unclassified">{t("feedback.verdictUnclassified")}</SelectItem>
+            <SelectItem value="unclassified">
+              {t("feedback.verdictUnclassified")}
+            </SelectItem>
             <SelectItem value="all">{t("feedback.verdictAll")}</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={category} onValueChange={(v) => { setCategory(v); setPage(0); }}>
-          <SelectTrigger className="h-9 w-36"><SelectValue /></SelectTrigger>
+        <Select
+          value={category}
+          onValueChange={(v) => {
+            setCategory(v);
+            setPage(0);
+          }}
+        >
+          <SelectTrigger className="h-9 w-36">
+            <SelectValue />
+          </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">{t("feedback.category")}: {t("common.all")}</SelectItem>
+            <SelectItem value="all">
+              {t("feedback.category")}: {t("common.all")}
+            </SelectItem>
             {(facets?.categories ?? []).map((c) => (
-              <SelectItem key={c} value={c}>{c}</SelectItem>
+              <SelectItem key={c} value={c}>
+                {c}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <Select value={status} onValueChange={(v) => { setStatus(v); setPage(0); }}>
-          <SelectTrigger className="h-9 w-40"><SelectValue /></SelectTrigger>
+        <Select
+          value={status}
+          onValueChange={(v) => {
+            setStatus(v);
+            setPage(0);
+          }}
+        >
+          <SelectTrigger className="h-9 w-40">
+            <SelectValue />
+          </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">{t("feedback.status")}: {t("common.all")}</SelectItem>
+            <SelectItem value="all">
+              {t("feedback.status")}: {t("common.all")}
+            </SelectItem>
             {(facets?.statuses ?? []).map((s) => (
-              <SelectItem key={s} value={s}>{s}</SelectItem>
+              <SelectItem key={s} value={s}>
+                {s}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
         <Button
           variant={unsureOnly ? "default" : "outline"}
           size="sm"
-          onClick={() => { setUnsureOnly((v) => !v); setPage(0); }}
+          onClick={() => {
+            setUnsureOnly((v) => !v);
+            setPage(0);
+          }}
           className="h-9"
           title={t("feedback.unsureHint")}
         >
@@ -229,7 +284,12 @@ export default function FeedbackTab() {
           {t("feedback.unsure")}
         </Button>
         {hasFilters && (
-          <Button variant="ghost" size="sm" onClick={resetFilters} className="h-9">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={resetFilters}
+            className="h-9"
+          >
             <X className="w-4 h-4 mr-1" />
             {t("common.close")}
           </Button>
@@ -238,7 +298,10 @@ export default function FeedbackTab() {
           variant="outline"
           size="sm"
           onClick={markListedHandled}
-          disabled={statusMutation.isPending || !listed.some((i) => i.status !== "Handled")}
+          disabled={
+            statusMutation.isPending ||
+            !listed.some((i) => i.status !== "Handled")
+          }
           className="h-9"
         >
           <CheckCheck className="w-4 h-4 mr-1" />
@@ -257,7 +320,16 @@ export default function FeedbackTab() {
       </div>
 
       {facets && (
-        <p className="text-xs text-muted-foreground">{t("feedback.summary", String(facets.total), String(facets.kept), String(facets.junk), String(facets.unclassified), String(facets.replied))}</p>
+        <p className="text-xs text-muted-foreground">
+          {t(
+            "feedback.summary",
+            String(facets.total),
+            String(facets.kept),
+            String(facets.junk),
+            String(facets.unclassified),
+            String(facets.replied),
+          )}
+        </p>
       )}
 
       {isLoading ? (
@@ -276,10 +348,18 @@ export default function FeedbackTab() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/50">
-                    <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">{t("feedback.date")}</th>
-                    <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">{t("feedback.category")}</th>
-                    <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">{t("feedback.message")}</th>
-                    <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">{t("feedback.status")}</th>
+                    <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                      {t("feedback.date")}
+                    </th>
+                    <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                      {t("feedback.category")}
+                    </th>
+                    <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                      {t("feedback.message")}
+                    </th>
+                    <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                      {t("feedback.status")}
+                    </th>
                     <th className="text-right p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider"></th>
                   </tr>
                 </thead>
@@ -293,17 +373,25 @@ export default function FeedbackTab() {
                         <td className="p-3 align-top">
                           <div className="flex flex-wrap gap-1">
                             {item.category && (
-                              <span className="rounded-md px-2 py-0.5 text-xs bg-primary/10 text-primary">{item.category}</span>
+                              <span className="rounded-md px-2 py-0.5 text-xs bg-primary/10 text-primary">
+                                {item.category}
+                              </span>
                             )}
                             {item.severity && (
-                              <span className={cn("rounded-md px-2 py-0.5 text-xs", severityBadge(item.severity))}>
+                              <span
+                                className={cn(
+                                  "rounded-md px-2 py-0.5 text-xs",
+                                  severityBadge(item.severity),
+                                )}
+                              >
                                 {item.severity}
                               </span>
                             )}
                             {item.verdict === "Junk" && (
                               <span className="rounded-md px-2 py-0.5 text-xs bg-muted text-muted-foreground">
                                 {t("feedback.verdictJunk")}
-                                {item.confidence != null && ` (${Math.round(item.confidence * 100)}%)`}
+                                {item.confidence != null &&
+                                  ` (${Math.round(item.confidence * 100)}%)`}
                               </span>
                             )}
                             {item.verdict == null && (
@@ -322,24 +410,37 @@ export default function FeedbackTab() {
                           {item.summary && (
                             <p className="font-medium">{item.summary}</p>
                           )}
-                          <p className="text-muted-foreground whitespace-pre-wrap break-words">{item.text}</p>
+                          <p className="text-muted-foreground whitespace-pre-wrap break-words">
+                            {item.text}
+                          </p>
                           {item.classifierError && (
-                            <p className="mt-1 text-xs text-destructive">{item.classifierError}</p>
+                            <p className="mt-1 text-xs text-destructive">
+                              {item.classifierError}
+                            </p>
                           )}
                         </td>
                         <td className="p-3 align-top">
-                          <span className={cn("rounded-md px-2 py-0.5 text-xs", statusBadge(item.status))}>
+                          <span
+                            className={cn(
+                              "rounded-md px-2 py-0.5 text-xs",
+                              statusBadge(item.status),
+                            )}
+                          >
                             {item.status}
                           </span>
                           {item.staffRepliedAtUtc && (
-                            <p className="mt-1 text-xs text-muted-foreground">{t("feedback.answered")}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {t("feedback.answered")}
+                            </p>
                           )}
                         </td>
                         <td className="p-3 align-top text-right whitespace-nowrap">
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => setExpanded(expanded === item.id ? null : item.id)}
+                            onClick={() =>
+                              setExpanded(expanded === item.id ? null : item.id)
+                            }
                             className="h-8"
                           >
                             {t("feedback.details")}
@@ -351,33 +452,60 @@ export default function FeedbackTab() {
                           <td colSpan={5} className="p-4 text-sm">
                             <dl className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 text-xs">
                               <div>
-                                <dt className="text-muted-foreground">{t("feedback.language")}</dt>
+                                <dt className="text-muted-foreground">
+                                  {t("feedback.language")}
+                                </dt>
                                 <dd>{item.language ?? "—"}</dd>
                               </div>
                               <div>
-                                <dt className="text-muted-foreground">{t("feedback.confidence")}</dt>
-                                <dd>{item.confidence != null ? Math.round(item.confidence * 100) + "%" : "—"}</dd>
+                                <dt className="text-muted-foreground">
+                                  {t("feedback.confidence")}
+                                </dt>
+                                <dd>
+                                  {item.confidence != null
+                                    ? Math.round(item.confidence * 100) + "%"
+                                    : "—"}
+                                </dd>
                               </div>
                               <div>
-                                <dt className="text-muted-foreground">{t("feedback.user")}</dt>
-                                <dd className="font-mono">{item.userId ?? t("feedback.anonymous")}</dd>
+                                <dt className="text-muted-foreground">
+                                  {t("feedback.user")}
+                                </dt>
+                                <dd className="font-mono">
+                                  {item.userId ?? t("feedback.anonymous")}
+                                </dd>
                               </div>
                               <div>
-                                <dt className="text-muted-foreground">{t("feedback.telegramChat")}</dt>
-                                <dd className="font-mono">{item.telegramChatId}</dd>
+                                <dt className="text-muted-foreground">
+                                  {t("feedback.telegramChat")}
+                                </dt>
+                                <dd className="font-mono">
+                                  {item.telegramChatId}
+                                </dd>
                               </div>
                             </dl>
-                            <h4 className="font-medium mb-1">{t("feedback.replies")}</h4>
+                            <h4 className="font-medium mb-1">
+                              {t("feedback.replies")}
+                            </h4>
                             {!detail?.replies.length ? (
-                              <p className="text-muted-foreground text-xs">{t("feedback.noReplies")}</p>
+                              <p className="text-muted-foreground text-xs">
+                                {t("feedback.noReplies")}
+                              </p>
                             ) : (
                               <ul className="space-y-2">
                                 {detail.replies.map((reply) => (
-                                  <li key={reply.id} className="border-l-2 border-border pl-3">
-                                    <p className="whitespace-pre-wrap break-words">{reply.text}</p>
+                                  <li
+                                    key={reply.id}
+                                    className="border-l-2 border-border pl-3"
+                                  >
+                                    <p className="whitespace-pre-wrap break-words">
+                                      {reply.text}
+                                    </p>
                                     <p className="text-xs text-muted-foreground">
-                                      {reply.staffUserName} · {formatDateTime(reply.sentAtUtc)}
-                                      {reply.deliveryError && ` · ${reply.deliveryError}`}
+                                      {reply.staffUserName} ·{" "}
+                                      {formatDateTime(reply.sentAtUtc)}
+                                      {reply.deliveryError &&
+                                        ` · ${reply.deliveryError}`}
                                     </p>
                                   </li>
                                 ))}
@@ -388,7 +516,12 @@ export default function FeedbackTab() {
                                 size="sm"
                                 variant="outline"
                                 disabled={statusMutation.isPending}
-                                onClick={() => statusMutation.mutate({ ids: [item.id], status: "Handled" })}
+                                onClick={() =>
+                                  statusMutation.mutate({
+                                    ids: [item.id],
+                                    status: "Handled",
+                                  })
+                                }
                               >
                                 {t("feedback.markHandled")}
                               </Button>
@@ -396,7 +529,12 @@ export default function FeedbackTab() {
                                 size="sm"
                                 variant="outline"
                                 disabled={statusMutation.isPending}
-                                onClick={() => statusMutation.mutate({ ids: [item.id], status: "Rejected" })}
+                                onClick={() =>
+                                  statusMutation.mutate({
+                                    ids: [item.id],
+                                    status: "Rejected",
+                                  })
+                                }
                               >
                                 {t("feedback.markRejected")}
                               </Button>
@@ -413,16 +551,31 @@ export default function FeedbackTab() {
 
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
-              {t("feedback.showing", String(page * PAGE_SIZE + 1), String(Math.min((page + 1) * PAGE_SIZE, data?.total ?? 0)), String(data?.total ?? 0))}
+              {t(
+                "feedback.showing",
+                String(page * PAGE_SIZE + 1),
+                String(Math.min((page + 1) * PAGE_SIZE, data?.total ?? 0)),
+                String(data?.total ?? 0),
+              )}
             </p>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page === 0}
+                onClick={() => setPage((p) => p - 1)}
+              >
                 <ChevronLeft className="w-4 h-4" />
               </Button>
               <span className="flex items-center text-sm text-muted-foreground">
                 {page + 1} / {Math.max(totalPages, 1)}
               </span>
-              <Button variant="outline" size="sm" disabled={page + 1 >= totalPages} onClick={() => setPage((p) => p + 1)}>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page + 1 >= totalPages}
+                onClick={() => setPage((p) => p + 1)}
+              >
                 <ChevronRight className="w-4 h-4" />
               </Button>
             </div>

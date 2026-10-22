@@ -46,7 +46,9 @@ describe("defaultQueryFn", () => {
   });
 
   it("returns the parsed body on the happy path", async () => {
-    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(jsonResponse(200, { total: 7 }));
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+      jsonResponse(200, { total: 7 }),
+    );
 
     await expect(run("/api/admin/vouchers")).resolves.toEqual({ total: 7 });
   });
@@ -66,14 +68,19 @@ describe("defaultQueryFn", () => {
     expect(ensureAccessToken).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledTimes(2);
     // The retry must carry the token the refresh just minted, not the stale one.
-    const retryHeaders = fetchMock.mock.calls[1][1].headers as Record<string, string>;
+    const retryHeaders = fetchMock.mock.calls[1][1].headers as Record<
+      string,
+      string
+    >;
     expect(retryHeaders.Authorization).toBe("Bearer fresh-token");
   });
 
   it("retries a 500 instead of failing the query outright", async () => {
     const fetchMock = fetch as ReturnType<typeof vi.fn>;
     fetchMock
-      .mockResolvedValueOnce(jsonResponse(500, { title: "An unexpected error occurred" }))
+      .mockResolvedValueOnce(
+        jsonResponse(500, { title: "An unexpected error occurred" }),
+      )
       .mockResolvedValueOnce(jsonResponse(200, { total: 7 }));
 
     await expect(run("/api/admin/vouchers")).resolves.toEqual({ total: 7 });
@@ -95,7 +102,9 @@ describe("defaultQueryFn", () => {
   });
 
   it("does not sign the operator out when a 403 answers instead of a 401", async () => {
-    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue(jsonResponse(403, { message: "No" }));
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      jsonResponse(403, { message: "No" }),
+    );
 
     await expect(run("/api/admin/vouchers")).rejects.toThrow();
     expect(signOut).not.toHaveBeenCalled();

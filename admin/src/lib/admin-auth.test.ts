@@ -39,9 +39,13 @@ describe("refreshAccessToken", () => {
   });
 
   it('stores the new access token and reports "refreshed" on success', async () => {
-    vi.mocked(fetch).mockResolvedValue(jsonResponse(200, { accessToken: "fresh" }));
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse(200, { accessToken: "fresh" }),
+    );
 
-    await expect(refreshAccessToken()).resolves.toMatchObject({ status: "refreshed" });
+    await expect(refreshAccessToken()).resolves.toMatchObject({
+      status: "refreshed",
+    });
     expect(getStoredAccessToken()).toBe("fresh");
     expect(fetch).toHaveBeenCalledOnce();
   });
@@ -49,18 +53,22 @@ describe("refreshAccessToken", () => {
   it('reports "expired" on a 401 and does not retry', async () => {
     vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 401 }));
 
-    await expect(refreshAccessToken()).resolves.toMatchObject({ status: "expired" });
+    await expect(refreshAccessToken()).resolves.toMatchObject({
+      status: "expired",
+    });
     expect(fetch).toHaveBeenCalledOnce();
   });
 
   it('reports "expired" on a 400 (no usable refresh cookie)', async () => {
     vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 400 }));
 
-    await expect(refreshAccessToken()).resolves.toMatchObject({ status: "expired" });
+    await expect(refreshAccessToken()).resolves.toMatchObject({
+      status: "expired",
+    });
     expect(fetch).toHaveBeenCalledOnce();
   });
 
-  it("reports \"rate_limited\" on a 429 and does NOT retry", async () => {
+  it('reports "rate_limited" on a 429 and does NOT retry', async () => {
     // A 429 means "not now", and the bucket refills on its own within the minute. Retrying it
     // spends another permit to earn another 429, which is how a client stays rate-limited.
     // Found on 2026-10-14: a 502 during a deploy tripped the ladder and the operator could not
@@ -74,7 +82,10 @@ describe("refreshAccessToken", () => {
     await flushTimers();
     // A rate limit is its own verdict, not an outage and not an expired session: folding it
     // into "unavailable" is what rendered "server unreachable" for a self-inflicted 429.
-    await expect(pending).resolves.toEqual({ status: "rate_limited", retryAfterSeconds: 45 });
+    await expect(pending).resolves.toEqual({
+      status: "rate_limited",
+      retryAfterSeconds: 45,
+    });
 
     // One request. The 3-retry ladder must not have run - that is the whole fix.
     expect(fetch).toHaveBeenCalledOnce();
@@ -121,9 +132,14 @@ describe("refreshAccessToken", () => {
   });
 
   it("single-flights concurrent callers onto one in-flight refresh", async () => {
-    vi.mocked(fetch).mockResolvedValue(jsonResponse(200, { accessToken: "fresh" }));
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse(200, { accessToken: "fresh" }),
+    );
 
-    const [a, b] = await Promise.all([refreshAccessToken(), refreshAccessToken()]);
+    const [a, b] = await Promise.all([
+      refreshAccessToken(),
+      refreshAccessToken(),
+    ]);
 
     expect(a).toEqual({ status: "refreshed", retryAfterSeconds: 0 });
     expect(b).toEqual({ status: "refreshed", retryAfterSeconds: 0 });
@@ -138,7 +154,9 @@ describe("isSessionRejected", () => {
   });
 
   it("is false for other statuses and plain errors", () => {
-    expect(isSessionRejected(Object.assign(new Error(), { status: 500 }))).toBe(false);
+    expect(isSessionRejected(Object.assign(new Error(), { status: 500 }))).toBe(
+      false,
+    );
     expect(isSessionRejected(new Error("boom"))).toBe(false);
     expect(isSessionRejected(undefined)).toBe(false);
   });

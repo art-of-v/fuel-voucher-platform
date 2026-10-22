@@ -7,7 +7,11 @@ import { StatementReconciliationPanel } from "@/components/StatementReconciliati
 
 vi.mock("@/lib/api-client", () => ({ apiRequest: vi.fn(), apiBlob: vi.fn() }));
 vi.mock("@/lib/i18n", () => ({
-  useI18n: () => ({ t: (key: string) => key, language: "uk", setLanguage: vi.fn() }),
+  useI18n: () => ({
+    t: (key: string) => key,
+    language: "uk",
+    setLanguage: vi.fn(),
+  }),
 }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
@@ -79,7 +83,9 @@ const ACT = {
 };
 
 function renderPanel() {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   );
@@ -110,10 +116,16 @@ describe("StatementReconciliationPanel", () => {
     // Default is the previous month, never the running one.
     const from = new URL(url, "http://x").searchParams.get("fromUtc")!;
     const to = new URL(url, "http://x").searchParams.get("toUtc")!;
-    expect(new Date(to).getTime() - new Date(from).getTime()).toBeGreaterThanOrEqual(27 * 86400000);
+    expect(
+      new Date(to).getTime() - new Date(from).getTime(),
+    ).toBeGreaterThanOrEqual(27 * 86400000);
 
-    expect(await screen.findByText("statementAct.status.matched")).toBeDefined();
-    expect(screen.getByText("statementAct.status.amountMismatch")).toBeDefined();
+    expect(
+      await screen.findByText("statementAct.status.matched"),
+    ).toBeDefined();
+    expect(
+      screen.getByText("statementAct.status.amountMismatch"),
+    ).toBeDefined();
   });
 
   it("surfaces a mismatch count rather than burying it in the table", async () => {
@@ -146,7 +158,10 @@ describe("StatementReconciliationPanel", () => {
 
   it("downloads the period's CSV through the blob client, not a JSON request", async () => {
     mockedApiRequest.mockResolvedValue(ACT);
-    mockedApiBlob.mockResolvedValue({ blob: new Blob(["a,b"]), fileName: "reconciliation-live-2026-09.csv" });
+    mockedApiBlob.mockResolvedValue({
+      blob: new Blob(["a,b"]),
+      fileName: "reconciliation-live-2026-09.csv",
+    });
     renderPanel();
 
     await userEvent.click(screen.getByText("statementAct.exportCsv"));
@@ -155,11 +170,18 @@ describe("StatementReconciliationPanel", () => {
     const [method, url] = mockedApiBlob.mock.calls[0];
     expect(method).toBe("GET");
     expect(String(url)).toContain("/api/admin/reconciliation/statement/csv?");
-    expect(mockedApiRequest).not.toHaveBeenCalledWith("GET", expect.stringContaining("/csv"));
+    expect(mockedApiRequest).not.toHaveBeenCalledWith(
+      "GET",
+      expect.stringContaining("/csv"),
+    );
   });
 
   it("says so when a period has no statement rows, instead of showing an empty table", async () => {
-    mockedApiRequest.mockResolvedValue({ ...ACT, rows: [], statementRowCount: 0 });
+    mockedApiRequest.mockResolvedValue({
+      ...ACT,
+      rows: [],
+      statementRowCount: 0,
+    });
     renderPanel();
 
     await userEvent.click(screen.getByText("statementAct.build"));

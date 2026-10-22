@@ -27,7 +27,12 @@ const ASCII_DIGITS = /^\d+$/;
 
 function isOptionalDigits(value: string, min: number, max: number): boolean {
   const trimmed = value.trim();
-  return trimmed === "" || (ASCII_DIGITS.test(trimmed) && trimmed.length >= min && trimmed.length <= max);
+  return (
+    trimmed === "" ||
+    (ASCII_DIGITS.test(trimmed) &&
+      trimmed.length >= min &&
+      trimmed.length <= max)
+  );
 }
 
 /**

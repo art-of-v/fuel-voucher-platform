@@ -1,7 +1,21 @@
 import { useState, useMemo, Fragment } from "react";
 import { useI18n } from "@/lib/i18n";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Bug, Loader2, ChevronLeft, ChevronRight, Search, X, Trash2, ChevronDown, ChevronUp, Download, Check, RotateCcw, CheckCheck } from "lucide-react";
+import {
+  Bug,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  X,
+  Trash2,
+  ChevronDown,
+  ChevronUp,
+  Download,
+  Check,
+  RotateCcw,
+  CheckCheck,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -52,7 +66,8 @@ type Resolution = "unresolved" | "resolved" | "all";
 
 function levelColor(level: string): string {
   const l = level.toLowerCase();
-  if (l === "critical" || l === "fatal") return "bg-destructive/20 text-destructive";
+  if (l === "critical" || l === "fatal")
+    return "bg-destructive/20 text-destructive";
   if (l === "error") return "bg-destructive/15 text-destructive";
   return "bg-warning/15 text-warning";
 }
@@ -77,7 +92,10 @@ export default function ErrorLogsTab() {
   });
 
   const filters = useMemo(() => {
-    const params = new URLSearchParams({ offset: String(page * PAGE_SIZE), limit: String(PAGE_SIZE) });
+    const params = new URLSearchParams({
+      offset: String(page * PAGE_SIZE),
+      limit: String(PAGE_SIZE),
+    });
     if (search.trim()) params.set("search", search.trim());
     if (level !== "all") params.set("level", level);
     if (source !== "all") params.set("source", source);
@@ -100,7 +118,7 @@ export default function ErrorLogsTab() {
       apiRequest("POST", "/api/admin/errors/resolve", { ids, resolved }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/errors"] });
-      toast.success(t('errorlogs.stateChanged'));
+      toast.success(t("errorlogs.stateChanged"));
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -115,10 +133,23 @@ export default function ErrorLogsTab() {
 
   const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 0;
 
-  const listed = data?.items ?? [];
-  const listedUnresolved = useMemo(() => listed.filter((e) => !e.resolvedAtUtc), [listed]);
+  // The rows, memoised on the query's own array. The `?? []` used to sit outside the memo,
+  // which made a NEW empty array on every render - and a dependency that changes every render
+  // is a memo that never hits.
+  const listed = useMemo(() => data?.items ?? [], [data?.items]);
+  const listedUnresolved = useMemo(
+    () => listed.filter((e) => !e.resolvedAtUtc),
+    [listed],
+  );
 
-  const hasFilters = search.trim() !== "" || level !== "all" || source !== "all" || traceId !== null || resolution !== "unresolved" || from !== "" || to !== "";
+  const hasFilters =
+    search.trim() !== "" ||
+    level !== "all" ||
+    source !== "all" ||
+    traceId !== null ||
+    resolution !== "unresolved" ||
+    from !== "" ||
+    to !== "";
 
   const resetFilters = () => {
     setSearch("");
@@ -139,34 +170,42 @@ export default function ErrorLogsTab() {
   const exportCsv = () => {
     const rows = data?.items ?? [];
     const header = [
-      t('errorlogs.date'),
-      t('errorlogs.level'),
-      t('errorlogs.source'),
-      t('errorlogs.message'),
-      t('errorlogs.exception'),
-      t('errorlogs.request'),
-      t('errorlogs.user'),
-      t('errorlogs.trace'),
-      t('errorlogs.status'),
-      t('errorlogs.resolvedBy'),
+      t("errorlogs.date"),
+      t("errorlogs.level"),
+      t("errorlogs.source"),
+      t("errorlogs.message"),
+      t("errorlogs.exception"),
+      t("errorlogs.request"),
+      t("errorlogs.user"),
+      t("errorlogs.trace"),
+      t("errorlogs.status"),
+      t("errorlogs.resolvedBy"),
     ];
     const escape = csvCell;
     const lines = [
       header.map(escape).join(","),
-      ...rows.map((e) => [
-        formatDateTime(e.loggedAtUtc),
-        e.level,
-        e.source ?? '',
-        e.message,
-        e.exceptionMessage ?? '',
-        `${e.requestMethod ?? ''} ${e.requestPath ?? ''}`.trim(),
-        e.userName ?? '',
-        e.traceId ?? '',
-        e.resolvedAtUtc ? t('errorlogs.statusResolved') : t('errorlogs.statusUnresolved'),
-        e.resolvedByUserName ?? '',
-      ].map(escape).join(",")),
+      ...rows.map((e) =>
+        [
+          formatDateTime(e.loggedAtUtc),
+          e.level,
+          e.source ?? "",
+          e.message,
+          e.exceptionMessage ?? "",
+          `${e.requestMethod ?? ""} ${e.requestPath ?? ""}`.trim(),
+          e.userName ?? "",
+          e.traceId ?? "",
+          e.resolvedAtUtc
+            ? t("errorlogs.statusResolved")
+            : t("errorlogs.statusUnresolved"),
+          e.resolvedByUserName ?? "",
+        ]
+          .map(escape)
+          .join(","),
+      ),
     ];
-    const blob = new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob(["\uFEFF" + lines.join("\n")], {
+      type: "text/csv;charset=utf-8;",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -182,77 +221,146 @@ export default function ErrorLogsTab() {
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(0); }}
-            placeholder={t('common.search')}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(0);
+            }}
+            placeholder={t("common.search")}
             className="pl-9 h-9"
           />
         </div>
-        <Select value={level} onValueChange={(v) => { setLevel(v); setPage(0); }}>
-          <SelectTrigger className="h-9 w-36"><SelectValue /></SelectTrigger>
+        <Select
+          value={level}
+          onValueChange={(v) => {
+            setLevel(v);
+            setPage(0);
+          }}
+        >
+          <SelectTrigger className="h-9 w-36">
+            <SelectValue />
+          </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">{t('errorlogs.level')}: all</SelectItem>
+            <SelectItem value="all">{t("errorlogs.level")}: all</SelectItem>
             {facets?.levels.map((l) => (
-              <SelectItem key={l} value={l}>{l}</SelectItem>
+              <SelectItem key={l} value={l}>
+                {l}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <Select value={source} onValueChange={(v) => { setSource(v); setPage(0); }}>
-          <SelectTrigger className="h-9 w-52"><SelectValue /></SelectTrigger>
+        <Select
+          value={source}
+          onValueChange={(v) => {
+            setSource(v);
+            setPage(0);
+          }}
+        >
+          <SelectTrigger className="h-9 w-52">
+            <SelectValue />
+          </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">{t('errorlogs.source')}: all</SelectItem>
+            <SelectItem value="all">{t("errorlogs.source")}: all</SelectItem>
             {facets?.sources.map((s) => (
-              <SelectItem key={s} value={s}>{s}</SelectItem>
+              <SelectItem key={s} value={s}>
+                {s}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <Select value={resolution} onValueChange={(v) => { setResolution(v as Resolution); setPage(0); }}>
-          <SelectTrigger className="h-9 w-44" title={t('errorlogs.statusHint')}><SelectValue /></SelectTrigger>
+        <Select
+          value={resolution}
+          onValueChange={(v) => {
+            setResolution(v as Resolution);
+            setPage(0);
+          }}
+        >
+          <SelectTrigger className="h-9 w-44" title={t("errorlogs.statusHint")}>
+            <SelectValue />
+          </SelectTrigger>
           <SelectContent>
-            <SelectItem value="unresolved">{t('errorlogs.status')}: {t('errorlogs.statusUnresolved')}</SelectItem>
-            <SelectItem value="all">{t('errorlogs.status')}: {t('errorlogs.statusAll')}</SelectItem>
-            <SelectItem value="resolved">{t('errorlogs.status')}: {t('errorlogs.statusResolved')}</SelectItem>
+            <SelectItem value="unresolved">
+              {t("errorlogs.status")}: {t("errorlogs.statusUnresolved")}
+            </SelectItem>
+            <SelectItem value="all">
+              {t("errorlogs.status")}: {t("errorlogs.statusAll")}
+            </SelectItem>
+            <SelectItem value="resolved">
+              {t("errorlogs.status")}: {t("errorlogs.statusResolved")}
+            </SelectItem>
           </SelectContent>
         </Select>
         <DateInput
           value={from}
-          onChange={(v) => { setFrom(v); setPage(0); }}
+          onChange={(v) => {
+            setFrom(v);
+            setPage(0);
+          }}
           className="h-9 w-36"
-          title={t('report.from')}
+          title={t("report.from")}
         />
         <DateInput
           value={to}
-          onChange={(v) => { setTo(v); setPage(0); }}
+          onChange={(v) => {
+            setTo(v);
+            setPage(0);
+          }}
           className="h-9 w-36"
-          title={t('report.to')}
+          title={t("report.to")}
         />
         {traceId && (
           <button
             type="button"
-            onClick={() => { setTraceId(null); setPage(0); }}
-            title={t('errorlogs.traceFilterHint')}
+            onClick={() => {
+              setTraceId(null);
+              setPage(0);
+            }}
+            title={t("errorlogs.traceFilterHint")}
             className="inline-flex items-center gap-1 h-9 px-2 rounded-md border border-border bg-muted/50 text-xs font-mono text-muted-foreground hover:bg-muted"
           >
-            {t('errorlogs.trace')}: {traceId.slice(0, 8)} …
+            {t("errorlogs.trace")}: {traceId.slice(0, 8)} …
             <X className="w-3 h-3" />
           </button>
         )}
         {hasFilters && (
-          <Button variant="ghost" size="sm" onClick={resetFilters} className="h-9">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={resetFilters}
+            className="h-9"
+          >
             <X className="w-4 h-4 mr-1" />
-            {t('common.close')}
+            {t("common.close")}
           </Button>
         )}
-        <Button variant="outline" size="sm" onClick={() => setConfirmResolveListed(true)} disabled={resolveMutation.isPending || !listedUnresolved.length} className="h-9">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setConfirmResolveListed(true)}
+          disabled={resolveMutation.isPending || !listedUnresolved.length}
+          className="h-9"
+        >
           <CheckCheck className="w-4 h-4 mr-1" />
-          {t('errorlogs.resolveListed')}
+          {t("errorlogs.resolveListed")}
         </Button>
-        <Button variant="outline" size="sm" onClick={exportCsv} disabled={!data?.items.length} className="h-9">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={exportCsv}
+          disabled={!data?.items.length}
+          className="h-9"
+        >
           <Download className="w-4 h-4 mr-1" />
           CSV
         </Button>
-        <Button variant="destructive" size="sm" onClick={handleClear} disabled={clearMutation.isPending || !data?.items.length} className="h-9">
+        <Button
+          variant="destructive"
+          size="sm"
+          onClick={handleClear}
+          disabled={clearMutation.isPending || !data?.items.length}
+          className="h-9"
+        >
           <Trash2 className="w-4 h-4 mr-1" />
-          {t('errorlogs.clear')}
+          {t("errorlogs.clear")}
         </Button>
       </div>
 
@@ -263,7 +371,7 @@ export default function ErrorLogsTab() {
       ) : !data?.items.length ? (
         <div className="text-center py-20 text-muted-foreground">
           <Bug className="w-12 h-12 mx-auto mb-4 opacity-40" />
-          <p>{t('errorlogs.noLogs')}</p>
+          <p>{t("errorlogs.noLogs")}</p>
         </div>
       ) : (
         <>
@@ -272,14 +380,30 @@ export default function ErrorLogsTab() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/50">
-                    <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">{t('errorlogs.date')}</th>
-                    <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">{t('errorlogs.level')}</th>
-                    <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">{t('errorlogs.source')}</th>
-                    <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">{t('errorlogs.message')}</th>
-                    <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">{t('errorlogs.request')}</th>
-                    <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">{t('errorlogs.user')}</th>
-                    <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">{t('errorlogs.trace')}</th>
-                    <th className="w-24 p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">{t('errorlogs.status')}</th>
+                    <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                      {t("errorlogs.date")}
+                    </th>
+                    <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                      {t("errorlogs.level")}
+                    </th>
+                    <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                      {t("errorlogs.source")}
+                    </th>
+                    <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                      {t("errorlogs.message")}
+                    </th>
+                    <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                      {t("errorlogs.request")}
+                    </th>
+                    <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                      {t("errorlogs.user")}
+                    </th>
+                    <th className="text-left p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                      {t("errorlogs.trace")}
+                    </th>
+                    <th className="w-24 p-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                      {t("errorlogs.status")}
+                    </th>
                     <th className="w-8 p-3"></th>
                   </tr>
                 </thead>
@@ -290,72 +414,101 @@ export default function ErrorLogsTab() {
                     // the whole incident. Scoped to the loaded page: an incident with more
                     // records than PAGE_SIZE is closed in batches, never silently half-closed.
                     const incidentIds = item.traceId
-                      ? listed.filter((e) => e.traceId === item.traceId && !e.resolvedAtUtc).map((e) => e.id)
+                      ? listed
+                          .filter(
+                            (e) =>
+                              e.traceId === item.traceId && !e.resolvedAtUtc,
+                          )
+                          .map((e) => e.id)
                       : [];
                     return (
                       <Fragment key={item.id}>
                         <tr
-                          onClick={() => setExpanded(isExpanded ? null : item.id)}
+                          onClick={() =>
+                            setExpanded(isExpanded ? null : item.id)
+                          }
                           className={cn(
                             "border-t border-border hover:bg-muted/20 transition-colors cursor-pointer",
-                            item.resolvedAtUtc && "opacity-50"
+                            item.resolvedAtUtc && "opacity-50",
                           )}
                         >
                           <td className="p-3 whitespace-nowrap text-muted-foreground text-xs tabular-nums">
                             {formatDateTime(item.loggedAtUtc)}
                           </td>
                           <td className="p-3">
-                            <span className={cn("inline-block px-2 py-0.5 rounded text-xs font-medium", levelColor(item.level))}>
+                            <span
+                              className={cn(
+                                "inline-block px-2 py-0.5 rounded text-xs font-medium",
+                                levelColor(item.level),
+                              )}
+                            >
                               {item.level}
                             </span>
                           </td>
                           <td className="p-3 text-muted-foreground text-xs font-mono max-w-52 truncate">
-                            {item.source ?? '—'}
+                            {item.source ?? "—"}
                           </td>
                           <td className="p-3 text-xs max-w-md">
-                            <span className="line-clamp-2 break-words">{item.message}</span>
+                            <span className="line-clamp-2 break-words">
+                              {item.message}
+                            </span>
                           </td>
                           <td className="p-3 text-muted-foreground text-xs font-mono whitespace-nowrap">
-                            {item.requestMethod ? `${item.requestMethod} ${item.requestPath ?? ''}` : '—'}
+                            {item.requestMethod
+                              ? `${item.requestMethod} ${item.requestPath ?? ""}`
+                              : "—"}
                           </td>
                           <td className="p-3 text-xs text-muted-foreground font-mono tabular-nums">
-                            {item.userName ?? '—'}
+                            {item.userName ?? "—"}
                           </td>
                           <td className="p-3 text-xs font-mono text-muted-foreground">
                             {item.traceId ? (
                               <button
                                 type="button"
-                                title={t('errorlogs.traceFilterHint')}
-                                onClick={(e) => { e.stopPropagation(); setTraceId(item.traceId); setPage(0); }}
+                                title={t("errorlogs.traceFilterHint")}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setTraceId(item.traceId);
+                                  setPage(0);
+                                }}
                                 className="hover:text-primary hover:underline underline-offset-2"
                               >
                                 {item.traceId.slice(0, 8)}
                               </button>
-                            ) : '—'}
+                            ) : (
+                              "—"
+                            )}
                           </td>
                           <td className="p-3 text-xs">
                             {item.resolvedAtUtc ? (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-success/15 text-success whitespace-nowrap">
                                 <Check className="w-3 h-3" />
-                                {t('errorlogs.statusResolved')}
+                                {t("errorlogs.statusResolved")}
                               </span>
                             ) : (
                               <button
                                 type="button"
-                                title={t('errorlogs.resolve')}
+                                title={t("errorlogs.resolve")}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  resolveMutation.mutate({ ids: [item.id], resolved: true });
+                                  resolveMutation.mutate({
+                                    ids: [item.id],
+                                    resolved: true,
+                                  });
                                 }}
                                 className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border border-border text-muted-foreground hover:text-primary hover:border-primary whitespace-nowrap"
                               >
                                 <Check className="w-3 h-3" />
-                                {t('errorlogs.resolve')}
+                                {t("errorlogs.resolve")}
                               </button>
                             )}
                           </td>
                           <td className="p-3 text-muted-foreground">
-                            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                            {isExpanded ? (
+                              <ChevronUp className="w-4 h-4" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4" />
+                            )}
                           </td>
                         </tr>
                         {isExpanded && (
@@ -364,47 +517,72 @@ export default function ErrorLogsTab() {
                               <div className="space-y-2 text-xs">
                                 {item.resolvedAtUtc && (
                                   <div>
-                                    <span className="text-muted-foreground font-medium">{t('errorlogs.resolvedBy')}: </span>
+                                    <span className="text-muted-foreground font-medium">
+                                      {t("errorlogs.resolvedBy")}:{" "}
+                                    </span>
                                     <span>
-                                      {item.resolvedByUserName ?? '—'}, {formatDateTime(item.resolvedAtUtc)}
+                                      {item.resolvedByUserName ?? "—"},{" "}
+                                      {formatDateTime(item.resolvedAtUtc)}
                                     </span>
                                     <Button
                                       variant="ghost"
                                       size="sm"
                                       className="h-6 ml-2 text-xs"
-                                      onClick={() => resolveMutation.mutate({ ids: [item.id], resolved: false })}
+                                      onClick={() =>
+                                        resolveMutation.mutate({
+                                          ids: [item.id],
+                                          resolved: false,
+                                        })
+                                      }
                                     >
                                       <RotateCcw className="w-3 h-3 mr-1" />
-                                      {t('errorlogs.reopen')}
+                                      {t("errorlogs.reopen")}
                                     </Button>
                                   </div>
                                 )}
                                 {item.traceId && (
                                   <div>
-                                    <span className="text-muted-foreground font-medium">{t('errorlogs.trace')}: </span>
-                                    <span className="font-mono break-all">{item.traceId}</span>
+                                    <span className="text-muted-foreground font-medium">
+                                      {t("errorlogs.trace")}:{" "}
+                                    </span>
+                                    <span className="font-mono break-all">
+                                      {item.traceId}
+                                    </span>
                                     <Button
                                       variant="ghost"
                                       size="sm"
                                       className="h-6 ml-2 text-xs"
                                       disabled={!incidentIds.length}
-                                      onClick={() => resolveMutation.mutate({ ids: incidentIds, resolved: true })}
+                                      onClick={() =>
+                                        resolveMutation.mutate({
+                                          ids: incidentIds,
+                                          resolved: true,
+                                        })
+                                      }
                                     >
                                       <CheckCheck className="w-3 h-3 mr-1" />
-                                      {t('errorlogs.resolveIncident')}
+                                      {t("errorlogs.resolveIncident")}
                                     </Button>
                                   </div>
                                 )}
                                 {item.exceptionType && (
                                   <div>
-                                    <span className="text-muted-foreground font-medium">{t('errorlogs.exceptionType')}: </span>
-                                    <span className="font-mono text-destructive">{item.exceptionType}</span>
+                                    <span className="text-muted-foreground font-medium">
+                                      {t("errorlogs.exceptionType")}:{" "}
+                                    </span>
+                                    <span className="font-mono text-destructive">
+                                      {item.exceptionType}
+                                    </span>
                                   </div>
                                 )}
                                 {item.exceptionMessage && (
                                   <div>
-                                    <span className="text-muted-foreground font-medium">{t('errorlogs.exception')}: </span>
-                                    <span className="font-mono break-all">{item.exceptionMessage}</span>
+                                    <span className="text-muted-foreground font-medium">
+                                      {t("errorlogs.exception")}:{" "}
+                                    </span>
+                                    <span className="font-mono break-all">
+                                      {item.exceptionMessage}
+                                    </span>
                                   </div>
                                 )}
                                 {item.stackTrace && (
@@ -412,9 +590,13 @@ export default function ErrorLogsTab() {
                                     {item.stackTrace}
                                   </pre>
                                 )}
-                                {!item.exceptionType && !item.exceptionMessage && !item.stackTrace && (
-                                  <span className="text-muted-foreground">{t('errorlogs.noException')}</span>
-                                )}
+                                {!item.exceptionType &&
+                                  !item.exceptionMessage &&
+                                  !item.stackTrace && (
+                                    <span className="text-muted-foreground">
+                                      {t("errorlogs.noException")}
+                                    </span>
+                                  )}
                               </div>
                             </td>
                           </tr>
@@ -429,13 +611,29 @@ export default function ErrorLogsTab() {
 
           {totalPages > 1 && (
             <div className="flex items-center justify-between text-sm text-muted-foreground">
-              <span>{t('errorlogs.total')}: {data.total}</span>
+              <span>
+                {t("errorlogs.total")}: {data.total}
+              </span>
               <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" disabled={page === 0} onClick={() => setPage(p => p - 1)} className="h-8">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={page === 0}
+                  onClick={() => setPage((p) => p - 1)}
+                  className="h-8"
+                >
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
-                <span className="text-xs">{page + 1} / {totalPages}</span>
-                <Button variant="ghost" size="sm" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)} className="h-8">
+                <span className="text-xs">
+                  {page + 1} / {totalPages}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={page >= totalPages - 1}
+                  onClick={() => setPage((p) => p + 1)}
+                  className="h-8"
+                >
                   <ChevronRight className="w-4 h-4" />
                 </Button>
               </div>
@@ -448,22 +646,28 @@ export default function ErrorLogsTab() {
         open={confirmClear}
         onOpenChange={setConfirmClear}
         destructive
-        title={t('errorlogs.clear')}
-        description={t('errorlogs.clearConfirm')}
-        confirmLabel={t('errorlogs.clear')}
-        cancelLabel={t('common.cancel')}
+        title={t("errorlogs.clear")}
+        description={t("errorlogs.clearConfirm")}
+        confirmLabel={t("errorlogs.clear")}
+        cancelLabel={t("common.cancel")}
         onConfirm={() => clearMutation.mutate()}
       />
 
       <ConfirmDialog
         open={confirmResolveListed}
         onOpenChange={setConfirmResolveListed}
-        title={t('errorlogs.resolveListed')}
-        description={t('errorlogs.resolveListedConfirm', String(listedUnresolved.length))}
-        confirmLabel={t('errorlogs.resolve')}
-        cancelLabel={t('common.cancel')}
+        title={t("errorlogs.resolveListed")}
+        description={t(
+          "errorlogs.resolveListedConfirm",
+          String(listedUnresolved.length),
+        )}
+        confirmLabel={t("errorlogs.resolve")}
+        cancelLabel={t("common.cancel")}
         onConfirm={() => {
-          resolveMutation.mutate({ ids: listedUnresolved.map((e) => e.id), resolved: true });
+          resolveMutation.mutate({
+            ids: listedUnresolved.map((e) => e.id),
+            resolved: true,
+          });
           setConfirmResolveListed(false);
         }}
       />

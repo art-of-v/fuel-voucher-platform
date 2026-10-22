@@ -97,7 +97,8 @@ beforeEach(() => {
   mockedApiRequest.mockReset();
   mockedApiRequest.mockImplementation((_method: string, url: string) => {
     if (url.includes("signed-contracts")) return Promise.resolve([SIGNED]);
-    if (url.includes("legal-entity/contracts")) return Promise.resolve([CONTRACT]);
+    if (url.includes("legal-entity/contracts"))
+      return Promise.resolve([CONTRACT]);
     if (url.includes("/api/admin/brands")) return Promise.resolve(BRANDS);
     if (url.includes("contract-versions")) return Promise.resolve([]);
     return Promise.resolve([]);
@@ -126,10 +127,16 @@ describe("ContractsTab", () => {
   it("shows who signed what, and lets the operator look at the signature", async () => {
     renderTab();
 
-    await waitFor(() => expect(screen.getByText("contracts.view")).toBeDefined());
+    await waitFor(() =>
+      expect(screen.getByText("contracts.view")).toBeDefined(),
+    );
     // The customer and the company, from the signature's own row.
-    expect(cellTexts().filter((c) => c === "+380991234567").length).toBeGreaterThan(0);
-    expect(cellTexts().filter((c) => c === "ACMELLC").length).toBeGreaterThan(0);
+    expect(
+      cellTexts().filter((c) => c === "+380991234567").length,
+    ).toBeGreaterThan(0);
+    expect(cellTexts().filter((c) => c === "ACMELLC").length).toBeGreaterThan(
+      0,
+    );
   });
 
   it("publishes the document the operator handed over", async () => {
@@ -144,20 +151,24 @@ describe("ContractsTab", () => {
     const file = new File(["the terms"], "terms.docx", {
       type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     });
-    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const fileInput = document.querySelector(
+      'input[type="file"]',
+    ) as HTMLInputElement;
     await user.upload(fileInput, file);
 
     await user.click(screen.getByText("contracts.upload"));
 
     await waitFor(() => {
       const call = mockedApiRequest.mock.calls.find(
-        (c) => c[0] === "POST" && String(c[1]).includes("contract-versions/upload"),
+        (c) =>
+          c[0] === "POST" && String(c[1]).includes("contract-versions/upload"),
       );
       expect(call).toBeDefined();
     });
 
     const [, , body] = mockedApiRequest.mock.calls.find(
-      (c) => c[0] === "POST" && String(c[1]).includes("contract-versions/upload"),
+      (c) =>
+        c[0] === "POST" && String(c[1]).includes("contract-versions/upload"),
     )!;
     const form = body as FormData;
     // The provider, the term and the document - the three things the endpoint binds.

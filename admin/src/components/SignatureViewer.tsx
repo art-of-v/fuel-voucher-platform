@@ -22,7 +22,9 @@ export function SignatureViewer({ data }: { data: string }) {
   try {
     const paths = JSON.parse(data);
     if (!Array.isArray(paths))
-      return <div className="text-red-500">{t("contracts.signatureInvalid")}</div>;
+      return (
+        <div className="text-red-500">{t("contracts.signatureInvalid")}</div>
+      );
 
     return (
       <svg

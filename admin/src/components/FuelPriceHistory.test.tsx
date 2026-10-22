@@ -11,7 +11,11 @@ import {
 
 vi.mock("@/lib/api-client", () => ({ apiRequest: vi.fn() }));
 vi.mock("@/lib/i18n", () => ({
-  useI18n: () => ({ t: (key: string) => key, language: "uk", setLanguage: vi.fn() }),
+  useI18n: () => ({
+    t: (key: string) => key,
+    language: "uk",
+    setLanguage: vi.fn(),
+  }),
 }));
 
 import { apiRequest } from "@/lib/api-client";
@@ -49,7 +53,9 @@ const LOG: FuelPriceHistoryEntry[] = [
 ];
 
 function renderHistory() {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   const wrap = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   );
@@ -84,7 +90,9 @@ describe("FuelPriceHistory", () => {
     mockApi();
     renderHistory();
 
-    await waitFor(() => expect(screen.getByText("priceHistory.reasonOperator")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByText("priceHistory.reasonOperator")).toBeTruthy(),
+    );
     expect(screen.getByText("priceHistory.reasonPumpImport")).toBeTruthy();
     // Buy, margin and pump are all shown, because a price nobody can explain is not trusted.
     expect(screen.getByText("48,90")).toBeTruthy();
@@ -122,14 +130,18 @@ describe("FuelPriceHistory", () => {
     });
 
     // Not an error and not an empty table: "the fuel was not priced yet" is the answer.
-    await waitFor(() => expect(screen.getByText("priceHistory.atNone")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByText("priceHistory.atNone")).toBeTruthy(),
+    );
   });
 
   it("marks a rehearsal row so it is never read as a live price", async () => {
-    mockedApiRequest.mockImplementation(async (_method: string, url: string) => {
-      if (url.includes("price-at")) return null;
-      return [{ ...LOG[0], dataKind: "qa" }];
-    });
+    mockedApiRequest.mockImplementation(
+      async (_method: string, url: string) => {
+        if (url.includes("price-at")) return null;
+        return [{ ...LOG[0], dataKind: "qa" }];
+      },
+    );
     renderHistory();
 
     await waitFor(() => expect(screen.getByText("qa")).toBeTruthy());
@@ -141,6 +153,8 @@ describe("FuelPriceHistory", () => {
     );
     renderHistory();
 
-    await waitFor(() => expect(screen.getByText("priceHistory.empty")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByText("priceHistory.empty")).toBeTruthy(),
+    );
   });
 });

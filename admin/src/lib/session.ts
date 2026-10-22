@@ -25,7 +25,10 @@ import { hasSessionMarker, useSession } from "./session-store";
  */
 
 /** Applies a refresh outcome to session state. Shared by boot and 401 recovery. */
-async function applyRefresh({ status, retryAfterSeconds }: RefreshResult): Promise<void> {
+async function applyRefresh({
+  status,
+  retryAfterSeconds,
+}: RefreshResult): Promise<void> {
   const store = useSession.getState();
 
   switch (status) {
@@ -53,7 +56,9 @@ async function applyRefresh({ status, retryAfterSeconds }: RefreshResult): Promi
     case "rate_limited":
       store.block({
         reason: "rate_limited",
-        retryAt: Date.now() + (retryAfterSeconds || REFRESH_RATE_LIMIT_FALLBACK_SECONDS) * 1000,
+        retryAt:
+          Date.now() +
+          (retryAfterSeconds || REFRESH_RATE_LIMIT_FALLBACK_SECONDS) * 1000,
       });
       return;
 
@@ -64,7 +69,11 @@ async function applyRefresh({ status, retryAfterSeconds }: RefreshResult): Promi
 }
 
 function isRejected(err: unknown): boolean {
-  return typeof err === "object" && err !== null && (err as { status?: number }).status === 401;
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    (err as { status?: number }).status === 401
+  );
 }
 
 /**
@@ -107,12 +116,17 @@ export async function ensureAccessToken(): Promise<string | null> {
   if (status === "anonymous") return null;
 
   await applyRefresh(await refreshAccessToken());
-  return useSession.getState().status === "authenticated" ? getStoredAccessToken() : null;
+  return useSession.getState().status === "authenticated"
+    ? getStoredAccessToken()
+    : null;
 }
 
 /** Verify an OTP and adopt the resulting session. Returns the user so the caller can apply its
  *  own role gate without a second round trip. */
-export async function signInWithCode(phoneNumber: string, code: string): Promise<CurrentUser> {
+export async function signInWithCode(
+  phoneNumber: string,
+  code: string,
+): Promise<CurrentUser> {
   await verifyCode(phoneNumber, code);
   const user = await fetchCurrentUser();
   useSession.getState().authenticate(user);

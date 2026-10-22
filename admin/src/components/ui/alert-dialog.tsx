@@ -1,10 +1,10 @@
-import * as React from "react"
-import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog"
+import * as React from "react";
+import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
 
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
-const AlertDialog = AlertDialogPrimitive.Root
+const AlertDialog = AlertDialogPrimitive.Root;
 
 const AlertDialogOverlay = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Overlay>,
@@ -14,12 +14,12 @@ const AlertDialogOverlay = React.forwardRef<
     ref={ref}
     className={cn(
       "fixed inset-0 z-50 bg-black/60 backdrop-blur-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-      className
+      className,
     )}
     {...props}
   />
-))
-AlertDialogOverlay.displayName = AlertDialogPrimitive.Overlay.displayName
+));
+AlertDialogOverlay.displayName = AlertDialogPrimitive.Overlay.displayName;
 
 const AlertDialogContent = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Content>,
@@ -35,13 +35,13 @@ const AlertDialogContent = React.forwardRef<
         // backdrop-filter composite to an invisible/black rectangle in Chromium. glass-chrome
         // paints a real dark background, so it renders regardless — same surface SelectContent uses.
         "glass-chrome rounded-xl text-foreground fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 gap-4 p-6 duration-200 focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-        className
+        className,
       )}
       {...props}
     />
   </AlertDialogPrimitive.Portal>
-))
-AlertDialogContent.displayName = AlertDialogPrimitive.Content.displayName
+));
+AlertDialogContent.displayName = AlertDialogPrimitive.Content.displayName;
 
 const AlertDialogTitle = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Title>,
@@ -52,8 +52,8 @@ const AlertDialogTitle = React.forwardRef<
     className={cn("text-xl font-bold text-foreground", className)}
     {...props}
   />
-))
-AlertDialogTitle.displayName = AlertDialogPrimitive.Title.displayName
+));
+AlertDialogTitle.displayName = AlertDialogPrimitive.Title.displayName;
 
 const AlertDialogDescription = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Description>,
@@ -64,18 +64,19 @@ const AlertDialogDescription = React.forwardRef<
     className={cn("text-sm text-muted-foreground", className)}
     {...props}
   />
-))
-AlertDialogDescription.displayName = AlertDialogPrimitive.Description.displayName
+));
+AlertDialogDescription.displayName =
+  AlertDialogPrimitive.Description.displayName;
 
 export interface ConfirmDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  title: React.ReactNode
-  description: React.ReactNode
-  confirmLabel: React.ReactNode
-  cancelLabel: React.ReactNode
-  onConfirm: () => void
-  destructive?: boolean
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: React.ReactNode;
+  description: React.ReactNode;
+  confirmLabel: React.ReactNode;
+  cancelLabel: React.ReactNode;
+  onConfirm: () => void;
+  destructive?: boolean;
 }
 
 /**
@@ -119,7 +120,7 @@ function ConfirmDialog({
         </div>
       </AlertDialogContent>
     </AlertDialog>
-  )
+  );
 }
 
 export {
@@ -129,4 +130,4 @@ export {
   AlertDialogTitle,
   AlertDialogDescription,
   ConfirmDialog,
-}
+};

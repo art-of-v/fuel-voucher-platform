@@ -58,6 +58,10 @@ export function isValidCoordinate(lat: number, lng: number): boolean {
 // value when a create leaves the external id blank; this only pre-fills that field.
 // It takes the brand's SLUG, not its uuid — seeding the uuid here would write a key
 // no import file could ever produce.
-export function deriveExternalId(brandSlug: string, lat: number, lng: number): string {
+export function deriveExternalId(
+  brandSlug: string,
+  lat: number,
+  lng: number,
+): string {
   return `${brandSlug}-${lat.toFixed(5)}-${lng.toFixed(5)}`;
 }

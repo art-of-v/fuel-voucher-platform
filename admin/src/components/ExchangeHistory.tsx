@@ -79,17 +79,19 @@ export function ExchangeHistory() {
   if (from) params.set("from", from);
   if (to) params.set("to", to);
 
-  const {
-    data,
-    isLoading,
-    isError,
-  } = useQuery<ExchangeBatchesResponse>({
+  const { data, isLoading, isError } = useQuery<ExchangeBatchesResponse>({
     // Filters live in the key, so changing them re-queries rather than filtering a stale page.
-    queryKey: ["/api/admin/voucher-exchange/batches", supplierId, from, to, page],
+    queryKey: [
+      "/api/admin/voucher-exchange/batches",
+      supplierId,
+      from,
+      to,
+      page,
+    ],
     queryFn: () =>
       apiRequest<unknown, ExchangeBatchesResponse>(
         "GET",
-        `/api/admin/voucher-exchange/batches?${params.toString()}`
+        `/api/admin/voucher-exchange/batches?${params.toString()}`,
       ),
     staleTime: 30_000,
   });
@@ -119,7 +121,9 @@ export function ExchangeHistory() {
           }}
           className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
         >
-          <option value={ALL}>{t("voucherExchange.historyAllSuppliers")}</option>
+          <option value={ALL}>
+            {t("voucherExchange.historyAllSuppliers")}
+          </option>
           {(data?.suppliers ?? []).map((s) => (
             <option key={s.id} value={s.id}>
               {s.name}
@@ -153,8 +157,12 @@ export function ExchangeHistory() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-muted/50 text-left text-muted-foreground">
-              <th className="p-2 font-medium">{t("voucherExchange.historyDate")}</th>
-              <th className="p-2 font-medium">{t("voucherExchange.historySupplier")}</th>
+              <th className="p-2 font-medium">
+                {t("voucherExchange.historyDate")}
+              </th>
+              <th className="p-2 font-medium">
+                {t("voucherExchange.historySupplier")}
+              </th>
               <th className="p-2 font-medium text-right">
                 {t("voucherExchange.historyVouchers")}
               </th>
@@ -167,7 +175,9 @@ export function ExchangeHistory() {
               <th className="p-2 font-medium text-right">
                 {t("voucherExchange.historyCostMove")}
               </th>
-              <th className="p-2 font-medium">{t("voucherExchange.historyRecordedBy")}</th>
+              <th className="p-2 font-medium">
+                {t("voucherExchange.historyRecordedBy")}
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -177,9 +187,13 @@ export function ExchangeHistory() {
                 onClick={() => setOpenBatchId(b.exchangeBatchId)}
                 className="cursor-pointer border-t border-border hover:bg-muted/40"
               >
-                <td className="p-2 font-mono text-xs">{b.atUtc.slice(0, 10)}</td>
+                <td className="p-2 font-mono text-xs">
+                  {b.atUtc.slice(0, 10)}
+                </td>
                 <td className="p-2">{b.supplierName ?? "-"}</td>
-                <td className="p-2 text-right tabular-nums">{b.vouchersExchanged}</td>
+                <td className="p-2 text-right tabular-nums">
+                  {b.vouchersExchanged}
+                </td>
                 <td className="p-2 text-right tabular-nums">{b.litersOut}</td>
                 <td className="p-2 text-right font-mono tabular-nums">
                   {formatMoney(b.surchargeUah)}
@@ -187,7 +201,9 @@ export function ExchangeHistory() {
                 <td className="p-2 text-right font-mono tabular-nums">
                   {perL(b.costPerLiterBefore)} → {perL(b.costPerLiterAfter)}
                 </td>
-                <td className="p-2 text-xs text-muted-foreground">{b.recordedBy ?? "-"}</td>
+                <td className="p-2 text-xs text-muted-foreground">
+                  {b.recordedBy ?? "-"}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -199,7 +215,9 @@ export function ExchangeHistory() {
           </p>
         )}
         {isError && (
-          <p className="p-4 text-sm text-destructive">{t("voucherExchange.historyLoadFailed")}</p>
+          <p className="p-4 text-sm text-destructive">
+            {t("voucherExchange.historyLoadFailed")}
+          </p>
         )}
         {!isLoading && !isError && batches.length === 0 && (
           <p className="p-4 text-sm text-muted-foreground">
@@ -253,7 +271,7 @@ function ExchangeBatchDetailView({
     queryFn: () =>
       apiRequest<unknown, ExchangeBatchDetail>(
         "GET",
-        `/api/admin/voucher-exchange/batches/${encodeURIComponent(batchId)}`
+        `/api/admin/voucher-exchange/batches/${encodeURIComponent(batchId)}`,
       ),
     staleTime: 30_000,
   });
@@ -274,7 +292,9 @@ function ExchangeBatchDetailView({
         </p>
       )}
       {isError && (
-        <p className="text-sm text-destructive">{t("voucherExchange.historyLoadFailed")}</p>
+        <p className="text-sm text-destructive">
+          {t("voucherExchange.historyLoadFailed")}
+        </p>
       )}
 
       {data && (
@@ -287,7 +307,9 @@ function ExchangeBatchDetailView({
               {data.supplierName ?? "-"}
             </span>
             <span>
-              <span className="text-muted-foreground">{t("voucherExchange.historyDate")}: </span>
+              <span className="text-muted-foreground">
+                {t("voucherExchange.historyDate")}:{" "}
+              </span>
               <span className="font-mono">{data.atUtc.slice(0, 10)}</span>
             </span>
             <span>
@@ -302,8 +324,12 @@ function ExchangeBatchDetailView({
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-muted/50 text-left text-muted-foreground">
-                  <th className="p-2 font-medium">{t("voucherExchange.historyOld")}</th>
-                  <th className="p-2 font-medium">{t("voucherExchange.historyNew")}</th>
+                  <th className="p-2 font-medium">
+                    {t("voucherExchange.historyOld")}
+                  </th>
+                  <th className="p-2 font-medium">
+                    {t("voucherExchange.historyNew")}
+                  </th>
                   <th className="p-2 font-medium text-right">
                     {t("voucherExchange.historyLiters")}
                   </th>
@@ -318,9 +344,15 @@ function ExchangeBatchDetailView({
               <tbody>
                 {data.pairs.map((p) => (
                   <tr key={p.oldVoucherId} className="border-t border-border">
-                    <td className="p-2 font-mono text-xs">{p.oldVoucherNumber ?? "-"}</td>
-                    <td className="p-2 font-mono text-xs">{p.newVoucherNumber ?? "-"}</td>
-                    <td className="p-2 text-right tabular-nums">{p.oldLiters ?? "-"}</td>
+                    <td className="p-2 font-mono text-xs">
+                      {p.oldVoucherNumber ?? "-"}
+                    </td>
+                    <td className="p-2 font-mono text-xs">
+                      {p.newVoucherNumber ?? "-"}
+                    </td>
+                    <td className="p-2 text-right tabular-nums">
+                      {p.oldLiters ?? "-"}
+                    </td>
                     <td className="p-2 text-right font-mono tabular-nums">
                       {perL(p.oldCostPerLiter)} → {perL(p.newCostPerLiter)}
                     </td>
@@ -336,7 +368,9 @@ function ExchangeBatchDetailView({
                   <td className="p-2" colSpan={2}>
                     {t("voucherExchange.historyTotal")}
                   </td>
-                  <td className="p-2 text-right tabular-nums">{data.totalLiters}</td>
+                  <td className="p-2 text-right tabular-nums">
+                    {data.totalLiters}
+                  </td>
                   <td className="p-2" />
                   <td className="p-2 text-right font-mono tabular-nums">
                     {formatMoney(data.totalSurchargeUah)}
