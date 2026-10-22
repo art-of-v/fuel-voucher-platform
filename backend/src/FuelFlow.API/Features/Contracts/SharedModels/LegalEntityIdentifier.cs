@@ -8,9 +8,10 @@ namespace FuelFlow.Features.Contracts.SharedModels;
 /// <remarks>
 /// <para>
 /// Server-side is the authoritative gate: every write path for a legal entity runs through
-/// <c>LegalEntityController</c>, so validating there covers create, the profile upsert and the
-/// scoped edit at once. The mobile and admin forms mirror these rules for instant feedback, but a
-/// client that forgets is caught here.
+/// <c>LegalEntityController</c>, and the three of them share one gate
+/// (<c>LegalEntityDetails.DescribeProblem</c>), so validating there covers create, the profile
+/// upsert and the scoped edit at once. The mobile and admin forms mirror these rules for instant
+/// feedback, but a client that forgets is caught here.
 /// </para>
 /// <para>
 /// Two layers, deliberately distinct. The <em>format</em> rule (#128) is a shape check. The
