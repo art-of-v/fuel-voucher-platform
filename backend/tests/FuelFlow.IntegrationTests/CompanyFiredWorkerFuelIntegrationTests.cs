@@ -13,6 +13,7 @@ using FuelFlow.Features.Vouchers.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Observability;
+using FuelFlow.Testing;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using static FuelFlow.SharedKernel.Domain.FuelIdMapper;
@@ -348,8 +349,8 @@ public sealed class CompanyFiredWorkerFuelIntegrationTests : IClassFixture<TestD
             Id = id,
             PhoneNumber = $"+38{id:N}"[..20],
             IsActive = true,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
     private static LegalEntity NewLegalEntity(Guid id, Guid ownerUserId, string name = "ACME LLC", string edrpou = "12345678")
@@ -359,8 +360,8 @@ public sealed class CompanyFiredWorkerFuelIntegrationTests : IClassFixture<TestD
             UserId = ownerUserId,
             Name = name,
             Edrpou = edrpou,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
     private static CompanyMember NewMember(Guid id, Guid legalEntityId, Guid workerUserId)
@@ -369,7 +370,7 @@ public sealed class CompanyFiredWorkerFuelIntegrationTests : IClassFixture<TestD
             Id = id,
             LegalEntityId = legalEntityId,
             WorkerUserId = workerUserId,
-            JoinedAtUtc = DateTime.UtcNow
+            JoinedAtUtc = TestClock.UtcNow
         };
 
     private static FuelVoucher NewVoucher(
@@ -386,8 +387,8 @@ public sealed class CompanyFiredWorkerFuelIntegrationTests : IClassFixture<TestD
             Brand = "okko",
             FuelTypeId = ToUuid("okko-95"),
             Liters = 50m,
-            SupplierExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
-            CustomerExpirationDate = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1)),
+            SupplierExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
+            CustomerExpirationDate = DateOnly.FromDateTime(TestClock.UtcNow.AddMonths(1)),
             VoucherNumber = $"OKKO-{id:N}"[..20],
             QrPayload = $"payload-{id:N}",
             Status = status,
@@ -395,8 +396,8 @@ public sealed class CompanyFiredWorkerFuelIntegrationTests : IClassFixture<TestD
             AssignedToUserId = assignedToUserId,
             WorkerUserId = workerUserId,
             OrderId = orderId,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         };
 
     private static Guid SeedPurchaseOrder(ApplicationDbContext ctx, Guid userId)
@@ -408,8 +409,8 @@ public sealed class CompanyFiredWorkerFuelIntegrationTests : IClassFixture<TestD
             UserId = userId,
             Price = 0,
             Status = OrderStatus.Fulfilled,
-            CreatedAtUtc = DateTime.UtcNow,
-            UpdatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = TestClock.UtcNow,
+            UpdatedAtUtc = TestClock.UtcNow
         });
         return orderId;
     }
