@@ -167,7 +167,13 @@ internal static class AuthSetup
             .AddPolicy(AuthPolicies.UserAdministration, policy =>
                 policy.RequireRole(SeedRoles.AdminAndOwnerRoleNames))
             .AddPolicy(AuthPolicies.QaTestAccess, policy =>
-                policy.RequireRole(SeedRoles.AdminAndOwnerRoleNames));
+                policy.RequireRole(SeedRoles.AdminAndOwnerRoleNames))
+            // The redeemable payload of a voucher is a bearer instrument: whoever holds it can
+            // spend the customer's fuel, and nothing records that they did. It is narrower than
+            // the staff surface for that reason - a Manager reads the stock, the Admin tier
+            // holds the code.
+            .AddPolicy(AuthPolicies.VoucherPayload, policy =>
+                policy.RequireRole(SeedRoles.VoucherPayloadRoleNames));
 
         return services;
     }

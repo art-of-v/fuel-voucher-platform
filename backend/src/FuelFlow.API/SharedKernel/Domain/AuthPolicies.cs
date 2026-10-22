@@ -62,7 +62,23 @@ internal static class AuthPolicies
     /// <summary>
     /// Turn the QA test-access switch. Admin and ProductOwner only: the switch decides whether a
     /// client-side test account may sign in at all, and the client-side test account is a
-    /// <c>User</c> row — not a staff role.
+    /// <c>User</c> row - not a staff role.
     /// </summary>
     public const string QaTestAccess = "QaTestAccess";
+
+    /// <summary>
+    /// See a voucher's redeemable payload - the code the customer redeems at the pump.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The payload is a bearer instrument: whoever holds it can spend the customer's fuel, and
+    /// nothing records that they did. That is the difference from a refund, which the Manager may
+    /// make - a refund is an audited row and a ledger entry, and a redemption is neither.
+    /// </para>
+    /// <para>
+    /// So the capability is its own, and it is narrower than the staff surface: an operator
+    /// reads the stock, its status and its cost, and the code itself is for the Admin tier.
+    /// </para>
+    /// </remarks>
+    public const string VoucherPayload = "VoucherPayload";
 }

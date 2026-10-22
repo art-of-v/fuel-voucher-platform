@@ -3,7 +3,6 @@ namespace FuelFlow.Features.Vouchers.GetAdminVouchers;
 public sealed class AdminVoucherListItemDto
 {
     public Guid Id { get; set; }
-    public string? QrPayload { get; set; }
     public decimal Liters { get; set; }
     public Guid FuelTypeId { get; set; }
     public FuelTypeRefDto? FuelType { get; set; }

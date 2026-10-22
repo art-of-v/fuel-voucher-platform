@@ -108,6 +108,19 @@ internal static class SeedRoles
     /// </summary>
     public static readonly string[] StaffOperationsRoleNames = { ProductOwnerName, AdminName, ManagerName };
 
+    /// <summary>
+    /// The roles that may see a voucher's redeemable payload - the code the customer redeems at
+    /// the pump.
+    /// <para>
+    /// <b>Why this is narrower than the staff surface.</b> The payload is a bearer instrument:
+    /// whoever holds it can spend the customer's fuel, and nothing records that they did. A refund,
+    /// which a Manager may make, is an audited row and a ledger entry - a redemption is neither.
+    /// So the Admin tier holds the code, and the operations tier reads the stock, its status and
+    /// its cost.
+    /// </para>
+    /// </summary>
+    public static readonly string[] VoucherPayloadRoleNames = { ProductOwnerName, AdminName };
+
     // Fixed, deterministic GUIDs matching the seeded database rows.
     // Admin and User IDs must match existing seeded data (migrations 20260619000001, 20260915121550).
     // ProductOwner, Manager and QA are new roles; use stable random UUIDs.

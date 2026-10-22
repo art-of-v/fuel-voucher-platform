@@ -79,6 +79,18 @@ public sealed class AdminVoucherController : ControllerBase
     {
         var result = await _getByIdHandler.HandleAsync(new GetAdminVoucherByIdQuery(id), cancellationToken);
         if (result is null) return NotFound();
+
+        // The redeemable payload leaves the process only for the roles that hold the capability
+        // (AuthPolicies.VoucherPayload). It is a bearer instrument: whoever holds it can spend
+        // the customer's fuel, and nothing records that they did - which is the difference from a
+        // refund, an audited row a Manager may write. The rest of the detail - the number, the
+        // status, the cost, the term - is the operator's either way.
+        if (!CanSeeVoucherPayload())
+        {
+            result.QrPayload = null;
+            result.QrImage = null;
+        }
+
         return Ok(result);
     }
 
@@ -178,6 +190,13 @@ public sealed class AdminVoucherController : ControllerBase
         if (result == null)
             return NotFound();
 
+        // The verification's image IS the voucher's redeemable code, so it leaves the process
+        // only for the roles that hold the capability. The numbers stay: the mismatch percent
+        // and the module counts are the verification's result, and an operator checking a
+        // printed voucher needs them.
+        if (!CanSeeVoucherPayload())
+            result = result with { QrCodeBase64 = null! };
+
         return Ok(result);
     }
 
@@ -204,6 +223,13 @@ public sealed class AdminVoucherController : ControllerBase
         var result = await _lifecycleHandler.HandleAsync(new GetAdminVoucherLifecycleQuery(id), cancellationToken);
         return result is null ? NotFound() : Ok(result);
     }
+
+    /// <summary>
+    /// Whether the actor may see a voucher's redeemable payload. The membership is the policy's
+    /// own list, read from one place, so the attribute and this check cannot disagree.
+    /// </summary>
+    private bool CanSeeVoucherPayload()
+        => SeedRoles.VoucherPayloadRoleNames.Any(role => User.IsInRole(role));
 
     /// <summary>
     /// The authenticated admin's id, or <c>null</c> when the token carries none.

@@ -201,6 +201,10 @@ public sealed class AuthorizePolicySurfaceTests : IClassFixture<TestDatabaseFixt
         (AuthPolicies.StaffOperations, [SeedRoles.ProductOwnerName, SeedRoles.AdminName, SeedRoles.ManagerName]),
         (AuthPolicies.UserAdministration, [SeedRoles.ProductOwnerName, SeedRoles.AdminName]),
         (AuthPolicies.QaTestAccess, [SeedRoles.ProductOwnerName, SeedRoles.AdminName]),
+        // The redeemable payload of a voucher is a bearer instrument: whoever holds it can spend
+        // the customer's fuel, and nothing records that they did. So it is narrower than the money
+        // movement a Manager may do - a refund is an audited row, a redemption is neither.
+        (AuthPolicies.VoucherPayload, [SeedRoles.ProductOwnerName, SeedRoles.AdminName]),
     ];
 
     /// <summary>
