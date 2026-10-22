@@ -72,6 +72,10 @@ internal static class DatabaseSetup
 
         services.AddScoped<IImportVouchersDbContext>(brand => brand.GetRequiredService<ApplicationDbContext>());
 
+        services.AddScoped<TenantScopeAccessor>();
+        services.AddScoped<TenantConnectionInterceptor>();
+        services.AddScoped<TenantTransactionInterceptor>();
+
         // The outbox dispatcher, registered HERE rather than in the host's Program.cs, so that every
         // host that builds an ApplicationDbContext gets it - a host that forgot it would write
         // outbox rows that nothing dispatches until the safety net catches them, and the gap would
@@ -94,7 +98,10 @@ internal static class DatabaseSetup
             // recurring jobs that used to poll for it every minute stay as a safety net, for the
             // case where the enqueue failed or the process died between the commit and the
             // enqueue - which is why they only claim events old enough not to race with this.
-            options.AddInterceptors(brand.GetRequiredService<OutboxDispatchInterceptor>());
+            options.AddInterceptors(
+                brand.GetRequiredService<OutboxDispatchInterceptor>(),
+                brand.GetRequiredService<TenantConnectionInterceptor>(),
+                brand.GetRequiredService<TenantTransactionInterceptor>());
             // Tracking is deliberately left at the default, TrackAll.
             //
             // This context used to be configured NoTracking globally, on the reasonable-sounding grounds

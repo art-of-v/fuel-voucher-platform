@@ -234,6 +234,11 @@ public sealed class TestDatabaseFixture : WebApplicationFactory<Program>, IAsync
             .Build();
         await container.StartAsync();
 
+        // The row-level policies name fuelflow_app, and the migration creates them only when that
+        // role exists (a development database has no roles). The suite therefore creates the role
+        // before the migration, so the policies are installed and can be exercised by SET ROLE.
+        await EnsureTenantTestRoleAsync(container);
+
         // Migrate the template database directly (the app's MigrateDatabaseOnStartup also
         // migrates on host start, but doing it here guarantees readiness, and it has to happen
         // before the database is frozen).
@@ -245,6 +250,8 @@ public sealed class TestDatabaseFixture : WebApplicationFactory<Program>, IAsync
         {
             await context.Database.MigrateAsync();
         }
+
+        await GrantTenantTestRoleAsync(container);
 
         // Freeze it: is a template, and refuses new connections. From here on nothing can connect
         // to it - which is both why the per-class clones can never race a live session and why a
@@ -332,6 +339,52 @@ public sealed class TestDatabaseFixture : WebApplicationFactory<Program>, IAsync
             Database = name,
             SslMode = SslMode.Disable,
         }.ConnectionString;
+    }
+
+    /// <summary>
+    /// Creates the role the application connects as in production, so the conditional policies in
+    /// <c>TheTenantScopeIsAGate</c> are installed in the template.
+    /// </summary>
+    /// <remarks>
+    /// NOLOGIN and NOREPLICATION because the suite never connects as it: it connects as the
+    /// container's superuser and uses <c>SET ROLE</c> for the policy tests. A superuser may SET
+    /// ROLE to any role, and after SET ROLE the current user is fuelflow_app, so the policies
+    /// apply exactly as they do to the production traffic.
+    /// </remarks>
+    private static async Task EnsureTenantTestRoleAsync(PostgreSqlContainer container)
+    {
+        await using var maintenance = new ApplicationDbContext(MaintenanceContextOptions(container), TestQrCipher.Instance);
+        await maintenance.Database.ExecuteSqlRawAsync(
+            """
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'fuelflow_app') THEN
+                    CREATE ROLE fuelflow_app NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE
+                        NOINHERIT NOREPLICATION NOBYPASSRLS;
+                END IF;
+            END
+            $$;
+            """);
+    }
+
+    /// <summary>
+    /// The grants production's <c>ensure-database-roles.sh</c> gives the traffic role. The policy
+    /// predicates read the membership and owner tables, so those need SELECT as well.
+    /// </summary>
+    private static async Task GrantTenantTestRoleAsync(PostgreSqlContainer container)
+    {
+        await using var template = new ApplicationDbContext(NonPoolingContextOptions(container, TemplateDatabaseName), TestQrCipher.Instance);
+        await template.Database.ExecuteSqlRawAsync(
+            """
+            GRANT USAGE ON SCHEMA public TO fuelflow_app;
+            GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
+                public.orders,
+                public.fuel_vouchers,
+                public.user_contracts,
+                public.company_members,
+                public.legal_entities
+                TO fuelflow_app;
+            """);
     }
 
     /// <summary>

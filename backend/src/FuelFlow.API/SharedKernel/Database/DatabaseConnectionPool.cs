@@ -26,12 +26,16 @@ namespace FuelFlow.SharedKernel.Database;
 /// <para>
 /// <b>Why it is safe here, and where it is not.</b> Npgsql's own documentation says the cost of
 /// this setting is "leaking state": a connection returned to the pool keeps whatever the last
-/// user left on it. This application leaves nothing behind - there is no session-level
-/// <c>SET</c>, no temporary table, no <c>LISTEN</c>, and the only advisory locks it takes are
-/// transaction-scoped (<c>pg_advisory_xact_lock</c>), which the transaction's end releases. The
-/// connection string also does not set <c>Application Name</c>, so no connection inherits
-/// another one's identity. A transaction still open when the connection is returned is rolled
-/// back by Npgsql, which this setting does not change.
+/// user left on it. This application leaves nothing behind that is not deliberately overwritten.
+/// The row-level policies read two session variables, <c>app.user_id</c> and
+/// <c>app.is_system</c>; <see cref="TenantConnectionInterceptor"/> writes both on every open -
+/// including the anonymous and system cases - so a connection can never hand the next request
+/// the previous request's identity. There is no other session-level <c>SET</c>, no temporary
+/// table and no <c>LISTEN</c>, and the only advisory locks it takes are transaction-scoped
+/// (<c>pg_advisory_xact_lock</c>), which the transaction's end releases. The connection string
+/// also does not set <c>Application Name</c>, so no connection inherits another one's identity.
+/// A transaction still open when the connection is returned is rolled back by Npgsql, which this
+/// setting does not change.
 /// </para>
 /// <para>
 /// <b>The Hangfire storage is the exception, and it is not a small one.</b> The Hangfire

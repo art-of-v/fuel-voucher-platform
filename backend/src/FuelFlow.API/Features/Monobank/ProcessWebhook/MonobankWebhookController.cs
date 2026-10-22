@@ -1,4 +1,5 @@
 using FuelFlow.API.Features.Orders.SharedServices.Monobank.Models;
+using FuelFlow.SharedKernel.Database;
 using FuelFlow.SharedKernel.Errors;
 using FuelFlow.SharedKernel.Options;
 using FuelFlow.SharedKernel.Security;
@@ -14,6 +15,7 @@ namespace FuelFlow.Features.Monobank.ProcessWebhook;
 
 [ApiController]
 [Route("api/monobank")]
+[SystemScope]
 public sealed class MonobankWebhookController : ControllerBase
 {
     private readonly ProcessMonobankWebhookCommandHandler _handler;
