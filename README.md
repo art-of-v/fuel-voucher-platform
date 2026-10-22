@@ -152,6 +152,24 @@ npm start -- --ios --private-key-path ./keys/private-key.pem   # or --android
 > production URL. `--private-key-path` is required because the committed `app.json` ships an Expo
 > code-signing certificate; a checkout without the key under `mobile/keys/` omits the flag.
 
+### JavaScript dependencies
+
+CI fails the build on a known advisory in `admin/` or `mobile/` that is not on the accepted-risk
+list — the counterpart of the NuGet scan the backend job runs:
+
+```bash
+node scripts/npm-audit-gate.mjs admin mobile   # what CI runs
+node --test scripts/npm-audit-gate.test.mjs     # the gate's own tests
+```
+
+The accepted advisories live in `scripts/npm-audit-accepted-risk.json`, and every entry carries
+the path the advisory reaches this repository through, the fix (or the statement that there is
+none), and the reason the risk is accepted. Adding an advisory to that list is a decision: write
+the reason, or the next reader has a number instead of a decision.
+
+The `overrides` blocks in `admin/package.json` and `mobile/package.json` pin the transitive
+dependencies whose advisory has a fix, so a lockfile refresh cannot quietly bring one back.
+
 ### Database migrations
 
 Migrations auto-apply on startup (`RunMigrationsOnBoot`, default `true`); to apply them by hand:

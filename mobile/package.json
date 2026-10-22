@@ -85,6 +85,13 @@
   },
   "private": true,
   "overrides": {
-    "minimatch": "^10.2.1"
+    "minimatch": "^10.2.1",
+    "brace-expansion": "^5.0.12",
+    "compression": "^1.8.2",
+    "fast-uri": "^3.1.8",
+    "postcss": "^8.5.31",
+    "shell-quote": "^1.11.0",
+    "source-map-js": "^1.2.2",
+    "undici": "^6.28.1"
   }
 }
