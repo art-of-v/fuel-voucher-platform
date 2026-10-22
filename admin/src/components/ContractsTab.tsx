@@ -79,8 +79,13 @@ export default function ContractsTab() {
 
   // The signed contracts are a PAGE, and the list carries no signature image: the image is
   // fetched per record, on demand, by the query below.
-  const { data: signedContractsPage } = useQuery<PagedResult<AdminSignedContract>>({
-    queryKey: ["/api/admin/legal-entity/contracts/signed-contracts", signedPage],
+  const { data: signedContractsPage } = useQuery<
+    PagedResult<AdminSignedContract>
+  >({
+    queryKey: [
+      "/api/admin/legal-entity/contracts/signed-contracts",
+      signedPage,
+    ],
     queryFn: () =>
       apiRequest<void, PagedResult<AdminSignedContract>>(
         "GET",
@@ -96,7 +101,10 @@ export default function ContractsTab() {
   // list.
   const { data: signature, isLoading: isSignatureLoading } =
     useQuery<AdminSignedContractSignature | null>({
-      queryKey: ["/api/admin/legal-entity/contracts/signed-contracts", signatureId],
+      queryKey: [
+        "/api/admin/legal-entity/contracts/signed-contracts",
+        signatureId,
+      ],
       queryFn: async () => {
         if (!signatureId) return null;
         return await apiRequest<void, AdminSignedContractSignature>(
@@ -167,8 +175,7 @@ export default function ContractsTab() {
   // for it (AuthPolicies.SignaturePayload) and refuses a Manager outright. The button is
   // hidden as well, rather than opening a modal with nothing in it.
   const actorRole = user?.role ?? "";
-  const canSeeSignature =
-    actorRole === "Admin" || actorRole === "ProductOwner";
+  const canSeeSignature = actorRole === "Admin" || actorRole === "ProductOwner";
 
   return (
     <div className="space-y-6">

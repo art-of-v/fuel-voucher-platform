@@ -3292,7 +3292,8 @@ export const translations: Record<Language, Record<string, string>> = {
     "contracts.signatureRestricted":
       "Die Unterschriften sind für die Admin-Ebene: ein Manager darf sie nicht öffnen.",
     "contracts.signaturesPage": "Seite {0} von {1}",
-    "contracts.signatureLoadFailed": "Die Unterschrift konnte nicht geladen werden.",
+    "contracts.signatureLoadFailed":
+      "Die Unterschrift konnte nicht geladen werden.",
     "contracts.noneSigned": "Noch keine unterzeichneten Verträge",
     "contracts.signatureInvalid": "Ungültige Unterschriftdaten",
     "contracts.signatureUnreadable":

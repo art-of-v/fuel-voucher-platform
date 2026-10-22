@@ -19,8 +19,9 @@ vi.mock("@/lib/i18n", () => ({
 // the Admin tier holds it, and the button is hidden for anybody else - so the tab is rendered
 // as an Admin here.
 vi.mock("@/lib/session-store", () => ({
-  useSession: (selector: (state: { user: { role: string } | null }) => unknown) =>
-    selector({ user: { role: "Admin" } }),
+  useSession: (
+    selector: (state: { user: { role: string } | null }) => unknown,
+  ) => selector({ user: { role: "Admin" } }),
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
@@ -127,7 +128,8 @@ function cellTexts(): string[] {
 beforeEach(() => {
   mockedApiRequest.mockReset();
   mockedApiRequest.mockImplementation((_method: string, url: string) => {
-    if (url.includes("signed-contracts/uc-1")) return Promise.resolve(SIGNATURE);
+    if (url.includes("signed-contracts/uc-1"))
+      return Promise.resolve(SIGNATURE);
     if (url.includes("signed-contracts")) return Promise.resolve(SIGNED_PAGE);
     if (url.includes("legal-entity/contracts"))
       return Promise.resolve([CONTRACT]);
@@ -167,7 +169,9 @@ describe("ContractsTab", () => {
     expect(
       cellTexts().filter((c) => c === "+380991234567").length,
     ).toBeGreaterThan(0);
-    expect(cellTexts().filter((c) => c === "ACMELLC").length).toBeGreaterThan(0);
+    expect(cellTexts().filter((c) => c === "ACMELLC").length).toBeGreaterThan(
+      0,
+    );
 
     // The list carries no image, so the per-record endpoint has not been asked yet.
     const imageCall = () =>
