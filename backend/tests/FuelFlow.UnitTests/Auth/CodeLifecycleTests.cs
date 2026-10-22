@@ -2,6 +2,7 @@ using FluentAssertions;
 using FuelFlow.Features.Auth.SendCode;
 using FuelFlow.Features.Auth.SendCode.Abstractions;
 using FuelFlow.Features.Auth.SharedModels;
+using FuelFlow.Features.Auth.TwoFactor;
 using FuelFlow.Features.Auth.Verify;
 using FuelFlow.Features.Brands;
 using FuelFlow.Persistence;
@@ -153,7 +154,19 @@ public sealed class CodeLifecycleTests : IDisposable
         await _context.SaveChangesAsync();
 
         var handler = BuildVerifyHandler();
-        await handler.HandleAsync(new VerifyCodeCommand(phone, "111111"), CancellationToken.None);
+        var first = await handler.HandleAsync(new VerifyCodeCommand(phone, "111111"), CancellationToken.None);
+
+        // The first factor alone is not a login, so it is not audited as one.
+        (await _context.Set<AuditEventOutbox>().AnyAsync(e => e.EventType == "StaffLoggedIn"))
+            .Should().BeFalse();
+
+        // The second factor completes the login, and that is what the audit row records.
+        var second = await BuildTwoFactorVerify().HandleAsync(
+            new VerifyTwoFactorCommand(
+                first.TwoFactor!.Challenge,
+                Totp.ComputeCode(first.TwoFactor.EnrollmentSecret!, TestClock.UtcNow)),
+            CancellationToken.None);
+        second.AccessToken.Should().Be("access-token");
 
         var audit = await _context.Set<AuditEventOutbox>()
             .SingleAsync(e => e.EventType == "StaffLoggedIn");
@@ -204,17 +217,27 @@ public sealed class CodeLifecycleTests : IDisposable
             RefreshTokenExpirationDays = 7
         });
 
+        var authMock = new Mock<IOptions<AuthOptions>>();
+        authMock.Setup(o => o.Value).Returns(new AuthOptions { DevBypass = false });
+
         return new VerifyCodeCommandHandler(
             _context,
             tokenServiceMock.Object,
             phoneNumberServiceMock.Object,
             jwtOptionsMock.Object,
+            authMock.Object,
+            StaffTwoFactorTestFactory.Build(_context),
             new Mock<ILogger<VerifyCodeCommandHandler>>().Object,
             new AuditEventService(_context));
     }
 
-    private SendCodeCommandHandler BuildSendHandler()
-    {
+    private VerifyTwoFactorCommandHandler BuildTwoFactorVerify() =>
+        new(_context,
+            StaffTwoFactorTestFactory.Build(_context),
+            BuildVerifyHandler(),
+            new Mock<ILogger<VerifyTwoFactorCommandHandler>>().Object);
+
+    private SendCodeCommandHandler BuildSendHandler()    {
         var phoneMock = new Mock<IPhoneNumberService>();
         phoneMock.Setup(x => x.Normalize(It.IsAny<string>())).Returns((string phone) => phone);
 
@@ -230,6 +253,7 @@ public sealed class CodeLifecycleTests : IDisposable
             phoneMock.Object,
             new Mock<ILogger<SendCodeCommandHandler>>().Object,
             authMock.Object,
-            emailMock.Object);
+            emailMock.Object,
+            new AuditEventService(_context));
     }
 }

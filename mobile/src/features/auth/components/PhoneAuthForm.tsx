@@ -37,12 +37,16 @@ export function PhoneAuthForm({ onSuccess, onBack }: PhoneAuthFormProps) {
     step,
     phone,
     code,
+    twoFactorCode,
+    twoFactor,
     loading,
     error,
     setPhone,
     setCode,
+    setTwoFactorCode,
     handleSendCode,
     handleVerifyCode,
+    handleVerifyTwoFactor,
     resetToPhone,
   } = useLogin(onSuccess);
 
@@ -213,6 +217,68 @@ export function PhoneAuthForm({ onSuccess, onBack }: PhoneAuthFormProps) {
               hapticStyle="light"
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                resetToPhone();
+              }}
+            />
+          </View>
+        </View>
+      )}
+
+      {step === 'two_factor' && (
+        <View style={styles.content}>
+          {heading(
+            t('phoneAuth.twoFactorTitle'),
+            t('phoneAuth.twoFactorHint'),
+            iconBox(<Lock size={32} color={tokens.colors.primary} />),
+          )}
+
+          <View style={[styles.form, { gap: tokens.spacing.xl }]}>
+            {twoFactor?.needsEnrollment && (
+              <View
+                style={{
+                  borderWidth: 1,
+                  borderColor: tokens.colors.border ?? tokens.colors.text.muted,
+                  borderRadius: tokens.radius.md,
+                  padding: tokens.spacing.md,
+                  gap: tokens.spacing.xs,
+                }}
+              >
+                <Text role="caption" tone="secondary">
+                  {t('phoneAuth.twoFactorEnrollHint')}
+                </Text>
+                <Text role="body" style={{ fontFamily: undefined }}>
+                  {twoFactor.enrollmentSecret}
+                </Text>
+              </View>
+            )}
+
+            <TextField
+              label={t('phoneAuth.twoFactorCodeLabel')}
+              value={twoFactorCode}
+              onChangeText={setTwoFactorCode}
+              placeholder="000000"
+              keyboardType="number-pad"
+              maxLength={6}
+              codeStyle
+              autoFocus
+              disabled={loading}
+              error={error ?? undefined}
+            />
+
+            <Button
+              label={t('phoneAuth.verify')}
+              onPress={handleVerifyTwoFactor}
+              loading={loading}
+              disabled={twoFactorCode.length !== 6}
+              icon={<ArrowRight />}
+            />
+
+            <Button
+              label={t('phoneAuth.changePhone')}
+              variant="ghost"
+              size="md"
+              hapticStyle="light"
+              onPress={() => {
                 resetToPhone();
               }}
             />

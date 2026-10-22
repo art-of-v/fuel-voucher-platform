@@ -613,6 +613,13 @@ export const es: Record<string, string> = {
     'Para iniciar sesión, configura un código de acceso (bloqueo de pantalla) en Ajustes y vuelve a intentarlo.',
   'phoneAuth.tooManyAttempts': 'Demasiados intentos. Espera un minuto e inténtalo de nuevo.',
 
+  /* El segundo factor del inicio de sesión de un empleado. */
+  'phoneAuth.twoFactorTitle': 'CÓDIGO DE DOS FACTORES',
+  'phoneAuth.twoFactorHint': 'Introduce el código de tu aplicación de autenticación',
+  'phoneAuth.twoFactorEnrollHint':
+    'Añade esta clave a tu aplicación de autenticación y luego introduce el código que muestre:',
+  'phoneAuth.twoFactorCodeLabel': 'CÓDIGO DE 6 DÍGITOS',
+
   /* First-run onboarding (Apple 5.1.1: disclose data collection before sign-up). */
   'onboarding.skip': 'Saltar',
   'onboarding.next': 'Siguiente',

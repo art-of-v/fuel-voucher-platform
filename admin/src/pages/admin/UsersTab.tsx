@@ -132,6 +132,25 @@ export default function UsersTab() {
     },
   });
 
+  // The second factor of a staff account. Revoking it is the recovery path: the
+  // authenticator phone was lost, and without a way to take the factor away the account
+  // would be locked out of the panel with no way back in.
+  const revokeTwoFactorMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      await apiRequest<void, unknown>(
+        "POST",
+        `/api/admin/users/${userId}/two-factor/revoke`,
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast.success(t("users.twoFactorRevoked"));
+    },
+    onError: (err: Error) => {
+      toast.error(`${t("users.twoFactorRevokeFailed")}: ${err.message}`);
+    },
+  });
+
   const setUserEmailMutation = useMutation({
     mutationFn: async ({
       userId,
@@ -348,6 +367,20 @@ export default function UsersTab() {
                           </>
                         )}
                       </Button>
+                      {row.hasTwoFactor && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => revokeTwoFactorMutation.mutate(row.id)}
+                          disabled={revokeTwoFactorMutation.isPending}
+                          title={t("users.revokeTwoFactorTitle")}
+                          className="text-warning hover:bg-warning/10"
+                        >
+                          <span className="ml-1 text-xs">
+                            {t("users.revokeTwoFactor")}
+                          </span>
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"

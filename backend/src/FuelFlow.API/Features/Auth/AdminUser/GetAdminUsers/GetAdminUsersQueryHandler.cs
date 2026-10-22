@@ -79,6 +79,11 @@ public sealed class GetAdminUsersQueryHandler
                 // deliberately no setter: the flag is granted by the seeding migration and by the
                 // QA-gated registration path, never from the admin UI.
                 IsQaAccount = u.IsQaAccount,
+                // Whether the staff account has a second factor enrolled. The operator needs it to
+                // know that the "revoke the second factor" button has anything to revoke - and
+                // that a staff account without one is the one to look at.
+                HasTwoFactor = _context.StaffTwoFactors
+                    .Any(f => f.UserId == u.Id && f.SecretCiphertext != null),
                 CreatedAt = u.CreatedAtUtc.ToString("o")
             })
             .ToListAsync(ct);
@@ -123,5 +128,12 @@ public sealed class AdminUserDto
     public bool IsBanned { get; set; }
     public bool IsDeleted { get; set; }
     public bool IsQaAccount { get; set; }
+
+    /// <summary>
+    /// Whether the account has a second factor enrolled. Only a staff account can have one, and
+    /// only an enrolled (proven) secret counts - a half-finished enrolment is not a factor.
+    /// </summary>
+    public bool HasTwoFactor { get; set; }
+
     public string CreatedAt { get; set; } = null!;
 }

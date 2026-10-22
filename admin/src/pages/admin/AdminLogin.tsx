@@ -3,7 +3,7 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LionMark } from "@/components/LionMark";
-import { sendCode, signInWithCode } from "@/lib/session";
+import { sendCode, signInWithCode, signInWithTwoFactor } from "@/lib/session";
 import { hasSessionMarker, useSession } from "@/lib/session-store";
 import { STAFF_ROLES } from "@/lib/roles";
 import { type CurrentUser } from "@/lib/admin-auth";
@@ -16,6 +16,13 @@ import { errorMessage } from "@/lib/error-message";
 // every sign-in.
 const UA_DIAL_PREFIX = "+380";
 
+/** The outstanding second factor of a staff sign-in. */
+interface TwoFactorState {
+  challenge: string;
+  needsEnrollment: boolean;
+  enrollmentSecret?: string | null;
+}
+
 /**
  * The sign-in form, and the gate that decides whether the signed-in account may use the admin at
  * all.
@@ -24,6 +31,14 @@ const UA_DIAL_PREFIX = "+380";
  * The dashboard is admin-only, so a token for any other role is discarded here and this screen
  * explains why. It used to live inside the dashboard's own component, with the form's state
  * interleaved with the dashboard's; on its own it is one thing with one job.
+ * </p>
+ *
+ * <p>
+ * A staff sign-in has TWO factors. The code that arrives by SMS is the first one, and it does
+ * not sign anybody in: the backend answers with a challenge and the screen asks for the code
+ * from the authenticator app. The first time, that means enrolling one - the screen shows the
+ * secret to add to the app, and the code the app then produces is what proves it.
+ * </p>
  */
 export default function AdminLogin() {
   const theme = useTheme((s) => s.theme);
@@ -32,7 +47,11 @@ export default function AdminLogin() {
 
   const [loginPhone, setLoginPhone] = useState(UA_DIAL_PREFIX);
   const [loginCode, setLoginCode] = useState("");
-  const [loginStep, setLoginStep] = useState<"phone" | "code">("phone");
+  const [loginStep, setLoginStep] = useState<"phone" | "code" | "two_factor">(
+    "phone",
+  );
+  const [twoFactor, setTwoFactor] = useState<TwoFactorState | null>(null);
+  const [twoFactorCode, setTwoFactorCode] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState("");
   const [unauthorized, setUnauthorized] = useState(false);
@@ -66,12 +85,51 @@ export default function AdminLogin() {
     setLoginError("");
     setUnauthorized(false);
     try {
-      const u = await signInWithCode(loginPhone, loginCode);
-      acceptUser(u);
+      const outcome = await signInWithCode(loginPhone, loginCode);
+      if (outcome.status === "two_factor") {
+        // The first factor is proven; the sign-in continues at the second one.
+        setTwoFactor({
+          challenge: outcome.challenge,
+          needsEnrollment: outcome.needsEnrollment,
+          enrollmentSecret: outcome.enrollmentSecret,
+        });
+        setTwoFactorCode("");
+        setLoginStep("two_factor");
+        return;
+      }
+      acceptUser(outcome.user);
     } catch (e: unknown) {
       setLoginError(errorMessage(e) || "Failed to verify code");
     }
     setLoginLoading(false);
+  };
+
+  const handleVerifyTwoFactor = async () => {
+    if (!twoFactor) return;
+    setLoginLoading(true);
+    setLoginError("");
+    setUnauthorized(false);
+    try {
+      const user = await signInWithTwoFactor(
+        twoFactor.challenge,
+        twoFactorCode,
+      );
+      acceptUser(user);
+    } catch (e: unknown) {
+      setLoginError(
+        errorMessage(e) || "Failed to verify the authenticator code",
+      );
+    }
+    setLoginLoading(false);
+  };
+
+  const resetToPhone = () => {
+    setLoginStep("phone");
+    setLoginError("");
+    setTwoFactor(null);
+    setTwoFactorCode("");
+    setLoginPhone(UA_DIAL_PREFIX);
+    setLoginCode("");
   };
 
   // The "this account may not use the admin" notice is a temporary answer to a temporary
@@ -122,10 +180,7 @@ export default function AdminLogin() {
             <Button
               onClick={() => {
                 setUnauthorized(false);
-                setLoginError("");
-                setLoginStep("phone");
-                setLoginPhone(UA_DIAL_PREFIX);
-                setLoginCode("");
+                resetToPhone();
               }}
               className="w-full"
             >
@@ -157,7 +212,7 @@ export default function AdminLogin() {
                   )}
                 </Button>
               </>
-            ) : (
+            ) : loginStep === "code" ? (
               <>
                 <p className="text-muted-foreground text-sm mb-4 text-center">
                   Code sent to {loginPhone}
@@ -178,6 +233,62 @@ export default function AdminLogin() {
                   ) : (
                     "Verify Code"
                   )}
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="w-full mt-2"
+                  onClick={resetToPhone}
+                >
+                  Use a different account
+                </Button>
+              </>
+            ) : (
+              <>
+                {twoFactor?.needsEnrollment && (
+                  <div className="mb-4 rounded border border-border bg-muted/40 p-3">
+                    <p className="text-sm font-semibold mb-2">
+                      Set up your authenticator
+                    </p>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Add this key to your authenticator app (Google
+                      Authenticator, Authy, 1Password), then type the code it
+                      shows.
+                    </p>
+                    <code className="block break-all font-mono text-xs bg-background rounded p-2 select-all">
+                      {twoFactor.enrollmentSecret}
+                    </code>
+                  </div>
+                )}
+                <p className="text-muted-foreground text-sm mb-4 text-center">
+                  Enter the 6-digit code from your authenticator app
+                </p>
+                <Input
+                  placeholder="000000"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={twoFactorCode}
+                  onChange={(e) =>
+                    setTwoFactorCode(e.target.value.replace(/\D/g, ""))
+                  }
+                  className="mb-4"
+                />
+                <Button
+                  onClick={handleVerifyTwoFactor}
+                  disabled={loginLoading || twoFactorCode.length !== 6}
+                  className="w-full"
+                >
+                  {loginLoading ? (
+                    <Loader2 className="animate-spin" />
+                  ) : (
+                    "Verify Code"
+                  )}
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="w-full mt-2"
+                  onClick={resetToPhone}
+                >
+                  Use a different account
                 </Button>
               </>
             )}

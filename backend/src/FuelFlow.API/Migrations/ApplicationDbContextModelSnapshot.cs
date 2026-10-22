@@ -299,6 +299,74 @@ namespace FuelFlow.API.Migrations
                     b.ToTable("refresh_tokens", (string)null);
                 });
 
+            modelBuilder.Entity("FuelFlow.Features.Auth.SharedModels.StaffTwoFactor", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc")
+                        .HasComment("When the row was created.");
+
+                    b.Property<int>("FailedAttempts")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("failed_attempts")
+                        .HasComment("How many times a code was tried against the outstanding challenge and failed. The challenge is burned once the limit is reached, so one challenge cannot be brute-forced.");
+
+                    b.Property<DateTime?>("LastVerifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_verified_at_utc")
+                        .HasComment("When a code was last accepted for this account, or NULL while it never has been.");
+
+                    b.Property<string>("PendingChallengeHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("pending_challenge_hash")
+                        .HasComment("The hash of the outstanding challenge - the proof that the first factor was verified for this account and that a second factor may now be attempted. NULL when no challenge is outstanding.");
+
+                    b.Property<DateTime?>("PendingExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("pending_expires_at_utc")
+                        .HasComment("When the outstanding challenge stops being redeemable.");
+
+                    b.Property<byte[]>("PendingSecretCiphertext")
+                        .HasColumnType("bytea")
+                        .HasColumnName("pending_secret_ciphertext")
+                        .HasComment("A secret that was sent to a client and has not been proven yet, encrypted. The next sign-in attempt overwrites it, so an enrolment nobody finished never becomes a factor nobody chose.");
+
+                    b.Property<byte[]>("SecretCiphertext")
+                        .HasColumnType("bytea")
+                        .HasColumnName("secret_ciphertext")
+                        .HasComment("The TOTP secret, encrypted with the environment's AES-256 key. NULL while the account has no second factor yet - a secret that was handed out and never proven lives in the pending column instead.");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc")
+                        .HasComment("When the row last changed.");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id")
+                        .HasComment("The staff account the second factor belongs to. One row per account: a factor is bound to the person, not to the phone they happen to carry.");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PendingChallengeHash")
+                        .HasDatabaseName("ix_staff_two_factor_pending_challenge_hash")
+                        .HasFilter("pending_challenge_hash IS NOT NULL");
+
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_staff_two_factor_user_id");
+
+                    b.ToTable("staff_two_factor", (string)null);
+                });
+
             modelBuilder.Entity("FuelFlow.Features.Auth.SharedModels.VerificationCode", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4929,6 +4997,17 @@ namespace FuelFlow.API.Migrations
                 });
 
             modelBuilder.Entity("FuelFlow.Features.Auth.SharedModels.RefreshToken", b =>
+                {
+                    b.HasOne("FuelFlow.SharedKernel.Domain.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("FuelFlow.Features.Auth.SharedModels.StaffTwoFactor", b =>
                 {
                     b.HasOne("FuelFlow.SharedKernel.Domain.User", "User")
                         .WithMany()

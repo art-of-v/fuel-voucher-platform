@@ -2,6 +2,7 @@ using FuelFlow.Features.Auth.QaTestAccess;
 using FuelFlow.Features.Auth.SendCode.Abstractions;
 using FuelFlow.SharedKernel.Abstractions;
 using FuelFlow.Features.Auth.SharedModels;
+using FuelFlow.Features.Brands;
 using FuelFlow.SharedKernel.Observability;
 using FuelFlow.SharedKernel.Notifications.Email;
 using FuelFlow.SharedKernel.Options;
@@ -12,6 +13,7 @@ using FuelFlow.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using System.Security.Cryptography;
+using System.Text.Json;
 
 namespace FuelFlow.Features.Auth.SendCode;
 
@@ -27,6 +29,7 @@ public sealed class SendCodeCommandHandler
     private readonly ILogger<SendCodeCommandHandler> _logger;
     private readonly IOptions<AuthOptions> _authOptions;
     private readonly IEmailSender _emailSender;
+    private readonly AuditEventService _eventService;
     private readonly QaTestAccessService? _qaTestAccess;
     private readonly FuelFlowMetrics? _metrics;
 
@@ -39,6 +42,7 @@ public sealed class SendCodeCommandHandler
         ILogger<SendCodeCommandHandler> logger,
         IOptions<AuthOptions> authOptions,
         IEmailSender emailSender,
+        AuditEventService eventService,
         QaTestAccessService? qaTestAccess = null,
         FuelFlowMetrics? metrics = null)
     {
@@ -48,6 +52,7 @@ public sealed class SendCodeCommandHandler
         _logger = logger;
         _authOptions = authOptions;
         _emailSender = emailSender;
+        _eventService = eventService;
         _qaTestAccess = qaTestAccess;
         _metrics = metrics;
     }
@@ -114,34 +119,51 @@ public sealed class SendCodeCommandHandler
     }
 
     /// <summary>
-    /// Routes the OTP to email for any Staff account with an email on file (free) and to
-    /// SMS for everyone else (spec §3/§15 — the channel follows the account's current
-    /// email, not a hard-coded role). Any gap in the email path - disabled, not
-    /// configured, no email on file, or a send failure - falls back to SMS, so a staff
-    /// member is never locked out and a brand-new or not-yet-activated user always
-    /// receives their code. IsActive gates only voucher purchase, never OTP delivery, so
-    /// it is not consulted here.
+    /// Routes the OTP to the SIM for everyone (spec §3/§15), with one exception: the email
+    /// break-glass, which is off by default and has to be acknowledged, recorded and earned.
+    /// Any gap in the email path - disabled, not configured, no email on file, or a send failure -
+    /// falls back to SMS, so a staff member is never locked out and a brand-new or
+    /// not-yet-activated user always receives their code. IsActive gates only voucher purchase,
+    /// never OTP delivery, so it is not consulted here.
     /// </summary>
     private async Task DeliverCodeAsync(string phoneNumber, string code, CancellationToken cancellationToken)
     {
-        if (_authOptions.Value.AdminOtpViaEmail && _emailSender.IsConfigured)
+        if (BreakGlassIsOpen() && _emailSender.IsConfigured)
         {
-            var staffEmail = await TryResolveStaffEmailAsync(phoneNumber, cancellationToken);
-            if (staffEmail is not null)
+            var staff = await TryResolveStaffAsync(phoneNumber, cancellationToken);
+            if (staff is not null && !string.IsNullOrWhiteSpace(staff.Email))
             {
-                try
+                // The break-glass weakens the FIRST factor, so it is only offered to an account
+                // that still has to prove a second one. For an account without a second factor
+                // the mailbox would be the whole sign-in, and that is the finding this closes.
+                var hasSecondFactor = await _context.StaffTwoFactors
+                    .AsNoTracking()
+                    .AnyAsync(f => f.UserId == staff.Id && f.SecretCiphertext != null, cancellationToken);
+
+                if (hasSecondFactor)
                 {
-                    await _emailSender.SendAsync(staffEmail, BuildAdminEmail(code), cancellationToken);
-                    _logger.LogInformation("Staff verification code emailed to the account for {PhoneNumber}",
-                        SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
-                    return;
+                    try
+                    {
+                        await _emailSender.SendAsync(staff.Email!, BuildAdminEmail(code), cancellationToken);
+                        await RecordBreakGlassUseAsync(staff, cancellationToken);
+                        _logger.LogWarning(
+                            "Staff verification code emailed to the account for {PhoneNumber} through the break-glass",
+                            SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
+                        return;
+                    }
+                    catch (Exception ex)
+                    {
+                        if (ex is OperationCanceledException && cancellationToken.IsCancellationRequested)
+                            throw;
+                        _logger.LogWarning(ex,
+                            "Staff OTP email failed for {PhoneNumber}; falling back to SMS",
+                            SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
+                    }
                 }
-                catch (Exception ex)
+                else
                 {
-                    if (ex is OperationCanceledException && cancellationToken.IsCancellationRequested)
-                        throw;
-                    _logger.LogWarning(ex,
-                        "Staff OTP email failed for {PhoneNumber}; falling back to SMS",
+                    _logger.LogWarning(
+                        "The email break-glass was not offered to {PhoneNumber}: the account has no second factor",
                         SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
                 }
             }
@@ -152,18 +174,52 @@ public sealed class SendCodeCommandHandler
             SensitiveDataRedactor.MaskPhoneNumber(phoneNumber));
     }
 
-    // Every Staff role, not just Admin: a ProductOwner or Manager with an email on file
-    // authenticates by email too (spec §3/§15). SeedRoles.StaffRoleNames is already the
-    // complete list, so there is nothing to add here when a staff role is introduced.
+    /// <summary>
+    /// Whether the email break-glass may be used at all.
+    /// </summary>
+    /// <remarks>
+    /// Two switches, and both have to be on. The first says the owner wants the break-glass;
+    /// the second says the owner knows what it costs and has written that down. In Production the
+    /// configuration validator refuses to start when only the first is set, so the two cannot
+    /// drift apart.
+    /// </remarks>
+    private bool BreakGlassIsOpen() =>
+        _authOptions.Value.AdminOtpViaEmail
+        && _authOptions.Value.AdminOtpViaEmailBreakGlassAcknowledged;
+
+    /// <summary>
+    /// Records that the weaker channel was used for a staff account. A break-glass that leaves no
+    /// trace is not a break-glass, it is a second default.
+    /// </summary>
+    private async Task RecordBreakGlassUseAsync(User staff, CancellationToken cancellationToken)
+    {
+        _eventService.RecordEvent(
+            "Auth",
+            staff.Id.ToString(),
+            "StaffOtpViaEmailBreakGlass",
+            null,
+            JsonSerializer.Serialize(new { staff.Id, staff.PhoneNumber, Role = staff.Role?.Name }),
+            staff.Id,
+            staff.PhoneNumber,
+            $"The staff sign-in code for {staff.PhoneNumber} was delivered by email through the break-glass",
+            staff.Id.ToString());
+
+        // The audit row is committed on its own: nothing else changed.
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    // Every Staff role, not just Admin: the break-glass serves a ProductOwner or Manager with an
+    // email on file too. SeedRoles.StaffRoleNames is already the complete list, so there is
+    // nothing to add here when a staff role is introduced.
     private static readonly string[] StaffRoleNames = SeedRoles.StaffRoleNames;
 
-    /// <summary>Email of the non-deleted Staff account bound to this phone, or null when no
-    /// such account exists. The channel follows the account's current role and email at send
-    /// time (§3/§15), so removing a staff member's email flips them back to SMS on the next
-    /// request. IsActive is deliberately NOT filtered: an inactive staff member still
-    /// authenticates by email. The code always goes to the address already on file for the
-    /// phone, never to a caller-supplied one.</summary>
-    private async Task<string?> TryResolveStaffEmailAsync(string phoneNumber, CancellationToken cancellationToken)
+    /// <summary>The non-deleted Staff account bound to this phone, or null when no such account
+    /// exists. The channel follows the account's current role and email at send time (§3/§15),
+    /// so removing a staff member's email flips them back to SMS on the next request. IsActive is
+    /// deliberately NOT filtered: an inactive staff member still authenticates by email. The code
+    /// always goes to the address already on file for the phone, never to a caller-supplied
+    /// one.</summary>
+    private async Task<User?> TryResolveStaffAsync(string phoneNumber, CancellationToken cancellationToken)
     {
         var staff = await _context.Users
             .AsNoTracking()
@@ -175,7 +231,7 @@ public sealed class SendCodeCommandHandler
                 && u.Role != null && StaffRoleNames.Contains(u.Role.Name),
                 cancellationToken);
 
-        return staff?.Email;
+        return staff;
     }
 
     // Branded OTP email (HTML + retained plain-text fallback). The verification code is placed only

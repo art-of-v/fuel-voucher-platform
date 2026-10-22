@@ -62,6 +62,8 @@ export interface AdminUser {
   isDeleted: boolean;
   /** The backend grants this by migration or by the QA-gated registration path, never from a panel. */
   isQaAccount: boolean;
+  /** Whether the account has a second factor enrolled - only a staff account can have one. */
+  hasTwoFactor: boolean;
   role: string | null;
   createdAt: string;
 }

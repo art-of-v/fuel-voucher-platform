@@ -4,6 +4,7 @@ using FuelFlow.Features.Auth.Logout;
 using FuelFlow.Features.Auth.Refresh;
 using FuelFlow.Features.Auth.SendCode;
 using FuelFlow.Features.Auth.SendCode.Services;
+using FuelFlow.Features.Auth.TwoFactor;
 using FuelFlow.Features.Auth.Verify;
 using FuelFlow.SharedKernel.Errors;
 using FuelFlow.SharedKernel.Options;
@@ -25,6 +26,7 @@ public sealed class AuthController : ControllerBase
     private readonly VerifyCodeCommandHandler _verifyCodeHandler;
     private readonly AdminSendCodeCommandHandler _adminSendCodeHandler;
     private readonly AdminVerifyCodeCommandHandler _adminVerifyCodeHandler;
+    private readonly VerifyTwoFactorCommandHandler _verifyTwoFactorHandler;
     private readonly RefreshTokenCommandHandler _refreshTokenHandler;
     private readonly LogoutSessionCommandHandler _logoutSessionHandler;
     private readonly GetCurrentUserQueryHandler _getCurrentUserHandler;
@@ -36,6 +38,7 @@ public sealed class AuthController : ControllerBase
         VerifyCodeCommandHandler verifyCodeHandler,
         AdminSendCodeCommandHandler adminSendCodeHandler,
         AdminVerifyCodeCommandHandler adminVerifyCodeHandler,
+        VerifyTwoFactorCommandHandler verifyTwoFactorHandler,
         RefreshTokenCommandHandler refreshTokenHandler,
         LogoutSessionCommandHandler logoutSessionHandler,
         GetCurrentUserQueryHandler getCurrentUserHandler,
@@ -46,6 +49,7 @@ public sealed class AuthController : ControllerBase
         _verifyCodeHandler = verifyCodeHandler;
         _adminSendCodeHandler = adminSendCodeHandler;
         _adminVerifyCodeHandler = adminVerifyCodeHandler;
+        _verifyTwoFactorHandler = verifyTwoFactorHandler;
         _refreshTokenHandler = refreshTokenHandler;
         _logoutSessionHandler = logoutSessionHandler;
         _getCurrentUserHandler = getCurrentUserHandler;
@@ -216,6 +220,42 @@ public sealed class AuthController : ControllerBase
             SetRefreshTokenCookie(result.RefreshToken);
             // The admin panel is a browser: it keeps the refresh token in the HttpOnly cookie
             // and never sees it in the body.
+            return Ok(IsNativeClient ? result : result with { RefreshToken = null });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return ApiError.Unauthorized(ex.Message);
+        }
+    }
+
+    // The second step of a staff sign-in. The first step - the OTP - is verified by
+    // /admin/verify (or /verify), which does NOT mint a session for a staff account: it answers
+    // with a challenge instead. This endpoint redeems that challenge with a code from the
+    // authenticator app and mints the session.
+    //
+    // Anonymous by necessity: the client has no session yet - that is the whole point of the
+    // challenge. What stands in for the session is the challenge itself: a random token that
+    // exists only because the first factor was verified, expires in five minutes, is consumed by
+    // the first attempt that uses it, and is capped at five wrong codes.
+    [HttpPost("two-factor/verify")]
+    [AllowAnonymous]
+    [EnableRateLimiting(VerifyCodePolicy)]
+    [ProducesResponseType(typeof(VerifyCodeResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> VerifyTwoFactor([FromBody] VerifyTwoFactorCommand command, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(command.Challenge))
+            return ApiError.BadRequest("Challenge is required");
+
+        if (string.IsNullOrWhiteSpace(command.Code))
+            return ApiError.BadRequest("Verification code is required");
+
+        try
+        {
+            var result = await _verifyTwoFactorHandler.HandleAsync(command, cancellationToken);
+            SetRefreshTokenCookie(result.RefreshToken);
+            // The body carries the refresh token only for the native app, exactly as in /verify.
             return Ok(IsNativeClient ? result : result with { RefreshToken = null });
         }
         catch (UnauthorizedAccessException ex)

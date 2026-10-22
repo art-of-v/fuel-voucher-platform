@@ -305,4 +305,82 @@ public sealed class SecurityConfigurationValidatorTests
         var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
         act.Should().NotThrow();
     }
+
+    // --- the staff sign-in's second factor --------------------------------
+
+    [Fact]
+    public void Validate_DoesNotThrow_WhenTheSecondFactorIsUnset()
+    {
+        // Absence of the key must read as required (the default is true), so simply not
+        // configuring it never blocks startup - and never turns the factor off either.
+        var settings = ValidProductionBaseline();
+        settings.Remove("Auth:StaffSecondFactorRequired");
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Validate_Throws_WhenTheSecondFactorIsOff()
+    {
+        // A staff sign-in that completes with a code from a mailbox, for an account that can move
+        // money, is not a control. Production refuses to start in this state.
+        var settings = ValidProductionBaseline();
+        settings["Auth:StaffSecondFactorRequired"] = "false";
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*StaffSecondFactorRequired is false*");
+    }
+
+    [Fact]
+    public void Validate_DoesNotThrow_WhenTheSecondFactorIsOffOutsideProduction()
+    {
+        // The local development loop and a rollback need to be expressible.
+        var settings = ValidProductionBaseline();
+        settings["Auth:StaffSecondFactorRequired"] = "false";
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env("Staging"));
+        act.Should().NotThrow();
+    }
+
+    // --- the email break-glass -------------------------------------------
+
+    [Fact]
+    public void Validate_Throws_WhenTheEmailBreakGlassIsOn_AndNotAcknowledged()
+    {
+        // The channel that delivers the staff code to a mailbox has to be a decision, not a
+        // variable somebody flipped during an outage and forgot.
+        var settings = ValidProductionBaseline();
+        settings["Auth:AdminOtpViaEmail"] = "true";
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*AdminOtpViaEmail is true*")
+            .WithMessage("*AdminOtpViaEmailBreakGlassAcknowledged*");
+    }
+
+    [Fact]
+    public void Validate_DoesNotThrow_WhenTheEmailBreakGlassIsAcknowledged()
+    {
+        var settings = ValidProductionBaseline();
+        settings["Auth:AdminOtpViaEmail"] = "true";
+        settings["Auth:AdminOtpViaEmailBreakGlassAcknowledged"] = "true";
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Validate_DoesNotThrow_WhenTheEmailBreakGlassIsOff()
+    {
+        // The default: the staff code goes to the SIM.
+        var settings = ValidProductionBaseline();
+        settings["Auth:AdminOtpViaEmail"] = "false";
+
+        var act = () => SecurityConfigurationValidator.Validate(Config(settings), Env());
+        act.Should().NotThrow();
+    }
 }

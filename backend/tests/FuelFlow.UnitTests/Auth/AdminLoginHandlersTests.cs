@@ -60,7 +60,8 @@ public sealed class AdminLoginHandlersTests : IDisposable
         emailMock.SetupGet(e => e.IsConfigured).Returns(false);
         return new SendCodeCommandHandler(
             _context, smsMock.Object, IdentityPhone(),
-            new Mock<ILogger<SendCodeCommandHandler>>().Object, authMock.Object, emailMock.Object);
+            new Mock<ILogger<SendCodeCommandHandler>>().Object, authMock.Object, emailMock.Object,
+            new AuditEventService(_context));
     }
 
     private VerifyCodeCommandHandler BuildInnerVerify()
@@ -81,11 +82,16 @@ public sealed class AdminLoginHandlersTests : IDisposable
             RefreshTokenExpirationDays = 14
         });
 
+        var authMock = new Mock<IOptions<AuthOptions>>();
+        authMock.Setup(o => o.Value).Returns(new AuthOptions { DevBypass = false });
+
         return new VerifyCodeCommandHandler(
             _context,
             tokenServiceMock.Object,
             IdentityPhone(),
             jwtOptionsMock.Object,
+            authMock.Object,
+            StaffTwoFactorTestFactory.Build(_context),
             new Mock<ILogger<VerifyCodeCommandHandler>>().Object,
             new AuditEventService(_context));
     }
@@ -225,7 +231,7 @@ public sealed class AdminLoginHandlersTests : IDisposable
     // --- AdminVerify -----------------------------------------------------
 
     [Fact]
-    public async Task AdminVerify_StaffPhoneWithValidCode_IssuesTokens()
+    public async Task AdminVerify_StaffPhoneWithValidCode_StopsAtTheSecondFactor()
     {
         const string phone = "+380991112244";
         await SeedUser(phone, SeedRoles.AdminName);
@@ -233,9 +239,13 @@ public sealed class AdminLoginHandlersTests : IDisposable
 
         var result = await BuildAdminVerify().HandleAsync(new AdminVerifyCodeCommand(phone, "123456"), CancellationToken.None);
 
-        result.AccessToken.Should().Be("access-token");
-        result.RefreshToken.Should().Be("refresh-token");
-        (await _context.RefreshTokens.CountAsync()).Should().Be(1);
+        // A staff sign-in does not complete with the first factor alone: the answer is a
+        // challenge, not a session. StaffSecondFactorSignInTests pins the property for every
+        // staff role and on the shared endpoint as well.
+        result.AccessToken.Should().BeNull();
+        result.RefreshToken.Should().BeNull();
+        result.TwoFactor.Should().NotBeNull();
+        (await _context.RefreshTokens.CountAsync()).Should().Be(0);
     }
 
     [Fact]

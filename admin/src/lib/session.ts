@@ -6,6 +6,7 @@ import {
   refreshAccessToken,
   sendCode,
   verifyCode,
+  verifyTwoFactor,
   logout as revokeSessionOnServer,
   type CurrentUser,
   type RefreshResult,
@@ -121,13 +122,57 @@ export async function ensureAccessToken(): Promise<string | null> {
     : null;
 }
 
+/**
+ * What a staff sign-in produced.
+ *
+ * <p>
+ * `signed_in` - the session is up.
+ * `two_factor` - the first factor was proven and the second one is outstanding: the backend
+ * answered with a challenge instead of a token, and the sign-in continues at the challenge.
+ * </p>
+ */
+export type SignInOutcome =
+  | { status: "signed_in"; user: CurrentUser }
+  | {
+      status: "two_factor";
+      challenge: string;
+      /** True when the account has no secret yet and one has to be enrolled. */
+      needsEnrollment: boolean;
+      enrollmentSecret?: string | null;
+      provisioningUri?: string | null;
+    };
+
 /** Verify an OTP and adopt the resulting session. Returns the user so the caller can apply its
  *  own role gate without a second round trip. */
 export async function signInWithCode(
   phoneNumber: string,
   code: string,
+): Promise<SignInOutcome> {
+  const result = await verifyCode(phoneNumber, code);
+
+  // A staff account is not signed in by the first factor alone: the backend answers with a
+  // challenge, and there is no token to adopt yet.
+  if (result.twoFactor) {
+    return {
+      status: "two_factor",
+      challenge: result.twoFactor.challenge,
+      needsEnrollment: result.twoFactor.status === "enroll",
+      enrollmentSecret: result.twoFactor.enrollmentSecret,
+      provisioningUri: result.twoFactor.provisioningUri,
+    };
+  }
+
+  const user = await fetchCurrentUser();
+  useSession.getState().authenticate(user);
+  return { status: "signed_in", user };
+}
+
+/** The second factor of a staff sign-in: the code from the authenticator app. */
+export async function signInWithTwoFactor(
+  challenge: string,
+  code: string,
 ): Promise<CurrentUser> {
-  await verifyCode(phoneNumber, code);
+  await verifyTwoFactor(challenge, code);
   const user = await fetchCurrentUser();
   useSession.getState().authenticate(user);
   return user;
