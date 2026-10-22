@@ -1,4 +1,3 @@
-using System.Net.Mail;
 using System.Security.Cryptography;
 using FuelFlow.SharedKernel.Domain;
 using FuelFlow.SharedKernel.Notifications.Email;
@@ -18,18 +17,7 @@ public static class PendingEmailChange
 {
     public static readonly TimeSpan Ttl = TimeSpan.FromHours(24);
 
-    public static bool IsValidEmail(string value)
-    {
-        try
-        {
-            var addr = new MailAddress(value);
-            return addr.Address == value && value.Contains('.');
-        }
-        catch (FormatException)
-        {
-            return false;
-        }
-    }
+    public static bool IsValidEmail(string value) => EmailAddress.IsValid(value);
 
     /// <summary>
     /// Stages <paramref name="newEmail"/> as a pending change on <paramref name="user"/> and returns

@@ -40,9 +40,6 @@
     <PackageReference Include="Microsoft.OpenApi" Version="2.12.2" />
     
     <!-- Shared packages from Application and Infrastructure -->
-    <PackageReference Include="AutoMapper" Version="16.2.0" />
-    <PackageReference Include="FluentValidation" Version="12.1.1" />
-    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
     <PackageReference Include="Hangfire.AspNetCore" Version="1.8.25" />
     <PackageReference Include="Hangfire.PostgreSql" Version="1.21.1" />
     <!-- Hangfire.Core 1.8.25 pulls Newtonsoft.Json 11.0.1 transitively (it serializes

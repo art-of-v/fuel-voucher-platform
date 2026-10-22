@@ -1,7 +1,6 @@
 using FuelFlow.Features.Support.SharedModels;
 using FuelFlow.Persistence;
 using FuelFlow.SharedKernel.Time;
-using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 
 namespace FuelFlow.Features.Support.CreateSupportMessage;
@@ -9,21 +8,6 @@ namespace FuelFlow.Features.Support.CreateSupportMessage;
 public sealed record CreateSupportMessageCommand(string Email, string Message, string? Website);
 
 public sealed record CreateSupportMessageResponse(Guid Id);
-
-public sealed class CreateSupportMessageCommandValidator : AbstractValidator<CreateSupportMessageCommand>
-{
-    public CreateSupportMessageCommandValidator()
-    {
-        RuleFor(c => c.Email)
-            .NotEmpty().WithMessage("Вкажіть email.")
-            .MaximumLength(254)
-            .EmailAddress().WithMessage("Email виглядає некоректно.");
-
-        RuleFor(c => c.Message)
-            .NotEmpty().WithMessage("Напишіть повідомлення.")
-            .MaximumLength(4000);
-    }
-}
 
 public sealed class CreateSupportMessageCommandHandler
 {

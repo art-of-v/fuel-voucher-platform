@@ -1,4 +1,3 @@
-using FluentValidation;
 using FuelFlow.API.BackgroundJobs;
 using FuelFlow.API.Extensions;
 using FuelFlow.API.Services;
@@ -152,16 +151,12 @@ try
     builder.Services.AddSingleton<IConnectionMultiplexer>(redisMultiplexer);
     builder.Services.AddStackExchangeRedisCache(options =>
         options.ConnectionMultiplexerFactory = () => Task.FromResult<IConnectionMultiplexer>(redisMultiplexer));
-    builder.Services.AddValidatorsFromAssemblyContaining<Program>();
     builder.Services.AddResponseCaching();
     builder.Services.Configure<FormOptions>(options =>
         options.MultipartBodyLengthLimit = 25_000_000);
     builder.WebHost.ConfigureKestrel(options =>
         options.Limits.MaxRequestBodySize = 25_000_000);
-    builder.Services.AddControllers(options =>
-        {
-            options.Filters.Add<FuelFlow.Middleware.ValidateAttribute>();
-        })
+    builder.Services.AddControllers()
         .AddJsonOptions(options =>
         {
             options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
